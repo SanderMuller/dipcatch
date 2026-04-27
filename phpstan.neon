@@ -1,0 +1,153 @@
+# Default PHPStan config
+# can be overridden by copying this to phpstan.neon
+# if that file exists, then that will be used as config
+
+includes:
+    - ./phpstan-baseline.neon
+    - phar://phpstan.phar/conf/bleedingEdge.neon
+    - vendor/spaze/phpstan-disallowed-calls/disallowed-dangerous-calls.neon
+    - vendor/spaze/phpstan-disallowed-calls/disallowed-execution-calls.neon
+    - vendor/spaze/phpstan-disallowed-calls/disallowed-insecure-calls.neon
+
+rules:
+    - Symplify\PHPStanRules\Rules\StringFileAbsolutePathExistsRule
+    - Symplify\PHPStanRules\Rules\Complexity\NoArrayMapWithArrayCallableRule
+    - Symplify\PHPStanRules\Rules\Complexity\ForbiddenArrayMethodCallRule
+    - Symplify\PHPStanRules\Rules\ForbiddenMultipleClassLikeInOneFileRule
+    - Symplify\PHPStanRules\Rules\NoDynamicNameRule
+    - Symplify\PHPStanRules\Rules\NoGlobalConstRule
+    - Symplify\PHPStanRules\Rules\PreventParentMethodVisibilityOverrideRule
+    - Symplify\PHPStanRules\Rules\Enum\RequireUniqueEnumConstantRule
+    - Symplify\PHPStanRules\Rules\UppercaseConstantRule
+    - Symplify\PHPStanRules\Rules\PHPUnit\PublicStaticDataProviderRule
+    - Symplify\PHPStanRules\Rules\Explicit\NoMissingVariableDimFetchRule
+
+parameters:
+    tmpDir: .cache/phpstan
+
+    paths:
+        - app
+        - bootstrap
+        - config
+        - database/factories
+        - database/seeders
+        - routes
+        - tests/Feature
+        - tests/Unit
+
+    type_coverage:
+        return: 100
+        param: 100
+        property: 100
+        constant: 100
+        # also, how many files has declare strict types
+        declare: 100
+
+    type_perfect:
+        null_over_false: true
+        no_mixed: false
+        narrow_param: false
+        narrow_return: false
+
+    cognitive_complexity:
+        class: 40
+        function: 20
+
+    # The level ranges from 0 to 9 and the latter is the highest level
+    # more info at https://phpstan.org/user-guide/rule-levels
+    level: max
+
+    strictRules:
+        allRules: false
+
+    reportUnmatchedIgnoredErrors: false
+    checkOctaneCompatibility: false
+    noEnvCallsOutsideOfConfig: true
+    reportMaybesInPropertyPhpDocTypes: false
+    checkModelProperties: true
+    checkModelAppends: true
+    treatPhpDocTypesAsCertain: false
+    # ignore the following error: Called 'Model::make()' which performs unnecessary work, use 'new Model()'.
+    noModelMake: false
+
+    # Optional for having a clickable link to PHPStorm
+    editorUrl: 'phpstorm://open?file=%%file%%&line=%%line%%'
+
+    ignoreErrors:
+        -
+            identifier: greaterOrEqual.alwaysTrue
+            path: config/database.php
+        -
+            identifier: method.nonObject
+            path: tests
+        -
+            identifier: method.internalClass
+            path: tests
+        -
+            identifier: property.nonObject
+            path: tests
+        -
+            identifier: typeCoverage.paramTypeCoverage
+            path: tests
+        -
+            identifier: disallowed.function
+            path: tests/Feature/Auth/EmailVerificationTest.php
+        - '#Call to an undefined method [a-zA-Z0-9\\_\<\>]+::[a-zA-Z]+\(\)#'
+        - '#Call to an undefined static method [a-zA-Z0-9\\_]+::[a-zA-Z]+\(\)#'
+        - '#Call to method [a-zA-Z0-9\\_]+\(\) on an unknown class (static|self)#'
+        - '#Call to private method trashed\(\) of parent class Database\\Factories\\[a-zA-Z0-9\\_]+#'
+        - '#Call to an undefined method .*Illuminate\\Database\\Eloquent\\Relations\\.*::withTrashed\(\)#'
+        - '#Access to an undefined property (Illuminate\\Database\\Eloquent\\Model|App\\Models\\[a-zA-Z\\]+)::\$[a-zA-Z0-9_]+#'
+        - '#Access to an undefined property (.*|Illuminate\\Database\\Eloquent\\Collection\<int, .*\>)::#'
+        - '#Call to an undefined method (.*|Illuminate\\Database\\Eloquent\\Collection\<int, .*\>)::#'
+        - '#Method [a-zA-Z0-9\\_]+::make\(\) should return [a-zA-Z0-9\\_]+ but returns Illuminate\\(Database\\Eloquent|Support)\\Collection<[^>]+\>+#'
+        - '#Offset \d does not exist on Illuminate\\Database\\Eloquent\\Model+#'
+        - '#Offset \d does not exist on App\\Models\\+#'
+        - '#Property App\\Models\\[a-zA-Z\\]+::\$[a-zA-Z0-9_]+ \(Carbon\\(CarbonInterval|CarbonInterface)(\|null)?\) does not accept (float|int)+#'
+        - '#Call to an undefined method Carbon\\CarbonInterval::toIso8601\(\)#'
+        - '#Call to an undefined method Staudenmeir\\LaravelAdjacencyList\\Eloquent\\Relations\\Descendants<[^>]+\>::withTrashed\(\)#'
+        - '#Method App\\Livewire\\[a-zA-Z\\]+::[a-zA-Z0-9\\_]+\(\) never returns Livewire\\Features\\SupportRedirects\\Redirector so it can be removed from the return type+#'
+        - '#Property App\\Models\\Subtitle::\$type \(App\\Enums\\SubtitleType\|null\) does not accept string+#'
+        - '#Property App\\Models\\Subtitle::\$source \(App\\Enums\\SubtitleSource\|null\) does not accept string+#'
+        - '#Property App\\Models\\[a-zA-Z\\]*Video::\$status \(App\\Enums\\Video\\VideoStatus\) does not accept int+#'
+        - '#Property App\\Models\\[a-zA-Z\\]*Video::\$end_video_metadata \(stdClass\|null\) does not accept array+#'
+        - '#Property App\\Models\\[a-zA-Z\\]*Video::\$type \(App\\Enums\\Video\\VideoType\|null\) does not accept int+#'
+        - '#Property App\\Models\\Interaction::\$attributes \(object\|null\) does not accept#'
+        - '#Property App\\Models\\[a-zA-Z\\]*Video::\$end_video_action \(App\\Enums\\Video\\EndVideoAction\|null\) does not accept int+#'
+        - '#Property App\\Models\\[a-zA-Z\\]+::\$action \((App\\DataObjects\\Video\\Action\\[a-zA-Z\\]+)(\|null)?\) does not accept (array|App\\DataObjects\\Video\\Action\\[a-zA-Z\\]+)+#'
+        - '#Method App\\Models(\\[a-zA-Z]+)+::[a-zA-Z]+\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\.* is not subtype of native type Illuminate\\Database\\Eloquent\\Relations\\#'
+        - '#Parameter (\#\d )?\$locale of function \_\_ expects string(\|null)?, App\\Enums\\Locale#'
+        - '#Parameter (\#\d )?\$replace of function \_\_ expects array\<string, bool\|float\|int\|string\>, array\<string, Illuminate\\Contracts\\Support\\Htmlable(\|string)?(\|null)?\> given#'
+        - '#Parameter \#2 \$callback of method Illuminate\\Database\\Eloquent\\Relations\\HasMany<App\\Models\\[a-zA-Z\\]+>::when\(\) expects#'
+        - '#Parameter \#2 \$callback of method Illuminate\\(Database\\Eloquent|Support)\\Collection<[^>]+\>::when\(\) expects#'
+        - '#Parameter \#2 \$callback of method Illuminate\\Database\\Eloquent\\Builder#'
+        - '#Parameter \#1 \$rules of method Laravel\\Nova\\Fields\\Field\:\:rules\(\) expects#'
+        - '#Parameter \#1 \$[a-zA-Z]+ of method Database\\Factories\\.*::[a-zA-Z]+\(\) expects App\\Models\\#'
+        - '#Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<.*\>::transform\(\) expects callable\(.*\): .*, Closure\(.*\): .* given.#'
+        - '#Parameter \#1 \$column of method Illuminate\\Database\\Eloquent\\Builder\<.*\>::[a-zA-Z]+\(\) expects#'
+        - '#Parameter \$callback of method Illuminate\\Database\\Eloquent\\Builder#'
+        - '#Unable to resolve the template type (TKey|TValue) in call to function collect#'
+        - '#Unsafe usage of new static\(\) in#'
+        - '#Provide more specific return type \"Illuminate\\View\\View\" over abstract one#'
+        - identifier: method.childParameterType
+        - identifier: method.childReturnType
+        - identifier: offsetAccess.nonOffsetAccessible
+        - identifier: missingType.iterableValue
+        - identifier: missingType.generics
+          path: tests
+        - identifier: property.private
+          path: tests
+        - identifier: method.protected
+          path: tests
+        - identifier: complexity.classLike
+          path: tests
+        - identifier: symplify.noDynamicName
+          path: tests
+        - identifier: complexity.classLike
+          path: app/Policies
+        - identifier: complexity.classLike
+          path: app/Models
+
+    excludePaths:
+        - bootstrap/cache
+        - .cache
