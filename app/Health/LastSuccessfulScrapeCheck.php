@@ -2,7 +2,6 @@
 
 namespace App\Health;
 
-use App\Enums\ScrapeStatus;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Spatie\Health\Checks\Check;
@@ -42,7 +41,6 @@ class LastSuccessfulScrapeCheck extends Check
             ->where('active', true)
             ->where(function (EloquentQueryBuilder $query): void {
                 $query->whereNull('last_success_at')
-                    ->orWhere('last_status', '!=', ScrapeStatus::Ok->value)
                     ->orWhere('last_success_at', '<', now()->subHours($this->warnAfterHours));
             })
             ->count();

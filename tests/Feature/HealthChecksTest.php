@@ -85,6 +85,19 @@ test('LastSuccessfulScrapeCheck escalates a constantly-failing product to failed
     expect($result->status->value)->toBe('failed');
 });
 
+test('LastSuccessfulScrapeCheck does not flip on a single transient failure with a recent successful scrape', function (): void {
+    Product::factory()->create([
+        'last_status' => ScrapeStatus::HttpError,
+        'last_checked_at' => now()->subMinutes(5),
+        'last_success_at' => now()->subMinutes(20),
+    ]);
+
+    $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();
+
+    expect($result->status->value)->toBe('ok')
+        ->and($result->shortSummary)->toBe('0/1 stale');
+});
+
 test('LastSuccessfulScrapeCheck treats inactive products as not relevant', function (): void {
     Product::factory()->inactive()->create([
         'last_status' => ScrapeStatus::Ok,

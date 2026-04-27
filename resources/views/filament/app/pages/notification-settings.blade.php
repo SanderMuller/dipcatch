@@ -45,31 +45,47 @@
                     }
                 }
 
-                const registration = await navigator.serviceWorker.register('/sw.js');
-                const subscription = await registration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: this.urlBase64ToUint8Array(this.vapidPublicKey),
-                });
+                if (! this.vapidPublicKey) {
+                    this.disablePushToggle('Browser push is not configured on the server.');
+                    return;
+                }
 
-                await fetch(this.subscribeUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': this.csrfToken,
-                        Accept: 'application/json',
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({
-                        endpoint: subscription.endpoint,
-                        keys: {
-                            p256dh: this.arrayBufferToBase64Url(subscription.getKey('p256dh')),
-                            auth: this.arrayBufferToBase64Url(subscription.getKey('auth')),
+                try {
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    const subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: this.urlBase64ToUint8Array(this.vapidPublicKey),
+                    });
+
+                    const response = await fetch(this.subscribeUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': this.csrfToken,
+                            Accept: 'application/json',
                         },
-                        contentEncoding: 'aes128gcm',
-                    }),
-                });
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            endpoint: subscription.endpoint,
+                            keys: {
+                                p256dh: this.arrayBufferToBase64Url(subscription.getKey('p256dh')),
+                                auth: this.arrayBufferToBase64Url(subscription.getKey('auth')),
+                            },
+                            contentEncoding: 'aes128gcm',
+                        }),
+                    });
 
-                this.message = 'Browser push subscription registered.';
+                    if (! response.ok) {
+                        try { await subscription.unsubscribe(); } catch (e) { /* ignore */ }
+                        this.disablePushToggle('Could not register browser push subscription with the server. Please try again.');
+                        return;
+                    }
+
+                    this.message = 'Browser push subscription registered.';
+                } catch (error) {
+                    console.error('Push subscription failed', error);
+                    this.disablePushToggle('Browser push setup failed. Please try again.');
+                }
             },
 
             urlBase64ToUint8Array(base64String) {

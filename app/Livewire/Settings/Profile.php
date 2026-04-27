@@ -63,7 +63,7 @@ class Profile extends Component
         assert($user instanceof User);
 
         if ($user->hasVerifiedEmail()) {
-            $this->redirectIntended(default: route('dashboard', absolute: false));
+            $this->redirectIntended(default: '/app');
 
             return;
         }
