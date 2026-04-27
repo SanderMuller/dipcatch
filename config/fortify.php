@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Laravel\Fortify\Features;
 
 return [
@@ -144,7 +146,8 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Public registration is disabled — DipCatch is invite-only.
+        // Features::registration(),
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([

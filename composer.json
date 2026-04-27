@@ -1,31 +1,63 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/livewire-starter-kit",
+    "name": "sandermuller/dipcatch",
     "type": "project",
     "description": "The official Laravel starter kit for Livewire.",
-    "keywords": [
-        "laravel",
-        "framework"
-    ],
+    "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
-        "laravel/fortify": "^1.34",
-        "laravel/framework": "^13.0",
-        "laravel/tinker": "^3.0",
-        "livewire/flux": "^2.13.1",
-        "livewire/livewire": "^4.1"
+        "php": "^8.5",
+        "filament/filament": "^5.6.1",
+        "laravel-notification-channels/webpush": "^10.5",
+        "laravel/fortify": "^1.36.2",
+        "laravel/framework": "^13.6",
+        "livewire/flux": "^2.14.1",
+        "livewire/livewire": "^4.2.4",
+        "sandermuller/laravel-fluent-validation": "^1.24.0",
+        "sandermuller/laravel-queue-insights": "^0.2.1",
+        "sandermuller/stopwatch": "^0.5.2",
+        "shuvroroy/filament-spatie-laravel-health": "^3.3",
+        "spatie/cpu-load-health-check": "^1.0.5",
+        "spatie/laravel-data": "^4.22.0",
+        "spatie/laravel-failed-job-monitor": "^4.4.0",
+        "spatie/laravel-html": "^3.13.0",
+        "spatie/robots-txt": "^2.5.4",
+        "spatie/security-advisories-health-check": "^1.3.1",
+        "symfony/css-selector": "^8.0.8",
+        "symfony/dom-crawler": "^8.0.8",
+        "zae/strict-transport-security": "^0.0.3"
     },
     "require-dev": {
-        "fakerphp/faker": "^1.24",
-        "laravel/pail": "^1.2.5",
-        "laravel/pint": "^1.27",
-        "laravel/sail": "^1.53",
-        "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.9.3",
-        "nunomaduro/pao": "^1.0.3",
-        "pestphp/pest": "^4.6",
-        "pestphp/pest-plugin-laravel": "^4.1"
+        "barryvdh/laravel-debugbar": "^4.2.8",
+        "calebdw/larastan-livewire": "^2.5.0",
+        "dg/bypass-finals": "^1.9",
+        "driftingly/rector-laravel": "^2.3.0",
+        "fakerphp/faker": "^1.24.1",
+        "hihaho/phpstan-rules": "^3.1.2",
+        "hihaho/rector-rules": "^0.1.4",
+        "larastan/larastan": "^3.9.6",
+        "laravel/boost": "^2.4.5",
+        "laravel/pint": "^1.29.1",
+        "laravel/tinker": "^3.0.2",
+        "mockery/mockery": "^1.6.12",
+        "nunomaduro/collision": "^8.9.4",
+        "nunomaduro/pao": "^1.0.4",
+        "pestphp/pest": "^4.6.3",
+        "pestphp/pest-plugin-laravel": "^4.1",
+        "pestphp/pest-plugin-livewire": "^4.1",
+        "phpstan/extension-installer": "^1.4.3",
+        "phpstan/phpstan-deprecation-rules": "^2.0.4",
+        "phpstan/phpstan-mockery": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0.16",
+        "phpstan/phpstan-strict-rules": "^2.0.10",
+        "rector/type-perfect": "^2.1.4",
+        "sandermuller/laravel-fluent-validation-phpstan": "^0.1.0",
+        "sandermuller/laravel-fluent-validation-rector": "^0.14.1",
+        "spaze/phpstan-disallowed-calls": "^4.11.0",
+        "symplify/phpstan-extensions": "^12.0.2",
+        "symplify/phpstan-rules": "^14.9.11",
+        "tomasvotruba/cognitive-complexity": "^1.1",
+        "tomasvotruba/type-coverage": "^2.1.0"
     },
     "autoload": {
         "psr-4": {
@@ -67,19 +99,30 @@
             "@lint:check",
             "@php artisan test"
         ],
+        "fix-cs": "vendor/bin/pint --parallel",
+        "phpstan": "vendor/bin/phpstan analyse --memory-limit=2G",
+        "phpstan-simplified": "vendor/bin/phpstan analyse --memory-limit=2G --error-format symplify",
+        "phpstan-clear-cache": "vendor/bin/phpstan clear-result-cache",
+        "rector": "vendor/bin/rector process",
+        "qa": [
+            "vendor/bin/rector process --no-ansi",
+            "vendor/bin/pint --parallel --no-ansi --dirty",
+            "vendor/bin/phpstan analyse --no-ansi --memory-limit=2G"
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi"
+            "@php artisan package:discover --ansi",
+            "@php artisan filament:upgrade"
         ],
         "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+            "@php artisan boost:update --ansi"
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan migrate --graceful --ansi"
         ],
         "pre-package-uninstall": [
@@ -97,7 +140,8 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "phpstan/extension-installer": true
         }
     },
     "minimum-stability": "stable",

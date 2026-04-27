@@ -1,0 +1,34 @@
+{
+    "agents": [
+        "claude_code",
+        "codex",
+        "copilot"
+    ],
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch_mcp": false,
+    "packages": [
+        "filament/filament"
+    ],
+    "sail": false,
+    "skills": [
+        "fortify-development",
+        "laravel-best-practices",
+        "fluxui-development",
+        "livewire-development",
+        "pest-testing",
+        "tailwindcss-development",
+        "ai-guidelines",
+        "autoresearch",
+        "backend-quality",
+        "bug-fixing",
+        "code-review",
+        "codex-review",
+        "evaluate",
+        "implement-spec",
+        "pr-review-feedback",
+        "pre-release",
+        "profile-app",
+        "write-spec"
+    ]
+}
