@@ -30,7 +30,7 @@ Track product prices across the web. Get notified when a price drops more than y
 
 ## Specs
 
-Implementation-ready specs live in [`specs/`](specs/README.md). Build order: `foundation → scraper → product-management → scheduling → drop-detection → notifications → dashboard`.
+Implementation-ready specs live in [`specs/`](specs/README.md). All v1 specs (`foundation`, `scraper`, `product-management`, `scheduling`, `drop-detection`, `notifications`, `dashboard`) have shipped; their files are removed once fully implemented. The remaining spec is `notifications.md` (LOW-priority hardening — Phase 5 admin queue widget deferred).
 
 ## Local dev
 

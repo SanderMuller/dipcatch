@@ -7,10 +7,10 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 1. ~~`foundation.md`~~ — ✅ shipped (Postgres, Filament v5 panels, invite-only auth, migrations, deployment).
 2. ~~`scraper.md`~~ — ✅ shipped (HTTP scrape service, price/currency parsing, robots.txt + throttle, JSON-LD).
 3. ~~`product-management.md`~~ — ✅ shipped (Product resource, two-step add wizard, edit/view, bulk + re-scrape with cooldown).
-4. **[scheduling.md](scheduling.md)** — 24h scheduler, queue jobs with retries + jitter, cleanup commands.
-5. **[drop-detection.md](drop-detection.md)** — 30d median reference, adaptive tier defaults, threshold evaluator, re-notify state machine.
-6. **[notifications.md](notifications.md)** — email + Filament bell + web push, per-user channel toggles, profile UI.
-7. **[dashboard.md](dashboard.md)** — stats widgets, active drops, recent notifications, savings chart, per-product price history chart.
+4. ~~`scheduling.md`~~ — ✅ shipped (24h scheduler, queue jobs with retries + jitter, cleanup commands).
+5. ~~`drop-detection.md`~~ — ✅ shipped (30d median reference, adaptive tier defaults, threshold evaluator, re-notify state machine).
+6. **[notifications.md](notifications.md)** — email + Filament bell + web push, per-user channel toggles, profile UI. Phases 1–4 shipped; Phase 5 hardening partially shipped (per-user hourly rate-limit done; admin queue-depth widget deferred).
+7. ~~`dashboard.md`~~ — ✅ shipped (stats widgets, active drops, recent notifications, savings chart, per-product price history chart).
 
 ## Decisions (locked)
 

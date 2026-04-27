@@ -1,9 +1,10 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\WaitlistSignups\Pages;
 
 use App\Filament\Admin\Resources\WaitlistSignups\WaitlistSignupResource;
-use Filament\Actions\CreateAction;
+use App\Filament\Exports\WaitlistSignupExporter;
+use Filament\Actions\ExportAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListWaitlistSignups extends ListRecords
@@ -13,7 +14,7 @@ class ListWaitlistSignups extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            ExportAction::make()->exporter(WaitlistSignupExporter::class),
         ];
     }
 }
