@@ -1,9 +1,12 @@
 <?php declare(strict_types=1);
 
+use App\Console\Commands\DispatchScrapesCommand;
+use App\Console\Commands\PruneOldChecksCommand;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use SanderMuller\QueueInsights\Console\QueueInsightsSnapshotCommand;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,15 +15,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
-        $schedule->command('dipcatch:dispatch-scrapes')
+        $schedule->command(DispatchScrapesCommand::class)
             ->everyFifteenMinutes()
             ->withoutOverlapping()
             ->onOneServer();
 
-        $schedule->command('dipcatch:prune-checks')
+        $schedule->command(PruneOldChecksCommand::class)
             ->dailyAt('03:00')
             ->withoutOverlapping()
             ->onOneServer();
+
+        $schedule->command(QueueInsightsSnapshotCommand::class)
+            ->everyMinute();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         //

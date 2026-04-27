@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a14ab30cb2b7e97aaa2cbb4ec2da746c",
+    "content-hash": "17c447525d1e2489073de7aba2045dcc",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -62,16 +62,16 @@
         },
         {
             "name": "aws/aws-sdk-php",
-            "version": "3.379.7",
+            "version": "3.379.8",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aws/aws-sdk-php.git",
-                "reference": "2c338cb3f2bcb9e8616ffbac7a36d66034f2ceef"
+                "reference": "856ddf3d241c29132fe1eb946e112351ab043542"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/2c338cb3f2bcb9e8616ffbac7a36d66034f2ceef",
-                "reference": "2c338cb3f2bcb9e8616ffbac7a36d66034f2ceef",
+                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/856ddf3d241c29132fe1eb946e112351ab043542",
+                "reference": "856ddf3d241c29132fe1eb946e112351ab043542",
                 "shasum": ""
             },
             "require": {
@@ -153,9 +153,9 @@
             "support": {
                 "forum": "https://github.com/aws/aws-sdk-php/discussions",
                 "issues": "https://github.com/aws/aws-sdk-php/issues",
-                "source": "https://github.com/aws/aws-sdk-php/tree/3.379.7"
+                "source": "https://github.com/aws/aws-sdk-php/tree/3.379.8"
             },
-            "time": "2026-04-24T18:17:06+00:00"
+            "time": "2026-04-27T19:13:21+00:00"
         },
         {
             "name": "bacon/bacon-qr-code",
@@ -5893,16 +5893,16 @@
         },
         {
             "name": "sandermuller/laravel-queue-insights",
-            "version": "0.2.1",
+            "version": "0.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/SanderMuller/laravel-queue-insights.git",
-                "reference": "43b0ff2569197eb2c52982d6edb0d5d57689f0aa"
+                "reference": "7620dd12013a2c66865de75d7e2980be9f335b10"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SanderMuller/laravel-queue-insights/zipball/43b0ff2569197eb2c52982d6edb0d5d57689f0aa",
-                "reference": "43b0ff2569197eb2c52982d6edb0d5d57689f0aa",
+                "url": "https://api.github.com/repos/SanderMuller/laravel-queue-insights/zipball/7620dd12013a2c66865de75d7e2980be9f335b10",
+                "reference": "7620dd12013a2c66865de75d7e2980be9f335b10",
                 "shasum": ""
             },
             "require": {
@@ -5980,9 +5980,9 @@
             ],
             "support": {
                 "issues": "https://github.com/SanderMuller/laravel-queue-insights/issues",
-                "source": "https://github.com/SanderMuller/laravel-queue-insights/tree/0.2.1"
+                "source": "https://github.com/SanderMuller/laravel-queue-insights/tree/0.4.0"
             },
-            "time": "2026-04-26T19:32:57+00:00"
+            "time": "2026-04-27T19:37:36+00:00"
         },
         {
             "name": "sandermuller/stopwatch",
@@ -6433,16 +6433,16 @@
         },
         {
             "name": "spatie/laravel-data",
-            "version": "4.22.0",
+            "version": "4.22.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/spatie/laravel-data.git",
-                "reference": "cec66f8d53bedbf78bea9f3155c7ee49fa8a61fb"
+                "reference": "ec254c0ebc3f3b37515cd7449e2dbb10588e606b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/laravel-data/zipball/cec66f8d53bedbf78bea9f3155c7ee49fa8a61fb",
-                "reference": "cec66f8d53bedbf78bea9f3155c7ee49fa8a61fb",
+                "url": "https://api.github.com/repos/spatie/laravel-data/zipball/ec254c0ebc3f3b37515cd7449e2dbb10588e606b",
+                "reference": "ec254c0ebc3f3b37515cd7449e2dbb10588e606b",
                 "shasum": ""
             },
             "require": {
@@ -6455,7 +6455,7 @@
             "require-dev": {
                 "fakerphp/faker": "^1.14",
                 "friendsofphp/php-cs-fixer": "^3.0",
-                "inertiajs/inertia-laravel": "^2.0",
+                "inertiajs/inertia-laravel": "^2.0|^3.0",
                 "livewire/livewire": "^3.0|^4.0",
                 "mockery/mockery": "^1.6",
                 "nesbot/carbon": "^2.63|^3.0",
@@ -6503,7 +6503,7 @@
             ],
             "support": {
                 "issues": "https://github.com/spatie/laravel-data/issues",
-                "source": "https://github.com/spatie/laravel-data/tree/4.22.0"
+                "source": "https://github.com/spatie/laravel-data/tree/4.22.1"
             },
             "funding": [
                 {
@@ -6511,7 +6511,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-04-16T13:26:30+00:00"
+            "time": "2026-04-27T07:30:53+00:00"
         },
         {
             "name": "spatie/laravel-failed-job-monitor",
@@ -7161,16 +7161,16 @@
         },
         {
             "name": "spatie/shiki-php",
-            "version": "2.3.3",
+            "version": "2.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/spatie/shiki-php.git",
-                "reference": "9d50ff4d9825d87d3283a6695c65ae9c3c3caa6b"
+                "reference": "b8b0ca32d3a82bc5c533e68ffab96c5d4ec1b9ba"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/shiki-php/zipball/9d50ff4d9825d87d3283a6695c65ae9c3c3caa6b",
-                "reference": "9d50ff4d9825d87d3283a6695c65ae9c3c3caa6b",
+                "url": "https://api.github.com/repos/spatie/shiki-php/zipball/b8b0ca32d3a82bc5c533e68ffab96c5d4ec1b9ba",
+                "reference": "b8b0ca32d3a82bc5c533e68ffab96c5d4ec1b9ba",
                 "shasum": ""
             },
             "require": {
@@ -7214,7 +7214,7 @@
                 "spatie"
             ],
             "support": {
-                "source": "https://github.com/spatie/shiki-php/tree/2.3.3"
+                "source": "https://github.com/spatie/shiki-php/tree/2.4.0"
             },
             "funding": [
                 {
@@ -7222,7 +7222,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-02-01T09:30:04+00:00"
+            "time": "2026-04-27T14:27:52+00:00"
         },
         {
             "name": "spatie/temporary-directory",
@@ -12131,21 +12131,21 @@
         },
         {
             "name": "nunomaduro/pao",
-            "version": "v1.0.4",
+            "version": "v1.0.5",
             "source": {
                 "type": "git",
-                "url": "https://github.com/nunomaduro/pao.git",
-                "reference": "abb05092e543e031b035058894ede0f5e7dbfecf"
+                "url": "https://github.com/laravel/pao.git",
+                "reference": "4e2865b711ce4b220ff13612f991c486f5b0c8ec"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nunomaduro/pao/zipball/abb05092e543e031b035058894ede0f5e7dbfecf",
-                "reference": "abb05092e543e031b035058894ede0f5e7dbfecf",
+                "url": "https://api.github.com/repos/laravel/pao/zipball/4e2865b711ce4b220ff13612f991c486f5b0c8ec",
+                "reference": "4e2865b711ce4b220ff13612f991c486f5b0c8ec",
                 "shasum": ""
             },
             "require": {
                 "php": "^8.3",
-                "shipfastlabs/agent-detector": "^1.1.3"
+                "shipfastlabs/agent-detector": "^1.1.4"
             },
             "conflict": {
                 "laravel/framework": "<12.0",
@@ -12155,11 +12155,11 @@
             },
             "require-dev": {
                 "brianium/paratest": "^7.20.0",
-                "laravel/pint": "^1.29.0",
+                "laravel/pint": "^1.29.1",
                 "orchestra/testbench": "^10.11.0 || ^11.1.0",
                 "pestphp/pest": "^4.6.3 || ^5.0.0",
                 "pestphp/pest-plugin-type-coverage": "^4.0.4 || ^5.0.0",
-                "phpstan/phpstan": "^2.1.50",
+                "phpstan/phpstan": "^2.1.51",
                 "rector/rector": "^2.4.2",
                 "symfony/process": "^7.4.8 || ^8.1.0",
                 "symfony/var-dumper": "^7.4.8 || ^8.0.8"
@@ -12208,24 +12208,10 @@
                 "testing"
             ],
             "support": {
-                "issues": "https://github.com/nunomaduro/pao/issues",
-                "source": "https://github.com/nunomaduro/pao/tree/v1.0.4"
+                "issues": "https://github.com/laravel/pao/issues",
+                "source": "https://github.com/laravel/pao/tree/v1.0.5"
             },
-            "funding": [
-                {
-                    "url": "https://www.paypal.com/paypalme/enunomaduro",
-                    "type": "custom"
-                },
-                {
-                    "url": "https://github.com/nunomaduro",
-                    "type": "github"
-                },
-                {
-                    "url": "https://www.patreon.com/nunomaduro",
-                    "type": "patreon"
-                }
-            ],
-            "time": "2026-04-20T15:51:00+00:00"
+            "time": "2026-04-27T09:30:41+00:00"
         },
         {
             "name": "pestphp/pest",
@@ -14045,16 +14031,16 @@
         },
         {
             "name": "sandermuller/laravel-fluent-validation-rector",
-            "version": "0.14.1",
+            "version": "0.19.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/SanderMuller/laravel-fluent-validation-rector.git",
-                "reference": "aa35e390674437064d6ea72cf72425e3c5b1da95"
+                "reference": "00efdda010528479f7cb7cf09964380bf3d7f121"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SanderMuller/laravel-fluent-validation-rector/zipball/aa35e390674437064d6ea72cf72425e3c5b1da95",
-                "reference": "aa35e390674437064d6ea72cf72425e3c5b1da95",
+                "url": "https://api.github.com/repos/SanderMuller/laravel-fluent-validation-rector/zipball/00efdda010528479f7cb7cf09964380bf3d7f121",
+                "reference": "00efdda010528479f7cb7cf09964380bf3d7f121",
                 "shasum": ""
             },
             "require": {
@@ -14066,7 +14052,7 @@
             "require-dev": {
                 "laravel/pint": "^1.29",
                 "nikic/php-parser": "^5.4",
-                "orchestra/testbench": "^9.0||^10.11",
+                "orchestra/testbench": "^9.0||^10.11||^11.0",
                 "pestphp/pest": "^3.0||^4.4",
                 "phpstan/extension-installer": "^1.4",
                 "phpstan/phpstan": "^2.0",
@@ -14113,9 +14099,9 @@
             ],
             "support": {
                 "issues": "https://github.com/SanderMuller/laravel-fluent-validation-rector/issues",
-                "source": "https://github.com/SanderMuller/laravel-fluent-validation-rector/tree/0.14.1"
+                "source": "https://github.com/SanderMuller/laravel-fluent-validation-rector/tree/0.19.0"
             },
-            "time": "2026-04-26T11:59:56+00:00"
+            "time": "2026-04-27T19:34:38+00:00"
         },
         {
             "name": "sebastian/cli-parser",
@@ -15019,12 +15005,12 @@
             "version": "v1.1.4",
             "source": {
                 "type": "git",
-                "url": "https://github.com/shipfastlabs/agent-detector.git",
+                "url": "https://github.com/laravel/agent-detector.git",
                 "reference": "7719ba7ebbed18911494467139c389549ed53467"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/shipfastlabs/agent-detector/zipball/7719ba7ebbed18911494467139c389549ed53467",
+                "url": "https://api.github.com/repos/laravel/agent-detector/zipball/7719ba7ebbed18911494467139c389549ed53467",
                 "reference": "7719ba7ebbed18911494467139c389549ed53467",
                 "shasum": ""
             },
@@ -15070,8 +15056,8 @@
                 "php"
             ],
             "support": {
-                "issues": "https://github.com/shipfastlabs/agent-detector/issues",
-                "source": "https://github.com/shipfastlabs/agent-detector/tree/v1.1.4"
+                "issues": "https://github.com/laravel/agent-detector/issues",
+                "source": "https://github.com/laravel/agent-detector/tree/v1.1.4"
             },
             "funding": [
                 {

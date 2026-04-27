@@ -8,6 +8,7 @@ use App\Services\Scraper\Scraper;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
@@ -31,6 +32,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->registerHealthChecks();
+
+        Gate::define('viewQueueInsights', static fn (): bool => app()->isLocal());
+
+        Gate::define('retryFailedJobs', static fn (): bool => app()->isLocal());
     }
 
     protected function configureDefaults(): void
@@ -41,7 +46,7 @@ class AppServiceProvider extends ServiceProvider
             app()->isProduction(),
         );
 
-        Password::defaults(fn (): ?Password => app()->isProduction()
+        Password::defaults(static fn (): ?Password => app()->isProduction()
             ? Password::min(12)
                 ->mixedCase()
                 ->letters()
