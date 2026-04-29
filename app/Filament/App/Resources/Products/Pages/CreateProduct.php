@@ -53,6 +53,9 @@ class CreateProduct extends CreateRecord
     /** Maximum age of a preview the form will accept on save. */
     public const int PREVIEW_TTL_SECONDS = 300;
 
+    /**
+     * @return Step[]
+     */
     protected function getSteps(): array
     {
         return [

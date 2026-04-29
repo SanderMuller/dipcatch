@@ -3,6 +3,7 @@
 use App\Filament\App\Widgets\RecentNotificationsTableWidget;
 use App\Models\Product;
 use App\Models\User;
+use App\Notifications\PriceDropNotification;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
 
@@ -12,7 +13,7 @@ function seedDropNotification(User $user, Product $product, array $overrides = [
 {
     return DatabaseNotification::create([
         'id' => (string) Str::uuid(),
-        'type' => 'App\\Notifications\\PriceDropNotification',
+        'type' => PriceDropNotification::class,
         'notifiable_type' => User::class,
         'notifiable_id' => $user->id,
         'data' => array_merge([

@@ -14,6 +14,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Support\Components\ViewComponent;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -24,6 +25,9 @@ class EditProduct extends EditRecord
     /** Cooldown after a successful manual re-scrape, in seconds. */
     public const int RESCRAPE_COOLDOWN_SECONDS = 3600;
 
+    /**
+     * @return ViewComponent[]
+     */
     protected function getHeaderActions(): array
     {
         return [

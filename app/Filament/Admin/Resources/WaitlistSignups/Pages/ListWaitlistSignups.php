@@ -11,6 +11,9 @@ class ListWaitlistSignups extends ListRecords
 {
     protected static string $resource = WaitlistSignupResource::class;
 
+    /**
+     * @return ExportAction[]
+     */
     protected function getHeaderActions(): array
     {
         return [

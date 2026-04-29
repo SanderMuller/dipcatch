@@ -21,6 +21,9 @@ function pushOutcome(): DropOutcome
     );
 }
 
+/**
+ * @return array<string, string|array<string, string>>
+ */
 function subscriptionPayload(string $endpoint = 'https://push.example.com/endpoint/abc'): array
 {
     return [

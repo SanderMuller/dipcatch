@@ -11,6 +11,9 @@ class ManageInvitations extends ManageRecords
 {
     protected static string $resource = InvitationResource::class;
 
+    /**
+     * @return CreateAction[]
+     */
     protected function getHeaderActions(): array
     {
         return [

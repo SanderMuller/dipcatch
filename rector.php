@@ -25,6 +25,7 @@ use Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector;
 use Rector\Php81\Rector\FuncCall\NullToStrictStringFuncCallArgRector;
 use Rector\Php82\Rector\Param\AddSensitiveParameterAttributeRector;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
+use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
 use Rector\PHPUnit\CodeQuality\Rector\Class_\PreferPHPUnitSelfCallRector;
 use Rector\PHPUnit\CodeQuality\Rector\Class_\PreferPHPUnitThisCallRector;
 use Rector\Privatization\Rector\Property\PrivatizeFinalClassPropertyRector;
@@ -102,6 +103,7 @@ return RectorConfig::configure()
             __DIR__ . '/tests/*',
         ],
         AddOverrideAttributeToOverriddenMethodsRector::class,
+        AddOverrideAttributeToOverriddenPropertiesRector::class,
         AppToResolveRector::class,
         ApplyDefaultInsteadOfNullCoalesceRector::class,
         ArgumentAdderRector::class,
@@ -160,7 +162,7 @@ return RectorConfig::configure()
         FluentValidationSetList::POLISH,
         FluentValidationSetList::SIMPLIFY,
         HihahoSetList::ALL,
-        LaravelSetList::LARAVEL_120,
+        LaravelSetList::LARAVEL_130,
         LaravelSetList::LARAVEL_CODE_QUALITY,
         LaravelSetList::LARAVEL_ARRAYACCESS_TO_METHOD_CALL,
         LaravelSetList::LARAVEL_COLLECTION,
@@ -176,6 +178,7 @@ return RectorConfig::configure()
         codeQuality: true,
         codingStyle: false,
         typeDeclarations: true,
+        typeDeclarationDocblocks: true,
         privatization: false,
         instanceOf: false,
         earlyReturn: true,
@@ -183,10 +186,9 @@ return RectorConfig::configure()
         rectorPreset: true,
         phpunitCodeQuality: true,
     )
-    ->withTypeCoverageDocblockLevel(2)
 //    ->withIndent()
 //    ->withFluentCallNewLine()
     ->withAttributesSets()
     ->withImportNames()
     ->withMemoryLimit('3G')
-    ->withPhpSets(php84: true);
+    ->withPhpSets(php85: true);

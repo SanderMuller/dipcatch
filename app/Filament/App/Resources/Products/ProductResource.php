@@ -11,6 +11,7 @@ use App\Filament\App\Resources\Products\Schemas\ProductInfolist;
 use App\Filament\App\Resources\Products\Tables\ProductsTable;
 use App\Models\Product;
 use BackedEnum;
+use Filament\Resources\Pages\PageRegistration;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -55,6 +56,9 @@ class ProductResource extends Resource
         return $query->where('user_id', auth()->id());
     }
 
+    /**
+     * @return array<string, PageRegistration>
+     */
     public static function getPages(): array
     {
         return [

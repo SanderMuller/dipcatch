@@ -11,6 +11,9 @@ class ViewProduct extends ViewRecord
 {
     protected static string $resource = ProductResource::class;
 
+    /**
+     * @return EditAction[]
+     */
     protected function getHeaderActions(): array
     {
         return [
