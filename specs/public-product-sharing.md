@@ -51,16 +51,21 @@ public function publicShareUrl(): ?string { ... }  // route('product.public', $t
 `App\Http\Controllers\PublicProductController` (single-action `__invoke`), `GET /p/{slug}`:
 
 - **No auth middleware.** `web` + a per-IP throttle (`throttle:public-product` — registered in `FortifyServiceProvider`, e.g. 120/min per IP).
-- Looks up `Product::where('share_slug', $slug)->firstOrFail()` (returns 404 on miss).
-- Eager-loads `shops` (only `active = true`, ordered by current_price) + the open `ProductCheapestHistory` segment + the recent history segments for the chart window.
-- Returns a Blade view `public.product` with: product, shops, chart payload (decimal arrays).
+- **Independent lookup.** Look up by `share_slug` only — do NOT route through `ProductPolicy::view()` or Filament's `ProductResource::getEloquentQuery()`, both of which scope to `auth()->id()` and would 403/empty for guests. Use a plain `Product::query()->where('share_slug', $slug)->firstOrFail()`.
+- **Column projection — explicit allowlist, not full models.** `Shop` carries private fields (`notes`, `price_selector`, `title_selector`, `image_selector`, raw `url`) and so does `Product` (`drop_threshold_*`, `last_notified_*`, `cheapest_shop_id`). The controller must `select()` only the columns the view actually renders:
+  - Product: `id, title, image_url, currency, cheapest_price, share_slug`
+  - Shop: `id, product_id, host, current_price, current_in_stock, last_checked_at, url` (kept for the click-through link)
+  - ProductCheapestHistory: `cheapest_price, started_at, ended_at`
+- **Eligibility filter on shops** — match the production "eligible shop" logic from `Product::recomputeCheapestShop` (`app/Models/Product.php:106`): `active = true` AND `current_in_stock = true` AND `health != dead` AND `current_price NOT NULL`. Order by `current_price` ascending.
+- Eager-loads the recent `ProductCheapestHistory` segments for the 90-day chart window (last 90 days of `started_at`).
+- Returns a Blade view `public.product` with: product, eligible shops, chart payload (decimal arrays).
 - Response headers: `X-Robots-Tag: noindex, nofollow` so a bot that picks up a link doesn't keep it in an index.
 
 Route registration in `routes/web.php` (outside the `auth+verified` group):
 
 ```php
 Route::get('p/{slug}', PublicProductController::class)
-    ->where('slug', '[A-Za-z0-9]+')
+    ->where('slug', '[A-Za-z0-9]{32}')   // exact length — rejects junk-length probes before hitting the DB / rate-limiter
     ->middleware('throttle:public-product')
     ->name('product.public');
 ```
@@ -95,6 +100,7 @@ On `ViewProduct` (the existing product view page in the Filament app panel), add
   - `<meta name="robots" content="noindex, nofollow">` (defense in depth — the X-Robots-Tag header is primary).
   - Open Graph: `og:title` = product title, `og:image` = product image, `og:description` = "Tracked on DipCatch: cheapest at {currency} {price}". Lets the link unfurl nicely in chat / social.
   - Twitter Card: `twitter:card = summary_large_image` if image present, else `summary`.
+- **`og:image` / `<img>` validation.** `image_url` is user-supplied (set on the product create form). Blade `{{ }}` escapes the value into the attribute, but only emit it when it parses as an `http://` or `https://` URL — reject `javascript:`, `data:`, `file:` etc. before the meta tag renders. Use a tiny helper `$product->safeImageUrl(): ?string` that returns null for non-http(s) values, the view conditionally emits the meta tag + `<img>` only when non-null.
 
 ---
 
@@ -103,21 +109,27 @@ On `ViewProduct` (the existing product view page in the Filament app panel), add
 ### Phase 1 — Schema + model + share/revoke action
 
 1. Migration: `share_slug` (string, 32, nullable, unique) on `products`.
-2. `Product` model: factory default null, `isPubliclyShared()` + `publicShareUrl()` helpers.
-3. Filament `share` action on `ViewProduct` page (generate / rotate / stop).
-4. Tests:
+2. `Product` model: `isPubliclyShared()` + `publicShareUrl()` + `safeImageUrl()` helpers (the last validates `http://` / `https://` prefix for the OG-tag emit).
+3. `ProductFactory`: add `'share_slug' => null` default.
+4. Filament `share` action on `ViewProduct` page (generate / rotate / stop).
+5. Tests:
    - factory round-trip + uniqueness constraint
    - Filament action: generates a 32-char slug, rotates produces a different slug, stop nulls it
+   - `safeImageUrl()` returns the URL for http/https, null for `javascript:` / `data:` / non-URL strings
 
 ### Phase 2 — Public controller + route + minimal Blade view
 
 1. `App\Http\Controllers\PublicProductController` + route + throttle limiter.
 2. Blade view: header + shops table (no chart yet).
 3. Tests:
-   - happy path: valid slug → 200, page contains product title + shop list
+   - happy path: valid slug → 200, page contains product title + eligible shop list
    - unknown slug → 404
    - null `share_slug` on a real product → 404 (can't fetch via the empty-string slug)
-   - inactive / out-of-stock / dead shops omitted from the shop list
+   - wrong slug length (e.g. 16 chars) → 404 via the route regex *before* the controller runs
+   - inactive / out-of-stock / dead-health / null-price shops omitted from the shop list (exhaustive coverage of all four eligibility predicates)
+   - **private-data guard**: shop `notes`, `price_selector`, `title_selector`, `image_selector` do NOT appear in the response body
+   - **private-product-data guard**: product `drop_threshold_pct` / `drop_threshold_abs` / `last_notified_price` do NOT appear
+   - guest sees the page without any auth redirect (i.e. the controller doesn't trip an owner-policy reuse)
    - response headers include `X-Robots-Tag: noindex, nofollow`
    - throttle: 121st request in a minute returns 429
 
@@ -142,6 +154,7 @@ On `ViewProduct` (the existing product view page in the Filament app panel), add
 - **Q3:** should the owner see how many people opened the public link? **Default:** no — adds a counter column + a hit middleware for a feature nobody has asked for. Easy to add later if real demand surfaces.
 - **Q4:** rate-limit budget — 120/min/IP is generous for normal viewing (chat preview unfurls hit the URL once; a human refreshing manually never gets close). Tighten or expand based on real traffic. Defer until shipped.
 - **Q5:** if the product owner deletes a shop / the product itself, the public link... 404s (FK cascade) for delete-product; just shows fewer shops for delete-shop. Default behavior is fine. Confirm with a test in Phase 2.
+- **Q6:** "Stop sharing" rotates the slug to null and the new URL 404s — but social platforms (Slack, Twitter, etc.) cache the unfurled preview for hours to days. We can't invalidate those caches. **Default:** document this in the in-app share modal ("Existing chat previews may persist for some time"). No code change.
 
 ---
 
