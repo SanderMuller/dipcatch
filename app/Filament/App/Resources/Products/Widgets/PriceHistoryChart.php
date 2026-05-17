@@ -2,26 +2,23 @@
 
 namespace App\Filament\App\Resources\Products\Widgets;
 
-use App\Enums\ScrapeStatus;
-use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\ProductCheapestHistory;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Support\Collection;
 
 class PriceHistoryChart extends ChartWidget
 {
-    protected ?string $heading = 'Price history';
+    protected ?string $heading = 'Cheapest price history';
 
     protected int|string|array $columnSpan = 'full';
 
-    /** Product is set on the widget by the view page (passed via the view's data). */
     public ?Product $record = null;
 
-    /** Default lookback window — bound to Filament's chart-widget filter dropdown. */
     public ?string $filter = '90';
 
     /**
@@ -52,58 +49,44 @@ class PriceHistoryChart extends ChartWidget
             return ['datasets' => [], 'labels' => []];
         }
 
-        $checks = $this->checksFor($product);
+        $segments = $this->segmentsFor($product);
+        $now = CarbonImmutable::now();
 
         /** @var list<string> $labels */
         $labels = [];
-        /** @var list<float> $points */
+        /** @var list<float|null> $points */
         $points = [];
-        /** @var list<int> $checkIds */
-        $checkIds = [];
-        foreach ($checks as $check) {
-            $checkedAt = $check->checked_at;
-            if (! $checkedAt instanceof CarbonInterface) {
+        foreach ($segments as $segment) {
+            $started = $segment->started_at;
+            if (! $started instanceof CarbonInterface) {
                 continue;
             }
-            $labels[] = $checkedAt->toDateTimeString();
-            $points[] = (float) $check->price;
-            $checkIds[] = (int) $check->id;
+            $labels[] = self::formatStamp($started);
+            $points[] = $segment->cheapest_price === null
+                ? null
+                : (float) $segment->cheapest_price;
         }
 
-        $reference = $this->referencePrice($product);
-        $thresholdLow = $this->thresholdLow($product, $reference);
-        $markers = $this->notificationMarkers($product, $checkIds);
-
-        $datasets = [];
-        $datasets[] = [
-            'label' => 'Price (' . $product->currency . ')',
-            'data' => $points,
-            'borderColor' => '#6366f1',
-            'tension' => 0.2,
-        ];
-        $datasets[] = [
-            'label' => 'Reference (30d median)',
-            'data' => array_fill(0, count($points), $reference),
-            'borderColor' => '#3b82f6',
-            'borderDash' => [],
-            'pointRadius' => 0,
-        ];
-        if ($thresholdLow !== null) {
-            $datasets[] = [
-                'label' => 'Threshold low',
-                'data' => array_fill(0, count($points), $thresholdLow),
-                'borderColor' => '#f59e0b',
-                'borderDash' => [6, 4],
-                'pointRadius' => 0,
-            ];
+        $current = $segments->last();
+        if ($current instanceof ProductCheapestHistory) {
+            $labels[] = self::formatStamp($now);
+            $points[] = $current->cheapest_price === null
+                ? null
+                : (float) $current->cheapest_price;
         }
-        $datasets[] = [
-            'label' => 'Initial',
-            'data' => array_fill(0, count($points), (float) $product->initial_price),
-            'borderColor' => '#9ca3af',
-            'borderDash' => [4, 4],
-            'pointRadius' => 0,
+
+        $markers = $this->notificationMarkers($product, $segments, $labels);
+
+        $datasets = [
+            [
+                'label' => 'Cheapest (' . $product->currency . ')',
+                'data' => $points,
+                'borderColor' => '#6366f1',
+                'stepped' => true,
+                'tension' => 0,
+            ],
         ];
+
         if ($markers !== []) {
             $datasets[] = [
                 'label' => 'Notified',
@@ -127,97 +110,126 @@ class PriceHistoryChart extends ChartWidget
     }
 
     /**
-     * @return EloquentCollection<int, PriceCheck>
+     * @return EloquentCollection<int, ProductCheapestHistory>
      */
-    private function checksFor(Product $product): EloquentCollection
+    private function segmentsFor(Product $product): EloquentCollection
     {
-        $query = $product->priceChecks()
-            ->where('status', ScrapeStatus::Ok)
-            ->oldest('checked_at');
+        $query = $product->cheapestHistory()
+            ->orderBy('started_at');
 
-        $filter = $this->filter ?? '90';
-        if ($filter !== 'all') {
-            $days = max(1, (int) $filter);
-            $query->where('checked_at', '>=', CarbonImmutable::now()->subDays($days));
+        $windowStart = $this->windowStart();
+        if ($windowStart !== null) {
+            // Include any segment that overlaps the window — `started_at < window`
+            // but still active (`ended_at IS NULL` or `ended_at >= window`).
+            // Otherwise long-lived current prices disappear from the left edge.
+            $query->where(function (EloquentBuilder $q) use ($windowStart): void {
+                $q->where('started_at', '>=', $windowStart)
+                    ->orWhereNull('ended_at')
+                    ->orWhere('ended_at', '>=', $windowStart);
+            });
         }
 
         return $query->get();
     }
 
-    private function referencePrice(Product $product): float
+    /**
+     * The cutoff matching the active filter, or null when "All time" is
+     * selected. Shared by segment + notification-marker queries so the
+     * chart and its markers always agree on what's "in view".
+     */
+    private function windowStart(): ?CarbonImmutable
     {
-        /** @var Collection<int, float> $window */
-        $window = $product->priceChecks()
-            ->where('status', ScrapeStatus::Ok)
-            ->where('checked_at', '>=', CarbonImmutable::now()->subDays(30))
-            ->pluck('price')
-            ->map(fn (mixed $p): float => (float) (is_scalar($p) ? $p : 0))
-            ->sort()
-            ->values();
-
-        if ($window->count() < 7) {
-            return (float) $product->initial_price;
-        }
-
-        return self::median(array_values($window->all()));
-    }
-
-    private function thresholdLow(Product $product, float $reference): ?float
-    {
-        $abs = $product->drop_threshold_abs === null ? null : (float) $product->drop_threshold_abs;
-        $pct = $product->drop_threshold_pct === null ? null : (float) $product->drop_threshold_pct;
-
-        $candidates = [];
-        if ($abs !== null) {
-            $candidates[] = $abs;
-        }
-        if ($pct !== null) {
-            $candidates[] = $reference * $pct / 100.0;
-        }
-        if ($candidates === []) {
+        $filter = $this->filter ?? '90';
+        if ($filter === 'all') {
             return null;
         }
 
-        return $reference - max($candidates);
+        $days = max(1, (int) $filter);
+
+        return CarbonImmutable::now()->subDays($days);
+    }
+
+    private static function formatStamp(CarbonInterface $dt): string
+    {
+        return $dt->format('Y-m-d H:i:s');
     }
 
     /**
-     * @param  list<int>  $checkIds
+     * Map each price_drop_event onto the chart segment whose [started_at, ended_at)
+     * interval contains the event's `fired_at`. Events outside any segment are
+     * skipped. Returns one float|null per label so it aligns with the cheapest
+     * dataset.
+     *
+     * @param  EloquentCollection<int, ProductCheapestHistory>  $segments
+     * @param  list<string>  $labels
      * @return list<float|null>
      */
-    private function notificationMarkers(Product $product, array $checkIds): array
+    private function notificationMarkers(Product $product, EloquentCollection $segments, array $labels): array
     {
-        if ($checkIds === []) {
+        if ($labels === []) {
             return [];
         }
 
+        // Scope markers to the same window as the line — otherwise old drop
+        // events on a still-active long segment leak into "Last 30 days".
         $events = PriceDropEvent::query()
             ->where('product_id', $product->id)
-            ->whereIn('price_check_id', $checkIds)
-            ->pluck('new_price', 'price_check_id');
+            ->when(
+                $this->windowStart(),
+                fn (EloquentBuilder $q, CarbonImmutable $windowStart) => $q->where('fired_at', '>=', $windowStart),
+            )
+            ->orderBy('fired_at')
+            ->get(['new_price', 'fired_at']);
 
-        $out = [];
-        foreach ($checkIds as $id) {
-            $value = $events->get($id);
-            $out[] = is_scalar($value) ? (float) $value : null;
+        if ($events->isEmpty()) {
+            return array_fill(0, count($labels), null);
         }
 
-        return $out;
+        // Build segment index → marker price. Last label corresponds to "now"
+        // (the active open segment).
+        $markers = array_fill(0, count($labels), null);
+
+        foreach ($events as $event) {
+            $firedAt = $event->fired_at;
+            if (! $firedAt instanceof CarbonInterface) {
+                continue;
+            }
+            $index = $this->findSegmentIndex($segments, $firedAt);
+            if ($index === null) {
+                continue;
+            }
+            $markers[$index] = (float) $event->new_price;
+        }
+
+        return array_values($markers);
     }
 
     /**
-     * @param  list<float>  $values
+     * @param  EloquentCollection<int, ProductCheapestHistory>  $segments
      */
-    private static function median(array $values): float
+    private function findSegmentIndex(EloquentCollection $segments, CarbonInterface $firedAt): ?int
     {
-        sort($values);
-        $count = count($values);
-        $middle = (int) ($count / 2);
+        $i = 0;
+        foreach ($segments as $segment) {
+            $started = $segment->started_at;
+            if (! $started instanceof CarbonInterface) {
+                $i++;
 
-        if ($count % 2 === 1) {
-            return $values[$middle];
+                continue;
+            }
+            $ended = $segment->ended_at;
+            $endTime = $ended instanceof CarbonInterface ? $ended : null;
+
+            $inSegment = ! $firedAt->isBefore($started)
+                && ($endTime === null || $firedAt->isBefore($endTime));
+
+            if ($inSegment) {
+                return $i;
+            }
+
+            $i++;
         }
 
-        return ($values[$middle - 1] + $values[$middle]) / 2.0;
+        return null;
     }
 }

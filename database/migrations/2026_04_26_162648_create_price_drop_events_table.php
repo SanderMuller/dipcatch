@@ -13,6 +13,7 @@ return new class extends Migration {
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->unsignedBigInteger('price_check_id');
             $table->uuid('notification_id')->nullable();
+            $table->foreignUuid('triggered_by_shop_id')->nullable()->constrained('shops')->nullOnDelete();
             $table->char('currency', 3);
             $table->decimal('reference_price', 12, 2);
             $table->string('reference_kind');

@@ -4,8 +4,10 @@ namespace App\Filament\App\Resources\Products\Pages;
 
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Filament\App\Resources\Products\Widgets\PriceHistoryChart;
+use App\Models\Product;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
+use Livewire\Attributes\On;
 
 class ViewProduct extends ViewRecord
 {
@@ -29,5 +31,18 @@ class ViewProduct extends ViewRecord
         return [
             PriceHistoryChart::class,
         ];
+    }
+
+    /**
+     * Re-fetch the Product when the embedded AddShop Livewire component
+     * persists a new offer. Without this the infolist keeps showing the
+     * stale `cheapest_price` / `cheapest_shop_id` until the user reloads.
+     */
+    #[On('shop-added')]
+    public function refreshRecordAfterOfferAdded(): void
+    {
+        if ($this->record instanceof Product) {
+            $this->record->refresh();
+        }
     }
 }

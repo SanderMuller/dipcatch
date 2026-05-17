@@ -1,12 +1,10 @@
 <?php declare(strict_types=1);
 
-use App\Enums\ScrapeStatus;
 use App\Filament\App\Resources\Products\Widgets\PriceHistoryChart;
-use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
-use App\Models\User;
-use Carbon\CarbonImmutable;
+use App\Models\ProductCheapestHistory;
+use App\Models\Shop;
 
 function makeChartFor(Product $product, string $range = '90'): PriceHistoryChart
 {
@@ -17,197 +15,125 @@ function makeChartFor(Product $product, string $range = '90'): PriceHistoryChart
     return $widget;
 }
 
-/**
- * @return array<string, mixed>
- */
-function chartData(Product $product, string $range = '90'): array
-{
-    return makeChartFor($product, $range)->computeData();
-}
+test('empty product returns empty labels', function (): void {
+    $product = Product::factory()->create();
 
-/**
- * @param  array<string, mixed>  $data
- * @return array<string, mixed>
- */
-function findDataset(array $data, string $label): array
-{
-    /** @var iterable<array<string, mixed>> $sets */
-    $sets = is_array($data['datasets'] ?? null) ? $data['datasets'] : [];
-    foreach ($sets as $set) {
-        if (($set['label'] ?? null) === $label) {
-            return $set;
-        }
-    }
+    $data = makeChartFor($product)->computeData();
 
-    return ['data' => []];
-}
-
-function currentTestUser(): User
-{
-    /** @var User $user */
-    $user = test()->user; // @phpstan-ignore-line property.internalClass
-
-    return $user;
-}
-
-beforeEach(function (): void {
-    $this->user = User::factory()->create();
-    $this->actingAs($this->user);
+    expect($data['labels'])->toBe([]);
 });
 
-test('chart shows only Ok-status checks for the product, sorted by checked_at', function (): void {
-    $product = Product::factory()->for(currentTestUser())->create([
-        'initial_price' => '100.00',
-        'currency' => 'EUR',
-        'drop_threshold_pct' => '10',
-        'drop_threshold_abs' => '5',
+test('renders cheapest segments as a stepped line', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create();
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '100.00',
+        'started_at' => now()->subDays(20),
+        'ended_at' => now()->subDays(10),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '85.00',
+        'started_at' => now()->subDays(10),
+        'ended_at' => null,
     ]);
 
-    PriceCheck::factory()->for($product)->state([
-        'price' => '95.00',
-        'status' => ScrapeStatus::Ok,
-        'checked_at' => CarbonImmutable::now()->subDays(2),
-    ])->create();
-    PriceCheck::factory()->for($product)->failed()->state([
-        'checked_at' => CarbonImmutable::now()->subDay(),
-    ])->create();
-    PriceCheck::factory()->for($product)->state([
-        'price' => '90.00',
-        'status' => ScrapeStatus::Ok,
-        'checked_at' => CarbonImmutable::now(),
-    ])->create();
+    $data = makeChartFor($product)->computeData();
 
-    $data = chartData($product);
+    /** @var list<array<string, mixed>> $datasets */
+    $datasets = $data['datasets'];
+    $cheapest = collect($datasets)->firstWhere('label', 'Cheapest (EUR)');
+    assert(is_array($cheapest));
 
-    expect(findDataset($data, 'Price (EUR)')['data'])->toBe([95.0, 90.0]);
+    expect($cheapest['data'])->toContain(100.0)
+        ->and($cheapest['data'])->toContain(85.0)
+        ->and($cheapest['stepped'])->toBeTrue();
 });
 
-test('range filter limits checks to the selected window', function (): void {
-    $product = Product::factory()->for(currentTestUser())->create();
+test('respects the range filter', function (): void {
+    $product = Product::factory()->create();
+    $shop = Shop::factory()->for($product)->create();
 
-    PriceCheck::factory()->for($product)->state([
-        'price' => '50.00',
-        'status' => ScrapeStatus::Ok,
-        'checked_at' => CarbonImmutable::now()->subDays(45),
-    ])->create();
-    PriceCheck::factory()->for($product)->state([
-        'price' => '40.00',
-        'status' => ScrapeStatus::Ok,
-        'checked_at' => CarbonImmutable::now()->subDays(2),
-    ])->create();
-
-    $thirtyDay = chartData($product, '30');
-    $ninetyDay = chartData($product, '90');
-    $label = 'Price (' . $product->currency . ')';
-
-    expect(findDataset($thirtyDay, $label)['data'])->toBe([40.0])
-        ->and(findDataset($ninetyDay, $label)['data'])->toBe([50.0, 40.0]);
-});
-
-test('overlay datasets render the initial line for every product', function (): void {
-    $product = Product::factory()->for(currentTestUser())->create([
-        'initial_price' => '100.00',
-        'currency' => 'EUR',
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '500.00',
+        'started_at' => now()->subDays(120),
+        'ended_at' => now()->subDays(115),
     ]);
-    PriceCheck::factory()->for($product)->state([
-        'price' => '95.00',
-        'status' => ScrapeStatus::Ok,
-        'checked_at' => CarbonImmutable::now(),
-    ])->create();
-
-    $data = chartData($product);
-
-    expect(findDataset($data, 'Initial')['data'])->toBe([100.0]);
-});
-
-test('reference line falls back to initial price when fewer than 7 samples', function (): void {
-    $product = Product::factory()->for(currentTestUser())->create([
-        'initial_price' => '50.00',
-        'currency' => 'EUR',
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '50.00',
+        'started_at' => now()->subDays(2),
+        'ended_at' => null,
     ]);
 
-    PriceCheck::factory()->for($product)->count(3)->state([
-        'price' => '45.00',
-        'status' => ScrapeStatus::Ok,
-        'checked_at' => CarbonImmutable::now(),
-    ])->create();
+    $thirtyDay = makeChartFor($product, '30')->computeData();
+    /** @var list<array<string, mixed>> $datasets */
+    $datasets = $thirtyDay['datasets'];
+    $cheapest = collect($datasets)->first(static function (array $set): bool {
+        $label = $set['label'] ?? null;
 
-    $data = chartData($product);
+        return is_string($label) && str_starts_with($label, 'Cheapest');
+    });
+    assert(is_array($cheapest));
 
-    expect(findDataset($data, 'Reference (30d median)')['data'][0])->toBe(50.0);
+    expect($cheapest['data'])->not->toContain(500.0)
+        ->and($cheapest['data'])->toContain(50.0);
 });
 
-test('reference line uses the median when at least 7 samples exist', function (): void {
-    $product = Product::factory()->for(currentTestUser())->create([
-        'initial_price' => '500.00',
-        'currency' => 'EUR',
+test('notification markers are scoped to the active range filter', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create();
+
+    // Two segments so each event lands on its own (notificationMarkers
+    // collapses multiple events on the same segment to the last one — pre-
+    // existing limitation, not what this test asserts about).
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '60.00',
+        'started_at' => now()->subDays(120),
+        'ended_at' => now()->subDays(90),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '50.00',
+        'started_at' => now()->subDays(10),
+        'ended_at' => null,
     ]);
 
-    foreach ([100, 110, 120, 130, 140, 150, 200] as $price) {
-        PriceCheck::factory()->for($product)->state([
-            'price' => (string) $price,
-            'status' => ScrapeStatus::Ok,
-            'checked_at' => CarbonImmutable::now()->subDays(1),
-        ])->create();
-    }
-
-    $data = chartData($product);
-
-    // Median of [100,110,120,130,140,150,200] = 130
-    expect(findDataset($data, 'Reference (30d median)')['data'][0])->toBe(130.0);
-});
-
-test('threshold low overlay = reference - max(abs, ref * pct/100)', function (): void {
-    $product = Product::factory()->for(currentTestUser())->create([
-        'initial_price' => '100.00',
-        'currency' => 'EUR',
-        'drop_threshold_pct' => '10',  // 10% of 100 = 10
-        'drop_threshold_abs' => '5',   // abs 5 < 10 so pct wins
+    // Old drop event on the old segment (outside 30-day window).
+    PriceDropEvent::factory()->for($product)->create([
+        'user_id' => $product->user_id,
+        'fired_at' => now()->subDays(100),
+        'new_price' => '60.00',
     ]);
 
-    PriceCheck::factory()->for($product)->state([
-        'price' => '90.00',
-        'status' => ScrapeStatus::Ok,
-        'checked_at' => CarbonImmutable::now(),
-    ])->create();
+    // Recent drop event on the current segment (inside 30-day window).
+    PriceDropEvent::factory()->for($product)->create([
+        'user_id' => $product->user_id,
+        'fired_at' => now()->subDays(5),
+        'new_price' => '50.00',
+    ]);
 
-    $data = chartData($product);
+    $thirtyDay = makeChartFor($product, '30')->computeData();
+    /** @var list<array<string, mixed>> $datasets */
+    $datasets = $thirtyDay['datasets'];
+    $notified = collect($datasets)->firstWhere('label', 'Notified');
+    assert(is_array($notified));
 
-    // Reference falls back to initial 100 (only 1 sample), so low = 100 - 10 = 90.
-    expect(findDataset($data, 'Threshold low')['data'][0])->toBe(90.0);
-});
+    // Only the recent (50.00) marker should be present; the old 60.00 must
+    // not leak in even though the segment it sits on extends back 120 days.
+    expect($notified['data'])->toContain(50.0)
+        ->and($notified['data'])->not->toContain(60.0);
 
-test('notification markers come from price_drop_events joined by price_check_id', function (): void {
-    $product = Product::factory()->for(currentTestUser())->create();
-
-    PriceCheck::factory()->for($product)->state([
-        'price' => '90.00',
-        'status' => ScrapeStatus::Ok,
-        'checked_at' => CarbonImmutable::now()->subDays(2),
-    ])->create();
-    $check2 = PriceCheck::factory()->for($product)->state([
-        'price' => '80.00',
-        'status' => ScrapeStatus::Ok,
-        'checked_at' => CarbonImmutable::now(),
-    ])->create();
-
-    PriceDropEvent::factory()->state([
-        'product_id' => $product->id,
-        'user_id' => currentTestUser()->id,
-        'price_check_id' => $check2->id,
-        'currency' => $product->currency,
-        'new_price' => '80.00',
-        'fired_at' => CarbonImmutable::now(),
-    ])->create();
-
-    $data = chartData($product);
-    $markers = findDataset($data, 'Notified');
-
-    // Only the second check has a marker; first is null (no marker).
-    expect($markers['data'])->toBe([null, 80.0]);
-});
-
-test('returns empty datasets when no record is set', function (): void {
-    $widget = new PriceHistoryChart();
-    expect($widget->computeData())->toBe(['datasets' => [], 'labels' => []]);
+    // Sanity: "All time" still includes both.
+    $allTime = makeChartFor($product, 'all')->computeData();
+    /** @var list<array<string, mixed>> $datasetsAll */
+    $datasetsAll = $allTime['datasets'];
+    $notifiedAll = collect($datasetsAll)->firstWhere('label', 'Notified');
+    assert(is_array($notifiedAll));
+    expect($notifiedAll['data'])->toContain(50.0)
+        ->and($notifiedAll['data'])->toContain(60.0);
 });

@@ -3,12 +3,23 @@
 namespace App\Providers;
 
 use App\Health\LastSuccessfulScrapeCheck;
-use App\Services\Scraper\HtmlScraper;
-use App\Services\Scraper\Scraper;
+use App\Jobs\CheckShopPrice;
+use App\PriceAdapters\AdapterResolver;
+use App\PriceAdapters\GenericAdapter;
+use App\PriceAdapters\Hosts\AmazonAdapter;
+use App\PriceAdapters\Hosts\BolAdapter;
+use App\PriceAdapters\Hosts\ZooplusAdapter;
+use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\MicrodataAdapter;
+use App\PriceAdapters\OpenGraphAdapter;
+use App\PriceAdapters\UserSelectorAdapter;
+use App\Support\Config as DipConfig;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
@@ -25,17 +36,45 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(Scraper::class, HtmlScraper::class);
+        $this->app->singleton(AdapterResolver::class, fn (): AdapterResolver => new AdapterResolver([
+            // User-supplied selectors take precedence — self-skips unless the
+            // call passes an AdapterContext with a non-empty price selector.
+            new UserSelectorAdapter(),
+            // Host-specific adapters slot in here first; each one self-skips
+            // when the URL host doesn't match.
+            new AmazonAdapter(),
+            new BolAdapter(),
+            new ZooplusAdapter(),
+            // Generic chain in priority order.
+            new JsonLdAdapter(),
+            new MicrodataAdapter(),
+            new OpenGraphAdapter(),
+            new GenericAdapter(),
+        ]));
     }
 
     public function boot(): void
     {
         $this->configureDefaults();
         $this->registerHealthChecks();
+        $this->registerRateLimiters();
 
         Gate::define('viewQueueInsights', static fn (): bool => app()->isLocal());
 
         Gate::define('retryFailedJobs', static fn (): bool => app()->isLocal());
+    }
+
+    protected function registerRateLimiters(): void
+    {
+        $perMinute = DipConfig::int('dipcatch.fetcher.rate_limit_per_minute', 12);
+
+        // Queue middleware on `CheckShopPrice` keys on the offer's host so
+        // background workers share the per-host budget that the synchronous
+        // probe path also respects (the fetcher enforces the same limit
+        // directly — see ShopFetcher::throttle).
+        RateLimiter::for('shop-fetch', static function (CheckShopPrice $job) use ($perMinute): Limit {
+            return Limit::perMinute($perMinute)->by('shop-fetch:' . $job->shop->host);
+        });
     }
 
     protected function configureDefaults(): void

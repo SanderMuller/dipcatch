@@ -28,16 +28,15 @@ class ActiveDropsTableWidget extends BaseWidget
             ->columns([
                 ImageColumn::make('image_url')->label('')->circular()->imageSize(36),
                 TextColumn::make('title')->limit(60)->wrap(),
-                TextColumn::make('last_price')
+                TextColumn::make('cheapest_price')
                     ->label('Now')
-                    ->state(fn (Product $r): string => $r->currency . ' ' . $r->last_price),
+                    ->state(fn (Product $r): string => $r->currency . ' ' . ($r->cheapest_price ?? '—')),
                 TextColumn::make('last_notified_price')
                     ->label('Notified at')
-                    ->state(fn (Product $r): string => $r->currency . ' ' . $r->last_notified_price),
-                TextColumn::make('drop_pct_dynamic')
-                    ->label('Δ vs initial')
-                    ->state(fn (Product $r): string => $this->formatPercent($r))
-                    ->color('success'),
+                    ->state(fn (Product $r): string => $r->currency . ' ' . ($r->last_notified_price ?? '—')),
+                TextColumn::make('cheapestShop.host')
+                    ->label('Shop')
+                    ->placeholder('—'),
                 TextColumn::make('last_notified_at')
                     ->label('Notified')
                     ->since()
@@ -59,16 +58,5 @@ class ActiveDropsTableWidget extends BaseWidget
             ->where('user_id', auth()->id())
             ->whereNotNull('last_notified_price')
             ->latest('last_notified_at');
-    }
-
-    private function formatPercent(Product $product): string
-    {
-        $initial = (float) $product->initial_price;
-        if ($initial <= 0.0) {
-            return '—';
-        }
-        $delta = ((float) $product->last_price - $initial) / $initial * 100.0;
-
-        return sprintf('%+0.1f%%', $delta);
     }
 }

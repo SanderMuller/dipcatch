@@ -21,11 +21,29 @@ final class PriceDropNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    /**
+     * Snapshot of host/url/price at dispatch time. Pinned here so a recompute
+     * that lands between fire and queue-render doesn't swap the payload to a
+     * different shop or price than the `price_drop_events` row anchored to
+     * this dispatch.
+     */
+    public readonly string $snapshotPrice;
+
+    public readonly ?string $snapshotHost;
+
+    public readonly ?string $snapshotOfferUrl;
+
     public function __construct(
         public Product $product,
         public DropOutcome $outcome,
         public string $priceDropEventId,
     ) {
+        $this->snapshotPrice = $product->cheapest_price === null ? '0.00' : (string) $product->cheapest_price;
+
+        $cheapest = $product->cheapestShop;
+        $this->snapshotHost = is_string($cheapest?->host) && $cheapest->host !== '' ? $cheapest->host : null;
+        $this->snapshotOfferUrl = is_string($cheapest?->url) && $cheapest->url !== '' ? $cheapest->url : null;
+
         // Defer queue dispatch until the surrounding DB transaction commits
         // so a rollback inside DetectDrop cannot leave a queued job pointing
         // at a non-existent PriceDropEvent.
@@ -54,14 +72,17 @@ final class PriceDropNotification extends Notification implements ShouldQueue
 
     public function toMail(User $notifiable): MailMessage
     {
-        $newPrice = (string) ($this->product->last_price ?? '0.00');
-        $price = $this->product->currency . ' ' . $newPrice;
+        $subject = 'Price drop on ' . $this->product->title
+            . ($this->snapshotHost !== null ? ' at ' . $this->snapshotHost : '')
+            . ': ' . $this->product->currency . ' ' . $this->snapshotPrice;
 
         return new MailMessage()
-            ->subject('Price drop on ' . $this->product->title . ': ' . $price)
+            ->subject($subject)
             ->markdown('notifications.price-drop', [
                 'product' => $this->product,
-                'newPrice' => $newPrice,
+                'newPrice' => $this->snapshotPrice,
+                'host' => $this->snapshotHost,
+                'offerUrl' => $this->snapshotOfferUrl,
                 'referencePrice' => $this->outcome->referencePrice,
                 'referenceKind' => $this->outcome->referenceKind,
                 'dropPercent' => $this->outcome->dropPercent,
@@ -72,11 +93,13 @@ final class PriceDropNotification extends Notification implements ShouldQueue
 
     public function toWebPush(User $notifiable): WebPushMessage
     {
-        $newPrice = $this->product->currency . ' ' . ($this->product->last_price ?? '0.00');
+        $priceLine = $this->product->currency . ' ' . $this->snapshotPrice;
+        $body = $this->product->title . ' is now ' . $priceLine
+            . ($this->snapshotHost !== null ? ' at ' . $this->snapshotHost : '');
 
         return new WebPushMessage()
             ->title('Price drop: ' . $this->product->title)
-            ->body($this->product->title . ' is now ' . $newPrice)
+            ->body($body)
             ->icon($this->product->image_url ?? '/favicon.svg')
             ->data(['url' => ProductResource::getUrl('view', ['record' => $this->product])]);
     }
@@ -95,7 +118,9 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             'title' => $this->product->title,
             'image_url' => $this->product->image_url,
             'currency' => $this->product->currency,
-            'new_price' => $this->product->last_price,
+            'new_price' => $this->snapshotPrice,
+            'host' => $this->snapshotHost,
+            'offer_url' => $this->snapshotOfferUrl,
             'reference_price' => $this->outcome->referencePrice,
             'reference_kind' => $this->outcome->referenceKind,
             'drop_percent' => $this->outcome->dropPercent,

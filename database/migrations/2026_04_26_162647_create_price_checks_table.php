@@ -9,15 +9,16 @@ return new class extends Migration {
     {
         Schema::create('price_checks', function (Blueprint $table): void {
             $table->bigIncrements('id');
-            $table->foreignUuid('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('shop_id')->constrained()->cascadeOnDelete();
             $table->decimal('price', 12, 2)->nullable();
             $table->char('currency', 3)->nullable();
+            $table->boolean('in_stock')->nullable();
             $table->text('raw')->nullable();
             $table->string('status');
             $table->text('error')->nullable();
             $table->timestampTz('checked_at');
 
-            $table->index(['product_id', 'checked_at']);
+            $table->index(['shop_id', 'checked_at']);
         });
     }
 

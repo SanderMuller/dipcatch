@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\Shop;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -24,10 +25,14 @@ class PriceDropEventFactory extends Factory
 
                 return is_int($userId) ? $userId : (is_numeric($userId) ? (int) $userId : 0);
             },
-            'price_check_id' => fn (array $attrs): int => PriceCheck::factory()
-                ->state(['product_id' => $attrs['product_id']])
-                ->create()
-                ->id,
+            'price_check_id' => function (array $attrs): int {
+                $shop = Shop::factory()->create(['product_id' => $attrs['product_id']]);
+
+                return PriceCheck::factory()
+                    ->create(['shop_id' => $shop->id])
+                    ->id;
+            },
+            'triggered_by_shop_id' => null,
             'notification_id' => null,
             'currency' => function (array $attrs): string {
                 $currency = Product::query()->whereKey($attrs['product_id'])->value('currency');

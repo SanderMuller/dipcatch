@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\DropOutcome;
@@ -29,9 +30,13 @@ test('database channel writes a row with the price_drop_event_id payload', funct
 
     $product = Product::factory()->for($user)->create([
         'currency' => 'EUR',
-        'last_price' => '85.00',
         'title' => 'Acme Headphones',
     ]);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://bol.com/p/x',
+        'current_price' => '85.00',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '85.00'])->save();
 
     $eventId = (string) Str::uuid();
 

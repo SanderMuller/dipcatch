@@ -32,5 +32,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="DIPCATCH_FETCHER_ALLOW_UNRESOLVED" value="true"/>
+        <env name="DIPCATCH_FETCHER_ALLOW_PRIVATE_IPS" value="true"/>
     </php>
 </phpunit>

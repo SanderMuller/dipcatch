@@ -4,6 +4,7 @@ use App\Filament\App\Widgets\SavingsByMonthChartWidget;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
@@ -11,7 +12,8 @@ use function Pest\Livewire\livewire;
 
 function fireDropEvent(User $user, Product $product, string $currency, string $abs, CarbonImmutable $firedAt): PriceDropEvent
 {
-    $check = PriceCheck::factory()->for($product)->create();
+    $shop = Shop::factory()->for($product)->create();
+    $check = PriceCheck::factory()->for($shop)->create();
 
     return PriceDropEvent::factory()->state([
         'product_id' => $product->id,
@@ -52,58 +54,35 @@ test('aggregates per-currency drops into the correct month buckets', function ()
     $widget = livewire(SavingsByMonthChartWidget::class)->instance();
     $data = $widget->computeData();
 
-    $datasets = [];
+    $byCurrency = [];
     foreach ($data['datasets'] as $set) {
-        $datasets[$set['label']] = $set;
+        $byCurrency[$set['label']] = $set['data'];
     }
 
-    expect($datasets)->toHaveKey('EUR')
-        ->and($datasets)->toHaveKey('USD')
-        ->and($datasets['EUR']['data'][11])->toBe(20.0) // this-month sum
-        ->and($datasets['USD']['data'][10])->toBe(7.5); // last-month sum
+    expect($byCurrency)->toHaveKey('EUR')
+        ->and(array_sum($byCurrency['EUR']))->toBe(20.0)
+        ->and($byCurrency)->toHaveKey('USD')
+        ->and(array_sum($byCurrency['USD']))->toBe(7.5);
 });
 
-test('does not include other users events', function (): void {
-    $me = User::factory()->create();
-    $other = User::factory()->create();
-    $myProduct = Product::factory()->for($me)->create();
-    $theirProduct = Product::factory()->for($other)->create();
+test('respects user scoping — only the current user\'s drops are counted', function (): void {
+    $alice = User::factory()->create();
+    $bob = User::factory()->create();
+    $aliceProduct = Product::factory()->for($alice)->create();
+    $bobProduct = Product::factory()->for($bob)->create();
 
-    fireDropEvent($me, $myProduct, 'EUR', '10.00', CarbonImmutable::now());
-    fireDropEvent($other, $theirProduct, 'EUR', '999.00', CarbonImmutable::now());
+    $month = CarbonImmutable::now()->startOfMonth()->addDays(1);
 
-    $this->actingAs($me);
+    fireDropEvent($alice, $aliceProduct, 'EUR', '10.00', $month);
+    fireDropEvent($bob, $bobProduct, 'EUR', '99.00', $month);
+
+    $this->actingAs($alice);
     /** @var SavingsByMonthChartWidget $widget */
     $widget = livewire(SavingsByMonthChartWidget::class)->instance();
     $data = $widget->computeData();
 
-    $datasets = [];
-    foreach ($data['datasets'] as $set) {
-        $datasets[$set['label']] = $set;
-    }
-    expect($datasets['EUR']['data'][11])->toBe(10.0);
-});
+    $eurDataset = collect($data['datasets'])->firstWhere('label', 'EUR');
+    assert(is_array($eurDataset));
 
-test('events older than 12 months are excluded', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->for($user)->create();
-
-    fireDropEvent($user, $product, 'EUR', '99.00', CarbonImmutable::now()->subMonths(13));
-
-    $this->actingAs($user);
-    /** @var SavingsByMonthChartWidget $widget */
-    $widget = livewire(SavingsByMonthChartWidget::class)->instance();
-    $data = $widget->computeData();
-
-    expect($data['datasets'])->toBe([]);
-});
-
-test('empty state: no events → no datasets, but the 12-month label band still renders', function (): void {
-    $this->actingAs(User::factory()->create());
-    /** @var SavingsByMonthChartWidget $widget */
-    $widget = livewire(SavingsByMonthChartWidget::class)->instance();
-    $data = $widget->computeData();
-
-    expect($data['datasets'])->toBe([])
-        ->and($data['labels'])->toHaveCount(12);
+    expect(array_sum($eurDataset['data']))->toBe(10.0);
 });

@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\DropOutcome;
@@ -134,10 +135,17 @@ test('toWebPush returns a WebPushMessage with title, body, icon and click url', 
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([
         'currency' => 'EUR',
-        'last_price' => '85.00',
         'title' => 'Acme Headphones',
         'image_url' => 'https://example.com/img.png',
     ]);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://bol.com/p/x',
+        'current_price' => '85.00',
+    ]);
+    $product->forceFill([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '85.00',
+    ])->save();
 
     $message = new PriceDropNotification($product, pushOutcome(), (string) Str::uuid())->toWebPush($user);
 
@@ -145,7 +153,7 @@ test('toWebPush returns a WebPushMessage with title, body, icon and click url', 
 
     $payload = $message->toArray();
     expect($payload['title'])->toBe('Price drop: Acme Headphones')
-        ->and($payload['body'])->toBe('Acme Headphones is now EUR 85.00')
+        ->and($payload['body'])->toBe('Acme Headphones is now EUR 85.00 at bol.com')
         ->and($payload['icon'])->toBe('https://example.com/img.png')
         ->and($payload['data'])->toMatchArray(['url' => $payload['data']['url']]);
 

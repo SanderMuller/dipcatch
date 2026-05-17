@@ -6,6 +6,7 @@ use App\Filament\App\Resources\Products\Pages\CreateProduct;
 use App\Filament\App\Resources\Products\Pages\EditProduct;
 use App\Filament\App\Resources\Products\Pages\ListProducts;
 use App\Filament\App\Resources\Products\Pages\ViewProduct;
+use App\Filament\App\Resources\Products\RelationManagers\ShopsRelationManager;
 use App\Filament\App\Resources\Products\Schemas\ProductForm;
 use App\Filament\App\Resources\Products\Schemas\ProductInfolist;
 use App\Filament\App\Resources\Products\Tables\ProductsTable;
@@ -54,6 +55,16 @@ class ProductResource extends Resource
         $query = parent::getEloquentQuery();
 
         return $query->where('user_id', auth()->id());
+    }
+
+    /**
+     * @return list<class-string>
+     */
+    public static function getRelations(): array
+    {
+        return [
+            ShopsRelationManager::class,
+        ];
     }
 
     /**

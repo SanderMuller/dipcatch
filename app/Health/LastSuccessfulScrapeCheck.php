@@ -2,7 +2,9 @@
 
 namespace App\Health;
 
+use App\Enums\ShopHealth;
 use App\Models\Product;
+use App\Models\Shop;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Spatie\Health\Checks\Check;
 use Spatie\Health\Checks\Result;
@@ -29,51 +31,58 @@ class LastSuccessfulScrapeCheck extends Check
 
     public function run(): Result
     {
-        $activeCount = Product::query()->where('active', true)->count();
+        $activeProductCount = Product::query()->where('active', true)->count();
 
-        if ($activeCount === 0) {
+        if ($activeProductCount === 0) {
             return Result::make()
                 ->ok('No active products being tracked.')
                 ->shortSummary('idle');
         }
 
-        $stale = Product::query()
+        // Count active offers (attached to active products) whose last
+        // successful fetch is missing or older than the warning threshold.
+        $staleOfferCount = $this->staleOfferQuery($this->warnAfterHours)->count();
+        $totalActiveOfferCount = Shop::query()
             ->where('active', true)
-            ->where(function (EloquentQueryBuilder $query): void {
-                $query->whereNull('last_success_at')
-                    ->orWhere('last_success_at', '<', now()->subHours($this->warnAfterHours));
-            })
+            ->where('health', '!=', ShopHealth::Dead->value)
+            ->whereHas('product', fn (EloquentQueryBuilder $q) => $q->where('active', true))
             ->count();
 
         $result = Result::make()
             ->meta([
-                'active_products' => $activeCount,
-                'stale_products' => $stale,
+                'active_products' => $activeProductCount,
+                'active_offers' => $totalActiveOfferCount,
+                'stale_offers' => $staleOfferCount,
                 'warn_after_hours' => $this->warnAfterHours,
                 'fail_after_hours' => $this->failAfterHours,
             ])
-            ->shortSummary("{$stale}/{$activeCount} stale");
+            ->shortSummary("{$staleOfferCount}/{$totalActiveOfferCount} stale");
 
-        if ($stale === 0) {
-            return $result->ok('All active products have a recent successful scrape.');
+        if ($staleOfferCount === 0) {
+            return $result->ok('All active offers have a recent successful fetch.');
         }
 
-        // Use `last_success_at` (set only on Ok scrapes by RecordScrape) so a
-        // product failing every 15 minutes still escalates from warning to
-        // failed once the critical threshold is crossed — fresh
-        // `last_checked_at` from retries no longer masks repeated failures.
-        $criticallyStale = Product::query()
-            ->where('active', true)
-            ->where(function (EloquentQueryBuilder $query): void {
-                $query->whereNull('last_success_at')
-                    ->orWhere('last_success_at', '<', now()->subHours($this->failAfterHours));
-            })
-            ->exists();
+        $criticallyStale = $this->staleOfferQuery($this->failAfterHours)->exists();
 
         if ($criticallyStale) {
-            return $result->failed("{$stale} active product(s) failing or unscraped for over {$this->failAfterHours}h.");
+            return $result->failed("{$staleOfferCount} active offer(s) failing or unscraped for over {$this->failAfterHours}h.");
         }
 
-        return $result->warning("{$stale} active product(s) failing or unscraped for over {$this->warnAfterHours}h.");
+        return $result->warning("{$staleOfferCount} active offer(s) failing or unscraped for over {$this->warnAfterHours}h.");
+    }
+
+    /**
+     * @return EloquentQueryBuilder<Shop>
+     */
+    private function staleOfferQuery(int $hours): EloquentQueryBuilder
+    {
+        return Shop::query()
+            ->where('active', true)
+            ->where('health', '!=', ShopHealth::Dead->value)
+            ->whereHas('product', fn (EloquentQueryBuilder $q) => $q->where('active', true))
+            ->where(function (EloquentQueryBuilder $q) use ($hours): void {
+                $q->whereNull('last_success_at')
+                    ->orWhere('last_success_at', '<', now()->subHours($hours));
+            });
     }
 }

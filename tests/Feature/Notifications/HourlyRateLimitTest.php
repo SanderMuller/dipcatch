@@ -1,10 +1,11 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Drops\DetectDrop;
-use App\Enums\ScrapeStatus;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\ProductCheapestHistory;
+use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use Illuminate\Support\Facades\Cache;
@@ -15,27 +16,40 @@ beforeEach(function (): void {
 });
 
 /**
- * @param  array<string, mixed>  $attrs
+ * Build a product whose cheapest_price is below threshold against a stable
+ * historical reference of 100. Returns the freshly-created triggering
+ * price_check id.
+ *
+ * @return array{0: Product, 1: int}
  */
-function makeDroppingProductForUser(User $user, array $attrs = []): Product
+function makeDroppingProductForUser(User $user): array
 {
-    $product = Product::factory()->for($user)->create(array_merge([
-        'initial_price' => '100.00',
-        'last_price' => '85.00',
-        'last_status' => ScrapeStatus::Ok,
+    $product = Product::factory()->for($user)->create([
+        'currency' => 'EUR',
         'drop_threshold_pct' => '10.00',
         'drop_threshold_abs' => '5.00',
-        'last_notified_price' => null,
-        'last_notified_at' => null,
-    ], $attrs));
-
-    PriceCheck::factory()->for($product)->create([
-        'price' => '85.00',
-        'status' => ScrapeStatus::Ok,
-        'checked_at' => now(),
     ]);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/' . fake()->unique()->slug(),
+        'current_price' => '85.00',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '85.00'])->save();
 
-    return $product;
+    // Seed 8 stable 100.00 segments in the 30-day window so Reference picks
+    // median (or falls back to initial=100). Either way the new cheapest is
+    // well below threshold.
+    foreach (range(1, 8) as $i) {
+        ProductCheapestHistory::factory()->for($product)->create([
+            'cheapest_shop_id' => $shop->id,
+            'cheapest_price' => '100.00',
+            'started_at' => now()->subDays(20 - $i),
+            'ended_at' => now()->subDays(19 - $i),
+        ]);
+    }
+
+    $check = PriceCheck::factory()->for($shop)->create(['price' => '85.00']);
+
+    return [$product, (int) $check->id];
 }
 
 test('the per-user hourly notification limit suppresses excess notifications but still writes the event row', function (): void {
@@ -48,15 +62,12 @@ test('the per-user hourly notification limit suppresses excess notifications but
         'notify_via_push' => false,
     ]);
 
-    // Three distinct products dropping in the same hour — each generates a fresh
-    // price_drop_event because the latch is per-product.
     for ($n = 0; $n < 4; $n++) {
-        $product = makeDroppingProductForUser($user);
-        app(DetectDrop::class)($product);
+        [$product, $checkId] = makeDroppingProductForUser($user);
+        app(DetectDrop::class)($product, $checkId);
     }
 
     expect(PriceDropEvent::query()->where('user_id', $user->id)->count())->toBe(4);
-
     Notification::assertSentToTimes($user, PriceDropNotification::class, 3);
 });
 
@@ -71,7 +82,8 @@ test('limit set to zero disables rate-limiting entirely', function (): void {
     ]);
 
     for ($n = 0; $n < 5; $n++) {
-        app(DetectDrop::class)(makeDroppingProductForUser($user));
+        [$product, $checkId] = makeDroppingProductForUser($user);
+        app(DetectDrop::class)($product, $checkId);
     }
 
     Notification::assertSentToTimes($user, PriceDropNotification::class, 5);
@@ -81,20 +93,15 @@ test('separate users do not share the rate-limit bucket', function (): void {
     Notification::fake();
     config()->set('dipcatch.notifications.user_hourly_limit', 1);
 
-    $alice = User::factory()->create([
-        'notify_via_email' => true,
-        'notify_via_filament' => false,
-        'notify_via_push' => false,
-    ]);
-    $bob = User::factory()->create([
-        'notify_via_email' => true,
-        'notify_via_filament' => false,
-        'notify_via_push' => false,
-    ]);
+    $alice = User::factory()->create(['notify_via_email' => true, 'notify_via_filament' => false]);
+    $bob = User::factory()->create(['notify_via_email' => true, 'notify_via_filament' => false]);
 
-    app(DetectDrop::class)(makeDroppingProductForUser($alice));
-    app(DetectDrop::class)(makeDroppingProductForUser($alice));
-    app(DetectDrop::class)(makeDroppingProductForUser($bob));
+    [$p, $c] = makeDroppingProductForUser($alice);
+    app(DetectDrop::class)($p, $c);
+    [$p2, $c2] = makeDroppingProductForUser($alice);
+    app(DetectDrop::class)($p2, $c2);
+    [$pb, $cb] = makeDroppingProductForUser($bob);
+    app(DetectDrop::class)($pb, $cb);
 
     Notification::assertSentToTimes($alice, PriceDropNotification::class, 1);
     Notification::assertSentToTimes($bob, PriceDropNotification::class, 1);

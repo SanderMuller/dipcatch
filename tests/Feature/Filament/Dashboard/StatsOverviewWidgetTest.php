@@ -1,12 +1,35 @@
 <?php declare(strict_types=1);
 
 use App\Filament\App\Widgets\StatsOverviewWidget;
+use App\Models\PriceCheck;
+use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 
 use function Pest\Livewire\livewire;
 
-test('counts only the current user s active products', function (): void {
+function seedSavings(User $user, string $currency, string $absSum, string $dropAbs = '10.00'): void
+{
+    $product = Product::factory()->for($user)->create(['currency' => $currency]);
+    $shop = Shop::factory()->for($product)->create();
+
+    $remaining = (float) $absSum;
+    while ($remaining > 0) {
+        $thisAmount = min((float) $dropAbs, $remaining);
+        $check = PriceCheck::factory()->for($shop)->create();
+        PriceDropEvent::factory()->state([
+            'product_id' => $product->id,
+            'user_id' => $user->id,
+            'price_check_id' => $check->id,
+            'currency' => $currency,
+            'drop_abs' => (string) $thisAmount,
+        ])->create();
+        $remaining -= $thisAmount;
+    }
+}
+
+test('counts only the current user\'s active products', function (): void {
     $me = User::factory()->create();
     $other = User::factory()->create();
     Product::factory()->count(3)->for($me)->create(['active' => true]);
@@ -34,24 +57,9 @@ test('Active drops counts only products with last_notified_price set, scoped to 
         ->assertSeeText('2');
 });
 
-test('Lifetime savings sums (initial - last) when last < initial, in user default currency', function (): void {
+test('Lifetime savings sums drop_abs in user\'s default currency', function (): void {
     $me = User::factory()->create(['default_currency' => 'EUR']);
-    Product::factory()->for($me)->create([
-        'currency' => 'EUR',
-        'initial_price' => '100.00',
-        'last_price' => '80.00', // saved 20
-    ]);
-    Product::factory()->for($me)->create([
-        'currency' => 'EUR',
-        'initial_price' => '50.00',
-        'last_price' => '45.00', // saved 5
-    ]);
-    // Increased price should not count.
-    Product::factory()->for($me)->create([
-        'currency' => 'EUR',
-        'initial_price' => '20.00',
-        'last_price' => '30.00',
-    ]);
+    seedSavings($me, 'EUR', '25.00');
 
     $this->actingAs($me);
 
@@ -60,18 +68,10 @@ test('Lifetime savings sums (initial - last) when last < initial, in user defaul
         ->assertSeeText('EUR 25.00');
 });
 
-test('Lifetime savings shows per-currency breakdown when portfolio is mixed', function (): void {
+test('Lifetime savings shows per-currency breakdown', function (): void {
     $me = User::factory()->create(['default_currency' => 'EUR']);
-    Product::factory()->for($me)->create([
-        'currency' => 'EUR',
-        'initial_price' => '100.00',
-        'last_price' => '90.00', // saved 10 EUR
-    ]);
-    Product::factory()->for($me)->create([
-        'currency' => 'USD',
-        'initial_price' => '200.00',
-        'last_price' => '170.00', // saved 30 USD
-    ]);
+    seedSavings($me, 'EUR', '10.00');
+    seedSavings($me, 'USD', '30.00');
 
     $this->actingAs($me);
 
@@ -81,23 +81,19 @@ test('Lifetime savings shows per-currency breakdown when portfolio is mixed', fu
         ->assertSeeText('FX not converted in v1');
 });
 
-test('Lifetime savings empty state when no products yet', function (): void {
+test('Lifetime savings empty state when no drops yet', function (): void {
     $me = User::factory()->create(['default_currency' => 'EUR']);
     $this->actingAs($me);
 
     livewire(StatsOverviewWidget::class)
         ->assertSeeText('EUR 0.00')
-        ->assertSeeText('No saved cents yet');
+        ->assertSeeText('No drops fired yet');
 });
 
-test('cross-user isolation: another user s products do not leak into savings sum', function (): void {
+test('cross-user isolation: another user\'s drops do not leak into savings sum', function (): void {
     $me = User::factory()->create(['default_currency' => 'EUR']);
     $other = User::factory()->create();
-    Product::factory()->for($other)->create([
-        'currency' => 'EUR',
-        'initial_price' => '1000.00',
-        'last_price' => '500.00', // would be huge if leaked
-    ]);
+    seedSavings($other, 'EUR', '500.00');
 
     $this->actingAs($me);
 

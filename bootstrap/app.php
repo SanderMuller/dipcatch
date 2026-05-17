@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
-use App\Console\Commands\DispatchScrapesCommand;
 use App\Console\Commands\PruneOldChecksCommand;
+use App\Console\Commands\RecheckActiveShopsCommand;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,8 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
-        $schedule->command(DispatchScrapesCommand::class)
-            ->everyFifteenMinutes()
+        $schedule->command(RecheckActiveShopsCommand::class)
+            ->everyFiveMinutes()
             ->withoutOverlapping()
             ->onOneServer();
 

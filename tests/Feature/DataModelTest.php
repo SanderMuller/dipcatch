@@ -5,6 +5,7 @@ use App\Models\Invitation;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 
 test('user has dipcatch columns with sensible defaults', function (): void {
@@ -21,19 +22,17 @@ test('product factory builds a valid product with cast columns', function (): vo
     $product = Product::factory()->create();
 
     expect($product->id)->toBeString()
-        ->and($product->fallback_selectors)->toBeArray()
         ->and($product->active)->toBeTrue()
-        ->and($product->needs_js)->toBeFalse()
-        ->and($product->last_status)->toBe(ScrapeStatus::Ok)
+        ->and($product->currency)->toBe('EUR')
         ->and($product->user)->toBeInstanceOf(User::class);
 });
 
-test('product hasMany price checks', function (): void {
-    $product = Product::factory()->create();
-    PriceCheck::factory()->count(3)->for($product)->create();
+test('offer hasMany price checks', function (): void {
+    $shop = Shop::factory()->create();
+    PriceCheck::factory()->count(3)->for($shop)->create();
 
-    expect($product->priceChecks)->toHaveCount(3)
-        ->and($product->priceChecks->first())->toBeInstanceOf(PriceCheck::class);
+    expect($shop->priceChecks)->toHaveCount(3)
+        ->and($shop->priceChecks->first())->toBeInstanceOf(PriceCheck::class);
 });
 
 test('price check status casts to enum', function (): void {
@@ -74,19 +73,15 @@ test('cascade delete on user wipes products', function (): void {
     expect(Product::query()->count())->toBe(0);
 });
 
-test('cascade delete on product wipes its price checks and drop events', function (): void {
+test('cascade delete on product wipes its offers and their checks', function (): void {
     $product = Product::factory()->create();
-    $checks = PriceCheck::factory()->count(2)->for($product)->create();
-    PriceDropEvent::factory()->state([
-        'product_id' => $product->id,
-        'user_id' => $product->user_id,
-        'price_check_id' => $checks->first()->id,
-    ])->create();
+    $shop = Shop::factory()->for($product)->create();
+    PriceCheck::factory()->count(2)->for($shop)->create();
 
     $product->delete();
 
-    expect(PriceCheck::query()->where('product_id', $product->id)->count())->toBe(0)
-        ->and(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(0);
+    expect(Shop::query()->where('product_id', $product->id)->count())->toBe(0)
+        ->and(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(0);
 });
 
 test('ScrapeStatus enum has all seven cases with stable string values', function (): void {

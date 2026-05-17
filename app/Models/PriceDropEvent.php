@@ -54,4 +54,12 @@ class PriceDropEvent extends Model
     {
         return $this->belongsTo(PriceCheck::class);
     }
+
+    /**
+     * @return BelongsTo<Shop, $this>
+     */
+    public function triggeredByShop(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class, 'triggered_by_shop_id');
+    }
 }

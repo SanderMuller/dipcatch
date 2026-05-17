@@ -24,16 +24,22 @@ class PriceCheck extends Model
     {
         return [
             'price' => 'decimal:2',
+            'in_stock' => 'boolean',
             'checked_at' => 'datetime',
             'status' => ScrapeStatus::class,
         ];
     }
 
     /**
-     * @return BelongsTo<Product, $this>
+     * @return BelongsTo<Shop, $this>
      */
-    public function product(): BelongsTo
+    public function shop(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Shop::class);
+    }
+
+    public function product(): ?Product
+    {
+        return $this->shop?->product;
     }
 }

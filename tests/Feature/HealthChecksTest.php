@@ -1,8 +1,8 @@
 <?php declare(strict_types=1);
 
-use App\Enums\ScrapeStatus;
 use App\Health\LastSuccessfulScrapeCheck;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
@@ -29,10 +29,10 @@ test('LastSuccessfulScrapeCheck reports OK when no active products', function ()
         ->and($result->shortSummary)->toBe('idle');
 });
 
-test('LastSuccessfulScrapeCheck reports OK when all active products have a recent successful scrape', function (): void {
-    Product::factory()->count(2)->create([
-        'last_status' => ScrapeStatus::Ok,
-        'last_checked_at' => now()->subHours(2),
+test('LastSuccessfulScrapeCheck reports OK when all active offers have a recent successful fetch', function (): void {
+    $product = Product::factory()->create();
+    Shop::factory()->count(2)->for($product)->create([
+        'last_success_at' => now()->subHours(2),
     ]);
 
     $result = new LastSuccessfulScrapeCheck()->run();
@@ -41,17 +41,10 @@ test('LastSuccessfulScrapeCheck reports OK when all active products have a recen
         ->and($result->shortSummary)->toBe('0/2 stale');
 });
 
-test('LastSuccessfulScrapeCheck warns when a product is stale beyond warn threshold', function (): void {
-    Product::factory()->create([
-        'last_status' => ScrapeStatus::Ok,
-        'last_checked_at' => now()->subHours(2),
-        'last_success_at' => now()->subHours(2),
-    ]);
-    Product::factory()->create([
-        'last_status' => ScrapeStatus::Ok,
-        'last_checked_at' => now()->subHours(60),
-        'last_success_at' => now()->subHours(60),
-    ]);
+test('LastSuccessfulScrapeCheck warns when an offer is stale beyond warn threshold', function (): void {
+    $product = Product::factory()->create();
+    Shop::factory()->for($product)->create(['last_success_at' => now()->subHours(2)]);
+    Shop::factory()->for($product)->create(['last_success_at' => now()->subHours(60)]);
 
     $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();
 
@@ -59,38 +52,18 @@ test('LastSuccessfulScrapeCheck warns when a product is stale beyond warn thresh
         ->and($result->shortSummary)->toBe('1/2 stale');
 });
 
-test('LastSuccessfulScrapeCheck fails when a product is critically stale', function (): void {
-    Product::factory()->create([
-        'last_status' => ScrapeStatus::Ok,
-        'last_checked_at' => now()->subHours(120),
-        'last_success_at' => now()->subHours(120),
-    ]);
+test('LastSuccessfulScrapeCheck fails when an offer is critically stale', function (): void {
+    $product = Product::factory()->create();
+    Shop::factory()->for($product)->create(['last_success_at' => now()->subHours(120)]);
 
     $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();
 
     expect($result->status->value)->toBe('failed');
 });
 
-test('LastSuccessfulScrapeCheck escalates a constantly-failing product to failed even when last_checked_at is fresh', function (): void {
-    // Product is being retried every cycle (fresh last_checked_at) but every
-    // attempt has been a failure since well before failAfterHours.
-    Product::factory()->create([
-        'last_status' => ScrapeStatus::HttpError,
-        'last_checked_at' => now()->subMinutes(5),
-        'last_success_at' => now()->subHours(120),
-    ]);
-
-    $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();
-
-    expect($result->status->value)->toBe('failed');
-});
-
-test('LastSuccessfulScrapeCheck does not flip on a single transient failure with a recent successful scrape', function (): void {
-    Product::factory()->create([
-        'last_status' => ScrapeStatus::HttpError,
-        'last_checked_at' => now()->subMinutes(5),
-        'last_success_at' => now()->subMinutes(20),
-    ]);
+test('LastSuccessfulScrapeCheck does not flip on a recent successful offer', function (): void {
+    $product = Product::factory()->create();
+    Shop::factory()->for($product)->create(['last_success_at' => now()->subMinutes(20)]);
 
     $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();
 
@@ -98,12 +71,18 @@ test('LastSuccessfulScrapeCheck does not flip on a single transient failure with
         ->and($result->shortSummary)->toBe('0/1 stale');
 });
 
+test('LastSuccessfulScrapeCheck treats dead offers as not relevant', function (): void {
+    $product = Product::factory()->create();
+    Shop::factory()->for($product)->dead()->create(['last_success_at' => now()->subHours(120)]);
+
+    $result = new LastSuccessfulScrapeCheck()->run();
+
+    expect($result->status->value)->toBe('ok');
+});
+
 test('LastSuccessfulScrapeCheck treats inactive products as not relevant', function (): void {
-    Product::factory()->inactive()->create([
-        'last_status' => ScrapeStatus::Ok,
-        'last_checked_at' => now()->subHours(120),
-        'last_success_at' => now()->subHours(120),
-    ]);
+    $product = Product::factory()->inactive()->create();
+    Shop::factory()->for($product)->create(['last_success_at' => now()->subHours(120)]);
 
     $result = new LastSuccessfulScrapeCheck()->run();
 

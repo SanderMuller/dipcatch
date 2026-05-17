@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Enums\ScrapeStatus;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -17,30 +16,17 @@ class ProductFactory extends Factory
      */
     public function definition(): array
     {
-        $price = fake()->randomFloat(2, 5, 2000);
-
         return [
             'user_id' => User::factory(),
-            'url' => fake()->url(),
             'title' => fake()->sentence(3),
             'image_url' => fake()->imageUrl(),
-            'price_selector' => '.product-price',
-            'fallback_selectors' => [],
-            'image_selector' => null,
-            'title_selector' => null,
             'currency' => 'EUR',
-            'initial_price' => $price,
-            'initial_checked_at' => now(),
-            'last_price' => $price,
-            'last_checked_at' => now(),
-            'last_success_at' => now(),
-            'last_status' => ScrapeStatus::Ok,
-            'last_error' => null,
             'drop_threshold_pct' => 10.00,
             'drop_threshold_abs' => 5.00,
             'last_notified_price' => null,
             'last_notified_at' => null,
-            'needs_js' => false,
+            'cheapest_shop_id' => null,
+            'cheapest_price' => null,
             'active' => true,
         ];
     }

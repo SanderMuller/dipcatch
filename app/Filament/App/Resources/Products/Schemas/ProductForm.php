@@ -2,9 +2,7 @@
 
 namespace App\Filament\App\Resources\Products\Schemas;
 
-use App\Rules\ValidCssSelector;
 use App\Support\Iso4217;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -17,14 +15,8 @@ class ProductForm
     {
         return $schema
             ->components([
-                Section::make('Source')
+                Section::make('Product')
                     ->schema([
-                        TextInput::make('url')
-                            ->label('Product URL')
-                            ->url()
-                            ->maxLength(2048)
-                            ->required(),
-
                         TextInput::make('title')
                             ->maxLength(255)
                             ->required(),
@@ -36,39 +28,8 @@ class ProductForm
                     ])
                     ->columns(1),
 
-                Section::make('Selectors')
-                    ->schema([
-                        TextInput::make('price_selector')
-                            ->label('CSS selector for price')
-                            ->maxLength(500)
-                            ->rules([new ValidCssSelector()])
-                            ->required(),
-
-                        Repeater::make('fallback_selectors')
-                            ->label('Fallback selectors (optional)')
-                            ->schema([
-                                TextInput::make('selector')
-                                    ->maxLength(500)
-                                    ->rules([new ValidCssSelector()])
-                                    ->required(),
-                            ])
-                            ->defaultItems(0)
-                            ->reorderable()
-                            ->addActionLabel('Add fallback selector'),
-
-                        TextInput::make('image_selector')
-                            ->label('Image selector (optional override)')
-                            ->maxLength(500)
-                            ->rules([new ValidCssSelector()]),
-
-                        TextInput::make('title_selector')
-                            ->label('Title selector (optional override)')
-                            ->maxLength(500)
-                            ->rules([new ValidCssSelector()]),
-                    ])
-                    ->columns(1),
-
                 Section::make('Pricing & alerts')
+                    ->description('Shops are managed separately from the product page.')
                     ->schema([
                         Select::make('currency')
                             ->options(Iso4217::options())

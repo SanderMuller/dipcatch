@@ -2,6 +2,7 @@
 
 namespace App\Filament\App\Widgets;
 
+use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\User;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
@@ -9,12 +10,6 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class StatsOverviewWidget extends BaseWidget
 {
-    /**
-     * Render synchronously (small COUNT/SUM queries, above the fold). Heavier
-     * widgets — `ActiveDropsTableWidget`, `RecentNotificationsTableWidget`,
-     * `SavingsByMonthChartWidget`, `PriceHistoryChart` — keep Filament's
-     * default lazy hydration.
-     */
     protected static bool $isLazy = false;
 
     protected ?string $pollingInterval = '60s';
@@ -59,19 +54,22 @@ class StatsOverviewWidget extends BaseWidget
 
     private function lifetimeSavingsStat(int $userId): Stat
     {
+        // Savings now come from the firehose of recorded drops — sum of
+        // `drop_abs` per currency over price_drop_events. This replaces the
+        // pre-refactor "initial_price - last_price" snapshot, which the
+        // multi-webshop schema no longer carries on Product.
         $totals = $this->savingsByCurrency($userId);
         $defaultCurrency = $this->userDefaultCurrency();
 
         if ($totals === []) {
             return Stat::make('Lifetime savings', $defaultCurrency . ' 0.00')
-                ->description('No saved cents yet — keep tracking.')
+                ->description('No drops fired yet — keep tracking.')
                 ->icon('heroicon-o-banknotes')
                 ->color('gray');
         }
 
         $primary = $totals[$defaultCurrency] ?? null;
         if ($primary === null) {
-            // No products in user's default currency — pick the largest other.
             arsort($totals);
             $defaultCurrency = array_key_first($totals);
             $primary = $totals[$defaultCurrency];
@@ -83,7 +81,7 @@ class StatsOverviewWidget extends BaseWidget
         unset($others[$defaultCurrency]);
 
         $description = $others === []
-            ? 'Total dropped vs. each product\'s initial price.'
+            ? 'Total saved across all fired drops.'
             : 'Also: ' . collect($others)
                 ->map(fn (float $amount, string $code): string => $code . ' ' . number_format($amount, 2, '.', ','))
                 ->values()
@@ -96,15 +94,13 @@ class StatsOverviewWidget extends BaseWidget
     }
 
     /**
-     * @return array<string, float> currency code => sum of (initial_price - last_price)
+     * @return array<string, float>
      */
     private function savingsByCurrency(int $userId): array
     {
-        $rows = Product::query()
+        $rows = PriceDropEvent::query()
             ->where('user_id', $userId)
-            ->whereNotNull('last_price')
-            ->whereColumn('last_price', '<', 'initial_price')
-            ->selectRaw('currency, SUM(initial_price - last_price) as savings')
+            ->selectRaw('currency, SUM(drop_abs) as savings')
             ->groupBy('currency')
             ->pluck('savings', 'currency')
             ->all();

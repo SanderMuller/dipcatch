@@ -2,6 +2,7 @@
 
 namespace App\Actions\Drops;
 
+use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\User;
@@ -25,13 +26,19 @@ final readonly class DetectDrop
         private DropEvaluator $evaluator,
     ) {}
 
-    public function __invoke(Product $product): void
+    /**
+     * Invoked from `Product::recomputeCheapestShop()` when the cheapest price
+     * has decreased. `$triggeringPriceCheckId` is the id of the freshly-inserted
+     * price_check row that caused the drop — it becomes the event's anchor
+     * (no `latest('checked_at')` lookup; that was racy under concurrent jobs).
+     */
+    public function __invoke(Product $product, ?int $triggeringPriceCheckId): void
     {
-        if ($product->last_price === null) {
+        if ($product->cheapest_price === null) {
             return;
         }
 
-        $newPrice = (string) $product->last_price;
+        $newPrice = (string) $product->cheapest_price;
 
         $ref = $this->reference->compute($product);
 
@@ -41,19 +48,36 @@ final readonly class DetectDrop
 
         $outcome = $this->evaluator->evaluate($product, $newPrice, $ref);
 
-        if ($this->isRecovered($newPrice, $ref)) {
+        if (! $outcome->belowThreshold) {
+            return;
+        }
+
+        $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId);
+    }
+
+    /**
+     * Clear `last_notified_price` / `last_notified_at` when the new cheapest
+     * is at or above the reference (recovered). Called from
+     * `recomputeCheapestShop()` on upward / null-cheapest moves so the latch
+     * doesn't get stuck after the original cheapest offer goes out of stock.
+     */
+    public function clearLatchIfRecovered(Product $product, ?string $newPrice, ?ReferenceValue $reference): void
+    {
+        if ($product->last_notified_price === null && $product->last_notified_at === null) {
+            return;
+        }
+
+        // Null cheapest = no eligible offer; treat as "recovered" (nothing to
+        // compare against, latch should not stay armed indefinitely).
+        if ($newPrice === null || $reference === null) {
             $this->clearLatchAtomically($product);
 
             return;
         }
 
-        if (! $outcome->belowThreshold) {
-            return;
+        if ($this->isRecovered($newPrice, $reference)) {
+            $this->clearLatchAtomically($product);
         }
-
-        // Re-check latch + write event + dispatch notification under a row
-        // lock so concurrent scrapes for the same product can't both fire.
-        $this->triggerNotificationAtomically($product, $newPrice, $outcome);
     }
 
     private function isRecovered(string $newPrice, ReferenceValue $ref): bool
@@ -72,10 +96,6 @@ final readonly class DetectDrop
 
     private function clearLatchAtomically(Product $product): void
     {
-        if ($product->last_notified_price === null && $product->last_notified_at === null) {
-            return;
-        }
-
         DB::transaction(function () use ($product): void {
             $locked = Product::query()->lockForUpdate()->find($product->id);
 
@@ -94,17 +114,19 @@ final readonly class DetectDrop
         });
     }
 
-    private function triggerNotificationAtomically(Product $product, string $newPrice, DropOutcome $outcome): void
-    {
-        DB::transaction(function () use ($product, $newPrice, $outcome): void {
+    private function triggerNotificationAtomically(
+        Product $product,
+        string $newPrice,
+        DropOutcome $outcome,
+        ?int $triggeringPriceCheckId,
+    ): void {
+        DB::transaction(function () use ($product, $newPrice, $outcome, $triggeringPriceCheckId): void {
             $locked = Product::query()->lockForUpdate()->find($product->id);
 
             if ($locked === null) {
                 return;
             }
 
-            // Re-evaluate against the freshly locked row — another worker may
-            // already have written a lower latch value while we were waiting.
             if (! $this->shouldNotify($locked, $newPrice)) {
                 return;
             }
@@ -114,7 +136,7 @@ final readonly class DetectDrop
                 'last_notified_at' => now(),
             ])->save();
 
-            $triggerCheck = $locked->priceChecks()->latest('checked_at')->first();
+            $triggerCheck = $this->resolveTriggerCheck($locked, $triggeringPriceCheckId);
 
             if ($triggerCheck === null) {
                 return;
@@ -124,6 +146,7 @@ final readonly class DetectDrop
                 'product_id' => $locked->id,
                 'user_id' => $locked->user_id,
                 'price_check_id' => $triggerCheck->id,
+                'triggered_by_shop_id' => $triggerCheck->shop_id,
                 'currency' => $locked->currency,
                 'reference_price' => $outcome->referencePrice,
                 'reference_kind' => $outcome->referenceKind,
@@ -151,9 +174,28 @@ final readonly class DetectDrop
     }
 
     /**
-     * Per-user hourly rate limit. Returns true if a slot is consumed (notification
-     * may proceed); false when the user is over the configured threshold.
+     * Prefer the explicit triggering check id passed in by the recompute
+     * caller. Fall back to the latest check on the cheapest offer for paths
+     * that don't carry an explicit id (e.g. tests, manual triggers).
      */
+    private function resolveTriggerCheck(Product $product, ?int $triggeringPriceCheckId): ?PriceCheck
+    {
+        if ($triggeringPriceCheckId !== null) {
+            return PriceCheck::query()->find($triggeringPriceCheckId);
+        }
+
+        $cheapestOfferId = $product->cheapest_shop_id;
+
+        if ($cheapestOfferId === null) {
+            return null;
+        }
+
+        return PriceCheck::query()
+            ->where('shop_id', $cheapestOfferId)
+            ->latest('checked_at')
+            ->first();
+    }
+
     private function withinHourlyLimit(User $user): bool
     {
         $limit = DipConfig::int('dipcatch.notifications.user_hourly_limit', 30);
