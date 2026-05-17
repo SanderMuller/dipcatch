@@ -89,7 +89,9 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             // Per-host budget exhausted (probe path or another worker drained
             // it). Release for retry instead of writing a `rate_limited` check
             // and ticking the failure counter — the bucket refills shortly.
-            $this->release(max(1, $e->retryAfterSeconds));
+            // Jitter avoids a thundering herd when many queued jobs for the
+            // same drained host all wake at the bucket's exact refill instant.
+            $this->release(max(1, $e->retryAfterSeconds) + random_int(0, 5));
 
             return;
         }
@@ -117,8 +119,11 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         try {
             $fetch = $fetcher->fetch($shop->url);
         } catch (RateLimitedByHost $e) {
-            // Bubble up so handle() can release the job. We deliberately do
-            // NOT classify this as a failed check.
+            // This arm exists to PREVENT the broader FetchException catch
+            // below from misclassifying rate-limit as a failed check —
+            // RateLimitedByHost extends FetchException, so without this
+            // specific arm it would fall into failureOutcome(). handle()
+            // turns the re-thrown exception into a job release.
             throw $e;
         } catch (FetchException $e) {
             return $this->failureOutcome($e);

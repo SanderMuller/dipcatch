@@ -114,10 +114,19 @@ final class ShopFetcher
         );
     }
 
+    /**
+     * Canonical cache key for the per-host rate-limit bucket. Exposed so the
+     * queue path (CheckShopPrice) and tests can target the same bucket.
+     */
+    public static function throttleKey(string $host): string
+    {
+        return "dipcatch:fetcher:host:{$host}";
+    }
+
     private function throttle(string $host): void
     {
         $limit = DipConfig::int('dipcatch.fetcher.rate_limit_per_minute', self::DEFAULT_RATE_LIMIT_PER_MINUTE);
-        $key = "dipcatch:fetcher:host:{$host}";
+        $key = self::throttleKey($host);
 
         // Use attempt() so the check + hit happen as a single atomic operation
         // against the cache store. Without this, two workers can both pass

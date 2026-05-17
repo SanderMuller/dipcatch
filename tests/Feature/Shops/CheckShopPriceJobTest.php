@@ -32,7 +32,7 @@ function fakeJsonLdResponse(string $host, string $path, string $price = '60.00',
 
 beforeEach(function (): void {
     Cache::flush();
-    RateLimiter::clear('dipcatch:fetcher:host:shop.test');
+    RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
 });
 
 test('successful check writes price_check, updates offer, recomputes cheapest', function (): void {
@@ -167,12 +167,14 @@ test('inactive or dead offer is skipped', function (): void {
 });
 
 test('per-host rate limit releases instead of writing a failed check or ticking counter', function (): void {
-    // Drain the per-host bucket — same key ShopFetcher::throttle() uses.
     $perMinute = config()->integer('dipcatch.fetcher.rate_limit_per_minute', 12);
     for ($i = 0; $i < $perMinute; $i++) {
-        RateLimiter::hit('dipcatch:fetcher:host:shop.test', 60);
+        RateLimiter::hit(ShopFetcher::throttleKey('shop.test'), 60);
     }
-    Http::fake(['https://shop.test/*' => Http::response('', 200)]);
+    // Pre-warm robots cache so the policy check doesn't issue an HTTP call —
+    // otherwise assertNothingSent below would see the robots.txt fetch.
+    Cache::put('dipcatch:robots:shop.test', [], 60);
+    Http::fake();
 
     $shop = Shop::factory()->create([
         'url' => 'https://shop.test/p/1',
@@ -188,6 +190,7 @@ test('per-host rate limit releases instead of writing a failed check or ticking 
         app(AdapterResolver::class),
     );
 
+    Http::assertNothingSent();
     expect(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(0)
         ->and($shop->fresh()->consecutive_failures)->toBe(0);
 });
