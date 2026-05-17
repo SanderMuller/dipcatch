@@ -1,4 +1,6 @@
 @php
+    use App\Support\MoneyFormatter;
+
     $image = $product->safeImageUrl();
     // Suppress the denormalized `cheapest_price` when no eligible shop is
     // currently visible. The denorm is recomputed asynchronously after each
@@ -6,7 +8,7 @@
     // recompute, the column carries a stale number. Rendering it next to
     // "0 shops tracked" misleads — fall back to the no-price treatment.
     $priceLine = ($product->cheapest_price !== null && $shops->isNotEmpty())
-        ? $product->currency . ' ' . number_format((float) $product->cheapest_price, 2, '.', '')
+        ? MoneyFormatter::format((string) $product->cheapest_price, $product->currency)
         : null;
     $ogDescription = $priceLine !== null
         ? "Tracked on DipCatch: cheapest at {$priceLine}"
@@ -159,7 +161,7 @@
                             </div>
                             <div class="text-right">
                                 <p class="text-sm font-semibold">
-                                    {{ $shop->currency }} {{ number_format((float) $shop->current_price, 2, '.', '') }}
+                                    {{ MoneyFormatter::format((string) $shop->current_price, $shop->currency) }}
                                 </p>
                                 <a
                                     href="{{ $shop->url }}"
