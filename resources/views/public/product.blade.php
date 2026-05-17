@@ -1,3 +1,14 @@
+@php
+    $image = $product->safeImageUrl();
+    $priceLine = $product->cheapest_price !== null
+        ? $product->currency . ' ' . number_format((float) $product->cheapest_price, 2, '.', '')
+        : null;
+    $ogDescription = $priceLine !== null
+        ? "Tracked on DipCatch: cheapest at {$priceLine}"
+        : 'Tracked on DipCatch.';
+    $canonicalUrl = $product->publicShareUrl() ?? url('/');
+    $hasChart = ! empty($chart);
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,14 +16,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
     <title>{{ $product->title }} — DipCatch</title>
+
+    {{-- Open Graph / Twitter Card. og:image / twitter:image only emit when
+         the user-supplied image_url passes the http(s) scheme check via
+         safeImageUrl(). --}}
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{ $product->title }}">
+    <meta property="og:description" content="{{ $ogDescription }}">
+    <meta property="og:url" content="{{ $canonicalUrl }}">
+    @if ($image)
+        <meta property="og:image" content="{{ $image }}">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:image" content="{{ $image }}">
+    @else
+        <meta name="twitter:card" content="summary">
+    @endif
+    <meta name="twitter:title" content="{{ $product->title }}">
+    <meta name="twitter:description" content="{{ $ogDescription }}">
+
     @vite(['resources/css/app.css'])
+
+    @if ($hasChart)
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
+    @endif
 </head>
 <body class="min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
     <main class="mx-auto max-w-2xl px-6 py-12">
 
         {{-- Header --}}
         <header class="mb-8 flex items-start gap-6">
-            @php($image = $product->safeImageUrl())
             @if ($image)
                 <img
                     src="{{ $image }}"
@@ -26,10 +58,8 @@
                     {{ $product->title }}
                 </h1>
 
-                @if ($product->cheapest_price !== null)
-                    <p class="mt-3 text-3xl font-bold">
-                        {{ $product->currency }} {{ number_format((float) $product->cheapest_price, 2, '.', '') }}
-                    </p>
+                @if ($priceLine !== null)
+                    <p class="mt-3 text-3xl font-bold">{{ $priceLine }}</p>
                     <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                         Cheapest across {{ $shops->count() }} {{ $shops->count() === 1 ? 'shop' : 'shops' }} tracked.
                     </p>
@@ -40,6 +70,56 @@
                 @endif
             </div>
         </header>
+
+        {{-- Price-history chart --}}
+        @if ($hasChart)
+            <section class="mt-8">
+                <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Price (last 90 days)
+                </h2>
+                <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+                    <canvas id="price-history-chart" height="180"></canvas>
+                </div>
+                <script id="price-history-data" type="application/json">@json($chart)</script>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        const init = function () {
+                            if (typeof Chart === 'undefined') {
+                                return setTimeout(init, 50);
+                            }
+                            const data = JSON.parse(document.getElementById('price-history-data').textContent);
+                            const ctx = document.getElementById('price-history-chart');
+                            new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    datasets: [{
+                                        data: data,
+                                        borderColor: 'rgb(99, 102, 241)',
+                                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                        borderWidth: 2,
+                                        pointRadius: 0,
+                                        stepped: 'before',
+                                        tension: 0,
+                                        fill: true,
+                                        parsing: { xAxisKey: 'x', yAxisKey: 'y' },
+                                    }],
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        x: { type: 'time', time: { unit: 'day' }, grid: { display: false } },
+                                        y: { beginAtZero: false },
+                                    },
+                                    plugins: { legend: { display: false } },
+                                },
+                            });
+                        };
+                        init();
+                    });
+                </script>
+            </section>
+        @endif
 
         {{-- Shop list --}}
         @if ($shops->isNotEmpty())

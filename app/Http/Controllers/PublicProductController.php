@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ShopHealth;
-use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
+use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Response;
@@ -13,7 +14,7 @@ use Illuminate\Http\Response;
 /**
  * Renders the public product page at GET /p/{slug}. No auth.
  *
- * Lookup is independent of {@see ProductResource::getEloquentQuery()}
+ * Lookup is independent of `ProductResource::getEloquentQuery()`
  * (which scopes to auth()->id()) and of `ProductPolicy::view()` (which only
  * allows the owner). Going through either would 403 / return empty for guests.
  *
@@ -42,11 +43,56 @@ final class PublicProductController extends Controller
             ->orderBy('current_price')
             ->get();
 
+        $chart = $this->chartPayload($product);
+
         return response()
             ->view('public.product', [
                 'product' => $product,
                 'shops' => $shops,
+                'chart' => $chart,
             ])
             ->header('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    /**
+     * Build the [{x: ISO timestamp, y: decimal price string}, ...] payload
+     * the Chart.js line chart consumes. Reads from ProductCheapestHistory
+     * for segments whose started_at falls in the last 90 days. Each segment
+     * contributes two points (started_at, ended_at) so the line steps when
+     * the cheapest shop changes; the open segment's right edge is "now".
+     *
+     * @return list<array{x: string, y: string|null}>
+     */
+    private function chartPayload(Product $product): array
+    {
+        $cutoff = CarbonImmutable::now()->subDays(90);
+
+        /** @var Collection<int, ProductCheapestHistory> $segments */
+        $segments = ProductCheapestHistory::query()
+            ->select(['cheapest_price', 'started_at', 'ended_at'])
+            ->where('product_id', $product->id)
+            ->where('started_at', '>=', $cutoff)
+            ->orderBy('started_at')
+            ->get();
+
+        $points = [];
+        $now = CarbonImmutable::now();
+        foreach ($segments as $segment) {
+            $price = $segment->cheapest_price === null ? null : (string) $segment->cheapest_price;
+            $started = $segment->started_at;
+            $ended = $segment->ended_at ?? $now;
+            // Larastan doesn't infer the datetime cast off the model's
+            // casts() method shape — narrow to CarbonInterface for PHPStan.
+            assert($started instanceof CarbonImmutable);
+            assert($ended instanceof CarbonImmutable);
+            /** @var string $startedIso */
+            $startedIso = $started->toIso8601String();
+            /** @var string $endedIso */
+            $endedIso = $ended->toIso8601String();
+            $points[] = ['x' => $startedIso, 'y' => $price];
+            $points[] = ['x' => $endedIso, 'y' => $price];
+        }
+
+        return $points;
     }
 }

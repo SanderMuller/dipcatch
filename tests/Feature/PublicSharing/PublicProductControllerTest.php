@@ -2,6 +2,7 @@
 
 use App\Models\PriceCheck;
 use App\Models\Product;
+use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Support\Facades\RateLimiter;
@@ -184,6 +185,100 @@ test('response includes X-Robots-Tag noindex header', function (): void {
     $response = $this->get('/p/' . str_repeat('a', 32));
 
     $response->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+});
+
+test('emits OG + Twitter meta tags with safeImageUrl-guarded image', function (): void {
+    makeSharedProduct(['image_url' => 'https://example.com/img.png']);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertSee('<meta property="og:title" content="Acme Headphones">', escape: false)
+        ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at EUR 85.00">', escape: false)
+        ->assertSee('<meta property="og:image" content="https://example.com/img.png">', escape: false)
+        ->assertSee('<meta name="twitter:card" content="summary_large_image">', escape: false)
+        ->assertSee('<meta name="twitter:image" content="https://example.com/img.png">', escape: false);
+});
+
+test('OG image is omitted when image_url uses a non-http scheme', function (): void {
+    makeSharedProduct(['image_url' => 'javascript:alert(1)']);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertSee('<meta name="twitter:card" content="summary">', escape: false)
+        ->assertDontSee('og:image', escape: false)
+        ->assertDontSee('twitter:image', escape: false)
+        ->assertDontSee('javascript:alert', escape: false);
+});
+
+test('OG image is omitted when image_url is null', function (): void {
+    makeSharedProduct(['image_url' => null]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertSee('<meta name="twitter:card" content="summary">', escape: false)
+        ->assertDontSee('og:image', escape: false);
+});
+
+test('chart payload renders inline with started/ended segment data', function (): void {
+    $product = makeSharedProduct();
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '100.00',
+        'started_at' => now()->subDays(10),
+        'ended_at' => now()->subDays(5),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '85.00',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+    Shop::factory()->for($product)->create(['current_price' => '85.00']);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertOk()
+        ->assertSee('Price (last 90 days)', escape: false)
+        ->assertSee('id="price-history-chart"', escape: false)
+        ->assertSee('"y":"100.00"', escape: false)
+        ->assertSee('"y":"85.00"', escape: false)
+        ->assertSee('cdn.jsdelivr.net/npm/chart.js', escape: false);
+});
+
+test('chart + Chart.js script are not emitted when history is empty', function (): void {
+    $product = makeSharedProduct();
+    Shop::factory()->for($product)->create([
+        'current_price' => '85.00',
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertOk()
+        ->assertDontSee('Price (last 90 days)', escape: false)
+        ->assertDontSee('id="price-history-chart"', escape: false)
+        ->assertDontSee('cdn.jsdelivr.net/npm/chart.js', escape: false);
+});
+
+test('chart payload excludes history segments older than 90 days', function (): void {
+    $product = makeSharedProduct();
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '999.99',  // sentinel — should NOT appear
+        'started_at' => now()->subDays(120),
+        'ended_at' => now()->subDays(100),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '85.00',
+        'started_at' => now()->subDays(30),
+        'ended_at' => null,
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertOk()
+        ->assertDontSee('"y":"999.99"', escape: false)
+        ->assertSee('"y":"85.00"', escape: false);
 });
 
 test('throttle: the 121st request in a minute returns 429', function (): void {
