@@ -12,11 +12,14 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 6. **[notifications.md](notifications.md)** — email + Filament bell + web push, per-user channel toggles, profile UI. Phases 1–4 shipped; Phase 5 hardening partially shipped (per-user hourly rate-limit done; admin queue-depth widget deferred).
 7. ~~`dashboard.md`~~ — ✅ shipped (stats widgets, active drops, recent notifications, savings chart, per-product price history chart).
 
-## Post-launch refactors
+## Post-launch refactors + features
 
 - ~~`multi-webshop-price-tracking.md`~~ — ✅ shipped (Product/Shop split, adapter chain, per-shop checks, ProductCheapestHistory timeline).
 - ~~`test-helper-hoist.md`~~ — ✅ shipped (`withJsonLd` + `jsonLdPage` consolidated in `tests/Pest.php`; `phpstan.neon` `scanFiles` added).
 - ~~`failure-code-enum.md`~~ — ✅ shipped (`App\Enums\ProbeFailure`, `ProbeOutcome::extractionFailed()` + `shouldOfferManualSelector()`, `CheckShopPrice::failureOutcome` via `ScrapeStatus::tryFrom`).
+- ~~`email-digest.md`~~ — ✅ shipped (replaced per-drop email with daily 09:00 user-local digest; `users.timezone` + `last_digest_sent_at`, `SendDailyDigest` job, `DispatchDailyDigestsCommand`).
+- ~~`shop-notes.md`~~ — ✅ shipped (free-text `shops.notes` column, App-panel `edit_notes` action + indicator column, admin read-only column).
+- ~~`timezone-autodetect.md`~~ — ✅ shipped (`users.timezone_detected_at` + browser `Intl` detection on first authenticated page load; atomic conditional UPDATE so explicit save in NotificationSettings can't be clobbered).
 
 ## Decisions (locked)
 

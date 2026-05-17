@@ -16,7 +16,9 @@ final class UrlNormalizer
 
     /**
      * Normalize a URL so two URLs that point at the same resource produce the
-     * same string. See specs/multi-webshop-price-tracking.md §1 for the rules.
+     * same string: lowercase scheme + host, strip default ports, strip the
+     * trailing slash on non-root paths, drop `utm_*` query params, sort
+     * remaining params alphabetically.
      *
      * @throws InvalidArgumentException when the input is not a parseable http/https URL.
      */

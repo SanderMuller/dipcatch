@@ -33,7 +33,7 @@ Track product prices across the web. Get notified when a price drops more than y
 
 ## Specs
 
-Implementation-ready specs live in [`specs/`](specs/README.md). All v1 launch specs (`foundation`, `scraper`, `product-management`, `scheduling`, `drop-detection`, `notifications`, `dashboard`) have shipped, plus the post-launch `multi-webshop-price-tracking` refactor and the cleanup specs `test-helper-hoist` + `failure-code-enum`. `notifications.md` still has a deferred Phase 5 admin queue widget.
+Implementation-ready specs live in [`specs/`](specs/README.md). All v1 launch specs and post-launch refactors are shipped; their files are removed once fully implemented (see the strikethrough entries in the spec index for what shipped). `notifications.md` still has a deferred Phase 5 admin queue widget.
 
 ## Local dev
 

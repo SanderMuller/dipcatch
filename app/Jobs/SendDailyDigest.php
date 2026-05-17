@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Mail;
 
 /**
  * Build + send the daily price-drop digest for a single user. Replaces the
- * per-drop email path (see specs/email-digest.md).
+ * per-drop email path (Filament bell + web push remain real-time).
  *
  * Dispatched once per user per local day by DispatchDailyDigestsCommand. The
  * dispatcher passes the local digest-date string so the uniqueness key is

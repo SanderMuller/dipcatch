@@ -15,7 +15,7 @@ use NotificationChannels\WebPush\WebPushMessage;
 /**
  * Real-time channels for a price drop: Filament in-app bell + web push.
  * Email is NOT a real-time channel anymore — it batches into the daily
- * digest dispatched by SendDailyDigest (see specs/email-digest.md).
+ * digest dispatched by SendDailyDigest.
  */
 final class PriceDropNotification extends Notification implements ShouldQueue
 {

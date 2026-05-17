@@ -11,7 +11,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
  * (e.g. `Europe/Amsterdam`, `America/New_York`).
  *
  * Drives `users.timezone` validation on profile updates — anchoring the
- * daily 09:00-local digest dispatch (see specs/email-digest.md).
+ * daily 09:00-local digest dispatch.
  */
 final class IanaTimezone implements ValidationRule
 {

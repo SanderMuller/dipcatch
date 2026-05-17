@@ -76,7 +76,9 @@ function withJsonLd(string $jsonLd): string
 /**
  * Build a single-Product JSON-LD page wrapped in HTML. The offer-block uses
  * `@type => Shop` for historical reasons; the JsonLdAdapter tolerates it, so
- * existing tests rely on that exact body. See specs/test-helper-hoist.md Q2.
+ * existing tests rely on that exact body. Fixing to schema.org's `Offer`
+ * is a separate follow-up — would change the JSON-LD shape the adapter
+ * parses.
  */
 function jsonLdPage(string $price = '50.00', string $currency = 'EUR', string $title = 'Test Item'): string
 {
