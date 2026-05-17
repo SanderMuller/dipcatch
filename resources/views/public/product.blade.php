@@ -1,6 +1,11 @@
 @php
     $image = $product->safeImageUrl();
-    $priceLine = $product->cheapest_price !== null
+    // Suppress the denormalized `cheapest_price` when no eligible shop is
+    // currently visible. The denorm is recomputed asynchronously after each
+    // CheckShopPrice; between "all shops became ineligible" and the next
+    // recompute, the column carries a stale number. Rendering it next to
+    // "0 shops tracked" misleads — fall back to the no-price treatment.
+    $priceLine = ($product->cheapest_price !== null && $shops->isNotEmpty())
         ? $product->currency . ' ' . number_format((float) $product->cheapest_price, 2, '.', '')
         : null;
     $ogDescription = $priceLine !== null
@@ -37,7 +42,21 @@
     @vite(['resources/css/app.css'])
 
     @if ($hasChart)
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
+        {{-- Pinned versions with SRI (sha384) so a compromised CDN response
+             cannot inject code on this page. The bundled date-fns adapter
+             is required for Chart.js 4's `time` scale to render at all. --}}
+        <script
+            src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"
+            integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt"
+            crossorigin="anonymous"
+            defer
+        ></script>
+        <script
+            src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"
+            integrity="sha384-cVMg8E3QFwTvGCDuK+ET4PD341jF3W8nO1auiXfuZNQkzbUUiBGLsIQUE+b1mxws"
+            crossorigin="anonymous"
+            defer
+        ></script>
     @endif
 </head>
 <body class="min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">

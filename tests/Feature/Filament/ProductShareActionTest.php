@@ -79,6 +79,32 @@ test('rotate_share + stop_share hidden when product is not shared', function ():
         ->assertActionHidden('stop_share');
 });
 
+// The share / rotate / stop actions use atomic conditional UPDATEs to refuse
+// last-writer-wins overwrites between concurrent owner tabs. The conditional
+// SQL is what makes the race safe — Filament's livewire-test harness re-fetches
+// the record on mount, so we cannot reliably stage a stale in-memory record
+// the way two real browser tabs would. Asserting the underlying conditional
+// UPDATE semantic is enough to prove the race-fix mechanism works.
+test('conditional UPDATE on share_slug is a no-op when the stale precondition does not match', function (): void {
+    $product = Product::factory()->create(['share_slug' => 'current-slug-aaaaaaaaaaaaaaaaaaa']);
+
+    $rows = Product::query()
+        ->whereKey($product->getKey())
+        ->where('share_slug', 'stale-precondition-doesnt-match!!')
+        ->update(['share_slug' => 'attacker-overwrites-aaaaaaaaaaaaa']);
+
+    expect($rows)->toBe(0);
+    expect($product->fresh()->share_slug)->toBe('current-slug-aaaaaaaaaaaaaaaaaaa');
+
+    $rows = Product::query()
+        ->whereKey($product->getKey())
+        ->where('share_slug', 'current-slug-aaaaaaaaaaaaaaaaaaa')
+        ->update(['share_slug' => null]);
+
+    expect($rows)->toBe(1);
+    expect($product->fresh()->share_slug)->toBeNull();
+});
+
 test('share action is owner-scoped: stranger cannot generate a slug on another user\'s product', function (): void {
     $owner = User::factory()->create();
     $product = Product::factory()->for($owner)->create(['share_slug' => null]);

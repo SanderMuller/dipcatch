@@ -37,7 +37,26 @@ class ViewProduct extends ViewRecord
                 ->modalDescription('Anyone with the generated link will see the product summary, price history, and shop list. Edit actions, private notes, and the add-shop form stay hidden. Existing chat / social previews may persist for some time after you later stop sharing.')
                 ->modalSubmitActionLabel('Generate link')
                 ->action(function (Product $record): void {
-                    $record->update(['share_slug' => Str::random(32)]);
+                    $newSlug = Str::random(32);
+                    // Atomic conditional UPDATE: only set the slug if the row
+                    // is still un-shared. Two tabs racing the share action
+                    // both committing would otherwise overwrite each other's
+                    // freshly generated slug.
+                    $updated = Product::query()
+                        ->whereKey($record->getKey())
+                        ->whereNull('share_slug')
+                        ->update(['share_slug' => $newSlug]);
+                    $record->refresh();
+                    if ($updated === 0) {
+                        Notification::make()
+                            ->title('Already shared in another tab')
+                            ->body($record->publicShareUrl() ?? '')
+                            ->warning()
+                            ->persistent()
+                            ->send();
+
+                        return;
+                    }
                     Notification::make()
                         ->title('Public link created')
                         ->body($record->publicShareUrl() ?? '')
@@ -58,7 +77,27 @@ class ViewProduct extends ViewRecord
                 ->modalHeading('Rotate the public link?')
                 ->modalDescription('A new URL is generated and the previous one stops working immediately. Useful if you suspect the previous link leaked.')
                 ->action(function (Product $record): void {
-                    $record->update(['share_slug' => Str::random(32)]);
+                    $previousSlug = $record->share_slug;
+                    $newSlug = Str::random(32);
+                    // Conditional on the slug we saw, not just "still shared".
+                    // A concurrent stop+share in another tab would already
+                    // have changed the slug — rotating then would silently
+                    // overwrite the freshly issued URL.
+                    $updated = Product::query()
+                        ->whereKey($record->getKey())
+                        ->where('share_slug', $previousSlug)
+                        ->update(['share_slug' => $newSlug]);
+                    $record->refresh();
+                    if ($updated === 0) {
+                        Notification::make()
+                            ->title('Link changed in another tab — not rotated')
+                            ->body($record->publicShareUrl() ?? 'Sharing is currently off.')
+                            ->warning()
+                            ->persistent()
+                            ->send();
+
+                        return;
+                    }
                     Notification::make()
                         ->title('Public link rotated')
                         ->body($record->publicShareUrl() ?? '')
@@ -76,7 +115,25 @@ class ViewProduct extends ViewRecord
                 ->modalHeading('Stop sharing this product?')
                 ->modalDescription('The public link will 404. Existing chat / social previews may persist for some time outside our control.')
                 ->action(function (Product $record): void {
-                    $record->update(['share_slug' => null]);
+                    $previousSlug = $record->share_slug;
+                    // Conditional on the slug we saw. If another tab already
+                    // rotated to a new slug, "stop" against the old one is a
+                    // no-op rather than a revoke of the freshly issued URL.
+                    $updated = Product::query()
+                        ->whereKey($record->getKey())
+                        ->where('share_slug', $previousSlug)
+                        ->update(['share_slug' => null]);
+                    $record->refresh();
+                    if ($updated === 0) {
+                        Notification::make()
+                            ->title('Link changed in another tab — not revoked')
+                            ->body($record->publicShareUrl() ?? '')
+                            ->warning()
+                            ->persistent()
+                            ->send();
+
+                        return;
+                    }
                     Notification::make()->title('Public sharing stopped')->success()->send();
                 }),
         ];

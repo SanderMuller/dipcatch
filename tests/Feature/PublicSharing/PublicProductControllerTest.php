@@ -188,7 +188,8 @@ test('response includes X-Robots-Tag noindex header', function (): void {
 });
 
 test('emits OG + Twitter meta tags with safeImageUrl-guarded image', function (): void {
-    makeSharedProduct(['image_url' => 'https://example.com/img.png']);
+    $product = makeSharedProduct(['image_url' => 'https://example.com/img.png']);
+    Shop::factory()->for($product)->create(['current_price' => '85.00']);
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
@@ -279,6 +280,24 @@ test('chart payload excludes history segments older than 90 days', function (): 
     $response->assertOk()
         ->assertDontSee('"y":"999.99"', escape: false)
         ->assertSee('"y":"85.00"', escape: false);
+});
+
+test('stale cheapest_price is suppressed when no shop is currently eligible', function (): void {
+    // Denormalized cheapest_price is recomputed async after each CheckShopPrice.
+    // Between "all shops became ineligible" and the next recompute the column
+    // carries a stale number; rendering it next to "0 shops" misleads.
+    $product = makeSharedProduct(['cheapest_price' => '85.00']);
+    Shop::factory()->for($product)->dead()->create([
+        'url' => 'https://gone.test/p/1',
+        'current_price' => '85.00',
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertOk()
+        ->assertSee('No live price available right now', escape: false)
+        ->assertDontSee('EUR 85.00', escape: false)
+        ->assertDontSee('gone.test', escape: false);
 });
 
 test('throttle: the 121st request in a minute returns 429', function (): void {
