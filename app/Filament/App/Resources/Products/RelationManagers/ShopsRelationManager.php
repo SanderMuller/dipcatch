@@ -40,6 +40,8 @@ class ShopsRelationManager extends RelationManager
 
     protected static ?string $title = 'Shops';
 
+    private const Heroicon NOTES_ICON = Heroicon::ChatBubbleOvalLeft;
+
     public function table(Table $table): Table
     {
         return $table
@@ -54,12 +56,12 @@ class ShopsRelationManager extends RelationManager
 
                 IconColumn::make('notes_indicator')
                     ->label('')
-                    ->state(fn (Shop $record): bool => $record->notes !== null && $record->notes !== '')
+                    ->state(fn (Shop $record): bool => self::hasNotes($record))
                     ->boolean()
-                    ->trueIcon(Heroicon::ChatBubbleOvalLeft)
+                    ->trueIcon(self::NOTES_ICON)
                     ->falseIcon(null)
-                    ->tooltip(fn (Shop $record): ?string => is_string($record->notes) && $record->notes !== ''
-                        ? Str::limit($record->notes, 120)
+                    ->tooltip(fn (Shop $record): ?string => self::hasNotes($record)
+                        ? Str::limit((string) $record->notes, 120)
                         : null),
 
                 TextColumn::make('current_price')
@@ -124,7 +126,7 @@ class ShopsRelationManager extends RelationManager
 
                 Action::make('edit_notes')
                     ->label('Notes')
-                    ->icon(Heroicon::ChatBubbleOvalLeft)
+                    ->icon(self::NOTES_ICON)
                     ->modalHeading('Shop notes (private)')
                     ->modalSubmitActionLabel('Save notes')
                     ->fillForm(fn (Shop $record): array => ['notes' => $record->notes])
@@ -137,7 +139,8 @@ class ShopsRelationManager extends RelationManager
                             ->columnSpanFull(),
                     ])
                     ->action(function (array $data, Shop $record): void {
-                        $notes = is_string($data['notes'] ?? null) ? trim($data['notes']) : '';
+                        $raw = $data['notes'] ?? null;
+                        $notes = is_string($raw) ? trim($raw) : '';
                         $record->update(['notes' => $notes === '' ? null : $notes]);
                         self::notify('Notes saved', success: true);
                     }),
@@ -243,6 +246,11 @@ class ShopsRelationManager extends RelationManager
         $livewire->dispatch('shop-added');
 
         self::notify('Shop URL updated and price re-checked', success: true);
+    }
+
+    private static function hasNotes(Shop $shop): bool
+    {
+        return $shop->notes !== null && $shop->notes !== '';
     }
 
     private static function notify(string $title, bool $success = false, bool $danger = false): void
