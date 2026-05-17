@@ -74,6 +74,31 @@ test('unauthenticated requests are redirected away (302)', function (): void {
         ->assertStatus(302);
 });
 
+test('auto-detect view emits the script when the authenticated user has no timezone_detected_at', function (): void {
+    $user = User::factory()->create(['timezone_detected_at' => null]);
+    $this->actingAs($user);
+
+    $rendered = view('filament.app.timezone-autodetect')->render();
+
+    expect($rendered)->toContain('Intl.DateTimeFormat')
+        ->and($rendered)->toContain('profile/timezone/auto-detect');
+});
+
+test('auto-detect view emits nothing once timezone_detected_at is set', function (): void {
+    $user = User::factory()->create(['timezone_detected_at' => now()]);
+    $this->actingAs($user);
+
+    $rendered = view('filament.app.timezone-autodetect')->render();
+
+    expect(trim($rendered))->toBe('');
+});
+
+test('auto-detect view emits nothing for an unauthenticated request', function (): void {
+    $rendered = view('filament.app.timezone-autodetect')->render();
+
+    expect(trim($rendered))->toBe('');
+});
+
 test('NotificationSettings::save() stamps timezone_detected_at so future auto-detects are no-ops', function (): void {
     $user = User::factory()->create([
         'timezone' => 'Europe/Amsterdam',
