@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Http\Controllers\AutoDetectTimezoneController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\PushSubscriptionController;
 use Illuminate\Support\Facades\Route;
@@ -11,6 +12,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     Route::post('push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
     Route::delete('push/subscribe', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
+
+    Route::post('profile/timezone/auto-detect', AutoDetectTimezoneController::class)
+        ->name('profile.timezone.auto-detect');
 });
 
 Route::middleware('throttle:invitation')->group(function (): void {

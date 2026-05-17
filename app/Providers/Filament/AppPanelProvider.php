@@ -14,8 +14,10 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
+use Illuminate\Contracts\View\View;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -64,6 +66,14 @@ class AppPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 EnsureEmailIsVerified::class,
-            ]);
+            ])
+            // Inject a tiny fire-and-forget JS snippet that POSTs the
+            // browser-detected IANA timezone to the auto-detect endpoint on
+            // first authenticated page load. The view short-circuits if the
+            // user already has timezone_detected_at set.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): View => view('filament.app.timezone-autodetect'),
+            );
     }
 }

@@ -35,6 +35,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'notify_via_filament' => 'boolean',
             'notify_via_push' => 'boolean',
             'last_digest_sent_at' => 'datetime',
+            'timezone_detected_at' => 'datetime',
         ];
     }
 

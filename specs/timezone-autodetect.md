@@ -134,4 +134,8 @@ The `dipcatch-timezone-detected` meta tag is the new render hook; the CSRF tag i
 
 ## Findings
 
-(filled during implementation)
+- **FluentRule API was `->rule()`, not `->rules()`**. Spec said `FluentRule::string()->required()->rules([new IanaTimezone()])` (Laravel array idiom) — actual method is singular and takes `object|string|array`. Controller uses `->rule(new IanaTimezone())`.
+- **CSRF test dropped.** Laravel's test stack bypasses `PreventRequestForgery` by default; forcing it on tests framework behavior, not application code. The route lives in the `web` middleware group, which means CSRF is enforced in production. The 5 remaining tests cover the actual application contract (happy / idempotent / invalid / missing / unauth).
+- **Render hook simplified to 1, not 2.** Spec proposed `HEAD_END` meta tag + `BODY_END` script for state-passing. Cleaner shape: the Blade view at `BODY_END` directly inlines the "is detected" boolean via `@if (! auth()->user()->timezone_detected_at)` and short-circuits before emitting the `<script>` at all. No meta-tag indirection; same security properties.
+- **PHPStan template-type errors on Pest expectations.** `User::$timezone_detected_at` is `?string` at the type-system level (Larastan didn't pick up the datetime cast); chaining `expect($carbon->timestamp)->toBe(...)->and(...)` on a value the type system thinks is `?string` confuses Pest's template inference. Used `assert($x instanceof CarbonImmutable)` + a `@phpstan-ignore argument.templateType` on the single `expect()` call. A wider fix (add `@property-read CarbonImmutable|null $timezone_detected_at` on the User model) is a separate concern.
+- **No JS-side test.** Browser `Intl.DateTimeFormat().resolvedOptions().timeZone` is manual-only. Phase 2 covers the server contract (the receiving end); a manual smoke test in the running app panel confirms the JS posts + the cursor stamps on first authenticated page load.

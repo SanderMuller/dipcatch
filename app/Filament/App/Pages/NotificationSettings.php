@@ -109,6 +109,11 @@ class NotificationSettings extends Page
                 ? $this->data['default_currency']
                 : 'EUR',
             'timezone' => $timezone,
+            // Explicit save is the strongest signal of intent — stamp so the
+            // browser-detected timezone POST (see AutoDetectTimezoneController)
+            // never overwrites the user's choice. Idempotent: re-saving on a
+            // subsequent visit just refreshes the timestamp.
+            'timezone_detected_at' => now(),
         ])->save();
 
         Notification::make()->title('Preferences saved')->success()->send();
