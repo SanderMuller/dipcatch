@@ -2,8 +2,8 @@
 
 namespace App\Rules;
 
+use App\Support\IanaTimezones;
 use Closure;
-use DateTimeZone;
 use Illuminate\Contracts\Validation\ValidationRule;
 
 /**
@@ -22,7 +22,7 @@ final class IanaTimezone implements ValidationRule
             return;
         }
 
-        if (! in_array($value, DateTimeZone::listIdentifiers(), true)) {
+        if (! IanaTimezones::isValid($value)) {
             $fail("The {$attribute} is not a recognised IANA timezone identifier.");
         }
     }

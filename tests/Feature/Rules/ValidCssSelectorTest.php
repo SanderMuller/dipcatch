@@ -1,23 +1,6 @@
 <?php declare(strict_types=1);
 
 use App\Rules\ValidCssSelector;
-use Illuminate\Translation\PotentiallyTranslatedString;
-
-function runRule(string $value): array
-{
-    $errors = [];
-    new ValidCssSelector()->validate(
-        'selector',
-        $value,
-        function (string $message, ?string $attribute = null) use (&$errors): PotentiallyTranslatedString {
-            $errors[] = $message;
-
-            return new PotentiallyTranslatedString($message, app('translator'));
-        },
-    );
-
-    return $errors;
-}
 
 dataset('valid_selectors', [
     'class' => '.foo',
@@ -29,7 +12,7 @@ dataset('valid_selectors', [
 ]);
 
 test('valid CSS selectors pass', function (string $selector): void {
-    expect(runRule($selector))->toBe([]);
+    expect(runRule(new ValidCssSelector(), 'selector', $selector))->toBe([]);
 })->with('valid_selectors');
 
 dataset('invalid_selectors', [
@@ -38,11 +21,12 @@ dataset('invalid_selectors', [
 ]);
 
 test('invalid CSS selectors fail with a descriptive error', function (string $selector): void {
-    expect(runRule($selector))->not->toBe([])
-        ->and(runRule($selector)[0])->toContain('selector');
+    $errors = runRule(new ValidCssSelector(), 'selector', $selector);
+    expect($errors)->not->toBe([])
+        ->and($errors[0])->toContain('selector');
 })->with('invalid_selectors');
 
 test('empty value is not a CSS-selector failure (required validates separately)', function (): void {
-    expect(runRule(''))->toBe([])
-        ->and(runRule('   '))->toBe([]);
+    expect(runRule(new ValidCssSelector(), 'selector', ''))->toBe([])
+        ->and(runRule(new ValidCssSelector(), 'selector', '   '))->toBe([]);
 });

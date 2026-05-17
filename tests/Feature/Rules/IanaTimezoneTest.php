@@ -3,23 +3,6 @@
 use App\Models\User;
 use App\Rules\IanaTimezone;
 use Carbon\CarbonImmutable;
-use Illuminate\Translation\PotentiallyTranslatedString;
-
-function runTimezoneRule(string $value): array
-{
-    $errors = [];
-    new IanaTimezone()->validate(
-        'timezone',
-        $value,
-        function (string $message, ?string $attribute = null) use (&$errors): PotentiallyTranslatedString {
-            $errors[] = $message;
-
-            return new PotentiallyTranslatedString($message, app('translator'));
-        },
-    );
-
-    return $errors;
-}
 
 dataset('valid_timezones', [
     'Europe/Amsterdam' => 'Europe/Amsterdam',
@@ -29,7 +12,7 @@ dataset('valid_timezones', [
 ]);
 
 test('valid IANA timezones pass', function (string $tz): void {
-    expect(runTimezoneRule($tz))->toBe([]);
+    expect(runRule(new IanaTimezone(), 'timezone', $tz))->toBe([]);
 })->with('valid_timezones');
 
 dataset('invalid_timezones', [
@@ -40,12 +23,12 @@ dataset('invalid_timezones', [
 ]);
 
 test('invalid timezones fail with a descriptive error', function (string $tz): void {
-    expect(runTimezoneRule($tz))->not->toBe([])
-        ->and(runTimezoneRule($tz)[0])->toContain('timezone');
+    expect(runRule(new IanaTimezone(), 'timezone', $tz))->not->toBe([])
+        ->and(runRule(new IanaTimezone(), 'timezone', $tz)[0])->toContain('timezone');
 })->with('invalid_timezones');
 
 test('empty value is not a timezone failure (required validates separately)', function (): void {
-    expect(runTimezoneRule(''))->toBe([]);
+    expect(runRule(new IanaTimezone(), 'timezone', ''))->toBe([]);
 });
 
 test('User model round-trips timezone + last_digest_sent_at', function (): void {

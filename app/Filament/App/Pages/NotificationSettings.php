@@ -5,9 +5,9 @@ namespace App\Filament\App\Pages;
 use App\Models\User;
 use App\Notifications\TestNotification;
 use App\Rules\IanaTimezone;
+use App\Support\IanaTimezones;
 use App\Support\Iso4217;
 use BackedEnum;
-use DateTimeZone;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
@@ -82,10 +82,7 @@ class NotificationSettings extends Page
                         Select::make('timezone')
                             ->label('Timezone')
                             ->helperText('Used to anchor the daily 09:00 digest. Pick the timezone you want the digest to arrive in.')
-                            ->options(fn (): array => array_combine(
-                                DateTimeZone::listIdentifiers(),
-                                DateTimeZone::listIdentifiers(),
-                            ))
+                            ->options(IanaTimezones::options())
                             ->searchable()
                             ->required()
                             ->rules([new IanaTimezone()]),
@@ -99,9 +96,9 @@ class NotificationSettings extends Page
         /** @var User $user */
         $user = auth()->user();
 
-        $timezone = is_string($this->data['timezone'] ?? null)
-            && in_array($this->data['timezone'], DateTimeZone::listIdentifiers(), true)
-            ? $this->data['timezone']
+        $timezoneInput = $this->data['timezone'] ?? null;
+        $timezone = is_string($timezoneInput) && IanaTimezones::isValid($timezoneInput)
+            ? $timezoneInput
             : 'Europe/Amsterdam';
 
         $user->forceFill([

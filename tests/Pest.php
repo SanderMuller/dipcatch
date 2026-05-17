@@ -1,6 +1,8 @@
 <?php declare(strict_types=1);
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Translation\PotentiallyTranslatedString;
 use Tests\TestCase;
 
 /*
@@ -74,4 +76,31 @@ function jsonLdPage(string $price = '50.00', string $currency = 'EUR', string $t
     ], JSON_THROW_ON_ERROR);
 
     return withJsonLd($json);
+}
+
+/**
+ * Drive an `Illuminate\Contracts\Validation\ValidationRule` against a value
+ * and return the collected error messages. Use in rule-unit tests:
+ *
+ *     expect(runRule(new MyRule(), 'attr', $value))->toBe([]);
+ *
+ * @return list<string>
+ */
+function runRule(
+    ValidationRule $rule,
+    string $attribute,
+    mixed $value,
+): array {
+    $errors = [];
+    $rule->validate(
+        $attribute,
+        $value,
+        function (string $message, ?string $attribute = null) use (&$errors): PotentiallyTranslatedString {
+            $errors[] = $message;
+
+            return new PotentiallyTranslatedString($message, app('translator'));
+        },
+    );
+
+    return $errors;
 }

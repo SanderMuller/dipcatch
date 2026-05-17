@@ -10,7 +10,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -64,7 +63,6 @@ class SendDailyDigest implements ShouldBeUnique, ShouldQueue
             ? $lastSent->max($minSince)
             : CarbonImmutable::now()->subDay()->max($minSince);
 
-        /** @var Collection<int, PriceDropEvent> $events */
         $events = PriceDropEvent::query()
             ->where('user_id', $this->user->id)
             ->where('fired_at', '>', $since)
@@ -78,18 +76,6 @@ class SendDailyDigest implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $grouped = $events
-            ->groupBy('product_id')
-            ->map(function (Collection $eventsForProduct): array {
-                $first = $eventsForProduct->first();
-                assert($first instanceof PriceDropEvent);
-
-                return [
-                    'product' => $first->product,
-                    'events' => $eventsForProduct->values(),
-                ];
-            });
-
         // Claim the window BEFORE Mail::send so a crash or transient mail
         // failure between send and cursor save doesn't double-deliver on
         // retry. Trade-off: a failed mail loses that batch from the email
@@ -97,10 +83,6 @@ class SendDailyDigest implements ShouldBeUnique, ShouldQueue
         // delivered live via the Filament bell + web push channels.
         $this->user->forceFill(['last_digest_sent_at' => CarbonImmutable::now()])->save();
 
-        Mail::to($this->user->email)->send(new PriceDropDigestMail(
-            user: $this->user,
-            grouped: $grouped,
-            totalDrops: $events->count(),
-        ));
+        Mail::to($this->user->email)->send(new PriceDropDigestMail($this->user, $events));
     }
 }

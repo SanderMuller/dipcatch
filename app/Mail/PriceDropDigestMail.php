@@ -2,10 +2,10 @@
 
 namespace App\Mail;
 
+use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
@@ -16,22 +16,45 @@ use Illuminate\Support\Collection;
  * Daily price-drop digest for a single user — one message summarising every
  * PriceDropEvent fired since their previous digest, grouped by product.
  *
- * SendDailyDigest hands us a pre-grouped collection (keyed by product_id)
- * already filtered + ordered by the caller; this class is a thin shell over
- * the Blade view.
+ * Takes a flat collection of events (caller filters + orders); groups
+ * internally and exposes `$grouped` to the Blade view.
  */
 class PriceDropDigestMail extends Mailable
 {
     use Queueable, SerializesModels;
 
     /**
-     * @param  Collection<(int|string), array{product: ?Product, events: \Illuminate\Database\Eloquent\Collection<int, Model>}>  $grouped
+     * Grouped events for the Blade view: `product_id => { product, events }`.
+     * `events` widens to `Collection<int, mixed>` because Eloquent's
+     * `->values()` doesn't carry the inner generic — view treats them as
+     * PriceDropEvent regardless.
+     *
+     * @var Collection<int|string, array{product: ?Product, events: Collection<int, mixed>}>
+     */
+    public Collection $grouped;
+
+    public int $totalDrops;
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Collection<int, PriceDropEvent>  $events
      */
     public function __construct(
         public User $user,
-        public Collection $grouped,
-        public int $totalDrops,
-    ) {}
+        \Illuminate\Database\Eloquent\Collection $events,
+    ) {
+        $this->totalDrops = $events->count();
+        $this->grouped = $events
+            ->groupBy('product_id')
+            ->map(function (Collection $eventsForProduct): array {
+                $first = $eventsForProduct->first();
+                assert($first instanceof PriceDropEvent);
+
+                return [
+                    'product' => $first->product,
+                    'events' => $eventsForProduct->values(),
+                ];
+            });
+    }
 
     public function envelope(): Envelope
     {
