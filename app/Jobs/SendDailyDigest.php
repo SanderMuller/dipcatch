@@ -21,8 +21,10 @@ use Illuminate\Support\Facades\Mail;
  * per-drop email path (see specs/email-digest.md).
  *
  * Dispatched once per user per local day by DispatchDailyDigestsCommand. The
- * uniqueness key includes the user's local date, so a re-dispatch within the
- * same local day is a no-op.
+ * dispatcher passes the local digest-date string so the uniqueness key is
+ * fixed at dispatch time — not recomputed from mutable `$user->timezone`
+ * inside handle(), which would risk drift around midnight boundaries if the
+ * user changed timezone between dispatch and run.
  */
 class SendDailyDigest implements ShouldBeUnique, ShouldQueue
 {
@@ -33,16 +35,14 @@ class SendDailyDigest implements ShouldBeUnique, ShouldQueue
     /** @var list<int> Retry backoff in seconds. */
     public array $backoff = [60, 300, 1800];
 
-    public function __construct(public User $user) {}
+    public function __construct(
+        public User $user,
+        public string $digestDate,
+    ) {}
 
     public function uniqueId(): string
     {
-        // Local-date-aware: prevents a same-day re-dispatch even if the
-        // command fires twice (e.g. scheduler restart). The command's "is
-        // 09:00 yet" check is the primary gate; this is belt-and-braces.
-        $localDate = CarbonImmutable::now($this->resolveTimezone())->format('Y-m-d');
-
-        return "daily-digest:{$this->user->id}:{$localDate}";
+        return "daily-digest:{$this->user->id}:{$this->digestDate}";
     }
 
     public function uniqueFor(): int
@@ -90,19 +90,17 @@ class SendDailyDigest implements ShouldBeUnique, ShouldQueue
                 ];
             });
 
+        // Claim the window BEFORE Mail::send so a crash or transient mail
+        // failure between send and cursor save doesn't double-deliver on
+        // retry. Trade-off: a failed mail loses that batch from the email
+        // channel — but those drops are still in the DB and were already
+        // delivered live via the Filament bell + web push channels.
+        $this->user->forceFill(['last_digest_sent_at' => CarbonImmutable::now()])->save();
+
         Mail::to($this->user->email)->send(new PriceDropDigestMail(
             user: $this->user,
             grouped: $grouped,
             totalDrops: $events->count(),
         ));
-
-        $this->user->forceFill(['last_digest_sent_at' => CarbonImmutable::now()])->save();
-    }
-
-    private function resolveTimezone(): string
-    {
-        $tz = $this->user->timezone;
-
-        return is_string($tz) && $tz !== '' ? $tz : 'Europe/Amsterdam';
     }
 }

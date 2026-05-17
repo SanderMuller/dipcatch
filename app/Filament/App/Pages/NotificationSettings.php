@@ -4,8 +4,10 @@ namespace App\Filament\App\Pages;
 
 use App\Models\User;
 use App\Notifications\TestNotification;
+use App\Rules\IanaTimezone;
 use App\Support\Iso4217;
 use BackedEnum;
+use DateTimeZone;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
@@ -45,6 +47,9 @@ class NotificationSettings extends Page
             'notify_via_filament' => (bool) $user->notify_via_filament,
             'notify_via_push' => (bool) $user->notify_via_push,
             'default_currency' => is_string($user->default_currency) ? $user->default_currency : 'EUR',
+            'timezone' => is_string($user->timezone) && $user->timezone !== ''
+                ? $user->timezone
+                : 'Europe/Amsterdam',
         ];
     }
 
@@ -74,6 +79,16 @@ class NotificationSettings extends Page
                             ->options(Iso4217::options())
                             ->searchable()
                             ->required(),
+                        Select::make('timezone')
+                            ->label('Timezone')
+                            ->helperText('Used to anchor the daily 09:00 digest. Pick the timezone you want the digest to arrive in.')
+                            ->options(fn (): array => array_combine(
+                                DateTimeZone::listIdentifiers(),
+                                DateTimeZone::listIdentifiers(),
+                            ))
+                            ->searchable()
+                            ->required()
+                            ->rules([new IanaTimezone()]),
                     ]),
             ])
             ->statePath('data');
@@ -84,6 +99,11 @@ class NotificationSettings extends Page
         /** @var User $user */
         $user = auth()->user();
 
+        $timezone = is_string($this->data['timezone'] ?? null)
+            && in_array($this->data['timezone'], DateTimeZone::listIdentifiers(), true)
+            ? $this->data['timezone']
+            : 'Europe/Amsterdam';
+
         $user->forceFill([
             'notify_via_email' => (bool) ($this->data['notify_via_email'] ?? false),
             'notify_via_filament' => (bool) ($this->data['notify_via_filament'] ?? false),
@@ -91,6 +111,7 @@ class NotificationSettings extends Page
             'default_currency' => is_string($this->data['default_currency'] ?? null)
                 ? $this->data['default_currency']
                 : 'EUR',
+            'timezone' => $timezone,
         ])->save();
 
         Notification::make()->title('Preferences saved')->success()->send();

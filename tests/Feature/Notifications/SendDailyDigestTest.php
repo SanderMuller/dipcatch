@@ -25,7 +25,7 @@ test('empty window does not send mail and does not update last_digest_sent_at', 
         'last_digest_sent_at' => null,
     ]);
 
-    new SendDailyDigest($user)->handle();
+    new SendDailyDigest($user, '2026-01-15')->handle();
 
     Mail::assertNothingSent();
     expect($user->fresh()->last_digest_sent_at)->toBeNull();
@@ -52,7 +52,7 @@ test('sends one mail grouping drops by product and updates last_digest_sent_at',
         ->state(['fired_at' => now()->subHour()])
         ->create();
 
-    new SendDailyDigest($user)->handle();
+    new SendDailyDigest($user, '2026-01-15')->handle();
 
     Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail) use ($user): bool {
         return $mail->hasTo($user->email)
@@ -82,7 +82,7 @@ test('only includes events since last_digest_sent_at', function (): void {
         ->state(['fired_at' => now()->subHour()])
         ->create();
 
-    new SendDailyDigest($user)->handle();
+    new SendDailyDigest($user, '2026-01-15')->handle();
 
     Mail::assertSent(PriceDropDigestMail::class, fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 1);
 });
@@ -109,9 +109,35 @@ test('caps the lookback at configured days even with stale last_digest_sent_at',
         ->state(['fired_at' => now()->subDays(1)])
         ->create();
 
-    new SendDailyDigest($user)->handle();
+    new SendDailyDigest($user, '2026-01-15')->handle();
 
     Mail::assertSent(PriceDropDigestMail::class, fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 1);
+});
+
+test('claims the cursor before sending so a mail failure does not double-send on retry', function (): void {
+    $user = User::factory()->create([
+        'notify_via_email' => true,
+        'last_digest_sent_at' => null,
+    ]);
+    $product = Product::factory()->for($user)->create();
+    PriceDropEvent::factory()
+        ->for($user)
+        ->for($product)
+        ->state(['fired_at' => now()->subHour()])
+        ->create();
+
+    // Make Mail::send throw to simulate a transient transport failure.
+    Mail::shouldReceive('to')->andThrow(new RuntimeException('SMTP timeout'));
+
+    try {
+        new SendDailyDigest($user, '2026-01-15')->handle();
+    } catch (RuntimeException) {
+        // Expected.
+    }
+
+    // Cursor advanced even though send failed — second attempt (retry) sees
+    // an empty window and won't double-send.
+    expect($user->fresh()->last_digest_sent_at)->not->toBeNull();
 });
 
 test('second run within the same digest window sends no new mail', function (): void {
@@ -126,8 +152,8 @@ test('second run within the same digest window sends no new mail', function (): 
         ->state(['fired_at' => now()->subHour()])
         ->create();
 
-    new SendDailyDigest($user)->handle();
-    new SendDailyDigest($user)->handle();
+    new SendDailyDigest($user, '2026-01-15')->handle();
+    new SendDailyDigest($user, '2026-01-15')->handle();
 
     Mail::assertSent(PriceDropDigestMail::class, 1);
 });

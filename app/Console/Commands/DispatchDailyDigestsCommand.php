@@ -63,6 +63,8 @@ class DispatchDailyDigestsCommand extends Command
                 break;
             }
 
+            $digestDate = $localNow->format('Y-m-d');
+
             User::query()
                 ->where('notify_via_email', true)
                 ->where('timezone', $timezone)
@@ -71,8 +73,8 @@ class DispatchDailyDigestsCommand extends Command
                         ->orWhere('last_digest_sent_at', '<', $startOfTodayLocalUtc);
                 })
                 ->limit($remaining)
-                ->each(function (User $user) use (&$dispatched): void {
-                    dispatch(new SendDailyDigest($user))->onQueue('digests');
+                ->each(function (User $user) use ($digestDate, &$dispatched): void {
+                    dispatch(new SendDailyDigest($user, $digestDate))->onQueue('digests');
                     $dispatched++;
                 });
 
