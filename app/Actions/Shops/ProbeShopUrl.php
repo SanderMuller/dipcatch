@@ -99,10 +99,7 @@ final readonly class ProbeShopUrl
         }
 
         if (! $extraction->isSuccess()) {
-            return ProbeOutcome::failed(
-                ProbeFailure::ExtractionFailed,
-                extractionReason: $extraction->failureReason,
-            );
+            return ProbeOutcome::extractionFailed($extraction->failureReason);
         }
 
         $snapshot = $extraction->snapshot;

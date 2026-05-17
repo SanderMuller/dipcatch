@@ -237,12 +237,14 @@ test('dedupe check runs before rate limit so retry on dup does not burn budget',
     }
 });
 
-test('ProbeOutcome::failed rejects extractionReason on non-ExtractionFailed codes', function (): void {
-    expect(fn () => ProbeOutcome::failed(
-        errorCode: ProbeFailure::HttpError,
-        extractionReason: 'jsonld_no_price',
-    ))->toThrow(
-        InvalidArgumentException::class,
-        'extractionReason is only valid when errorCode === ProbeFailure::ExtractionFailed',
-    );
+test('ProbeOutcome::shouldOfferManualSelector returns true only for the manual-selector-triggering reasons', function (): void {
+    expect(ProbeOutcome::extractionFailed('no_adapter_matched')->shouldOfferManualSelector())->toBeTrue()
+        ->and(ProbeOutcome::extractionFailed('user_selector_no_match')->shouldOfferManualSelector())->toBeTrue()
+        ->and(ProbeOutcome::extractionFailed('user_selector_invalid')->shouldOfferManualSelector())->toBeTrue()
+        // Other extraction reasons do NOT trigger manual selector — adapter
+        // could parse the page but the data was wrong (e.g. missing price).
+        ->and(ProbeOutcome::extractionFailed('jsonld_no_price')->shouldOfferManualSelector())->toBeFalse()
+        ->and(ProbeOutcome::extractionFailed(null)->shouldOfferManualSelector())->toBeFalse()
+        // Non-extraction failures never trigger manual selector.
+        ->and(ProbeOutcome::failed(ProbeFailure::HttpError)->shouldOfferManualSelector())->toBeFalse();
 });

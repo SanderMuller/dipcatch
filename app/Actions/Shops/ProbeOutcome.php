@@ -6,7 +6,6 @@ use App\Enums\ProbeFailure;
 use App\Models\Shop;
 use App\PriceAdapters\ShopSnapshot;
 use App\PriceAdapters\VariantCandidate;
-use InvalidArgumentException;
 
 /**
  * Result of `ProbeShopUrl`. Mutually exclusive states: success, duplicate,
@@ -67,23 +66,47 @@ final readonly class ProbeOutcome
     /**
      * @param  array<string, mixed>|null  $context
      */
-    public static function failed(ProbeFailure $errorCode, ?array $context = null, ?string $extractionReason = null): self
+    public static function failed(ProbeFailure $errorCode, ?array $context = null): self
     {
-        // extractionReason is the Layer-1 → Layer-2 bridge and is only
-        // meaningful when the caller is signalling an extraction failure.
-        // Reject mixed-layer constructions at the factory boundary.
-        if ($extractionReason !== null && $errorCode !== ProbeFailure::ExtractionFailed) {
-            throw new InvalidArgumentException(
-                "extractionReason is only valid when errorCode === ProbeFailure::ExtractionFailed; got {$errorCode->value}.",
-            );
-        }
+        return new self(state: self::STATE_FAILED, errorCode: $errorCode, context: $context);
+    }
 
+    /**
+     * Failed-state factory dedicated to extraction failures — keeps the Layer-1
+     * adapter reason (e.g. `no_adapter_matched`, `user_selector_no_match`)
+     * alongside the typed Layer-2 ExtractionFailed code so the AddShop UI can
+     * decide whether to offer the manual-selector flow.
+     *
+     * @param  array<string, mixed>|null  $context
+     */
+    public static function extractionFailed(?string $reason, ?array $context = null): self
+    {
         return new self(
             state: self::STATE_FAILED,
-            errorCode: $errorCode,
+            errorCode: ProbeFailure::ExtractionFailed,
             context: $context,
-            extractionReason: $extractionReason,
+            extractionReason: $reason,
         );
+    }
+
+    /**
+     * True when this outcome is a Layer-1 extraction failure that AddShop
+     * should respond to by surfacing the manual-selector form instead of an
+     * error message. The check is policy living next to the data so the UI
+     * layer doesn't have to know Layer-1 vocabulary.
+     */
+    public function shouldOfferManualSelector(): bool
+    {
+        if ($this->errorCode !== ProbeFailure::ExtractionFailed) {
+            return false;
+        }
+
+        $reason = $this->extractionReason;
+        if ($reason === null) {
+            return false;
+        }
+
+        return $reason === 'no_adapter_matched' || str_starts_with($reason, 'user_selector_');
     }
 
     /**

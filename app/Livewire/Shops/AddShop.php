@@ -4,7 +4,6 @@ namespace App\Livewire\Shops;
 
 use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
-use App\Enums\ProbeFailure;
 use App\Enums\ScrapeStatus;
 use App\Models\PriceCheck;
 use App\Models\Product;
@@ -251,31 +250,16 @@ class AddShop extends Component
 
     private function handleFailure(ProbeOutcome $outcome): void
     {
-        // Auto-detect couldn't find the price OR a user-selector probe failed:
-        // keep the URL the user pasted and stay in the manual-selector form so
-        // they can adjust the selector without re-typing the URL. The Layer-1
-        // reason rides on ProbeOutcome::$extractionReason whenever
-        // errorCode === ProbeFailure::ExtractionFailed (see spec failure-code-enum).
-        $reason = $outcome->extractionReason;
-        if ($outcome->errorCode === ProbeFailure::ExtractionFailed
-            && $reason !== null
-            && ($reason === 'no_adapter_matched' || str_starts_with($reason, 'user_selector_'))) {
-            $this->errorCode = $reason;
+        if ($outcome->shouldOfferManualSelector()) {
+            $this->errorCode = $outcome->extractionReason;
             $this->errorContext = $outcome->context;
             $this->state = 'manual_selector';
 
             return;
         }
 
-        // Type-wise PHPStan proves errorCode is non-null here (handleFailure
-        // is only routed to by the failed-state match arm in submitProbe, and
-        // ProbeOutcome::failed() requires a non-null ProbeFailure). Defensive
-        // null guard anyway — this is the UI boundary and a future malformed
-        // outcome should surface as an inline 'unknown' error rather than a
-        // production TypeError (assertions are dev-only).
-        // @phpstan-ignore nullsafe.neverNull
-        $code = $outcome->errorCode?->value ?? 'unknown';
-        $this->failWith($code, $outcome->context);
+        assert($outcome->errorCode !== null);
+        $this->failWith($outcome->errorCode->value, $outcome->context);
     }
 
     /**

@@ -8,12 +8,8 @@ use App\Models\PriceCheck;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
-use App\Services\ShopFetcher\Exceptions\Blocked;
 use App\Services\ShopFetcher\Exceptions\FetchException;
-use App\Services\ShopFetcher\Exceptions\HttpError;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
-use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
-use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
 use App\Services\ShopFetcher\FetchResult;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Config as DipConfig;
@@ -190,13 +186,11 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      */
     private function failureOutcome(FetchException $e): array
     {
-        $status = match (true) {
-            $e instanceof RobotsDisallowed => ScrapeStatus::RobotsDisallowed,
-            $e instanceof Blocked => ScrapeStatus::Blocked,
-            $e instanceof TemporaryFailure => ScrapeStatus::TransientServerError,
-            $e instanceof HttpError => ScrapeStatus::HttpError,
-            default => ScrapeStatus::Failed,
-        };
+        // Each FetchException subclass already exposes its discriminant via
+        // code() (e.g. 'blocked', 'http_error') — and they map 1:1 to
+        // ScrapeStatus values. Use that mapping directly instead of
+        // re-deriving with `match ($e instanceof X)`.
+        $status = ScrapeStatus::tryFrom($e->code()) ?? ScrapeStatus::Failed;
 
         return [
             'status' => $status->value,
