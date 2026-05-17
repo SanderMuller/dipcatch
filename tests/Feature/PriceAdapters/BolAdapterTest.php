@@ -2,11 +2,6 @@
 
 use App\PriceAdapters\Hosts\BolAdapter;
 
-function withBolJsonLd(string $jsonLd): string
-{
-    return "<html><head><script type=\"application/ld+json\">{$jsonLd}</script></head><body></body></html>";
-}
-
 beforeEach(function (): void {
     $this->adapter = new BolAdapter();
 });
@@ -32,7 +27,7 @@ test('matches www.bol.com via normalized host', function (): void {
         'offers' => ['@type' => 'Shop', 'price' => '50.00', 'priceCurrency' => 'EUR'],
     ], JSON_THROW_ON_ERROR);
 
-    $result = $this->adapter->extract('https://www.bol.com/p/1', withBolJsonLd($json));
+    $result = $this->adapter->extract('https://www.bol.com/p/1', withJsonLd($json));
 
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->price)->toBe('50.00');
@@ -50,7 +45,7 @@ test('delegates to JsonLdAdapter on the happy path', function (): void {
         ],
     ], JSON_THROW_ON_ERROR);
 
-    $result = $this->adapter->extract('https://bol.com/headphones/9200000123', withBolJsonLd($json));
+    $result = $this->adapter->extract('https://bol.com/headphones/9200000123', withJsonLd($json));
 
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->price)->toBe('289.99')

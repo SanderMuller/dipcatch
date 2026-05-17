@@ -2,11 +2,6 @@
 
 use App\PriceAdapters\Hosts\AmazonAdapter;
 
-function withAmazonJsonLd(string $jsonLd): string
-{
-    return "<html><head><script type=\"application/ld+json\">{$jsonLd}</script></head><body></body></html>";
-}
-
 beforeEach(function (): void {
     $this->adapter = new AmazonAdapter();
 });
@@ -81,7 +76,7 @@ test('delegates to JsonLdAdapter when the page exposes schema.org markup', funct
         ],
     ], JSON_THROW_ON_ERROR);
 
-    $result = $this->adapter->extract('https://amazon.com/dp/B0000', withAmazonJsonLd($json));
+    $result = $this->adapter->extract('https://amazon.com/dp/B0000', withJsonLd($json));
 
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->price)->toBe('49.99')

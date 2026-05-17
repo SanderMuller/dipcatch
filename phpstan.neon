@@ -35,6 +35,12 @@ parameters:
         - tests/Feature
         - tests/Unit
 
+    # tests/Pest.php hosts shared fixture helpers (withJsonLd, jsonLdPage).
+    # scanFiles lets PHPStan discover those symbols without analysing the
+    # Pest bootstrap itself (which has its own dynamic-this idioms).
+    scanFiles:
+        - tests/Pest.php
+
     type_coverage:
         return: 100
         param: 100

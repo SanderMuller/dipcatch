@@ -27,7 +27,7 @@ function fakeJsonLdOffer(string $url = 'https://shop.example.com/p/1', string $p
 
     return [
         "https://{$host}/robots.txt" => Http::response('', 404),
-        $url => Http::response("<html><head><script type=\"application/ld+json\">{$json}</script></head></html>", 200, ['Content-Type' => 'text/html']),
+        $url => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
     ];
 }
 
@@ -242,7 +242,7 @@ test('ambiguous variants surfaces chooser and selecting a variant proceeds to pr
     Http::fake([
         'https://shop.example.com/robots.txt' => Http::response('', 404),
         'https://shop.example.com/p/1' => Http::response(
-            "<html><head><script type=\"application/ld+json\">{$variantJson}</script></head></html>",
+            withJsonLd($variantJson),
             200,
             ['Content-Type' => 'text/html'],
         ),

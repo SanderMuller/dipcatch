@@ -8,23 +8,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 
-function jsonLdPage(string $price = '50.00', string $currency = 'EUR', string $title = 'Test Item'): string
-{
-    $json = json_encode([
-        '@context' => 'https://schema.org',
-        '@type' => 'Product',
-        'name' => $title,
-        'offers' => [
-            '@type' => 'Shop',
-            'price' => $price,
-            'priceCurrency' => $currency,
-            'availability' => 'https://schema.org/InStock',
-        ],
-    ], JSON_THROW_ON_ERROR);
-
-    return "<html><head><script type=\"application/ld+json\">{$json}</script></head><body></body></html>";
-}
-
 beforeEach(function (): void {
     Cache::flush();
     RateLimiter::clear('dipcatch:fetcher:host:example.com');
@@ -174,7 +157,7 @@ test('multi-variant ProductGroup with no URL match returns AMBIGUOUS with varian
         ],
     ], JSON_THROW_ON_ERROR);
 
-    $html = "<html><head><script type=\"application/ld+json\">{$json}</script></head><body></body></html>";
+    $html = withJsonLd($json);
 
     Http::fake([
         'https://example.com/robots.txt' => Http::response('', 404),
@@ -218,7 +201,7 @@ test('passing variantKey resolves AMBIGUOUS into SUCCESS', function (): void {
         ],
     ], JSON_THROW_ON_ERROR);
 
-    $html = "<html><head><script type=\"application/ld+json\">{$json}</script></head><body></body></html>";
+    $html = withJsonLd($json);
 
     Http::fake([
         'https://example.com/robots.txt' => Http::response('', 404),

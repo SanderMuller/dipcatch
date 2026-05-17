@@ -3,11 +3,6 @@
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\JsonLdAdapter;
 
-function withJsonLd(string $jsonLd): string
-{
-    return "<html><head><script type=\"application/ld+json\">{$jsonLd}</script></head><body></body></html>";
-}
-
 test('skips when no application/ld+json script is present', function (): void {
     $result = new JsonLdAdapter()->extract('https://x.test', '<html></html>');
 

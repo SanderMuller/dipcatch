@@ -79,4 +79,8 @@ Two changes:
 
 ## Findings
 
-(filled during implementation)
+- **Q1 default applied**: flat function helpers in `tests/Pest.php`. Reasonable for two helpers; revisit if the `fakeJsonLd*` family grows.
+- **Q2 default applied**: preserved the `offers['@type'] = 'Shop'` typo. Added a PHPDoc note on `jsonLdPage()` pointing at this spec for context. Follow-up to fix should also touch the JsonLdAdapter's tolerance of the typo so the fixture and the production behavior stay in sync.
+- **Q3 default applied**: `fakeJsonLdResponse()` (CheckShopPriceJobTest) and `fakeJsonLdOffer()` (AddShopLivewireTest) stayed file-local. Phase 3 *did* touch `fakeJsonLdOffer()` internally — replaced its inline wrapper with `withJsonLd($json)` — but the function itself remains scoped to AddShopLivewireTest.
+- **PHPStan config gap surfaced (not in spec)**: hoisting `withJsonLd` to `tests/Pest.php` made PHPStan throw 51 `function.notFound` errors because `tests/Pest.php` wasn't in the `paths` or `scanFiles` list — only `tests/Feature` + `tests/Unit` were analysed. Fixed by adding `tests/Pest.php` to `scanFiles` in `phpstan.neon` (scan for symbols, don't analyse — the Pest bootstrap has dynamic-`$this` idioms that PHPStan flags noisily otherwise).
+- **Wrapper duplication eliminated**: the `<html><head><script type="application/ld+json">…</script></head></html>` body now appears exactly once, in `tests/Pest.php::withJsonLd()`.

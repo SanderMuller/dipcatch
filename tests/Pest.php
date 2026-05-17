@@ -44,7 +44,34 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something(): void
+/**
+ * Wrap a JSON-LD payload in a minimal HTML document. The single source of
+ * truth for the `<html><head><script type="application/ld+json">…</script>
+ * </head></html>` shape used across adapter + Shops fixtures.
+ */
+function withJsonLd(string $jsonLd): string
 {
-    // ..
+    return "<html><head><script type=\"application/ld+json\">{$jsonLd}</script></head><body></body></html>";
+}
+
+/**
+ * Build a single-Product JSON-LD page wrapped in HTML. The offer-block uses
+ * `@type => Shop` for historical reasons; the JsonLdAdapter tolerates it, so
+ * existing tests rely on that exact body. See specs/test-helper-hoist.md Q2.
+ */
+function jsonLdPage(string $price = '50.00', string $currency = 'EUR', string $title = 'Test Item'): string
+{
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => $title,
+        'offers' => [
+            '@type' => 'Shop',
+            'price' => $price,
+            'priceCurrency' => $currency,
+            'availability' => 'https://schema.org/InStock',
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    return withJsonLd($json);
 }
