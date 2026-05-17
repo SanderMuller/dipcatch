@@ -28,7 +28,7 @@ return [
         'allow_private_ips' => filter_var(env('DIPCATCH_FETCHER_ALLOW_PRIVATE_IPS', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
-    'offer' => [
+    'shop' => [
         // Health thresholds for the main failure counter (parse / 4xx / block).
         'failing_after' => (int) env('DIPCATCH_SHOP_FAILING_AFTER', 3),
         'dead_after' => (int) env('DIPCATCH_SHOP_DEAD_AFTER', 10),
@@ -40,6 +40,19 @@ return [
     'recheck' => [
         'interval_hours' => (int) env('DIPCATCH_RECHECK_INTERVAL_HOURS', 6),
         'jitter_minutes' => (int) env('DIPCATCH_RECHECK_JITTER_MINUTES', 30),
+    ],
+
+    // Price extraction chain. Order is priority — user selectors first, then
+    // host-specific, then generic fallback. See AdapterResolver for semantics.
+    'adapters' => [
+        App\PriceAdapters\UserSelectorAdapter::class,
+        App\PriceAdapters\Hosts\AmazonAdapter::class,
+        App\PriceAdapters\Hosts\BolAdapter::class,
+        App\PriceAdapters\Hosts\ZooplusAdapter::class,
+        App\PriceAdapters\JsonLdAdapter::class,
+        App\PriceAdapters\MicrodataAdapter::class,
+        App\PriceAdapters\OpenGraphAdapter::class,
+        App\PriceAdapters\GenericAdapter::class,
     ],
 
 ];

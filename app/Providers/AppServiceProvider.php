@@ -5,14 +5,7 @@ namespace App\Providers;
 use App\Health\LastSuccessfulScrapeCheck;
 use App\Jobs\CheckShopPrice;
 use App\PriceAdapters\AdapterResolver;
-use App\PriceAdapters\GenericAdapter;
-use App\PriceAdapters\Hosts\AmazonAdapter;
-use App\PriceAdapters\Hosts\BolAdapter;
-use App\PriceAdapters\Hosts\ZooplusAdapter;
-use App\PriceAdapters\JsonLdAdapter;
-use App\PriceAdapters\MicrodataAdapter;
-use App\PriceAdapters\OpenGraphAdapter;
-use App\PriceAdapters\UserSelectorAdapter;
+use App\PriceAdapters\ShopAdapter;
 use App\Support\Config as DipConfig;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -36,21 +29,20 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(AdapterResolver::class, fn (): AdapterResolver => new AdapterResolver([
-            // User-supplied selectors take precedence — self-skips unless the
-            // call passes an AdapterContext with a non-empty price selector.
-            new UserSelectorAdapter(),
-            // Host-specific adapters slot in here first; each one self-skips
-            // when the URL host doesn't match.
-            new AmazonAdapter(),
-            new BolAdapter(),
-            new ZooplusAdapter(),
-            // Generic chain in priority order.
-            new JsonLdAdapter(),
-            new MicrodataAdapter(),
-            new OpenGraphAdapter(),
-            new GenericAdapter(),
-        ]));
+        $this->app->singleton(AdapterResolver::class, function (): AdapterResolver {
+            /** @var list<class-string<ShopAdapter>> $classes */
+            $classes = (array) config('dipcatch.adapters', []);
+
+            return new AdapterResolver(array_map(
+                function (string $class): ShopAdapter {
+                    $instance = $this->app->make($class);
+                    assert($instance instanceof ShopAdapter);
+
+                    return $instance;
+                },
+                $classes,
+            ));
+        });
     }
 
     public function boot(): void

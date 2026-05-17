@@ -151,6 +151,95 @@ test('per-user rate limit kicks in after 6 probes in a minute', function (): voi
     expect($blocked->errorCode)->toBe('probe_rate_limited');
 });
 
+test('multi-variant ProductGroup with no URL match returns AMBIGUOUS with variants', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Feliway Family',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Feliway 1-pack',
+                'productID' => '111-1',
+                'url' => 'https://example.com/p/1pack/',
+                'offers' => ['@type' => 'Offer', 'price' => '23.95', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Feliway 3-pack',
+                'productID' => '111-3',
+                'url' => 'https://example.com/p/3pack/',
+                'offers' => ['@type' => 'Offer', 'price' => '52.86', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $html = "<html><head><script type=\"application/ld+json\">{$json}</script></head><body></body></html>";
+
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/canonical' => Http::response($html, 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $user = User::factory()->create();
+
+    $outcome = app(ProbeShopUrl::class)($product, 'https://example.com/p/canonical', $user);
+
+    expect($outcome->isAmbiguous())->toBeTrue()
+        ->and($outcome->host)->toBe('example.com')
+        ->and($outcome->normalizedUrl)->toBe('https://example.com/p/canonical')
+        ->and($outcome->variants)->toHaveCount(2)
+        ->and($outcome->variants[0]->key)->toBe('111-1')
+        ->and($outcome->variants[0]->price)->toBe('23.95')
+        ->and($outcome->variants[1]->key)->toBe('111-3');
+});
+
+test('passing variantKey resolves AMBIGUOUS into SUCCESS', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Feliway Family',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Feliway 1-pack',
+                'productID' => '111-1',
+                'url' => 'https://example.com/p/1pack/',
+                'offers' => ['@type' => 'Offer', 'price' => '23.95', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Feliway 3-pack',
+                'productID' => '111-3',
+                'url' => 'https://example.com/p/3pack/',
+                'offers' => ['@type' => 'Offer', 'price' => '52.86', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $html = "<html><head><script type=\"application/ld+json\">{$json}</script></head><body></body></html>";
+
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/canonical' => Http::response($html, 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $user = User::factory()->create();
+
+    $outcome = app(ProbeShopUrl::class)(
+        $product,
+        'https://example.com/p/canonical',
+        $user,
+        variantKey: '111-3',
+    );
+
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->snapshot?->price)->toBe('52.86')
+        ->and($outcome->snapshot?->title)->toBe('Feliway 3-pack');
+});
+
 test('dedupe check runs before rate limit so retry on dup does not burn budget', function (): void {
     $product = Product::factory()->create();
     Shop::factory()->for($product)->create(['url' => 'https://example.com/p/1']);

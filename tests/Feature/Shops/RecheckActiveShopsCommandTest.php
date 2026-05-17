@@ -55,3 +55,39 @@ test('respects scheduler batch size', function (): void {
 
     Queue::assertPushed(CheckShopPrice::class, 2);
 });
+
+test('never-checked shops are prioritised over oldest checked, then oldest first', function (): void {
+    config()->set('dipcatch.recheck.interval_hours', 6);
+    config()->set('dipcatch.recheck.jitter_minutes', 0);
+    config()->set('dipcatch.scheduler.batch_size', 2);
+
+    $product = Product::factory()->create();
+    $oldChecked = Shop::factory()->for($product)->create(['last_checked_at' => now()->subDays(2)]);
+    Shop::factory()->for($product)->create(['last_checked_at' => now()->subHours(7)]);
+    $never = Shop::factory()->for($product)->create(['last_checked_at' => null]);
+
+    $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
+
+    Queue::assertPushed(CheckShopPrice::class, 2);
+    Queue::assertPushed(CheckShopPrice::class, fn (CheckShopPrice $j): bool => $j->shop->is($never));
+    Queue::assertPushed(CheckShopPrice::class, fn (CheckShopPrice $j): bool => $j->shop->is($oldChecked));
+});
+
+test('dispatch delay stays within configured jitter window', function (): void {
+    config()->set('dipcatch.recheck.interval_hours', 6);
+    config()->set('dipcatch.recheck.jitter_minutes', 5);
+
+    $product = Product::factory()->create();
+    Shop::factory()->count(3)->for($product)->create(['last_checked_at' => now()->subDay()]);
+
+    $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
+
+    /** @var iterable<CheckShopPrice> $jobs */
+    $jobs = Queue::pushed(CheckShopPrice::class);
+    foreach ($jobs as $job) {
+        $delay = $job->delay;
+        assert($delay instanceof DateTimeInterface);
+        $seconds = $delay->getTimestamp() - now()->getTimestamp();
+        expect($seconds)->toBeGreaterThanOrEqual(0)->toBeLessThanOrEqual(5 * 60);
+    }
+});

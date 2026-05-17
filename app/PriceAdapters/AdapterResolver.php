@@ -38,7 +38,10 @@ final readonly class AdapterResolver
             if ($persisted !== null) {
                 $result = $persisted->extract($url, $html, $context);
 
-                if ($result->isSuccess()) {
+                // Ambiguous from the hint means the page genuinely has multiple
+                // variants; falling through to a weaker adapter would silently
+                // pick the wrong one. Propagate the chooser instead.
+                if ($result->isSuccess() || $result->isAmbiguous()) {
                     return $result->withAdapterKey($persisted->key());
                 }
             }
