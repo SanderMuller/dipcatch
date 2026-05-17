@@ -2,6 +2,7 @@
 
 namespace App\Actions\Shops;
 
+use App\Enums\ProbeFailure;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -45,7 +46,7 @@ final readonly class ProbeShopUrl
         try {
             $normalizedUrl = UrlNormalizer::normalize($rawUrl);
         } catch (InvalidArgumentException) {
-            return ProbeOutcome::failed('invalid_url');
+            return ProbeOutcome::failed(ProbeFailure::InvalidUrl);
         }
 
         $urlHash = UrlNormalizer::hash($normalizedUrl);
@@ -55,24 +56,26 @@ final readonly class ProbeShopUrl
         }
 
         if (! $this->withinPerUserLimit($actor)) {
-            return ProbeOutcome::failed('probe_rate_limited');
+            return ProbeOutcome::failed(ProbeFailure::ProbeRateLimited);
         }
 
         try {
             $fetch = $this->fetcher->fetch($normalizedUrl);
         } catch (RobotsDisallowed) {
-            return ProbeOutcome::failed('robots_disallowed');
+            return ProbeOutcome::failed(ProbeFailure::RobotsDisallowed);
         } catch (Blocked) {
-            return ProbeOutcome::failed('blocked');
+            return ProbeOutcome::failed(ProbeFailure::Blocked);
         } catch (RateLimitedByHost $e) {
             return ProbeOutcome::failed(
-                $e->source === RateLimitedByHost::SOURCE_LOCAL ? 'local_throttle' : 'host_rate_limited',
+                $e->source === RateLimitedByHost::SOURCE_LOCAL
+                    ? ProbeFailure::LocalThrottle
+                    : ProbeFailure::HostRateLimited,
                 ['retry_after_seconds' => $e->retryAfterSeconds],
             );
         } catch (TemporaryFailure $e) {
-            return ProbeOutcome::failed('temporary_failure', ['status' => $e->statusCode]);
+            return ProbeOutcome::failed(ProbeFailure::TemporaryFailure, ['status' => $e->statusCode]);
         } catch (HttpError $e) {
-            return ProbeOutcome::failed('http_error', ['status' => $e->statusCode]);
+            return ProbeOutcome::failed(ProbeFailure::HttpError, ['status' => $e->statusCode]);
         }
 
         $context = new AdapterContext(
@@ -97,7 +100,8 @@ final readonly class ProbeShopUrl
 
         if (! $extraction->isSuccess()) {
             return ProbeOutcome::failed(
-                $extraction->failureReason ?? 'extraction_failed',
+                ProbeFailure::ExtractionFailed,
+                extractionReason: $extraction->failureReason,
             );
         }
 
@@ -105,7 +109,7 @@ final readonly class ProbeShopUrl
         assert($snapshot !== null);
 
         if (strcasecmp($snapshot->currency, $product->currency) !== 0) {
-            return ProbeOutcome::failed('currency_mismatch', [
+            return ProbeOutcome::failed(ProbeFailure::CurrencyMismatch, [
                 'expected' => $product->currency,
                 'actual' => $snapshot->currency,
             ]);

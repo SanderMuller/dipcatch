@@ -2,6 +2,7 @@
 
 namespace App\Actions\Shops;
 
+use App\Enums\ProbeFailure;
 use App\Models\Shop;
 use App\PriceAdapters\ShopSnapshot;
 use App\PriceAdapters\VariantCandidate;
@@ -23,8 +24,11 @@ final readonly class ProbeOutcome
     public const string STATE_AMBIGUOUS = 'ambiguous';
 
     /**
-     * @param  array<string, mixed>|null  $context   Extra info for the UI (e.g. expected/actual currency).
-     * @param  list<VariantCandidate>     $variants  Populated only when state === STATE_AMBIGUOUS.
+     * @param  array<string, mixed>|null  $context           Extra info for the UI (e.g. expected/actual currency).
+     * @param  list<VariantCandidate>     $variants          Populated only when state === STATE_AMBIGUOUS.
+     * @param  ?string                    $extractionReason  Layer-1 adapter diagnostic (e.g. `no_adapter_matched`,
+     *                                                       `user_selector_no_match`). Populated only when
+     *                                                       errorCode === ProbeFailure::ExtractionFailed.
      */
     private function __construct(
         public string $state,
@@ -33,9 +37,10 @@ final readonly class ProbeOutcome
         public ?string $host = null,
         public ?string $adapterKey = null,
         public ?Shop $existingShop = null,
-        public ?string $errorCode = null,
+        public ?ProbeFailure $errorCode = null,
         public ?array $context = null,
         public array $variants = [],
+        public ?string $extractionReason = null,
     ) {}
 
     public static function success(
@@ -61,9 +66,14 @@ final readonly class ProbeOutcome
     /**
      * @param  array<string, mixed>|null  $context
      */
-    public static function failed(string $errorCode, ?array $context = null): self
+    public static function failed(ProbeFailure $errorCode, ?array $context = null, ?string $extractionReason = null): self
     {
-        return new self(state: self::STATE_FAILED, errorCode: $errorCode, context: $context);
+        return new self(
+            state: self::STATE_FAILED,
+            errorCode: $errorCode,
+            context: $context,
+            extractionReason: $extractionReason,
+        );
     }
 
     /**

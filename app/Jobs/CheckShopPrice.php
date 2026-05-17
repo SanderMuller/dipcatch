@@ -191,15 +191,15 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     private function failureOutcome(FetchException $e): array
     {
         $status = match (true) {
-            $e instanceof RobotsDisallowed => 'robots_disallowed',
-            $e instanceof Blocked => 'blocked',
-            $e instanceof TemporaryFailure => '5xx',
-            $e instanceof HttpError => ScrapeStatus::HttpError->value,
-            default => 'failed',
+            $e instanceof RobotsDisallowed => ScrapeStatus::RobotsDisallowed,
+            $e instanceof Blocked => ScrapeStatus::Blocked,
+            $e instanceof TemporaryFailure => ScrapeStatus::TransientServerError,
+            $e instanceof HttpError => ScrapeStatus::HttpError,
+            default => ScrapeStatus::Failed,
         };
 
         return [
-            'status' => $status,
+            'status' => $status->value,
             'price' => null,
             'currency' => null,
             'in_stock' => null,
@@ -314,10 +314,10 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     private function incrementCountersFor(Shop $shop, string $status): array
     {
         return match ($status) {
-            '5xx' => [
+            ScrapeStatus::TransientServerError->value => [
                 'consecutive_5xx_failures' => $shop->consecutive_5xx_failures + 1,
             ],
-            'robots_disallowed' => [
+            ScrapeStatus::RobotsDisallowed->value => [
                 // Permanent — both counters preserved but health flips to dead below.
             ],
             default => [

@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Shops\ProbeShopUrl;
+use App\Enums\ProbeFailure;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -56,7 +57,7 @@ test('robots.txt disallow → robots_disallowed failure', function (): void {
     $outcome = app(ProbeShopUrl::class)($product, 'https://example.com/p/1', $user);
 
     expect($outcome->isFailed())->toBeTrue()
-        ->and($outcome->errorCode)->toBe('robots_disallowed');
+        ->and($outcome->errorCode)->toBe(ProbeFailure::RobotsDisallowed);
 });
 
 test('Cloudflare-challenged 403 → blocked failure', function (): void {
@@ -70,7 +71,7 @@ test('Cloudflare-challenged 403 → blocked failure', function (): void {
 
     $outcome = app(ProbeShopUrl::class)($product, 'https://example.com/p/1', $user);
 
-    expect($outcome->errorCode)->toBe('blocked');
+    expect($outcome->errorCode)->toBe(ProbeFailure::Blocked);
 });
 
 test('extraction-failed when page has no parseable price', function (): void {
@@ -85,7 +86,8 @@ test('extraction-failed when page has no parseable price', function (): void {
     $outcome = app(ProbeShopUrl::class)($product, 'https://example.com/p/1', $user);
 
     expect($outcome->isFailed())->toBeTrue()
-        ->and($outcome->errorCode)->toBe('no_adapter_matched');
+        ->and($outcome->errorCode)->toBe(ProbeFailure::ExtractionFailed)
+        ->and($outcome->extractionReason)->toBe('no_adapter_matched');
 });
 
 test('currency mismatch is rejected with context', function (): void {
@@ -100,7 +102,7 @@ test('currency mismatch is rejected with context', function (): void {
     $outcome = app(ProbeShopUrl::class)($product, 'https://example.com/p/1', $user);
 
     expect($outcome->isFailed())->toBeTrue()
-        ->and($outcome->errorCode)->toBe('currency_mismatch')
+        ->and($outcome->errorCode)->toBe(ProbeFailure::CurrencyMismatch)
         ->and($outcome->context)->toBe(['expected' => 'EUR', 'actual' => 'GBP']);
 });
 
@@ -112,7 +114,7 @@ test('invalid URL returns invalid_url failure (no fetch)', function (): void {
 
     $outcome = app(ProbeShopUrl::class)($product, 'not a url', $user);
 
-    expect($outcome->errorCode)->toBe('invalid_url');
+    expect($outcome->errorCode)->toBe(ProbeFailure::InvalidUrl);
     Http::assertNothingSent();
 });
 
@@ -131,7 +133,7 @@ test('per-user rate limit kicks in after 6 probes in a minute', function (): voi
     }
 
     $blocked = app(ProbeShopUrl::class)($product, 'https://example.com/p/7', $user);
-    expect($blocked->errorCode)->toBe('probe_rate_limited');
+    expect($blocked->errorCode)->toBe(ProbeFailure::ProbeRateLimited);
 });
 
 test('multi-variant ProductGroup with no URL match returns AMBIGUOUS with variants', function (): void {

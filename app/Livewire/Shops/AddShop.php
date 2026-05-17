@@ -4,6 +4,7 @@ namespace App\Livewire\Shops;
 
 use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
+use App\Enums\ProbeFailure;
 use App\Enums\ScrapeStatus;
 use App\Models\PriceCheck;
 use App\Models\Product;
@@ -250,20 +251,27 @@ class AddShop extends Component
 
     private function handleFailure(ProbeOutcome $outcome): void
     {
-        $code = $outcome->errorCode ?? 'unknown';
-
         // Auto-detect couldn't find the price OR a user-selector probe failed:
         // keep the URL the user pasted and stay in the manual-selector form so
-        // they can adjust the selector without re-typing the URL.
-        if ($code === 'no_adapter_matched' || str_starts_with($code, 'user_selector_')) {
-            $this->errorCode = $code;
+        // they can adjust the selector without re-typing the URL. The Layer-1
+        // reason rides on ProbeOutcome::$extractionReason whenever
+        // errorCode === ProbeFailure::ExtractionFailed (see spec failure-code-enum).
+        $reason = $outcome->extractionReason;
+        if ($outcome->errorCode === ProbeFailure::ExtractionFailed
+            && $reason !== null
+            && ($reason === 'no_adapter_matched' || str_starts_with($reason, 'user_selector_'))) {
+            $this->errorCode = $reason;
             $this->errorContext = $outcome->context;
             $this->state = 'manual_selector';
 
             return;
         }
 
-        $this->failWith($code, $outcome->context);
+        // handleFailure is reached only via the failed-state branch (see match
+        // in submitProbe), where ProbeOutcome::failed() requires a non-null
+        // ProbeFailure. PHPStan proves it; assert for the human reader.
+        assert($outcome->errorCode !== null);
+        $this->failWith($outcome->errorCode->value, $outcome->context);
     }
 
     /**
