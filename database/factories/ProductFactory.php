@@ -27,6 +27,7 @@ class ProductFactory extends Factory
             'last_notified_at' => null,
             'cheapest_shop_id' => null,
             'cheapest_price' => null,
+            'share_slug' => null,
             'active' => true,
         ];
     }

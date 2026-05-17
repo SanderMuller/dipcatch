@@ -78,6 +78,39 @@ class Product extends Model
         return $this->hasMany(PriceDropEvent::class);
     }
 
+    public function isPubliclyShared(): bool
+    {
+        return is_string($this->share_slug) && $this->share_slug !== '';
+    }
+
+    public function publicShareUrl(): ?string
+    {
+        // Phase 2 wires up the named route 'product.public'; for now build
+        // the URL by hand so the share action works the moment the schema
+        // ships, without depending on the controller-not-yet-built.
+        return $this->isPubliclyShared()
+            ? url('/p/' . $this->share_slug)
+            : null;
+    }
+
+    /**
+     * Validate the user-supplied `image_url` against http(s) scheme before
+     * emitting it as an `og:image` or `<img src>`. Rejects `javascript:`,
+     * `data:`, `file:`, and non-string values. Returns null when unsafe so
+     * the view can omit the tag entirely instead of rendering a stub.
+     */
+    public function safeImageUrl(): ?string
+    {
+        $url = $this->image_url;
+        if (! is_string($url) || $url === '') {
+            return null;
+        }
+
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+
+        return $scheme === 'http' || $scheme === 'https' ? $url : null;
+    }
+
     /**
      * Recompute the product's cheapest offer + price. Safe under concurrent
      * CheckShopPrice jobs: locks the product row, writes a new history
