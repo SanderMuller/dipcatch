@@ -54,6 +54,10 @@ class ShopsTable
                 TextColumn::make('last_status')->label('Last status')->badge(),
                 TextColumn::make('last_checked_at')->since()->placeholder('Never')->sortable(),
                 IconColumn::make('active')->boolean(),
+                TextColumn::make('notes')
+                    ->limit(60)
+                    ->placeholder('—')
+                    ->tooltip(fn (Shop $r): ?string => $r->notes),
             ])
             ->filters([
                 SelectFilter::make('health')

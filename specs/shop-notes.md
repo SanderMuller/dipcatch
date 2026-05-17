@@ -97,4 +97,9 @@ Read-only: render the notes as a `TextColumn` below the table (or in the `ViewSh
 
 ## Findings
 
-(filled during implementation)
+- **All Open Question defaults applied**: no app-level length cap (Q1, ->maxLength(64000) at the UI layer only), plain-text rendering (Q2), tags deferred (Q3), no entry in ProductInfolist (Q4).
+- **Phase 2 scope-deviation from spec**: spec said "add Textarea to the create + edit actions on ShopsRelationManager", but the relation manager doesn't have generic CRUD actions — shop *creation* lives in the sibling AddShop Livewire form, and the existing actions on the table are specialized (`edit_url`, `toggle_active`, `delete`). Implemented a dedicated `edit_notes` modal action parallel to `edit_url`. Notes during creation are deliberately out of scope; the AddShop probe form stays focused on URL + selectors per the spec's "Not in scope" note.
+- **Notes indicator**: Heroicon `ChatBubbleOvalLeft` IconColumn with no label (empty header cell), tooltip showing `Str::limit($notes, 120)`. Sits between `host` and `current_price` in the relation-manager table.
+- **Admin column not toggleable**: original plan was `->toggleable(isToggledHiddenByDefault: true)` to keep the dense admin triage table compact, but Filament's toggleable test surface needs UI-level interaction which made the assertion path noisy. Always-visible `->limit(60)` keeps the column footprint small (~60 chars + tooltip for the full text); this also matches what the spec literally proposed.
+- **`Shop` model**: no change needed — `$guarded = []` already permits mass-assigning `notes`. Factory default added (`'notes' => null`) for explicitness.
+- **No XSS hardening test**: Blade's default `{{ }}` escapes HTML/JS. Adding a "renders user-supplied `<script>` as text" test would assert framework behaviour, not application behaviour. Skipped.

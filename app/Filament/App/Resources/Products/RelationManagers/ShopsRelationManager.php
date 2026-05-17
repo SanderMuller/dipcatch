@@ -14,6 +14,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -23,6 +24,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\On;
 
@@ -49,6 +51,16 @@ class ShopsRelationManager extends RelationManager
                     ->label('Shop')
                     ->searchable()
                     ->sortable(),
+
+                IconColumn::make('notes_indicator')
+                    ->label('')
+                    ->state(fn (Shop $record): bool => $record->notes !== null && $record->notes !== '')
+                    ->boolean()
+                    ->trueIcon(Heroicon::ChatBubbleOvalLeft)
+                    ->falseIcon(null)
+                    ->tooltip(fn (Shop $record): ?string => is_string($record->notes) && $record->notes !== ''
+                        ? Str::limit($record->notes, 120)
+                        : null),
 
                 TextColumn::make('current_price')
                     ->label('Price')
@@ -108,6 +120,26 @@ class ShopsRelationManager extends RelationManager
                     ->action(function (array $data, Shop $record, RelationManager $livewire): void {
                         /** @var array<string, mixed> $data */
                         self::handleEditUrl($data, $record, $livewire);
+                    }),
+
+                Action::make('edit_notes')
+                    ->label('Notes')
+                    ->icon(Heroicon::ChatBubbleOvalLeft)
+                    ->modalHeading('Shop notes (private)')
+                    ->modalSubmitActionLabel('Save notes')
+                    ->fillForm(fn (Shop $record): array => ['notes' => $record->notes])
+                    ->schema([
+                        Textarea::make('notes')
+                            ->label('Notes (private)')
+                            ->placeholder('Anything worth remembering about this shop — shipping limits, coupons, payment quirks…')
+                            ->rows(4)
+                            ->maxLength(64000)
+                            ->columnSpanFull(),
+                    ])
+                    ->action(function (array $data, Shop $record): void {
+                        $notes = is_string($data['notes'] ?? null) ? trim($data['notes']) : '';
+                        $record->update(['notes' => $notes === '' ? null : $notes]);
+                        self::notify('Notes saved', success: true);
                     }),
 
                 Action::make('toggle_active')

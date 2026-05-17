@@ -38,6 +38,7 @@ class ShopFactory extends Factory
             'consecutive_5xx_failures' => 0,
             'health' => 'ok',
             'active' => true,
+            'notes' => null,
         ];
     }
 
