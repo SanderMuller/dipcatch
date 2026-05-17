@@ -26,7 +26,7 @@ function fakeJsonLdResponse(string $host, string $path, string $price = '60.00',
 
     return [
         "https://{$host}/robots.txt" => Http::response('', 404),
-        "https://{$host}{$path}" => Http::response("<html><script type=\"application/ld+json\">{$json}</script></html>", 200, ['Content-Type' => 'text/html']),
+        "https://{$host}{$path}" => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
     ];
 }
 
