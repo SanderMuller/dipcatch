@@ -5,10 +5,10 @@
 Failure / status codes flow through three layers as **raw strings** today, each with its own vocabulary:
 
 1. `ExtractionResult::failureReason` — adapter-internal diagnostic (`jsonld_no_price`, `user_selector_no_match`, …).
-2. `ProbeOutcome::errorCode` — caller-facing Add-Shop probe outcome (`invalid_url`, `currency_mismatch`, `extraction_failed`, …).
-3. `PriceCheck::status` — persisted check classification (`ok`, `blocked`, `5xx`, `robots_disallowed`, `failed`, …). **Already** modelled as `App\Enums\ScrapeStatus`, but the producing call sites (`CheckShopPrice::failureOutcome`) still write raw strings that happen to match the enum's `->value`.
+2. `ProbeOutcome::errorCode` — caller-facing Add-Shop probe outcome (`invalid_url`, `currency_mismatch`, `extraction_failed`, …) — but **also** load-bearing for the manual-selector fallback (`no_adapter_matched`, `user_selector_*` propagate from Layer 1 through this layer and drive UI state in `AddShop`).
+3. `PriceCheck::status` — persisted check classification (`ok`, `blocked`, `5xx`, `robots_disallowed`, `parse_error`, `http_error`, `failed`, …). **Already** modelled as `App\Enums\ScrapeStatus`, but the producing call sites in `CheckShopPrice` still write raw strings that happen to match the enum's `->value`, and internal status comparisons inside the job also use raw strings.
 
-Goal: stop the stringly-typed drift. Land enums where the vocabulary is finite + caller-facing, keep strings where the vocabulary is open-ended + diagnostic, and make existing enums (ScrapeStatus) the single source of truth in their layer.
+Goal: stop the stringly-typed drift. Land enums where the vocabulary is finite + caller-facing, keep strings where the vocabulary is open-ended + diagnostic, and make existing enums (ScrapeStatus) the single source of truth in their layer. **Preserve the manual-selector fallback signal that AddShop currently relies on** — see Phase 2 design.
 
 This spec is a refactor — no behavior change, no DB migration, all tests must continue to pass.
 
@@ -31,55 +31,61 @@ Producer sites (`grep -rn "ExtractionResult::failed("`):
 | `app/PriceAdapters/UserSelectorAdapter.php` | `user_selector_invalid`, `user_selector_no_match`, `user_selector_no_price`, `user_selector_no_currency` |
 | `app/PriceAdapters/Hosts/HostAdapter.php:58` | **dynamic** — `{adapter_key}_extraction_failed` |
 
-Plus the special-case ambiguous reason `multiple_variants` written by `ExtractionResult::ambiguous()`.
+Plus `multiple_variants` written by `ExtractionResult::ambiguous()` (does **not** travel through the failure channel — `ambiguous` is a distinct state).
 
-The dynamic key in `HostAdapter` is the awkward bit: it widens the vocabulary by one entry per host adapter and would force every new host adapter to add an enum case (or break the type contract).
+The dynamic key in `HostAdapter` widens the vocabulary by one entry per host adapter and is the main reason this layer stays open-ended.
 
 ### Layer 2 — `ProbeOutcome::errorCode` (string today)
 
-Producer sites (`grep -rn "ProbeOutcome::failed("`):
+Producer sites in `app/Actions/Shops/ProbeShopUrl.php`:
 
-| File:line | Code |
+| Code | Origin |
 |---|---|
-| `app/Actions/Shops/ProbeShopUrl.php:48` | `invalid_url` |
-| `:58` | `probe_rate_limited` |
-| `:64` | `robots_disallowed` |
-| `:66` | `blocked` |
-| `:68` | `local_throttle` *or* `host_rate_limited` (branch on `RateLimitedByHost->source`) |
-| `:73` | `temporary_failure` |
-| `:75` | `http_error` |
-| `:100` | passes through `$extraction->failureReason` from Layer 1, or `extraction_failed` if null |
-| `:108` | `currency_mismatch` |
+| `invalid_url` | `parse_url` failure |
+| `probe_rate_limited` | per-user limit on probes |
+| `robots_disallowed` | `RobotsDisallowed` exception |
+| `blocked` | `Blocked` exception |
+| `local_throttle` / `host_rate_limited` | branch on `RateLimitedByHost->source` |
+| `temporary_failure` | `TemporaryFailure` exception |
+| `http_error` | `HttpError` exception |
+| `extraction_failed` (or Layer-1 string passthrough at line 99) | `! $extraction->isSuccess()` |
+| `currency_mismatch` | snapshot currency ≠ product currency |
 
-Finite set of ~10 caller-facing codes — clean enum candidate. **But** `:100` pipes a Layer-1 string through, so making `errorCode` strictly enum-typed requires a design decision (see Open Questions).
+**Critical**: the line-99 passthrough is load-bearing. `AddShop::handleFailure()` (line 251) checks `$code === 'no_adapter_matched' || str_starts_with($code, 'user_selector_')` to decide whether to switch the form into `manual_selector` state. Collapsing Layer-1 reasons into a generic `ProbeFailure::ExtractionFailed` enum case would lose this branch — it would have to become a separate first-class signal on `ProbeOutcome`.
+
+Consumers of `errorCode`:
+
+- `app/Livewire/Shops/AddShop.php` — branches on values; also produces its own local codes (`user_selector_required` at line 75, `'unknown'` fallback at line 253) on the same `?string $errorCode` property.
+- `resources/views/livewire/shops/add-shop.blade.php` — switches at lines 90 (`user_selector_required` / `user_selector_invalid` / `user_selector_no_match` / `user_selector_no_price`) and 188 (probe failures rendered for the user).
+- Tests in `tests/Feature/Shops/ProbeShopUrlTest.php` and `tests/Feature/Shops/AddShopLivewireTest.php`.
 
 ### Layer 3 — `PriceCheck::status` (`ScrapeStatus` enum exists; producers still write strings)
 
-`CheckShopPrice::failureOutcome()` (`app/Jobs/CheckShopPrice.php:185-189` after the rate-limit fix) match expression:
+`CheckShopPrice` writes statuses to `price_checks.status` along two paths:
 
-```php
-$status = match (true) {
-    $e instanceof RobotsDisallowed => 'robots_disallowed',
-    $e instanceof Blocked          => 'blocked',
-    $e instanceof TemporaryFailure => '5xx',
-    $e instanceof HttpError        => ScrapeStatus::HttpError->value,  // already enum
-    default                        => 'failed',
-};
-```
+- **Network failure** path — `failureOutcome()` (around `app/Jobs/CheckShopPrice.php:191`) builds a match expression that returns string literals except for `HttpError` which already uses `ScrapeStatus::HttpError->value`.
+- **Extraction failure** path — `fetchAndExtract()` at line 151 returns `'status' => ScrapeStatus::ParseError->value` (already enum-based).
+- **Success** path — line 168 uses `ScrapeStatus::Ok->value` (already enum-based).
+- **Generic failure** — `genericFailure()` around line 228 uses `ScrapeStatus::HttpError->value`.
 
-Inconsistent: one arm uses `ScrapeStatus::HttpError->value`, the rest use string literals that happen to match enum cases.
+Internal consumers in `CheckShopPrice` also branch on raw status strings:
 
-Consumers (`grep -rn "->status === '...'"`): nothing in production switches on these strings — they're written to the DB and read back by the UI. Tests assert exact strings, however.
+- Line 279: `$outcome['status'] === ScrapeStatus::Ok->value` (correct enum usage).
+- Around line 314 (`incrementCountersFor()`): match against `'5xx'`, `'robots_disallowed'` literals.
+
+So "nothing in production switches on these strings" is false — production *does* compare them; the migration must update those comparison sites too.
+
+Tests assert exact strings on `->last_status`. Those continue to work because enum `->value` matches the string they assert.
 
 ---
 
 ## Phases
 
-### Phase 1 — Tighten `CheckShopPrice::failureOutcome()` against `ScrapeStatus`
+### Phase 1 — Tighten `CheckShopPrice` against `ScrapeStatus` end-to-end
 
-Lowest-risk pass. Pure substitution of equivalent enum values.
+Lowest-risk pass. Producer and consumer call sites both swap to the enum.
 
-1. In `app/Jobs/CheckShopPrice.php`, rewrite the `failureOutcome()` match:
+1. In `app/Jobs/CheckShopPrice.php::failureOutcome()`, rewrite the match to return `ScrapeStatus` cases:
    ```php
    $status = match (true) {
        $e instanceof RobotsDisallowed => ScrapeStatus::RobotsDisallowed,
@@ -88,59 +94,71 @@ Lowest-risk pass. Pure substitution of equivalent enum values.
        $e instanceof HttpError        => ScrapeStatus::HttpError,
        default                        => ScrapeStatus::Failed,
    };
-   return [
-       'status' => $status->value,
-       …
-   ];
+   return ['status' => $status->value, …];
    ```
-2. Repeat for `genericFailure()` (uses `ScrapeStatus::HttpError->value` already — just normalise the assignment shape).
-3. Repeat for the success outcome inside `fetchAndExtract()` — currently `'status' => ScrapeStatus::Ok->value` is fine; standardize on producing `ScrapeStatus` cases and `->value`-ing only at the array boundary.
-4. Run the affected tests:
-   ```bash
-   vendor/bin/pest tests/Feature/Shops/CheckShopPriceJobTest.php --compact
-   ```
+2. `genericFailure()` already uses `ScrapeStatus::HttpError->value` — fine.
+3. In the internal `incrementCountersFor()` (around line 314), replace `'5xx'` / `'robots_disallowed'` string literals with `ScrapeStatus::TransientServerError->value` / `ScrapeStatus::RobotsDisallowed->value` (or refactor the match to take `ScrapeStatus` directly).
+4. Run: `vendor/bin/pest tests/Feature/Shops/CheckShopPriceJobTest.php --compact`. Must pass — tests assert `->value` strings, which don't change.
 
-No test changes expected — assertions are against `->last_status` (string from DB), which still equals the same `->value`.
+No test changes expected.
 
-### Phase 2 — Introduce `App\Enums\ProbeFailure`
+### Phase 2 — Introduce `App\Enums\ProbeFailure` and split extraction signal
+
+The naive plan ("collapse all extraction reasons to `ExtractionFailed`") would regress the manual-selector flow. Instead, give the load-bearing signal its own first-class field on `ProbeOutcome`.
 
 1. Create `app/Enums/ProbeFailure.php`:
    ```php
-   <?php declare(strict_types=1);
-
-   namespace App\Enums;
-
    enum ProbeFailure: string
    {
-       case InvalidUrl         = 'invalid_url';
-       case RateLimitedByUser  = 'probe_rate_limited';
-       case RobotsDisallowed   = 'robots_disallowed';
-       case Blocked            = 'blocked';
-       case LocalThrottle      = 'local_throttle';
-       case HostRateLimited    = 'host_rate_limited';
-       case TemporaryFailure   = 'temporary_failure';
-       case HttpError          = 'http_error';
-       case ExtractionFailed   = 'extraction_failed';
-       case CurrencyMismatch   = 'currency_mismatch';
+       case InvalidUrl        = 'invalid_url';
+       case ProbeRateLimited  = 'probe_rate_limited';
+       case RobotsDisallowed  = 'robots_disallowed';
+       case Blocked           = 'blocked';
+       case LocalThrottle     = 'local_throttle';
+       case HostRateLimited   = 'host_rate_limited';
+       case TemporaryFailure  = 'temporary_failure';
+       case HttpError         = 'http_error';
+       case ExtractionFailed  = 'extraction_failed';
+       case CurrencyMismatch  = 'currency_mismatch';
    }
    ```
-2. Change `ProbeOutcome::errorCode` type from `?string` to `?ProbeFailure`.
-   Update `ProbeOutcome::failed()` signature: `public static function failed(ProbeFailure $errorCode, ?array $context = null): self`.
-3. Rewrite producers in `app/Actions/Shops/ProbeShopUrl.php` to pass enum cases.
-4. **Layer-1 passthrough at `ProbeShopUrl.php:100`** — `$extraction->failureReason` is a Layer-1 string that cannot map to `ProbeFailure` cleanly. Resolve per Open Question Q1. Default plan: always collapse to `ProbeFailure::ExtractionFailed` and surface the raw reason in the `context` array (`['extraction_reason' => $extraction->failureReason]`) — preserves diagnostic detail without bleeding Layer-1 vocabulary into Layer-2.
-5. Update consumers:
-   - `app/Livewire/Shops/AddShop.php` — any switch on `$outcome->errorCode` against string literals.
-   - Tests in `tests/Feature/Shops/ProbeShopUrlTest.php` and Livewire tests — replace `->toBe('invalid_url')` with `->toBe(ProbeFailure::InvalidUrl)`.
-6. Run:
-   ```bash
-   vendor/bin/pest tests/Feature/Shops --compact
+2. Change `ProbeOutcome`:
+   - `errorCode` → `?ProbeFailure` (strict)
+   - Add `public ?string $extractionReason = null;` — carries the Layer-1 string verbatim (`no_adapter_matched`, `user_selector_no_match`, `jsonld_no_price`, etc.) when `errorCode === ExtractionFailed`. Null in all other cases.
+   - Update `ProbeOutcome::failed()` to require `ProbeFailure`. Add optional `extractionReason` param to support the extraction-failed factory:
+     ```php
+     public static function failed(ProbeFailure $errorCode, ?array $context = null, ?string $extractionReason = null): self
+     ```
+3. In `ProbeShopUrl.php`:
+   - All existing `ProbeOutcome::failed('...')` calls take enum cases.
+   - The line-99 passthrough becomes:
+     ```php
+     return ProbeOutcome::failed(
+         ProbeFailure::ExtractionFailed,
+         extractionReason: $extraction->failureReason,
+     );
+     ```
+4. Update `AddShop::handleFailure()` to switch on the new shape:
+   ```php
+   $reason = $outcome->extractionReason ?? '';
+   if ($outcome->errorCode === ProbeFailure::ExtractionFailed
+       && ($reason === 'no_adapter_matched' || str_starts_with($reason, 'user_selector_'))) {
+       $this->errorCode = $reason;     // keep blade view + manual-selector flow unchanged
+       …
+   }
    ```
+   AddShop's local `?string $errorCode` property and `'user_selector_required'` / `'unknown'` codes stay as-is — they're AddShop-internal UI state, not part of the `ProbeOutcome` contract. Casting `ProbeFailure` to `->value` at the AddShop boundary preserves the blade view's string switches.
+5. Audit the blade view at `resources/views/livewire/shops/add-shop.blade.php` (lines 90 + 188). The string literals it switches on (`user_selector_required`, `user_selector_invalid`, `user_selector_no_match`, `user_selector_no_price`, plus probe failures) must match the values AddShop assigns to its `$errorCode` property. Verify no drift after Phase 2.
+6. Update tests:
+   - `tests/Feature/Shops/ProbeShopUrlTest.php` — replace `->toBe('invalid_url')` etc. with `->toBe(ProbeFailure::InvalidUrl)`.
+   - `tests/Feature/Shops/AddShopLivewireTest.php` — tests around line 134 exercise the manual-selector flow. Verify they still pass; if they assert on `ProbeOutcome` directly, update to new shape.
+7. Run: `vendor/bin/pest tests/Feature/Shops --compact`. Must pass.
 
-### Phase 3 — `ExtractionResult::failureReason`: decide & implement
+### Phase 3 — `ExtractionResult::failureReason`: keep as `?string`
 
-Resolve Open Question Q2 first. Default plan: **keep as `?string`** because of the dynamic `{adapter_key}_extraction_failed` pattern in `HostAdapter`. The reason is adapter-private diagnostic, not a stable API surface — the only external consumer is the `extraction_reason` context bag from Phase 2.
+Per Q1's resolution (default below), no work. Adapter-private diagnostic strings remain free-form. The Layer-1 → Layer-2 bridge from Phase 2 (`extractionReason` field) preserves diagnostic detail without leaking the vocabulary into an enum.
 
-If Q2 closes the other way (strict enum), the work is bigger — requires per-adapter cases + the dynamic `HostAdapter` reason eliminated or refactored.
+If Q1 closes the other way (strict enum at Layer 1), the work is bigger — requires per-adapter cases and `HostAdapter::extractFromHtml`'s dynamic `{adapter_key}_extraction_failed` either eliminated or refactored into a structured `(adapter_key, generic_reason)` tuple.
 
 ### Phase 4 — Verify
 
@@ -152,9 +170,8 @@ If Q2 closes the other way (strict enum), the work is bigger — requires per-ad
 
 ## Open Questions
 
-- **Q1 (blocks Phase 2):** when Layer-1 extraction fails inside the probe path (`ProbeShopUrl.php:100`), should `ProbeOutcome::errorCode` (Layer-2) be a strict `ProbeFailure` enum and the underlying Layer-1 reason move to `context['extraction_reason']`, or should `errorCode` be a `ProbeFailure | string` union that lets the raw Layer-1 string through? **Default:** strict enum + context bag — keeps the public outcome shape narrow, preserves diagnostic detail.
-- **Q2 (blocks Phase 3):** should `ExtractionResult::failureReason` become a strict enum (e.g. `ExtractionFailure`) or stay `?string` for adapter-private diagnostics? **Default:** stay `?string`. The `HostAdapter::extractFromHtml` failure path generates `{adapter_key}_extraction_failed` dynamically, which doesn't fit an enum cleanly; the reason is never assertion-relevant in production code, only in tests + UI debug.
-- **Q3 (cosmetic):** include the special `multiple_variants` case in any new enum? It's emitted by `ExtractionResult::ambiguous()` (a *non-failure* state) but it's the `failureReason` slot of that constructor for legacy reasons. **Default:** leave alone for this spec; revisit if `ExtractionResult` itself gets refactored.
+- **Q1 (blocks Phase 3):** should `ExtractionResult::failureReason` become a strict enum, or stay `?string` for adapter-private diagnostics? **Default:** stay `?string`. `HostAdapter::extractFromHtml`'s dynamic `{adapter_key}_extraction_failed` pattern doesn't fit an enum cleanly, and the reason is consumed only by the `extractionReason` bridge in `ProbeOutcome` (Phase 2) plus debug surfaces.
+- **Q2 (Phase 2 fork):** instead of the `extractionReason: ?string` field, should `ProbeFailure` grow first-class cases for the manual-selector-fallback signals (`NoAdapterMatched`, `UserSelectorInvalid`, `UserSelectorNoMatch`, `UserSelectorNoPrice`, `UserSelectorNoCurrency`)? **Default:** no — that pulls Layer-1 vocabulary into Layer-2 and forces every new adapter-side reason to update the `ProbeFailure` enum. The split-field design keeps the layers clean and lets the AddShop branch logic stay scoped to the few signals it actually uses.
 
 ---
 
