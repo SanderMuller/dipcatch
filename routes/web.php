@@ -13,11 +13,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::post('push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
     Route::delete('push/subscribe', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
 
-    // 30/min per authenticated user is generous for legitimate use (JS fires
-    // once per page load, then stops once stamped) and bounds a tab-storm /
-    // buggy client.
     Route::post('profile/timezone/auto-detect', AutoDetectTimezoneController::class)
-        ->middleware('throttle:30,1')
+        ->middleware('throttle:auto-detect-timezone')
         ->name('profile.timezone.auto-detect');
 });
 

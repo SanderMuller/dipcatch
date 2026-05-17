@@ -3,6 +3,8 @@
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Translation\PotentiallyTranslatedString;
+use Pest\Expectation;
+use PHPUnit\Framework\Assert;
 use Tests\TestCase;
 
 /*
@@ -33,6 +35,21 @@ pest()->extend(TestCase::class)
 
 expect()->extend('toBeOne', function () {
     return $this->toBe(1);
+});
+
+/**
+ * Assert that the value under test (a DateTimeInterface-like) has the same
+ * UNIX timestamp as the expected value. Narrows the value to
+ * `\Carbon\CarbonInterface` via assert() so PHPStan + Pest's template
+ * inference don't trip on `?string`-typed Eloquent attributes.
+ */
+expect()->extend('toBeSameTimestampAs', function (DateTimeInterface $expected): Expectation {
+    /** @var mixed $actual */
+    $actual = $this->value;
+    Assert::assertInstanceOf(DateTimeInterface::class, $actual);
+    Assert::assertSame($expected->getTimestamp(), $actual->getTimestamp());
+
+    return $this;
 });
 
 /*

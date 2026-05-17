@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
@@ -73,6 +74,18 @@ class FortifyServiceProvider extends ServiceProvider
 
         RateLimiter::for('invitation', function (Request $request) {
             return Limit::perMinute(30)->by($request->ip() ?? 'unknown');
+        });
+
+        // Per-user budget for the browser timezone auto-detect POST. The JS
+        // fires once per page load until timezone_detected_at is stamped,
+        // so 30/min is generous for normal use and bounds a tab-storm. The
+        // route this limiter serves is auth+verified, so $request->user()
+        // is always set when the limiter callback runs.
+        RateLimiter::for('auto-detect-timezone', function (Request $request) {
+            $user = $request->user();
+            assert($user instanceof User);
+
+            return Limit::perMinute(30)->by($user->id);
         });
     }
 }

@@ -2,7 +2,6 @@
 
 use App\Filament\App\Pages\NotificationSettings;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 
 use function Pest\Livewire\livewire;
@@ -40,13 +39,10 @@ test('idempotent: a second POST does not overwrite a user-chosen timezone', func
         ->assertExactJson(['ok' => true]);
 
     $fresh = $user->fresh();
-    $stamp = $fresh->timezone_detected_at;
-    assert($stamp instanceof CarbonImmutable);
     // Timezone unchanged, timestamp preserved — atomic conditional UPDATE
     // matched 0 rows because timezone_detected_at was already non-null.
     expect($fresh->timezone)->toBe('Asia/Tokyo');
-    /** @phpstan-ignore argument.templateType */
-    expect($stamp->timestamp)->toBe($detectedAt->timestamp);
+    expect($fresh->timezone_detected_at)->toBeSameTimestampAs($detectedAt);
 });
 
 test('rejects an unrecognised IANA timezone with 422', function (): void {
