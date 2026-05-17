@@ -100,7 +100,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      * outcome with everything `persist()` needs.
      *
      * @return array{
-     *   status: string,
+     *   status: ScrapeStatus,
      *   price: ?string,
      *   currency: ?string,
      *   in_stock: ?bool,
@@ -146,7 +146,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
         if (! $extraction->isSuccess()) {
             return [
-                'status' => ScrapeStatus::ParseError->value,
+                'status' => ScrapeStatus::ParseError,
                 'price' => null,
                 'currency' => null,
                 'in_stock' => null,
@@ -161,7 +161,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         assert($snapshot !== null);
 
         return [
-            'status' => ScrapeStatus::Ok->value,
+            'status' => ScrapeStatus::Ok,
             'price' => $snapshot->price,
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
@@ -174,7 +174,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
     /**
      * @return array{
-     *   status: string,
+     *   status: ScrapeStatus,
      *   price: ?string,
      *   currency: ?string,
      *   in_stock: ?bool,
@@ -193,7 +193,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         $status = ScrapeStatus::tryFrom($e->code()) ?? ScrapeStatus::Failed;
 
         return [
-            'status' => $status->value,
+            'status' => $status,
             'price' => null,
             'currency' => null,
             'in_stock' => null,
@@ -206,7 +206,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
     /**
      * @return array{
-     *   status: string,
+     *   status: ScrapeStatus,
      *   price: ?string,
      *   currency: ?string,
      *   in_stock: ?bool,
@@ -219,7 +219,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     private function genericFailure(string $message): array
     {
         return [
-            'status' => ScrapeStatus::HttpError->value,
+            'status' => ScrapeStatus::HttpError,
             'price' => null,
             'currency' => null,
             'in_stock' => null,
@@ -235,7 +235,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      * one transaction with offer→product lock order.
      *
      * @param  array{
-     *   status: string,
+     *   status: ScrapeStatus,
      *   price: ?string,
      *   currency: ?string,
      *   in_stock: ?bool,
@@ -258,19 +258,21 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
+            $status = $outcome['status'];
+
             $check = PriceCheck::create([
                 'shop_id' => $locked->id,
                 'price' => $outcome['price'],
                 'currency' => $outcome['currency'],
                 'in_stock' => $outcome['in_stock'],
-                'status' => $outcome['status'],
+                'status' => $status->value,
                 'error' => $outcome['error'],
                 'checked_at' => $now,
             ]);
 
-            $updates = ['last_checked_at' => $now, 'last_status' => $outcome['status']];
+            $updates = ['last_checked_at' => $now, 'last_status' => $status->value];
 
-            if ($outcome['status'] === ScrapeStatus::Ok->value) {
+            if ($status === ScrapeStatus::Ok) {
                 $updates += [
                     'current_price' => $outcome['price'],
                     'current_in_stock' => (bool) ($outcome['in_stock'] ?? true),
@@ -290,7 +292,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             } else {
                 $updates['last_error'] = $outcome['error'];
 
-                $counters = $this->incrementCountersFor($locked, $outcome['status']);
+                $counters = $this->incrementCountersFor($locked, $status);
                 $updates += $counters;
 
                 $updates += $this->healthTransitionsFor($counters);
@@ -305,13 +307,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     /**
      * @return array{consecutive_failures?: int, consecutive_5xx_failures?: int}
      */
-    private function incrementCountersFor(Shop $shop, string $status): array
+    private function incrementCountersFor(Shop $shop, ScrapeStatus $status): array
     {
         return match ($status) {
-            ScrapeStatus::TransientServerError->value => [
+            ScrapeStatus::TransientServerError => [
                 'consecutive_5xx_failures' => $shop->consecutive_5xx_failures + 1,
             ],
-            ScrapeStatus::RobotsDisallowed->value => [
+            ScrapeStatus::RobotsDisallowed => [
                 // Permanent — both counters preserved but health flips to dead below.
             ],
             default => [
