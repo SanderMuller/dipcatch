@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterResolver;
 use App\Services\ShopFetcher\ShopFetcher;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -164,6 +165,29 @@ test('inactive or dead offer is skipped', function (): void {
 
     Http::assertNothingSent();
     expect(PriceCheck::query()->count())->toBe(0);
+});
+
+test('queue middleware shares the per-host bucket with ShopFetcher::throttle', function (): void {
+    // Drain the fetcher's bucket for shop.test by hitting it directly.
+    $perMinute = config()->integer('dipcatch.fetcher.rate_limit_per_minute', 12);
+    for ($i = 0; $i < $perMinute; $i++) {
+        RateLimiter::hit('dipcatch:fetcher:host:shop.test', 60);
+    }
+
+    // Resolve the registered 'shop-fetch' limiter callback and feed it a job
+    // for the same host. Its Limit must report tooManyAttempts now — proving
+    // both paths target the same RateLimiter key.
+    $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
+    $callback = RateLimiter::limiter('shop-fetch');
+    assert($callback instanceof Closure);
+
+    $limit = $callback(new CheckShopPrice($shop));
+    assert($limit instanceof Limit);
+    $key = $limit->key;
+    assert(is_string($key));
+
+    expect($key)->toBe('dipcatch:fetcher:host:shop.test')
+        ->and(RateLimiter::tooManyAttempts($key, $limit->maxAttempts))->toBeTrue();
 });
 
 test('successful check resets both counters and clears failing health', function (): void {

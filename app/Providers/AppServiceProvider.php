@@ -60,12 +60,12 @@ class AppServiceProvider extends ServiceProvider
     {
         $perMinute = DipConfig::int('dipcatch.fetcher.rate_limit_per_minute', 12);
 
-        // Queue middleware on `CheckShopPrice` keys on the offer's host so
-        // background workers share the per-host budget that the synchronous
-        // probe path also respects (the fetcher enforces the same limit
-        // directly — see ShopFetcher::throttle).
+        // The `by()` key MUST match ShopFetcher::throttle()'s key verbatim so
+        // both paths hit the same RateLimiter bucket — otherwise the queue
+        // middleware admits the job, then the fetcher rejects it from its
+        // own (separate) counter. Keep these two strings identical.
         RateLimiter::for('shop-fetch', static function (CheckShopPrice $job) use ($perMinute): Limit {
-            return Limit::perMinute($perMinute)->by('shop-fetch:' . $job->shop->host);
+            return Limit::perMinute($perMinute)->by('dipcatch:fetcher:host:' . $job->shop->host);
         });
     }
 
