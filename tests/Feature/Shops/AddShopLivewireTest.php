@@ -148,6 +148,35 @@ test('extraction failure flips into manual_selector state without persisting', f
     expect(Shop::query()->count())->toBe(0);
 });
 
+test('ExtractionFailed with non-manual reason stays in error state, not manual_selector', function (): void {
+    // jsonld_no_offer is an extraction reason but NOT a manual-selector
+    // trigger (those are 'no_adapter_matched' + 'user_selector_*'). Ensure
+    // the bridge in AddShop::handleFailure() doesn't over-match — without
+    // this assertion the bridge would silently divert all extraction
+    // failures into the selector form.
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'No-Offer Product',
+        // Deliberately no `offers` key → JsonLdAdapter::failed('jsonld_no_offer').
+    ], JSON_THROW_ON_ERROR);
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'error')
+        ->assertSet('errorCode', 'extraction_failed');
+
+    expect(Shop::query()->count())->toBe(0);
+});
+
 test('manual selector flow extracts price and persists offer with selectors', function (): void {
     $html = <<<'HTML'
 <html><body>

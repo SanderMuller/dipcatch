@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ProbeFailure;
 use App\Models\Product;
@@ -234,4 +235,14 @@ test('dedupe check runs before rate limit so retry on dup does not burn budget',
         $outcome = app(ProbeShopUrl::class)($product, 'https://example.com/p/1', $user);
         expect($outcome->isDuplicate())->toBeTrue();
     }
+});
+
+test('ProbeOutcome::failed rejects extractionReason on non-ExtractionFailed codes', function (): void {
+    expect(fn () => ProbeOutcome::failed(
+        errorCode: ProbeFailure::HttpError,
+        extractionReason: 'jsonld_no_price',
+    ))->toThrow(
+        InvalidArgumentException::class,
+        'extractionReason is only valid when errorCode === ProbeFailure::ExtractionFailed',
+    );
 });

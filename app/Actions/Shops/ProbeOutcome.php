@@ -6,6 +6,7 @@ use App\Enums\ProbeFailure;
 use App\Models\Shop;
 use App\PriceAdapters\ShopSnapshot;
 use App\PriceAdapters\VariantCandidate;
+use InvalidArgumentException;
 
 /**
  * Result of `ProbeShopUrl`. Mutually exclusive states: success, duplicate,
@@ -68,6 +69,15 @@ final readonly class ProbeOutcome
      */
     public static function failed(ProbeFailure $errorCode, ?array $context = null, ?string $extractionReason = null): self
     {
+        // extractionReason is the Layer-1 → Layer-2 bridge and is only
+        // meaningful when the caller is signalling an extraction failure.
+        // Reject mixed-layer constructions at the factory boundary.
+        if ($extractionReason !== null && $errorCode !== ProbeFailure::ExtractionFailed) {
+            throw new InvalidArgumentException(
+                "extractionReason is only valid when errorCode === ProbeFailure::ExtractionFailed; got {$errorCode->value}.",
+            );
+        }
+
         return new self(
             state: self::STATE_FAILED,
             errorCode: $errorCode,

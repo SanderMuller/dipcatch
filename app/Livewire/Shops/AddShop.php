@@ -267,11 +267,15 @@ class AddShop extends Component
             return;
         }
 
-        // handleFailure is reached only via the failed-state branch (see match
-        // in submitProbe), where ProbeOutcome::failed() requires a non-null
-        // ProbeFailure. PHPStan proves it; assert for the human reader.
-        assert($outcome->errorCode !== null);
-        $this->failWith($outcome->errorCode->value, $outcome->context);
+        // Type-wise PHPStan proves errorCode is non-null here (handleFailure
+        // is only routed to by the failed-state match arm in submitProbe, and
+        // ProbeOutcome::failed() requires a non-null ProbeFailure). Defensive
+        // null guard anyway — this is the UI boundary and a future malformed
+        // outcome should surface as an inline 'unknown' error rather than a
+        // production TypeError (assertions are dev-only).
+        // @phpstan-ignore nullsafe.neverNull
+        $code = $outcome->errorCode?->value ?? 'unknown';
+        $this->failWith($code, $outcome->context);
     }
 
     /**
