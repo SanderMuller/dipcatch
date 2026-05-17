@@ -22,7 +22,6 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -37,9 +36,11 @@ use Throwable;
  * Failure classification (see spec §5 "Per-job logic"):
  *   - success                : reset both counters
  *   - 5xx                    : increment `consecutive_5xx_failures` only
- *   - blocked / rate_limited
- *     / 4xx / parse_failed   : increment `consecutive_failures` only
+ *   - blocked / 4xx
+ *     / parse_failed         : increment `consecutive_failures` only
  *   - robots_disallowed      : flip to health='dead', active=false
+ *   - rate_limited           : release the job back to the queue (no counter
+ *                              tick, no PriceCheck row) — see handle().
  *
  * Health transitions (config-driven):
  *   - consecutive_failures >= failing_after        → health=failing
@@ -75,14 +76,6 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         return DipConfig::int('dipcatch.recheck.jitter_minutes', 30) * 60 + 600;
     }
 
-    /**
-     * @return list<object>
-     */
-    public function middleware(): array
-    {
-        return [new RateLimited('shop-fetch')];
-    }
-
     public function handle(ShopFetcher $fetcher, AdapterResolver $resolver): void
     {
         $shop = Shop::query()->with('product')->find($this->shop->id);
@@ -90,7 +83,16 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $outcome = $this->fetchAndExtract($shop, $fetcher, $resolver);
+        try {
+            $outcome = $this->fetchAndExtract($shop, $fetcher, $resolver);
+        } catch (RateLimitedByHost $e) {
+            // Per-host budget exhausted (probe path or another worker drained
+            // it). Release for retry instead of writing a `rate_limited` check
+            // and ticking the failure counter — the bucket refills shortly.
+            $this->release(max(1, $e->retryAfterSeconds));
+
+            return;
+        }
 
         $this->persist($shop, $outcome);
     }
@@ -114,6 +116,10 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     {
         try {
             $fetch = $fetcher->fetch($shop->url);
+        } catch (RateLimitedByHost $e) {
+            // Bubble up so handle() can release the job. We deliberately do
+            // NOT classify this as a failed check.
+            throw $e;
         } catch (FetchException $e) {
             return $this->failureOutcome($e);
         } catch (Throwable $e) {
@@ -182,7 +188,6 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         $status = match (true) {
             $e instanceof RobotsDisallowed => 'robots_disallowed',
             $e instanceof Blocked => 'blocked',
-            $e instanceof RateLimitedByHost => 'rate_limited',
             $e instanceof TemporaryFailure => '5xx',
             $e instanceof HttpError => ScrapeStatus::HttpError->value,
             default => 'failed',

@@ -3,16 +3,12 @@
 namespace App\Providers;
 
 use App\Health\LastSuccessfulScrapeCheck;
-use App\Jobs\CheckShopPrice;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ShopAdapter;
-use App\Support\Config as DipConfig;
 use Carbon\CarbonImmutable;
-use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
@@ -49,24 +45,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->registerHealthChecks();
-        $this->registerRateLimiters();
 
         Gate::define('viewQueueInsights', static fn (): bool => app()->isLocal());
 
         Gate::define('retryFailedJobs', static fn (): bool => app()->isLocal());
-    }
-
-    protected function registerRateLimiters(): void
-    {
-        $perMinute = DipConfig::int('dipcatch.fetcher.rate_limit_per_minute', 12);
-
-        // The `by()` key MUST match ShopFetcher::throttle()'s key verbatim so
-        // both paths hit the same RateLimiter bucket — otherwise the queue
-        // middleware admits the job, then the fetcher rejects it from its
-        // own (separate) counter. Keep these two strings identical.
-        RateLimiter::for('shop-fetch', static function (CheckShopPrice $job) use ($perMinute): Limit {
-            return Limit::perMinute($perMinute)->by('dipcatch:fetcher:host:' . $job->shop->host);
-        });
     }
 
     protected function configureDefaults(): void
