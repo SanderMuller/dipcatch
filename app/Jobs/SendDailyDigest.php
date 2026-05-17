@@ -67,7 +67,7 @@ class SendDailyDigest implements ShouldBeUnique, ShouldQueue
             ->where('user_id', $this->user->id)
             ->where('fired_at', '>', $since)
             ->with(['product', 'triggeredByShop'])
-            ->orderBy('fired_at')
+            ->oldest('fired_at')
             ->get();
 
         if ($events->isEmpty()) {

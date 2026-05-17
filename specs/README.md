@@ -20,6 +20,7 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 - ~~`email-digest.md`~~ — ✅ shipped (replaced per-drop email with daily 09:00 user-local digest; `users.timezone` + `last_digest_sent_at`, `SendDailyDigest` job, `DispatchDailyDigestsCommand`).
 - ~~`shop-notes.md`~~ — ✅ shipped (free-text `shops.notes` column, App-panel `edit_notes` action + indicator column, admin read-only column).
 - ~~`timezone-autodetect.md`~~ — ✅ shipped (`users.timezone_detected_at` + browser `Intl` detection on first authenticated page load; atomic conditional UPDATE so explicit save in NotificationSettings can't be clobbered).
+- ~~`public-product-sharing.md`~~ — ✅ shipped (per-product `share_slug` + public `/p/{slug}` route, Chart.js price-history + OG/Twitter meta, atomic conditional UPDATE on share/rotate/stop to refuse last-writer-wins between owner tabs, SRI-pinned CDN scripts).
 
 ## Decisions (locked)
 

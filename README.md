@@ -10,6 +10,7 @@ Track product prices across the web. Get notified when a price drops more than y
 - When the cheapest price drops more than `X` (absolute or %) below a reference price, user gets a notification.
 - Dashboard lists every tracked product with image, name, cheapest shop, cheapest price, and per-product drilldown (price history chart + per-shop status).
 - "Add shop" form: URL → live probe → preview/variant chooser → confirm. URLs are normalized + deduped per product.
+- Optional per-product public share link (unguessable 32-char slug at `/p/{slug}`, owner-rotatable, `noindex,nofollow`): exposes only product summary, eligible shops, and price-history chart — no notes, thresholds, or private fields.
 
 ## Core concepts
 

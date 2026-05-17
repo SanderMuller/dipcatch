@@ -8,7 +8,7 @@ use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Response;
 
 /**
@@ -33,7 +33,7 @@ final class PublicProductController extends Controller
             ->where('share_slug', $slug)
             ->firstOrFail();
 
-        /** @var Collection<int, Shop> $shops */
+        /** @var EloquentCollection<int, Shop> $shops */
         $shops = $product->shops()
             ->select(['id', 'product_id', 'host', 'current_price', 'current_in_stock', 'currency', 'last_checked_at', 'url'])
             ->where('active', true)
@@ -67,12 +67,12 @@ final class PublicProductController extends Controller
     {
         $cutoff = CarbonImmutable::now()->subDays(90);
 
-        /** @var Collection<int, ProductCheapestHistory> $segments */
+        /** @var EloquentCollection<int, ProductCheapestHistory> $segments */
         $segments = ProductCheapestHistory::query()
             ->select(['cheapest_price', 'started_at', 'ended_at'])
             ->where('product_id', $product->id)
             ->where('started_at', '>=', $cutoff)
-            ->orderBy('started_at')
+            ->oldest('started_at')
             ->get();
 
         $points = [];
@@ -85,9 +85,9 @@ final class PublicProductController extends Controller
             // casts() method shape — narrow to CarbonInterface for PHPStan.
             assert($started instanceof CarbonImmutable);
             assert($ended instanceof CarbonImmutable);
-            /** @var string $startedIso */
+            /** @var string $startedIso — Larastan widens toIso8601String() to mixed; the @var pins it for the array shape below. */
             $startedIso = $started->toIso8601String();
-            /** @var string $endedIso */
+            /** @var string $endedIso — same widening as above. */
             $endedIso = $ended->toIso8601String();
             $points[] = ['x' => $startedIso, 'y' => $price];
             $points[] = ['x' => $endedIso, 'y' => $price];
