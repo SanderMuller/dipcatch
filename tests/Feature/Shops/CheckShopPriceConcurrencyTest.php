@@ -71,12 +71,10 @@ test('two CheckShopPrice runs against shops on the same product settle determini
         'shop_a' => Shop::factory()->for($product)->create([
             'url' => 'https://shop-a.test/p/1',
             'current_price' => '90.00',
-            'current_in_stock' => true,
         ]),
         'shop_b' => Shop::factory()->for($product)->create([
             'url' => 'https://shop-b.test/p/1',
             'current_price' => '100.00',
-            'current_in_stock' => true,
         ]),
     ];
 
@@ -147,12 +145,11 @@ test('rerunning CheckShopPrice for the same shop with unchanged price does not w
 });
 
 test('a failing recheck on the current cheapest does not corrupt the history segment', function (): void {
-    // shop-a is the active cheapest; shop-b is more expensive. shop-a now
-    // returns a parse-failure page. The failing check must NOT close the
-    // open history segment because shop-a is still the cheapest in-stock
-    // option (the persist path skips recompute for non-Ok statuses only via
-    // the shop-state update; but recompute itself still runs unconditionally
-    // — verify the segment chain stays consistent regardless).
+    // recompute runs unconditionally at the end of persist(), even when the
+    // outcome is a failure. On a failed check the shop's current_price is
+    // NOT overwritten — so shop-a's stored 60.00 is still the lowest live
+    // price and recompute must leave the open history segment intact rather
+    // than churning it.
     Http::fake([
         'https://shop-a.test/robots.txt' => Http::response('', 404),
         'https://shop-a.test/p/1' => Http::response('<html><body>no metadata</body></html>', 200),
@@ -162,12 +159,10 @@ test('a failing recheck on the current cheapest does not corrupt the history seg
     $shopA = Shop::factory()->for($product)->create([
         'url' => 'https://shop-a.test/p/1',
         'current_price' => '60.00',
-        'current_in_stock' => true,
     ]);
     Shop::factory()->for($product)->create([
         'url' => 'https://shop-b.test/p/1',
         'current_price' => '90.00',
-        'current_in_stock' => true,
     ]);
 
     // Seed the open segment so we can verify it's preserved.
