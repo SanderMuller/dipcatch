@@ -2,10 +2,19 @@
 
 use App\Http\Controllers\AutoDetectTimezoneController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\PushSubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+// Public product share page — no auth, throttled per IP, exact 32-char
+// alphanumeric slug. Lives outside the auth+verified group so guests
+// can hit it.
+Route::get('p/{slug}', PublicProductController::class)
+    ->where('slug', '[A-Za-z0-9]{32}')
+    ->middleware('throttle:public-product')
+    ->name('product.public');
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::view('dashboard', 'dashboard')->name('dashboard');

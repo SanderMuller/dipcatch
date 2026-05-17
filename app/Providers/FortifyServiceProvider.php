@@ -87,5 +87,14 @@ class FortifyServiceProvider extends ServiceProvider
 
             return Limit::perMinute(30)->by($user->id);
         });
+
+        // Per-IP budget for the public product share page. Bounded to
+        // protect against scraping the unguessable-slug URL space; 120/min
+        // is well above legitimate viewing patterns (chat unfurl + a few
+        // refreshes) but low enough to bite a crawler. Public route — no
+        // user to key on, IP is the only signal.
+        RateLimiter::for('public-product', function (Request $request) {
+            return Limit::perMinute(120)->by($request->ip() ?? 'unknown');
+        });
     }
 }

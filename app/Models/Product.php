@@ -85,11 +85,8 @@ class Product extends Model
 
     public function publicShareUrl(): ?string
     {
-        // Phase 2 wires up the named route 'product.public'; for now build
-        // the URL by hand so the share action works the moment the schema
-        // ships, without depending on the controller-not-yet-built.
         return $this->isPubliclyShared()
-            ? url('/p/' . $this->share_slug)
+            ? route('product.public', ['slug' => $this->share_slug])
             : null;
     }
 
