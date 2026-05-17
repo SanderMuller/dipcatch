@@ -112,7 +112,7 @@ class ShopsRelationManager extends RelationManager
 
                 Action::make('toggle_active')
                     ->label(fn (Shop $record): string => $record->active ? 'Pause' : 'Resume')
-                    ->icon(fn (Shop $record) => $record->active ? Heroicon::Pause : Heroicon::Play)
+                    ->icon(fn (Shop $record): Heroicon => $record->active ? Heroicon::Pause : Heroicon::Play)
                     ->color(fn (Shop $record): string => $record->active ? 'gray' : 'success')
                     ->action(function (Shop $record): void {
                         $wasInactive = ! $record->active;
@@ -206,7 +206,7 @@ class ShopsRelationManager extends RelationManager
         // new price now. Sync dispatch also bypasses `ShouldBeUnique`, so a
         // background recheck already holding the per-offer lock doesn't
         // swallow this run.
-        CheckShopPrice::dispatchSync($record->refresh());
+        dispatch_sync(new CheckShopPrice($record->refresh()));
 
         $livewire->dispatch('shop-added');
 

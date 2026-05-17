@@ -30,7 +30,7 @@ use Throwable;
  *    bypass), keyed on normalized host.
  *  - Body cap 2 MB; charset → UTF-8.
  */
-final class ShopFetcher
+final readonly class ShopFetcher
 {
     // Cloudflare / Akamai blanket-block anything that admits to being a bot,
     // even when robots.txt would allow us. We still honor robots.txt, throttle
@@ -57,8 +57,8 @@ final class ShopFetcher
     ];
 
     public function __construct(
-        private readonly RobotsTxtPolicy $robots,
-        private readonly UrlSafetyGuard $safety,
+        private RobotsTxtPolicy $robots,
+        private UrlSafetyGuard $safety,
     ) {}
 
     public function fetch(string $url): FetchResult
@@ -78,7 +78,7 @@ final class ShopFetcher
 
         try {
             $this->safety->assertSafe($url);
-        } catch (InvalidArgumentException $e) {
+        } catch (InvalidArgumentException) {
             throw new HttpError(0);
         }
 
@@ -224,13 +224,7 @@ final class ShopFetcher
 
         $head = strtolower(substr($body, 0, 4096));
 
-        foreach (self::BLOCK_MARKERS as $marker) {
-            if (str_contains($head, $marker)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(self::BLOCK_MARKERS, fn (string $marker): bool => str_contains($head, $marker));
     }
 
     private function prepareBody(Response $response): string
@@ -260,7 +254,7 @@ final class ShopFetcher
         // Strip invalid UTF-8 byte sequences via a round-trip convert; without
         // this the Crawler's libxml parser bails on the first bad byte.
         if (! mb_check_encoding($body, 'UTF-8')) {
-            $body = (string) mb_convert_encoding($body, 'UTF-8', 'UTF-8');
+            return mb_convert_encoding($body, 'UTF-8', 'UTF-8');
         }
 
         return $body;

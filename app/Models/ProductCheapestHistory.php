@@ -12,6 +12,9 @@ class ProductCheapestHistory extends Model
     /** @use HasFactory<ProductCheapestHistoryFactory> */
     use HasFactory;
 
+    // Larastan needs $table as a property (not #[Table] attribute) to introspect
+    // model properties via the migration schema. Don't switch back to #[Table]
+    // unless we also update larastan to support attribute-table model discovery.
     protected $table = 'product_cheapest_history';
 
     public $timestamps = false;

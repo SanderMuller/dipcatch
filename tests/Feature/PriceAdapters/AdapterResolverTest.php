@@ -120,9 +120,9 @@ test('persisted key failed → full chain runs (does not stop)', function (): vo
 test('container wires resolver from dipcatch.adapters config in order', function (): void {
     app()->forgetInstance(AdapterResolver::class);
 
-    app()->singleton('test.adapter.one', fn () => fakeAdapter('one', ExtractionResult::skip()));
-    app()->singleton('test.adapter.two', fn () => fakeAdapter('two', ExtractionResult::success(snap('42.00'))));
-    app()->singleton('test.adapter.three', fn () => fakeAdapter('three', ExtractionResult::success(snap('99.00'))));
+    app()->singleton('test.adapter.one', fn (): ShopAdapter => fakeAdapter('one', ExtractionResult::skip()));
+    app()->singleton('test.adapter.two', fn (): ShopAdapter => fakeAdapter('two', ExtractionResult::success(snap('42.00'))));
+    app()->singleton('test.adapter.three', fn (): ShopAdapter => fakeAdapter('three', ExtractionResult::success(snap('99.00'))));
 
     config()->set('dipcatch.adapters', [
         'test.adapter.one',

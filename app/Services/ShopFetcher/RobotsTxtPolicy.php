@@ -130,7 +130,7 @@ final readonly class RobotsTxtPolicy
                 continue;
             }
 
-            [$key, $value] = array_pad(array_map('trim', explode(':', $line, 2)), 2, '');
+            [$key, $value] = array_pad(array_map(trim(...), explode(':', $line, 2)), 2, '');
             $keyLower = strtolower($key);
 
             if ($keyLower === 'user-agent') {

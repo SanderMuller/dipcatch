@@ -13,6 +13,9 @@ final readonly class BolAdapter extends HostAdapter
         return 'bol';
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function hosts(): array
     {
         return [

@@ -45,7 +45,7 @@ final class Reference
                 $q->whereNull('ended_at')
                     ->orWhere('ended_at', '>=', $windowStart);
             })
-            ->orderBy('started_at')
+            ->oldest('started_at')
             ->get();
 
         /** @var list<array{price: string, weightSeconds: int}> $weighted */
@@ -159,7 +159,7 @@ final class Reference
     {
         $first = $product->cheapestHistory()
             ->whereNotNull('cheapest_price')
-            ->orderBy('started_at')
+            ->oldest('started_at')
             ->first();
 
         if ($first === null || $first->cheapest_price === null) {

@@ -96,12 +96,12 @@ test('different query orders produce identical hashes', function (): void {
 });
 
 test('rejects non-http(s) schemes', function (): void {
-    expect(fn () => UrlNormalizer::normalize('ftp://example.com/'))
+    expect(fn (): string => UrlNormalizer::normalize('ftp://example.com/'))
         ->toThrow(InvalidArgumentException::class);
 });
 
 test('rejects unparseable URLs', function (): void {
-    expect(fn () => UrlNormalizer::normalize('not a url'))
+    expect(fn (): string => UrlNormalizer::normalize('not a url'))
         ->toThrow(InvalidArgumentException::class);
 });
 

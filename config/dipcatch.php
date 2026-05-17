@@ -1,5 +1,14 @@
 <?php declare(strict_types=1);
 
+use App\PriceAdapters\UserSelectorAdapter;
+use App\PriceAdapters\Hosts\AmazonAdapter;
+use App\PriceAdapters\Hosts\BolAdapter;
+use App\PriceAdapters\Hosts\ZooplusAdapter;
+use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\MicrodataAdapter;
+use App\PriceAdapters\OpenGraphAdapter;
+use App\PriceAdapters\GenericAdapter;
+
 return [
 
     'admin' => [
@@ -45,14 +54,14 @@ return [
     // Price extraction chain. Order is priority — user selectors first, then
     // host-specific, then generic fallback. See AdapterResolver for semantics.
     'adapters' => [
-        App\PriceAdapters\UserSelectorAdapter::class,
-        App\PriceAdapters\Hosts\AmazonAdapter::class,
-        App\PriceAdapters\Hosts\BolAdapter::class,
-        App\PriceAdapters\Hosts\ZooplusAdapter::class,
-        App\PriceAdapters\JsonLdAdapter::class,
-        App\PriceAdapters\MicrodataAdapter::class,
-        App\PriceAdapters\OpenGraphAdapter::class,
-        App\PriceAdapters\GenericAdapter::class,
+        UserSelectorAdapter::class,
+        AmazonAdapter::class,
+        BolAdapter::class,
+        ZooplusAdapter::class,
+        JsonLdAdapter::class,
+        MicrodataAdapter::class,
+        OpenGraphAdapter::class,
+        GenericAdapter::class,
     ],
 
 ];

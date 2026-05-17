@@ -80,7 +80,6 @@ test('fails when matched element has no parseable number', function (): void {
 test('fails when fallback currency is missing', function (): void {
     $result = $this->adapter->extract('https://x.test', '<span class="p">10.00</span>', new AdapterContext(
         selectors: ['price' => '.p'],
-        fallbackCurrency: null,
     ));
 
     expect($result->isFailed())->toBeTrue()

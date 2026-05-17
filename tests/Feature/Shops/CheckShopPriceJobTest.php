@@ -45,7 +45,7 @@ test('successful check writes price_check, updates offer, recomputes cheapest', 
         'consecutive_failures' => 2,
     ]);
 
-    (new CheckShopPrice($shop))->handle(app(ShopFetcher::class), app(AdapterResolver::class));
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class));
 
     $shop->refresh();
     $product->refresh();
@@ -70,7 +70,7 @@ test('parse failure increments main counter and writes failed price_check', func
         'consecutive_failures' => 1,
     ]);
 
-    (new CheckShopPrice($shop))->handle(
+    new CheckShopPrice($shop)->handle(
         app(ShopFetcher::class),
         app(AdapterResolver::class),
     );
@@ -93,7 +93,7 @@ test('5xx increments the 5xx counter only', function (): void {
         'consecutive_5xx_failures' => 0,
     ]);
 
-    (new CheckShopPrice($shop))->handle(
+    new CheckShopPrice($shop)->handle(
         app(ShopFetcher::class),
         app(AdapterResolver::class),
     );
@@ -119,7 +119,7 @@ test('main counter reaching dead_after flips health to dead + active=false', fun
         'health' => 'failing',
     ]);
 
-    (new CheckShopPrice($shop))->handle(
+    new CheckShopPrice($shop)->handle(
         app(ShopFetcher::class),
         app(AdapterResolver::class),
     );
@@ -141,7 +141,7 @@ test('robots disallow flips offer to dead immediately', function (): void {
         'active' => true,
     ]);
 
-    (new CheckShopPrice($shop))->handle(
+    new CheckShopPrice($shop)->handle(
         app(ShopFetcher::class),
         app(AdapterResolver::class),
     );
@@ -157,7 +157,7 @@ test('inactive or dead offer is skipped', function (): void {
 
     Http::fake();
 
-    (new CheckShopPrice($shop))->handle(
+    new CheckShopPrice($shop)->handle(
         app(ShopFetcher::class),
         app(AdapterResolver::class),
     );
@@ -185,7 +185,7 @@ test('per-host rate limit releases instead of writing a failed check or ticking 
     // queued job context, InteractsWithQueue::release() is a no-op — what we
     // care about is that NO PriceCheck row is written and the failure counter
     // does NOT tick, even though the fetcher rejected the host.
-    (new CheckShopPrice($shop))->handle(
+    new CheckShopPrice($shop)->handle(
         app(ShopFetcher::class),
         app(AdapterResolver::class),
     );
@@ -205,7 +205,7 @@ test('successful check resets both counters and clears failing health', function
         'health' => 'failing',
     ]);
 
-    (new CheckShopPrice($shop))->handle(
+    new CheckShopPrice($shop)->handle(
         app(ShopFetcher::class),
         app(AdapterResolver::class),
     );

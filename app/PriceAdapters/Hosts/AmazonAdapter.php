@@ -44,6 +44,9 @@ final readonly class AmazonAdapter extends HostAdapter
         return 'amazon';
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function hosts(): array
     {
         return [
@@ -167,13 +170,7 @@ final readonly class AmazonAdapter extends HostAdapter
 
         $text = strtolower(trim($availability->text('')));
 
-        foreach (['currently unavailable', 'niet beschikbaar', 'derzeit nicht verfügbar', 'non disponible', 'no disponible', 'attualmente non disponibile'] as $needle) {
-            if (str_contains($text, $needle)) {
-                return false;
-            }
-        }
-
-        return true;
+        return array_all(['currently unavailable', 'niet beschikbaar', 'derzeit nicht verfügbar', 'non disponible', 'no disponible', 'attualmente non disponibile'], fn (string $needle): bool => ! str_contains($text, $needle));
     }
 
     private static function firstUrlFromDynamicImage(string $json): ?string

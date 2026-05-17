@@ -20,6 +20,9 @@ final readonly class ZooplusAdapter extends HostAdapter
         return 'zooplus';
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function hosts(): array
     {
         // Zooplus runs the same template across all country TLDs.

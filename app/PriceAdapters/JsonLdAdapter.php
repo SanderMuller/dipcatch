@@ -222,12 +222,6 @@ final readonly class JsonLdAdapter implements ShopAdapter
 
         $availability = strtolower($availability);
 
-        foreach (['/outofstock', '/discontinued', '/soldout', 'outofstock', 'discontinued', 'soldout'] as $negative) {
-            if ($availability === $negative || str_ends_with($availability, $negative)) {
-                return false;
-            }
-        }
-
-        return true;
+        return array_all(['/outofstock', '/discontinued', '/soldout', 'outofstock', 'discontinued', 'soldout'], fn (string $negative): bool => $availability !== $negative && ! str_ends_with($availability, $negative));
     }
 }

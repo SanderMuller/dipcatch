@@ -67,11 +67,11 @@ test('writes a history segment when cheapest changes', function (): void {
     expect($product->cheapestHistory()->count())->toBe(2);
 
     /** @var ProductCheapestHistory $closed */
-    $closed = $product->cheapestHistory()->orderBy('started_at')->first();
+    $closed = $product->cheapestHistory()->oldest('started_at')->first();
     expect($closed->ended_at)->not->toBeNull();
 
     /** @var ProductCheapestHistory $open */
-    $open = $product->cheapestHistory()->orderByDesc('started_at')->first();
+    $open = $product->cheapestHistory()->latest('started_at')->first();
     expect($open->ended_at)->toBeNull()
         ->and((string) $open->cheapest_price)->toBe('80.00');
 });
@@ -99,7 +99,7 @@ test('clears cheapest when all offers become ineligible', function (): void {
         ->and($product->cheapest_price)->toBeNull();
 
     /** @var ProductCheapestHistory $latest */
-    $latest = $product->cheapestHistory()->orderByDesc('started_at')->first();
+    $latest = $product->cheapestHistory()->latest('started_at')->first();
     expect($latest->cheapest_price)->toBeNull()
         ->and($latest->ended_at)->toBeNull();
 });

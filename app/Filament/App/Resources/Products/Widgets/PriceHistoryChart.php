@@ -115,7 +115,7 @@ class PriceHistoryChart extends ChartWidget
     private function segmentsFor(Product $product): EloquentCollection
     {
         $query = $product->cheapestHistory()
-            ->orderBy('started_at');
+            ->oldest('started_at');
 
         $windowStart = $this->windowStart();
         if ($windowStart !== null) {
@@ -178,7 +178,7 @@ class PriceHistoryChart extends ChartWidget
                 $this->windowStart(),
                 fn (EloquentBuilder $q, CarbonImmutable $windowStart) => $q->where('fired_at', '>=', $windowStart),
             )
-            ->orderBy('fired_at')
+            ->oldest('fired_at')
             ->get(['new_price', 'fired_at']);
 
         if ($events->isEmpty()) {

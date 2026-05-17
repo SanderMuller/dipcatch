@@ -36,7 +36,7 @@ final class UrlNormalizer
 
         $host = self::normalizeHost($parts['host']);
 
-        $port = isset($parts['port']) ? (int) $parts['port'] : null;
+        $port = $parts['port'] ?? null;
         $portSegment = self::normalizePort($scheme, $port);
 
         $path = self::normalizePath($parts['path'] ?? '');
@@ -169,12 +169,6 @@ final class UrlNormalizer
             return true;
         }
 
-        foreach (self::TRACKING_PARAM_PREFIXES as $prefix) {
-            if (str_starts_with($key, $prefix)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(self::TRACKING_PARAM_PREFIXES, fn (string $prefix): bool => str_starts_with($key, $prefix));
     }
 }
