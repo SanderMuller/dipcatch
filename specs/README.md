@@ -12,6 +12,12 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 6. **[notifications.md](notifications.md)** — email + Filament bell + web push, per-user channel toggles, profile UI. Phases 1–4 shipped; Phase 5 hardening partially shipped (per-user hourly rate-limit done; admin queue-depth widget deferred).
 7. ~~`dashboard.md`~~ — ✅ shipped (stats widgets, active drops, recent notifications, savings chart, per-product price history chart).
 
+## Post-launch refactors
+
+- ~~`multi-webshop-price-tracking.md`~~ — ✅ shipped (Product/Shop split, adapter chain, per-shop checks, ProductCheapestHistory timeline).
+- ~~`test-helper-hoist.md`~~ — ✅ shipped (`withJsonLd` + `jsonLdPage` consolidated in `tests/Pest.php`; `phpstan.neon` `scanFiles` added).
+- ~~`failure-code-enum.md`~~ — ✅ shipped (`App\Enums\ProbeFailure`, `ProbeOutcome::extractionFailed()` + `shouldOfferManualSelector()`, `CheckShopPrice::failureOutcome` via `ScrapeStatus::tryFrom`).
+
 ## Decisions (locked)
 
 - **Stack baseline:** PHP 8.5, Laravel 13, Filament v5.6+, Fortify v1, Livewire 4 + Flux 2, Pest 4, Larastan 3, Postgres, Laravel Cloud — all already installed; specs *configure* these, never reinstall.

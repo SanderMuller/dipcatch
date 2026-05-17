@@ -34,6 +34,7 @@ use Rector\TypeDeclaration\Rector\StmtsAwareInterface\DeclareStrictTypesRector;
 use RectorLaravel\Rector\ArrayDimFetch\EnvVariableToEnvHelperRector;
 use RectorLaravel\Rector\ArrayDimFetch\RequestVariablesToRequestFacadeRector;
 use RectorLaravel\Rector\ArrayDimFetch\ServerVariableToRequestFacadeRector;
+use RectorLaravel\Rector\Class_\TablePropertyToTableAttributeRector;
 use RectorLaravel\Rector\ClassMethod\ScopeNamedClassMethodToScopeAttributedClassMethodRector;
 use RectorLaravel\Rector\Coalesce\ApplyDefaultInsteadOfNullCoalesceRector;
 use RectorLaravel\Rector\FuncCall\AppToResolveRector;
@@ -104,6 +105,10 @@ return RectorConfig::configure()
         ],
         AddOverrideAttributeToOverriddenMethodsRector::class,
         AddOverrideAttributeToOverriddenPropertiesRector::class,
+        // Larastan can't introspect models that declare their table via
+        // #[Table] attribute — it still reads `protected $table`. Keep the
+        // property form until the larastan upgrade resolves.
+        TablePropertyToTableAttributeRector::class,
         AppToResolveRector::class,
         ApplyDefaultInsteadOfNullCoalesceRector::class,
         ArgumentAdderRector::class,
