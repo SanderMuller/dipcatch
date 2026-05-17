@@ -51,6 +51,17 @@ return [
         'jitter_minutes' => (int) env('DIPCATCH_RECHECK_JITTER_MINUTES', 30),
     ],
 
+    'digest' => [
+        // Local hour-of-day at which each user's daily digest fires. 24h.
+        'send_hour' => (int) env('DIPCATCH_DIGEST_SEND_HOUR', 9),
+        // Max users dispatched per scheduler tick. Bounds the 09:00 burst
+        // across timezones so the mailer isn't slammed.
+        'batch_size' => (int) env('DIPCATCH_DIGEST_BATCH_SIZE', 500),
+        // Max age of PriceDropEvents pulled into a single digest, in days.
+        // Caps the backlog if a user's mail bounced for a while.
+        'lookback_days' => (int) env('DIPCATCH_DIGEST_LOOKBACK_DAYS', 7),
+    ],
+
     // Price extraction chain. Order is priority — user selectors first, then
     // host-specific, then generic fallback. See AdapterResolver for semantics.
     'adapters' => [

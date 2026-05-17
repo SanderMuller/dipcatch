@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Console\Commands\DispatchDailyDigestsCommand;
 use App\Console\Commands\PruneOldChecksCommand;
 use App\Console\Commands\RecheckActiveShopsCommand;
 use Illuminate\Console\Scheduling\Schedule;
@@ -22,6 +23,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->command(PruneOldChecksCommand::class)
             ->dailyAt('03:00')
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        $schedule->command(DispatchDailyDigestsCommand::class)
+            ->everyMinute()
             ->withoutOverlapping()
             ->onOneServer();
 

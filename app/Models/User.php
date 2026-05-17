@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
-#[Fillable(['name', 'email', 'password', 'is_admin'])]
+#[Fillable(['name', 'email', 'password', 'is_admin', 'timezone'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 {
@@ -34,6 +34,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'notify_via_email' => 'boolean',
             'notify_via_filament' => 'boolean',
             'notify_via_push' => 'boolean',
+            'last_digest_sent_at' => 'datetime',
         ];
     }
 

@@ -5,9 +5,8 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\DropOutcome;
-use Illuminate\Mail\Markdown;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Str;
+use NotificationChannels\WebPush\WebPushChannel;
 
 function buildOutcome(): DropOutcome
 {
@@ -43,46 +42,6 @@ function buildProductAt85(User $user): Product
     return $product;
 }
 
-test('toMail uses the price-drop markdown view with the right subject + payload', function (): void {
-    $user = User::factory()->create();
-    $product = buildProductAt85($user);
-
-    $eventId = (string) Str::uuid();
-    $message = new PriceDropNotification($product, buildOutcome(), $eventId)->toMail($user);
-
-    expect($message)->toBeInstanceOf(MailMessage::class)
-        ->and($message->subject)->toBe('Price drop on Acme Headphones at bol.com: EUR 85.00')
-        ->and($message->markdown)->toBe('notifications.price-drop');
-
-    expect($message->viewData)->toMatchArray([
-        'newPrice' => '85.00',
-        'host' => 'bol.com',
-        'offerUrl' => 'https://bol.com/p/headphones',
-        'referencePrice' => '100.00',
-        'referenceKind' => 'median_30d',
-        'dropPercent' => '15.00',
-        'dropAbsolute' => '15.00',
-    ]);
-
-    $viewUrl = $message->viewData['viewUrl'] ?? '';
-    expect($viewUrl)->toBeString()
-        ->and($viewUrl)->not->toBe('');
-});
-
-test('toMail markdown view renders end-to-end via the Markdown renderer', function (): void {
-    $user = User::factory()->create();
-    $product = buildProductAt85($user);
-
-    $message = new PriceDropNotification($product, buildOutcome(), (string) Str::uuid())->toMail($user);
-    $rendered = (string) app(Markdown::class)
-        ->render((string) $message->markdown, $message->viewData);
-
-    expect($rendered)
-        ->toContain('Acme Headphones')
-        ->toContain('EUR 85.00')
-        ->toContain('15.00%');
-});
-
 test('toDatabase payload contains the keys the dashboard widget consumes', function (): void {
     $user = User::factory()->create();
     $product = buildProductAt85($user);
@@ -104,17 +63,34 @@ test('toDatabase payload contains the keys the dashboard widget consumes', funct
     ])->and($payload['view_url'])->toBeString();
 });
 
-test('via() respects per-user channel toggles', function (): void {
+test('via() returns only real-time channels (database + push); never mail', function (): void {
     $product = Product::factory()->create();
     $outcome = buildOutcome();
 
-    $emailOnly = User::factory()->create(['notify_via_email' => true, 'notify_via_filament' => false]);
-    $bellOnly = User::factory()->create(['notify_via_email' => false, 'notify_via_filament' => true]);
-    $silent = User::factory()->create(['notify_via_email' => false, 'notify_via_filament' => false]);
+    // notify_via_email is now decoupled from PriceDropNotification — the
+    // toggle drives SendDailyDigest dispatch, not this real-time path.
+    $bellOnly = User::factory()->create(['notify_via_email' => true, 'notify_via_filament' => true, 'notify_via_push' => false]);
+    $silent = User::factory()->create(['notify_via_email' => true, 'notify_via_filament' => false, 'notify_via_push' => false]);
 
     $notification = new PriceDropNotification($product, $outcome, 'fake-id');
 
-    expect($notification->via($emailOnly))->toBe(['mail'])
-        ->and($notification->via($bellOnly))->toBe(['database'])
-        ->and($notification->via($silent))->toBe([]);
+    expect($notification->via($bellOnly))->toBe(['database'])
+        ->and($notification->via($silent))->toBe([])
+        ->and($notification->via($bellOnly))->not->toContain('mail');
+});
+
+test('via() includes web push only when user has subscriptions AND opted in', function (): void {
+    $product = Product::factory()->create();
+    $outcome = buildOutcome();
+
+    $optedInNoSubscriptions = User::factory()->create([
+        'notify_via_filament' => false,
+        'notify_via_push' => true,
+    ]);
+
+    $notification = new PriceDropNotification($product, $outcome, 'fake-id');
+
+    // No subscriptions yet → push channel not included.
+    expect($notification->via($optedInNoSubscriptions))->toBe([])
+        ->and($notification->via($optedInNoSubscriptions))->not->toContain(WebPushChannel::class);
 });

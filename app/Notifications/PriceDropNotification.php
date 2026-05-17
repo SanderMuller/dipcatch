@@ -8,14 +8,14 @@ use App\Models\User;
 use App\Services\Drops\DropOutcome;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
 
 /**
- * Channels (mail / database / web push) are wired up in the notifications.md
- * spec. This stub exists so drop-detection can dispatch the notification.
+ * Real-time channels for a price drop: Filament in-app bell + web push.
+ * Email is NOT a real-time channel anymore — it batches into the daily
+ * digest dispatched by SendDailyDigest (see specs/email-digest.md).
  */
 final class PriceDropNotification extends Notification implements ShouldQueue
 {
@@ -57,9 +57,6 @@ final class PriceDropNotification extends Notification implements ShouldQueue
     {
         $channels = [];
 
-        if ($notifiable->notify_via_email) {
-            $channels[] = 'mail';
-        }
         if ($notifiable->notify_via_filament) {
             $channels[] = 'database';
         }
@@ -68,27 +65,6 @@ final class PriceDropNotification extends Notification implements ShouldQueue
         }
 
         return $channels;
-    }
-
-    public function toMail(User $notifiable): MailMessage
-    {
-        $subject = 'Price drop on ' . $this->product->title
-            . ($this->snapshotHost !== null ? ' at ' . $this->snapshotHost : '')
-            . ': ' . $this->product->currency . ' ' . $this->snapshotPrice;
-
-        return new MailMessage()
-            ->subject($subject)
-            ->markdown('notifications.price-drop', [
-                'product' => $this->product,
-                'newPrice' => $this->snapshotPrice,
-                'host' => $this->snapshotHost,
-                'offerUrl' => $this->snapshotOfferUrl,
-                'referencePrice' => $this->outcome->referencePrice,
-                'referenceKind' => $this->outcome->referenceKind,
-                'dropPercent' => $this->outcome->dropPercent,
-                'dropAbsolute' => $this->outcome->dropAbsolute,
-                'viewUrl' => ProductResource::getUrl('view', ['record' => $this->product]),
-            ]);
     }
 
     public function toWebPush(User $notifiable): WebPushMessage

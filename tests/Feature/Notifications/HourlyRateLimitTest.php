@@ -76,8 +76,8 @@ test('limit set to zero disables rate-limiting entirely', function (): void {
     config()->set('dipcatch.notifications.user_hourly_limit', 0);
 
     $user = User::factory()->create([
-        'notify_via_email' => true,
-        'notify_via_filament' => false,
+        'notify_via_email' => false,
+        'notify_via_filament' => true,
         'notify_via_push' => false,
     ]);
 
@@ -93,8 +93,8 @@ test('separate users do not share the rate-limit bucket', function (): void {
     Notification::fake();
     config()->set('dipcatch.notifications.user_hourly_limit', 1);
 
-    $alice = User::factory()->create(['notify_via_email' => true, 'notify_via_filament' => false]);
-    $bob = User::factory()->create(['notify_via_email' => true, 'notify_via_filament' => false]);
+    $alice = User::factory()->create(['notify_via_email' => false, 'notify_via_filament' => true]);
+    $bob = User::factory()->create(['notify_via_email' => false, 'notify_via_filament' => true]);
 
     [$p, $c] = makeDroppingProductForUser($alice);
     app(DetectDrop::class)($p, $c);

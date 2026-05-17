@@ -41,11 +41,14 @@ final class TestNotification extends Notification implements ShouldQueue
 
     public function toMail(User $notifiable): MailMessage
     {
+        // Note: real price-drop emails are batched into the daily digest at
+        // 09:00 in the user's local timezone. This test message exists to
+        // confirm DipCatch can reach the inbox.
         return new MailMessage()
-            ->subject('DipCatch test notification')
+            ->subject('DipCatch test email')
             ->greeting('Hi ' . $notifiable->name . ',')
-            ->line('This is a test notification from DipCatch.')
-            ->line('If you can read this, your email channel is working.');
+            ->line('This is a test email from DipCatch.')
+            ->line('If you can read this, we can reach your inbox. Real price-drop alerts arrive as a daily digest at 09:00 in your local time.');
     }
 
     /**

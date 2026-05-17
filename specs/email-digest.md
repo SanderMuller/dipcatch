@@ -131,4 +131,11 @@ No column on `price_drop_events` — the existing `fired_at` + the new `users.la
 
 ## Findings
 
-(filled during implementation)
+- **Q1 default applied**: lookback coalesces null → 24h, caps at `dipcatch.digest.lookback_days` (default 7). Validated by a dedicated test.
+- **Q2 default applied**: dispatched on a new `digests` queue. Assertion in the command test pins this so a future refactor can't silently re-route the load.
+- **Q3 (profile UI)**: kept the email toggle visible with sharpened label ("Daily email digest") + helper text explaining the new semantics ("One summary email per day at 09:00 in your local timezone … Real-time email per drop is no longer sent."). Other toggles got matching "Real-time" annotations so the digest/real-time split is legible.
+- **Q4 (admin queue widget)**: untouched — out of scope.
+- **TestNotification kept its email path**: a "send test email" probe is a delivery sanity check, not a per-drop preview. Reworded its body to set expectations ("Real price-drop alerts arrive as a daily digest at 09:00 in your local time.") instead of removing the channel.
+- **HourlyRateLimitTest** had user setups assuming `notify_via_email` triggered the per-drop send. With email decoupled from `PriceDropNotification`, those users' `via()` returned `[]` and the notification never sent. Flipped the test setups to `notify_via_filament => true` so there's a real-time channel for the rate-limiter to gate.
+- **Orphaned view**: deleted `resources/views/notifications/price-drop.blade.php` (the per-drop markdown template). Its only consumer was the removed `toMail()` method.
+- **PHPStan + the `groupBy` callback**: had to loosen `PriceDropDigestMail`'s `@param` to accept `Collection<int|string, array{product: ?Product, events: EloquentCollection<int, Model>}>` because `->values()` on an Eloquent `Collection<int, PriceDropEvent>` widens back to `Collection<int, Model>` and Laravel's stubs don't carry the narrowing. Functional impact: nil — the blade view still iterates `$events` as `PriceDropEvent` instances.

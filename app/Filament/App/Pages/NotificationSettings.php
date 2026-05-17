@@ -56,12 +56,14 @@ class NotificationSettings extends Page
                     ->description('Choose how you want price-drop alerts delivered.')
                     ->schema([
                         Toggle::make('notify_via_email')
-                            ->label('Email notifications'),
+                            ->label('Daily email digest')
+                            ->helperText('One summary email per day at 09:00 in your local timezone, grouped by product. Real-time email per drop is no longer sent.'),
                         Toggle::make('notify_via_filament')
-                            ->label('In-app (bell) notifications'),
+                            ->label('In-app (bell) notifications')
+                            ->helperText('Real-time — one entry per drop.'),
                         Toggle::make('notify_via_push')
                             ->label('Browser push notifications')
-                            ->helperText('Requires granting permission in your browser. The toggle stays off if permission is denied.'),
+                            ->helperText('Real-time — requires granting permission in your browser. The toggle stays off if permission is denied.'),
                     ])
                     ->columns(1),
 

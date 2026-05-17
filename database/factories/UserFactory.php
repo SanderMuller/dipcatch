@@ -38,6 +38,8 @@ class UserFactory extends Factory
             'notify_via_email' => true,
             'notify_via_filament' => true,
             'notify_via_push' => false,
+            'timezone' => 'Europe/Amsterdam',
+            'last_digest_sent_at' => null,
         ];
     }
 
