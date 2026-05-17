@@ -265,12 +265,12 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'price' => $outcome['price'],
                 'currency' => $outcome['currency'],
                 'in_stock' => $outcome['in_stock'],
-                'status' => $status->value,
+                'status' => $status,
                 'error' => $outcome['error'],
                 'checked_at' => $now,
             ]);
 
-            $updates = ['last_checked_at' => $now, 'last_status' => $status->value];
+            $updates = ['last_checked_at' => $now, 'last_status' => $status];
 
             if ($status === ScrapeStatus::Ok) {
                 $updates += [
@@ -282,8 +282,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                     'consecutive_failures' => 0,
                     'consecutive_5xx_failures' => 0,
                     'health' => $locked->health === ShopHealth::Failing
-                        ? ShopHealth::Ok->value
-                        : $locked->health->value,
+                        ? ShopHealth::Ok
+                        : $locked->health,
                 ];
 
                 if ($outcome['adapter_key'] !== null) {

@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Jobs\CheckShopPrice;
 use App\Models\PriceCheck;
@@ -52,7 +53,7 @@ test('successful check writes price_check, updates offer, recomputes cheapest', 
 
     expect((string) $shop->current_price)->toBe('60.00')
         ->and($shop->consecutive_failures)->toBe(0)
-        ->and($shop->last_status)->toBe('ok')
+        ->and($shop->last_status)->toBe(ScrapeStatus::Ok)
         ->and($shop->adapter_key)->toBe('jsonld')
         ->and((string) $product->cheapest_price)->toBe('60.00');
 
@@ -101,7 +102,7 @@ test('5xx increments the 5xx counter only', function (): void {
     $shop->refresh();
     expect($shop->consecutive_failures)->toBe(0)
         ->and($shop->consecutive_5xx_failures)->toBe(1)
-        ->and($shop->last_status)->toBe('5xx');
+        ->and($shop->last_status)->toBe(ScrapeStatus::TransientServerError);
 });
 
 test('main counter reaching dead_after flips health to dead + active=false', function (): void {
@@ -149,7 +150,7 @@ test('robots disallow flips offer to dead immediately', function (): void {
     $shop->refresh();
     expect($shop->health)->toBe(ShopHealth::Dead)
         ->and($shop->active)->toBeFalse()
-        ->and($shop->last_status)->toBe('robots_disallowed');
+        ->and($shop->last_status)->toBe(ScrapeStatus::RobotsDisallowed);
 });
 
 test('inactive or dead offer is skipped', function (): void {

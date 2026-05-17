@@ -36,6 +36,7 @@ class Shop extends Model
             'current_in_stock' => 'boolean',
             'active' => 'boolean',
             'health' => ShopHealth::class,
+            'last_status' => ScrapeStatus::class,
         ];
     }
 
@@ -72,9 +73,9 @@ class Shop extends Model
             'host' => UrlNormalizer::normalizeHost(parse_url($normalized, PHP_URL_HOST) ?: ''),
             'consecutive_failures' => 0,
             'consecutive_5xx_failures' => 0,
-            'last_status' => ScrapeStatus::Pending->value,
+            'last_status' => ScrapeStatus::Pending,
             'last_error' => null,
-            'health' => ShopHealth::Ok->value,
+            'health' => ShopHealth::Ok,
             'active' => true,
             // Drop URL-blind hints so the next probe re-runs the full chain.
             // Stale selectors / variant keys would otherwise match the first
