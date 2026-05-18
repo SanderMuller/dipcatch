@@ -35,10 +35,8 @@ use RectorLaravel\Rector\ArrayDimFetch\EnvVariableToEnvHelperRector;
 use RectorLaravel\Rector\ArrayDimFetch\RequestVariablesToRequestFacadeRector;
 use RectorLaravel\Rector\ArrayDimFetch\ServerVariableToRequestFacadeRector;
 use RectorLaravel\Rector\Class_\TablePropertyToTableAttributeRector;
-use RectorLaravel\Rector\ClassMethod\ScopeNamedClassMethodToScopeAttributedClassMethodRector;
 use RectorLaravel\Rector\Coalesce\ApplyDefaultInsteadOfNullCoalesceRector;
 use RectorLaravel\Rector\FuncCall\AppToResolveRector;
-use RectorLaravel\Rector\MethodCall\ContainerBindConcreteWithClosureOnlyRector;
 use RectorLaravel\Rector\MethodCall\RedirectRouteToToRouteHelperRector;
 use RectorLaravel\Rector\MethodCall\ReplaceServiceContainerCallArgRector;
 use RectorLaravel\Rector\StaticCall\CarbonToDateFacadeRector;
@@ -117,7 +115,6 @@ return RectorConfig::configure()
         ClosureToArrowFunctionRector::class,
         CombineIfRector::class,
         CompleteDynamicPropertiesRector::class,
-        ContainerBindConcreteWithClosureOnlyRector::class,
         DeclareStrictTypesRector::class, // Performed by Pint
         ExplicitBoolCompareRector::class,
         EnvVariableToEnvHelperRector::class,
@@ -152,7 +149,6 @@ return RectorConfig::configure()
         RequestVariablesToRequestFacadeRector::class => [
             __DIR__ . '/tests/*',
         ],
-        ScopeNamedClassMethodToScopeAttributedClassMethodRector::class,
         ServerVariableToRequestFacadeRector::class => [
             __DIR__ . '/tests/*',
         ],
