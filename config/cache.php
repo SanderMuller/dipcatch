@@ -77,7 +77,13 @@ return [
         'redis' => [
             'driver' => 'redis',
             'connection' => env('REDIS_CACHE_CONNECTION', 'cache'),
-            'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'default'),
+            // Align locks with the cache connection (Laravel's default is
+            // `default`, which lands lock keys in a different Redis DB).
+            // Keeping both on the `cache` connection makes `cache:clear`
+            // actually purge `Cache::lock()` keys — including the
+            // `laravel_unique_job:*` keys ShouldBeUnique writes via the lock
+            // store — instead of leaving them orphaned past their TTL.
+            'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'cache'),
         ],
 
         'dynamodb' => [
