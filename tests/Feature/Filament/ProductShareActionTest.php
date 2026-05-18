@@ -11,14 +11,13 @@ beforeEach(function (): void {
     Filament::setCurrentPanel('app');
 });
 
-test('share action creates a 32-char share_slug on an unshared product', function (): void {
+test('generateShareLink creates a 32-char share_slug on an unshared product', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create(['share_slug' => null]);
     $this->actingAs($user);
 
     livewire(ViewProduct::class, ['record' => $product->getKey()])
-        ->callAction('share')
-        ->assertHasNoActionErrors();
+        ->call('generateShareLink');
 
     $fresh = $product->fresh();
     expect($fresh->share_slug)
@@ -26,7 +25,7 @@ test('share action creates a 32-char share_slug on an unshared product', functio
         ->and(strlen((string) $fresh->share_slug))->toBe(32);
 });
 
-test('share action is hidden once a slug is already set', function (): void {
+test('generateShareLink is a no-op when the product is already shared', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([
         'share_slug' => 'already-shared-slug-abcdef123456',
@@ -34,10 +33,14 @@ test('share action is hidden once a slug is already set', function (): void {
     $this->actingAs($user);
 
     livewire(ViewProduct::class, ['record' => $product->getKey()])
-        ->assertActionHidden('share');
+        ->call('generateShareLink');
+
+    // Conditional UPDATE only touches an un-shared row; the existing slug
+    // must survive a redundant Generate click.
+    expect($product->fresh()->share_slug)->toBe('already-shared-slug-abcdef123456');
 });
 
-test('rotate_share replaces an existing share_slug with a different one', function (): void {
+test('rotateShareLink replaces an existing share_slug with a different one', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([
         'share_slug' => 'original-slug-1234567890abcdef12',
@@ -45,8 +48,7 @@ test('rotate_share replaces an existing share_slug with a different one', functi
     $this->actingAs($user);
 
     livewire(ViewProduct::class, ['record' => $product->getKey()])
-        ->callAction('rotate_share')
-        ->assertHasNoActionErrors();
+        ->call('rotateShareLink');
 
     $fresh = $product->fresh();
     expect($fresh->share_slug)
@@ -55,7 +57,7 @@ test('rotate_share replaces an existing share_slug with a different one', functi
         ->and(strlen((string) $fresh->share_slug))->toBe(32);
 });
 
-test('stop_share nulls the share_slug', function (): void {
+test('stopSharing nulls the share_slug', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([
         'share_slug' => 'about-to-be-revoked-abcdef123456',
@@ -63,20 +65,22 @@ test('stop_share nulls the share_slug', function (): void {
     $this->actingAs($user);
 
     livewire(ViewProduct::class, ['record' => $product->getKey()])
-        ->callAction('stop_share')
-        ->assertHasNoActionErrors();
+        ->call('stopSharing');
 
     expect($product->fresh()->share_slug)->toBeNull();
 });
 
-test('rotate_share + stop_share hidden when product is not shared', function (): void {
+test('rotateShareLink + stopSharing are no-ops when product is not shared', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create(['share_slug' => null]);
     $this->actingAs($user);
 
     livewire(ViewProduct::class, ['record' => $product->getKey()])
-        ->assertActionHidden('rotate_share')
-        ->assertActionHidden('stop_share');
+        ->call('rotateShareLink')
+        ->call('stopSharing');
+
+    // No precondition matched the null slug — neither mutation persisted one.
+    expect($product->fresh()->share_slug)->toBeNull();
 });
 
 // The share / rotate / stop actions use atomic conditional UPDATEs to refuse
