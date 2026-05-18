@@ -50,7 +50,7 @@ DipCatch targets [Laravel Cloud](https://cloud.laravel.com/) — fully managed, 
 ### Required services
 
 - **Postgres** add-on attached → `DATABASE_URL` injected.
-- **Queue worker** (1 small instance), `database` driver. Runs `php artisan queue:work --queue=scrapes,default --tries=1` — the `scrapes` queue carries `CheckShopPrice` jobs.
+- **Queue worker** (1 small instance), `redis` driver. Runs `php artisan queue:work --queue=scrapes,digests,default --tries=1` — `scrapes` carries `CheckShopPrice`, `digests` carries `SendDailyDigest`.
 - **Scheduler** enabled — runs `php artisan schedule:run` minutely.
 
 ### Required env vars
@@ -77,7 +77,7 @@ Health checks are exposed inside the admin panel at `/admin/health-check-results
 
 ### Cache + lock driver
 
-Cache driver is `database` (cache + cache_locks tables migrated automatically). Required for `withoutOverlapping()` on the scheduler and the per-host `ShopFetcher` rate-limit bucket.
+Cache + queue + unique-job locks all run on Redis (`CACHE_STORE=redis`, `QUEUE_CONNECTION=redis`). The Redis connection backs `withoutOverlapping()` on the scheduler, the per-host `ShopFetcher` rate-limit bucket, and `ShouldBeUnique` locks on `CheckShopPrice`.
 
 ### First deploy
 
