@@ -23,6 +23,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -30,9 +31,9 @@ use Livewire\Attributes\On;
 
 /**
  * Renders the "Shops" list on the product view page: each offer's host,
- * current price, in-stock state, health, and a remove action. The "Add another
- * shop" form sits above this table (see the Livewire `add-shop` component
- * embedded in `ProductInfolist`).
+ * current price, in-stock state, health, and a remove action. The "Add a
+ * shop" button in the table header opens a modal hosting the Livewire
+ * `add-shop` component.
  */
 class ShopsRelationManager extends RelationManager
 {
@@ -46,8 +47,14 @@ class ShopsRelationManager extends RelationManager
     {
         return $table
             ->heading(null)
+            ->headerActions([
+                self::addShopAction(),
+            ])
             ->emptyStateHeading('No shops yet')
-            ->emptyStateDescription('Use the form above to add the first shop URL.')
+            ->emptyStateDescription('Paste a product URL from any webshop to start tracking its price.')
+            ->emptyStateActions([
+                self::addShopAction(),
+            ])
             ->columns([
                 TextColumn::make('host')
                     ->label('Shop')
@@ -198,9 +205,32 @@ class ShopsRelationManager extends RelationManager
             ]);
     }
 
-    /** Live re-render after the sibling AddShop component saves an offer. */
+    /** Live re-render after the AddShop component saves an offer. */
     #[On('shop-added')]
     public function refreshAfterOfferAdded(): void {}
+
+    /**
+     * Header / empty-state CTA: opens a modal hosting the AddShop Livewire
+     * component. The component manages its own multi-step state (preview /
+     * manual selector / variant chooser) and dispatches `shop-added` on
+     * confirm — the listener above re-renders the table behind the modal so
+     * the new row appears immediately. Modal stays open; AddShop resets to
+     * idle after each save so a second URL can be pasted without reopening.
+     */
+    private static function addShopAction(): Action
+    {
+        return Action::make('addShop')
+            ->label('Add a shop')
+            ->icon(Heroicon::Plus)
+            ->color('primary')
+            ->modalHeading('Add a shop')
+            ->modalDescription('Paste a product URL from any webshop. We will fetch the price and show a preview before saving.')
+            ->modalContent(fn (RelationManager $livewire): View => view('filament.partials.add-shop-modal', [
+                'product' => $livewire->getOwnerRecord(),
+            ]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close');
+    }
 
     /**
      * @param  array<string, mixed>  $data

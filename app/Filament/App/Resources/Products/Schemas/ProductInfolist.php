@@ -3,12 +3,12 @@
 namespace App\Filament\App\Resources\Products\Schemas;
 
 use App\Models\Product;
-use Filament\Infolists\Components\IconEntry;
+use App\Support\MoneyFormatter;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 
 class ProductInfolist
 {
@@ -29,30 +29,42 @@ class ProductInfolist
                 Section::make('Pricing')
                     ->schema([
                         TextEntry::make('cheapest_price')
-                            ->state(fn (Product $r): ?string => $r->cheapest_price === null
-                                ? null
-                                : $r->currency . ' ' . $r->cheapest_price)
-                            ->placeholder('—')
-                            ->label('Cheapest now'),
+                            ->label('Cheapest now')
+                            ->state(fn (Product $r): string => MoneyFormatter::format(
+                                $r->cheapest_price === null ? null : (string) $r->cheapest_price,
+                                $r->currency,
+                            )),
+
                         TextEntry::make('cheapestShop.host')
+                            ->label('Cheapest at')
                             ->placeholder('—')
-                            ->label('Cheapest at'),
+                            ->url(fn (Product $r): ?string => $r->cheapestShop?->url)
+                            ->openUrlInNewTab()
+                            ->icon(fn (Product $r): ?Heroicon => $r->cheapestShop === null
+                                ? null
+                                : Heroicon::ArrowTopRightOnSquare)
+                            ->iconPosition('after'),
+
                         TextEntry::make('drop_threshold_pct')
-                            ->state(fn (Product $r): string => ($r->drop_threshold_pct ?? '—') . ' %  /  ' . $r->currency . ' ' . ($r->drop_threshold_abs ?? '—'))
-                            ->label('Threshold'),
-                        IconEntry::make('active')
-                            ->boolean(),
+                            ->label('Drop threshold (%)')
+                            ->state(fn (Product $r): string => $r->drop_threshold_pct === null
+                                ? '—'
+                                : $r->drop_threshold_pct . ' %'),
+
+                        TextEntry::make('drop_threshold_abs')
+                            ->label('Drop threshold (absolute)')
+                            ->state(fn (Product $r): string => MoneyFormatter::format(
+                                $r->drop_threshold_abs === null ? null : (string) $r->drop_threshold_abs,
+                                $r->currency,
+                            )),
+
+                        TextEntry::make('active')
+                            ->label('Tracking')
+                            ->badge()
+                            ->state(fn (Product $r): string => $r->active ? 'Active' : 'Paused')
+                            ->color(fn (Product $r): string => $r->active ? 'success' : 'gray'),
                     ])
                     ->columns(2),
-
-                Section::make('Shops')
-                    ->description('Paste a product URL from any webshop to track its price here.')
-                    ->schema([
-                        TextEntry::make('offers_count_placeholder')
-                            ->state(fn (Product $r): string => $r->shops()->count() . ' shop(s) tracked')
-                            ->label(''),
-                        View::make('filament.partials.add-shop-livewire'),
-                    ]),
             ]);
     }
 }
