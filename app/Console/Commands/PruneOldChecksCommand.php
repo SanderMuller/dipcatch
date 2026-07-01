@@ -85,8 +85,11 @@ class PruneOldChecksCommand extends Command
         $referencedByEvents = PriceDropEvent::query()
             ->whereNotNull('price_check_id')
             ->where(function (EloquentBuilder $q) use ($offerId): void {
-                $q->whereHas('triggeredByShop', fn (EloquentBuilder $inner) => $inner->where('shops.id', $offerId))
-                    ->orWhereHas('priceCheck', fn (EloquentBuilder $inner) => $inner->where('price_checks.shop_id', $offerId));
+                $q->whereHas('triggeredByShop', function (EloquentBuilder $inner) use ($offerId): void {
+                    $inner->where('shops.id', $offerId);
+                })->orWhereHas('priceCheck', function (EloquentBuilder $inner) use ($offerId): void {
+                    $inner->where('price_checks.shop_id', $offerId);
+                });
             })
             ->pluck('price_check_id')
             ->all();

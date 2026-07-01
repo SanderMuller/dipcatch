@@ -1,5 +1,17 @@
-<laravel-boost-guidelines>
-=== .ai/release-notes rules ===
+## Always Capture Command Output
+
+Append `|| true` to all verification commands (tests, linting, type checks) so the output is always captured, even on failure. Without it, a non-zero exit code can hide the output, forcing an expensive second run just to read the errors.
+
+```bash
+# CORRECT — output always visible
+vendor/bin/pest --filter=testName || true
+vendor/bin/pint --dirty --format agent || true
+
+# WRONG — output lost on failure, wastes time re-running
+vendor/bin/pest --filter=testName
+```
+
+---
 
 ## Release Notes vs CHANGELOG
 
@@ -9,7 +21,208 @@ When you need to document a user-facing change for a release, write it to `RELEA
 
 If you find yourself editing `CHANGELOG.md` directly, stop — it will be overwritten.
 
-=== .ai/verification-before-completion rules ===
+---
+
+## AskUserQuestion Phrasing
+
+When writing an `AskUserQuestion` question, option labels, or option descriptions, **avoid first- and second-person pronouns** — `I`, `me`, `my`, `we`, `our`, `you`, `your`. In that tool the user is reading a question *from* the assistant and answering it, so the roles are inverted and these pronouns are ambiguous: the reader cannot tell whether `I`/`my` means the assistant or themselves, nor whether `you`/`your` means them or the assistant.
+
+Name the actor explicitly instead — "the assistant" (these guidelines are shared across agents, so avoid hard-coding a product name like Claude or Copilot) and "the user" (or a concrete role) for the person answering — or rephrase to drop the pronoun entirely.
+
+```text
+❌ "Which approach do you want me to take?"
+❌ "Should I keep the existing tests you wrote?"
+
+✅ "Which approach should the assistant take?"
+✅ "Keep the existing tests, or replace them?"   (pronoun dropped)
+✅ "Should the assistant keep the tests already in the repo?"
+```
+
+This applies to every part of the question payload: the `question` text, each option `label`, and each option `description`.
+
+---
+
+## Database Safety
+
+### Never Run Destructive Database Commands
+
+**Do not run commands that drop, wipe, reset, or recreate a database or its tables** — regardless of flags or environment arguments. Destructive operations include, whatever the stack:
+
+- Framework commands that drop and rebuild the schema (a "fresh", "reset", "refresh", or "wipe" migration command).
+- Raw SQL `DROP` or `TRUNCATE` against any database.
+- Restoring or re-importing a database over an existing one.
+
+These destroy data. An environment flag (`--env=...`, an alternate connection name) is **not** a safety net — it only helps if a separate, correctly configured environment actually exists. If you are unsure which database a destructive command targets, do not run it.
+
+### Test Database
+
+- The test database is owned by the project's test runner. Let the test suite create, migrate, and tear it down — never migrate or refresh it by hand.
+- If the test database gets into a broken state, ask the user to fix it rather than running destructive commands.
+
+### Safe Operations
+
+Safe — these advance or add to the schema without destroying data:
+
+- Running pending migrations **forward** on a non-test database — *after* checking that the pending files only add or alter columns. A forward migration is not automatically safe: it can still drop a column or table, or delete data in a backfill. Read it first.
+- Running the test suite (it manages its own database lifecycle).
+- Seeding additional data without truncating existing tables.
+
+### When a Destructive Operation Is Genuinely Needed
+
+Stop and ask the user to run it themselves, or to confirm it explicitly. Never decide on your own that data loss is acceptable.
+
+---
+
+## JavaScript & TypeScript
+
+### Control Structures
+
+- Always use curly braces for control structures, even for a single statement.
+- Never use single-line `if/return`, `if/break`, or `if/continue` statements.
+- Each control-structure statement goes on its own line.
+
+```js
+// ❌ WRONG — single-line control structures
+if (index === -1) break;
+if (! element) return 0;
+if (query === '') return;
+
+// ✅ CORRECT — curly braces, each statement on its own line
+if (index === -1) {
+    break;
+}
+
+if (! element) {
+    return 0;
+}
+
+if (query === '') {
+    return;
+}
+```
+
+## Eye-verify frontend changes (browser/runtime)
+
+A change that renders UI calls for **seeing it run in a real browser** — type-check and linting
+can't see runtime/visual bugs: stale state, dead toggles, broken scroll / sticky / fixed
+behaviour, z-index show-through, async races, untranslated-key leaks.
+
+- **When:** the diff touches code that renders to users — JS/TS that drives the DOM, or a
+  server-rendered template/component.
+- **How:** drive it in a real browser. Use the project's browser eye-verify harness if it
+  ships one (commonly under `tools/verify/`, with a setup doc loaded on demand); otherwise a
+  browser-automation tool (Playwright, or a Playwright MCP server). DOM/console first;
+  screenshots back up visual claims.
+- **Verify behaviour, not just geometry** — a fixed/sticky element must also not be painted
+  over, and pop-out content (dropdowns / tooltips / modals) must still escape.
+- **In an ephemeral clone or git worktree**, the app may be served at a different host/port
+  than the canonical checkout, so the harness can silently verify the *wrong* tree — confirm
+  it targets *this* checkout, and sanity-check the host serves a real page before trusting a
+  green. A hard 404 on the expected page is the signature of hitting the wrong host.
+- If the harness can't run (no seeded data, wrong host served, no login), **stop and ask** —
+  don't substitute reasoning for the browser.
+
+### Verify against the design, per element
+
+When the change has an approved design (a mockup, a Figma frame, a ticket attachment), don't
+eyeball the whole image and call it close — *"looks about right"* is how visual regressions
+ship. Verify it **element by element**:
+
+- List each changed element, plus the element as a whole; exclude anything documented as
+  out of scope.
+- Check each against the design attribute by attribute: alignment (horizontal and vertical),
+  size, text and background colour (including gradients), border presence / colour / width,
+  border-radius, icon, typography (family, weight, size), and spacing.
+- Record the deltas. Each mismatch is either a fix or a question for the designer — a
+  whole-image glance misses a 4px-vs-8px radius or a lost gradient.
+- When you crop a screenshot to a single element, keep a small margin (~15px) around it — a
+  flush crop hides the alignment and spacing errors at the element's own edges.
+
+The `frontend-quality` skill walks this as a suggested step; the `pull-requests` skill flags
+it before a PR.
+
+---
+
+## Migrations
+
+Conventions for schema migration files, whatever the migration tool. Examples use a schema-builder DSL for illustration; the principles apply to raw-SQL migrations too.
+
+### Self-Contained Migrations
+
+- Migrations must be fully self-contained. Never reference application code — model constants, enums, config values, or helper functions.
+- Use plain string and scalar literals for column names, table names, and other identifiers directly in the migration file.
+- This keeps migrations stable and runnable regardless of future application code changes — a migration written today must still run years later, even if the code it once referenced has been renamed or deleted.
+- Legacy migrations may still reference application code; only update them to follow this guideline when you are otherwise modifying those migrations.
+
+```php
+// ❌ WRONG — references an application constant
+$table->boolean(Feature::FLAG_ENABLED)->nullable();
+
+// ✅ CORRECT — plain string literal
+$table->boolean('flag_enabled')->nullable();
+```
+
+### Column Ordering
+
+- Add new columns at the **end** of the table — do not insert one into the middle of an existing table.
+- On MySQL/MariaDB, positioning a column mid-table (an `AFTER` clause) can disable instant/online DDL and force a full table copy — a significant hit on large tables. Other engines such as PostgreSQL have no column-position concept at all, so a position clause is meaningless there. Appending is safe and portable everywhere.
+
+```php
+// ❌ WRONG — mid-table positioning can force a full table rebuild on MySQL/MariaDB
+$table->string('description')->after('name');
+
+// ✅ CORRECT — just append the column
+$table->string('description');
+```
+
+---
+
+## Fixing PHPStan Errors
+
+When fixing a PHPStan error, first decide whether it represents a runtime bug a test could catch — and if so, write that test before the fix.
+
+### Process
+
+1. **Assess testability** — does the error represent a runtime bug a test could reproduce (a wrong argument type, a missing method, an incorrect return type used downstream)?
+2. **Write the test first** — if a test can catch it, write a failing test that reproduces the error before applying the fix.
+3. **Fix the code** — apply the fix so both the PHPStan error and the new test pass.
+4. **Verify both** — confirm PHPStan reports no error and the test passes.
+
+### When to Write a Test
+
+Write a test when the PHPStan error indicates a fault that would surface at runtime:
+
+- A method call on a value of the wrong type
+- Missing or incorrect arguments to a function or method
+- A return-type mismatch that would break callers
+- Accessing a property or method that does not exist
+- Any type error that would manifest as a runtime exception
+
+### When to Skip the Test
+
+Skip the test when the error is purely static and cannot cause a runtime failure:
+
+- Missing return-type declarations
+- PHPDoc mismatches with no runtime impact
+- Unused variables or imports
+- Generic-type parameter issues
+
+---
+
+## Signed Commits
+
+Applies **only when the repository has commit signing enabled** (e.g. `git config commit.gpgsign` is `true`, or a `user.signingkey` / `gpg.format` is set). If signing is not enabled, this guideline does not apply — commit normally.
+
+### Never fall back to an unsigned commit
+
+When signing is enabled, every commit must be signed. If the signing backend or agent (1Password, `gpg-agent`, `ssh-agent`, a hardware key, etc.) is unavailable, locked, or not responding:
+
+- **Stop and surface the failure** to the user with the exact error.
+- **Do not** retry with `--no-gpg-sign`, unset `commit.gpgsign`, or otherwise produce an unsigned commit to "get past" the problem.
+
+A missing signature is a blocker to resolve (unlock the agent, re-authenticate 1Password, plug in the key), not a step to skip. Let the user fix the signing setup, then commit signed.
+
+---
 
 ## Verification Before Completion
 
@@ -22,40 +235,20 @@ Before claiming any work is complete or successful, run the verification command
 3. **Confirm** it supports the claim
 4. **Then** state the result with evidence
 
-### During Development (after each change)
+| Claim            | Required verification                                            |
+|------------------|------------------------------------------------------------------|
+| Tests pass       | The project's test command, output showing 0 failures            |
+| Code style clean | The project's formatter/style checker, output showing no changes |
+| Linting clean    | The project's linter, output showing 0 errors                    |
+| Types check      | The project's type checker, output showing 0 errors              |
+| Bug fixed        | The previously failing test now passes                           |
+| Feature complete | All related tests pass                                           |
 
-| Claim            | Required verification                            |
-|------------------|--------------------------------------------------|
-| Code style clean | `vendor/bin/pint --dirty --format agent` output  |
-| Tests pass       | Related tests pass via `--filter` or specific file |
-| Bug fixed        | Previously failing test now passes               |
+Use the project's own commands — check its `composer.json` / `package.json` scripts, CI config, or sibling docs to find them. Do not assume a specific tool.
 
-### At Completion Only (feature/phase done, before PR)
+### Delegating the checks
 
-These are slow checks — only run them once at the very end:
-
-| Claim             | Required verification                                           |
-|-------------------|-----------------------------------------------------------------|
-| Rector ran clean  | `vendor/bin/rector process` showing 0 changes                   |
-| PHPStan clean     | `vendor/bin/phpstan analyse --memory-limit=2G` showing 0 errors |
-| Full suite passes | `vendor/bin/pest` output showing 0 failures                     |
-| Feature complete  | All above checks pass                                           |
-
-### Always Capture Command Output
-
-Append `|| true` to all verification commands (tests, linting, type checks) so the output is always captured, even on failure. Without it, a non-zero exit code can hide the output, forcing an expensive second run just to read the errors.
-
-```bash
-
-# CORRECT — output always visible
-
-vendor/bin/pest --filter=testName || true
-vendor/bin/pint --dirty --format agent || true
-
-# WRONG — output lost on failure, wastes time re-running
-
-vendor/bin/pest --filter=testName
-```
+Where the project has dedicated quality-check skills synced, delegate to them — `backend-quality` for backend files, `frontend-quality` for frontend files, both when a change spans both. Otherwise, run the project's own equivalent commands directly.
 
 ### Never Use Without Evidence
 
@@ -66,421 +259,16 @@ vendor/bin/pest --filter=testName
 
 These phrases indicate missing verification. Run the command first, then report what actually happened.
 
-=== foundation rules ===
-
-# Laravel Boost Guidelines
-
-The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to ensure the best experience when building Laravel applications.
-
-## Foundational Context
-
-This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
-
-- php - 8.5
-- filament/filament (FILAMENT) - v5
-- laravel/fortify (FORTIFY) - v1
-- laravel/framework (LARAVEL) - v13
-- laravel/prompts (PROMPTS) - v0
-- livewire/flux (FLUXUI_FREE) - v2
-- livewire/livewire (LIVEWIRE) - v4
-- larastan/larastan (LARASTAN) - v3
-- laravel/boost (BOOST) - v2
-- laravel/mcp (MCP) - v0
-- laravel/pint (PINT) - v1
-- pestphp/pest (PEST) - v4
-- phpunit/phpunit (PHPUNIT) - v12
-- rector/rector (RECTOR) - v2
-- tailwindcss (TAILWINDCSS) - v4
-
-## Skills Activation
-
-This project has domain-specific skills available in `**/skills/**`. You MUST activate the relevant skill whenever you work in that domain—don't wait until you're stuck.
-
-## Conventions
-
-- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, and naming.
-- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
-- Check for existing components to reuse before writing a new one.
-
-## Verification Scripts
-
-- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
-
-## Application Structure & Architecture
-
-- Stick to existing directory structure; don't create new base folders without approval.
-- Do not change the application's dependencies without approval.
-
-## Frontend Bundling
-
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `yarn run build`, `yarn run dev`, or `composer run dev`. Ask them.
-
-## Documentation Files
-
-- You must only create documentation files if explicitly requested by the user.
-
-## Replies
-
-- Be concise in your explanations - focus on what's important rather than explaining obvious details.
-
-=== boost rules ===
-
-# Laravel Boost
-
-## Tools
-
-- Laravel Boost is an MCP server with tools designed specifically for this application. Prefer Boost tools over manual alternatives like shell commands or file reads.
-- Use `database-query` to run read-only queries against the database instead of writing raw SQL in tinker.
-- Use `database-schema` to inspect table structure before writing migrations or models.
-- Use `get-absolute-url` to resolve the correct scheme, domain, and port for project URLs. Always use this before sharing a URL with the user.
-- Use `browser-logs` to read browser logs, errors, and exceptions. Only recent logs are useful, ignore old entries.
-
-## Searching Documentation (IMPORTANT)
-
-- Always use `search-docs` before making code changes. Do not skip this step. It returns version-specific docs based on installed packages automatically.
-- Pass a `packages` array to scope results when you know which packages are relevant.
-- Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
-- Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
-
-### Search Syntax
-
-1. Use words for auto-stemmed AND logic: `rate limit` matches both "rate" AND "limit".
-2. Use `"quoted phrases"` for exact position matching: `"infinite scroll"` requires adjacent words in order.
-3. Combine words and phrases for mixed queries: `middleware "rate limit"`.
-4. Use multiple queries for OR logic: `queries=["authentication", "middleware"]`.
-
-## Artisan
-
-- Run Artisan commands directly via the command line (e.g., `php artisan route:list`). Use `php artisan list` to discover available commands and `php artisan [command] --help` to check parameters.
-- Inspect routes with `php artisan route:list`. Filter with: `--method=GET`, `--name=users`, `--path=api`, `--except-vendor`, `--only-vendor`.
-- Read configuration values using dot notation: `php artisan config:show app.name`, `php artisan config:show database.default`. Or read config files directly from the `config/` directory.
-- To check environment variables, read the `.env` file directly.
-
-## Tinker
-
-- Execute PHP in app context for debugging and testing code. Do not create models without user approval, prefer tests with factories instead. Prefer existing Artisan commands over custom tinker code.
-- Always use single quotes to prevent shell expansion: `php artisan tinker --execute 'Your::code();'`
-  - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
-
-=== php rules ===
-
-# PHP
-
-- Always use curly braces for control structures, even for single-line bodies.
-- Use PHP 8 constructor property promotion: `public function __construct(public GitHub $github) { }`. Do not leave empty zero-parameter `__construct()` methods unless the constructor is private.
-- Use explicit return type declarations and type hints for all method parameters: `function isAccessible(User $user, ?string $path = null): bool`
-- Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
-- Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
-- Use array shape type definitions in PHPDoc blocks.
-
-=== deployments rules ===
-
-# Deployment
-
-- Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
-
-=== herd rules ===
-
-# Laravel Herd
-
-- The application is served by Laravel Herd at `https?://[kebab-case-project-dir].test`. Use the `get-absolute-url` tool to generate valid URLs. Never run commands to serve the site. It is always available.
-- Use the `herd` CLI to manage services, PHP versions, and sites (e.g. `herd sites`, `herd services:start <service>`, `herd php:list`). Run `herd list` to discover all available commands.
-
-=== tests rules ===
-
-# Test Enforcement
-
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
-
-=== laravel/core rules ===
-
-# Do Things the Laravel Way
-
-- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
-- If you're creating a generic PHP class, use `php artisan make:class`.
-- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
-
-### Model Creation
-
-- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
-
-## APIs & Eloquent Resources
-
-- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
-
-## URL Generation
-
-- When generating links to other pages, prefer named routes and the `route()` function.
-
-## Testing
-
-- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
-- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
-- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
-
-## Vite Error
-
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `yarn run build` or ask the user to run `yarn run dev` or `composer run dev`.
-
-=== livewire/core rules ===
-
-# Livewire
-
-- Livewire allow to build dynamic, reactive interfaces in PHP without writing JavaScript.
-- You can use Alpine.js for client-side interactions instead of JavaScript frameworks.
-- Keep state server-side so the UI reflects it. Validate and authorize in actions as you would in HTTP requests.
-
-=== pint/core rules ===
-
-# Laravel Pint Code Formatter
-
-- If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
-- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
-
-=== pest/core rules ===
-
-## Pest
-
-- This project uses Pest for testing. Create tests: `php artisan make:test --pest {name}`.
-- The `{name}` argument should not include the test suite directory. Use `php artisan make:test --pest SomeFeatureTest` instead of `php artisan make:test --pest Feature/SomeFeatureTest`.
-- Run tests: `php artisan test --compact` or filter: `php artisan test --compact --filter=testName`.
-- Do NOT delete tests without approval.
-
-=== filament/filament rules ===
-
-## Filament
-
-- Filament is a Laravel UI framework built on Livewire, Alpine.js, and Tailwind CSS. UIs are defined in PHP via fluent, chainable components. Follow existing conventions in this app.
-- Use the `search-docs` tool for official documentation on Artisan commands, code examples, testing, relationships, and idiomatic practices. If `search-docs` is unavailable, refer to https://filamentphp.com/docs.
-
-### Artisan
-
-- Always use Filament-specific Artisan commands to create files. Find available commands with the `list-artisan-commands` tool, or run `php artisan --help`.
-- Inspect required options before running, and always pass `--no-interaction`.
-
-### Patterns
-
-Always use static `make()` methods to initialize components. Most configuration methods accept a `Closure` for dynamic values.
-
-Use `Get $get` to read other form field values for conditional logic:
-
-<code-snippet name="Conditional form field visibility" lang="php">
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Utilities\Get;
-
-Select::make('type')
-    ->options(CompanyType::class)
-    ->required()
-    ->live(),
-
-TextInput::make('company_name')
-    ->required()
-    ->visible(fn (Get $get): bool => $get('type') === 'business'),
-
-</code-snippet>
-
-Use `Set $set` inside `->afterStateUpdated()` on a `->live()` field to mutate another field reactively. Prefer `->live(onBlur: true)` on text inputs to avoid per-keystroke updates:
-
-<code-snippet name="Reactive field update" lang="php">
-use Filament\Schemas\Components\Utilities\Set;
-use Illuminate\Support\Str;
-
-TextInput::make('title')
-    ->required()
-    ->live(onBlur: true)
-    ->afterStateUpdated(fn (Set $set, ?string $state) => $set(
-        'slug',
-        Str::slug($state ?? ''),
-    )),
-
-TextInput::make('slug')
-    ->required(),
-
-</code-snippet>
-
-Compose layout by nesting `Section` and `Grid`. Children need explicit `->columnSpan()` or `->columnSpanFull()`:
-
-<code-snippet name="Section and Grid layout" lang="php">
-use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\Section;
-
-Section::make('Details')
-    ->schema([
-        Grid::make(2)->schema([
-            TextInput::make('first_name')
-                ->columnSpan(1),
-            TextInput::make('last_name')
-                ->columnSpan(1),
-            TextInput::make('bio')
-                ->columnSpanFull(),
-        ]),
-    ]),
-
-</code-snippet>
-
-Use `Repeater` for inline `HasMany` management. `->relationship()` with no args binds to the relationship matching the field name:
-
-<code-snippet name="Repeater for HasMany" lang="php">
-use Filament\Forms\Components\Repeater;
-
-Repeater::make('qualifications')
-    ->relationship()
-    ->schema([
-        TextInput::make('institution')
-            ->required(),
-        TextInput::make('qualification')
-            ->required(),
-    ])
-    ->columns(2),
-
-</code-snippet>
-
-Use `state()` with a `Closure` to compute derived column values:
-
-<code-snippet name="Computed table column value" lang="php">
-use Filament\Tables\Columns\TextColumn;
-
-TextColumn::make('full_name')
-    ->state(fn (User $record): string => "{$record->first_name} {$record->last_name}"),
-
-</code-snippet>
-
-Use `SelectFilter` for enum or relationship filters, and `Filter` with a `->query()` closure for custom logic:
-
-<code-snippet name="Table filters" lang="php">
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\SelectFilter;
-use Illuminate\Database\Eloquent\Builder;
-
-SelectFilter::make('status')
-    ->options(UserStatus::class),
-
-SelectFilter::make('author')
-    ->relationship('author', 'name'),
-
-Filter::make('verified')
-    ->query(fn (Builder $query) => $query->whereNotNull('email_verified_at')),
-
-</code-snippet>
-
-Actions are buttons that encapsulate optional modal forms and behavior:
-
-<code-snippet name="Action with modal form" lang="php">
-use Filament\Actions\Action;
-
-Action::make('updateEmail')
-    ->schema([
-        TextInput::make('email')
-            ->email()
-            ->required(),
-    ])
-    ->action(fn (array $data, User $record) => $record->update($data)),
-
-</code-snippet>
-
-### Testing
-
-Testing setup (requires `pestphp/pest-plugin-livewire` in `composer.json`):
-
-- Always call `$this->actingAs(User::factory()->create())` before testing panel functionality.
-- For edit pages, pass `['record' => $user->id]`, use `->call('save')` (not `->call('create')`), and do not assert `->assertRedirect()` (edit pages do not redirect after save).
-
-<code-snippet name="Table test" lang="php">
-use function Pest\Livewire\livewire;
-
-livewire(ListUsers::class)
-    ->assertCanSeeTableRecords($users)
-    ->searchTable($users->first()->name)
-    ->assertCanSeeTableRecords($users->take(1))
-    ->assertCanNotSeeTableRecords($users->skip(1));
-
-</code-snippet>
-
-<code-snippet name="Create resource test" lang="php">
-use function Pest\Laravel\assertDatabaseHas;
-
-livewire(CreateUser::class)
-    ->fillForm([
-        'name' => 'Test',
-        'email' => 'test@example.com',
-    ])
-    ->call('create')
-    ->assertNotified()
-    ->assertHasNoFormErrors()
-    ->assertRedirect();
-
-assertDatabaseHas(User::class, [
-    'name' => 'Test',
-    'email' => 'test@example.com',
-]);
-
-</code-snippet>
-
-<code-snippet name="Edit resource test" lang="php">
-livewire(EditUser::class, ['record' => $user->id])
-    ->fillForm(['name' => 'Updated'])
-    ->call('save')
-    ->assertNotified()
-    ->assertHasNoFormErrors();
-
-assertDatabaseHas(User::class, [
-    'id' => $user->id,
-    'name' => 'Updated',
-]);
-
-</code-snippet>
-
-<code-snippet name="Testing validation" lang="php">
-livewire(CreateUser::class)
-    ->fillForm([
-        'name' => null,
-        'email' => 'invalid-email',
-    ])
-    ->call('create')
-    ->assertHasFormErrors([
-        'name' => 'required',
-        'email' => 'email',
-    ])
-    ->assertNotNotified();
-
-</code-snippet>
-
-Use `->callAction(DeleteAction::class)` for page actions, or `->callAction(TestAction::make('name')->table($record))` for table actions:
-
-<code-snippet name="Calling actions" lang="php">
-use Filament\Actions\Testing\TestAction;
-
-livewire(ListUsers::class)
-    ->callAction(TestAction::make('promote')->table($user), [
-        'role' => 'admin',
-    ])
-    ->assertNotified();
-
-</code-snippet>
-
-### Correct Namespaces
-
-- Form fields (`TextInput`, `Select`, `Repeater`, etc.): `Filament\Forms\Components\`
-- Infolist entries (`TextEntry`, `IconEntry`, etc.): `Filament\Infolists\Components\`
-- Layout components (`Grid`, `Section`, `Fieldset`, `Tabs`, `Wizard`, etc.): `Filament\Schemas\Components\`
-- Schema utilities (`Get`, `Set`, etc.): `Filament\Schemas\Components\Utilities\`
-- Table columns (`TextColumn`, `IconColumn`, etc.): `Filament\Tables\Columns\`
-- Table filters (`SelectFilter`, `Filter`, etc.): `Filament\Tables\Filters\`
-- Actions (`DeleteAction`, `CreateAction`, etc.): `Filament\Actions\`. Never use `Filament\Tables\Actions\`, `Filament\Forms\Actions\`, or any other sub-namespace for actions.
-- Icons: `Filament\Support\Icons\Heroicon` enum (e.g., `Heroicon::PencilSquare`)
-
-### Common Mistakes
-
-- **Never assume public file visibility.** File visibility is `private` by default. Always use `->visibility('public')` when public access is needed.
-- **Never assume full-width layout.** `Grid`, `Section`, `Fieldset`, and `Repeater` do not span all columns by default.
-- **Use `Select::make('author_id')->relationship('author', 'name')` for BelongsTo fields.** `BelongsToSelect` does not exist in v4.
-- **`Repeater` uses `->schema()`, not `->fields()`.**
-- **Never add `->dehydrated(false)` to fields that need to be saved.** It strips the value from form state before `->action()` or the save handler runs. Only use it for helper/UI-only fields.
-- **Use correct property types when overriding `Page`, `Resource`, and `Widget` properties.** These properties have union types or changed modifiers that must be preserved:
-  - `$navigationIcon`: `protected static string | BackedEnum | null` (not `?string`)
-  - `$navigationGroup`: `protected static string | UnitEnum | null` (not `?string`)
-  - `$view`: `protected string` (not `protected static string`) on `Page` and `Widget` classes
-
-</laravel-boost-guidelines>
+---
+
+## FluentRule Validation
+
+- This project uses `sandermuller/laravel-fluent-validation` for type-safe validation rules. Use `FluentRule::` instead of string rules or `Rule::` where possible.
+- FormRequests MUST use `HasFluentRules` trait. Livewire components MUST use `HasFluentValidation` trait.
+- Do NOT use `->rule('string_rule')` when a native FluentRule method exists. Check the skill references before using escape hatches.
+- Available types: `FluentRule::string()`, `integer()`, `numeric()`, `email()`, `date()`, `dateTime()`, `boolean()`, `array()`, `file()`, `image()`, `password()`, `field()`.
+- Convenience shortcuts: `FluentRule::url()`, `uuid()`, `ulid()`, `ip()` — shorthand for `FluentRule::string()->url()`, etc.
+- `email()` and `password()` use app defaults (`Email::default()`, `Password::default()`). Pass `defaults: false` to opt out.
+- All conditional modifiers (`requiredIf`, `excludeIf`, `prohibitedIf`, etc.) accept both `(string $field, ...$values)` AND `(Closure|bool)` — do NOT wrap in `Rule::requiredIf()`.
+- For converting validation rules, activate the `fluent-validation-optimize` skill which has a complete method reference.
+- For Livewire-specific guidance, activate the `fluent-validation-livewire` skill.

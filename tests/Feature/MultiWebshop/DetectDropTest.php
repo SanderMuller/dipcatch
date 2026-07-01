@@ -74,7 +74,7 @@ test('clearLatchIfRecovered with null newPrice clears latch (no eligible offer)'
         'last_notified_at' => now()->subHour(),
     ]);
 
-    app(DetectDrop::class)->clearLatchIfRecovered($product, null, null);
+    app(DetectDrop::class)->clearLatchIfRecovered($product, newPrice: null, reference: null);
 
     $product->refresh();
 

@@ -17,7 +17,7 @@ test('skips when context lacks a price selector', function (): void {
     $result = $this->adapter->extract(
         'https://x.test',
         '<html></html>',
-        new AdapterContext(selectors: [], fallbackCurrency: 'EUR'),
+        new AdapterContext(fallbackCurrency: 'EUR'),
     );
 
     expect($result->isSkip())->toBeTrue();

@@ -8,6 +8,7 @@ includes:
     - vendor/spaze/phpstan-disallowed-calls/disallowed-dangerous-calls.neon
     - vendor/spaze/phpstan-disallowed-calls/disallowed-execution-calls.neon
     - vendor/spaze/phpstan-disallowed-calls/disallowed-insecure-calls.neon
+    - vendor/hihaho/phpstan-rules/named-argument-manifest.neon
 
 rules:
     - Symplify\PHPStanRules\Rules\StringFileAbsolutePathExistsRule
@@ -24,6 +25,27 @@ rules:
 
 parameters:
     tmpDir: .cache/phpstan
+
+    # Lets hihaho/phpstan-rules' RouteBindingReturnTypeExtension infer $this->route('x')
+    # return types from the Route::model()/Route::bind() declarations in these providers.
+    routeBindingProviders:
+        - App\Providers\RouteServiceProvider
+
+    # Lets the same extension infer implicit route-model bindings from the controller
+    # type-hints on these route files (no Route::model/bind declaration needed).
+    routeFiles:
+        - routes/settings.php
+        - routes/web.php
+
+    # Produces named-arguments-manifest.json for rector-rules'
+    # NamedArgumentFromManifestRector — the larastan-resolved positional flags
+    # rector cannot name on its own. Run phpstan before rector to refresh it.
+    namedArgumentManifest:
+        firstPartyNamespaces:
+            - App
+            - Database\Factories
+            - Tests
+        outputPath: .config/named-arguments-manifest.json
 
     paths:
         - app

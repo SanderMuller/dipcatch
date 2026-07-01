@@ -37,7 +37,7 @@ test('security settings page requires password confirmation when enabled', funct
 });
 
 test('security settings page renders without two factor when feature is disabled', function (): void {
-    config(['fortify.features' => []]);
+    config()->set('fortify.features', []);
 
     $user = User::factory()->create();
 

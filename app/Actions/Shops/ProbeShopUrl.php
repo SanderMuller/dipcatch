@@ -126,7 +126,7 @@ final readonly class ProbeShopUrl
         if (RateLimiter::tooManyAttempts($key, self::PER_USER_LIMIT_PER_MIN)) {
             return false;
         }
-        RateLimiter::hit($key, decaySeconds: 60);
+        RateLimiter::hit($key);
 
         return true;
     }

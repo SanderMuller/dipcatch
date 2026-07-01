@@ -2,9 +2,6 @@
 
 namespace App\Enums;
 
-use App\Actions\Shops\ProbeOutcome;
-use App\Actions\Shops\ProbeShopUrl;
-
 /**
  * Caller-facing failure code emitted by {@see ProbeShopUrl}.
  *

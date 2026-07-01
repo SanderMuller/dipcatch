@@ -28,7 +28,7 @@ final readonly class JsonLdEntitySearcher
         $types = JsonLdEntities::typesOf($entity);
         $variantKey = $context?->variantKey;
 
-        if (in_array('Product', $types, true)) {
+        if (in_array('Product', $types, strict: true)) {
             $matched = self::tryMatch($entity, $url, $variantKey);
             if ($matched !== null) {
                 return $matched;
@@ -36,7 +36,7 @@ final readonly class JsonLdEntitySearcher
             $state->product ??= $entity;
         }
 
-        if (in_array('ProductGroup', $types, true)) {
+        if (in_array('ProductGroup', $types, strict: true)) {
             $state->productGroup ??= $entity;
             $matched = self::scanVariants($entity, $url, $variantKey, $state);
             if ($matched !== null) {
@@ -73,7 +73,7 @@ final readonly class JsonLdEntitySearcher
             }
 
             /** @var array<string, mixed> $variant */
-            if (! in_array('Product', JsonLdEntities::typesOf($variant), true)) {
+            if (! in_array('Product', JsonLdEntities::typesOf($variant), strict: true)) {
                 continue;
             }
 

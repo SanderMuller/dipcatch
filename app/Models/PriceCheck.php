@@ -4,16 +4,16 @@ namespace App\Models;
 
 use App\Enums\ScrapeStatus;
 use Database\Factories\PriceCheckFactory;
+use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+#[WithoutTimestamps]
 class PriceCheck extends Model
 {
     /** @use HasFactory<PriceCheckFactory> */
     use HasFactory;
-
-    public $timestamps = false;
 
     protected $guarded = [];
 

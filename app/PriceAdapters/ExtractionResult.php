@@ -35,17 +35,17 @@ final readonly class ExtractionResult
 
     public static function skip(): self
     {
-        return new self(self::STATE_SKIP, null, null);
+        return new self(self::STATE_SKIP, snapshot: null, failureReason: null);
     }
 
     public static function failed(string $reason): self
     {
-        return new self(self::STATE_FAILED, null, $reason);
+        return new self(self::STATE_FAILED, snapshot: null, failureReason: $reason);
     }
 
     public static function success(ShopSnapshot $snapshot): self
     {
-        return new self(self::STATE_SUCCESS, $snapshot, null);
+        return new self(self::STATE_SUCCESS, $snapshot, failureReason: null);
     }
 
     /**
@@ -53,7 +53,7 @@ final readonly class ExtractionResult
      */
     public static function ambiguous(array $variants): self
     {
-        return new self(self::STATE_AMBIGUOUS, null, 'multiple_variants', null, $variants);
+        return new self(self::STATE_AMBIGUOUS, snapshot: null, failureReason: 'multiple_variants', variants: $variants);
     }
 
     public function withAdapterKey(string $key): self

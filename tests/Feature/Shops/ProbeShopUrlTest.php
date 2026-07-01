@@ -244,7 +244,7 @@ test('ProbeOutcome::shouldOfferManualSelector returns true only for the manual-s
         // Other extraction reasons do NOT trigger manual selector — adapter
         // could parse the page but the data was wrong (e.g. missing price).
         ->and(ProbeOutcome::extractionFailed('jsonld_no_price')->shouldOfferManualSelector())->toBeFalse()
-        ->and(ProbeOutcome::extractionFailed(null)->shouldOfferManualSelector())->toBeFalse()
+        ->and(ProbeOutcome::extractionFailed(reason: null)->shouldOfferManualSelector())->toBeFalse()
         // Non-extraction failures never trigger manual selector.
         ->and(ProbeOutcome::failed(ProbeFailure::HttpError)->shouldOfferManualSelector())->toBeFalse();
 });

@@ -27,6 +27,6 @@ final class Iso4217
 
     public static function isValid(string $code): bool
     {
-        return in_array(strtoupper($code), self::CODES, true);
+        return in_array(strtoupper($code), self::CODES, strict: true);
     }
 }

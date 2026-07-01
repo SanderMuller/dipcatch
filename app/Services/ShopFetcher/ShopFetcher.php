@@ -135,7 +135,6 @@ final readonly class ShopFetcher
             $key,
             $limit,
             static fn (): bool => true,
-            decaySeconds: 60,
         );
 
         if ($granted === false) {

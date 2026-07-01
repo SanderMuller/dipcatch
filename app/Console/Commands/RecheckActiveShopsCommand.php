@@ -27,7 +27,9 @@ class RecheckActiveShopsCommand extends Command
         Shop::query()
             ->where('active', true)
             ->where('health', '!=', ShopHealth::Dead->value)
-            ->whereHas('product', fn (EloquentQueryBuilder $q) => $q->where('active', true))
+            ->whereHas('product', function (EloquentQueryBuilder $q): void {
+                $q->where('active', true);
+            })
             ->where(function (EloquentQueryBuilder $q) use ($cutoff): void {
                 $q->whereNull('last_checked_at')
                     ->orWhere('last_checked_at', '<', $cutoff);

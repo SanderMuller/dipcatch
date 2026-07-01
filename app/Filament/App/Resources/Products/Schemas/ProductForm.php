@@ -53,7 +53,7 @@ class ProductForm
                         Toggle::make('active')
                             ->label('Tracking active'),
                     ])
-                    ->columns(2),
+                    ->columns(),
             ]);
     }
 }

@@ -105,7 +105,7 @@ class ShopsRelationManager extends RelationManager
                 SelectFilter::make('health')
                     ->options(ShopHealth::class),
             ])
-            ->defaultSort('current_price', 'asc')
+            ->defaultSort('current_price')
             ->recordActions([
                 Action::make('open')
                     ->icon(Heroicon::ArrowTopRightOnSquare)

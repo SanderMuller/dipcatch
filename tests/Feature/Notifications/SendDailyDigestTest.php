@@ -106,7 +106,7 @@ test('caps the lookback at configured days even with stale last_digest_sent_at',
     PriceDropEvent::factory()
         ->for($user)
         ->for($product)
-        ->state(['fired_at' => now()->subDays(1)])
+        ->state(['fired_at' => now()->subDays()])
         ->create();
 
     new SendDailyDigest($user, '2026-01-15')->handle();

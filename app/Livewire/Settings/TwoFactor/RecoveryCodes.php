@@ -46,7 +46,7 @@ class RecoveryCodes extends Component
 
         if ($user->hasEnabledTwoFactorAuthentication() && $user->two_factor_recovery_codes) {
             try {
-                $decoded = json_decode(Crypt::decryptString((string) $user->two_factor_recovery_codes), true);
+                $decoded = json_decode(Crypt::decryptString((string) $user->two_factor_recovery_codes), associative: true);
                 $this->recoveryCodes = is_array($decoded) ? $decoded : [];
             } catch (Exception) {
                 $this->addError('recoveryCodes', 'Failed to load recovery codes');

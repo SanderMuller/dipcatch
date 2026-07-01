@@ -37,6 +37,6 @@ final class IanaTimezones
 
     public static function isValid(string $identifier): bool
     {
-        return in_array($identifier, self::identifiers(), true);
+        return in_array($identifier, self::identifiers(), strict: true);
     }
 }

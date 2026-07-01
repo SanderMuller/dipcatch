@@ -91,7 +91,7 @@ class AddShop extends Component
             return;
         }
 
-        $this->runProbe($probe, [], null, $this->chosenVariantKey);
+        $this->runProbe($probe, variantKey: $this->chosenVariantKey);
     }
 
     /**
@@ -107,7 +107,7 @@ class AddShop extends Component
         $url = trim($this->url);
 
         if ($url === '') {
-            $this->failWith('empty_url', null);
+            $this->failWith('empty_url', context: null);
 
             return;
         }
@@ -115,7 +115,7 @@ class AddShop extends Component
         /** @var User|null $actor */
         $actor = auth()->user();
         if (! $actor instanceof User) {
-            $this->failWith('unauthenticated', null);
+            $this->failWith('unauthenticated', context: null);
 
             return;
         }

@@ -147,7 +147,7 @@ final readonly class JsonLdAdapter implements ShopAdapter
     {
         $types = JsonLdEntities::typesOf($shop);
 
-        if (in_array('AggregateOffer', $types, true)) {
+        if (in_array('AggregateOffer', $types, strict: true)) {
             return PriceNormalizer::fromMixed($shop['lowPrice'] ?? null);
         }
 

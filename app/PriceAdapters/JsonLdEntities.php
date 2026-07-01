@@ -70,7 +70,7 @@ final class JsonLdEntities
      */
     public static function isOfferType(array $types): bool
     {
-        return in_array('Shop', $types, true) || in_array('AggregateOffer', $types, true);
+        return in_array('Shop', $types, strict: true) || in_array('AggregateOffer', $types, strict: true);
     }
 
     /**

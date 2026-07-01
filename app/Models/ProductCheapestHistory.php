@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Database\Factories\ProductCheapestHistoryFactory;
+use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+#[WithoutTimestamps]
 class ProductCheapestHistory extends Model
 {
     /** @use HasFactory<ProductCheapestHistoryFactory> */
@@ -16,8 +18,6 @@ class ProductCheapestHistory extends Model
     // model properties via the migration schema. Don't switch back to #[Table]
     // unless we also update larastan to support attribute-table model discovery.
     protected $table = 'product_cheapest_history';
-
-    public $timestamps = false;
 
     protected $guarded = [];
 

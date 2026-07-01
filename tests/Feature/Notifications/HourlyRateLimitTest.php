@@ -103,6 +103,6 @@ test('separate users do not share the rate-limit bucket', function (): void {
     [$pb, $cb] = makeDroppingProductForUser($bob);
     app(DetectDrop::class)($pb, $cb);
 
-    Notification::assertSentToTimes($alice, PriceDropNotification::class, 1);
-    Notification::assertSentToTimes($bob, PriceDropNotification::class, 1);
+    Notification::assertSentToTimes($alice, PriceDropNotification::class);
+    Notification::assertSentToTimes($bob, PriceDropNotification::class);
 });

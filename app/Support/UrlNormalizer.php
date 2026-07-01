@@ -167,7 +167,7 @@ final class UrlNormalizer
 
     private static function isTrackingParam(string $key): bool
     {
-        if (in_array($key, self::TRACKING_PARAM_EXACT, true)) {
+        if (in_array($key, self::TRACKING_PARAM_EXACT, strict: true)) {
             return true;
         }
 

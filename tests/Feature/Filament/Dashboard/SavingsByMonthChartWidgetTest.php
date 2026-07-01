@@ -71,7 +71,7 @@ test('respects user scoping — only the current user\'s drops are counted', fun
     $aliceProduct = Product::factory()->for($alice)->create();
     $bobProduct = Product::factory()->for($bob)->create();
 
-    $month = CarbonImmutable::now()->startOfMonth()->addDays(1);
+    $month = CarbonImmutable::now()->startOfMonth()->addDays();
 
     fireDropEvent($alice, $aliceProduct, 'EUR', '10.00', $month);
     fireDropEvent($bob, $bobProduct, 'EUR', '99.00', $month);

@@ -64,7 +64,7 @@ class ProductInfolist
                             ->state(fn (Product $r): string => $r->active ? 'Active' : 'Paused')
                             ->color(fn (Product $r): string => $r->active ? 'success' : 'gray'),
                     ])
-                    ->columns(2),
+                    ->columns(),
             ]);
     }
 }

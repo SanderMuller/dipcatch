@@ -170,7 +170,7 @@ test('inactive or dead offer is skipped', function (): void {
 test('per-host rate limit releases instead of writing a failed check or ticking counter', function (): void {
     $perMinute = config()->integer('dipcatch.fetcher.rate_limit_per_minute', 12);
     for ($i = 0; $i < $perMinute; $i++) {
-        RateLimiter::hit(ShopFetcher::throttleKey('shop.test'), 60);
+        RateLimiter::hit(ShopFetcher::throttleKey('shop.test'));
     }
     // Pre-warm robots cache so the policy check doesn't issue an HTTP call —
     // otherwise assertNothingSent below would see the robots.txt fetch.

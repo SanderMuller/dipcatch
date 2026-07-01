@@ -45,7 +45,9 @@ class LastSuccessfulScrapeCheck extends Check
         $totalActiveOfferCount = Shop::query()
             ->where('active', true)
             ->where('health', '!=', ShopHealth::Dead->value)
-            ->whereHas('product', fn (EloquentQueryBuilder $q) => $q->where('active', true))
+            ->whereHas('product', function (EloquentQueryBuilder $q): void {
+                $q->where('active', true);
+            })
             ->count();
 
         $result = Result::make()
@@ -79,7 +81,9 @@ class LastSuccessfulScrapeCheck extends Check
         return Shop::query()
             ->where('active', true)
             ->where('health', '!=', ShopHealth::Dead->value)
-            ->whereHas('product', fn (EloquentQueryBuilder $q) => $q->where('active', true))
+            ->whereHas('product', function (EloquentQueryBuilder $q): void {
+                $q->where('active', true);
+            })
             ->where(function (EloquentQueryBuilder $q) use ($hours): void {
                 $q->whereNull('last_success_at')
                     ->orWhere('last_success_at', '<', now()->subHours($hours));

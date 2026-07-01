@@ -207,13 +207,13 @@ class Product extends Model
             return 'null';
         }
 
-        if ($previous === null && $new !== null) {
+        if ($previous === null) {
             return 'down';
         }
 
         $cmp = bccomp(
-            Numeric::str((string) $new),
-            Numeric::str((string) $previous),
+            Numeric::str($new),
+            Numeric::str($previous),
             self::BC_SCALE,
         );
 
