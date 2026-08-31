@@ -14,7 +14,7 @@ Shows a normalized unit price (€/kg or €/l) next to every shop's pack price,
 - **Thresholds and notifications stay on the pack price** — carried from the accepted feature assessment; unit price is display-only.
 - **A null parse on recheck keeps the existing pack columns** — AI default: a source hiccup must not wipe a known size. Cosmetic.
 - **Unit price formatting** — AI default: two decimals, `€ 8.45 /kg`, `tabular-nums`, `—` when absent. Cosmetic.
-- **Codex-review hardening (2026-09-01)** — applied without re-grilling (all strictly-safer parser/update semantics): positive-quantity guard, alias vocabulary incl. written-out Dutch units, piece multipacks + `-pack`, ambiguity-parses-to-null for ranges/additive sizes, `plakken`/`+`-suffix exclusion, Livewire `pack_size` transport, structured-empty clears vs title-null keeps, URL-edit clears pack columns.
+- **Codex-review hardening, rounds 1+2 (2026-09-01)** — applied without re-grilling (all strictly-safer parser/update semantics): positive-quantity guard, alias vocabulary incl. written-out Dutch units, piece multipacks + `-pack`, ambiguity-parses-to-null for ranges/additive sizes, `plakken`/`+`-suffix exclusion, Livewire `pack_size` transport, structured-empty clears vs title-null keeps, URL-edit clears pack columns; snapshot authority flag (three size states), authoritative-unparseable clears, exact five-step parse algorithm with vel-drop for paper products, plain `unitPrice()` methods instead of magic accessors.
 
 ---
 
@@ -39,9 +39,13 @@ Consequence: AH and Lidl get reliable unit prices; scraped shops get them only w
 - Unit aliases, case-insensitive, attached forms allowed (`"500gram"`, `"330ML"`): mass `g|gr|gram|kg|kilo|kilogram`; volume `ml|milliliter|cl|centiliter|dl|deciliter|l|ltr|liter`. Normalization: kg → ×1000 g, l → ×1000 ml, dl → ×100 ml, cl → ×10 ml. Comma decimals accepted (`"0,75 l"`).
 - Multipacks — for mass, volume, AND pieces: `"6 x 250 ml"` → 1500 ml; `"2 x 4 rollen"` → 8 pieces; `"3x10 stuks"` → 30 pieces; `"6-pack"` → 6 pieces. `x` or `×`, optional spaces.
 - Piece vocabulary, singular + plural: `stuk|stuks|st|rol|rollen|vel|vellen|tablet|tabletten|zakje|zakjes|pack`. `plakken` is deliberately excluded — cheese names carry fat percentages (`"48+ plakken"`) that must never become 48 pieces. A number suffixed with `+` or `%` never starts a size token.
-- Precedence mass > volume > pieces, so `"48+ plakken 150 g"` is 150 g.
-- **Ambiguity parses to null**: ranges (`"500-600 g"`), additive sizes (`"200 g + 150 g"`), and more than one distinct size token outside a single multipack pattern all return null — no plausible-but-wrong guesses.
-- Title fallback: the same parser over the product title, same anchoring rules, so `"40% minder zout"` never matches.
+- **Exact algorithm** (replaces any looser precedence prose):
+  1. Whole-string rejects first: a range (`"500-600 g"`, `"ca. 500–600 g"`) or an additive size (`"200 g + 150 g"`) parses to null.
+  2. A single multipack pattern (`\d+ ?[x×] ?<size-or-count>`, or `\d+-pack`) resolves and wins.
+  3. Otherwise collect all size tokens and bucket them: mass, volume, pieces. `vel|vellen` tokens are dropped whenever any other piece token is present (`"8 rollen à 200 vel"` → 8 rolls; sheets are per-roll detail); alone, sheets count.
+  4. Pick the highest-precedence non-empty bucket: mass > volume > pieces (`"6 stuks 300 g"` → 300 g; `"48+ plakken 150 g"` → 150 g).
+  5. The chosen bucket must hold exactly one distinct token — two distinct masses (outside step 2) parse to null. Tokens in lower buckets are ignored, never ambiguity.
+- Title fallback: the same parser over the product title, same rules, so `"40% minder zout"` never matches.
 - Unit price: mass/volume = `price / quantity × 1000` rendered `€ 8.45 /kg` / `€ 1.23 /l`; pieces = `price / count` rendered `€ 0.45 /stuk`. Two decimals, `tabular-nums`.
 
 ## 3. Data Model
@@ -51,18 +55,20 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
 - `pack_quantity` decimal(10,2) nullable — normalized grams, milliliters, or piece count
 - `pack_unit` string nullable — `'g'` | `'ml'` | `'piece'`
 
-`Shop` gains a computed accessor `unit_price(): ?string` (null unless `current_price` + pack columns present) plus a `unit_price_label` (`/kg`, `/l`, or `/stuk`). Docblock properties per the model conventions.
+`Shop` gains plain domain methods — not magic accessors — `unitPrice(): ?string` (null unless `current_price` + pack columns present) and `unitPriceLabel(): ?string` (`/kg`, `/l`, or `/stuk`). UI callers invoke them explicitly (Filament columns via a `state`/`getStateUsing` closure, Blade via `$shop->unitPrice()`), so no attribute-name magic can silently render blank.
 
 ## 4. Plumbing
 
-- `ShopSnapshot` gains `public ?string $packSize = null` (the raw size string). Sources fill it:
-  - `AhApiSource::snapshotFrom()` — `salesUnitSize` (app/Services/AhApi/AhApiSource.php).
-  - `CheckjebonSource::resolve()` — the `size` column (app/Services/Checkjebon/CheckjebonSource.php).
-  - Scraped adapters leave it null; persistence falls back to parsing the snapshot title.
+- `ShopSnapshot` gains two fields: `public ?string $packSize = null` (the raw size string) and `public bool $packSizeAuthoritative = false` — true when a structured source supplied the size field at all (even empty), so the three states are representable: authoritative value, authoritative empty, and no structured source (title fallback allowed). Sources fill them:
+  - `AhApiSource::snapshotFrom()` — `salesUnitSize`, authoritative (app/Services/AhApi/AhApiSource.php).
+  - `CheckjebonSource::resolve()` — the `size` column, authoritative (app/Services/Checkjebon/CheckjebonSource.php).
+  - Scraped adapters leave both defaults (not authoritative); persistence falls back to parsing the snapshot title.
 - **Livewire transport**: `DrivesShopProbe::showPreview()` serializes the snapshot into an array (app/Livewire/Concerns/DrivesShopProbe.php:159) — add `pack_size` to that array, or both confirm methods read nothing. Test the probe-to-confirm round trip, not only the adapter boundary.
 - Persistence parses once and stores normalized values:
   - Probe confirm: `AddShop::confirm()` and `CreateProductFromUrl::confirm()` add `pack_quantity` / `pack_unit` to the `shops()->create()` payload (parse the transported `pack_size`, falling back to the title).
-  - Recheck: `CheckShopPrice` outcomes carry the parsed pack fields; `persist()` updates them on `Ok` checks so a packaging change heals itself. A **title-fallback** null parse keeps existing values (a flaky title must not wipe a known size), but an **authoritative empty structured size** (AH `salesUnitSize` / dataset `size` present-but-empty) clears them.
+  - Recheck update semantics on `Ok` checks, driven by `packSizeAuthoritative`:
+    - **Authoritative** snapshot → the parse result is written verbatim: a value overwrites, and an empty or unparseable authoritative size **clears** the pack columns (a stale wrong unit price is worse than none).
+    - **Not authoritative** (title fallback) → only a successful parse writes; a null parse keeps existing values (a flaky title must not wipe a known size).
   - **URL edit**: `Shop::updateUrl()` (app/Models/Shop.php:61) can point a shop at a different product — clear both pack columns there so a stale size never prices the new product.
 - `PriceCheck` stays untouched — unit price derives from the shop's current state; history stays pack-price-based.
 
@@ -83,12 +89,13 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
 | Multipack (`"6 x 250 ml"`) | Total volume 1500 ml → correct €/l (parser Tests) |
 | Comma decimal (`"0,75 l"`) | 750 ml (parser Tests) |
 | Title contains misleading numbers (`"48+"`, `"40%"`) | Unit-anchored regex never matches them (parser Tests) |
-| Title with several size tokens (`"6 x 33 cl krat 24"`) | Multipack pattern wins; otherwise last size token (parser Tests) |
+| Title with several size tokens (`"6 x 33 cl krat 24"`, `"6 stuks 300 g"`) | Multipack wins; else bucket precedence, single-token bucket rule (parser Tests) |
 | Recheck title-fallback parses null for a shop that has a size | Existing pack columns kept (plumbing Tests) |
 | Structured source returns an explicitly empty size | Pack columns cleared (plumbing Tests) |
 | Shop URL manually edited to another product (`Shop::updateUrl()`) | Pack columns cleared until the next check refills them (plumbing Tests) |
 | Zero quantity (`"0 g"`) or fractional piece count | Parses null — never divides by zero (parser Tests) |
 | Range or additive size (`"500-600 g"`, `"200 g + 150 g"`) | Parses null — no plausible-but-wrong unit price (parser Tests) |
+| Paper products (`"8 rollen à 200 vel"`) | 8 pieces — `vel(len)` dropped when another piece token exists; `"200 vellen"` alone counts (parser Tests) |
 | Piece multipack (`"2 x 4 rollen"`, `"6-pack"`) | 8 pieces / 6 pieces (parser Tests) |
 | Cheese fat marker (`"48+ plakken"` alone) | Parses null — `plakken` excluded, `+`-suffixed numbers never match (parser Tests) |
 | Packaging changes upstream (200 g → 250 g) | Next `Ok` recheck overwrites the pack columns (plumbing Tests) |
@@ -104,17 +111,17 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
 
 - [ ] `App\Support\PackSize` value object + `parse()` — Section 2 rules incl. multipacks, comma decimals, unit anchoring, last-token pick.
 - [ ] Unit-price math + label helper (`/kg`, `/l`, `/stuk`) on the value object — price string in, formatted unit price out.
-- [ ] Tests — every Section 2 example incl. multipacks, comma decimals, piece vocabulary, precedence, and the misleading-number rows.
+- [ ] Tests — every Section 2 example incl. multipacks, comma decimals, piece vocabulary, the exact five-step algorithm (buckets, vel-drop, single-token rule), and the misleading-number rows.
 
 ### Phase 2: Columns + source plumbing (Priority: HIGH)
 
 **ID:** plumbing · **Depends:** parser
 
-- [ ] Migration `add_pack_size_to_shops_table` + `Shop` accessor + docblock — Section 3.
-- [ ] `ShopSnapshot::$packSize` + fills in `AhApiSource` and `CheckjebonSource` + the `pack_size` key in `DrivesShopProbe::showPreview()`'s snapshot array — Section 4.
+- [ ] Migration `add_pack_size_to_shops_table` + `Shop::unitPrice()` / `unitPriceLabel()` methods + docblock — Section 3.
+- [ ] `ShopSnapshot::$packSize` + `$packSizeAuthoritative` + fills in `AhApiSource` / `CheckjebonSource` + both keys in `DrivesShopProbe::showPreview()`'s snapshot array — Section 4.
 - [ ] Persist on probe confirm (both Livewire components) with title fallback — Section 4.
-- [ ] Recheck outcomes carry pack fields; `persist()` updates on `Ok`, keeps existing on title-null, clears on structured-empty; `Shop::updateUrl()` clears both columns — Section 4.
-- [ ] Tests — AH probe stores 200 g from `salesUnitSize`; checkjebon probe stores the dataset size; Jumbo recheck parses the title; probe-to-confirm round trip persists `pack_size`; title-null keeps values; structured-empty clears; URL edit clears; packaging change overwrites.
+- [ ] Recheck outcomes carry pack fields + authority flag; `persist()` applies the Section 4 semantics (authoritative writes verbatim incl. clears; fallback only fills); `Shop::updateUrl()` clears both columns — Section 4.
+- [ ] Tests — AH probe stores 200 g from `salesUnitSize`; checkjebon probe stores the dataset size; Jumbo recheck parses the title; probe-to-confirm round trip persists `pack_size`; title-null keeps values; structured-empty and structured-unparseable clear; URL edit clears; packaging change overwrites.
 
 ### Phase 3: UI (Priority: HIGH)
 
