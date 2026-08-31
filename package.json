@@ -20,6 +20,6 @@
         "lightningcss-linux-x64-gnu": "^1.29.1"
     },
     "devDependencies": {
-        "chokidar": "^5.0.0"
+        "chokidar": "^4.0.3"
     }
 }

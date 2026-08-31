@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.5",
         "ext-bcmath": "*",
+        "aws/aws-sdk-php": "^3.394",
         "filament/filament": "^5.7.6",
         "laravel-notification-channels/webpush": "^10.5",
         "laravel/fortify": "^1.39.0",
