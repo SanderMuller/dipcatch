@@ -24,6 +24,11 @@ rules:
     - Symplify\PHPStanRules\Rules\Explicit\NoMissingVariableDimFetchRule
 
 parameters:
+    # Runs before the Laravel extension's own bootstrap, and defines the
+    # version constant that extension reads without a guard. See the file.
+    bootstrapFiles:
+        - phpstan-bootstrap.php
+
     tmpDir: .cache/phpstan
 
     # Lets hihaho/phpstan-rules' RouteBindingReturnTypeExtension infer $this->route('x')
