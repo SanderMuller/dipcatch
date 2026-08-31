@@ -9,6 +9,7 @@ use App\Models\User;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ShopSnapshot;
+use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\Exceptions\Blocked;
 use App\Services\ShopFetcher\Exceptions\HttpError;
@@ -36,6 +37,7 @@ final readonly class ProbeShopUrl
         private ShopFetcher $fetcher,
         private AdapterResolver $resolver,
         private CheckjebonSource $checkjebon,
+        private AhApiSource $ahApi,
     ) {}
 
     /**
@@ -71,8 +73,9 @@ final readonly class ProbeShopUrl
             return ProbeOutcome::failed(ProbeFailure::NotInDataset, ['reason' => 'use_boodschaapje']);
         }
 
-        if ($this->checkjebon->supports($host)) {
-            return $this->resolveFromCheckjebon($product, $normalizedUrl, $host);
+        $local = $this->resolveFromLocalSources($product, $normalizedUrl, $host);
+        if ($local instanceof ProbeOutcome) {
+            return $local;
         }
 
         if (! $this->withinPerUserLimit($actor)) {
@@ -140,6 +143,29 @@ final readonly class ProbeShopUrl
         );
     }
 
+    /**
+     * ah.nl resolves via the mobile API (live, bonus-aware) with the
+     * checkjebon dataset as a regular-price fallback when the unofficial
+     * API misbehaves; boodschaapje.nl/Lidl is dataset-only. Returns null
+     * for every other host so the network probe runs.
+     */
+    private function resolveFromLocalSources(?Product $product, string $normalizedUrl, string $host): ?ProbeOutcome
+    {
+        if ($this->ahApi->supports($host)) {
+            $result = $this->ahApi->resolve($normalizedUrl);
+            $snapshot = $result->snapshot;
+            if ($snapshot instanceof ShopSnapshot) {
+                return $this->successFromSnapshot($product, $snapshot, $normalizedUrl, $host, adapterKey: 'ah-api');
+            }
+        }
+
+        if ($this->checkjebon->supports($host)) {
+            return $this->resolveFromCheckjebon($product, $normalizedUrl, $host);
+        }
+
+        return null;
+    }
+
     private function resolveFromCheckjebon(?Product $product, string $normalizedUrl, string $host): ProbeOutcome
     {
         $result = $this->checkjebon->resolve($normalizedUrl);
@@ -151,6 +177,16 @@ final readonly class ProbeShopUrl
         $snapshot = $result->snapshot;
         assert($snapshot instanceof ShopSnapshot);
 
+        return $this->successFromSnapshot($product, $snapshot, $normalizedUrl, $host, adapterKey: 'checkjebon');
+    }
+
+    private function successFromSnapshot(
+        ?Product $product,
+        ShopSnapshot $snapshot,
+        string $normalizedUrl,
+        string $host,
+        string $adapterKey,
+    ): ProbeOutcome {
         if ($product instanceof Product && strcasecmp($snapshot->currency, $product->currency) !== 0) {
             return ProbeOutcome::failed(ProbeFailure::CurrencyMismatch, [
                 'expected' => $product->currency,
@@ -162,7 +198,7 @@ final readonly class ProbeShopUrl
             snapshot: $snapshot,
             normalizedUrl: $normalizedUrl,
             host: $host,
-            adapterKey: 'checkjebon',
+            adapterKey: $adapterKey,
         );
     }
 

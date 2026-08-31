@@ -7,6 +7,7 @@ use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterResolver;
+use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\ShopFetcher;
 use Illuminate\Support\Facades\Cache;
@@ -47,7 +48,7 @@ test('successful check writes price_check, updates offer, recomputes cheapest', 
         'consecutive_failures' => 2,
     ]);
 
-    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class));
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
 
     $shop->refresh();
     $product->refresh();
@@ -76,6 +77,7 @@ test('parse failure increments main counter and writes failed price_check', func
         app(ShopFetcher::class),
         app(AdapterResolver::class),
         app(CheckjebonSource::class),
+        app(AhApiSource::class),
     );
 
     $shop->refresh();
@@ -100,6 +102,7 @@ test('5xx increments the 5xx counter only', function (): void {
         app(ShopFetcher::class),
         app(AdapterResolver::class),
         app(CheckjebonSource::class),
+        app(AhApiSource::class),
     );
 
     $shop->refresh();
@@ -127,6 +130,7 @@ test('main counter reaching dead_after flips health to dead + active=false', fun
         app(ShopFetcher::class),
         app(AdapterResolver::class),
         app(CheckjebonSource::class),
+        app(AhApiSource::class),
     );
 
     $shop->refresh();
@@ -150,6 +154,7 @@ test('robots disallow flips offer to dead immediately', function (): void {
         app(ShopFetcher::class),
         app(AdapterResolver::class),
         app(CheckjebonSource::class),
+        app(AhApiSource::class),
     );
 
     $shop->refresh();
@@ -167,6 +172,7 @@ test('inactive or dead offer is skipped', function (): void {
         app(ShopFetcher::class),
         app(AdapterResolver::class),
         app(CheckjebonSource::class),
+        app(AhApiSource::class),
     );
 
     Http::assertNothingSent();
@@ -196,6 +202,7 @@ test('per-host rate limit releases instead of writing a failed check or ticking 
         app(ShopFetcher::class),
         app(AdapterResolver::class),
         app(CheckjebonSource::class),
+        app(AhApiSource::class),
     );
 
     Http::assertNothingSent();
@@ -217,6 +224,7 @@ test('successful check resets both counters and clears failing health', function
         app(ShopFetcher::class),
         app(AdapterResolver::class),
         app(CheckjebonSource::class),
+        app(AhApiSource::class),
     );
 
     $shop->refresh();

@@ -24,8 +24,23 @@ function seedAhRow(string $externalId = 'wi257', string $name = 'AH Kruiden room
     ]);
 }
 
-test('probe resolves an AH URL from the dataset without any network fetch', function (): void {
-    Http::fake(); // any HTTP request would throw a stray-request error below
+test('probe resolves an AH URL via the mobile API with the bonus price', function (): void {
+    Http::fake(ahApiProductFakes(currentPrice: '1.69', priceBeforeBonus: '2.19'));
+    Http::preventStrayRequests();
+    $user = User::factory()->create();
+
+    $outcome = app(ProbeShopUrl::class)(null, 'https://www.ah.nl/producten/product/wi526381/lay-s-naturel?utm_source=x', $user);
+
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->adapterKey)->toBe('ah-api')
+        ->and($outcome->snapshot?->title)->toBe("Lay's Naturel")
+        ->and($outcome->snapshot?->price)->toBe('1.69')
+        ->and($outcome->snapshot?->raw['is_bonus'] ?? null)->toBeTrue()
+        ->and($outcome->host)->toBe('ah.nl');
+});
+
+test('probe falls back to the dataset when the AH API is down', function (): void {
+    Http::fake(ahApiDownFakes());
     Http::preventStrayRequests();
     seedAhRow();
     $user = User::factory()->create();
@@ -37,11 +52,10 @@ test('probe resolves an AH URL from the dataset without any network fetch', func
         ->and($outcome->snapshot?->title)->toBe('AH Kruiden roomkaas')
         ->and($outcome->snapshot?->price)->toBe('1.25')
         ->and($outcome->host)->toBe('ah.nl');
-
-    Http::assertNothingSent();
 });
 
 test('dataset probes do not consume the per-user probe rate limit', function (): void {
+    Http::fake(ahApiDownFakes());
     seedAhRow();
     $user = User::factory()->create();
 
@@ -54,6 +68,7 @@ test('dataset probes do not consume the per-user probe rate limit', function ():
 });
 
 test('AH product missing from the dataset fails with not_in_dataset', function (): void {
+    Http::fake(ahApiDownFakes());
     seedAhRow();
     $user = User::factory()->create();
 
@@ -66,6 +81,7 @@ test('AH product missing from the dataset fails with not_in_dataset', function (
 });
 
 test('empty dataset fails with dataset_empty reason', function (): void {
+    Http::fake(ahApiDownFakes());
     $user = User::factory()->create();
 
     $outcome = app(ProbeShopUrl::class)(null, 'https://www.ah.nl/producten/product/wi257/x', $user);
@@ -88,6 +104,7 @@ test('lidl.nl URLs fast-fail pointing to boodschaapje', function (): void {
 });
 
 test('currency mismatch still fires when adding to a non-EUR product', function (): void {
+    Http::fake(ahApiDownFakes());
     seedAhRow();
     $product = Product::factory()->create(['currency' => 'USD']);
     $user = User::factory()->create();
@@ -99,6 +116,7 @@ test('currency mismatch still fires when adding to a non-EUR product', function 
 });
 
 test('create-from-URL flow creates product + shop + check from a seeded dataset row', function (): void {
+    Http::fake(ahApiDownFakes());
     seedAhRow(price: '55.00');
     $user = User::factory()->create();
     $this->actingAs($user);
@@ -129,6 +147,7 @@ test('create-from-URL flow creates product + shop + check from a seeded dataset 
 });
 
 test('add-shop-mode probe on an EUR product succeeds from the dataset', function (): void {
+    Http::fake(ahApiDownFakes());
     seedAhRow();
     $product = Product::factory()->create(['currency' => 'EUR']);
     $user = User::factory()->create();

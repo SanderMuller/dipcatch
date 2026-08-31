@@ -18,6 +18,8 @@ final readonly class CheckjebonResult
 
     public const string REASON_DATASET_EMPTY = 'dataset_empty';
 
+    public const string REASON_API_ERROR = 'api_error';
+
     private function __construct(
         public ?ShopSnapshot $snapshot,
         public ?string $missReason,

@@ -8,6 +8,8 @@ use App\Models\PriceCheck;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
+use App\PriceAdapters\ShopSnapshot;
+use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\Exceptions\FetchException;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
@@ -73,11 +75,21 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         return DipConfig::int('dipcatch.recheck.jitter_minutes', 30) * 60 + 600;
     }
 
-    public function handle(ShopFetcher $fetcher, AdapterResolver $resolver, CheckjebonSource $checkjebon): void
+    public function handle(ShopFetcher $fetcher, AdapterResolver $resolver, CheckjebonSource $checkjebon, AhApiSource $ahApi): void
     {
         $shop = Shop::query()->with('product')->find($this->shop->id);
         if ($shop === null || ! $shop->active || $shop->health === ShopHealth::Dead) {
             return;
+        }
+
+        // ah.nl: mobile API first (live, bonus-aware); dataset as fallback.
+        if ($ahApi->supports($shop->host)) {
+            $result = $ahApi->resolve($shop->url);
+            if ($result->snapshot !== null) {
+                $this->persist($shop, $this->sourceOutcome($result->snapshot, 'ah-api'));
+
+                return;
+            }
         }
 
         if ($checkjebon->supports($shop->host)) {
@@ -137,6 +149,23 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             ];
         }
 
+        return $this->sourceOutcome($snapshot, 'checkjebon');
+    }
+
+    /**
+     * @return array{
+     *   status: ScrapeStatus,
+     *   price: ?string,
+     *   currency: ?string,
+     *   in_stock: ?bool,
+     *   raw: ?string,
+     *   error: ?string,
+     *   adapter_key: ?string,
+     *   fetch_result: ?FetchResult,
+     * }
+     */
+    private function sourceOutcome(ShopSnapshot $snapshot, string $adapterKey): array
+    {
         return [
             'status' => ScrapeStatus::Ok,
             'price' => $snapshot->price,
@@ -144,7 +173,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'in_stock' => $snapshot->inStock,
             'raw' => null,
             'error' => null,
-            'adapter_key' => 'checkjebon',
+            'adapter_key' => $adapterKey,
             'fetch_result' => null,
         ];
     }

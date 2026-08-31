@@ -7,6 +7,7 @@ use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterResolver;
+use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\ShopFetcher;
 use Illuminate\Support\Facades\Http;
@@ -17,6 +18,7 @@ function runCheck(Shop $shop): void
         app(ShopFetcher::class),
         app(AdapterResolver::class),
         app(CheckjebonSource::class),
+        app(AhApiSource::class),
     );
 }
 
@@ -31,8 +33,8 @@ function checkjebonShop(string $url = 'https://ah.nl/producten/product/wi257/roo
     ]);
 }
 
-test('recheck of a dataset host reads the table, no network fetch', function (): void {
-    Http::fake();
+test('recheck of a dataset host falls back to the table when the AH API is down', function (): void {
+    Http::fake(ahApiDownFakes());
     Http::preventStrayRequests();
 
     CheckjebonPrice::query()->create([
@@ -56,11 +58,24 @@ test('recheck of a dataset host reads the table, no network fetch', function ():
     $check = PriceCheck::query()->where('shop_id', $shop->id)->latest('id')->first();
     expect((string) $check->price)->toBe('1.15')
         ->and($check->status)->toBe(ScrapeStatus::Ok);
+});
 
-    Http::assertNothingSent();
+test('recheck of an AH shop uses the mobile API bonus price', function (): void {
+    Http::fake(ahApiProductFakes(currentPrice: '1.69'));
+    Http::preventStrayRequests();
+
+    $shop = checkjebonShop('https://ah.nl/producten/product/wi526381/lay-s-naturel');
+    runCheck($shop);
+
+    $shop->refresh();
+    expect((string) $shop->current_price)->toBe('1.69')
+        ->and($shop->last_status)->toBe(ScrapeStatus::Ok)
+        ->and($shop->adapter_key)->toBe('ah-api')
+        ->and($shop->consecutive_failures)->toBe(0);
 });
 
 test('dataset miss records EmptyMatch and ticks the failure counter', function (): void {
+    Http::fake(ahApiDownFakes());
     // Table non-empty for AH, but not this product.
     CheckjebonPrice::query()->create([
         'supermarket' => 'ah',
@@ -84,6 +99,7 @@ test('dataset miss records EmptyMatch and ticks the failure counter', function (
 });
 
 test('re-listed product recovers the shop on the next check', function (): void {
+    Http::fake(ahApiDownFakes());
     $shop = checkjebonShop();
     runCheck($shop); // miss: table empty
     expect($shop->refresh()->consecutive_failures)->toBe(1);

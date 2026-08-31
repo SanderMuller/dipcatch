@@ -1,7 +1,9 @@
 <?php declare(strict_types=1);
 
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Translation\PotentiallyTranslatedString;
 use Pest\Expectation;
@@ -146,4 +148,46 @@ function runRule(
     );
 
     return $errors;
+}
+
+/**
+ * Fake the AH mobile API as unreachable, so ah.nl flows exercise the
+ * checkjebon-dataset fallback. Merge into a wider Http::fake via the
+ * returned array.
+ *
+ * @return array<string, PromiseInterface>
+ */
+function ahApiDownFakes(): array
+{
+    return [
+        'https://api.ah.nl/*' => Http::response('down', 500),
+    ];
+}
+
+/**
+ * Fake the AH mobile API serving a product (trimmed replica of the
+ * detail/v4 response shape, observed live 2026-08-31).
+ *
+ * @return array<string, PromiseInterface>
+ */
+function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBonus = '2.19', bool $isBonus = true, string $title = "Lay's Naturel"): array
+{
+    return [
+        'https://api.ah.nl/mobile-auth/v1/auth/token/anonymous' => Http::response([
+            'access_token' => 'fake-token',
+            'expires_in' => 604798,
+        ]),
+        'https://api.ah.nl/mobile-services/product/detail/v4/fir/*' => Http::response([
+            'productId' => 526381,
+            'productCard' => [
+                'webshopId' => 526381,
+                'title' => $title,
+                'images' => [['width' => 800, 'height' => 800, 'url' => 'https://static.ah.nl/dam/product/test.webp']],
+                'currentPrice' => (float) $currentPrice,
+                'priceBeforeBonus' => (float) $priceBeforeBonus,
+                'isBonus' => $isBonus,
+                'orderAvailabilityStatus' => 'IN_ASSORTMENT',
+            ],
+        ]),
+    ];
 }
