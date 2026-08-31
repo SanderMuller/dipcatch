@@ -32,7 +32,7 @@ final class AppPanelProvider extends PanelProvider
         return $panel
             ->default()
             ->id('app')
-            ->brandLogo(fn (): \Illuminate\Contracts\View\View => view('filament.partials.brand'))
+            ->brandLogo(fn (): View => view('filament.partials.brand'))
             ->favicon(asset('favicon.png'))
             ->path('app')
             ->viteTheme('resources/css/filament/app/theme.css')
