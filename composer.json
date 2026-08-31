@@ -52,7 +52,6 @@
         "phpstan/phpstan-mockery": "^2.0",
         "phpstan/phpstan-phpunit": "^2.0.18",
         "phpstan/phpstan-strict-rules": "^2.0.12",
-        "rector/type-perfect": "^2.2.0",
         "sandermuller/boost-skills": "^2.35",
         "sandermuller/laravel-fluent-validation-phpstan": "^0.2.0",
         "sandermuller/laravel-fluent-validation-rector": "^1.11.1",

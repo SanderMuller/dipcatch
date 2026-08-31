@@ -2,6 +2,7 @@
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Translation\PotentiallyTranslatedString;
 use Pest\Expectation;
 use PHPUnit\Framework\Assert;
@@ -62,6 +63,29 @@ expect()->extend('toBeSameTimestampAs', function (DateTimeInterface $expected): 
 | global functions to help you to reduce the number of lines of code in your test files.
 |
 */
+
+/**
+ * Clear the Redis bucket a `ThrottleRequestsWithRedis` named limiter writes
+ * to, for one throttle key (normally the client IP).
+ *
+ * `RateLimiter::clear()` does not reach this state. That facade talks to the
+ * cache store (`array` under phpunit.xml), while the middleware bypasses the
+ * cache and drives an `Illuminate\Redis\Limiters\DurationLimiter` straight
+ * on the Redis connection. So the counter lives in a real Redis server and
+ * survives between test runs, which makes a throttle test fail with 429 on
+ * its first request.
+ *
+ * The middleware key is `md5($limiterName . $key)`, or `"$limiterName:$key"`
+ * when `ThrottleRequests::shouldHashKeys(false)` is set. That flag is a
+ * protected static with no getter, so delete both forms.
+ */
+function clearRedisRateLimiter(string $limiterName, string $key = '127.0.0.1'): void
+{
+    Redis::connection()->del(
+        md5($limiterName . $key),
+        $limiterName . ':' . $key,
+    );
+}
 
 /**
  * Wrap a JSON-LD payload in a minimal HTML document. The single source of

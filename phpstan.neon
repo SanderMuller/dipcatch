@@ -71,11 +71,16 @@ parameters:
         # also, how many files has declare strict types
         declare: 100
 
+    # type_perfect rules ship inside tomasvotruba/type-coverage since the
+    # standalone rector/type-perfect package was abandoned and merged into it.
     type_perfect:
         null_over_false: true
         no_mixed: false
         narrow_param: false
         narrow_return: false
+        no_param_type_removal: true
+        no_isset_on_object: true
+        no_empty_on_object: true
 
     cognitive_complexity:
         class: 40

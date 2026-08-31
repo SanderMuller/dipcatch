@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4b20c5ef26a0af8d5d357d246e38407e",
+    "content-hash": "db4069497a9c2f6ea62b21908a7080fb",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -15072,71 +15072,6 @@
                 }
             ],
             "time": "2026-08-30T22:02:04+00:00"
-        },
-        {
-            "name": "rector/type-perfect",
-            "version": "2.2.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/rectorphp/type-perfect.git",
-                "reference": "33d189f48bbd4c2a0e95bddf78788b417259c364"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/rectorphp/type-perfect/zipball/33d189f48bbd4c2a0e95bddf78788b417259c364",
-                "reference": "33d189f48bbd4c2a0e95bddf78788b417259c364",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^8.2",
-                "phpstan/phpstan": "^2.1.30",
-                "webmozart/assert": "^1.11 || ^2.1"
-            },
-            "require-dev": {
-                "nikic/php-parser": "^5.6",
-                "phpstan/extension-installer": "^1.4",
-                "phpunit/phpunit": "^11.5|^12.2",
-                "rector/rector": "^2.2",
-                "symfony/dom-crawler": "^7.4",
-                "symplify/easy-coding-standard": "^12.6",
-                "symplify/phpstan-extensions": "^12.0",
-                "tomasvotruba/class-leak": "^2.0",
-                "tracy/tracy": "^2.10"
-            },
-            "type": "phpstan-extension",
-            "extra": {
-                "phpstan": {
-                    "includes": [
-                        "config/extension.neon"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Rector\\TypePerfect\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "description": "Next level type declaration checks - DEPRECATED, merged into tomasvotruba/type-coverage",
-            "support": {
-                "issues": "https://github.com/rectorphp/type-perfect/issues",
-                "source": "https://github.com/rectorphp/type-perfect/tree/2.2.0"
-            },
-            "funding": [
-                {
-                    "url": "https://www.paypal.me/rectorphp",
-                    "type": "custom"
-                },
-                {
-                    "url": "https://github.com/tomasvotruba",
-                    "type": "github"
-                }
-            ],
-            "abandoned": "tomasvotruba/type-coverage",
-            "time": "2026-07-30T14:54:45+00:00"
         },
         {
             "name": "sandermuller/boost-core",

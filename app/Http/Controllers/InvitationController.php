@@ -39,7 +39,6 @@ class InvitationController extends Controller
 
         /** @var array{name: string, password: string} $validated */
         $acceptLanguage = $request->header('Accept-Language');
-        $acceptLanguage = is_array($acceptLanguage) ? ($acceptLanguage[0] ?? null) : $acceptLanguage;
 
         $user = DB::transaction(function () use ($token, $validated, $createNewUser, $acceptLanguage): User {
             // Re-fetch with a row lock so concurrent redemptions of the same

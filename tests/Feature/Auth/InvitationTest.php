@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Mail;
 
 use function Pest\Livewire\livewire;
 
+beforeEach(function (): void {
+    clearRedisRateLimiter('invitation');
+});
+
 test('register route does not exist (invite-only)', function (): void {
     $this->get('/register')->assertNotFound();
 });

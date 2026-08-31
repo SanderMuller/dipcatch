@@ -22,6 +22,20 @@ jobs:
       matrix:
         php-version: ['8.5']
 
+    # The invitation and public-product routes throttle through
+    # ThrottleRequestsWithRedis, which drives a DurationLimiter straight on the
+    # Redis connection and ignores CACHE_STORE. The suite needs a real server.
+    services:
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -30,6 +44,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
+          extensions: bcmath, redis, pdo_sqlite, sqlite3
           tools: composer:v2
           coverage: xdebug
 
@@ -49,6 +64,9 @@ jobs:
 
       - name: Copy Environment File
         run: cp .env.example .env
+
+      - name: Verify Redis Is Reachable
+        run: php -r '$r = new Redis(); $r->connect("127.0.0.1", 6379); echo $r->ping(), PHP_EOL;'
 
       - name: Generate Application Key
         run: php artisan key:generate

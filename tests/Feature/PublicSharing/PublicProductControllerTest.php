@@ -5,10 +5,9 @@ use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
-use Illuminate\Support\Facades\RateLimiter;
 
 beforeEach(function (): void {
-    RateLimiter::clear('public-product:127.0.0.1');
+    clearRedisRateLimiter('public-product');
 });
 
 /**
