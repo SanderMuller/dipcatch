@@ -11,9 +11,11 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 5. ~~`drop-detection.md`~~ — ✅ shipped (30d median reference, adaptive tier defaults, threshold evaluator, re-notify state machine).
 6. **[notifications.md](notifications.md)** — email + Filament bell + web push, per-user channel toggles, profile UI. Phases 1–4 shipped; Phase 5 hardening partially shipped (per-user hourly rate-limit done; admin queue-depth widget deferred).
 7. ~~`dashboard.md`~~ — ✅ shipped (stats widgets, active drops, recent notifications, savings chart, per-product price history chart).
-8. ~~`checkjebon-price-source.md`~~ — ✅ shipped (daily checkjebon.nl dataset in Postgres for AH + Dirk + Lidl; probe + recheck bypass the scraper for these hosts; `CheckjebonFreshnessCheck` health check).
+8. ~~`checkjebon-price-source.md`~~ — ✅ shipped (daily checkjebon.nl dataset in Postgres for AH + Lidl-via-boodschaapje; probe + recheck bypass the scraper for these hosts; `CheckjebonFreshnessCheck` health check. Dirk moved to direct scraping afterwards: its JSON-LD carries the live promo price, the dataset only the regular price).
 
 ## Post-launch refactors + features
+
+- **[unit-pricing.md](unit-pricing.md)** — normalized unit price (€/kg, €/l, €/stuk) per shop, parsed from source size data with title fallback; shown on shops table, previews, public page, products list.
 
 - ~~`multi-webshop-price-tracking.md`~~ — ✅ shipped (Product/Shop split, adapter chain, per-shop checks, ProductCheapestHistory timeline).
 - ~~`test-helper-hoist.md`~~ — ✅ shipped (`withJsonLd` + `jsonLdPage` consolidated in `tests/Pest.php`; `phpstan.neon` `scanFiles` added).
