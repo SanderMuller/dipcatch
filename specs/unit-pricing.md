@@ -37,11 +37,11 @@ Consequence: AH and Lidl get reliable unit prices; scraped shops get them only w
 - `PackSize::parse(?string $text): ?PackSize` → `quantity` (float, normalized) + `unit` (`'g'` | `'ml'` | `'piece'`).
 - **Quantity must be finite and > 0** — `"0 g"`, `"0 stuks"` parse to null (no division by zero). Piece counts must be whole numbers.
 - Unit aliases, case-insensitive, attached forms allowed (`"500gram"`, `"330ML"`): mass `g|gr|gram|kg|kilo|kilogram`; volume `ml|milliliter|cl|centiliter|dl|deciliter|l|ltr|liter`. Normalization: kg → ×1000 g, l → ×1000 ml, dl → ×100 ml, cl → ×10 ml. Comma decimals accepted (`"0,75 l"`).
-- Multipacks — for mass, volume, AND pieces: `"6 x 250 ml"` → 1500 ml; `"2 x 4 rollen"` → 8 pieces; `"3x10 stuks"` → 30 pieces; `"6-pack"` → 6 pieces. `x` or `×`, optional spaces.
+- Multipacks — for mass, volume, AND pieces: `"6 x 250 ml"` → 1500 ml; `"2 x 4 rollen"` → 8 pieces; `"3x10 stuks"` → 30 pieces; `"6 blikjes à 330 ml"` → 1980 ml. Separators `x`, `×`, or `à` (count before the separator for `à`: `<count> <optional word> à <size>`), optional spaces. A bare `"6-pack"` → 6 pieces, but `-pack` never outranks an accompanying mass/volume token: `"6-pack 330 ml"` → 1980 ml (the pack count multiplies the size); `-pack` alone resolves to pieces only when no mass/volume token exists. **Two or more multipack patterns in one string parse to null.**
 - Piece vocabulary, singular + plural: `stuk|stuks|st|rol|rollen|vel|vellen|tablet|tabletten|zakje|zakjes|pack`. `plakken` is deliberately excluded — cheese names carry fat percentages (`"48+ plakken"`) that must never become 48 pieces. A number suffixed with `+` or `%` never starts a size token.
 - **Exact algorithm** (replaces any looser precedence prose):
   1. Whole-string rejects first: a range (`"500-600 g"`, `"ca. 500–600 g"`) or an additive size (`"200 g + 150 g"`) parses to null.
-  2. A single multipack pattern (`\d+ ?[x×] ?<size-or-count>`, or `\d+-pack`) resolves and wins.
+  2. Exactly one multipack pattern (`<count> [x×à] <size-or-count>`, or `<count>-pack` — combined with a lone mass/volume token when present) resolves and wins; two or more multipack patterns → null.
   3. Otherwise collect all size tokens and bucket them: mass, volume, pieces. `vel|vellen` tokens are dropped whenever any other piece token is present (`"8 rollen à 200 vel"` → 8 rolls; sheets are per-roll detail); alone, sheets count.
   4. Pick the highest-precedence non-empty bucket: mass > volume > pieces (`"6 stuks 300 g"` → 300 g; `"48+ plakken 150 g"` → 150 g).
   5. The chosen bucket must hold exactly one distinct token — two distinct masses (outside step 2) parse to null. Tokens in lower buckets are ignored, never ambiguity.
@@ -60,12 +60,12 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
 ## 4. Plumbing
 
 - `ShopSnapshot` gains two fields: `public ?string $packSize = null` (the raw size string) and `public bool $packSizeAuthoritative = false` — true when a structured source supplied the size field at all (even empty), so the three states are representable: authoritative value, authoritative empty, and no structured source (title fallback allowed). Sources fill them:
-  - `AhApiSource::snapshotFrom()` — `salesUnitSize`, authoritative (app/Services/AhApi/AhApiSource.php).
+  - `AhApiSource::snapshotFrom()` — `salesUnitSize`, authoritative **only when the key is present** (`array_key_exists`, not a nullable read): a partial API response with the field missing is non-authoritative, so it can never clear stored pack data (app/Services/AhApi/AhApiSource.php).
   - `CheckjebonSource::resolve()` — the `size` column, authoritative (app/Services/Checkjebon/CheckjebonSource.php).
   - Scraped adapters leave both defaults (not authoritative); persistence falls back to parsing the snapshot title.
-- **Livewire transport**: `DrivesShopProbe::showPreview()` serializes the snapshot into an array (app/Livewire/Concerns/DrivesShopProbe.php:159) — add `pack_size` to that array, or both confirm methods read nothing. Test the probe-to-confirm round trip, not only the adapter boundary.
+- **Livewire transport**: `DrivesShopProbe::showPreview()` serializes the snapshot into an array (app/Livewire/Concerns/DrivesShopProbe.php:159) — add BOTH `pack_size` and `pack_size_authoritative`, or the confirm methods read nothing. The authority rules apply identically at confirm time: an authoritative snapshot never falls back to the title (an authoritative empty/unparseable size stores null pack columns); only non-authoritative snapshots title-parse. Test the probe-to-confirm round trip for both states.
 - Persistence parses once and stores normalized values:
-  - Probe confirm: `AddShop::confirm()` and `CreateProductFromUrl::confirm()` add `pack_quantity` / `pack_unit` to the `shops()->create()` payload (parse the transported `pack_size`, falling back to the title).
+  - Probe confirm: `AddShop::confirm()` and `CreateProductFromUrl::confirm()` add `pack_quantity` / `pack_unit` to the `shops()->create()` payload (parse the transported `pack_size`; title fallback ONLY when `pack_size_authoritative` is false).
   - Recheck update semantics on `Ok` checks, driven by `packSizeAuthoritative`:
     - **Authoritative** snapshot → the parse result is written verbatim: a value overwrites, and an empty or unparseable authoritative size **clears** the pack columns (a stale wrong unit price is worse than none).
     - **Not authoritative** (title fallback) → only a successful parse writes; a null parse keeps existing values (a flaky title must not wipe a known size).
@@ -92,11 +92,15 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
 | Title with several size tokens (`"6 x 33 cl krat 24"`, `"6 stuks 300 g"`) | Multipack wins; else bucket precedence, single-token bucket rule (parser Tests) |
 | Recheck title-fallback parses null for a shop that has a size | Existing pack columns kept (plumbing Tests) |
 | Structured source returns an explicitly empty size | Pack columns cleared (plumbing Tests) |
+| AH response missing the `salesUnitSize` key entirely | Non-authoritative — stored pack data kept (plumbing Tests) |
 | Shop URL manually edited to another product (`Shop::updateUrl()`) | Pack columns cleared until the next check refills them (plumbing Tests) |
 | Zero quantity (`"0 g"`) or fractional piece count | Parses null — never divides by zero (parser Tests) |
 | Range or additive size (`"500-600 g"`, `"200 g + 150 g"`) | Parses null — no plausible-but-wrong unit price (parser Tests) |
 | Paper products (`"8 rollen à 200 vel"`) | 8 pieces — `vel(len)` dropped when another piece token exists; `"200 vellen"` alone counts (parser Tests) |
 | Piece multipack (`"2 x 4 rollen"`, `"6-pack"`) | 8 pieces / 6 pieces (parser Tests) |
+| `à` multipack (`"6 blikjes à 330 ml"`) | 1980 ml (parser Tests) |
+| `-pack` next to a size (`"6-pack 330 ml"`) | 1980 ml — pack count multiplies the size, never beats it (parser Tests) |
+| Two multipack patterns (`"2 x 100 g en 2 x 50 g"`) | Parses null (parser Tests) |
 | Cheese fat marker (`"48+ plakken"` alone) | Parses null — `plakken` excluded, `+`-suffixed numbers never match (parser Tests) |
 | Packaging changes upstream (200 g → 250 g) | Next `Ok` recheck overwrites the pack columns (plumbing Tests) |
 | Mixed units on one product (`/kg` vs `/l` vs `/stuk`) | Each row shows its own unit; no cross-unit comparison implied (UI Tests) |
@@ -109,7 +113,7 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
 
 **ID:** parser · **Depends:** none
 
-- [ ] `App\Support\PackSize` value object + `parse()` — Section 2 rules incl. multipacks, comma decimals, unit anchoring, last-token pick.
+- [ ] `App\Support\PackSize` value object + `parse()` — Section 2's five-step algorithm incl. multipacks (`x`/`×`/`à`/`-pack`), comma decimals, unit anchoring.
 - [ ] Unit-price math + label helper (`/kg`, `/l`, `/stuk`) on the value object — price string in, formatted unit price out.
 - [ ] Tests — every Section 2 example incl. multipacks, comma decimals, piece vocabulary, the exact five-step algorithm (buckets, vel-drop, single-token rule), and the misleading-number rows.
 
