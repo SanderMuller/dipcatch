@@ -6,6 +6,14 @@
                 "artisan",
                 "boost:mcp"
             ]
+        },
+        "richter": {
+            "command": "php",
+            "args": [
+                "artisan",
+                "mcp:start",
+                "richter"
+            ]
         }
     }
 }

@@ -27,6 +27,7 @@ return BoostConfig::configure()
         'sandermuller/boost-skills',
         'sandermuller/laravel-fluent-validation',
         'sandermuller/laravel-fluent-validation-rector',
+        'sandermuller/richter',
         'sandermuller/stopwatch',
         'laravel/fortify',
         'filament/filament',
@@ -45,6 +46,7 @@ return BoostConfig::configure()
         Tag::Database,
         Tag::Github,
         'release-automation',
+        'voice',
     ])
 
     // Project Conventions: fills the slot vocabulary that sandermuller/boost-skills
@@ -68,17 +70,7 @@ return BoostConfig::configure()
     // Pulled in by the release-automation tag alongside the wanted pre-release skill.
     ->withExcludedSkills([
         'sandermuller/boost-skills:readme',
+        'sandermuller/boost-skills:pre-release',
         'sandermuller/boost-skills:release-notes',
         'sandermuller/boost-skills:upgrading',
     ]);
-
-// Exclude specific vendor skills regardless of tags.
-// Each entry is a `vendor/package:skill-name` string.
-// ->withExcludedSkills(['acme/some-pack:unwanted-skill'])
-
-// Source paths default to the project root's .ai/skills and
-// .ai/guidelines. Override with an ABSOLUTE path only if your
-// sources live elsewhere. Avoid __DIR__-relative paths — they
-// break if this file moves (e.g. into .config/).
-// ->withSkillsPath('/absolute/path/to/skills')
-// ->withGuidelinesPath('/absolute/path/to/guidelines')

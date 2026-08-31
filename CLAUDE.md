@@ -110,36 +110,38 @@ behaviour, z-index show-through, async races, untranslated-key leaks.
 - **When:** the diff touches code that renders to users — JS/TS that drives the DOM, or a
   server-rendered template/component.
 - **How:** drive it in a real browser. Use the project's browser eye-verify harness if it
-  ships one (commonly under `tools/verify/`, with a setup doc loaded on demand); otherwise a
-  browser-automation tool (Playwright, or a Playwright MCP server). DOM/console first;
-  screenshots back up visual claims.
+  ships one (commonly under `tools/verify/`, with a setup doc loaded on demand); otherwise the
+  `frontend-quality` skill's shipped harness (`scripts/`) or a Playwright MCP server.
+  DOM/console first; screenshots back up visual claims.
+- **Cover every testable, name the gaps.** Derive the checklist first (ticket steps, edge
+  cases, design annotations), assert one testable per check, drive full flows and mutations
+  (create → round-trip → delete) — not just the happy path — and list anything you couldn't
+  drive as NOT-VERIFIED. A green run that quietly skipped cases is the failure mode to avoid.
 - **Verify behaviour, not just geometry** — a fixed/sticky element must also not be painted
   over, and pop-out content (dropdowns / tooltips / modals) must still escape.
+- **Drive the failure path.** Most "works locally" bugs live where an endpoint fails — force
+  it to fail, assert the UI shows a visible error and a way forward (not a silent hang), then
+  clear the fault and assert recovery.
 - **In an ephemeral clone or git worktree**, the app may be served at a different host/port
   than the canonical checkout, so the harness can silently verify the *wrong* tree — confirm
   it targets *this* checkout, and sanity-check the host serves a real page before trusting a
   green. A hard 404 on the expected page is the signature of hitting the wrong host.
-- If the harness can't run (no seeded data, wrong host served, no login), **stop and ask** —
-  don't substitute reasoning for the browser.
+- If a harness genuinely can't run this session (no seeded data, wrong host served, no login),
+  say so — record it as an explicit deferral rather than substituting reasoning for the browser
+  or reporting an unqualified green.
+
+The coverage contract, the traps that fake a green run, and fault injection are detailed in the
+`frontend-quality` skill's `references/eye-verify.md`.
 
 ### Verify against the design, per element
 
 When the change has an approved design (a mockup, a Figma frame, a ticket attachment), don't
 eyeball the whole image and call it close — *"looks about right"* is how visual regressions
-ship. Verify it **element by element**:
-
-- List each changed element, plus the element as a whole; exclude anything documented as
-  out of scope.
-- Check each against the design attribute by attribute: alignment (horizontal and vertical),
-  size, text and background colour (including gradients), border presence / colour / width,
-  border-radius, icon, typography (family, weight, size), and spacing.
-- Record the deltas. Each mismatch is either a fix or a question for the designer — a
-  whole-image glance misses a 4px-vs-8px radius or a lost gradient.
-- When you crop a screenshot to a single element, keep a small margin (~15px) around it — a
-  flush crop hides the alignment and spacing errors at the element's own edges.
-
-The `frontend-quality` skill walks this as a suggested step; the `pull-requests` skill flags
-it before a PR.
+ship (a 4px-vs-8px radius, a lost gradient, a control 3px off-centre). Verify it **element by
+element, attribute by attribute**, and record each delta as a fix or a question for the
+designer. The full attribute rubric and the per-element scoring table live in the
+`frontend-quality` skill's `references/design-verification.md` — that skill walks it as a
+suggested step, and the `pull-requests` skill flags it before a PR.
 
 ---
 
@@ -228,6 +230,10 @@ A missing signature is a blocker to resolve (unlock the agent, re-authenticate 1
 
 Before claiming any work is complete or successful, run the verification command fresh and confirm the output. Evidence before claims, always.
 
+### Claims About How the Code Behaves — Trace, Don't Assume
+
+A claim about **how the code currently behaves** — a root cause, an existing mechanism, or present behavior — in a spec, PR, commit message, code-review finding, issue, comment, or answer must be traced to the actual code (or observed at runtime) **before** you write it, never asserted from plausibility. (This governs statements of *fact about the present code*; the *intended* future behavior a spec or PR proposes is fine when it's clearly framed as a requirement, proposal, or decision — not disguised as a fact about what already exists.) Every illustrative example must be one you actually observed, never invented to fit a guess. A wrong "why" is worse than none: reproduction steps, tests, QA testables, and the fix itself all get built on the stated cause, so one unverified guess corrupts everything derived from it. When you have not traced it, say so — mark it `NEEDS-CONFIRMATION` or ask — rather than asserting. (A ticket once claimed a list was "sorted by display name" and backed it with an example that could not occur; the sort actually keyed on an internal identifier — one grep away. The trace is cheap; the false premise is not.)
+
 ### Required Before Any Completion Claim
 
 1. **Run** the relevant command (in the current message, not from memory)
@@ -258,6 +264,49 @@ Where the project has dedicated quality-check skills synced, delegate to them �
 - "I'm confident this works"
 
 These phrases indicate missing verification. Run the command first, then report what actually happened.
+
+---
+
+## Voice — Which Rule, Which Surface
+
+This table decides which rule applies to a piece of text. Never apply both to the same words, and never guess.
+
+| Surface | Rule |
+|---|---|
+| Chat replies to the user | Simplified Technical English |
+| PR titles, descriptions, checklists | Simplified Technical English |
+| PR review comments and replies to reviewers | Simplified Technical English |
+| Issue and ticket descriptions, comments, QA testables | Simplified Technical English |
+| Spec files | Simplified Technical English |
+| `AskUserQuestion` questions, options, descriptions | Simplified Technical English — plus the pronoun rules in the `AskUserQuestion Phrasing` guideline, when the project has it |
+| Commit messages | Simplified Technical English — an issue key the project's commit format requires stays as it is |
+| Text an end user reads — in-app copy, translations, release notes, help text, seed content | The project's own tone-of-voice rules, not this guideline |
+| Suggested translation strings inside an issue or ticket | The project's own tone-of-voice rules — the prose around them stays Simplified Technical English |
+| Code and code comments | Neither — the language guidelines own those |
+| Prose the user asks for in a named style, or an artifact whose own skill defines its voice — `humanizer`, `readme`, `release-notes` | That instruction or skill wins. This guideline does not override it |
+
+A surface the table does not list gets Simplified Technical English, unless an end user reads it. Then it gets the project's tone-of-voice rules. A project without documented tone-of-voice rules gets Simplified Technical English everywhere.
+
+This guideline governs **how a sentence is built**. It never overrides what a document is allowed to say: an issue-format doc still owns issue content, and a PR template still owns its sections.
+
+### Simplified Technical English
+
+**Write in ASD-STE100 Simplified Technical English.** Say the same thing in fewer, simpler words.
+
+- One idea per sentence. Keep procedural sentences to 20 words or less, descriptive sentences to 25 or less.
+- Use the active voice. Name the actor. Use the passive only when the actor is unknown.
+- Use simple tenses only — simple present, simple past, simple future, infinitive, imperative. No complex constructions built from auxiliary verbs.
+- Use one word for one meaning. Use the same word for the same thing every time — do not vary it for style.
+- Keep articles (`the`, `a`, `an`) and other small words that make a sentence clear. Simplified is not clipped.
+- One topic per paragraph, six sentences at most. Use a list when there is more than one item.
+- Cut filler, hedging, and repetition. Do not restate the question or summarise what you are about to say.
+- Give the answer first. Add detail after it, and only if the reader needs it.
+- Use everyday words. Write "use", not "utilise"; "help", not "facilitate". Keep technical terms exact — a class name, a flag, or an error message is quoted as it is.
+- Write Latin abbreviations out: "for example", not "eg"; "that is", not "ie"; "and so on", not "etc".
+- Do not shout. No exclamation marks, no capitals for emphasis, and no bold used only to raise the volume. Structural bold that a template defines — `**Before:**`, `**Expected:**`, a table header, a labelled line — is not emphasis and stays.
+- No metaphors, no clichés, no jokes that carry meaning the plain sentence does not.
+
+The sentence limits, the tense list, the article rule, and the paragraph limit come from the ASD-STE100 writing rules. The everyday-words, Latin-abbreviation, no-shouting, and no-metaphor rules come from the GOV.UK content style guide.
 
 ---
 
