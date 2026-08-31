@@ -74,7 +74,7 @@ class DispatchDailyDigestsCommand extends Command
                 })
                 ->limit($remaining)
                 ->each(function (User $user) use ($digestDate, &$dispatched): void {
-                    dispatch(new SendDailyDigest($user, $digestDate))->onQueue('digests');
+                    dispatch(new SendDailyDigest($user, $digestDate));
                     $dispatched++;
                 });
 

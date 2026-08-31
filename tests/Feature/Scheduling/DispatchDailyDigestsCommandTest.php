@@ -95,7 +95,7 @@ test('respects the configured batch size across mixed timezones', function (): v
     Queue::assertPushed(SendDailyDigest::class, 2);
 });
 
-test('dispatched jobs land on the digests queue', function (): void {
+test('dispatched jobs land on the default queue', function (): void {
     User::factory()->create([
         'timezone' => 'Europe/Amsterdam',
         'notify_via_email' => true,
@@ -104,5 +104,5 @@ test('dispatched jobs land on the digests queue', function (): void {
 
     $this->artisan('dipcatch:dispatch-daily-digests')->assertSuccessful();
 
-    Queue::assertPushedOn('digests', SendDailyDigest::class);
+    Queue::assertPushed(fn (SendDailyDigest $job): bool => $job->queue === null);
 });

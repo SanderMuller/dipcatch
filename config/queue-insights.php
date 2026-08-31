@@ -45,8 +45,6 @@ return [
      | config/queue.php. Driver is auto-detected via queue.connections.{name}.driver.
      */
     'snapshots' => [
-        ['connection' => env('QUEUE_CONNECTION', 'redis'), 'queue' => 'scrapes'],
-        ['connection' => env('QUEUE_CONNECTION', 'redis'), 'queue' => 'digests'],
         ['connection' => env('QUEUE_CONNECTION', 'redis'), 'queue' => 'default'],
     ],
 

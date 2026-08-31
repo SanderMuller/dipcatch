@@ -40,7 +40,6 @@ class RecheckActiveShopsCommand extends Command
             ->each(function (Shop $shop) use ($jitterMinutes, &$dispatched): void {
                 $delay = random_int(0, max(0, $jitterMinutes * 60));
                 dispatch(new CheckShopPrice($shop))
-                    ->onQueue('scrapes')
                     ->delay(now()->addSeconds($delay));
                 $dispatched++;
             });

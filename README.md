@@ -54,7 +54,7 @@ DipCatch targets [Laravel Cloud](https://cloud.laravel.com/) — fully managed, 
 
 - **App runtime: Laravel Octane (FrankenPHP)** — select the Octane runtime in the Laravel Cloud dashboard; `laravel/octane` + `config/octane.php` ship in the repo. Deploys reload workers automatically. Remember: code changes only apply after a worker reload — locally `composer dev` runs `octane:start --watch` for that.
 - **Postgres** add-on attached → `DATABASE_URL` injected.
-- **Queue worker** (1 small instance), `redis` driver. Runs `php artisan queue:work --queue=scrapes,digests,default --tries=1` — `scrapes` carries `CheckShopPrice`, `digests` carries `SendDailyDigest`.
+- **Queue worker** (1 small instance), `redis` driver. Runs `php artisan queue:work --tries=1` — everything (scrape checks, daily digests, notifications) runs on the `default` queue; split into dedicated queues later if volume demands it.
 - **Scheduler** enabled — runs `php artisan schedule:run` minutely.
 
 ### Required env vars
