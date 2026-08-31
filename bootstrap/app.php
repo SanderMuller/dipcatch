@@ -3,6 +3,7 @@
 use App\Console\Commands\DispatchDailyDigestsCommand;
 use App\Console\Commands\PruneOldChecksCommand;
 use App\Console\Commands\RecheckActiveShopsCommand;
+use App\Console\Commands\RefreshCheckjebonDatasetCommand;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,6 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command(RecheckActiveShopsCommand::class)
             ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        $schedule->command(RefreshCheckjebonDatasetCommand::class)
+            ->dailyAt('08:00')
+            ->timezone('Europe/Amsterdam')
             ->withoutOverlapping()
             ->onOneServer();
 

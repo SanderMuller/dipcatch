@@ -32,4 +32,13 @@ enum ProbeFailure: string
     case ExtractionFailed = 'extraction_failed';
 
     case CurrencyMismatch = 'currency_mismatch';
+
+    /**
+     * Checkjebon-served host (ah.nl / dirk.nl / boodschaapje.nl): the URL is
+     * fine but the product has no row in the local daily dataset — or the
+     * URL carries no recognizable product id, or the dataset was never
+     * refreshed. The specific case travels in the outcome context `reason`.
+     * No manual selector can help: there is no HTML to select from.
+     */
+    case NotInDataset = 'not_in_dataset';
 }

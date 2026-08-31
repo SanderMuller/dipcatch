@@ -73,7 +73,7 @@ DipCatch targets [Laravel Cloud](https://cloud.laravel.com/) — fully managed, 
 
 ### Health monitoring
 
-Health checks are exposed inside the admin panel at `/admin/health-check-results`. Active checks: environment, debug-mode, cache, database, schedule, used-disk-space, CPU load, security advisories, plus the custom `LastSuccessfulScrapeCheck` (warns if any active shop on an active product hasn't seen a successful fetch in 48h, fails after 96h).
+Health checks are exposed inside the admin panel at `/admin/health-check-results`. Active checks: environment, debug-mode, cache, database, schedule, used-disk-space, CPU load, security advisories, plus the custom `LastSuccessfulScrapeCheck` (warns if any active shop on an active product hasn't seen a successful fetch in 48h, fails after 96h) and `CheckjebonFreshnessCheck` (warns when the daily checkjebon price dataset is older than 48h, fails after 96h, hard-fails when empty while checkjebon shops exist).
 
 ### Cache + lock driver
 

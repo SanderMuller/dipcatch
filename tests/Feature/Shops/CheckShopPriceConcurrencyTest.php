@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterResolver;
+use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\ShopFetcher;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Cache;
@@ -83,6 +84,7 @@ test('two CheckShopPrice runs against shops on the same product settle determini
         new CheckShopPrice($shops[$key])->handle(
             app(ShopFetcher::class),
             app(AdapterResolver::class),
+            app(CheckjebonSource::class),
         );
     }
 
@@ -126,13 +128,13 @@ test('rerunning CheckShopPrice for the same shop with unchanged price does not w
     ]);
 
     // First run: 60.00 becomes the cheapest, creating segment #1.
-    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class));
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class));
     $segmentsAfterFirst = ProductCheapestHistory::query()
         ->where('product_id', $product->id)
         ->count();
 
     // Second run with identical upstream price: idempotent — no new segment.
-    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class));
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class));
 
     expect(ProductCheapestHistory::query()
         ->where('product_id', $product->id)
@@ -177,7 +179,7 @@ test('a failing recheck on the current cheapest does not corrupt the history seg
         'cheapest_price' => '60.00',
     ])->save();
 
-    new CheckShopPrice($shopA)->handle(app(ShopFetcher::class), app(AdapterResolver::class));
+    new CheckShopPrice($shopA)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class));
 
     $product->refresh();
 

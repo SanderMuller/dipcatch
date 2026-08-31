@@ -8,6 +8,7 @@ use App\Models\PriceCheck;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
+use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\Exceptions\FetchException;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\FetchResult;
@@ -72,10 +73,16 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         return DipConfig::int('dipcatch.recheck.jitter_minutes', 30) * 60 + 600;
     }
 
-    public function handle(ShopFetcher $fetcher, AdapterResolver $resolver): void
+    public function handle(ShopFetcher $fetcher, AdapterResolver $resolver, CheckjebonSource $checkjebon): void
     {
         $shop = Shop::query()->with('product')->find($this->shop->id);
         if ($shop === null || ! $shop->active || $shop->health === ShopHealth::Dead) {
+            return;
+        }
+
+        if ($checkjebon->supports($shop->host)) {
+            $this->persist($shop, $this->checkjebonOutcome($shop, $checkjebon));
+
             return;
         }
 
@@ -93,6 +100,53 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         }
 
         $this->persist($shop, $outcome);
+    }
+
+    /**
+     * Dataset-side: resolve from the local checkjebon dataset — no fetch, no
+     * adapter chain, no per-host rate limiting (it is a local DB read). A
+     * miss maps to `EmptyMatch` so a delisted product walks the existing
+     * failure counters into `failing` / `dead`.
+     *
+     * @return array{
+     *   status: ScrapeStatus,
+     *   price: ?string,
+     *   currency: ?string,
+     *   in_stock: ?bool,
+     *   raw: ?string,
+     *   error: ?string,
+     *   adapter_key: ?string,
+     *   fetch_result: ?FetchResult,
+     * }
+     */
+    private function checkjebonOutcome(Shop $shop, CheckjebonSource $checkjebon): array
+    {
+        $result = $checkjebon->resolve($shop->url);
+        $snapshot = $result->snapshot;
+
+        if ($snapshot === null) {
+            return [
+                'status' => ScrapeStatus::EmptyMatch,
+                'price' => null,
+                'currency' => null,
+                'in_stock' => null,
+                'raw' => null,
+                'error' => 'checkjebon:' . $result->missReason,
+                'adapter_key' => null,
+                'fetch_result' => null,
+            ];
+        }
+
+        return [
+            'status' => ScrapeStatus::Ok,
+            'price' => $snapshot->price,
+            'currency' => $snapshot->currency,
+            'in_stock' => $snapshot->inStock,
+            'raw' => null,
+            'error' => null,
+            'adapter_key' => 'checkjebon',
+            'fetch_result' => null,
+        ];
     }
 
     /**

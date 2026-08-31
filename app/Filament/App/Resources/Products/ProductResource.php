@@ -3,6 +3,7 @@
 namespace App\Filament\App\Resources\Products;
 
 use App\Filament\App\Resources\Products\Pages\CreateProduct;
+use App\Filament\App\Resources\Products\Pages\CreateProductManual;
 use App\Filament\App\Resources\Products\Pages\EditProduct;
 use App\Filament\App\Resources\Products\Pages\ListProducts;
 use App\Filament\App\Resources\Products\Pages\ViewProduct;
@@ -75,6 +76,7 @@ class ProductResource extends Resource
         return [
             'index' => ListProducts::route('/'),
             'create' => CreateProduct::route('/create'),
+            'create-manual' => CreateProductManual::route('/create-manual'),
             'view' => ViewProduct::route('/{record}'),
             'edit' => EditProduct::route('/{record}/edit'),
         ];

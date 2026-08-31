@@ -2,60 +2,23 @@
 
 namespace App\Livewire\Shops;
 
-use App\Actions\Shops\ProbeOutcome;
-use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ScrapeStatus;
+use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\PriceCheck;
 use App\Models\Product;
-use App\Models\User;
-use App\PriceAdapters\ShopSnapshot;
-use App\PriceAdapters\VariantCandidate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Livewire\Component;
 
 /**
- * Add-shop state machine driving the "Add another shop" form.
- *
- * States: 'idle' | 'preview' | 'error' | 'manual_selector' | 'variant_chooser'
- *  - no_adapter_matched      → flips to manual_selector
- *  - multiple_variants found → flips to variant_chooser
+ * Add-shop form for an existing product. The probe state machine lives
+ * in DrivesShopProbe; this component owns persistence on Confirm.
  */
 class AddShop extends Component
 {
+    use DrivesShopProbe;
+
     public Product $product;
-
-    public string $url = '';
-
-    /** One of: 'idle' | 'preview' | 'error' | 'manual_selector' | 'variant_chooser' */
-    public string $state = 'idle';
-
-    /** @var array<string, mixed>|null Snapshot data after a successful probe. */
-    public ?array $snapshot = null;
-
-    public ?string $normalizedUrl = null;
-
-    public ?string $host = null;
-
-    public ?string $adapterKey = null;
-
-    public ?string $errorCode = null;
-
-    /** @var array<string, mixed>|null */
-    public ?array $errorContext = null;
-
-    public string $priceSelector = '';
-
-    public string $titleSelector = '';
-
-    public string $imageSelector = '';
-
-    public string $manualCurrency = 'EUR';
-
-    /** @var list<array{key: string, title: string, price: string, currency: string}>|null */
-    public ?array $variants = null;
-
-    public ?string $chosenVariantKey = null;
 
     public function mount(Product $product): void
     {
@@ -63,80 +26,9 @@ class AddShop extends Component
         $this->manualCurrency = $product->currency !== '' ? $product->currency : 'EUR';
     }
 
-    public function probe(ProbeShopUrl $probe): void
+    protected function probeSubject(): ?Product
     {
-        $this->runProbe($probe);
-    }
-
-    public function probeWithSelectors(ProbeShopUrl $probe): void
-    {
-        $price = trim($this->priceSelector);
-        if ($price === '') {
-            $this->errorCode = 'user_selector_required';
-            $this->errorContext = null;
-
-            return;
-        }
-
-        $this->runProbe($probe, [
-            'price' => $price,
-            'title' => trim($this->titleSelector) ?: null,
-            'image' => trim($this->imageSelector) ?: null,
-        ], $this->manualCurrency);
-    }
-
-    public function selectVariant(ProbeShopUrl $probe): void
-    {
-        if ($this->chosenVariantKey === null || $this->chosenVariantKey === '') {
-            return;
-        }
-
-        $this->runProbe($probe, variantKey: $this->chosenVariantKey);
-    }
-
-    /**
-     * @param  array{price?: ?string, title?: ?string, image?: ?string}  $selectors
-     */
-    private function runProbe(
-        ProbeShopUrl $probe,
-        array $selectors = [],
-        ?string $currency = null,
-        ?string $variantKey = null,
-    ): void {
-        $this->resetPreview();
-        $url = trim($this->url);
-
-        if ($url === '') {
-            $this->failWith('empty_url', context: null);
-
-            return;
-        }
-
-        /** @var User|null $actor */
-        $actor = auth()->user();
-        if (! $actor instanceof User) {
-            $this->failWith('unauthenticated', context: null);
-
-            return;
-        }
-
-        $outcome = $probe($this->product, $url, $actor, $selectors, $currency, $variantKey);
-
-        match (true) {
-            $outcome->isSuccess() => $this->showPreview($outcome),
-            $outcome->isDuplicate() => $this->failWith('duplicate', [
-                'existing_shop_host' => $outcome->existingShop?->host,
-            ]),
-            $outcome->isAmbiguous() => $this->showVariantChooser($outcome),
-            default => $this->handleFailure($outcome),
-        };
-    }
-
-    public function showManualSelector(): void
-    {
-        $this->state = 'manual_selector';
-        $this->errorCode = null;
-        $this->errorContext = null;
+        return $this->product;
     }
 
     public function confirm(): void
@@ -200,106 +92,16 @@ class AddShop extends Component
         });
 
         $this->dispatch('shop-added', offerId: $offerId);
-        $this->resetAll();
+        $this->resetProbeState();
     }
 
     public function cancel(): void
     {
-        $this->resetAll();
+        $this->resetProbeState();
     }
 
     public function render(): View
     {
         return view('livewire.shops.add-shop');
-    }
-
-    private function showVariantChooser(ProbeOutcome $outcome): void
-    {
-        $this->state = 'variant_chooser';
-        $this->normalizedUrl = $outcome->normalizedUrl;
-        $this->host = $outcome->host;
-        $this->variants = array_map(
-            static fn (VariantCandidate $v): array => [
-                'key' => $v->key,
-                'title' => $v->title,
-                'price' => $v->price,
-                'currency' => $v->currency,
-            ],
-            $outcome->variants,
-        );
-        $this->chosenVariantKey ??= $this->variants[0]['key'] ?? null;
-    }
-
-    private function showPreview(ProbeOutcome $outcome): void
-    {
-        $snapshot = $outcome->snapshot;
-        assert($snapshot instanceof ShopSnapshot);
-
-        $this->state = 'preview';
-        $this->snapshot = [
-            'title' => $snapshot->title,
-            'image_url' => $snapshot->imageUrl,
-            'price' => $snapshot->price,
-            'currency' => $snapshot->currency,
-            'in_stock' => $snapshot->inStock,
-        ];
-        $this->normalizedUrl = $outcome->normalizedUrl;
-        $this->host = $outcome->host;
-        $this->adapterKey = $outcome->adapterKey;
-    }
-
-    private function handleFailure(ProbeOutcome $outcome): void
-    {
-        if ($outcome->shouldOfferManualSelector()) {
-            $this->errorCode = $outcome->extractionReason;
-            $this->errorContext = $outcome->context;
-            $this->state = 'manual_selector';
-
-            return;
-        }
-
-        assert($outcome->errorCode !== null);
-        $this->failWith($outcome->errorCode->value, $outcome->context);
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $context
-     */
-    private function failWith(string $code, ?array $context): void
-    {
-        $this->state = 'error';
-        $this->errorCode = $code;
-        $this->errorContext = $context;
-    }
-
-    private function resetPreview(): void
-    {
-        $this->snapshot = null;
-        $this->normalizedUrl = null;
-        $this->host = null;
-        $this->adapterKey = null;
-        $this->errorCode = null;
-        $this->errorContext = null;
-    }
-
-    private function resetAll(): void
-    {
-        $this->reset([
-            'url',
-            'state',
-            'snapshot',
-            'normalizedUrl',
-            'host',
-            'adapterKey',
-            'errorCode',
-            'errorContext',
-            'priceSelector',
-            'titleSelector',
-            'imageSelector',
-            'variants',
-            'chosenVariantKey',
-        ]);
-        $this->state = 'idle';
-        $this->manualCurrency = $this->product->currency !== '' ? $this->product->currency : 'EUR';
     }
 }

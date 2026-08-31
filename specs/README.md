@@ -11,6 +11,7 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 5. ~~`drop-detection.md`~~ — ✅ shipped (30d median reference, adaptive tier defaults, threshold evaluator, re-notify state machine).
 6. **[notifications.md](notifications.md)** — email + Filament bell + web push, per-user channel toggles, profile UI. Phases 1–4 shipped; Phase 5 hardening partially shipped (per-user hourly rate-limit done; admin queue-depth widget deferred).
 7. ~~`dashboard.md`~~ — ✅ shipped (stats widgets, active drops, recent notifications, savings chart, per-product price history chart).
+8. ~~`checkjebon-price-source.md`~~ — ✅ shipped (daily checkjebon.nl dataset in Postgres for AH + Dirk + Lidl; probe + recheck bypass the scraper for these hosts; `CheckjebonFreshnessCheck` health check).
 
 ## Post-launch refactors + features
 
@@ -20,6 +21,7 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 - ~~`email-digest.md`~~ — ✅ shipped (replaced per-drop email with daily 09:00 user-local digest; `users.timezone` + `last_digest_sent_at`, `SendDailyDigest` job, `DispatchDailyDigestsCommand`).
 - ~~`shop-notes.md`~~ — ✅ shipped (free-text `shops.notes` column, App-panel `edit_notes` action + indicator column, admin read-only column).
 - ~~`timezone-autodetect.md`~~ — ✅ shipped (`users.timezone_detected_at` + browser `Intl` detection on first authenticated page load; atomic conditional UPDATE so explicit save in NotificationSettings can't be clobbered).
+- ~~`url-first-product-creation.md`~~ — ✅ shipped (paste-URL-first create flow: probe fills title/image, tier-default thresholds, one Confirm creates product + first shop; manual form kept at `/create-manual`).
 - ~~`public-product-sharing.md`~~ — ✅ shipped (per-product `share_slug` + public `/p/{slug}` route, Chart.js price-history + OG/Twitter meta, atomic conditional UPDATE on share/rotate/stop to refuse last-writer-wins between owner tabs, SRI-pinned CDN scripts).
 
 ## Decisions (locked)

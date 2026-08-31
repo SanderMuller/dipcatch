@@ -8,6 +8,8 @@ use App\Models\Shop;
 use App\Models\User;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
+use App\PriceAdapters\ShopSnapshot;
+use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\Exceptions\Blocked;
 use App\Services\ShopFetcher\Exceptions\HttpError;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
@@ -19,9 +21,12 @@ use Illuminate\Support\Facades\RateLimiter;
 use InvalidArgumentException;
 
 /**
- * Sync probe used by the Add-Shop Livewire form: normalize → dedupe →
- * per-user rate-limit → fetch → resolve adapter → currency check. Never
- * persists; the Livewire component does that after Confirm.
+ * Sync probe used by the Add-Shop and Create-Product-From-URL Livewire
+ * forms: normalize → dedupe → dataset short-circuit (checkjebon hosts) →
+ * per-user rate-limit → fetch → resolve adapter → currency check. Never persists; the Livewire component does
+ * that after Confirm. With a null product (create mode) the per-product
+ * dedupe and currency-mismatch checks are skipped — the probed currency
+ * defines the product currency.
  */
 final readonly class ProbeShopUrl
 {
@@ -30,13 +35,14 @@ final readonly class ProbeShopUrl
     public function __construct(
         private ShopFetcher $fetcher,
         private AdapterResolver $resolver,
+        private CheckjebonSource $checkjebon,
     ) {}
 
     /**
      * @param  array{price?: ?string, title?: ?string, image?: ?string}  $selectors
      */
     public function __invoke(
-        Product $product,
+        ?Product $product,
         string $rawUrl,
         User $actor,
         array $selectors = [],
@@ -49,10 +55,24 @@ final readonly class ProbeShopUrl
             return ProbeOutcome::failed(ProbeFailure::InvalidUrl);
         }
 
-        $urlHash = UrlNormalizer::hash($normalizedUrl);
-        $existing = $product->shops()->where('url_hash', $urlHash)->first();
-        if ($existing instanceof Shop) {
-            return ProbeOutcome::duplicate($existing);
+        if ($product instanceof Product) {
+            $urlHash = UrlNormalizer::hash($normalizedUrl);
+            $existing = $product->shops()->where('url_hash', $urlHash)->first();
+            if ($existing instanceof Shop) {
+                return ProbeOutcome::duplicate($existing);
+            }
+        }
+
+        // Dataset-served hosts resolve locally: no network fetch, and no
+        // per-user probe budget consumed (bulk-adding must not throttle).
+        $host = UrlNormalizer::normalizeHost((string) parse_url($normalizedUrl, PHP_URL_HOST));
+
+        if ($host === 'lidl.nl' || str_ends_with($host, '.lidl.nl')) {
+            return ProbeOutcome::failed(ProbeFailure::NotInDataset, ['reason' => 'use_boodschaapje']);
+        }
+
+        if ($this->checkjebon->supports($host)) {
+            return $this->resolveFromCheckjebon($product, $normalizedUrl, $host);
         }
 
         if (! $this->withinPerUserLimit($actor)) {
@@ -80,7 +100,7 @@ final readonly class ProbeShopUrl
 
         $context = new AdapterContext(
             selectors: $selectors,
-            fallbackCurrency: $manualCurrency ?? $product->currency,
+            fallbackCurrency: $manualCurrency ?? $product->currency ?? 'EUR',
             variantKey: $variantKey,
         );
 
@@ -105,7 +125,7 @@ final readonly class ProbeShopUrl
         $snapshot = $extraction->snapshot;
         assert($snapshot !== null);
 
-        if (strcasecmp($snapshot->currency, $product->currency) !== 0) {
+        if ($product instanceof Product && strcasecmp($snapshot->currency, $product->currency) !== 0) {
             return ProbeOutcome::failed(ProbeFailure::CurrencyMismatch, [
                 'expected' => $product->currency,
                 'actual' => $snapshot->currency,
@@ -117,6 +137,32 @@ final readonly class ProbeShopUrl
             normalizedUrl: $normalizedUrl,
             host: $fetch->host,
             adapterKey: $extraction->adapterKey ?? 'generic',
+        );
+    }
+
+    private function resolveFromCheckjebon(?Product $product, string $normalizedUrl, string $host): ProbeOutcome
+    {
+        $result = $this->checkjebon->resolve($normalizedUrl);
+
+        if (! $result->isFound()) {
+            return ProbeOutcome::failed(ProbeFailure::NotInDataset, ['reason' => $result->missReason]);
+        }
+
+        $snapshot = $result->snapshot;
+        assert($snapshot instanceof ShopSnapshot);
+
+        if ($product instanceof Product && strcasecmp($snapshot->currency, $product->currency) !== 0) {
+            return ProbeOutcome::failed(ProbeFailure::CurrencyMismatch, [
+                'expected' => $product->currency,
+                'actual' => $snapshot->currency,
+            ]);
+        }
+
+        return ProbeOutcome::success(
+            snapshot: $snapshot,
+            normalizedUrl: $normalizedUrl,
+            host: $host,
+            adapterKey: 'checkjebon',
         );
     }
 

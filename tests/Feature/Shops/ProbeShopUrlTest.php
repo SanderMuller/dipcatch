@@ -248,3 +248,40 @@ test('ProbeOutcome::shouldOfferManualSelector returns true only for the manual-s
         // Non-extraction failures never trigger manual selector.
         ->and(ProbeOutcome::failed(ProbeFailure::HttpError)->shouldOfferManualSelector())->toBeFalse();
 });
+
+test('null product probes successfully without dedupe or currency checks', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response(jsonLdPage('50.00', 'USD'), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    // A shop on another product tracks the same URL — must not trigger DUPLICATE in create mode.
+    $otherProduct = Product::factory()->create(['currency' => 'EUR']);
+    Shop::factory()->for($otherProduct)->create(['url' => 'https://example.com/p/1']);
+
+    $user = User::factory()->create();
+
+    $outcome = app(ProbeShopUrl::class)(null, 'https://example.com/p/1?utm_source=foo', $user);
+
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->snapshot?->price)->toBe('50.00')
+        ->and($outcome->snapshot?->currency)->toBe('USD')
+        ->and($outcome->normalizedUrl)->toBe('https://example.com/p/1');
+});
+
+test('null product with manual selectors falls back to EUR when no currency chosen', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response(<<<'HTML'
+            <html><head><title>Widget</title></head>
+            <body><span id="p">19.95</span></body></html>
+            HTML, 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $user = User::factory()->create();
+
+    $outcome = app(ProbeShopUrl::class)(null, 'https://example.com/p/1', $user, ['price' => '#p']);
+
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->snapshot?->currency)->toBe('EUR');
+});
