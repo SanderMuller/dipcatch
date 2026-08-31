@@ -14,6 +14,7 @@ Shows a normalized unit price (€/kg or €/l) next to every shop's pack price,
 - **Thresholds and notifications stay on the pack price** — carried from the accepted feature assessment; unit price is display-only.
 - **A null parse on recheck keeps the existing pack columns** — AI default: a source hiccup must not wipe a known size. Cosmetic.
 - **Unit price formatting** — AI default: two decimals, `€ 8.45 /kg`, `tabular-nums`, `—` when absent. Cosmetic.
+- **Codex-review hardening (2026-09-01)** — applied without re-grilling (all strictly-safer parser/update semantics): positive-quantity guard, alias vocabulary incl. written-out Dutch units, piece multipacks + `-pack`, ambiguity-parses-to-null for ranges/additive sizes, `plakken`/`+`-suffix exclusion, Livewire `pack_size` transport, structured-empty clears vs title-null keeps, URL-edit clears pack columns.
 
 ---
 
@@ -34,10 +35,13 @@ Consequence: AH and Lidl get reliable unit prices; scraped shops get them only w
 `App\Support\PackSize` — a small readonly value object + parser:
 
 - `PackSize::parse(?string $text): ?PackSize` → `quantity` (float, normalized) + `unit` (`'g'` | `'ml'` | `'piece'`).
-- Normalization: `kg` → ×1000 g, `l` → ×1000 ml, `cl` → ×10 ml. Comma decimals accepted (`"0,75 l"`).
-- Multipacks: `"6 x 250 ml"` → 1500 ml; `"24 x 300 ml"` → 7200 ml. `x` or `×`, optional spaces.
-- Pieces: `"20 stuks"`, `"3 st."`, `"4 rollen"`, `"12 zakjes"`, `"8 tabletten"` → piece count. Precedence mass > volume > pieces, so `"48+ plakken 150 g"` is 150 g. Bare unitless numbers (`"48+"`) parse to null.
-- Title fallback: the same parser runs over a product title; it must anchor on `\d+(?:[.,]\d+)?\s?(g|kg|ml|cl|l)\b` tokens so `"48+ plakken"` or `"40% minder zout"` never match. When a title contains several size tokens, take the last (Dutch product names end with the pack size).
+- **Quantity must be finite and > 0** — `"0 g"`, `"0 stuks"` parse to null (no division by zero). Piece counts must be whole numbers.
+- Unit aliases, case-insensitive, attached forms allowed (`"500gram"`, `"330ML"`): mass `g|gr|gram|kg|kilo|kilogram`; volume `ml|milliliter|cl|centiliter|dl|deciliter|l|ltr|liter`. Normalization: kg → ×1000 g, l → ×1000 ml, dl → ×100 ml, cl → ×10 ml. Comma decimals accepted (`"0,75 l"`).
+- Multipacks — for mass, volume, AND pieces: `"6 x 250 ml"` → 1500 ml; `"2 x 4 rollen"` → 8 pieces; `"3x10 stuks"` → 30 pieces; `"6-pack"` → 6 pieces. `x` or `×`, optional spaces.
+- Piece vocabulary, singular + plural: `stuk|stuks|st|rol|rollen|vel|vellen|tablet|tabletten|zakje|zakjes|pack`. `plakken` is deliberately excluded — cheese names carry fat percentages (`"48+ plakken"`) that must never become 48 pieces. A number suffixed with `+` or `%` never starts a size token.
+- Precedence mass > volume > pieces, so `"48+ plakken 150 g"` is 150 g.
+- **Ambiguity parses to null**: ranges (`"500-600 g"`), additive sizes (`"200 g + 150 g"`), and more than one distinct size token outside a single multipack pattern all return null — no plausible-but-wrong guesses.
+- Title fallback: the same parser over the product title, same anchoring rules, so `"40% minder zout"` never matches.
 - Unit price: mass/volume = `price / quantity × 1000` rendered `€ 8.45 /kg` / `€ 1.23 /l`; pieces = `price / count` rendered `€ 0.45 /stuk`. Two decimals, `tabular-nums`.
 
 ## 3. Data Model
@@ -55,17 +59,19 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
   - `AhApiSource::snapshotFrom()` — `salesUnitSize` (app/Services/AhApi/AhApiSource.php).
   - `CheckjebonSource::resolve()` — the `size` column (app/Services/Checkjebon/CheckjebonSource.php).
   - Scraped adapters leave it null; persistence falls back to parsing the snapshot title.
+- **Livewire transport**: `DrivesShopProbe::showPreview()` serializes the snapshot into an array (app/Livewire/Concerns/DrivesShopProbe.php:159) — add `pack_size` to that array, or both confirm methods read nothing. Test the probe-to-confirm round trip, not only the adapter boundary.
 - Persistence parses once and stores normalized values:
-  - Probe confirm: `AddShop::confirm()` and `CreateProductFromUrl::confirm()` add `pack_quantity` / `pack_unit` to the `shops()->create()` payload (parse `snapshot.packSize`, falling back to the title).
-  - Recheck: `CheckShopPrice` outcomes carry the parsed pack fields; `persist()` updates them on `Ok` checks so a packaging change heals itself. A null parse on recheck leaves existing values untouched (a source hiccup must not wipe a known size).
+  - Probe confirm: `AddShop::confirm()` and `CreateProductFromUrl::confirm()` add `pack_quantity` / `pack_unit` to the `shops()->create()` payload (parse the transported `pack_size`, falling back to the title).
+  - Recheck: `CheckShopPrice` outcomes carry the parsed pack fields; `persist()` updates them on `Ok` checks so a packaging change heals itself. A **title-fallback** null parse keeps existing values (a flaky title must not wipe a known size), but an **authoritative empty structured size** (AH `salesUnitSize` / dataset `size` present-but-empty) clears them.
+  - **URL edit**: `Shop::updateUrl()` (app/Models/Shop.php:61) can point a shop at a different product — clear both pack columns there so a stale size never prices the new product.
 - `PriceCheck` stays untouched — unit price derives from the shop's current state; history stays pack-price-based.
 
 ## 5. UI
 
 - Shops table on the product page (`ShopsRelationManager`, after the `current_price` column at app/Filament/App/Resources/Products/RelationManagers/ShopsRelationManager.php:72): a `Unit price` column — `€ 8.45 /kg`, empty state `—`.
-- Products list (`ProductsTable`): the cheapest shop's unit price next to the cheapest price.
-- Probe previews (add-shop + create-from-URL blades): show the unit price under the pack price when parseable, so the comparison is visible before saving.
-- Public share page shop list: unit price under each shop's price, same format.
+- Products list (`ProductsTable`): the cheapest shop's unit price next to the cheapest price. Eager-load the cheapest-shop relation for the table query so the column adds no N+1.
+- Probe previews (add-shop + create-from-URL blades): show the unit price under the pack price when parseable, so the comparison is visible before saving. The preview computes it on the fly from the snapshot via the same `packSize`-then-title parse used at persist time — one helper, both callers.
+- Public share page shop list: unit price under each shop's price, same format. **`PublicProductController` selects shop columns explicitly** (app/Http/Controllers/PublicProductController.php:38) — add `pack_quantity` + `pack_unit` to that select, or the accessor silently renders nothing (the cheapest-badge bug class).
 - Eye-verify: product with mixed pack sizes shows comparable /kg values; a Dirk shop without size shows `—`.
 
 ## Edge Cases
@@ -78,10 +84,17 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
 | Comma decimal (`"0,75 l"`) | 750 ml (parser Tests) |
 | Title contains misleading numbers (`"48+"`, `"40%"`) | Unit-anchored regex never matches them (parser Tests) |
 | Title with several size tokens (`"6 x 33 cl krat 24"`) | Multipack pattern wins; otherwise last size token (parser Tests) |
-| Recheck returns no parseable size for a shop that has one | Existing pack columns kept (plumbing Tests) |
+| Recheck title-fallback parses null for a shop that has a size | Existing pack columns kept (plumbing Tests) |
+| Structured source returns an explicitly empty size | Pack columns cleared (plumbing Tests) |
+| Shop URL manually edited to another product (`Shop::updateUrl()`) | Pack columns cleared until the next check refills them (plumbing Tests) |
+| Zero quantity (`"0 g"`) or fractional piece count | Parses null — never divides by zero (parser Tests) |
+| Range or additive size (`"500-600 g"`, `"200 g + 150 g"`) | Parses null — no plausible-but-wrong unit price (parser Tests) |
+| Piece multipack (`"2 x 4 rollen"`, `"6-pack"`) | 8 pieces / 6 pieces (parser Tests) |
+| Cheese fat marker (`"48+ plakken"` alone) | Parses null — `plakken` excluded, `+`-suffixed numbers never match (parser Tests) |
 | Packaging changes upstream (200 g → 250 g) | Next `Ok` recheck overwrites the pack columns (plumbing Tests) |
 | Mixed units on one product (`/kg` vs `/l` vs `/stuk`) | Each row shows its own unit; no cross-unit comparison implied (UI Tests) |
 | Existing shops predate the feature | Columns null until their next successful recheck fills them (plumbing Tests) |
+| Public page's explicit column select | `pack_quantity`/`pack_unit` added to the select; page test asserts a rendered unit price (UI Tests) |
 
 ## Implementation
 
@@ -98,10 +111,10 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
 **ID:** plumbing · **Depends:** parser
 
 - [ ] Migration `add_pack_size_to_shops_table` + `Shop` accessor + docblock — Section 3.
-- [ ] `ShopSnapshot::$packSize` + fills in `AhApiSource` and `CheckjebonSource` — Section 4.
+- [ ] `ShopSnapshot::$packSize` + fills in `AhApiSource` and `CheckjebonSource` + the `pack_size` key in `DrivesShopProbe::showPreview()`'s snapshot array — Section 4.
 - [ ] Persist on probe confirm (both Livewire components) with title fallback — Section 4.
-- [ ] Recheck outcomes carry pack fields; `persist()` updates on `Ok`, keeps existing on null — Section 4.
-- [ ] Tests — AH probe stores 200 g from `salesUnitSize`; checkjebon probe stores the dataset size; Jumbo recheck parses the title; null-parse keeps existing values; packaging change overwrites.
+- [ ] Recheck outcomes carry pack fields; `persist()` updates on `Ok`, keeps existing on title-null, clears on structured-empty; `Shop::updateUrl()` clears both columns — Section 4.
+- [ ] Tests — AH probe stores 200 g from `salesUnitSize`; checkjebon probe stores the dataset size; Jumbo recheck parses the title; probe-to-confirm round trip persists `pack_size`; title-null keeps values; structured-empty clears; URL edit clears; packaging change overwrites.
 
 ### Phase 3: UI (Priority: HIGH)
 
@@ -109,7 +122,7 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
 
 - [ ] Shops-table `Unit price` column + products-list cheapest unit price — Section 5.
 - [ ] Probe-preview unit price in both blades — Section 5.
-- [ ] Public share page unit price per shop row — Section 5.
+- [ ] Public share page unit price per shop row incl. the controller's explicit column select — Section 5.
 - [ ] Tests — Livewire/page tests assert the rendered unit price and the `—` empty state; browser eye-verify per Section 5.
 
 ---
