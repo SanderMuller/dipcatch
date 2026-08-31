@@ -151,3 +151,9 @@ test('honeypot field is rendered off-screen and aria-hidden', function (): void 
     $response->assertSee('aria-hidden="true"', escape: false);
     $response->assertSee('id="waitlist-company"', escape: false);
 });
+
+test('responses carry the Strict-Transport-Security header', function (): void {
+    $this->get('/')
+        ->assertOk()
+        ->assertHeader('Strict-Transport-Security', 'max-age=31536000');
+});
