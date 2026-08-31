@@ -12,6 +12,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(AdminUserSeeder::class);
-        $this->call(ZooplusFeliwaySeeder::class);
+
+        // Demo data for local development only — production seeds just the
+        // admin user (db:seed --class=AdminUserSeeder --force).
+        if (! app()->environment('production')) {
+            $this->call(ZooplusFeliwaySeeder::class);
+        }
     }
 }

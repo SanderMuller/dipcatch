@@ -88,5 +88,5 @@ Cache + queue + unique-job locks all run on Redis (`CACHE_STORE=redis`, `QUEUE_C
 1. Provision Postgres add-on.
 2. Set the env vars above.
 3. Push to `main` → Laravel Cloud builds + runs migrations.
-4. Run `php artisan db:seed` once to create the initial admin user.
+4. Run `php artisan db:seed --class=AdminUserSeeder --force` once to create the initial admin user (`--force` passes the production guard; the class scope skips local demo seeders).
 5. Sign in at `/login`, create invitations from `/admin/invitations`.
