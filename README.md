@@ -44,7 +44,7 @@ composer setup    # install deps, copy env, key:generate, migrate, build assets
 composer dev      # octane (FrankenPHP, --watch) + queue + pail + vite (concurrent)
 ```
 
-The dev server runs Laravel Octane on FrankenPHP — the same runtime as production — with `--watch` so code changes reload the workers (requires the `chokidar` dev dependency, installed via `npm install`). The FrankenPHP binary downloads on first `php artisan octane:start` and is gitignored.
+The dev server runs Laravel Octane on FrankenPHP — the same runtime as production — with `--watch` so code changes reload the workers (FrankenPHP watches natively; no Node watcher needed). The FrankenPHP binary downloads on first `php artisan octane:start` and is gitignored.
 
 ## Deployment (Laravel Cloud)
 
