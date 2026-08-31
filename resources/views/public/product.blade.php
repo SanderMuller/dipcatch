@@ -41,6 +41,9 @@
     <meta name="twitter:title" content="{{ $product->title }}">
     <meta name="twitter:description" content="{{ $ogDescription }}">
 
+    <link rel="icon" href="{{ asset('favicon.png') }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
+
     @vite(['resources/css/app.css'])
 
     @if ($hasChart)
@@ -67,11 +70,7 @@
         {{-- Brand bar --}}
         <div class="mb-10 flex items-center justify-between">
             <a href="{{ url('/') }}" class="inline-flex items-center gap-2 text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-                <span class="flex size-6 items-center justify-center rounded-full bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">
-                    <svg viewBox="0 0 16 16" fill="none" class="size-3.5" aria-hidden="true">
-                        <path d="M2 5l4 6 3-4 2 2.5L15 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </span>
+                <img src="{{ asset('images/dipcatch-logo.png') }}" alt="" class="size-6" />
                 DipCatch
             </a>
             <span class="text-xs text-zinc-500 dark:text-zinc-400">Price tracking</span>

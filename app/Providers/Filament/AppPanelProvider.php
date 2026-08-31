@@ -25,13 +25,15 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
-class AppPanelProvider extends PanelProvider
+final class AppPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
             ->default()
             ->id('app')
+            ->brandLogo(fn (): \Illuminate\Contracts\View\View => view('filament.partials.brand'))
+            ->favicon(asset('favicon.png'))
             ->path('app')
             ->viteTheme('resources/css/filament/app/theme.css')
             ->authGuard('web')

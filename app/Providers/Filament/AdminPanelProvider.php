@@ -21,12 +21,14 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use ShuvroRoy\FilamentSpatieLaravelHealth\FilamentSpatieLaravelHealthPlugin;
 
-class AdminPanelProvider extends PanelProvider
+final class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
             ->id('admin')
+            ->brandLogo(fn (): \Illuminate\Contracts\View\View => view('filament.partials.brand'))
+            ->favicon(asset('favicon.png'))
             ->path('admin')
             ->authGuard('web')
             ->colors([

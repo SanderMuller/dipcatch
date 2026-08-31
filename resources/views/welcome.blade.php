@@ -29,8 +29,8 @@
 
                 <header class="relative mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
                     <a href="{{ route('home') }}" aria-label="{{ __('Homepage') }}" class="flex items-center gap-2 font-semibold">
-                        <span class="flex aspect-square size-8 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">
-                            <x-app-logo-icon class="size-5 fill-current" />
+                        <span class="flex aspect-square size-8 items-center justify-center rounded-xl bg-white p-0.5 dark:bg-white">
+                            <x-app-logo-icon class="size-7" />
                         </span>
                         <span>{{ config('app.name') }}</span>
                     </a>
