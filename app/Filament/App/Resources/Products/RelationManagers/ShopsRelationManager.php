@@ -47,14 +47,12 @@ class ShopsRelationManager extends RelationManager
     {
         return $table
             ->heading(null)
-            ->headerActions([
-                self::addShopAction(),
-            ])
+            ->header(fn (RelationManager $livewire): View => view('filament.partials.add-shop-header', [
+                'product' => $livewire->getOwnerRecord(),
+            ]))
             ->emptyStateHeading('No shops yet')
             ->emptyStateDescription('Paste a product URL from any webshop to start tracking its price.')
-            ->emptyStateActions([
-                self::addShopAction(),
-            ])
+            ->emptyStateActions([])
             ->columns([
                 TextColumn::make('host')
                     ->label('Shop')
@@ -208,29 +206,6 @@ class ShopsRelationManager extends RelationManager
     /** Live re-render after the AddShop component saves an offer. */
     #[On('shop-added')]
     public function refreshAfterOfferAdded(): void {}
-
-    /**
-     * Header / empty-state CTA: opens a modal hosting the AddShop Livewire
-     * component. The component manages its own multi-step state (preview /
-     * manual selector / variant chooser) and dispatches `shop-added` on
-     * confirm — the listener above re-renders the table behind the modal so
-     * the new row appears immediately. Modal stays open; AddShop resets to
-     * idle after each save so a second URL can be pasted without reopening.
-     */
-    private static function addShopAction(): Action
-    {
-        return Action::make('addShop')
-            ->label('Add a shop')
-            ->icon(Heroicon::Plus)
-            ->color('primary')
-            ->modalHeading('Add a shop')
-            ->modalDescription('Paste a product URL from any webshop. We will fetch the price and show a preview before saving.')
-            ->modalContent(fn (RelationManager $livewire): View => view('filament.partials.add-shop-modal', [
-                'product' => $livewire->getOwnerRecord(),
-            ]))
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel('Close');
-    }
 
     /**
      * @param  array<string, mixed>  $data
