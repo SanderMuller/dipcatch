@@ -36,3 +36,7 @@ yarn-error.log
 .config/boost/
 .github/prompts/
 # <<< boost (managed) <<<
+
+**/caddy
+frankenphp
+frankenphp-worker.php

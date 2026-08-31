@@ -1,5 +1,5 @@
 @php
-    $inputClass = 'block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-70 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-gray-500';
+    $inputClass = 'block w-full rounded-lg bg-white px-3 py-2 text-sm text-gray-900 shadow-xs ring-1 ring-gray-300 transition focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-70 dark:bg-white/5 dark:text-white dark:ring-white/10 dark:placeholder:text-gray-500';
     $labelClass = 'block text-sm font-medium text-gray-700 dark:text-gray-200';
     $helpClass = 'mt-1 text-xs text-gray-500 dark:text-gray-400';
     $errorTextClass = 'mt-1 text-xs text-red-600';
@@ -63,7 +63,7 @@
                 @endif
                 <div class="flex-1">
                     <div class="text-sm text-zinc-500">{{ $host }}</div>
-                    <div class="text-lg font-semibold mt-1">
+                    <div class="text-lg font-semibold mt-1 tabular-nums">
                         {{ $snapshot['currency'] }} {{ $snapshot['price'] }}
                         @if (! $snapshot['in_stock'])
                             <span class="ml-2 inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Out of stock</span>
@@ -112,7 +112,7 @@
                             min="0.01"
                             max="99.99"
                             wire:model="thresholdPct"
-                            class="mt-1 {{ $inputClass }}"
+                            class="mt-1 {{ $inputClass }} tabular-nums"
                         />
                         @error('thresholdPct') <p class="{{ $errorTextClass }}">{{ $message }}</p> @enderror
                     </div>
@@ -124,7 +124,7 @@
                             step="0.01"
                             min="0.01"
                             wire:model="thresholdAbs"
-                            class="mt-1 {{ $inputClass }}"
+                            class="mt-1 {{ $inputClass }} tabular-nums"
                         />
                         @error('thresholdAbs') <p class="{{ $errorTextClass }}">{{ $message }}</p> @enderror
                     </div>

@@ -28,6 +28,7 @@ Track product prices across the web. Get notified when a price drops more than y
 - Livewire 4 + Flux 2
 - Postgres on Laravel Cloud
 - HTTP-only fetching via `ShopFetcher` (robots.txt + SSRF guard + WAF detection + per-host rate limit + body cap), with a chain-of-responsibility `AdapterResolver` over price extractors — no headless browser in v1
+- Laravel Octane (FrankenPHP) app runtime
 - Queue worker + scheduler on Laravel Cloud
 - Mail + Filament in-app bell + web push (`laravel-notification-channels/webpush`)
 - Pest 4, PHPStan (Larastan), Pint, Rector — full quality stack
@@ -40,8 +41,10 @@ Implementation-ready specs live in [`specs/`](specs/README.md). All v1 launch sp
 
 ```bash
 composer setup    # install deps, copy env, key:generate, migrate, build assets
-composer dev      # serve + queue + pail + vite (concurrent)
+composer dev      # octane (FrankenPHP, --watch) + queue + pail + vite (concurrent)
 ```
+
+The dev server runs Laravel Octane on FrankenPHP — the same runtime as production — with `--watch` so code changes reload the workers (requires the `chokidar` dev dependency, installed via `npm install`). The FrankenPHP binary downloads on first `php artisan octane:start` and is gitignored.
 
 ## Deployment (Laravel Cloud)
 
@@ -49,6 +52,7 @@ DipCatch targets [Laravel Cloud](https://cloud.laravel.com/) — fully managed, 
 
 ### Required services
 
+- **App runtime: Laravel Octane (FrankenPHP)** — select the Octane runtime in the Laravel Cloud dashboard; `laravel/octane` + `config/octane.php` ship in the repo. Deploys reload workers automatically. Remember: code changes only apply after a worker reload — locally `composer dev` runs `octane:start --watch` for that.
 - **Postgres** add-on attached → `DATABASE_URL` injected.
 - **Queue worker** (1 small instance), `redis` driver. Runs `php artisan queue:work --queue=scrapes,digests,default --tries=1` — `scrapes` carries `CheckShopPrice`, `digests` carries `SendDailyDigest`.
 - **Scheduler** enabled — runs `php artisan schedule:run` minutely.

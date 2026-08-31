@@ -1,5 +1,5 @@
 @php
-    $inputClass = 'block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-70 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder:text-gray-500';
+    $inputClass = 'block w-full rounded-lg bg-white px-3 py-2 text-sm text-gray-900 shadow-xs ring-1 ring-gray-300 transition focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-70 dark:bg-white/5 dark:text-white dark:ring-white/10 dark:placeholder:text-gray-500';
     $labelClass = 'block text-sm font-medium text-gray-700 dark:text-gray-200';
     $helpClass = 'mt-1 text-xs text-gray-500 dark:text-gray-400';
     $primaryBtn = 'inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-60';
