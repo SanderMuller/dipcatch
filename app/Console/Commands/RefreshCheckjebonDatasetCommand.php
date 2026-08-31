@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 use JsonException;
 
 #[Signature('dipcatch:refresh-checkjebon')]
-#[Description('Refresh the local checkjebon.nl price dataset (AH, Dirk, Lidl) from the upstream daily JSON.')]
+#[Description('Refresh the local checkjebon.nl price dataset (AH, Lidl) from the upstream daily JSON.')]
 class RefreshCheckjebonDatasetCommand extends Command
 {
     private const string DATASET_URL = 'https://raw.githubusercontent.com/supermarkt/checkjebon/main/data/supermarkets.json';
@@ -27,7 +27,7 @@ class RefreshCheckjebonDatasetCommand extends Command
     private const int UPSERT_CHUNK = 1000;
 
     /** @var list<string> Dataset keys (`n`) this app tracks. */
-    private const array SUPERMARKETS = ['ah', 'dirk', 'lidl'];
+    private const array SUPERMARKETS = ['ah', 'lidl'];
 
     public function handle(): int
     {
@@ -159,7 +159,7 @@ class RefreshCheckjebonDatasetCommand extends Command
 
     /**
      * AH links look like `wi257/ah-kruiden-roomkaas` — the `wi` id is the
-     * match key. Dirk and Lidl links are the bare numeric product id.
+     * match key. Lidl links are the bare numeric product id.
      */
     private function externalIdFromLink(string $supermarket, string $link): ?string
     {

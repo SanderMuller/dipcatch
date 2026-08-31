@@ -8,9 +8,11 @@ use App\Support\UrlNormalizer;
 
 /**
  * Dataset-backed price source for hosts the HTTP scraper cannot serve:
- * ah.nl (WAF-blocked), dirk.nl (price only in a JS payload), and
- * boodschaapje.nl/Lidl (SPA shell). Resolves a product URL against the
- * local copy of checkjebon.nl's daily dataset instead of fetching the page.
+ * ah.nl (WAF-blocked) and boodschaapje.nl/Lidl (SPA shell). Resolves a
+ * product URL against the local copy of checkjebon.nl's daily dataset
+ * instead of fetching the page. dirk.nl is scraped directly — its pages
+ * carry JSON-LD with the live promo price, while the dataset only holds
+ * the regular price.
  *
  * The dataset carries no images and no stock flags: snapshots have a null
  * image and `inStock = true` always. Prices are EUR by definition.
@@ -20,7 +22,6 @@ final readonly class CheckjebonSource
     /** @var array<string, string> Normalized host → dataset supermarket key. */
     private const array HOSTS = [
         'ah.nl' => 'ah',
-        'dirk.nl' => 'dirk',
         'boodschaapje.nl' => 'lidl',
     ];
 
@@ -92,8 +93,8 @@ final readonly class CheckjebonSource
     }
 
     /**
-     * AH URLs carry a `wi<digits>` path segment; Dirk and boodschaapje
-     * product URLs end in the bare numeric product id.
+     * AH URLs carry a `wi<digits>` path segment; boodschaapje product
+     * URLs end in the bare numeric product id.
      */
     private static function externalIdFromUrl(string $supermarket, string $url): ?string
     {

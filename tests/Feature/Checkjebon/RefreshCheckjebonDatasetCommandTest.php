@@ -45,7 +45,7 @@ test('imports AH, Dirk, and Lidl rows with per-host external ids', function (): 
 
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
 
-    expect(CheckjebonPrice::query()->count())->toBe(4);
+    expect(CheckjebonPrice::query()->count())->toBe(3);
 
     $roomkaas = CheckjebonPrice::query()->where('supermarket', 'ah')->where('external_id', 'wi257')->first();
     expect($roomkaas)->not->toBeNull()
@@ -53,11 +53,11 @@ test('imports AH, Dirk, and Lidl rows with per-host external ids', function (): 
         ->and((string) $roomkaas->price)->toBe('1.25')
         ->and($roomkaas->size)->toBe('125 g');
 
-    expect(CheckjebonPrice::query()->where('supermarket', 'dirk')->where('external_id', '6')->exists())->toBeTrue()
-        ->and(CheckjebonPrice::query()->where('supermarket', 'lidl')->where('external_id', '8128671')->exists())->toBeTrue();
+    expect(CheckjebonPrice::query()->where('supermarket', 'lidl')->where('external_id', '8128671')->exists())->toBeTrue();
 
-    // Jumbo is scraped directly — never imported. Empty size becomes null.
+    // Jumbo and Dirk are scraped directly — never imported. Empty size becomes null.
     expect(CheckjebonPrice::query()->where('supermarket', 'jumbo')->exists())->toBeFalse()
+        ->and(CheckjebonPrice::query()->where('supermarket', 'dirk')->exists())->toBeFalse()
         ->and(CheckjebonPrice::query()->where('external_id', '8128671')->value('size'))->toBeNull();
 });
 
@@ -75,20 +75,20 @@ test('re-run upserts changed prices and prunes delisted rows', function (): void
 
     expect((string) CheckjebonPrice::query()->where('external_id', 'wi257')->firstOrFail()->price)->toBe('0.99')
         ->and(CheckjebonPrice::query()->where('external_id', 'wi195828')->exists())->toBeFalse()
-        ->and(CheckjebonPrice::query()->where('supermarket', 'dirk')->count())->toBe(1);
+        ->and(CheckjebonPrice::query()->where('supermarket', 'lidl')->count())->toBe(1);
 });
 
 test('an empty supermarket upstream keeps its existing rows', function (): void {
     Http::fake([checkjebonUrl() => Http::sequence()
         ->push(checkjebonFixture())
-        ->push(checkjebonFixture(dirk: []))]);
+        ->push(checkjebonFixture(lidl: []))]);
 
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
     $this->travel(1)->days();
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
 
-    // Dirk came back empty — its rows stay; AH/Lidl refreshed normally.
-    expect(CheckjebonPrice::query()->where('supermarket', 'dirk')->where('external_id', '6')->exists())->toBeTrue();
+    // Lidl came back empty — its rows stay; AH refreshed normally.
+    expect(CheckjebonPrice::query()->where('supermarket', 'lidl')->where('external_id', '8128671')->exists())->toBeTrue();
 });
 
 test('fetch failure keeps rows and exits non-zero', function (): void {
@@ -99,7 +99,7 @@ test('fetch failure keeps rows and exits non-zero', function (): void {
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertFailed();
 
-    expect(CheckjebonPrice::query()->count())->toBe(4);
+    expect(CheckjebonPrice::query()->count())->toBe(3);
 });
 
 test('invalid JSON keeps rows and exits non-zero', function (): void {
@@ -110,7 +110,7 @@ test('invalid JSON keeps rows and exits non-zero', function (): void {
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertFailed();
 
-    expect(CheckjebonPrice::query()->count())->toBe(4);
+    expect(CheckjebonPrice::query()->count())->toBe(3);
 });
 
 test('malformed product rows are skipped, valid ones imported', function (): void {

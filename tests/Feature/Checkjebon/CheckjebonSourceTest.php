@@ -20,11 +20,13 @@ beforeEach(function (): void {
     $this->source = app(CheckjebonSource::class);
 });
 
-test('supports the three dataset hosts and their subdomains only', function (): void {
+test('supports the dataset hosts and their subdomains only', function (): void {
     expect($this->source->supports('ah.nl'))->toBeTrue()
-        ->and($this->source->supports('dirk.nl'))->toBeTrue()
         ->and($this->source->supports('boodschaapje.nl'))->toBeTrue()
         ->and($this->source->supports('shop.ah.nl'))->toBeTrue()
+        // dirk.nl is scraped directly: its JSON-LD carries the live promo
+        // price, while the dataset only holds the regular price.
+        ->and($this->source->supports('dirk.nl'))->toBeFalse()
         ->and($this->source->supports('lidl.nl'))->toBeFalse()
         ->and($this->source->supports('jumbo.com'))->toBeFalse()
         ->and($this->source->supports('notah.nl'))->toBeFalse();
@@ -43,22 +45,16 @@ test('resolves an AH URL by its wi id, slug ignored', function (): void {
         ->and($result->snapshot?->inStock)->toBeTrue();
 });
 
-test('resolves Dirk and boodschaapje URLs by their trailing numeric id', function (): void {
-    seedCheckjebonRow('dirk', '6', 'Heineken Pilsener krat', '13.84');
+test('resolves boodschaapje URLs by their trailing numeric id', function (): void {
     seedCheckjebonRow('lidl', '8128671', 'Vlies filterzakken', '6.99');
 
-    expect($this->source->resolve('https://dirk.nl/boodschappen/dranken/bier/heineken-pilsener-krat/6')->snapshot?->price)->toBe('13.84')
-        ->and($this->source->resolve('https://boodschaapje.nl/product/8128671')->snapshot?->price)->toBe('6.99');
+    expect($this->source->resolve('https://boodschaapje.nl/product/8128671')->snapshot?->price)->toBe('6.99');
 });
 
 test('URL without a recognizable product id is unrecognized', function (): void {
-    seedCheckjebonRow('dirk', '6');
+    seedCheckjebonRow('lidl', '8128671');
 
-    $result = $this->source->resolve('https://dirk.nl/boodschappen/aardappelen-groente-fruit');
-
-    expect($result->isFound())->toBeFalse()
-        ->and($result->missReason)->toBe(CheckjebonResult::REASON_UNRECOGNIZED_URL)
-        ->and($this->source->resolve('https://boodschaapje.nl/product/not-a-number')->missReason)->toBe(CheckjebonResult::REASON_UNRECOGNIZED_URL)
+    expect($this->source->resolve('https://boodschaapje.nl/product/not-a-number')->missReason)->toBe(CheckjebonResult::REASON_UNRECOGNIZED_URL)
         ->and($this->source->resolve('https://boodschaapje.nl')->missReason)->toBe(CheckjebonResult::REASON_UNRECOGNIZED_URL);
 });
 

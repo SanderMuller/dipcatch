@@ -151,7 +151,8 @@ final readonly class JsonLdAdapter implements ShopAdapter
             return PriceNormalizer::fromMixed($shop['lowPrice'] ?? null);
         }
 
-        $normalized = PriceNormalizer::fromMixed($shop['price'] ?? null);
+        // Some shops emit non-spec key casing (dirk.nl writes `Price`).
+        $normalized = PriceNormalizer::fromMixed($shop['price'] ?? $shop['Price'] ?? null);
         if ($normalized !== null) {
             return $normalized;
         }

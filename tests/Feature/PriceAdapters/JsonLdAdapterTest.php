@@ -328,3 +328,24 @@ test('picks the variant matching context.variantKey by productID', function (): 
         ->and($result->snapshot?->price)->toBe('52.86')
         ->and($result->snapshot?->title)->toBe('Feliway 3-pack');
 });
+
+test('accepts the non-spec capitalized Price key dirk.nl emits', function (): void {
+    // Trimmed replica of dirk.nl product JSON-LD (observed 2026-08-31).
+    $json = json_encode([
+        '@context' => 'http://schema.org/',
+        '@type' => 'Product',
+        'name' => 'Beemster Kaas extra belegen 48+ plakken',
+        'offers' => [
+            '@type' => 'Offer',
+            'priceCurrency' => 'EUR',
+            'Price' => 1.69,
+            'url' => 'https://www.dirk.nl/boodschappen/x/x/x/115212',
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://www.dirk.nl/boodschappen/x/x/x/115212', withJsonLd($json));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('1.69')
+        ->and($result->snapshot?->currency)->toBe('EUR');
+});
