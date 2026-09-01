@@ -45,7 +45,7 @@ Replace `$tracked` with three grocery notifications built from the shops DipCatc
 | Icon | Product | Shop | From → to | Unit price line |
 |---|---|---|---|---|
 | 🥔 | Lay's Naturel 200 g | ah.nl | EUR 2.19 → **EUR 1.69** (bonus) | EUR 8.45 /kg · cheapest of 4 shops |
-| 🧀 | Beemster Extra Belegen 48+ 150 g | dirk.nl | EUR 3.49 → **EUR 1.69** | EUR 11.27 /kg · was cheapest at ah.nl |
+| 🧀 | Beemster Extra Belegen 48+ 150 g | dirk.nl | EUR 3.49 → **EUR 1.69** | EUR 11.27 /kg · cheapest of 3 shops |
 | 🧻 | Page toiletpapier 24 rollen | jumbo.com | EUR 12.99 → **EUR 9.99** | EUR 0.42 /stuk |
 
 Each card shows the shop favicon (`App\Support\Favicon::url($host)`) instead of the current "DipCatch" label, the product line, the drop line in emerald, and the unit-price line in muted text. Card 1 keeps the emerald ring. The mock container gets `role="img"` and an `aria-label` ("Example alerts: Lay's at ah.nl dropped to EUR 1.69, …") so screen readers get one sentence instead of nine fragments.
@@ -59,7 +59,8 @@ Under the hero CTA (guests only): **"See a live example →"** linking to `route
 - Add `lang/nl.json` with translations for every `__()` string in `welcome.blade.php` and `privacy.blade.php` only. The app panel is untouched.
 - Locale resolution for the two marketing routes (`home`, `privacy`): a `MarketingLocale` middleware sets the locale from, in order: `?lang=nl|en` query (also stored in the session), the session value, the `Accept-Language` header (first tag `nl*` → `nl`, anything else → `en`), then the default from Open Question 1.
 - A small language toggle (NL / EN) next to the appearance toggle in the header of both pages; it links to the current URL with `?lang=`.
-- `<html lang>` and the `og:locale` meta follow the resolved locale. `hreflang` alternates (`nl`, `en`, `x-default`) are added to `<head>` of both pages.
+- `<html lang>` and the `og:locale` meta follow the resolved locale. `hreflang` alternates (`nl` → `?lang=nl`, `en` → `?lang=en`, `x-default` → the bare URL) are added to `<head>` of both pages.
+- Determinism rule for crawlers: an explicit `?lang=` **always wins and is not influenced by the session** (it sets the session, never reads it), so `?lang=nl` and `?lang=en` are stable language variants for indexing. The bare URL is the only one that varies by session / `Accept-Language`, and it is the `x-default`. `<link rel="canonical">` on a `?lang=` URL points at itself; on the bare URL it points at the resolved language's `?lang=` variant.
 - The Filament app and emails stay English; `App::setLocale` is scoped to the marketing routes via the middleware, so nothing else changes.
 
 ## 4. FAQ Section
@@ -79,7 +80,8 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 
 ## 5. Config and Tests
 
-- `config/site.php`: add `demo_share_slug` (env `SITE_DEMO_SHARE_SLUG`), `faq` is not config — it lives in the view's `@php` array, next to `$steps`, so translators see it in one file.
+- `config/site.php`: add `demo_share_slug` (env `SITE_DEMO_SHARE_SLUG`).
+- The FAQ array is not config: it lives in the view's `@php` block next to `$steps`, so the translatable copy sits in one file.
 - `.env.example`: `SITE_DEMO_SHARE_SLUG=`.
 
 ## Edge Cases
@@ -92,6 +94,7 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 | Visitor with `Accept-Language: de` | Default locale from Open Question 1 (Phase `nl`, test) |
 | Signed-in user on the homepage | Locale logic still applies; app remains English after clicking "Open app" (Phase `nl`, test asserts `/app` renders English) |
 | Screen reader on the phone mock | One `aria-label` sentence; inner text is `aria-hidden` (Phase `hero`, manual check with VoiceOver noted in Findings) |
+| Crawler requests `?lang=en` with `Accept-Language: nl` and a Dutch session cookie | English renders — the query wins and ignores the session (Phase `nl`, test) |
 | FAQ JSON-LD | Validates in Google's Rich Results test; answers contain no HTML (Phase `faq`, unit test asserts valid JSON with 6 `Question` entities) |
 | H1 wraps to three lines on 390 px | Reduce to `text-4xl` at base (already) and check the `[24ch]` cap; adjust copy rather than shrinking type below `text-4xl` (Phase `hero`, browser check) |
 
@@ -102,6 +105,7 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 **ID:** hero · **Depends:** none
 
 - [ ] Replace `$h1`/`$sub` with the Section 2.1 copy — keep `max-w-[24ch]` / `max-w-[48ch]`.
+- [ ] Re-read the "How it works" intro sentence and the bottom-CTA copy against the new hero so the page tells one story (compare across shops), and adjust wording where it still says "track products".
 - [ ] Rebuild `$tracked` and the mock cards per Section 2.2 — favicon via `Favicon::url()`, unit-price line, `role="img"` + `aria-label` on the container, inner content `aria-hidden`.
 - [ ] Add `site.demo_share_slug` config + env example; render the "See a live example" link per Section 2.3 with the cached existence check.
 - [ ] Tests — homepage shows the new H1; mock contains the three shops and no `mediamarkt.nl`; live-example link renders only with a valid slug that exists; cache hides it after revoke.
@@ -109,7 +113,7 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 
 ### Phase 2: FAQ (Priority: HIGH)
 
-**ID:** faq · **Depends:** none
+**ID:** faq · **Depends:** hero — both phases edit `welcome.blade.php`, so they must not run concurrently
 
 - [ ] Add the six-item `$faq` array and the `<details>` section per Section 4, between "How it works" and the bottom CTA.
 - [ ] Emit `FAQPage` JSON-LD from the same array.
