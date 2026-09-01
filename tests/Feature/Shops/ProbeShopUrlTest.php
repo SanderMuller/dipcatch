@@ -305,3 +305,16 @@ test('a shop that renders its price in the browser is refused without a fetch', 
 
     Http::assertNothingSent();
 });
+
+test('a trailing-dot plus.nl URL is refused like any other', function (): void {
+    Http::fake();
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $outcome = app(ProbeShopUrl::class)($product, 'https://www.plus.nl./product/fanta-orange-fles-1500-ml-991700', $user);
+
+    expect($outcome->errorCode)->toBe(ProbeFailure::ShopNotServable);
+
+    Http::assertNothingSent();
+});

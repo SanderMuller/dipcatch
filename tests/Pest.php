@@ -384,8 +384,9 @@ function dekaMarktPage(
     string $productId = '126549',
     ?string $offerStart = '-1 day',
     ?string $offerEnd = '+6 days',
+    ?string $conflictingPrice = null,
 ): string {
-    $payload = json_encode([
+    $records = [
         ['productId' => 1, 'headerText' => 2, 'packaging' => 3, 'images' => 4],
         $productId,
         'Knorr Kruidenmix airfryer knoflook kip',
@@ -405,7 +406,15 @@ function dekaMarktPage(
         $offerPrice === null ? null : (float) $offerPrice,
         $offerStart === null ? null : now()->modify($offerStart)->toIso8601String(),
         $offerEnd === null ? null : now()->modify($offerEnd)->toIso8601String(),
-    ], JSON_THROW_ON_ERROR);
+    ];
+
+    if ($conflictingPrice !== null) {
+        // A second price record for the same article, stating another price.
+        $records[] = ['productId' => 1, 'normalPrice' => count($records) + 1];
+        $records[] = (float) $conflictingPrice;
+    }
+
+    $payload = json_encode($records, JSON_THROW_ON_ERROR);
 
     return '<html><body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';
 }

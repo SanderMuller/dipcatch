@@ -50,21 +50,21 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, ShopAdapter
             return ExtractionResult::failed('poiesz_no_product_id');
         }
 
-        $record = self::productRecord($data, $productId);
+        $record = NuxtData::recordsFor($data, ['price', 'name', 'id'], 'id', $productId)[0] ?? null;
 
         if ($record === null) {
             return ExtractionResult::failed('poiesz_no_product');
         }
 
-        $price = PriceNormalizer::fromMixed(self::value($data, $record, 'price'));
+        $price = PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'price'));
 
         if ($price === null) {
             return ExtractionResult::failed('poiesz_no_price');
         }
 
-        $title = self::value($data, $record, 'name');
-        $image = self::value($data, $record, 'image');
-        $packageDescription = self::value($data, $record, 'packageDescription');
+        $title = NuxtData::value($data, $record, 'name');
+        $image = NuxtData::value($data, $record, 'image');
+        $packageDescription = NuxtData::value($data, $record, 'packageDescription');
 
         return ExtractionResult::success(new ShopSnapshot(
             title: is_string($title) && $title !== '' ? $title : 'Unknown',
@@ -77,7 +77,7 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, ShopAdapter
             raw: ['source' => 'poiesz'],
             packSize: is_string($packageDescription) ? $packageDescription : null,
             packSizeAuthoritative: true,
-            gtin: Gtin::normalize(self::value($data, $record, 'ean')),
+            gtin: Gtin::normalize(NuxtData::value($data, $record, 'ean')),
             gtinAuthoritative: true,
         ));
     }
@@ -93,43 +93,6 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, ShopAdapter
         $host = UrlNormalizer::normalizeHost($host);
 
         return $host === 'poiesz-supermarkten.nl' || str_ends_with($host, '.poiesz-supermarkten.nl');
-    }
-
-    /**
-     * The product record carries `price` alongside `name` and `id`. Only the
-     * record whose id matches the URL counts — recommended products sit in
-     * the same payload with the same shape.
-     *
-     * @param  list<mixed>  $data
-     * @return array<string, mixed>|null
-     */
-    private static function productRecord(array $data, string $productId): ?array
-    {
-        foreach ($data as $element) {
-            if (! is_array($element) || ! isset($element['price'], $element['name'], $element['id'])) {
-                continue;
-            }
-
-            /** @var array<string, mixed> $element */
-            $recordId = self::value($data, $element, 'id');
-
-            if ((is_string($recordId) || is_int($recordId)) && (string) $recordId === $productId) {
-                return $element;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  list<mixed>  $data
-     * @param  array<string, mixed>  $record
-     */
-    private static function value(array $data, array $record, string $key): mixed
-    {
-        $index = $record[$key] ?? null;
-
-        return is_int($index) && array_key_exists($index, $data) ? $data[$index] : null;
     }
 
     private static function productIdFromUrl(string $url): ?string

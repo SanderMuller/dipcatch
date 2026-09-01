@@ -101,3 +101,30 @@ test('a numeric literal this adapter cannot read fails instead of truncating', f
     'exponent' => ['2.39e1'],
     'bigint' => ['239n'],
 ]);
+
+test('a nested object cannot donate its price to the product', function (): void {
+    // A promotion block sits inside productDetails, before the real price.
+    $html = str_replace(
+        'articleNumber:119614',
+        'promotion:{price:0.99,description:"Kortingsactie"},articleNumber:119614',
+        vomarPage(),
+    );
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->snapshot?->price)->toBe('2.39')
+        ->and($result->snapshot?->title)->toBe('Aardappelgratin Kaas');
+});
+
+test('a nested article number cannot satisfy the identity check', function (): void {
+    $html = str_replace(
+        'articleNumber:119614',
+        'related:{articleNumber:119614},articleNumber:888888',
+        vomarPage(),
+    );
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_product_mismatch');
+});

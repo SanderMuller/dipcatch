@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Services\ShopFetcher\UrlSafetyGuard;
+use App\Support\UrlNormalizer;
 
 beforeEach(function (): void {
     // These tests assert the prod behavior — temporarily disable the test-suite
@@ -37,4 +38,9 @@ test('accepts a public host that resolves to a public IP', function (): void {
 test('rejects unparseable URLs', function (): void {
     expect(fn () => new UrlSafetyGuard()->assertSafe('not a url'))
         ->toThrow(InvalidArgumentException::class);
+});
+
+test('a fully qualified host loses its DNS root dot, so host checks still match', function (): void {
+    expect(UrlNormalizer::normalizeHost('www.plus.nl.'))->toBe('plus.nl')
+        ->and(UrlNormalizer::normalizeHost('WWW.Vomar.NL.'))->toBe('vomar.nl');
 });

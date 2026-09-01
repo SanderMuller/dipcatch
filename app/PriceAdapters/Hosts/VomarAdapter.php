@@ -9,6 +9,7 @@ use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\Gtin;
+use App\Support\JsObjectLiteral;
 use App\Support\UrlNormalizer;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -48,6 +49,11 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
             return ExtractionResult::failed('vomar_no_product');
         }
 
+        // Only the object's own fields: a nested promotion or unit-price
+        // object carries a `price` too, and reading that as the shelf price
+        // would raise a price-drop alert for a discount that is not one.
+        $fields = JsObjectLiteral::fields($details);
+
         $productId = self::productIdFromUrl($url);
 
         if ($productId === null) {
@@ -58,18 +64,18 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
 
         // The state must say it describes that article. A hoisted (non
         // literal) articleNumber proves nothing, so it is refused too.
-        if (self::literal($details, 'articleNumber') !== $productId) {
+        if (JsObjectLiteral::literal($fields, 'articleNumber') !== $productId) {
             return ExtractionResult::failed('vomar_product_mismatch');
         }
 
-        $price = PriceNormalizer::fromMixed(self::literal($details, 'price'));
+        $price = PriceNormalizer::fromMixed(JsObjectLiteral::literal($fields, 'price'));
 
         if ($price === null) {
             return ExtractionResult::failed('vomar_no_price');
         }
 
         return ExtractionResult::success(new ShopSnapshot(
-            title: self::literal($details, 'description') ?? self::heading($html) ?? 'Unknown',
+            title: JsObjectLiteral::literal($fields, 'description') ?? self::heading($html) ?? 'Unknown',
             imageUrl: self::imageUrl($details),
             price: $price,
             currency: 'EUR',
@@ -78,9 +84,9 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
             // lists, and a delisted id 500s instead.
             inStock: true,
             raw: ['source' => 'vomar'],
-            packSize: self::packSize($details),
+            packSize: self::packSize($fields),
             packSizeAuthoritative: true,
-            gtin: Gtin::normalize(self::literal($details, 'primaryEan')),
+            gtin: Gtin::normalize(JsObjectLiteral::literal($fields, 'primaryEan')),
             gtinAuthoritative: true,
         ));
     }
@@ -105,40 +111,7 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
      */
     private static function productDetails(string $html): ?string
     {
-        $start = strpos($html, 'productDetails:{');
-
-        if ($start === false) {
-            return null;
-        }
-
-        $offset = $start + strlen('productDetails:{');
-        $depth = 1;
-        $inString = false;
-        $length = min(strlen($html), $offset + self::MAX_OBJECT_BYTES);
-
-        for ($i = $offset; $i < $length; $i++) {
-            $char = $html[$i];
-
-            if ($inString) {
-                if ($char === '\\') {
-                    $i++;
-                } elseif ($char === '"') {
-                    $inString = false;
-                }
-
-                continue;
-            }
-
-            if ($char === '"') {
-                $inString = true;
-            } elseif ($char === '{') {
-                $depth++;
-            } elseif ($char === '}' && --$depth === 0) {
-                return substr($html, $offset, $i - $offset);
-            }
-        }
-
-        return null;
+        return JsObjectLiteral::after($html, 'productDetails:{', self::MAX_OBJECT_BYTES);
     }
 
     private static function productIdFromUrl(string $url): ?string
@@ -156,29 +129,12 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
     }
 
     /**
-     * A quoted string or a bare number. An identifier (a hoisted value)
-     * yields null — a wrong value is worse than a missing one.
+     * @param  array<string, string>  $fields
      */
-    private static function literal(string $details, string $field): ?string
+    private static function packSize(array $fields): ?string
     {
-        // The numeric alternative must be followed by a value delimiter:
-        // without it `price:2.39e1` would yield 2.39 rather than failing on
-        // a literal this adapter does not support.
-        $pattern = '/\b' . preg_quote($field, '/') . ':(?:"((?:[^"\\\\]|\\\\.)*)"|(\d+(?:\.\d+)?)(?=[,}\]]|$))/';
-
-        if (preg_match($pattern, $details, $m) !== 1) {
-            return null;
-        }
-
-        $value = $m[1] !== '' ? $m[1] : ($m[2] ?? '');
-
-        return $value === '' ? null : stripcslashes($value);
-    }
-
-    private static function packSize(string $details): ?string
-    {
-        $contents = self::literal($details, 'contents');
-        $unit = self::literal($details, 'unit');
+        $contents = JsObjectLiteral::literal($fields, 'contents');
+        $unit = JsObjectLiteral::literal($fields, 'unit');
 
         if ($contents === null || $unit === null) {
             return null;

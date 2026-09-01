@@ -89,3 +89,13 @@ test('a URL without a product id is refused rather than priced from a related pr
     expect($result->isSuccess())->toBeFalse()
         ->and($result->failureReason)->toBe('dekamarkt_no_product_id');
 });
+
+test('two price records that disagree for one article are refused', function (): void {
+    // Same productId, two different shelf prices: nothing says which is real.
+    $page = dekaMarktPage(offerPrice: null, offerStart: null, offerEnd: null, conflictingPrice: '2.95');
+
+    $result = $this->adapter->extract(dekaMarktUrl(), $page);
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('dekamarkt_ambiguous_price');
+});

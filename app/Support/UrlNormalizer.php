@@ -54,6 +54,10 @@ final class UrlNormalizer
     public static function normalizeHost(string $host): string
     {
         $host = strtolower($host);
+        // A fully qualified name ends in the DNS root dot ("plus.nl."), which
+        // resolves to the same site — keeping it would let such a URL slip
+        // past every host comparison in the app.
+        $host = rtrim($host, '.');
         $host = preg_replace('/^www\./', '', $host) ?? $host;
 
         if ($host === '') {

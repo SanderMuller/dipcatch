@@ -52,21 +52,38 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
             return ExtractionResult::failed('dekamarkt_no_product_id');
         }
 
-        $product = self::recordWith($data, ['productId', 'headerText', 'packaging'], $productId);
-        $priceRecord = self::recordWith($data, ['productId', 'normalPrice'], $productId);
+        $product = NuxtData::recordsFor($data, ['productId', 'headerText', 'packaging'], 'productId', $productId)[0] ?? null;
+        $priceRecords = NuxtData::recordsFor($data, ['productId', 'normalPrice'], 'productId', $productId);
 
-        if ($product === null || $priceRecord === null) {
+        if ($product === null || $priceRecords === []) {
             return ExtractionResult::failed('dekamarkt_no_product');
         }
 
-        $price = PriceNormalizer::fromMixed(self::currentPrice($data, $priceRecord));
+        $prices = [];
+
+        foreach ($priceRecords as $record) {
+            $candidate = PriceNormalizer::fromMixed(self::currentPrice($data, $record));
+
+            if ($candidate !== null) {
+                $prices[$candidate] = true;
+            }
+        }
+
+        // A payload that states two different prices for one article gives no
+        // basis to pick one; the product page shows a single price, so this
+        // means the shape changed under us.
+        if (count($prices) > 1) {
+            return ExtractionResult::failed('dekamarkt_ambiguous_price');
+        }
+
+        $price = array_key_first($prices);
 
         if ($price === null) {
             return ExtractionResult::failed('dekamarkt_no_price');
         }
 
-        $title = self::value($data, $product, 'headerText');
-        $packaging = self::value($data, $product, 'packaging');
+        $title = NuxtData::value($data, $product, 'headerText');
+        $packaging = NuxtData::value($data, $product, 'packaging');
 
         return ExtractionResult::success(new ShopSnapshot(
             title: is_string($title) && $title !== '' ? $title : 'Unknown',
@@ -104,8 +121,8 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
      */
     private static function currentPrice(array $data, array $record): mixed
     {
-        $normal = self::value($data, $record, 'normalPrice');
-        $offer = self::value($data, $record, 'offerPrice');
+        $normal = NuxtData::value($data, $record, 'normalPrice');
+        $offer = NuxtData::value($data, $record, 'offerPrice');
 
         if ($offer === null || ! self::offerIsRunning($data, $record)) {
             return $normal;
@@ -139,7 +156,7 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
      */
     private static function date(array $data, array $record, string $key): ?CarbonImmutable
     {
-        $value = self::value($data, $record, $key);
+        $value = NuxtData::value($data, $record, $key);
 
         if (! is_string($value) || $value === '') {
             return null;
@@ -158,7 +175,7 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
      */
     private static function imageUrl(array $data, array $product): ?string
     {
-        $images = self::value($data, $product, 'images');
+        $images = NuxtData::value($data, $product, 'images');
 
         if (! is_array($images)) {
             return null;
@@ -172,7 +189,7 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
             }
 
             /** @var array<string, mixed> $image */
-            $path = self::value($data, $image, 'image');
+            $path = NuxtData::value($data, $image, 'image');
 
             if (is_string($path) && $path !== '') {
                 return self::IMAGE_BASE . ltrim($path, '/');
@@ -180,49 +197,6 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
         }
 
         return null;
-    }
-
-    /**
-     * The record carrying every named key whose `productId` matches the URL.
-     * A page also carries related products, so nothing else may win.
-     *
-     * @param  list<mixed>  $data
-     * @param  list<string>  $keys
-     * @return array<string, mixed>|null
-     */
-    private static function recordWith(array $data, array $keys, string $productId): ?array
-    {
-        foreach ($data as $element) {
-            if (! is_array($element)) {
-                continue;
-            }
-
-            foreach ($keys as $key) {
-                if (! isset($element[$key])) {
-                    continue 2;
-                }
-            }
-
-            /** @var array<string, mixed> $element */
-            $recordId = self::value($data, $element, 'productId');
-
-            if ((is_string($recordId) || is_int($recordId)) && (string) $recordId === $productId) {
-                return $element;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  list<mixed>  $data
-     * @param  array<string, mixed>  $record
-     */
-    private static function value(array $data, array $record, string $key): mixed
-    {
-        $index = $record[$key] ?? null;
-
-        return is_int($index) && array_key_exists($index, $data) ? $data[$index] : null;
     }
 
     private static function productIdFromUrl(string $url): ?string
