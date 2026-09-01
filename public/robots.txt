@@ -4,5 +4,5 @@ Disallow: /admin
 Disallow: /login
 Disallow: /register
 Disallow: /forgot-password
-Disallow: /invitation/
+Disallow: /invite/
 Allow: /

@@ -54,5 +54,6 @@ test('robots.txt keeps crawlers out of the app but allows the public pages', fun
 
     expect($robots)->toContain('Disallow: /app')
         ->toContain('Disallow: /admin')
+        ->toContain('Disallow: /invite/')
         ->toContain('Allow: /');
 });

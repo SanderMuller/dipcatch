@@ -137,3 +137,13 @@ test('Filament invitation form rejects emails that already belong to a user', fu
 
     expect(Invitation::query()->where('email', 'already@dipcatch.test')->count())->toBe(0);
 });
+
+test('deleting a user who created invitations keeps the invitations and detaches the inviter', function (): void {
+    $admin = User::factory()->admin()->create();
+    $invitation = Invitation::factory()->create(['invited_by' => $admin->id]);
+
+    $admin->delete();
+
+    expect($invitation->fresh())->not->toBeNull()
+        ->and($invitation->fresh()?->invited_by)->toBeNull();
+});

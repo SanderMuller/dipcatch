@@ -13,10 +13,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id
  * @property string $email
  * @property string $token
- * @property int $invited_by
+ * @property int|null $invited_by
  * @property CarbonImmutable|null $redeemed_at
  * @property CarbonImmutable $expires_at
- * @property User $inviter
+ * @property User|null $inviter
  */
 class Invitation extends Model
 {
