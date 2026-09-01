@@ -48,12 +48,17 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
             return ExtractionResult::failed('vomar_no_product');
         }
 
-        $articleNumber = self::literal($details, 'articleNumber');
         $productId = self::productIdFromUrl($url);
 
-        // The URL id must be the article the state describes. Without this a
-        // page that ever embeds a second product could price the wrong one.
-        if ($productId !== null && $articleNumber !== null && $articleNumber !== $productId) {
+        if ($productId === null) {
+            // A category or search URL names no article, and the state holds
+            // whichever product the page happened to render first.
+            return ExtractionResult::failed('vomar_no_product_id');
+        }
+
+        // The state must say it describes that article. A hoisted (non
+        // literal) articleNumber proves nothing, so it is refused too.
+        if (self::literal($details, 'articleNumber') !== $productId) {
             return ExtractionResult::failed('vomar_product_mismatch');
         }
 
@@ -156,7 +161,12 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
      */
     private static function literal(string $details, string $field): ?string
     {
-        if (preg_match('/\b' . preg_quote($field, '/') . ':(?:"((?:[^"\\\\]|\\\\.)*)"|(\d+(?:\.\d+)?))/', $details, $m) !== 1) {
+        // The numeric alternative must be followed by a value delimiter:
+        // without it `price:2.39e1` would yield 2.39 rather than failing on
+        // a literal this adapter does not support.
+        $pattern = '/\b' . preg_quote($field, '/') . ':(?:"((?:[^"\\\\]|\\\\.)*)"|(\d+(?:\.\d+)?)(?=[,}\]]|$))/';
+
+        if (preg_match($pattern, $details, $m) !== 1) {
             return null;
         }
 

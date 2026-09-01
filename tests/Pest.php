@@ -409,3 +409,18 @@ function dekaMarktPage(
 
     return '<html><body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';
 }
+
+/**
+ * A DekaMarkt page whose offer window is stated with the exact timestamps a
+ * captured page uses — an Amsterdam offset, not the test clock's own zone.
+ */
+function dekaMarktPageWithWindow(string $start, string $end): string
+{
+    $page = dekaMarktPage();
+
+    return str_replace(
+        [json_encode(now()->modify('-1 day')->toIso8601String()), json_encode(now()->modify('+6 days')->toIso8601String())],
+        [json_encode($start), json_encode($end)],
+        $page,
+    );
+}

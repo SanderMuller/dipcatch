@@ -73,3 +73,31 @@ test('a page describing a different article than the URL is refused', function (
     expect($result->isSuccess())->toBeFalse()
         ->and($result->failureReason)->toBe('vomar_product_mismatch');
 });
+
+test('a URL that names no article is refused', function (): void {
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers', vomarPage());
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_no_product_id');
+});
+
+test('a hoisted article number proves nothing and is refused', function (): void {
+    $html = str_replace('articleNumber:119614', 'articleNumber:aQ', vomarPage());
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_product_mismatch');
+});
+
+test('a numeric literal this adapter cannot read fails instead of truncating', function (string $literal): void {
+    $html = str_replace('price:2.39', 'price:' . $literal, vomarPage());
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_no_price');
+})->with([
+    'exponent' => ['2.39e1'],
+    'bigint' => ['239n'],
+]);

@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\PriceAdapters\Hosts\DekaMarktAdapter;
+use Carbon\CarbonImmutable;
 
 beforeEach(function (): void {
     $this->adapter = new DekaMarktAdapter();
@@ -53,11 +54,20 @@ test('an undated or unreadable offer window falls back to the shelf price', func
     'missing end' => ['-1 day', null],
 ]);
 
-test('an offer window given with an explicit timezone offset is honoured', function (): void {
-    $page = dekaMarktPage(offerStart: '-1 hour', offerEnd: '+1 hour');
+test('the offer window is judged as an instant, not as wall-clock text', function (string $now, string $expected): void {
+    // Fixed window in Amsterdam time; "now" is given in UTC, so a naive
+    // string or wrong-zone comparison lands on the other side of the edge.
+    $this->travelTo(CarbonImmutable::parse($now));
 
-    expect($this->adapter->extract(dekaMarktUrl(), $page)->snapshot?->price)->toBe('1.59');
-});
+    $page = dekaMarktPageWithWindow('2026-09-01T00:00:00.000+02:00', '2026-09-07T23:59:59.000+02:00');
+
+    expect($this->adapter->extract(dekaMarktUrl(), $page)->snapshot?->price)->toBe($expected);
+})->with([
+    'one minute before the window opens' => ['2026-08-31T21:59:00Z', '1.95'],
+    'just inside the window' => ['2026-08-31T22:01:00Z', '1.59'],
+    'the last second of the window' => ['2026-09-07T21:59:59Z', '1.59'],
+    'one second after it closes' => ['2026-09-07T22:00:00Z', '1.95'],
+]);
 
 test('an id the payload does not carry fails rather than guessing', function (): void {
     $result = $this->adapter->extract(dekaMarktUrl('999999'), dekaMarktPage());
