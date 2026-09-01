@@ -21,7 +21,7 @@ class ProductInfolist
                         ImageEntry::make('image_url')
                             ->label('')
                             ->circular()
-                            ->imageSize(80),
+                            ->imageSize(120),
 
                         TextEntry::make('title')->size('lg'),
                     ]),

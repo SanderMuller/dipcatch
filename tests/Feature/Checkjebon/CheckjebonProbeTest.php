@@ -158,3 +158,43 @@ test('add-shop-mode probe on an EUR product succeeds from the dataset', function
         ->and($outcome->adapterKey)->toBe('checkjebon')
         ->and($outcome->snapshot?->price)->toBe('1.25');
 });
+
+test('the AH probe transports salesUnitSize and confirm stores it', function (): void {
+    Http::fake(ahApiProductFakes(currentPrice: '1.69', salesUnitSize: '200 g'));
+    Http::preventStrayRequests();
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://www.ah.nl/producten/product/wi526381/lay-s-naturel')
+        ->call('probe')
+        ->assertSet('snapshot.pack_size', '200 g')
+        ->assertSet('snapshot.pack_size_authoritative', true)
+        ->assertSee('8.45')
+        ->assertSee('/kg')
+        ->call('confirm')
+        ->assertHasNoErrors();
+
+    $shop = Shop::query()->firstOrFail();
+    expect((string) $shop->pack_quantity)->toBe('200.00')
+        ->and($shop->pack_unit)->toBe('g')
+        ->and($shop->unitPrice())->toBe('8.45')
+        ->and($shop->unitPriceLabel())->toBe('/kg');
+});
+
+test('the dataset probe transports the dataset size and confirm stores it', function (): void {
+    Http::fake(ahApiDownFakes());
+    seedAhRow();
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://www.ah.nl/producten/product/wi257/ah-kruiden-roomkaas')
+        ->call('probe')
+        ->assertSet('snapshot.pack_size', '125 g')
+        ->assertSet('snapshot.pack_size_authoritative', true)
+        ->call('confirm')
+        ->assertHasNoErrors();
+
+    $shop = Shop::query()->firstOrFail();
+    expect((string) $shop->pack_quantity)->toBe('125.00')
+        ->and($shop->pack_unit)->toBe('g');
+});

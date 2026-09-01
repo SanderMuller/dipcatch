@@ -67,6 +67,8 @@ final readonly class CheckjebonSource
                 'source' => 'checkjebon',
                 'refreshed_at' => $row->refreshed_at->toIso8601String(),
             ],
+            packSize: $row->size,
+            packSizeAuthoritative: true,
         ));
     }
 

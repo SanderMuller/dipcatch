@@ -77,7 +77,7 @@
 
                     if (! response.ok) {
                         try { await subscription.unsubscribe(); } catch (e) { /* ignore */ }
-                        this.disablePushToggle('Could not register browser push subscription with the server. Please try again.');
+                        this.disablePushToggle('Could not register the push subscription with the server. Try again.');
                         return;
                     }
 

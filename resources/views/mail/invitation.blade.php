@@ -1,7 +1,7 @@
 <x-mail::message>
 # You're invited to DipCatch
 
-{{ $inviterName }} has invited you to join DipCatch — track product prices and get notified when they drop.
+{{ $inviterName }} has invited you to join DipCatch. It tracks product prices and alerts you when they drop.
 
 <x-mail::button :url="$redeemUrl">
 Accept invitation

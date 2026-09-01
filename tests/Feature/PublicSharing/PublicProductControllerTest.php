@@ -299,6 +299,40 @@ test('stale cheapest_price is suppressed when no shop is currently eligible', fu
         ->assertDontSee('gone.test', escape: false);
 });
 
+test('shop with a pack size renders its unit price under the price', function (): void {
+    $product = makeSharedProduct();
+    Shop::factory()->for($product)->create([
+        'url' => 'https://bol.com/p/headphones',
+        'current_price' => '1.69',
+        'currency' => 'EUR',
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertOk()
+        ->assertSee('EUR 8.45 /kg', escape: false);
+});
+
+test('shop without a pack size shows no unit price', function (): void {
+    $product = makeSharedProduct();
+    Shop::factory()->for($product)->create([
+        'url' => 'https://bol.com/p/headphones',
+        'current_price' => '85.00',
+        'currency' => 'EUR',
+        'pack_quantity' => null,
+        'pack_unit' => null,
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertOk()
+        ->assertDontSee('/kg', escape: false)
+        ->assertDontSee(' /l', escape: false)
+        ->assertDontSee('/stuk', escape: false);
+});
+
 test('throttle: the 121st request in a minute returns 429', function (): void {
     makeSharedProduct();
     $slug = '/p/' . str_repeat('a', 32);

@@ -114,7 +114,9 @@ class CreateProductFromUrl extends Component
         $priceSelector = $usedManualSelector ? trim($this->priceSelector) : null;
         $titleSelector = $usedManualSelector ? (trim($this->titleSelector) ?: null) : null;
         $imageSelector = $usedManualSelector ? (trim($this->imageSelector) ?: null) : null;
+        $shopImageUrl = $this->snapshotImageUrl();
         $variantKey = $this->chosenVariantKey;
+        $packSize = $this->snapshotPackSize();
 
         $product = DB::transaction(function () use (
             $snapshotPrice,
@@ -123,7 +125,9 @@ class CreateProductFromUrl extends Component
             $priceSelector,
             $titleSelector,
             $imageSelector,
+            $shopImageUrl,
             $variantKey,
+            $packSize,
         ): Product {
             $product = Product::query()->create([
                 'user_id' => auth()->id(),
@@ -141,7 +145,10 @@ class CreateProductFromUrl extends Component
                 'price_selector' => $priceSelector,
                 'title_selector' => $titleSelector,
                 'image_selector' => $imageSelector,
+                'image_url' => $shopImageUrl,
                 'variant_key' => $variantKey,
+                'pack_quantity' => $packSize?->quantity,
+                'pack_unit' => $packSize?->unit,
                 'currency' => $snapshotCurrency,
                 'initial_price' => $snapshotPrice,
                 'initial_checked_at' => now(),

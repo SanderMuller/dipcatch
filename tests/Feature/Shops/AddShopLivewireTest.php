@@ -10,12 +10,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
 
-function fakeJsonLdOffer(string $url = 'https://shop.example.com/p/1', string $price = '50.00', string $currency = 'EUR'): array
+function fakeJsonLdOffer(string $url = 'https://shop.example.com/p/1', string $price = '50.00', string $currency = 'EUR', string $name = 'Demo Item'): array
 {
     $host = parse_url($url, PHP_URL_HOST) ?: 'shop.example.com';
     $json = json_encode([
         '@type' => 'Product',
-        'name' => 'Demo Item',
+        'name' => $name,
         'image' => 'https://shop.example.com/img.jpg',
         'offers' => [
             '@type' => 'Shop',
@@ -297,4 +297,38 @@ test('ambiguous variants surfaces chooser and selecting a variant proceeds to pr
     expect($shop)->not->toBeNull()
         ->and($shop->variant_key)->toBe('111-3')
         ->and((string) $shop->current_price)->toBe('52.86');
+});
+
+test('confirm stores the pack size parsed from a non-authoritative title', function (): void {
+    Http::fake(fakeJsonLdOffer('https://shop.example.com/p/1', '1.79', name: 'HiPRO Protein Drink Mango 300ml'));
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('snapshot.pack_size', null)
+        ->assertSet('snapshot.pack_size_authoritative', false)
+        ->call('confirm');
+
+    $shop = Shop::query()->where('product_id', $product->id)->firstOrFail();
+    expect((string) $shop->pack_quantity)->toBe('300.00')
+        ->and($shop->pack_unit)->toBe('ml');
+});
+
+test('confirm stores no pack size when the title names none', function (): void {
+    Http::fake(fakeJsonLdOffer());
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->call('confirm');
+
+    $shop = Shop::query()->where('product_id', $product->id)->firstOrFail();
+    expect($shop->pack_quantity)->toBeNull()
+        ->and($shop->pack_unit)->toBeNull()
+        ->and($shop->unitPrice())->toBeNull()
+        ->and($shop->unitPriceLabel())->toBeNull();
 });

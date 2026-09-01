@@ -14,11 +14,11 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 
-function fakeJsonLdResponse(string $host, string $path, string $price = '60.00', string $currency = 'EUR'): array
+function fakeJsonLdResponse(string $host, string $path, string $price = '60.00', string $currency = 'EUR', string $name = 'X'): array
 {
     $json = json_encode([
         '@type' => 'Product',
-        'name' => 'X',
+        'name' => $name,
         'offers' => [
             '@type' => 'Shop',
             'price' => $price,
@@ -231,4 +231,54 @@ test('successful check resets both counters and clears failing health', function
     expect($shop->consecutive_failures)->toBe(0)
         ->and($shop->consecutive_5xx_failures)->toBe(0)
         ->and($shop->health)->toBe(ShopHealth::Ok);
+});
+
+test('a scraped check parses the pack size from the JSON-LD title', function (): void {
+    Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '1.79', name: 'HiPRO Protein Drink Mango 300ml'));
+
+    $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+    expect((string) $shop->pack_quantity)->toBe('300.00')
+        ->and($shop->pack_unit)->toBe('ml')
+        ->and($shop->unitPrice())->toBe('5.97')
+        ->and($shop->unitPriceLabel())->toBe('/l');
+});
+
+test('a title without a size keeps the stored pack columns', function (): void {
+    Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '2.49', name: 'HiPRO Protein Drink Mango'));
+
+    $shop = Shop::factory()->create([
+        'url' => 'https://shop.test/p/1',
+        'pack_quantity' => '300.00',
+        'pack_unit' => 'ml',
+    ]);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+    expect((string) $shop->pack_quantity)->toBe('300.00')
+        ->and($shop->pack_unit)->toBe('ml');
+});
+
+test('a failed check never touches the pack columns', function (): void {
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('<html><body>no metadata</body></html>', 200),
+    ]);
+
+    $shop = Shop::factory()->create([
+        'url' => 'https://shop.test/p/1',
+        'pack_quantity' => '250.00',
+        'pack_unit' => 'g',
+    ]);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+    expect($shop->last_status)->toBe(ScrapeStatus::ParseError)
+        ->and((string) $shop->pack_quantity)->toBe('250.00')
+        ->and($shop->pack_unit)->toBe('g');
 });

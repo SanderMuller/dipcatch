@@ -1,14 +1,14 @@
 @php
     $h1 = __('Catch every price drop.');
-    $sub = __('Track products across the web. DipCatch watches prices around the clock and pings you the moment they fall past your threshold.');
+    $sub = __('Track products across the web. DipCatch checks prices on a schedule and tells you when one falls past your threshold.');
     $authed = auth()->check();
     $primaryHref = $authed ? url('/app') : route('login');
     $primaryLabel = $authed ? __('Open dashboard') : __('Sign in');
     $headerLabel = $authed ? __('Open app') : __('Sign in');
     $steps = [
         ['n' => '01', 'title' => __('Paste a URL'), 'body' => __('Drop in a product link and a CSS selector for the price. DipCatch grabs the title and image too.')],
-        ['n' => '02', 'title' => __('We watch the price'), 'body' => __('Scheduled scrapes record every price point. No headless browser — fast, lightweight checks.')],
-        ['n' => '03', 'title' => __('You get the dip'), 'body' => __('When the price falls past your threshold, you get an email, in-app bell, and web push.')],
+        ['n' => '02', 'title' => __('We watch the price'), 'body' => __('Scheduled scrapes record every price point. The checks are plain HTTP fetches, so they stay fast.')],
+        ['n' => '03', 'title' => __('You get the dip'), 'body' => __('When the price falls past your threshold, you get a browser push, an in-app bell entry, and a daily email digest.')],
     ];
     $tracked = [
         ['icon' => '🎧', 'name' => 'Sony WH-1000XM5', 'shop' => 'amazon.com', 'old' => 399, 'new' => 249, 'pct' => '-37.6%', 'when' => 'now'],
@@ -100,7 +100,7 @@
 
                     <section id="how-it-works" class="py-20">
                         <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('How it works') }}</h2>
-                        <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('Add a product, set a threshold, get notified. No browser extensions, no manual checking.') }}</p>
+                        <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('Add a product and set a threshold. DipCatch does the checking, so you do not need a browser extension.') }}</p>
                         <dl class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach ($steps as $step)
                                 <div class="rounded-2xl bg-white/80 p-6 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:ring-zinc-800">

@@ -21,6 +21,8 @@ use Tests\TestCase;
 |
 */
 
+pest()->tia()->locally();
+
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
@@ -71,7 +73,7 @@ expect()->extend('toBeSameTimestampAs', function (DateTimeInterface $expected): 
  * to, for one throttle key (normally the client IP).
  *
  * `RateLimiter::clear()` does not reach this state. That facade talks to the
- * cache store (`array` under phpunit.xml), while the middleware bypasses the
+ * cache store (`array` under phpunit.xml.dist), while the middleware bypasses the
  * cache and drives an `Illuminate\Redis\Limiters\DurationLimiter` straight
  * on the Redis connection. So the counter lives in a real Redis server and
  * survives between test runs, which makes a throttle test fail with 429 on
@@ -170,8 +172,24 @@ function ahApiDownFakes(): array
  *
  * @return array<string, PromiseInterface>
  */
-function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBonus = '2.19', bool $isBonus = true, string $title = "Lay's Naturel"): array
+function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBonus = '2.19', bool $isBonus = true, string $title = "Lay's Naturel", ?string $salesUnitSize = '200 g'): array
 {
+    $card = [
+        'webshopId' => 526381,
+        'title' => $title,
+        'images' => [['width' => 800, 'height' => 800, 'url' => 'https://static.ah.nl/dam/product/test.webp']],
+        'currentPrice' => (float) $currentPrice,
+        'priceBeforeBonus' => (float) $priceBeforeBonus,
+        'isBonus' => $isBonus,
+        'orderAvailabilityStatus' => 'IN_ASSORTMENT',
+    ];
+
+    // A null $salesUnitSize omits the key entirely — the partial-response
+    // case the authority flag must treat as non-authoritative.
+    if ($salesUnitSize !== null) {
+        $card['salesUnitSize'] = $salesUnitSize;
+    }
+
     return [
         'https://api.ah.nl/mobile-auth/v1/auth/token/anonymous' => Http::response([
             'access_token' => 'fake-token',
@@ -179,15 +197,7 @@ function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBon
         ]),
         'https://api.ah.nl/mobile-services/product/detail/v4/fir/*' => Http::response([
             'productId' => 526381,
-            'productCard' => [
-                'webshopId' => 526381,
-                'title' => $title,
-                'images' => [['width' => 800, 'height' => 800, 'url' => 'https://static.ah.nl/dam/product/test.webp']],
-                'currentPrice' => (float) $currentPrice,
-                'priceBeforeBonus' => (float) $priceBeforeBonus,
-                'isBonus' => $isBonus,
-                'orderAvailabilityStatus' => 'IN_ASSORTMENT',
-            ],
+            'productCard' => $card,
         ]),
     ];
 }

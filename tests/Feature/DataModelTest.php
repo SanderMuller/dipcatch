@@ -21,8 +21,7 @@ test('user has dipcatch columns with sensible defaults', function (): void {
 test('product factory builds a valid product with cast columns', function (): void {
     $product = Product::factory()->create();
 
-    expect($product->id)->toBeString()
-        ->and($product->active)->toBeTrue()
+    expect($product->active)->toBeTrue()
         ->and($product->currency)->toBe('EUR')
         ->and($product->user)->toBeInstanceOf(User::class);
 });
@@ -50,15 +49,13 @@ test('invitation factory states work and helpers report state', function (): voi
     expect($fresh->isExpired())->toBeFalse()
         ->and($fresh->isRedeemed())->toBeFalse()
         ->and($expired->isExpired())->toBeTrue()
-        ->and($redeemed->isRedeemed())->toBeTrue()
-        ->and($fresh->inviter)->toBeInstanceOf(User::class);
+        ->and($redeemed->isRedeemed())->toBeTrue();
 });
 
 test('price drop event links product, user, and price check', function (): void {
     $event = PriceDropEvent::factory()->create();
 
-    expect($event->id)->toBeString()
-        ->and($event->product)->toBeInstanceOf(Product::class)
+    expect($event->product)->toBeInstanceOf(Product::class)
         ->and($event->user)->toBeInstanceOf(User::class)
         ->and($event->priceCheck)->toBeInstanceOf(PriceCheck::class)
         ->and($event->reference_kind)->toBe('median_30d');

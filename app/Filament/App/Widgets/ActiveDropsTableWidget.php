@@ -22,7 +22,7 @@ class ActiveDropsTableWidget extends BaseWidget
         return $table
             ->heading('Active drops')
             ->emptyStateHeading('No active drops right now')
-            ->emptyStateDescription('DipCatch is watching — we\'ll alert you the moment a price drops below your threshold.')
+            ->emptyStateDescription('DipCatch is watching. We\'ll alert you when a price drops below your threshold.')
             ->query($this->scopedQuery())
             ->paginated(false)
             ->columns([

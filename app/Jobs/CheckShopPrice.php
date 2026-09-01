@@ -16,6 +16,8 @@ use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\FetchResult;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Config as DipConfig;
+use App\Support\ImageUrl;
+use App\Support\PackSize;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -125,10 +127,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   price: ?string,
      *   currency: ?string,
      *   in_stock: ?bool,
+     *   image_url: ?string,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
+     *   pack_size: ?PackSize,
+     *   pack_size_authoritative: bool,
      * }
      */
     private function checkjebonOutcome(Shop $shop, CheckjebonSource $checkjebon): array
@@ -142,10 +147,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'price' => null,
                 'currency' => null,
                 'in_stock' => null,
+                'image_url' => null,
                 'raw' => null,
                 'error' => 'checkjebon:' . $result->missReason,
                 'adapter_key' => null,
                 'fetch_result' => null,
+                'pack_size' => null,
+                'pack_size_authoritative' => false,
             ];
         }
 
@@ -158,10 +166,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   price: ?string,
      *   currency: ?string,
      *   in_stock: ?bool,
+     *   image_url: ?string,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
+     *   pack_size: ?PackSize,
+     *   pack_size_authoritative: bool,
      * }
      */
     private function sourceOutcome(ShopSnapshot $snapshot, string $adapterKey): array
@@ -171,10 +182,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'price' => $snapshot->price,
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
+            'image_url' => ImageUrl::safe($snapshot->imageUrl),
             'raw' => null,
             'error' => null,
             'adapter_key' => $adapterKey,
             'fetch_result' => null,
+            'pack_size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title),
+            'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
         ];
     }
 
@@ -187,10 +201,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   price: ?string,
      *   currency: ?string,
      *   in_stock: ?bool,
+     *   image_url: ?string,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
+     *   pack_size: ?PackSize,
+     *   pack_size_authoritative: bool,
      * }
      */
     private function fetchAndExtract(Shop $shop, ShopFetcher $fetcher, AdapterResolver $resolver): array
@@ -233,10 +250,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'price' => null,
                 'currency' => null,
                 'in_stock' => null,
+                'image_url' => null,
                 'raw' => null,
                 'error' => $extraction->failureReason,
                 'adapter_key' => $extraction->adapterKey,
                 'fetch_result' => $fetch,
+                'pack_size' => null,
+                'pack_size_authoritative' => false,
             ];
         }
 
@@ -248,10 +268,15 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'price' => $snapshot->price,
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
+            'image_url' => ImageUrl::absolute($snapshot->imageUrl, $fetch->finalUrl),
             'raw' => null,
             'error' => null,
             'adapter_key' => $extraction->adapterKey,
             'fetch_result' => $fetch,
+            // Scraped adapters carry no structured size — the title is the
+            // only source, and it is never authoritative.
+            'pack_size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title),
+            'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
         ];
     }
 
@@ -261,10 +286,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   price: ?string,
      *   currency: ?string,
      *   in_stock: ?bool,
+     *   image_url: ?string,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
+     *   pack_size: ?PackSize,
+     *   pack_size_authoritative: bool,
      * }
      */
     private function failureOutcome(FetchException $e): array
@@ -280,10 +308,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'price' => null,
             'currency' => null,
             'in_stock' => null,
+            'image_url' => null,
             'raw' => null,
             'error' => $e->getMessage(),
             'adapter_key' => null,
             'fetch_result' => null,
+            'pack_size' => null,
+            'pack_size_authoritative' => false,
         ];
     }
 
@@ -293,10 +324,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   price: ?string,
      *   currency: ?string,
      *   in_stock: ?bool,
+     *   image_url: ?string,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
+     *   pack_size: ?PackSize,
+     *   pack_size_authoritative: bool,
      * }
      */
     private function genericFailure(string $message): array
@@ -306,10 +340,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'price' => null,
             'currency' => null,
             'in_stock' => null,
+            'image_url' => null,
             'raw' => null,
             'error' => $message,
             'adapter_key' => null,
             'fetch_result' => null,
+            'pack_size' => null,
+            'pack_size_authoritative' => false,
         ];
     }
 
@@ -322,10 +359,13 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   price: ?string,
      *   currency: ?string,
      *   in_stock: ?bool,
+     *   image_url: ?string,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
+     *   pack_size: ?PackSize,
+     *   pack_size_authoritative: bool,
      * }  $outcome
      */
     private function persist(Shop $shop, array $outcome): void
@@ -371,6 +411,22 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
                 if ($outcome['adapter_key'] !== null) {
                     $updates['adapter_key'] = $outcome['adapter_key'];
+                }
+
+                // Keep the last known image when an extraction returns none —
+                // an empty picker is worse than a slightly stale thumbnail.
+                if ($outcome['image_url'] !== null) {
+                    $updates['image_url'] = $outcome['image_url'];
+                }
+
+                // An authoritative size is written verbatim — an empty or
+                // unparseable one clears the columns, because a stale unit
+                // price is worse than none. A title fallback only ever fills:
+                // a flaky title must not wipe a known size (spec Section 4).
+                $packSize = $outcome['pack_size'];
+                if ($outcome['pack_size_authoritative'] || $packSize !== null) {
+                    $updates['pack_quantity'] = $packSize?->quantity;
+                    $updates['pack_unit'] = $packSize?->unit;
                 }
             } else {
                 $updates['last_error'] = $outcome['error'];

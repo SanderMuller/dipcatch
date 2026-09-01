@@ -30,9 +30,8 @@ test('rejects private RFC1918 IPv4', function (): void {
 
 test('accepts a public host that resolves to a public IP', function (): void {
     // example.com is the canonical safe-public test fixture.
-    new UrlSafetyGuard()->assertSafe('https://example.com/p');
-
-    expect(true)->toBeTrue();
+    expect(fn () => new UrlSafetyGuard()->assertSafe('https://example.com/p'))
+        ->not->toThrow(InvalidArgumentException::class);
 });
 
 test('rejects unparseable URLs', function (): void {

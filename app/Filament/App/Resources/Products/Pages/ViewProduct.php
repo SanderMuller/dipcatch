@@ -100,7 +100,7 @@ class ViewProduct extends ViewRecord
 
         if ($updated === 0) {
             Notification::make()
-                ->title('Link changed in another tab — not rotated')
+                ->title('Link changed in another tab, not rotated')
                 ->warning()
                 ->send();
 
@@ -129,7 +129,7 @@ class ViewProduct extends ViewRecord
 
         if ($updated === 0) {
             Notification::make()
-                ->title('Link changed in another tab — not revoked')
+                ->title('Link changed in another tab, not revoked')
                 ->warning()
                 ->send();
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Drops\DetectDrop;
 use App\Enums\ShopHealth;
 use App\Services\Drops\Reference;
+use App\Support\ImageUrl;
 use App\Support\Numeric;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -90,22 +91,9 @@ class Product extends Model
             : null;
     }
 
-    /**
-     * Validate the user-supplied `image_url` against http(s) scheme before
-     * emitting it as an `og:image` or `<img src>`. Rejects `javascript:`,
-     * `data:`, `file:`, and non-string values. Returns null when unsafe so
-     * the view can omit the tag entirely instead of rendering a stub.
-     */
     public function safeImageUrl(): ?string
     {
-        $url = $this->image_url;
-        if (! is_string($url) || $url === '') {
-            return null;
-        }
-
-        $scheme = parse_url($url, PHP_URL_SCHEME);
-
-        return $scheme === 'http' || $scheme === 'https' ? $url : null;
+        return ImageUrl::safe($this->image_url);
     }
 
     /**

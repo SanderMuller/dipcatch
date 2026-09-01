@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
+use App\Support\ImageUrl;
+use App\Support\PackSize;
 use App\Support\UrlNormalizer;
 use Database\Factories\ShopFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -14,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property ShopHealth $health
+ * @property string|null $pack_quantity
+ * @property string|null $pack_unit
  */
 class Shop extends Model
 {
@@ -30,6 +34,7 @@ class Shop extends Model
         return [
             'initial_price' => 'decimal:2',
             'current_price' => 'decimal:2',
+            'pack_quantity' => 'decimal:2',
             'initial_checked_at' => 'datetime',
             'last_checked_at' => 'datetime',
             'last_success_at' => 'datetime',
@@ -87,9 +92,53 @@ class Shop extends Model
             'title_selector' => null,
             'image_selector' => null,
             'variant_key' => null,
+            'image_url' => null,
+            // A different product means a different pack: a stale size would
+            // price the new offer wrongly until the next successful check.
+            'pack_quantity' => null,
+            'pack_unit' => null,
         ])->save();
 
         return true;
+    }
+
+    /**
+     * Normalized unit price (per kg / l / piece) for the current pack price,
+     * or null when either the price or the pack size is unknown. A plain
+     * method, not an accessor — UI callers invoke it explicitly.
+     */
+    public function unitPrice(): ?string
+    {
+        $price = $this->current_price;
+
+        if (! is_string($price) && ! is_numeric($price)) {
+            return null;
+        }
+
+        return $this->packSize()?->unitPriceFor((string) $price);
+    }
+
+    /**
+     * `/kg`, `/l` or `/stuk` — null whenever {@see unitPrice()} is null, so
+     * no orphan label renders next to a missing price.
+     */
+    public function unitPriceLabel(): ?string
+    {
+        return $this->unitPrice() === null ? null : $this->packSize()?->label();
+    }
+
+    private function packSize(): ?PackSize
+    {
+        if ($this->pack_quantity === null || $this->pack_unit === null) {
+            return null;
+        }
+
+        return PackSize::of((float) $this->pack_quantity, $this->pack_unit);
+    }
+
+    public function safeImageUrl(): ?string
+    {
+        return ImageUrl::safe($this->image_url);
     }
 
     /**

@@ -49,7 +49,9 @@ class AddShop extends Component
         $priceSelector = $usedManualSelector ? trim($this->priceSelector) : null;
         $titleSelector = $usedManualSelector ? (trim($this->titleSelector) ?: null) : null;
         $imageSelector = $usedManualSelector ? (trim($this->imageSelector) ?: null) : null;
+        $imageUrl = $this->snapshotImageUrl();
         $variantKey = $this->chosenVariantKey;
+        $packSize = $this->snapshotPackSize();
 
         $offerId = DB::transaction(function () use (
             $snapshotPrice,
@@ -58,7 +60,9 @@ class AddShop extends Component
             $priceSelector,
             $titleSelector,
             $imageSelector,
+            $imageUrl,
             $variantKey,
+            $packSize,
         ): string {
             $shop = $this->product->shops()->create([
                 'url' => $this->normalizedUrl,
@@ -66,7 +70,10 @@ class AddShop extends Component
                 'price_selector' => $priceSelector,
                 'title_selector' => $titleSelector,
                 'image_selector' => $imageSelector,
+                'image_url' => $imageUrl,
                 'variant_key' => $variantKey,
+                'pack_quantity' => $packSize?->quantity,
+                'pack_unit' => $packSize?->unit,
                 'currency' => $snapshotCurrency,
                 'initial_price' => $snapshotPrice,
                 'initial_checked_at' => now(),

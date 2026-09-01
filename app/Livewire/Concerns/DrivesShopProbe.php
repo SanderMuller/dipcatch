@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\User;
 use App\PriceAdapters\ShopSnapshot;
 use App\PriceAdapters\VariantCandidate;
+use App\Support\ImageUrl;
+use App\Support\PackSize;
 
 /**
  * Probe-driving state machine shared by the Add-Shop form (existing
@@ -156,6 +158,31 @@ trait DrivesShopProbe
         $this->chosenVariantKey ??= $this->variants[0]['key'] ?? null;
     }
 
+    protected function snapshotImageUrl(): ?string
+    {
+        $image = $this->snapshot['image_url'] ?? null;
+
+        return is_string($image) && $image !== '' ? $image : null;
+    }
+
+    /**
+     * Pack size behind the previewed snapshot: the transported structured
+     * size, with the title fallback only for non-authoritative sources.
+     */
+    protected function snapshotPackSize(): ?PackSize
+    {
+        $snapshot = $this->snapshot ?? [];
+
+        $packSize = $snapshot['pack_size'] ?? null;
+        $title = $snapshot['title'] ?? null;
+
+        return PackSize::resolve(
+            is_string($packSize) ? $packSize : null,
+            (bool) ($snapshot['pack_size_authoritative'] ?? false),
+            is_string($title) ? $title : null,
+        );
+    }
+
     private function showPreview(ProbeOutcome $outcome): void
     {
         $snapshot = $outcome->snapshot;
@@ -164,10 +191,12 @@ trait DrivesShopProbe
         $this->state = 'preview';
         $this->snapshot = [
             'title' => $snapshot->title,
-            'image_url' => $snapshot->imageUrl,
+            'image_url' => ImageUrl::absolute($snapshot->imageUrl, $outcome->normalizedUrl ?? ''),
             'price' => $snapshot->price,
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
+            'pack_size' => $snapshot->packSize,
+            'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
         ];
         $this->normalizedUrl = $outcome->normalizedUrl;
         $this->host = $outcome->host;

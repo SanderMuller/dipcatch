@@ -41,7 +41,7 @@
                 </button>
             </div>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-                Anyone with this link can view the product. Existing previews may persist for some time after you stop sharing.
+                Anyone with this link can view the product. Link previews already created can stay visible for a while after you stop sharing.
             </p>
         </div>
 

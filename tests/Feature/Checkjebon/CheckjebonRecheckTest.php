@@ -22,14 +22,34 @@ function runCheck(Shop $shop): void
     );
 }
 
-function checkjebonShop(string $url = 'https://ah.nl/producten/product/wi257/roomkaas'): Shop
+/**
+ * @param  array<string, mixed>  $attributes  Extra Shop attributes applied after create.
+ */
+function checkjebonShop(string $url = 'https://ah.nl/producten/product/wi257/roomkaas', array $attributes = []): Shop
 {
     $product = Product::factory()->create(['currency' => 'EUR']);
 
-    return Shop::factory()->for($product)->create([
+    $shop = Shop::factory()->for($product)->create([
         'url' => $url,
         'adapter_key' => 'checkjebon',
         'current_price' => '9.99',
+    ]);
+    if ($attributes !== []) {
+        $shop->forceFill($attributes)->save();
+    }
+
+    return $shop;
+}
+
+function seedAhDatasetRow(string $size, string $price = '1.15'): void
+{
+    CheckjebonPrice::query()->create([
+        'supermarket' => 'ah',
+        'external_id' => 'wi257',
+        'name' => 'AH Kruiden roomkaas',
+        'price' => $price,
+        'size' => $size,
+        'refreshed_at' => now(),
     ]);
 }
 
@@ -118,4 +138,81 @@ test('re-listed product recovers the shop on the next check', function (): void 
     expect($shop->consecutive_failures)->toBe(0)
         ->and($shop->last_status)->toBe(ScrapeStatus::Ok)
         ->and((string) $shop->current_price)->toBe('1.25');
+});
+
+test('an AH recheck stores the pack size from salesUnitSize', function (): void {
+    Http::fake(ahApiProductFakes(currentPrice: '1.69', salesUnitSize: '200 g'));
+    Http::preventStrayRequests();
+
+    $shop = checkjebonShop('https://ah.nl/producten/product/wi526381/lay-s-naturel');
+    runCheck($shop);
+
+    $shop->refresh();
+    expect((string) $shop->pack_quantity)->toBe('200.00')
+        ->and($shop->pack_unit)->toBe('g');
+});
+
+test('a packaging change overwrites the stored pack size', function (): void {
+    Http::fake(ahApiProductFakes(currentPrice: '1.69', salesUnitSize: '250 g'));
+    Http::preventStrayRequests();
+
+    $shop = checkjebonShop('https://ah.nl/producten/product/wi526381/lay-s-naturel', [
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
+    ]);
+    runCheck($shop);
+
+    expect((string) $shop->refresh()->pack_quantity)->toBe('250.00');
+});
+
+test('an AH response without the salesUnitSize key keeps the stored pack size', function (): void {
+    Http::fake(ahApiProductFakes(currentPrice: '1.69', salesUnitSize: null));
+    Http::preventStrayRequests();
+
+    $shop = checkjebonShop('https://ah.nl/producten/product/wi526381/lay-s-naturel', [
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
+    ]);
+    runCheck($shop);
+
+    $shop->refresh();
+    expect((string) $shop->pack_quantity)->toBe('200.00')
+        ->and($shop->pack_unit)->toBe('g');
+});
+
+test('an authoritative empty size clears the pack columns', function (): void {
+    Http::fake(ahApiDownFakes());
+    seedAhDatasetRow('');
+
+    $shop = checkjebonShop(attributes: ['pack_quantity' => '125.00', 'pack_unit' => 'g']);
+    runCheck($shop);
+
+    $shop->refresh();
+    expect($shop->last_status)->toBe(ScrapeStatus::Ok)
+        ->and($shop->pack_quantity)->toBeNull()
+        ->and($shop->pack_unit)->toBeNull();
+});
+
+test('an authoritative unparseable size clears the pack columns', function (): void {
+    Http::fake(ahApiDownFakes());
+    seedAhDatasetRow('48+ plakken');
+
+    $shop = checkjebonShop(attributes: ['pack_quantity' => '125.00', 'pack_unit' => 'g']);
+    runCheck($shop);
+
+    $shop->refresh();
+    expect($shop->pack_quantity)->toBeNull()
+        ->and($shop->pack_unit)->toBeNull();
+});
+
+test('a dataset recheck stores the dataset size', function (): void {
+    Http::fake(ahApiDownFakes());
+    seedAhDatasetRow('0,75 l');
+
+    $shop = checkjebonShop();
+    runCheck($shop);
+
+    $shop->refresh();
+    expect((string) $shop->pack_quantity)->toBe('750.00')
+        ->and($shop->pack_unit)->toBe('ml');
 });

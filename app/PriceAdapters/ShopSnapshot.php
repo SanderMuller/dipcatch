@@ -19,5 +19,13 @@ final readonly class ShopSnapshot
         public string $currency,     // ISO 4217 uppercase, e.g. "EUR"
         public bool $inStock,
         public array $raw = [],
+        /** Raw pack-size text from the source, e.g. "200 g". */
+        public ?string $packSize = null,
+        /**
+         * True when a structured source supplied the size field at all, even
+         * empty — an authoritative empty size clears stored pack data, while
+         * a non-authoritative snapshot allows the title fallback.
+         */
+        public bool $packSizeAuthoritative = false,
     ) {}
 }

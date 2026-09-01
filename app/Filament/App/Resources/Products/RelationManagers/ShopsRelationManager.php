@@ -77,6 +77,18 @@ class ShopsRelationManager extends RelationManager
                     ))
                     ->sortable(),
 
+                TextColumn::make('unit_price')
+                    ->label('Unit price')
+                    ->state(function (Shop $record): string {
+                        $unitPrice = $record->unitPrice();
+
+                        if ($unitPrice === null) {
+                            return '—';
+                        }
+
+                        return MoneyFormatter::format($unitPrice, $record->currency) . ' ' . $record->unitPriceLabel();
+                    }),
+
                 IconColumn::make('current_in_stock')
                     ->label('In stock')
                     ->boolean(),
@@ -122,7 +134,7 @@ class ShopsRelationManager extends RelationManager
                             ->label('URL')
                             ->url()
                             ->required()
-                            ->helperText('We will fetch the new page right now and update the price.'),
+                            ->helperText('We fetch the new page now and update the price.'),
                     ])
                     ->action(function (array $data, Shop $record, RelationManager $livewire): void {
                         /** @var array<string, mixed> $data */
@@ -138,7 +150,7 @@ class ShopsRelationManager extends RelationManager
                     ->schema([
                         Textarea::make('notes')
                             ->label('Notes (private)')
-                            ->placeholder('Anything worth remembering about this shop — shipping limits, coupons, payment quirks…')
+                            ->placeholder('Anything worth remembering about this shop: shipping limits, coupons, payment quirks.')
                             ->rows(4)
                             ->maxLength(64000)
                             ->columnSpanFull(),
@@ -223,7 +235,7 @@ class ShopsRelationManager extends RelationManager
         }
 
         if (UrlNormalizer::hash($normalized) === $record->url_hash) {
-            self::notify('URL is already that — nothing to update');
+            self::notify('That URL is already saved. Nothing to update.');
 
             return;
         }

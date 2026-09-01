@@ -62,13 +62,13 @@ class NotificationSettings extends Page
                     ->schema([
                         Toggle::make('notify_via_email')
                             ->label('Daily email digest')
-                            ->helperText('One summary email per day at 09:00 in your local timezone, grouped by product. Real-time email per drop is no longer sent.'),
+                            ->helperText('One email per day at 09:00 in your local timezone, grouped by product. DipCatch no longer sends an email per drop.'),
                         Toggle::make('notify_via_filament')
                             ->label('In-app (bell) notifications')
-                            ->helperText('Real-time — one entry per drop.'),
+                            ->helperText('Sent right away, one entry per drop.'),
                         Toggle::make('notify_via_push')
                             ->label('Browser push notifications')
-                            ->helperText('Real-time — requires granting permission in your browser. The toggle stays off if permission is denied.'),
+                            ->helperText('Sent right away. Your browser must grant permission first. The toggle stays off if you deny it.'),
                     ])
                     ->columns(1),
 
@@ -81,7 +81,7 @@ class NotificationSettings extends Page
                             ->required(),
                         Select::make('timezone')
                             ->label('Timezone')
-                            ->helperText('Used to anchor the daily 09:00 digest. Pick the timezone you want the digest to arrive in.')
+                            ->helperText('Sets when the 09:00 digest arrives. Pick the timezone you want it in.')
                             ->options(IanaTimezones::options())
                             ->searchable()
                             ->required()

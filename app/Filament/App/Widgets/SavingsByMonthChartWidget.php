@@ -11,7 +11,7 @@ class SavingsByMonthChartWidget extends ChartWidget
 {
     protected ?string $heading = 'Savings by month';
 
-    protected ?string $description = 'Σ drop_abs from each fired alert, last 12 months. Per-currency datasets — no FX conversion in v1.';
+    protected ?string $description = 'Total saved across all fired alerts, last 12 months. One dataset per currency, with no currency conversion.';
 
     protected static ?int $sort = 4;
 

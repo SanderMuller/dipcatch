@@ -87,7 +87,7 @@ test('Lifetime savings empty state when no drops yet', function (): void {
 
     livewire(StatsOverviewWidget::class)
         ->assertSeeText('EUR 0.00')
-        ->assertSeeText('No drops fired yet');
+        ->assertSeeText('No drops fired yet. Keep tracking.');
 });
 
 test('cross-user isolation: another user\'s drops do not leak into savings sum', function (): void {

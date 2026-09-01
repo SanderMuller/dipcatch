@@ -15,6 +15,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 class ProductsTable
@@ -22,6 +23,7 @@ class ProductsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->with('cheapestShop'))
             ->columns([
                 ImageColumn::make('image_url')
                     ->label('Image')
@@ -41,6 +43,18 @@ class ProductsTable
                         $record->currency,
                     ))
                     ->sortable(),
+
+                TextColumn::make('cheapest_shop_unit_price')
+                    ->label('Unit price')
+                    ->state(function (Product $record): string {
+                        $unitPrice = $record->cheapestShop?->unitPrice();
+
+                        if ($unitPrice === null) {
+                            return '—';
+                        }
+
+                        return MoneyFormatter::format($unitPrice, $record->currency) . ' ' . $record->cheapestShop?->unitPriceLabel();
+                    }),
 
                 TextColumn::make('shops_count')
                     ->label('Shops')

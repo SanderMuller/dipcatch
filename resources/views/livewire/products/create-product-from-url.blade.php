@@ -45,6 +45,16 @@
     @endif
 
     @if ($state === 'preview' && $snapshot !== null)
+        @php
+            $previewPackSize = $this->snapshotPackSize();
+            $previewUnitPrice = null;
+            if ($previewPackSize !== null && is_string($snapshot['price'] ?? null)) {
+                $previewUnitPriceValue = $previewPackSize->unitPriceFor($snapshot['price']);
+                if ($previewUnitPriceValue !== null) {
+                    $previewUnitPrice = \App\Support\MoneyFormatter::format($previewUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
+                }
+            }
+        @endphp
         <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 space-y-4">
             @if ($existingTrackedProduct !== null)
                 <div class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
@@ -69,11 +79,14 @@
                             <span class="ml-2 inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Out of stock</span>
                         @endif
                     </div>
+                    @if ($previewUnitPrice !== null)
+                        <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">{{ $previewUnitPrice }}</p>
+                    @endif
                     @if ($adapterKey === 'user-selector')
                         <p class="mt-1 text-xs text-zinc-500">Extracted via manual selector.</p>
                     @endif
                     @if ($adapterKey === 'checkjebon')
-                        <p class="mt-1 text-xs text-zinc-500">Daily price via checkjebon.nl — no product image available.</p>
+                        <p class="mt-1 text-xs text-zinc-500">Daily price via checkjebon.nl. No product image available.</p>
                     @endif
                 </div>
             </div>
@@ -129,7 +142,7 @@
                         @error('thresholdAbs') <p class="{{ $errorTextClass }}">{{ $message }}</p> @enderror
                     </div>
                 </div>
-                <p class="{{ $helpClass }}">Suggested from the price — you get notified when the price drops past either threshold.</p>
+                <p class="{{ $helpClass }}">Suggested from the price. You get notified when the price drops past either threshold.</p>
 
                 <div class="flex gap-2">
                     <button type="submit" class="{{ $primaryBtn }}" wire:loading.attr="disabled">

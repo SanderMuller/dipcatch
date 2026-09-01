@@ -145,6 +145,12 @@ final readonly class AhApiSource
         $image = data_get($card, 'images.0.url');
         $orderable = data_get($card, 'orderAvailabilityStatus');
 
+        // Presence of the key — not a nullable read — decides authority: a
+        // partial response without `salesUnitSize` must never clear stored
+        // pack data (spec Section 4).
+        $hasSalesUnitSize = array_key_exists('salesUnitSize', $card);
+        $salesUnitSize = $hasSalesUnitSize && is_string($card['salesUnitSize']) ? $card['salesUnitSize'] : null;
+
         return new ShopSnapshot(
             title: is_string($title) && $title !== '' ? $title : 'AH product',
             imageUrl: is_string($image) ? $image : null,
@@ -156,6 +162,8 @@ final readonly class AhApiSource
                 'is_bonus' => (bool) data_get($card, 'isBonus'),
                 'price_before_bonus' => data_get($card, 'priceBeforeBonus'),
             ],
+            packSize: $salesUnitSize,
+            packSizeAuthoritative: $hasSalesUnitSize,
         );
     }
 

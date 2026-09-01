@@ -35,7 +35,7 @@ final class PublicProductController extends Controller
 
         /** @var EloquentCollection<int, Shop> $shops */
         $shops = $product->shops()
-            ->select(['id', 'product_id', 'host', 'current_price', 'current_in_stock', 'currency', 'last_checked_at', 'url'])
+            ->select(['id', 'product_id', 'host', 'current_price', 'current_in_stock', 'currency', 'last_checked_at', 'url', 'pack_quantity', 'pack_unit'])
             ->where('active', true)
             ->where('current_in_stock', true)
             ->where('health', '!=', ShopHealth::Dead->value)

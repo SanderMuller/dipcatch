@@ -63,7 +63,7 @@ class StatsOverviewWidget extends BaseWidget
 
         if ($totals === []) {
             return Stat::make('Lifetime savings', $defaultCurrency . ' 0.00')
-                ->description('No drops fired yet — keep tracking.')
+                ->description('No drops fired yet. Keep tracking.')
                 ->icon('heroicon-o-banknotes')
                 ->color('gray');
         }

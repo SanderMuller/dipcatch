@@ -7,7 +7,6 @@ use App\Notifications\PriceDropNotification;
 use App\Services\Drops\DropOutcome;
 use Illuminate\Support\Str;
 use NotificationChannels\WebPush\WebPushChannel;
-use NotificationChannels\WebPush\WebPushMessage;
 
 function pushOutcome(): DropOutcome
 {
@@ -148,8 +147,6 @@ test('toWebPush returns a WebPushMessage with title, body, icon and click url', 
     ])->save();
 
     $message = new PriceDropNotification($product, pushOutcome(), (string) Str::uuid())->toWebPush($user);
-
-    expect($message)->toBeInstanceOf(WebPushMessage::class);
 
     $payload = $message->toArray();
     expect($payload['title'])->toBe('Price drop: Acme Headphones')

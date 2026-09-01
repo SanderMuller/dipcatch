@@ -113,28 +113,28 @@ Migration `add_pack_size_to_shops_table` (self-contained literals, appended colu
 
 **ID:** parser · **Depends:** none
 
-- [ ] `App\Support\PackSize` value object + `parse()` — Section 2's five-step algorithm incl. multipacks (`x`/`×`/`à`/`-pack`), comma decimals, unit anchoring.
-- [ ] Unit-price math + label helper (`/kg`, `/l`, `/stuk`) on the value object — price string in, formatted unit price out.
-- [ ] Tests — every Section 2 example incl. multipacks, comma decimals, piece vocabulary, the exact five-step algorithm (buckets, vel-drop, single-token rule), and the misleading-number rows.
+- [x] `App\Support\PackSize` value object + `parse()` — Section 2's five-step algorithm incl. multipacks (`x`/`×`/`à`/`-pack`), comma decimals, unit anchoring.
+- [x] Unit-price math + label helper (`/kg`, `/l`, `/stuk`) on the value object — price string in, formatted unit price out.
+- [x] Tests — every Section 2 example incl. multipacks, comma decimals, piece vocabulary, the exact five-step algorithm (buckets, vel-drop, single-token rule), and the misleading-number rows.
 
 ### Phase 2: Columns + source plumbing (Priority: HIGH)
 
 **ID:** plumbing · **Depends:** parser
 
-- [ ] Migration `add_pack_size_to_shops_table` + `Shop::unitPrice()` / `unitPriceLabel()` methods + docblock — Section 3.
-- [ ] `ShopSnapshot::$packSize` + `$packSizeAuthoritative` + fills in `AhApiSource` / `CheckjebonSource` + both keys in `DrivesShopProbe::showPreview()`'s snapshot array — Section 4.
-- [ ] Persist on probe confirm (both Livewire components) with title fallback — Section 4.
-- [ ] Recheck outcomes carry pack fields + authority flag; `persist()` applies the Section 4 semantics (authoritative writes verbatim incl. clears; fallback only fills); `Shop::updateUrl()` clears both columns — Section 4.
-- [ ] Tests — AH probe stores 200 g from `salesUnitSize`; checkjebon probe stores the dataset size; Jumbo recheck parses the title; probe-to-confirm round trip persists `pack_size`; title-null keeps values; structured-empty and structured-unparseable clear; URL edit clears; packaging change overwrites.
+- [x] Migration `add_pack_size_to_shops_table` + `Shop::unitPrice()` / `unitPriceLabel()` methods + docblock — Section 3.
+- [x] `ShopSnapshot::$packSize` + `$packSizeAuthoritative` + fills in `AhApiSource` / `CheckjebonSource` + both keys in `DrivesShopProbe::showPreview()`'s snapshot array — Section 4.
+- [x] Persist on probe confirm (both Livewire components) with title fallback — Section 4.
+- [x] Recheck outcomes carry pack fields + authority flag; `persist()` applies the Section 4 semantics (authoritative writes verbatim incl. clears; fallback only fills); `Shop::updateUrl()` clears both columns — Section 4.
+- [x] Tests — AH probe stores 200 g from `salesUnitSize`; checkjebon probe stores the dataset size; Jumbo recheck parses the title; probe-to-confirm round trip persists `pack_size`; title-null keeps values; structured-empty and structured-unparseable clear; URL edit clears; packaging change overwrites.
 
 ### Phase 3: UI (Priority: HIGH)
 
 **ID:** ui · **Depends:** plumbing
 
-- [ ] Shops-table `Unit price` column + products-list cheapest unit price — Section 5.
-- [ ] Probe-preview unit price in both blades — Section 5.
-- [ ] Public share page unit price per shop row incl. the controller's explicit column select — Section 5.
-- [ ] Tests — Livewire/page tests assert the rendered unit price and the `—` empty state; browser eye-verify per Section 5.
+- [x] Shops-table `Unit price` column + products-list cheapest unit price — Section 5.
+- [x] Probe-preview unit price in both blades — Section 5.
+- [x] Public share page unit price per shop row incl. the controller's explicit column select — Section 5.
+- [x] Tests — Livewire/page tests assert the rendered unit price and the `—` empty state; browser eye-verify per Section 5.
 
 ---
 
@@ -161,4 +161,6 @@ None.
 
 ## Findings
 
-<!-- Notes added during implementation. Do not remove this section. -->
+- **Phase 3.** Previews call the protected `DrivesShopProbe::snapshotPackSize()` from Blade (valid: Livewire binds the view closure to the component scope — verified against Livewire source). Products list eager-loads `cheapestShop` via `modifyQueryUsing`. Filament column-state closure left without its own render test; math covered by Phase 1/2, wiring mirrors the `current_price` column. Browser eye-verify deferred to the orchestrator.
+- **Phase 2.** `PackSize` gained two additive helpers: `of(float, string)` (rebuild from stored columns) and `resolve(?string, bool, ?string)` — the single implementation of the authority/title-fallback rule shared by the Livewire trait, the recheck job, and the Phase 3 preview. `ahApiProductFakes()` expresses key-absence by omitting `salesUnitSize` when passed null. A checkjebon row with a null/empty `size` is authoritative and clears pack columns on recheck, per Section 4.
+- **Phase 1 (vel-drop ordering).** Spec step 2 vs step 3 contradict for `"8 rollen à 200 vel"` (à-multipack syntax vs the stated 8-pieces result). Resolved in favour of the spec's worked examples: when any non-`vel` piece token exists, `<number> vel/vellen` occurrences are stripped BEFORE multipack detection, not only at bucket collection. `"200 vellen"` alone still counts. 42 parser tests green.
