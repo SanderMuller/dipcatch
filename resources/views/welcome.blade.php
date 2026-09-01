@@ -45,7 +45,7 @@
                         <div class="lg:col-span-7">
                             <span class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:text-zinc-300 dark:ring-zinc-800">
                                 <span class="size-1.5 rounded-full bg-emerald-500"></span>
-                                {{ __('Invite-only beta') }}
+                                {{ __('Open beta') }}
                             </span>
                             <h1 class="mt-6 max-w-[24ch] text-4xl font-semibold tracking-tight text-balance sm:text-6xl">{{ $h1 }}</h1>
                             <p class="mt-6 max-w-[48ch] text-lg text-pretty text-zinc-600 sm:text-xl dark:text-zinc-400">{{ $sub }}</p>
@@ -55,9 +55,11 @@
                                 </div>
                             @else
                                 <div class="mt-10">
-                                    <livewire:waitlist-signup />
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <a href="{{ route('register') }}" class="inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-white dark:text-zinc-900 dark:shadow-none dark:hover:bg-zinc-200">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
+                                    </div>
                                     <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                                        {{ __('Already invited?') }}
+                                        {{ __('Already have an account?') }}
                                         <a href="{{ route('login') }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ __('Sign in') }}</a>
                                     </p>
                                 </div>

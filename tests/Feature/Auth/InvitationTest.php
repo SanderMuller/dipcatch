@@ -13,10 +13,6 @@ beforeEach(function (): void {
     clearRedisRateLimiter('invitation');
 });
 
-test('register route does not exist (invite-only)', function (): void {
-    $this->get('/register')->assertNotFound();
-});
-
 test('show invitation page renders for a fresh token', function (): void {
     $invitation = Invitation::factory()->create();
 

@@ -146,8 +146,7 @@ return [
     */
 
     'features' => [
-        // Public registration is disabled — DipCatch is invite-only.
-        // Features::registration(),
+        Features::registration(),
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([

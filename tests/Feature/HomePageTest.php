@@ -9,23 +9,24 @@ beforeEach(function (): void {
     RateLimiter::clear('waitlist:127.0.0.1');
 });
 
-test('guests see the homepage with the wait list form', function (): void {
+test('guests see the homepage with the register CTA', function (): void {
     $response = $this->get(route('home'));
 
     $response->assertOk();
     $response->assertSee('Catch every price drop.', escape: false);
-    $response->assertSee('Join wait list');
+    $response->assertSee('Create a free account');
+    $response->assertSee(route('register'));
     $response->assertSee(route('login'));
 });
 
-test('authenticated users see the dashboard CTA instead of the wait list', function (): void {
+test('authenticated users see the dashboard CTA instead of the register CTA', function (): void {
     $this->actingAs(User::factory()->create());
 
     $response = $this->get(route('home'));
 
     $response->assertOk();
     $response->assertSee('Open dashboard');
-    $response->assertDontSee('Join wait list');
+    $response->assertDontSee('Create a free account');
 });
 
 test('a guest can join the wait list', function (): void {
@@ -144,12 +145,12 @@ test('honeypot fill silently succeeds without writing a row or hitting the rate 
 });
 
 test('honeypot field is rendered off-screen and aria-hidden', function (): void {
-    $response = $this->get(route('home'));
-
-    $response->assertOk();
-    $response->assertSee('-left-[9999px]', escape: false);
-    $response->assertSee('aria-hidden="true"', escape: false);
-    $response->assertSee('id="waitlist-company"', escape: false);
+    // The homepage no longer embeds the waitlist form (open registration),
+    // so render the component directly.
+    Livewire::test('waitlist-signup')
+        ->assertSeeHtml('-left-[9999px]')
+        ->assertSeeHtml('aria-hidden="true"')
+        ->assertSeeHtml('id="waitlist-company"');
 });
 
 test('responses carry the Strict-Transport-Security header', function (): void {
