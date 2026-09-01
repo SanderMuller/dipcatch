@@ -285,3 +285,23 @@ test('null product with manual selectors falls back to EUR when no currency chos
     expect($outcome->isSuccess())->toBeTrue()
         ->and($outcome->snapshot?->currency)->toBe('EUR');
 });
+
+test('a shop that renders its price in the browser is refused without a fetch', function (): void {
+    Http::fake(); // any HTTP call would be an unexpected fetch
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $outcome = app(ProbeShopUrl::class)(
+        $product,
+        'https://www.plus.nl/product/fanta-orange-fles-1500-ml-991700',
+        $user,
+    );
+
+    expect($outcome->errorCode)->toBe(ProbeFailure::ShopNotServable)
+        ->and($outcome->context['reason'] ?? null)->toBe('plus_spa')
+        // No manual selector: there is no markup to select from.
+        ->and($outcome->shouldOfferManualSelector())->toBeFalse();
+
+    Http::assertNothingSent();
+});

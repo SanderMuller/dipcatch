@@ -136,6 +136,9 @@
                     @case('currency_mismatch')
                         That shop sells in {{ $errorContext['actual'] ?? '?' }} but this product is tracked in {{ $errorContext['expected'] ?? '?' }}. Multi-currency tracking is not supported yet.
                         @break
+                    @case('shop_not_servable')
+                        This shop builds its prices in the browser, so there is nothing for DipCatch to read on the page. It cannot be tracked.
+                        @break
                     @case('not_in_dataset')
                         @php $njReason = $errorContext['reason'] ?? null; @endphp
                         @if ($njReason === 'unrecognized_url')

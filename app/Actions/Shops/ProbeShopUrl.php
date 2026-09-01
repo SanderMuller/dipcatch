@@ -17,6 +17,7 @@ use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
 use App\Services\ShopFetcher\ShopFetcher;
+use App\Support\UnservableShops;
 use App\Support\UrlNormalizer;
 use Illuminate\Support\Facades\RateLimiter;
 use InvalidArgumentException;
@@ -68,6 +69,11 @@ final readonly class ProbeShopUrl
         // Dataset-served hosts resolve locally: no network fetch, and no
         // per-user probe budget consumed (bulk-adding must not throttle).
         $host = UrlNormalizer::normalizeHost((string) parse_url($normalizedUrl, PHP_URL_HOST));
+
+        $unservable = UnservableShops::reasonFor($host);
+        if ($unservable !== null) {
+            return ProbeOutcome::failed(ProbeFailure::ShopNotServable, ['reason' => $unservable]);
+        }
 
         $local = $this->resolveFromLocalSources($product, $normalizedUrl, $host);
         if ($local instanceof ProbeOutcome) {

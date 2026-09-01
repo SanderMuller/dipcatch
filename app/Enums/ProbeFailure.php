@@ -41,4 +41,13 @@ enum ProbeFailure: string
      * No manual selector can help: there is no HTML to select from.
      */
     case NotInDataset = 'not_in_dataset';
+
+    /**
+     * A shop whose prices are never present in the page the server can
+     * fetch — an app shell that renders its price client-side from an
+     * endpoint the user's browser is authorized for and we are not. No
+     * fetch and no manual selector can help, so the probe says so instead
+     * of offering the selector flow. See {@see UnservableShops}.
+     */
+    case ShopNotServable = 'shop_not_servable';
 }

@@ -93,7 +93,7 @@ A suggestion is *trackable* when the app can price that chain's URL today. Verif
 | poiesz | `PoieszAdapter` (added 2026-09-01), Nuxt payload | yes |
 | vomar | `VomarAdapter` (added 2026-09-01), Nuxt 2 SSR state | yes |
 | hoogvliet | Imperva challenge; the generic adapter had returned **22.33** for a 3.09 product | **no** |
-| plus | OutSystems SPA, data via signed POST endpoints | no |
+| plus | OutSystems SPA; its PDP endpoint refuses any request without the app's per-session CSRF token | no — probe refused up front |
 | dekamarkt | `DekaMarktAdapter` (added 2026-09-01) prices a pasted URL; the dataset ids still do not exist on the site | not suggested, but trackable when the user pastes the URL |
 
 Trackability is a static map keyed by chain, not a probe at render time — a per-suggestion probe would burn the 6/min per-user probe budget in `ProbeShopUrl` (`app/Actions/Shops/ProbeShopUrl.php:46`) before the user clicked anything. Hoogvliet is listed as untrackable *despite* parsing, because a confidently wrong price is worse than no price.
@@ -266,6 +266,8 @@ Stop and report — do not improvise — if any of these proves false during imp
 8. **What does a GTIN mismatch do?** **Decision:** Warn on the product page; change nothing about pricing or alerts. **Rationale:** On the Feliway product all three shops carry different EANs at 27.99–57.72, which is worth surfacing — but excluding offers from the cheapest calculation would silently drop offers that may be correct.
 
 ## Findings
+
+- **Plus cannot be adapted, and now says so (2026-09-01).** Tracing the live app showed the product page is a 7 KB shell that fetches its data from `POST /screenservices/ECP_Product_CW/ProductDetails/PDPContent/DataActionGetProductDetailsAndAgeInfo`. The module version is public (`/moduleservices/moduleversioninfo`), but the endpoint answers 403 `"Invalid Login"` to a byte-identical replay of the app's own request — including from inside the logged-in browser — unless it carries the `X-CSRFToken` header the app runtime issues per session. Reaching it means impersonating a browser session rather than reading a public page, so no adapter was built. Instead `plus.nl` is listed in `UnservableShops`: the probe refuses it before fetching, with copy that explains the shop builds its prices in the browser, and it never offers the manual-selector flow — no selector can match markup that does not exist.
 
 - **DekaMarkt adapter (2026-09-01).** Same platform as Dirk, but its JSON-LD carries only Organization and WebSite data, so `DekaMarktAdapter` takes price and title from the Nuxt payload: a product record (`headerText`, `packaging`, `images`) and a price record (`normalPrice`, `offerPrice`, offer window), both keyed by `productId` and matched against the id in the URL. It reports the offer price while the window is open and the shelf price once it closes — verified against a live "1+1 GRATIS" page showing 1.59 with 1.95 struck through. This does not make DekaMarkt suggestible: the dataset's ids are a different space (they look like article numbers, matching the digits in the image filenames), so a suggestion still cannot build a link. A URL the user pastes is now tracked normally.
 
