@@ -10,7 +10,6 @@ use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\Gtin;
 use App\Support\JsObjectLiteral;
-use App\Support\UrlNormalizer;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
@@ -39,7 +38,7 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
 
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        if (! self::handles($url)) {
+        if (! HostUrl::matches($url, 'vomar.nl')) {
             return ExtractionResult::skip();
         }
 
@@ -54,7 +53,7 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
         // would raise a price-drop alert for a discount that is not one.
         $fields = JsObjectLiteral::fields($details);
 
-        $productId = self::productIdFromUrl($url);
+        $productId = HostUrl::lastNumericSegment($url);
 
         if ($productId === null) {
             // A category or search URL names no article, and the state holds
@@ -91,19 +90,6 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
         ));
     }
 
-    public static function handles(string $url): bool
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-
-        if (! is_string($host) || $host === '') {
-            return false;
-        }
-
-        $host = UrlNormalizer::normalizeHost($host);
-
-        return $host === 'vomar.nl' || str_ends_with($host, '.vomar.nl');
-    }
-
     /**
      * The `productDetails` object, cut at its own closing brace rather than
      * at a fixed width: a window that overruns the object would read a
@@ -112,20 +98,6 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
     private static function productDetails(string $html): ?string
     {
         return JsObjectLiteral::after($html, 'productDetails:{', self::MAX_OBJECT_BYTES);
-    }
-
-    private static function productIdFromUrl(string $url): ?string
-    {
-        $path = parse_url($url, PHP_URL_PATH);
-
-        if (! is_string($path)) {
-            return null;
-        }
-
-        $segments = array_values(array_filter(explode('/', $path), static fn (string $s): bool => $s !== ''));
-        $last = end($segments);
-
-        return is_string($last) && ctype_digit($last) ? $last : null;
     }
 
     /**

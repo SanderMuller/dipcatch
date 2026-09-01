@@ -9,7 +9,6 @@ use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\NuxtData;
-use App\Support\UrlNormalizer;
 use Carbon\CarbonImmutable;
 use Throwable;
 
@@ -24,6 +23,10 @@ use Throwable;
  * window). The site shows the offer price while that window is open — a
  * "1+1 GRATIS" product displays 1.59 with 1.95 struck through — so the
  * adapter reports the same number the shopper sees.
+ *
+ * The price record carries a `storeId`: DekaMarkt prices per store, and the
+ * payload holds whichever store an anonymous visitor gets. That is the price
+ * the site itself shows for such a visitor, so it is the one to track.
  */
 final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapter
 {
@@ -36,7 +39,7 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
 
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        if (! self::handles($url)) {
+        if (! HostUrl::matches($url, 'dekamarkt.nl')) {
             return ExtractionResult::skip();
         }
 
@@ -46,7 +49,7 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
             return ExtractionResult::failed('dekamarkt_no_payload');
         }
 
-        $productId = self::productIdFromUrl($url);
+        $productId = HostUrl::lastNumericSegment($url);
 
         if ($productId === null) {
             return ExtractionResult::failed('dekamarkt_no_product_id');
@@ -97,19 +100,6 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
             packSize: is_string($packaging) && $packaging !== '' ? $packaging : null,
             packSizeAuthoritative: true,
         ));
-    }
-
-    public static function handles(string $url): bool
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-
-        if (! is_string($host) || $host === '') {
-            return false;
-        }
-
-        $host = UrlNormalizer::normalizeHost($host);
-
-        return $host === 'dekamarkt.nl' || str_ends_with($host, '.dekamarkt.nl');
     }
 
     /**
@@ -197,19 +187,5 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
         }
 
         return null;
-    }
-
-    private static function productIdFromUrl(string $url): ?string
-    {
-        $path = parse_url($url, PHP_URL_PATH);
-
-        if (! is_string($path)) {
-            return null;
-        }
-
-        $segments = array_values(array_filter(explode('/', $path), static fn (string $s): bool => $s !== ''));
-        $last = end($segments);
-
-        return is_string($last) && ctype_digit($last) ? $last : null;
     }
 }

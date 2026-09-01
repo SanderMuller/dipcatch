@@ -89,7 +89,7 @@ A suggestion is *trackable* when the app can price that chain's URL today. Verif
 | lidl | dataset path for the `boodschaapje.nl` URL the dataset links to; `LidlAdapter` prices `lidl.nl` directly when a user adds that host themselves | yes |
 | dirk | `DirkAdapter`, direct scrape | yes |
 | jumbo | `JumboAdapter`, direct scrape | yes |
-| spar | JSON-LD, 3.39 correct | yes |
+| spar | `SparAdapter`: JSON-LD price plus the pack size from the offer subtitle, so SPAR shops show a unit price | yes |
 | poiesz | `PoieszAdapter` (added 2026-09-01), Nuxt payload | yes |
 | vomar | `VomarAdapter` (added 2026-09-01), Nuxt 2 SSR state | yes |
 | hoogvliet | Imperva challenge; the generic adapter had returned **22.33** for a 3.09 product | **no** |

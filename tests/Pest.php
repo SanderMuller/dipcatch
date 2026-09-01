@@ -433,3 +433,26 @@ function dekaMarktPageWithWindow(string $start, string $end): string
         $page,
     );
 }
+
+/**
+ * Trimmed replica of a spar.nl product page: JSON-LD carrying the price,
+ * name, GTIN and an HTML-escaped brand, plus the offer subtitle that holds
+ * the pack size the JSON-LD omits (observed 2026-09-02).
+ */
+function sparPage(string $price = '2.45', ?string $packSize = '200 Gram'): string
+{
+    $jsonLd = json_encode([
+        '@context' => 'http://www.schema.org/',
+        '@type' => 'Product',
+        'name' => 'Lay&#39;s chips naturel',
+        'gtin13' => '8710398526014',
+        'image' => 'https://www.spar.nl/media/lays.png',
+        'offers' => ['@type' => 'Offer', 'price' => $price, 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock'],
+    ], JSON_THROW_ON_ERROR);
+
+    $subtitle = $packSize === null ? '' : '<h2 class="c-offer__subtitle">' . $packSize . '</h2>';
+
+    return '<html><head><script type="application/ld+json">' . $jsonLd . '</script></head>'
+        . '<body>' . $subtitle . '<div id="product-offer"></div>'
+        . '<p class="spar-paragraph__14-400">125 Gram</p></body></html>';
+}

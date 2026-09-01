@@ -9,7 +9,6 @@ use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\NuxtData;
-use App\Support\UrlNormalizer;
 
 /**
  * Host-specific adapter for dirk.nl. Price and title come from the page's
@@ -28,8 +27,7 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
 
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        $host = self::hostFor($url);
-        if ($host !== 'dirk.nl' && ! str_ends_with((string) $host, '.dirk.nl')) {
+        if (! HostUrl::matches($url, 'dirk.nl')) {
             return ExtractionResult::skip();
         }
 
@@ -41,7 +39,7 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
         $snapshot = $result->snapshot;
         assert($snapshot instanceof ShopSnapshot);
 
-        $packaging = self::packagingFromNuxtPayload($html, self::productIdFromUrl($url));
+        $packaging = self::packagingFromNuxtPayload($html, HostUrl::lastNumericSegment($url));
         if ($packaging === null) {
             return $result;
         }
@@ -95,25 +93,5 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
         }
 
         return $fallback;
-    }
-
-    private static function productIdFromUrl(string $url): ?string
-    {
-        $path = parse_url($url, PHP_URL_PATH);
-        if (! is_string($path)) {
-            return null;
-        }
-
-        $segments = array_values(array_filter(explode('/', $path), static fn (string $s): bool => $s !== ''));
-        $last = end($segments);
-
-        return is_string($last) && ctype_digit($last) ? $last : null;
-    }
-
-    private static function hostFor(string $url): ?string
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-
-        return is_string($host) && $host !== '' ? UrlNormalizer::normalizeHost($host) : null;
     }
 }

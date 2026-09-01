@@ -10,7 +10,6 @@ use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\Gtin;
 use App\Support\NuxtData;
-use App\Support\UrlNormalizer;
 
 /**
  * Host-specific adapter for the Poiesz webshop. The page carries no JSON-LD,
@@ -31,7 +30,7 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, ShopAdapter
 
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        if (! self::handles($url)) {
+        if (! HostUrl::matches($url, 'poiesz-supermarkten.nl')) {
             return ExtractionResult::skip();
         }
 
@@ -41,7 +40,7 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, ShopAdapter
             return ExtractionResult::failed('poiesz_no_payload');
         }
 
-        $productId = self::productIdFromUrl($url);
+        $productId = HostUrl::lastNumericSegment($url);
 
         if ($productId === null) {
             // Without an id there is nothing to match on, and the payload
@@ -80,32 +79,5 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, ShopAdapter
             gtin: Gtin::normalize(NuxtData::value($data, $record, 'ean')),
             gtinAuthoritative: true,
         ));
-    }
-
-    public static function handles(string $url): bool
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-
-        if (! is_string($host) || $host === '') {
-            return false;
-        }
-
-        $host = UrlNormalizer::normalizeHost($host);
-
-        return $host === 'poiesz-supermarkten.nl' || str_ends_with($host, '.poiesz-supermarkten.nl');
-    }
-
-    private static function productIdFromUrl(string $url): ?string
-    {
-        $path = parse_url($url, PHP_URL_PATH);
-
-        if (! is_string($path)) {
-            return null;
-        }
-
-        $segments = array_values(array_filter(explode('/', $path), static fn (string $s): bool => $s !== ''));
-        $last = end($segments);
-
-        return is_string($last) && ctype_digit($last) ? $last : null;
     }
 }

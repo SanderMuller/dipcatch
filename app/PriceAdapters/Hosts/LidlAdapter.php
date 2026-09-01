@@ -9,7 +9,6 @@ use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\NuxtData;
-use App\Support\UrlNormalizer;
 
 /**
  * Host-specific adapter for lidl.nl. Price, title, and image come from the
@@ -27,8 +26,7 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
 
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        $host = self::hostFor($url);
-        if ($host !== 'lidl.nl' && ! str_ends_with((string) $host, '.lidl.nl')) {
+        if (! HostUrl::matches($url, 'lidl.nl')) {
             return ExtractionResult::skip();
         }
 
@@ -40,7 +38,7 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
         $snapshot = $result->snapshot;
         assert($snapshot instanceof ShopSnapshot);
 
-        $packaging = self::packagingFromNuxtPayload($html, self::productIdFromUrl($url));
+        $packaging = self::packagingFromNuxtPayload($html, HostUrl::lastSegmentDigits($url, 'p'));
         if ($packaging === null) {
             return $result;
         }
@@ -105,27 +103,4 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
     /**
      * Lidl product URLs end in a `p<digits>` segment (`/p/lay-s/p10033095`).
      */
-    private static function productIdFromUrl(string $url): ?string
-    {
-        $path = parse_url($url, PHP_URL_PATH);
-        if (! is_string($path)) {
-            return null;
-        }
-
-        $segments = array_values(array_filter(explode('/', $path), static fn (string $s): bool => $s !== ''));
-        $last = end($segments);
-
-        if (! is_string($last) || preg_match('/^p(\d+)$/', $last, $m) !== 1) {
-            return null;
-        }
-
-        return $m[1];
-    }
-
-    private static function hostFor(string $url): ?string
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-
-        return is_string($host) && $host !== '' ? UrlNormalizer::normalizeHost($host) : null;
-    }
 }
