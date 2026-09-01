@@ -12,6 +12,11 @@ class EditProduct extends EditRecord
 {
     protected static string $resource = ProductResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        return ProductResource::getUrl('view', ['record' => $this->getRecord()]);
+    }
+
     /**
      * @return ViewComponent[]
      */
