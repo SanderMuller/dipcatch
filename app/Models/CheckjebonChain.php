@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\SupermarketChains;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Model;
@@ -24,7 +25,7 @@ class CheckjebonChain extends Model
 
     public function productUrl(string $link): string
     {
-        return $this->base_url . $link;
+        return SupermarketChains::baseUrl($this->chain, $this->base_url) . $link;
     }
 
     /**

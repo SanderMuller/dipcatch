@@ -248,3 +248,13 @@ test('dismissing drops the memo so the next call reflects it', function (): void
 
     expect(collect($action($product))->pluck('chain')->all())->not->toContain('dirk');
 });
+
+test('a chain whose dataset base url is wrong gets the corrected one', function (): void {
+    seedChains();
+    seedRow('dekamarkt', 'Beemster Extra belegen 48+ plakken', '150 g', '3.39', link: '454156');
+
+    $suggestion = suggest(beemsterProduct())[0];
+
+    // The dataset still advertises /boodschappen/, which 404s on DekaMarkt.
+    expect($suggestion->url)->toBe('https://www.dekamarkt.nl/producten/x/x/x/454156');
+});

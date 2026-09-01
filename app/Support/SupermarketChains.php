@@ -33,6 +33,26 @@ final class SupermarketChains
         'lidl' => ['lidl.nl'],
     ];
 
+    /**
+     * Base URLs the dataset gets wrong. DekaMarkt's `u` still points at
+     * `/boodschappen/…`, which answers "Het artikel is niet gevonden" —
+     * its product pages live under `/producten/…` (verified 2026-09-01).
+     *
+     * @var array<string, string>
+     */
+    private const array BASE_URL_OVERRIDES = [
+        'dekamarkt' => 'https://www.dekamarkt.nl/producten/x/x/x/',
+    ];
+
+    /**
+     * The base URL a product link is appended to, preferring the dataset's
+     * own value so an upstream change follows automatically.
+     */
+    public static function baseUrl(string $chain, string $datasetBaseUrl): string
+    {
+        return self::BASE_URL_OVERRIDES[$chain] ?? $datasetBaseUrl;
+    }
+
     public static function isTrackable(string $chain): bool
     {
         return in_array($chain, self::TRACKABLE, true);
