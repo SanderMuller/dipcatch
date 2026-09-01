@@ -8,9 +8,11 @@ use App\Jobs\CheckShopPrice;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Support\Favicon;
 use App\Support\MoneyFormatter;
 use App\Support\UrlNormalizer;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -20,11 +22,13 @@ use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\On;
@@ -43,6 +47,16 @@ class ShopsRelationManager extends RelationManager
 
     private const Heroicon NOTES_ICON = Heroicon::ChatBubbleOvalLeft;
 
+    /**
+     * Relation managers on View pages are read-only by default, which
+     * silently hides the delete (Remove shop) action — this table is the
+     * product's primary management surface, so keep it writable.
+     */
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
+
     public function table(Table $table): Table
     {
         return $table
@@ -54,17 +68,27 @@ class ShopsRelationManager extends RelationManager
             ->emptyStateDescription('Paste a product URL from any webshop to start tracking its price.')
             ->emptyStateActions([])
             ->columns([
+                ImageColumn::make('image_url')
+                    ->label('')
+                    ->state(fn (Shop $record): ?string => $record->safeImageUrl())
+                    ->circular()
+                    ->imageSize(44),
+
                 TextColumn::make('host')
                     ->label('Shop')
+                    ->formatStateUsing(fn (Shop $record): HtmlString => new HtmlString(Favicon::html($record->host)))
                     ->searchable()
                     ->sortable(),
 
                 IconColumn::make('notes_indicator')
                     ->label('')
                     ->state(fn (Shop $record): bool => self::hasNotes($record))
-                    ->boolean()
-                    ->trueIcon(self::NOTES_ICON)
-                    ->falseIcon(null)
+                    ->icon(fn (Shop $record): ?Heroicon => self::hasNotes($record) ? self::NOTES_ICON : null)
+                    ->color('gray')
+                    // Mounts the registered `edit_notes` record action (only
+                    // the name is used), so the icon opens the same modal.
+                    ->action(Action::make('edit_notes'))
+                    ->disabledClick(fn (Shop $record): bool => ! self::hasNotes($record))
                     ->tooltip(fn (Shop $record): ?string => self::hasNotes($record)
                         ? Str::limit((string) $record->notes, 120)
                         : null),
@@ -107,10 +131,10 @@ class ShopsRelationManager extends RelationManager
                     ->placeholder('Never')
                     ->sortable(),
 
-                IconColumn::make('active')
-                    ->boolean()
-                    ->label('Active'),
             ])
+            // A paused (inactive) shop reads as dimmed instead of carrying
+            // its own boolean column.
+            ->recordClasses(fn (Shop $record): ?string => $record->active ? null : 'opacity-50')
             ->filters([
                 SelectFilter::make('health')
                     ->options(ShopHealth::class),
@@ -123,81 +147,83 @@ class ShopsRelationManager extends RelationManager
                     ->url(fn (Shop $record): string => $record->url)
                     ->openUrlInNewTab(),
 
-                Action::make('edit_url')
-                    ->label('Edit URL')
-                    ->icon(Heroicon::PencilSquare)
-                    ->modalHeading('Update shop URL')
-                    ->modalSubmitActionLabel('Save and re-check')
-                    ->fillForm(fn (Shop $record): array => ['url' => $record->url])
-                    ->schema([
-                        TextInput::make('url')
-                            ->label('URL')
-                            ->url()
-                            ->required()
-                            ->helperText('We fetch the new page now and update the price.'),
-                    ])
-                    ->action(function (array $data, Shop $record, RelationManager $livewire): void {
-                        /** @var array<string, mixed> $data */
-                        self::handleEditUrl($data, $record, $livewire);
-                    }),
+                ActionGroup::make([
+                    Action::make('edit_url')
+                        ->label('Edit URL')
+                        ->icon(Heroicon::PencilSquare)
+                        ->modalHeading('Update shop URL')
+                        ->modalSubmitActionLabel('Save and re-check')
+                        ->fillForm(fn (Shop $record): array => ['url' => $record->url])
+                        ->schema([
+                            TextInput::make('url')
+                                ->label('URL')
+                                ->url()
+                                ->required()
+                                ->helperText('We fetch the new page now and update the price.'),
+                        ])
+                        ->action(function (array $data, Shop $record, RelationManager $livewire): void {
+                            /** @var array<string, mixed> $data */
+                            self::handleEditUrl($data, $record, $livewire);
+                        }),
 
-                Action::make('edit_notes')
-                    ->label('Notes')
-                    ->icon(self::NOTES_ICON)
-                    ->modalHeading('Shop notes (private)')
-                    ->modalSubmitActionLabel('Save notes')
-                    ->fillForm(fn (Shop $record): array => ['notes' => $record->notes])
-                    ->schema([
-                        Textarea::make('notes')
-                            ->label('Notes (private)')
-                            ->placeholder('Anything worth remembering about this shop: shipping limits, coupons, payment quirks.')
-                            ->rows(4)
-                            ->maxLength(64000)
-                            ->columnSpanFull(),
-                    ])
-                    ->action(function (array $data, Shop $record): void {
-                        $raw = $data['notes'] ?? null;
-                        $notes = is_string($raw) ? trim($raw) : '';
-                        $record->update(['notes' => $notes === '' ? null : $notes]);
-                        self::notify('Notes saved', success: true);
-                    }),
+                    Action::make('edit_notes')
+                        ->label('Notes')
+                        ->icon(self::NOTES_ICON)
+                        ->modalHeading('Shop notes (private)')
+                        ->modalSubmitActionLabel('Save notes')
+                        ->fillForm(fn (Shop $record): array => ['notes' => $record->notes])
+                        ->schema([
+                            Textarea::make('notes')
+                                ->label('Notes (private)')
+                                ->placeholder('Anything worth remembering about this shop: shipping limits, coupons, payment quirks.')
+                                ->rows(4)
+                                ->maxLength(64000)
+                                ->columnSpanFull(),
+                        ])
+                        ->action(function (array $data, Shop $record): void {
+                            $raw = $data['notes'] ?? null;
+                            $notes = is_string($raw) ? trim($raw) : '';
+                            $record->update(['notes' => $notes === '' ? null : $notes]);
+                            self::notify('Notes saved', success: true);
+                        }),
 
-                Action::make('toggle_active')
-                    ->label(fn (Shop $record): string => $record->active ? 'Pause' : 'Resume')
-                    ->icon(fn (Shop $record): Heroicon => $record->active ? Heroicon::Pause : Heroicon::Play)
-                    ->color(fn (Shop $record): string => $record->active ? 'gray' : 'success')
-                    ->action(function (Shop $record): void {
-                        $wasInactive = ! $record->active;
-                        $record->update(['active' => ! $record->active]);
+                    Action::make('toggle_active')
+                        ->label(fn (Shop $record): string => $record->active ? 'Pause' : 'Resume')
+                        ->icon(fn (Shop $record): Heroicon => $record->active ? Heroicon::Pause : Heroicon::Play)
+                        ->color(fn (Shop $record): string => $record->active ? 'gray' : 'success')
+                        ->action(function (Shop $record): void {
+                            $wasInactive = ! $record->active;
+                            $record->update(['active' => ! $record->active]);
 
-                        $product = $record->product;
-                        if (! $product instanceof Product) {
-                            return;
-                        }
+                            $product = $record->product;
+                            if (! $product instanceof Product) {
+                                return;
+                            }
 
-                        // Toggle-on: hand the latest successful check id to
-                        // recompute so a returning cheaper offer registers as
-                        // a real drop. Toggle-off raises cheapest at most.
-                        $triggerId = $wasInactive
-                            ? self::latestSuccessfulCheckId($record)
-                            : null;
+                            // Toggle-on: hand the latest successful check id to
+                            // recompute so a returning cheaper offer registers as
+                            // a real drop. Toggle-off raises cheapest at most.
+                            $triggerId = $wasInactive
+                                ? self::latestSuccessfulCheckId($record)
+                                : null;
 
-                        $product->recomputeCheapestShop($triggerId);
-                    }),
+                            $product->recomputeCheapestShop($triggerId);
+                        }),
 
-                DeleteAction::make()
-                    ->label('Remove shop')
-                    ->icon(Heroicon::Trash)
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->modalHeading('Remove this shop?')
-                    ->modalDescription('Stops tracking this shop for the product. Price history is retained.')
-                    ->after(function (Shop $record): void {
-                        $product = $record->product;
-                        if ($product instanceof Product) {
-                            $product->recomputeCheapestShop();
-                        }
-                    }),
+                    DeleteAction::make()
+                        ->label('Remove shop')
+                        ->icon(Heroicon::Trash)
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading('Remove this shop?')
+                        ->modalDescription('Stops tracking this shop for the product. Price history is retained.')
+                        ->after(function (Shop $record): void {
+                            $product = $record->product;
+                            if ($product instanceof Product) {
+                                $product->recomputeCheapestShop();
+                            }
+                        }),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
