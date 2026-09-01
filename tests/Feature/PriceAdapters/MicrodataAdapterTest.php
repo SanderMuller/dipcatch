@@ -65,3 +65,31 @@ HTML;
 
     expect($result->snapshot?->inStock)->toBeFalse();
 });
+
+test('every field comes from the scope around the price, not a neighbouring product', function (): void {
+    $html = <<<'HTML'
+<div itemscope itemtype="https://schema.org/Product">
+  <h1 itemprop="name">Other product</h1>
+  <img itemprop="image" src="https://shop.test/other.jpg" />
+  <meta itemprop="gtin13" content="0012345678905" />
+</div>
+<div itemscope itemtype="https://schema.org/Product">
+  <h1 itemprop="name">Tracked product</h1>
+  <img itemprop="image" src="https://shop.test/tracked.jpg" />
+  <meta itemprop="gtin13" content="8712243044506" />
+  <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+    <meta itemprop="price" content="12.50" />
+    <meta itemprop="priceCurrency" content="EUR" />
+    <link itemprop="availability" href="https://schema.org/InStock" />
+  </div>
+</div>
+HTML;
+
+    $result = $this->adapter->extract('https://x.test', $html);
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->title)->toBe('Tracked product')
+        ->and($result->snapshot?->imageUrl)->toBe('https://shop.test/tracked.jpg')
+        ->and($result->snapshot?->gtin)->toBe('8712243044506')
+        ->and($result->snapshot?->price)->toBe('12.50');
+});

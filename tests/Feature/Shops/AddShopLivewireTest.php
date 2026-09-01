@@ -4,7 +4,6 @@ use App\Livewire\Shops\AddShop;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
-use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -39,7 +38,7 @@ beforeEach(function (): void {
 test('probe success shows preview state with snapshot data', function (): void {
     Http::fake(fakeJsonLdOffer());
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -52,7 +51,7 @@ test('probe success shows preview state with snapshot data', function (): void {
 test('confirm persists offer + initial price_check + recomputes cheapest', function (): void {
     Http::fake(fakeJsonLdOffer());
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -76,7 +75,7 @@ test('confirm persists offer + initial price_check + recomputes cheapest', funct
 test('cancel returns to idle and does not persist', function (): void {
     Http::fake(fakeJsonLdOffer());
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -91,7 +90,7 @@ test('duplicate URL surfaces duplicate error without fetch', function (): void {
     Http::fake(); // any HTTP would be an unexpected call
     $product = Product::factory()->create();
     Shop::factory()->for($product)->create(['url' => 'https://shop.example.com/p/1']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1?utm_source=x')
@@ -106,7 +105,7 @@ test('robots-blocked URL is rejected without persisting', function (): void {
         'https://shop.example.com/p/1' => Http::response('<html>ok</html>', 200),
     ]);
     $product = Product::factory()->create();
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -120,7 +119,7 @@ test('robots-blocked URL is rejected without persisting', function (): void {
 test('currency mismatch is surfaced inline', function (): void {
     Http::fake(fakeJsonLdOffer('https://shop.example.com/p/1', '50.00', 'GBP'));
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -137,7 +136,7 @@ test('extraction failure flips into manual_selector state without persisting', f
         'https://shop.example.com/p/1' => Http::response('<html><body>no metadata</body></html>', 200),
     ]);
     $product = Product::factory()->create();
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -166,7 +165,7 @@ test('ExtractionFailed with non-manual reason stays in error state, not manual_s
     ]);
 
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -189,7 +188,7 @@ HTML;
         'https://shop.example.com/p/1' => Http::response($html, 200, ['Content-Type' => 'text/html']),
     ]);
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -217,7 +216,7 @@ test('manual selector that matches nothing surfaces inline error', function (): 
         'https://shop.example.com/p/1' => Http::response('<html><body><div class="x">x</div></body></html>', 200, ['Content-Type' => 'text/html']),
     ]);
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -234,7 +233,7 @@ test('manual selector that matches nothing surfaces inline error', function (): 
 test('empty URL triggers empty_url error and does not fetch', function (): void {
     Http::fake();
     $product = Product::factory()->create();
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', '   ')
@@ -278,7 +277,7 @@ test('ambiguous variants surfaces chooser and selecting a variant proceeds to pr
     ]);
 
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -302,7 +301,7 @@ test('ambiguous variants surfaces chooser and selecting a variant proceeds to pr
 test('confirm stores the pack size parsed from a non-authoritative title', function (): void {
     Http::fake(fakeJsonLdOffer('https://shop.example.com/p/1', '1.79', name: 'HiPRO Protein Drink Mango 300ml'));
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
@@ -319,7 +318,7 @@ test('confirm stores the pack size parsed from a non-authoritative title', funct
 test('confirm stores no pack size when the title names none', function (): void {
     Http::fake(fakeJsonLdOffer());
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')

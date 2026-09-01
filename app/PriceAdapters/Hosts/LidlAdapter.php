@@ -54,6 +54,8 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
             raw: $snapshot->raw,
             packSize: $packaging,
             packSizeAuthoritative: true,
+            gtin: $snapshot->gtin,
+            gtinAuthoritative: $snapshot->gtinAuthoritative,
         ));
     }
 

@@ -55,6 +55,8 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
             raw: $snapshot->raw,
             packSize: $packaging,
             packSizeAuthoritative: true,
+            gtin: $snapshot->gtin,
+            gtinAuthoritative: $snapshot->gtinAuthoritative,
         ));
     }
 

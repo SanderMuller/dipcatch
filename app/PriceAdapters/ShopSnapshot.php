@@ -27,5 +27,14 @@ final readonly class ShopSnapshot
          * a non-authoritative snapshot allows the title fallback.
          */
         public bool $packSizeAuthoritative = false,
+        /** Normalized GTIN (EAN/UPC) when the source published one. */
+        public ?string $gtin = null,
+        /**
+         * True when the adapter reads GTIN fields at all. An authoritative
+         * snapshot with a null GTIN clears the stored value — a page that
+         * stopped publishing one must not keep raising a stale mismatch
+         * warning; a source with no GTIN concept leaves it untouched.
+         */
+        public bool $gtinAuthoritative = false,
     ) {}
 }

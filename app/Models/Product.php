@@ -91,6 +91,31 @@ class Product extends Model
             : null;
     }
 
+    /**
+     * Hosts reporting a GTIN that differs from another shop's, when the
+     * product's shops disagree. Two different identifiers mean the offers
+     * are different articles — a wrong-pack offer would otherwise sit in the
+     * comparison unnoticed. Pricing is deliberately left alone: a mismatch
+     * is reported, never silently excluded.
+     *
+     * @return list<string>
+     */
+    public function mismatchedGtinHosts(): array
+    {
+        $withGtin = $this->shops->filter(
+            static fn (Shop $shop): bool => is_string($shop->gtin) && $shop->gtin !== '',
+        );
+
+        if ($withGtin->pluck('gtin')->unique()->count() < 2) {
+            return [];
+        }
+
+        /** @var list<string> $hosts */
+        $hosts = $withGtin->pluck('host')->filter()->unique()->sort()->values()->all();
+
+        return $hosts;
+    }
+
     public function safeImageUrl(): ?string
     {
         return ImageUrl::safe($this->image_url);

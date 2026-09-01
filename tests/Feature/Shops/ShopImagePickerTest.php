@@ -63,7 +63,7 @@ beforeEach(function (): void {
 test('adding a shop stores the detected image on the shop', function (): void {
     Http::fake(shopImagePickerFake('https://shop.example.com/img.jpg'));
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $this->actingAs(User::factory()->create());
+    $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')

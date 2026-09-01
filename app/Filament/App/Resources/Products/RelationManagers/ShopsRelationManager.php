@@ -217,18 +217,22 @@ class ShopsRelationManager extends RelationManager
                         ->requiresConfirmation()
                         ->modalHeading('Remove this shop?')
                         ->modalDescription('Stops tracking this shop for the product. Price history is retained.')
-                        ->after(function (Shop $record): void {
+                        ->after(function (Shop $record, RelationManager $livewire): void {
                             $product = $record->product;
                             if ($product instanceof Product) {
                                 $product->recomputeCheapestShop();
                             }
+
+                            // The chain is trackable again, so the suggestions
+                            // panel may now have a row it was hiding.
+                            $livewire->dispatch('shop-removed');
                         }),
                 ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
-                        ->after(function (EloquentCollection $records): void {
+                        ->after(function (EloquentCollection $records, RelationManager $livewire): void {
                             // Bulk delete cascades price_checks via FK; recompute
                             // each affected product so the denormalized
                             // `cheapest_*` columns reflect what's left.
@@ -236,6 +240,8 @@ class ShopsRelationManager extends RelationManager
                             Product::query()->whereIn('id', $productIds)->each(
                                 fn (Product $product) => $product->recomputeCheapestShop(),
                             );
+
+                            $livewire->dispatch('shop-removed');
                         }),
                 ]),
             ]);

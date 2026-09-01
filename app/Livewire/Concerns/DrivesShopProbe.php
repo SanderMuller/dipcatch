@@ -66,6 +66,11 @@ trait DrivesShopProbe
 
     public function probeWithSelectors(ProbeShopUrl $probe): void
     {
+        // Resolve the subject before the early return below: implementations
+        // authorize the hydrated product here, and a public Livewire action
+        // must not touch component state for a product the caller cannot see.
+        $this->probeSubject();
+
         $price = trim($this->priceSelector);
         if ($price === '') {
             $this->errorCode = 'user_selector_required';
@@ -83,6 +88,8 @@ trait DrivesShopProbe
 
     public function selectVariant(ProbeShopUrl $probe): void
     {
+        $this->probeSubject();
+
         if ($this->chosenVariantKey === null || $this->chosenVariantKey === '') {
             return;
         }
@@ -92,6 +99,8 @@ trait DrivesShopProbe
 
     public function showManualSelector(): void
     {
+        $this->probeSubject();
+
         $this->state = 'manual_selector';
         $this->errorCode = null;
         $this->errorContext = null;
@@ -158,6 +167,13 @@ trait DrivesShopProbe
         $this->chosenVariantKey ??= $this->variants[0]['key'] ?? null;
     }
 
+    protected function snapshotGtin(): ?string
+    {
+        $gtin = $this->snapshot['gtin'] ?? null;
+
+        return is_string($gtin) && $gtin !== '' ? $gtin : null;
+    }
+
     protected function snapshotImageUrl(): ?string
     {
         $image = $this->snapshot['image_url'] ?? null;
@@ -192,6 +208,7 @@ trait DrivesShopProbe
         $this->snapshot = [
             'title' => $snapshot->title,
             'image_url' => ImageUrl::absolute($snapshot->imageUrl, $outcome->normalizedUrl ?? ''),
+            'gtin' => $snapshot->gtin,
             'price' => $snapshot->price,
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,

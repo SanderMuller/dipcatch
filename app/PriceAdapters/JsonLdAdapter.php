@@ -2,6 +2,7 @@
 
 namespace App\PriceAdapters;
 
+use App\Support\Gtin;
 use JsonException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -129,6 +130,8 @@ final readonly class JsonLdAdapter implements ShopAdapter
             currency: strtoupper($currency),
             inStock: self::extractInStock($shop),
             raw: ['offer' => $shop],
+            gtin: Gtin::fromEntities([$product, $shop]),
+            gtinAuthoritative: true,
         ));
     }
 

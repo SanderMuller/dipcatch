@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Actions\Suggestions\SuggestShops;
 use App\Health\CheckjebonFreshnessCheck;
 use App\Health\LastSuccessfulScrapeCheck;
 use App\PriceAdapters\AdapterResolver;
@@ -26,6 +27,11 @@ final class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // One suggestion computation per request: the product page renders
+        // the suggestions component twice, and the catalogue scan is the
+        // expensive part.
+        $this->app->scoped(SuggestShops::class);
+
         $this->app->singleton(AdapterResolver::class, function (): AdapterResolver {
             /** @var list<class-string<ShopAdapter>> $classes */
             $classes = (array) config('dipcatch.adapters', []);

@@ -128,6 +128,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
@@ -148,6 +150,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'currency' => null,
                 'in_stock' => null,
                 'image_url' => null,
+                'gtin' => null,
+                'gtin_authoritative' => false,
                 'raw' => null,
                 'error' => 'checkjebon:' . $result->missReason,
                 'adapter_key' => null,
@@ -167,6 +171,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
@@ -183,6 +189,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
             'image_url' => ImageUrl::safe($snapshot->imageUrl),
+            'gtin' => $snapshot->gtin,
+            'gtin_authoritative' => $snapshot->gtinAuthoritative,
             'raw' => null,
             'error' => null,
             'adapter_key' => $adapterKey,
@@ -202,6 +210,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
@@ -251,6 +261,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'currency' => null,
                 'in_stock' => null,
                 'image_url' => null,
+                'gtin' => null,
+                'gtin_authoritative' => false,
                 'raw' => null,
                 'error' => $extraction->failureReason,
                 'adapter_key' => $extraction->adapterKey,
@@ -269,6 +281,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
             'image_url' => ImageUrl::absolute($snapshot->imageUrl, $fetch->finalUrl),
+            'gtin' => $snapshot->gtin,
+            'gtin_authoritative' => $snapshot->gtinAuthoritative,
             'raw' => null,
             'error' => null,
             'adapter_key' => $extraction->adapterKey,
@@ -287,6 +301,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
@@ -309,6 +325,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'currency' => null,
             'in_stock' => null,
             'image_url' => null,
+            'gtin' => null,
+            'gtin_authoritative' => false,
             'raw' => null,
             'error' => $e->getMessage(),
             'adapter_key' => null,
@@ -325,6 +343,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
@@ -341,6 +361,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'currency' => null,
             'in_stock' => null,
             'image_url' => null,
+            'gtin' => null,
+            'gtin_authoritative' => false,
             'raw' => null,
             'error' => $message,
             'adapter_key' => null,
@@ -360,6 +382,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
@@ -417,6 +441,15 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 // an empty picker is worse than a slightly stale thumbnail.
                 if ($outcome['image_url'] !== null) {
                     $updates['image_url'] = $outcome['image_url'];
+                }
+
+                // The GTIN follows the opposite rule: an adapter that reads
+                // GTIN fields and finds none is authoritative, and the stored
+                // value is cleared — a mismatch warning must not outlive the
+                // data it was raised on. A source with no GTIN concept (the
+                // AH API, the dataset) leaves the value alone.
+                if ($outcome['gtin'] !== null || $outcome['gtin_authoritative']) {
+                    $updates['gtin'] = $outcome['gtin'];
                 }
 
                 // An authoritative size is written verbatim — an empty or

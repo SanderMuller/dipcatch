@@ -115,6 +115,7 @@ class CreateProductFromUrl extends Component
         $titleSelector = $usedManualSelector ? (trim($this->titleSelector) ?: null) : null;
         $imageSelector = $usedManualSelector ? (trim($this->imageSelector) ?: null) : null;
         $shopImageUrl = $this->snapshotImageUrl();
+        $gtin = $this->snapshotGtin();
         $variantKey = $this->chosenVariantKey;
         $packSize = $this->snapshotPackSize();
 
@@ -126,6 +127,7 @@ class CreateProductFromUrl extends Component
             $titleSelector,
             $imageSelector,
             $shopImageUrl,
+            $gtin,
             $variantKey,
             $packSize,
         ): Product {
@@ -146,6 +148,7 @@ class CreateProductFromUrl extends Component
                 'title_selector' => $titleSelector,
                 'image_selector' => $imageSelector,
                 'image_url' => $shopImageUrl,
+                'gtin' => $gtin,
                 'variant_key' => $variantKey,
                 'pack_quantity' => $packSize?->quantity,
                 'pack_unit' => $packSize?->unit,

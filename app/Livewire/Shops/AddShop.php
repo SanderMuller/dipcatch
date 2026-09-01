@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Shops;
 
+use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ScrapeStatus;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -22,17 +25,41 @@ class AddShop extends Component
 
     public function mount(Product $product): void
     {
+        Gate::authorize('view', $product);
+
         $this->product = $product;
         $this->manualCurrency = $product->currency !== '' ? $product->currency : 'EUR';
     }
 
+    /** A suggestion hands over a URL; the flow from here is the normal one. */
+    #[On('suggest-shop')]
+    public function useSuggestion(string $url, ProbeShopUrl $probe): void
+    {
+        Gate::authorize('view', $this->product);
+
+        $this->resetProbeState();
+        $this->url = $url;
+
+        $this->runProbe($probe);
+    }
+
+    /**
+     * Called by `runProbe()` on every probe path — `probe()`,
+     * `probeWithSelectors()` and `selectVariant()` alike. Livewire
+     * re-hydrates `$product` from the request on each call without
+     * authorizing it, so the ownership check belongs here, not in mount().
+     */
     protected function probeSubject(): ?Product
     {
+        Gate::authorize('view', $this->product);
+
         return $this->product;
     }
 
     public function confirm(): void
     {
+        Gate::authorize('view', $this->product);
+
         if ($this->state !== 'preview' || $this->snapshot === null
             || $this->normalizedUrl === null || $this->host === null
             || $this->adapterKey === null) {
@@ -50,6 +77,7 @@ class AddShop extends Component
         $titleSelector = $usedManualSelector ? (trim($this->titleSelector) ?: null) : null;
         $imageSelector = $usedManualSelector ? (trim($this->imageSelector) ?: null) : null;
         $imageUrl = $this->snapshotImageUrl();
+        $gtin = $this->snapshotGtin();
         $variantKey = $this->chosenVariantKey;
         $packSize = $this->snapshotPackSize();
 
@@ -61,6 +89,7 @@ class AddShop extends Component
             $titleSelector,
             $imageSelector,
             $imageUrl,
+            $gtin,
             $variantKey,
             $packSize,
         ): string {
@@ -71,6 +100,7 @@ class AddShop extends Component
                 'title_selector' => $titleSelector,
                 'image_selector' => $imageSelector,
                 'image_url' => $imageUrl,
+                'gtin' => $gtin,
                 'variant_key' => $variantKey,
                 'pack_quantity' => $packSize?->quantity,
                 'pack_unit' => $packSize?->unit,
@@ -104,6 +134,8 @@ class AddShop extends Component
 
     public function cancel(): void
     {
+        Gate::authorize('view', $this->product);
+
         $this->resetProbeState();
     }
 

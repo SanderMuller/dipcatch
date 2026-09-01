@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 use JsonException;
 
 #[Signature('dipcatch:refresh-checkjebon')]
-#[Description('Refresh the local checkjebon.nl price dataset (AH, Lidl) from the upstream daily JSON.')]
+#[Description('Refresh the local checkjebon.nl price dataset (every chain with rows) from the upstream daily JSON.')]
 class RefreshCheckjebonDatasetCommand extends Command
 {
     private const string DATASET_URL = 'https://raw.githubusercontent.com/supermarkt/checkjebon/main/data/supermarkets.json';
@@ -25,9 +25,6 @@ class RefreshCheckjebonDatasetCommand extends Command
     private const int MAX_BODY_BYTES = 50 * 1024 * 1024;
 
     private const int UPSERT_CHUNK = 1000;
-
-    /** @var list<string> Dataset keys (`n`) this app tracks. */
-    private const array SUPERMARKETS = ['ah', 'lidl'];
 
     public function handle(): int
     {
@@ -69,12 +66,19 @@ class RefreshCheckjebonDatasetCommand extends Command
             return self::FAILURE;
         }
 
-        foreach (self::SUPERMARKETS as $supermarket) {
+        // Every chain the payload carries, rather than a hard-coded list:
+        // upstream adds and fills chains on its own schedule (ALDI and
+        // Ekoplaza ship empty today), and a suggestion only needs the
+        // chain's own base URL to build a product URL. Pricing is unaffected
+        // — CheckjebonSource maps its own two hosts.
+        foreach ($this->chainKeys($decoded) as $supermarket) {
             $rows = $this->rowsFor($decoded, $supermarket, $runStartedAt);
 
             if ($rows === []) {
                 // An upstream scrape hiccup (like ALDI's standing 0 rows) must
                 // not wipe local data — keep whatever the last good run stored.
+                // No metadata either: a chain with no rows would otherwise be
+                // reported as missing for as long as upstream stays empty.
                 Log::warning('Checkjebon refresh: supermarket empty or missing upstream; rows kept.', [
                     'supermarket' => $supermarket,
                 ]);
@@ -83,11 +87,13 @@ class RefreshCheckjebonDatasetCommand extends Command
                 continue;
             }
 
+            $this->storeChain($decoded, $supermarket, $runStartedAt);
+
             foreach (array_chunk($rows, self::UPSERT_CHUNK) as $chunk) {
                 DB::table('checkjebon_prices')->upsert(
                     $chunk,
                     ['supermarket', 'external_id'],
-                    ['name', 'price', 'size', 'refreshed_at'],
+                    ['name', 'price', 'size', 'link', 'refreshed_at'],
                 );
             }
 
@@ -104,20 +110,11 @@ class RefreshCheckjebonDatasetCommand extends Command
 
     /**
      * @param  array<array-key, mixed>  $decoded
-     * @return list<array{supermarket: string, external_id: string, name: string, price: string, size: ?string, refreshed_at: DateTimeInterface}>
+     * @return list<array{supermarket: string, external_id: string, name: string, price: string, size: ?string, link: string, refreshed_at: DateTimeInterface}>
      */
     private function rowsFor(array $decoded, string $supermarket, DateTimeInterface $refreshedAt): array
     {
-        $entry = null;
-        foreach ($decoded as $candidate) {
-            if (is_array($candidate) && ($candidate['n'] ?? null) === $supermarket) {
-                $entry = $candidate;
-
-                break;
-            }
-        }
-
-        $products = $entry['d'] ?? null;
+        $products = $this->entryFor($decoded, $supermarket)['d'] ?? null;
         if (! is_array($products)) {
             return [];
         }
@@ -150,6 +147,7 @@ class RefreshCheckjebonDatasetCommand extends Command
                 'name' => mb_substr($name, 0, 255),
                 'price' => number_format((float) $price, 2, '.', ''),
                 'size' => is_string($size) && $size !== '' ? mb_substr($size, 0, 255) : null,
+                'link' => $link,
                 'refreshed_at' => $refreshedAt,
             ];
         }
@@ -159,7 +157,10 @@ class RefreshCheckjebonDatasetCommand extends Command
 
     /**
      * AH links look like `wi257/ah-kruiden-roomkaas` — the `wi` id is the
-     * match key. Lidl links are the bare numeric product id.
+     * match key CheckjebonSource looks up from an ah.nl URL. Lidl links are
+     * the bare numeric boodschaapje product id, looked up the same way.
+     * Every other chain is match-only: the link itself is the id, whether
+     * that is a slug (`beemster-…-729228ZK`) or a number (`115217`).
      */
     private function externalIdFromLink(string $supermarket, string $link): ?string
     {
@@ -167,6 +168,77 @@ class RefreshCheckjebonDatasetCommand extends Command
             return preg_match('/^(wi\d+)\//i', $link, $m) === 1 ? strtolower($m[1]) : null;
         }
 
-        return ctype_digit($link) ? $link : null;
+        if ($supermarket === 'lidl') {
+            return ctype_digit($link) ? $link : null;
+        }
+
+        return mb_substr($link, 0, 255);
+    }
+
+    /**
+     * Store the chain's base URL + display name from the dataset's own `u`
+     * and `c` fields, so a suggestion can build a product URL without
+     * hard-coding one URL shape per chain.
+     *
+     * @param  array<array-key, mixed>  $decoded
+     */
+    private function storeChain(array $decoded, string $supermarket, DateTimeInterface $refreshedAt): void
+    {
+        $entry = $this->entryFor($decoded, $supermarket);
+
+        $baseUrl = $entry['u'] ?? null;
+        $label = $entry['c'] ?? null;
+
+        if (! is_string($baseUrl) || $baseUrl === '') {
+            return;
+        }
+
+        DB::table('checkjebon_chains')->upsert(
+            [[
+                'chain' => $supermarket,
+                'label' => is_string($label) && $label !== '' ? mb_substr($label, 0, 255) : $supermarket,
+                'base_url' => $baseUrl,
+                'refreshed_at' => $refreshedAt,
+            ]],
+            ['chain'],
+            ['label', 'base_url', 'refreshed_at'],
+        );
+    }
+
+    /**
+     * The chain keys the payload declares, in payload order.
+     *
+     * @param  array<array-key, mixed>  $decoded
+     * @return list<string>
+     */
+    private function chainKeys(array $decoded): array
+    {
+        $keys = [];
+
+        foreach ($decoded as $entry) {
+            $key = is_array($entry) ? ($entry['n'] ?? null) : null;
+
+            if (is_string($key) && $key !== '') {
+                $keys[] = $key;
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $decoded
+     * @return array<string, mixed>|null
+     */
+    private function entryFor(array $decoded, string $supermarket): ?array
+    {
+        foreach ($decoded as $candidate) {
+            if (is_array($candidate) && ($candidate['n'] ?? null) === $supermarket) {
+                /** @var array<string, mixed> $candidate */
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }

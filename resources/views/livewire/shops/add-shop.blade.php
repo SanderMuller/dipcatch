@@ -7,6 +7,16 @@
 @endphp
 
 <div class="space-y-4">
+    {{--
+        The suggestions list sits above the URL field: someone who opened
+        this disclosure to paste a URL usually wants one of these instead.
+        It hides once a probe is in flight so it cannot compete with the
+        preview the user has to act on.
+    --}}
+    @if ($state === 'idle' || $state === 'error')
+        @livewire('suggestions.shop-suggestions', ['product' => $product], key('shop-suggestions-add-' . $product->id))
+    @endif
+
     @if ($state === 'idle' || $state === 'error')
         <form wire:submit.prevent="probe" class="space-y-3">
             <div>

@@ -2,6 +2,8 @@
 
 use App\Filament\App\Resources\Products\Pages\ViewProduct;
 use App\Filament\App\Resources\Products\RelationManagers\ShopsRelationManager;
+use App\Models\CheckjebonChain;
+use App\Models\CheckjebonPrice;
 use App\Models\Product;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -271,5 +273,52 @@ function mountShopsRelationManager(Product $product): Testable
     return Pest\Livewire\livewire(ShopsRelationManager::class, [
         'ownerRecord' => $product,
         'pageClass' => ViewProduct::class,
+    ]);
+}
+
+/**
+ * Chains as the dataset ships them, with the base URLs a product URL is
+ * built from.
+ *
+ * @var array<string, array{0: string, 1: string}>
+ */
+function suggestionChains(): array
+{
+    return [
+        'ah' => ['AH', 'https://www.ah.nl/producten/product/'],
+        'dekamarkt' => ['DekaMarkt', 'https://www.dekamarkt.nl/boodschappen/x/x/x/'],
+        'dirk' => ['Dirk', 'https://www.dirk.nl/boodschappen/x/x/x/'],
+        'hoogvliet' => ['Hoogvliet', 'https://www.hoogvliet.com/product/'],
+        'jumbo' => ['Jumbo', 'https://www.jumbo.com/producten/'],
+        'lidl' => ['Lidl (via boodschaapje.nl)', 'https://boodschaapje.nl/product/'],
+        'plus' => ['PLUS', 'https://www.plus.nl/product/'],
+        'poiesz' => ['Poiesz', 'https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/'],
+        'spar' => ['SPAR', 'https://www.spar.nl/'],
+        'vomar' => ['Vomar', 'https://www.vomar.nl/producten/'],
+    ];
+}
+
+function seedChains(?DateTimeInterface $refreshedAt = null): void
+{
+    foreach (suggestionChains() as $chain => [$label, $baseUrl]) {
+        CheckjebonChain::query()->create([
+            'chain' => $chain,
+            'label' => $label,
+            'base_url' => $baseUrl,
+            'refreshed_at' => $refreshedAt ?? now(),
+        ]);
+    }
+}
+
+function seedRow(string $chain, string $name, ?string $size, string $price = '1.00', ?DateTimeInterface $refreshedAt = null, ?string $link = null): CheckjebonPrice
+{
+    return CheckjebonPrice::query()->create([
+        'supermarket' => $chain,
+        'external_id' => $link ?? ($chain . '-' . md5($name)),
+        'name' => $name,
+        'size' => $size,
+        'price' => $price,
+        'link' => $link ?? ($chain . '-' . md5($name)),
+        'refreshed_at' => $refreshedAt ?? now(),
     ]);
 }

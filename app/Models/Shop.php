@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ShopHealth $health
  * @property string|null $pack_quantity
  * @property string|null $pack_unit
+ * @property string|null $gtin
  */
 class Shop extends Model
 {
@@ -98,6 +99,7 @@ class Shop extends Model
             // price the new offer wrongly until the next successful check.
             'pack_quantity' => null,
             'pack_unit' => null,
+            'gtin' => null,
         ])->save();
 
         return true;
