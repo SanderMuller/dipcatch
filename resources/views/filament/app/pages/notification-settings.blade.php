@@ -84,6 +84,15 @@
                     this.message = 'Browser push subscription registered.';
                 } catch (error) {
                     console.error('Push subscription failed', error);
+
+                    // Brave ships with its push backend off; subscribing then
+                    // aborts with a push-service error even though the site
+                    // and permission are fine.
+                    if (error.name === 'AbortError' && navigator.brave) {
+                        this.disablePushToggle('Brave blocks browser push by default. Enable the setting: Use Google services for push messaging (brave://settings/privacy), restart Brave, and try again.');
+                        return;
+                    }
+
                     this.disablePushToggle('Browser push setup failed. Please try again.');
                 }
             },
