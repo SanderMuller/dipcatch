@@ -10,6 +10,7 @@ use Hihaho\RectorRules\Set\HihahoSetList;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
+use Pest\Rector\Set\PestSetList;
 use Rector\Arguments\Rector\ClassMethod\ArgumentAdderRector;
 use Rector\Caching\ValueObject\Storage\FileCacheStorage;
 use Rector\CodeQuality\Rector\Class_\CompleteDynamicPropertiesRector;
@@ -281,6 +282,7 @@ return RectorConfig::configure()
         LaravelSetList::LARAVEL_CONTAINER_STRING_TO_FULLY_QUALIFIED_NAME,
         LaravelSetList::LARAVEL_FACADE_ALIASES_TO_FULL_NAMES,
         LivewireLevelSetList::UP_TO_LIVEWIRE,
+        PestSetList::CODING_STYLE,
     ])
     // If needed, we can update the parallel settings to make sure Rector doesn't start generating errors on large codebases
     ->withParallel(300, $maxParallelProcesses, 15)
