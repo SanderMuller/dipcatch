@@ -18,6 +18,15 @@ class SavingsByMonthChartWidget extends ChartWidget
     protected int|string|array $columnSpan = 'full';
 
     /**
+     * An empty twelve-month axis says nothing; the chart appears once the
+     * first drop has fired for this user.
+     */
+    public static function canView(): bool
+    {
+        return PriceDropEvent::query()->where('user_id', auth()->id())->exists();
+    }
+
+    /**
      * @return array{datasets: list<array{label: string, data: list<float>}>, labels: list<string>}
      */
     protected function getData(): array

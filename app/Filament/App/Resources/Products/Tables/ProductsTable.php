@@ -26,14 +26,20 @@ class ProductsTable
     {
         return $table
             ->modifyQueryUsing(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->with('cheapestShop'))
-            ->emptyStateIcon(Heroicon::OutlinedShoppingBag)
-            ->emptyStateHeading('No products yet')
-            ->emptyStateDescription('Paste a product link from any webshop and DipCatch starts watching the price.')
+            // Filament shows one empty state for both "nothing tracked yet"
+            // and "search/filter matched nothing"; only the former gets the
+            // onboarding copy and CTA.
+            ->emptyStateIcon(fn (): Heroicon => self::hasNoProducts() ? Heroicon::OutlinedShoppingBag : Heroicon::OutlinedMagnifyingGlass)
+            ->emptyStateHeading(fn (): string => self::hasNoProducts() ? 'No products yet' : 'No matching products')
+            ->emptyStateDescription(fn (): string => self::hasNoProducts()
+                ? 'Paste a product link from any webshop and DipCatch starts watching the price.'
+                : 'Try a different search or clear the filters.')
             ->emptyStateActions([
                 Action::make('track')
                     ->label('Track a product')
                     ->icon(Heroicon::Plus)
-                    ->url(ProductResource::getUrl('create')),
+                    ->url(ProductResource::getUrl('create'))
+                    ->visible(fn (): bool => self::hasNoProducts()),
             ])
             ->columns([
                 ImageColumn::make('image_url')
@@ -101,5 +107,10 @@ class ProductsTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    private static function hasNoProducts(): bool
+    {
+        return ! Product::query()->where('user_id', auth()->id())->exists();
     }
 }

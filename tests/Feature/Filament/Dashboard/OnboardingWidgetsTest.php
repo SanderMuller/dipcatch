@@ -1,10 +1,13 @@
 <?php declare(strict_types=1);
 
 use App\Filament\App\Pages\Dashboard;
+use App\Filament\App\Resources\Products\Pages\ListProducts;
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Filament\App\Widgets\GettingStartedWidget;
 use App\Filament\App\Widgets\NextStepsWidget;
+use App\Filament\App\Widgets\SavingsByMonthChartWidget;
 use App\Filament\App\Widgets\StatsOverviewWidget;
+use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -68,4 +71,28 @@ test('the empty products list offers a track-a-product action', function (): voi
         ->assertOk()
         ->assertSee('No products yet')
         ->assertSee('Track a product');
+});
+
+test('the savings chart stays hidden until a drop has fired for the user', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->for($user)->create();
+    $this->actingAs($user);
+
+    expect(SavingsByMonthChartWidget::canView())->toBeFalse();
+
+    PriceDropEvent::factory()->for($user)->create();
+
+    expect(SavingsByMonthChartWidget::canView())->toBeTrue();
+});
+
+test('a search with no matches shows a no-results state instead of the onboarding empty state', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->for($user)->create(['title' => 'Beemster kaas']);
+    $this->actingAs($user);
+
+    livewire(ListProducts::class)
+        ->searchTable('zzz-no-such-product')
+        ->assertSee('No matching products')
+        ->assertDontSee('No products yet')
+        ->assertDontSee('Track a product');
 });

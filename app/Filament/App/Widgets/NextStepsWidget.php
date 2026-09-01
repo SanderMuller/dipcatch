@@ -40,11 +40,11 @@ class NextStepsWidget extends Widget
 
         $firstProduct = Product::query()
             ->where('user_id', $userId)
-            ->withCount('shops')
             ->orderBy('created_at')
             ->first();
 
         return [
+            'settingsUrl' => NotificationSettings::getUrl(),
             'steps' => [
                 [
                     'title' => 'Track a product',
@@ -62,21 +62,11 @@ class NextStepsWidget extends Widget
                         : ProductResource::getUrl('index'),
                     'cta' => 'Add a shop',
                 ],
-                [
-                    'title' => 'Get the first price check',
-                    'description' => 'Prices are re-checked automatically. Alerts go to your email digest and the in-app bell; browser push is optional.',
-                    'done' => Shop::query()
-                        ->whereIn('product_id', Product::query()->where('user_id', $userId)->select('id'))
-                        ->whereNotNull('last_checked_at')
-                        ->exists(),
-                    'url' => NotificationSettings::getUrl(),
-                    'cta' => 'Alert settings',
-                ],
             ],
         ];
     }
 
-    private static function hasComparison(mixed $userId): bool
+    private static function hasComparison(int|string|null $userId): bool
     {
         return Shop::query()
             ->whereIn('product_id', Product::query()->where('user_id', $userId)->select('id'))
