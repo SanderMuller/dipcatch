@@ -149,6 +149,10 @@ final class SuggestShops
         $chains = [];
 
         foreach (CheckjebonChain::query()->get() as $chain) {
+            if (! SupermarketChains::isLinkable($chain->chain)) {
+                continue;
+            }
+
             $refreshedAt = $freshness->get($chain->chain);
 
             if (! is_string($refreshedAt) || now()->parse($refreshedAt)->lt($cutoff)) {

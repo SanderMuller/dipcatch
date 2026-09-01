@@ -34,23 +34,21 @@ final class SupermarketChains
     ];
 
     /**
-     * Base URLs the dataset gets wrong. DekaMarkt's `u` still points at
-     * `/boodschappen/…`, which answers "Het artikel is niet gevonden" —
-     * its product pages live under `/producten/…` (verified 2026-09-01).
+     * Chains whose dataset links cannot be turned into a working product
+     * URL, so they are never suggested. DekaMarkt is the only one today:
+     * its `u` points at `/boodschappen/…` where every id answers "Het
+     * artikel is niet gevonden", and the real `/producten/x/x/x/<id>`
+     * pages use a different id space — five random dataset ids all miss,
+     * while an id taken from dekamarkt.nl itself resolves (2026-09-01).
+     * A row nobody can open or track is noise.
      *
-     * @var array<string, string>
+     * @var list<string>
      */
-    private const array BASE_URL_OVERRIDES = [
-        'dekamarkt' => 'https://www.dekamarkt.nl/producten/x/x/x/',
-    ];
+    private const array UNLINKABLE = ['dekamarkt'];
 
-    /**
-     * The base URL a product link is appended to, preferring the dataset's
-     * own value so an upstream change follows automatically.
-     */
-    public static function baseUrl(string $chain, string $datasetBaseUrl): string
+    public static function isLinkable(string $chain): bool
     {
-        return self::BASE_URL_OVERRIDES[$chain] ?? $datasetBaseUrl;
+        return ! in_array($chain, self::UNLINKABLE, true);
     }
 
     public static function isTrackable(string $chain): bool

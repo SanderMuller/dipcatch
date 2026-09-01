@@ -50,14 +50,16 @@ function suggest(Product $product): array
     return app(SuggestShops::class)($product);
 }
 
-test('it offers the seven chains that carry the article and rejects the three that do not', function (): void {
+test('it offers the chains that carry the article and rejects the ones that do not', function (): void {
     seedChains();
     seedBeemsterCatalogue();
 
     $suggestions = suggest(beemsterProduct());
 
+    // Seven chains carry this article; DekaMarkt is one of them but its
+    // dataset links do not resolve, so it never reaches a suggestion.
     expect(collect($suggestions)->pluck('chain')->sort()->values()->all())
-        ->toBe(['ah', 'dekamarkt', 'dirk', 'hoogvliet', 'jumbo', 'plus', 'spar']);
+        ->toBe(['ah', 'dirk', 'hoogvliet', 'jumbo', 'plus', 'spar']);
 });
 
 test('it builds the product url from the chain base url and the stored link', function (): void {
@@ -249,12 +251,11 @@ test('dismissing drops the memo so the next call reflects it', function (): void
     expect(collect($action($product))->pluck('chain')->all())->not->toContain('dirk');
 });
 
-test('a chain whose dataset base url is wrong gets the corrected one', function (): void {
+test('a chain whose dataset links do not resolve is never suggested', function (): void {
     seedChains();
     seedRow('dekamarkt', 'Beemster Extra belegen 48+ plakken', '150 g', '3.39', link: '454156');
 
-    $suggestion = suggest(beemsterProduct())[0];
-
-    // The dataset still advertises /boodschappen/, which 404s on DekaMarkt.
-    expect($suggestion->url)->toBe('https://www.dekamarkt.nl/producten/x/x/x/454156');
+    // Every DekaMarkt id in the dataset answers "Het artikel is niet
+    // gevonden" — a row nobody can open is worse than no row.
+    expect(suggest(beemsterProduct()))->toBe([]);
 });
