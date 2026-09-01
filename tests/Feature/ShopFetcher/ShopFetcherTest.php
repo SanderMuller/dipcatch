@@ -16,6 +16,7 @@ beforeEach(function (): void {
     RateLimiter::clear('dipcatch:fetcher:host:example.com');
     RateLimiter::clear('dipcatch:fetcher:host:blocked.com');
     RateLimiter::clear('dipcatch:fetcher:host:slow.com');
+    RateLimiter::clear('dipcatch:fetcher:host:shop.test');
 });
 
 test('robots.txt 404 → fail-open, fetches the page', function (): void {
@@ -146,4 +147,18 @@ test('response larger than body_cap_bytes throws HttpError(413)', function (): v
     } catch (HttpError $e) {
         expect($e->statusCode)->toBe(413);
     }
+});
+
+test('an Imperva challenge served as 200 is a block, not a page to parse', function (): void {
+    $challenge = '<html style="height:100%"><head><script src="/_Incapsula_Resource?SWJIYLWA=719d"></script></head>'
+        . '<body><iframe src="/_Incapsula_Resource?SWUDNSAI=31">Request unsuccessful. Incapsula incident ID: '
+        . '1487000310066016754-28872320744359880</iframe></body></html>';
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response($challenge, 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://shop.test/p/1'))
+        ->toThrow(Blocked::class);
 });

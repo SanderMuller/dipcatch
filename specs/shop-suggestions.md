@@ -90,8 +90,11 @@ A suggestion is *trackable* when the app can price that chain's URL today. Verif
 | dirk | `DirkAdapter`, direct scrape | yes |
 | jumbo | `JumboAdapter`, direct scrape | yes |
 | spar | JSON-LD, 3.39 correct | yes |
-| hoogvliet | generic adapter returns **22.33** for a 3.09 product | **no** |
-| plus, dekamarkt, vomar, poiesz | `no_adapter_matched` | no |
+| poiesz | `PoieszAdapter` (added 2026-09-01), Nuxt payload | yes |
+| vomar | `VomarAdapter` (added 2026-09-01), Nuxt 2 SSR state | yes |
+| hoogvliet | Imperva challenge; the generic adapter had returned **22.33** for a 3.09 product | **no** |
+| plus | OutSystems SPA, data via signed POST endpoints | no |
+| dekamarkt | parses, but its dataset ids do not exist on the site | no — excluded entirely |
 
 Trackability is a static map keyed by chain, not a probe at render time — a per-suggestion probe would burn the 6/min per-user probe budget in `ProbeShopUrl` (`app/Actions/Shops/ProbeShopUrl.php:46`) before the user clicked anything. Hoogvliet is listed as untrackable *despite* parsing, because a confidently wrong price is worse than no price.
 
@@ -263,6 +266,8 @@ Stop and report — do not improvise — if any of these proves false during imp
 8. **What does a GTIN mismatch do?** **Decision:** Warn on the product page; change nothing about pricing or alerts. **Rationale:** On the Feliway product all three shops carry different EANs at 27.99–57.72, which is worth surfacing — but excluding offers from the cheapest calculation would silently drop offers that may be correct.
 
 ## Findings
+
+- **Adapters added for Poiesz and Vomar (2026-09-01).** Both chains now price live and are marked trackable, so their suggestions carry a working Add button. Poiesz serves everything in the Nuxt `__NUXT_DATA__` payload the Dirk and Lidl adapters already decode — price, title, image, `packageDescription` and `ean` — matched on the id in the URL so recommended products cannot win. Vomar is Nuxt 2: its state sits in a minified `window.__NUXT__` IIFE, so `VomarAdapter` reads the `productDetails` object with targeted patterns, takes the price only when it is a literal (the minifier hoists repeated values into parameters), and falls back to the page `<h1>` when the name was hoisted. Hoogvliet got no adapter: it sits behind an Imperva challenge that the app's fetcher receives as a 212-byte shell, which is exactly how the generic adapter had produced 22.33 for a 3.09 product. The challenge markers are now in `ShopFetcher::BLOCK_MARKERS`, so such a page is a clean `Blocked` rather than a page to parse. Plus stays out: its OutSystems SPA has no stable public endpoint.
 
 - **DekaMarkt links do not resolve (post-ship check).** Verifying suggestion URLs against the live sites showed every DekaMarkt link is dead. Its dataset base URL points at `/boodschappen/…`, where each id answers "Het artikel is niet gevonden"; the real pages live at `/producten/x/x/x/<id>`, but that id space is different again — five random dataset ids all miss there, while an id copied from dekamarkt.nl itself resolves. DekaMarkt is therefore excluded from suggestions until the ids can be mapped: a row nobody can open or track is noise. Dirk, Poiesz, Spar and Vomar links were verified to reach the real product (Vomar renders client-side, so the page is only complete in a browser).
 

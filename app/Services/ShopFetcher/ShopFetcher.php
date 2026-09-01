@@ -54,6 +54,11 @@ final readonly class ShopFetcher
         'akamai reference',
         'perimeterx',
         'px-captcha',
+        // Imperva/Incapsula serves a 200 with a tiny iframe shell. Without
+        // this marker the generic adapter can read a number out of the
+        // challenge page and store it as a price (hoogvliet.com, 2026-09-01).
+        'incapsula incident id',
+        '_incapsula_resource',
     ];
 
     public function __construct(

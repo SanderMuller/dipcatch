@@ -6,6 +6,8 @@ use App\PriceAdapters\Hosts\BolAdapter;
 use App\PriceAdapters\Hosts\DirkAdapter;
 use App\PriceAdapters\Hosts\JumboAdapter;
 use App\PriceAdapters\Hosts\LidlAdapter;
+use App\PriceAdapters\Hosts\PoieszAdapter;
+use App\PriceAdapters\Hosts\VomarAdapter;
 use App\PriceAdapters\Hosts\ZooplusAdapter;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\MicrodataAdapter;
@@ -74,6 +76,8 @@ return [
         DirkAdapter::class,
         JumboAdapter::class,
         LidlAdapter::class,
+        PoieszAdapter::class,
+        VomarAdapter::class,
         ZooplusAdapter::class,
         JsonLdAdapter::class,
         MicrodataAdapter::class,

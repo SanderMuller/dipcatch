@@ -19,7 +19,7 @@ final class SupermarketChains
      *
      * @var list<string>
      */
-    private const array TRACKABLE = ['ah', 'dirk', 'jumbo', 'lidl', 'spar'];
+    private const array TRACKABLE = ['ah', 'dirk', 'jumbo', 'lidl', 'poiesz', 'spar', 'vomar'];
 
     /**
      * Hosts a chain can be tracked under beyond its dataset base URL. Lidl

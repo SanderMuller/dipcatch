@@ -322,3 +322,51 @@ function seedRow(string $chain, string $name, ?string $size, string $price = '1.
         'refreshed_at' => $refreshedAt ?? now(),
     ]);
 }
+
+/**
+ * Trimmed replica of a Poiesz webshop product page: no JSON-LD at all, only
+ * the Nuxt `__NUXT_DATA__` flat-array payload whose product record carries
+ * price, name, image, pack description and EAN (observed 2026-09-01). Index
+ * 0 is the product; a recommended product rides along at index 1 to prove
+ * the id in the URL decides.
+ */
+function poieszPage(string $price = '1.99', string $packageDescription = '120.00 Gram', string $productId = '278550', string $ean = '5060503500747'): string
+{
+    $payload = json_encode([
+        ['id' => 2, 'name' => 3, 'image' => 4, 'price' => 5, 'packageDescription' => 6, 'ean' => 7],
+        ['id' => 8, 'name' => 9, 'image' => 4, 'price' => 10, 'packageDescription' => 6, 'ean' => 11],
+        $productId,
+        "Ella's Kitchen Aardbeien met Appel 4+ Mnd.",
+        'https://images.poiesz-supermarkten.nl/artikelen/278550.jpg',
+        (float) $price,
+        $packageDescription,
+        $ean,
+        '503642',
+        'Zwitsal Shampoo',
+        4.29,
+        '8710447318539',
+    ], JSON_THROW_ON_ERROR);
+
+    return '<html><body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';
+}
+
+/**
+ * Trimmed replica of a vomar.nl product page: a Nuxt 2 app whose SSR state
+ * lives in a minified `window.__NUXT__` IIFE, so the product fields sit in
+ * a `productDetails:{…}` object literal. Passing null for the description
+ * reproduces a value the minifier hoisted into an IIFE parameter, which the
+ * adapter must not read as a name (observed 2026-09-01).
+ */
+function vomarPage(string $price = '2.39', ?string $description = 'Aardappelgratin Kaas', string $articleNumber = '119614', string $ean = '8718989087319'): string
+{
+    $name = $description === null ? 'T' : '"' . $description . '"';
+
+    $state = 'window.__NUXT__=(function(a,b,d,T){return {layout:a,data:[{productDetails:{'
+        . 'id:"5ab39d03-f524-4daf-9011-a13ce60aa4d8",articleNumber:' . $articleNumber . ','
+        . 'description:' . $name . ',contents:"500",unit:"gram",price:' . $price . ',inWebshop:d,'
+        . 'primaryEan:"' . $ean . '",brand:b,labels:[],'
+        . 'images:[{fileName:"product-images\u002F21070f17-ce64-430b-ae24-ef8572a67a37.png",imageType:a}]'
+        . '}}]}}("x","y",true,"Vomar Ontbijtkoek"));';
+
+    return '<html><body><h1> Ontbijtkoek </h1><script>' . $state . '</script></body></html>';
+}
