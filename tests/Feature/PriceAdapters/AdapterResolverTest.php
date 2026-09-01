@@ -3,6 +3,7 @@
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ExtractionResult;
+use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 
@@ -19,7 +20,9 @@ function snap(string $price = '10.00'): ShopSnapshot
 
 function fakeAdapter(string $key, ExtractionResult $result): ShopAdapter
 {
-    return new class ($key, $result) implements ShopAdapter {
+    // Implements the marker so persisted-key shortcut tests keep exercising
+    // the shortcut path (generic keys no longer short-circuit).
+    return new class ($key, $result) implements HostSpecificAdapter, ShopAdapter {
         public function __construct(public string $k, public ExtractionResult $r) {}
 
         public function key(): string
@@ -155,4 +158,20 @@ test('container resolves the production adapter chain shipped via config', funct
         ->and($result->snapshot?->price)->toBe('12.34')
         ->and($result->snapshot?->currency)->toBe('EUR')
         ->and($result->adapterKey)->toBe('og');
+});
+
+test('a persisted generic key does not outrank a later-added host adapter', function (): void {
+    // Shop keyed 'jsonld' before dirk.nl gained DirkAdapter: the chain must
+    // run and let the host adapter win (and re-key the shop).
+    $html = dirkPage();
+
+    $result = app(AdapterResolver::class)->resolve(
+        'https://www.dirk.nl/boodschappen/x/x/x/115212',
+        $html,
+        persistedKey: 'jsonld',
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->adapterKey)->toBe('dirk')
+        ->and($result->snapshot?->packSize)->toBe('150 g');
 });

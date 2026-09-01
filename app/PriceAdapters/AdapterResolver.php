@@ -32,21 +32,25 @@ final readonly class AdapterResolver
         ?string $persistedKey = null,
         ?AdapterContext $context = null,
     ): ExtractionResult {
-        if ($persistedKey !== null) {
-            $persisted = $this->findByKey($persistedKey);
+        $persisted = $persistedKey !== null ? $this->findByKey($persistedKey) : null;
 
-            if ($persisted !== null) {
-                $result = $persisted->extract($url, $html, $context);
-
-                // Ambiguous from the hint means the page genuinely has multiple
-                // variants; falling through to a weaker adapter would silently
-                // pick the wrong one. Propagate the chooser instead.
-                if ($result->isSuccess() || $result->isAmbiguous()) {
-                    return $result->withAdapterKey($persisted->key());
-                }
-            }
+        // Generic keys (jsonld etc.) never short-circuit — a host that
+        // later gained a dedicated adapter must get it on the next check.
+        if (! $persisted instanceof HostSpecificAdapter) {
+            return $this->runChain($url, $html, skipKey: null, context: $context);
         }
 
+        $result = $persisted->extract($url, $html, $context);
+
+        // Ambiguous from the hint means the page genuinely has multiple
+        // variants; falling through to a weaker adapter would silently
+        // pick the wrong one. Propagate the chooser instead.
+        if ($result->isSuccess() || $result->isAmbiguous()) {
+            return $result->withAdapterKey($persisted->key());
+        }
+
+        // The hint already ran and failed or skipped — exclude it from the
+        // fallback chain.
         return $this->runChain($url, $html, $persistedKey, $context);
     }
 

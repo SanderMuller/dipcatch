@@ -90,17 +90,21 @@ test('empty dataset fails with dataset_empty reason', function (): void {
         ->and($outcome->context)->toBe(['reason' => 'dataset_empty']);
 });
 
-test('lidl.nl URLs fast-fail pointing to boodschaapje', function (): void {
-    Http::fake();
+test('lidl.nl URLs probe over the network through the Lidl adapter', function (): void {
+    // UrlNormalizer strips the `www.` prefix before the fetch.
+    Http::fake([
+        'https://lidl.nl/robots.txt' => Http::response('', 404),
+        'https://lidl.nl/*' => Http::response(lidlPage(), 200),
+    ]);
     Http::preventStrayRequests();
     $user = User::factory()->create();
 
-    $outcome = app(ProbeShopUrl::class)(null, 'https://www.lidl.nl/p/some-product/p10012345', $user);
+    $outcome = app(ProbeShopUrl::class)(null, 'https://www.lidl.nl/p/lay-s/p10033095', $user);
 
-    expect($outcome->errorCode)->toBe(ProbeFailure::NotInDataset)
-        ->and($outcome->context)->toBe(['reason' => 'use_boodschaapje']);
-
-    Http::assertNothingSent();
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->adapterKey)->toBe('lidl')
+        ->and($outcome->snapshot?->price)->toBe('1.99')
+        ->and($outcome->snapshot?->packSize)->toBe('370 g');
 });
 
 test('currency mismatch still fires when adding to a non-EUR product', function (): void {

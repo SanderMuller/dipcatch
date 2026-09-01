@@ -34,7 +34,7 @@ enum ProbeFailure: string
     case CurrencyMismatch = 'currency_mismatch';
 
     /**
-     * Checkjebon-served host (ah.nl / dirk.nl / boodschaapje.nl): the URL is
+     * Checkjebon-served host (ah.nl / boodschaapje.nl): the URL is
      * fine but the product has no row in the local daily dataset — or the
      * URL carries no recognizable product id, or the dataset was never
      * refreshed. The specific case travels in the outcome context `reason`.

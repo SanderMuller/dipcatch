@@ -13,7 +13,7 @@ use Symfony\Component\DomCrawler\Crawler;
  * generic chain returns `no_adapter_matched` and the user pastes a selector)
  * and the periodic re-check job (selectors persisted on the offer row).
  */
-final readonly class UserSelectorAdapter implements ShopAdapter
+final readonly class UserSelectorAdapter implements HostSpecificAdapter, ShopAdapter
 {
     public function key(): string
     {

@@ -69,10 +69,6 @@ final readonly class ProbeShopUrl
         // per-user probe budget consumed (bulk-adding must not throttle).
         $host = UrlNormalizer::normalizeHost((string) parse_url($normalizedUrl, PHP_URL_HOST));
 
-        if ($host === 'lidl.nl' || str_ends_with($host, '.lidl.nl')) {
-            return ProbeOutcome::failed(ProbeFailure::NotInDataset, ['reason' => 'use_boodschaapje']);
-        }
-
         $local = $this->resolveFromLocalSources($product, $normalizedUrl, $host);
         if ($local instanceof ProbeOutcome) {
             return $local;

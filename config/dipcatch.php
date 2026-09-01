@@ -3,7 +3,9 @@
 use App\PriceAdapters\UserSelectorAdapter;
 use App\PriceAdapters\Hosts\AmazonAdapter;
 use App\PriceAdapters\Hosts\BolAdapter;
+use App\PriceAdapters\Hosts\DirkAdapter;
 use App\PriceAdapters\Hosts\JumboAdapter;
+use App\PriceAdapters\Hosts\LidlAdapter;
 use App\PriceAdapters\Hosts\ZooplusAdapter;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\MicrodataAdapter;
@@ -69,7 +71,9 @@ return [
         UserSelectorAdapter::class,
         AmazonAdapter::class,
         BolAdapter::class,
+        DirkAdapter::class,
         JumboAdapter::class,
+        LidlAdapter::class,
         ZooplusAdapter::class,
         JsonLdAdapter::class,
         MicrodataAdapter::class,

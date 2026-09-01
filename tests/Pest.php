@@ -1,11 +1,15 @@
 <?php declare(strict_types=1);
 
+use App\Filament\App\Resources\Products\Pages\ViewProduct;
+use App\Filament\App\Resources\Products\RelationManagers\ShopsRelationManager;
+use App\Models\Product;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Translation\PotentiallyTranslatedString;
+use Livewire\Features\SupportTesting\Testable;
 use Pest\Expectation;
 use PHPUnit\Framework\Assert;
 use Tests\TestCase;
@@ -200,4 +204,72 @@ function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBon
             'productCard' => $card,
         ]),
     ];
+}
+
+/**
+ * Trimmed replica of dirk.nl's product page: JSON-LD with the capitalized
+ * `Price` key plus the Nuxt `__NUXT_DATA__` flat-array payload carrying
+ * `packaging` (observed 2026-09-01).
+ */
+function dirkPage(string $price = '1.69', string $packaging = '150 g', string $productId = '115212'): string
+{
+    $jsonLd = json_encode([
+        '@context' => 'http://schema.org/',
+        '@type' => 'Product',
+        'name' => 'Beemster Kaas extra belegen 48+ plakken',
+        'offers' => ['@type' => 'Offer', 'priceCurrency' => 'EUR', 'Price' => (float) $price],
+    ], JSON_THROW_ON_ERROR);
+
+    // Flat devalue array: index 0 = root dict, values are indices.
+    $payload = json_encode([
+        ['productId' => 1, 'headerText' => 2, 'packaging' => 3],
+        $productId,
+        'Beemster Kaas extra belegen 48+ plakken',
+        $packaging,
+    ], JSON_THROW_ON_ERROR);
+
+    return '<html><head><script type="application/ld+json">' . $jsonLd . '</script></head>'
+        . '<body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';
+}
+
+/**
+ * Trimmed replica of lidl.nl's product page: standard JSON-LD plus the Nuxt
+ * `__NUXT_DATA__` flat-array payload where the product record's `price`
+ * points at a price record whose `packaging.text` holds the pack size
+ * (observed 2026-09-01).
+ */
+function lidlPage(string $price = '1.99', string $packaging = '370 g', int $productId = 10033095): string
+{
+    $jsonLd = json_encode([
+        '@context' => 'http://schema.org',
+        '@type' => 'Product',
+        'name' => "LAY'S",
+        'offers' => [['@type' => 'Offer', 'price' => (float) $price, 'priceCurrency' => 'EUR', 'availability' => 'InStoreOnly']],
+    ], JSON_THROW_ON_ERROR);
+
+    // Flat devalue array: object values are indices into the same array.
+    $payload = json_encode([
+        ['productId' => 1, 'price' => 2],
+        $productId,
+        ['price' => 3, 'packaging' => 4, 'currencyCode' => 6],
+        (float) $price,
+        ['text' => 5],
+        $packaging,
+        'EUR',
+    ], JSON_THROW_ON_ERROR);
+
+    return '<html><head><script type="application/ld+json">' . $jsonLd . '</script></head>'
+        . '<body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';
+}
+
+/**
+ * Mount the per-product Shops relation manager scoped to a given product.
+ * Centralises the (ownerRecord + pageClass) wiring so tests don't repeat it.
+ */
+function mountShopsRelationManager(Product $product): Testable
+{
+    return Pest\Livewire\livewire(ShopsRelationManager::class, [
+        'ownerRecord' => $product,
+        'pageClass' => ViewProduct::class,
+    ]);
 }

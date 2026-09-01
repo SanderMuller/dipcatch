@@ -4,6 +4,7 @@ namespace App\PriceAdapters\Hosts;
 
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
+use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
@@ -15,7 +16,7 @@ use App\Support\UrlNormalizer;
  * unknown host, delegate to JSON-LD on the happy path, fall back to CSS, and
  * surface a host-specific failure code when both fail.
  */
-abstract readonly class HostAdapter implements ShopAdapter
+abstract readonly class HostAdapter implements HostSpecificAdapter, ShopAdapter
 {
     /**
      * Normalized host (no `www.`) → ISO 4217 currency code.

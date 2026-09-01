@@ -1,26 +1,9 @@
 <?php declare(strict_types=1);
 
-use App\Filament\App\Resources\Products\Pages\ViewProduct;
-use App\Filament\App\Resources\Products\RelationManagers\ShopsRelationManager;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
-use Livewire\Features\SupportTesting\Testable;
-
-use function Pest\Livewire\livewire;
-
-/**
- * Mount the per-product Shops relation manager scoped to a given product.
- * Centralises the (ownerRecord + pageClass) wiring so tests don't repeat it.
- */
-function mountShopsRelationManager(Product $product): Testable
-{
-    return livewire(ShopsRelationManager::class, [
-        'ownerRecord' => $product,
-        'pageClass' => ViewProduct::class,
-    ]);
-}
 
 test('edit_notes action saves a note on the shop', function (): void {
     $user = User::factory()->create();
