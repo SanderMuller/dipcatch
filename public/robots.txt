@@ -1,2 +1,8 @@
 User-agent: *
-Disallow:
+Disallow: /app
+Disallow: /admin
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /invitation/
+Allow: /

@@ -9,6 +9,7 @@ use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+Route::view('privacy', 'privacy')->name('privacy');
 
 // Public product share page — no auth, throttled per IP, exact 32-char
 // alphanumeric slug. Lives outside the auth+verified group so guests

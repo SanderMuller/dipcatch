@@ -2,14 +2,15 @@
     $h1 = __('Catch every price drop.');
     $sub = __('Track products across the web. DipCatch checks prices on a schedule and tells you when one falls past your threshold.');
     $authed = auth()->check();
-    $primaryHref = $authed ? url('/app') : route('login');
-    $primaryLabel = $authed ? __('Open dashboard') : __('Sign in');
-    $headerLabel = $authed ? __('Open app') : __('Sign in');
+    $primaryHref = $authed ? url('/app') : route('register');
+    $headerLabel = $authed ? __('Open app') : __('Create account');
+    $contactEmail = config('site.contact_email');
     $steps = [
-        ['n' => '01', 'title' => __('Paste a URL'), 'body' => __('Drop in a product link and a CSS selector for the price. DipCatch grabs the title and image too.')],
-        ['n' => '02', 'title' => __('We watch the price'), 'body' => __('Scheduled scrapes record every price point. The checks are plain HTTP fetches, so they stay fast.')],
-        ['n' => '03', 'title' => __('You get the dip'), 'body' => __('When the price falls past your threshold, you get a browser push, an in-app bell entry, and a daily email digest.')],
+        ['n' => '01', 'title' => __('Paste a product link'), 'body' => __('DipCatch reads the title, image, price and pack size itself — no extension, no selectors, nothing to install.')],
+        ['n' => '02', 'title' => __('Add it from other shops'), 'body' => __('Track the same item at other shops and DipCatch shows the cheapest one, with unit prices (€/kg, €/l) so different pack sizes compare fairly.')],
+        ['n' => '03', 'title' => __('You get the dip'), 'body' => __('Prices are re-checked automatically. When one falls past your threshold you get a browser push, an in-app bell entry, and a daily email digest.')],
     ];
+    $supportedShops = \App\Support\SupportedShops::rows();
     $tracked = [
         ['icon' => '🎧', 'name' => 'Sony WH-1000XM5', 'shop' => 'amazon.com', 'old' => 399, 'new' => 249, 'pct' => '-37.6%', 'when' => 'now'],
         ['icon' => '📚', 'name' => 'Kindle Paperwhite', 'shop' => 'bol.com', 'old' => 159, 'new' => 119, 'pct' => '-25.2%', 'when' => '2h'],
@@ -19,7 +20,16 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
     <head>
-        @include('partials.head')
+        @include('partials.head', ['title' => __('Supermarket price alerts for the Netherlands')])
+        <meta name="description" content="{{ config('site.description') }}">
+        <link rel="canonical" href="{{ route('home') }}">
+        <meta property="og:type" content="website">
+        <meta property="og:site_name" content="{{ config('app.name') }}">
+        <meta property="og:title" content="{{ config('app.name') }} — {{ __('Catch every price drop.') }}">
+        <meta property="og:description" content="{{ config('site.description') }}">
+        <meta property="og:url" content="{{ route('home') }}">
+        <meta property="og:image" content="{{ asset('apple-touch-icon.png') }}">
+        <meta name="twitter:card" content="summary">
     </head>
     <body class="min-h-dvh bg-linear-to-br from-amber-50 to-rose-50 bg-fixed text-zinc-900 antialiased dark:from-zinc-950 dark:to-zinc-950 dark:text-zinc-50">
         <div class="isolate flex min-h-dvh flex-col">
@@ -59,11 +69,25 @@
                                         <a href="{{ route('register') }}" class="inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-white dark:text-zinc-900 dark:shadow-none dark:hover:bg-zinc-200">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
                                     </div>
                                     <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+                                        {{ __('Free during the beta. You’ll get a verification email first.') }}
                                         {{ __('Already have an account?') }}
                                         <a href="{{ route('login') }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ __('Sign in') }}</a>
                                     </p>
                                 </div>
                             @endauth
+
+                            <div class="mt-12">
+                                <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Works with') }}</p>
+                                <ul class="mt-3 flex flex-wrap gap-2">
+                                    @foreach ($supportedShops as $shop)
+                                        <li class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800">
+                                            <img src="{{ $shop['favicon'] }}" alt="" loading="lazy" class="size-4 rounded-sm" />
+                                            {{ $shop['host'] }}
+                                        </li>
+                                    @endforeach
+                                    <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">{{ __('+ most webshops that show a price') }}</li>
+                                </ul>
+                            </div>
                         </div>
 
                         <div class="lg:col-span-5">
@@ -113,11 +137,27 @@
                             @endforeach
                         </dl>
                     </section>
+
+                    @guest
+                        <section class="pb-20">
+                            <div class="rounded-3xl bg-zinc-900 px-8 py-12 text-center text-white ring-1 ring-zinc-800 sm:px-12 dark:bg-zinc-900/80">
+                                <h2 class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{{ __('Stop checking prices by hand.') }}</h2>
+                                <p class="mx-auto mt-3 max-w-[48ch] text-pretty text-zinc-300">{{ __('Add the products you buy anyway and let DipCatch tell you where they are cheapest this week.') }}</p>
+                                <a href="{{ route('register') }}" class="mt-8 inline-flex items-center rounded-full bg-white px-5 py-2.5 text-sm font-medium text-zinc-900 shadow-md hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
+                            </div>
+                        </section>
+                    @endguest
                 </main>
 
                 <footer class="relative mx-auto mt-auto w-full max-w-7xl px-6 pb-10 lg:px-8">
                     <div class="flex flex-col items-center justify-between gap-3 border-t border-zinc-200 pt-6 text-sm text-zinc-500 sm:flex-row dark:border-zinc-800 dark:text-zinc-400">
                         <p>&copy; {{ date('Y') }} {{ config('app.name') }}</p>
+                        <nav class="flex items-center gap-5" aria-label="{{ __('Footer') }}">
+                            <a href="{{ route('privacy') }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Privacy') }}</a>
+                            @if (filled($contactEmail))
+                                <a href="mailto:{{ $contactEmail }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Contact') }}</a>
+                            @endif
+                        </nav>
                     </div>
                 </footer>
             </div>
