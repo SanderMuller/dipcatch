@@ -29,7 +29,7 @@ class InvitationMail extends Mailable
             with: [
                 'redeemUrl' => route('invitation.show', ['token' => $this->invitation->token]),
                 'expiresAt' => $this->invitation->expires_at,
-                'inviterName' => $this->invitation->inviter?->name ?? config('app.name'),
+                'inviterName' => $this->invitation->inviter->name ?? config('app.name'),
             ],
         );
     }
