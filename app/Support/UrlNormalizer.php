@@ -20,6 +20,12 @@ final class UrlNormalizer
      * trailing slash on non-root paths, drop `utm_*` query params, sort
      * remaining params alphabetically.
      *
+     * The `www.` prefix is deliberately KEPT here: not every shop serves its
+     * apex domain (vomar.nl answers 404 while www.vomar.nl serves the page),
+     * and this string is what the fetcher requests. Dedupe is unaffected —
+     * {@see hash()} drops the prefix before hashing, so the two forms still
+     * collapse to one shop.
+     *
      * @throws InvalidArgumentException when the input is not a parseable http/https URL.
      */
     public static function normalize(string $url): string
@@ -36,7 +42,7 @@ final class UrlNormalizer
             throw new InvalidArgumentException("Unsupported URL scheme '{$scheme}' in '{$url}'.");
         }
 
-        $host = self::normalizeHost($parts['host']);
+        $host = self::canonicalHost($parts['host']);
 
         $port = $parts['port'] ?? null;
         $portSegment = self::normalizePort($scheme, $port);
@@ -48,17 +54,16 @@ final class UrlNormalizer
     }
 
     /**
-     * Public so callers (e.g. Shop model) can compute the canonical host
-     * separately from the full URL — for `offers.host` and rate-limit keys.
+     * Host as the site serves it: lowercased, IDN-encoded, without the DNS
+     * root dot — `www.` intact, because not every shop answers on its apex.
      */
-    public static function normalizeHost(string $host): string
+    public static function canonicalHost(string $host): string
     {
         $host = strtolower($host);
         // A fully qualified name ends in the DNS root dot ("plus.nl."), which
         // resolves to the same site — keeping it would let such a URL slip
         // past every host comparison in the app.
         $host = rtrim($host, '.');
-        $host = preg_replace('/^www\./', '', $host) ?? $host;
 
         if ($host === '') {
             throw new InvalidArgumentException('Empty host after normalization.');
@@ -79,9 +84,23 @@ final class UrlNormalizer
         return $host;
     }
 
+    /**
+     * The comparison form of a host, `www.` dropped: `shops.host`, rate-limit
+     * keys and every host allow-list compare on this.
+     */
+    public static function normalizeHost(string $host): string
+    {
+        return preg_replace('/^www\./', '', self::canonicalHost($host)) ?? self::canonicalHost($host);
+    }
+
+    /**
+     * Dedupe key for a normalized URL. `www.` is dropped here rather than in
+     * {@see normalize()}, so `www.shop.test/p` and `shop.test/p` are one
+     * shop while each keeps the host that actually serves it.
+     */
     public static function hash(string $normalizedUrl): string
     {
-        return hash('sha256', $normalizedUrl);
+        return hash('sha256', preg_replace('#^(https?://)www\.#', '$1', $normalizedUrl) ?? $normalizedUrl);
     }
 
     private static function normalizePort(string $scheme, ?int $port): string

@@ -318,3 +318,26 @@ test('a trailing-dot plus.nl URL is refused like any other', function (): void {
 
     Http::assertNothingSent();
 });
+
+test('a shop that only answers on its www host is probed there, not on the apex', function (): void {
+    // vomar.nl answers 404 while www.vomar.nl serves the page.
+    Http::fake([
+        'https://www.shop-with-www.test/robots.txt' => Http::response('', 404),
+        'https://www.shop-with-www.test/p/1' => Http::response(withJsonLd(json_encode([
+            '@type' => 'Product',
+            'name' => 'Demo',
+            'offers' => ['@type' => 'Offer', 'price' => '9.99', 'priceCurrency' => 'EUR'],
+        ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']),
+        'https://shop-with-www.test/*' => Http::response('gone', 404),
+    ]);
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $outcome = app(ProbeShopUrl::class)($product, 'https://www.shop-with-www.test/p/1', $user);
+
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->snapshot?->price)->toBe('9.99')
+        // The stored host still drops the prefix, so host comparisons hold.
+        ->and($outcome->host)->toBe('shop-with-www.test');
+});

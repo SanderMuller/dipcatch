@@ -349,3 +349,17 @@ test('accepts the non-spec capitalized Price key dirk.nl emits', function (): vo
         ->and($result->snapshot?->price)->toBe('1.69')
         ->and($result->snapshot?->currency)->toBe('EUR');
 });
+
+test('an HTML-escaped name is decoded — JSON-LD is never decoded by the parser', function (): void {
+    $html = withJsonLd(json_encode([
+        '@type' => 'Product',
+        'name' => 'Lay&#39;s chips naturel',
+        'image' => 'https://shop.test/i.jpg?a=1&amp;b=2',
+        'offers' => ['@type' => 'Offer', 'price' => '2.45', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR));
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', $html);
+
+    expect($result->snapshot?->title)->toBe("Lay's chips naturel")
+        ->and($result->snapshot?->imageUrl)->toBe('https://shop.test/i.jpg?a=1&b=2');
+});

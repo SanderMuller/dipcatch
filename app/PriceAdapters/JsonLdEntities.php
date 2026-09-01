@@ -109,7 +109,7 @@ final class JsonLdEntities
     public static function firstImageUrl(mixed $value): ?string
     {
         if (is_string($value) && $value !== '') {
-            return $value;
+            return html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
         if (! is_array($value)) {
@@ -132,9 +132,21 @@ final class JsonLdEntities
         return is_string($url) && $url !== '' ? $url : null;
     }
 
+    /**
+     * JSON-LD lives inside a `<script>`, so the HTML parser never decodes it:
+     * shops that HTML-escape their own data hand over a name like
+     * `Lay&#39;s chips naturel` (spar.nl, verified 2026-09-02), which would
+     * otherwise reach the product title verbatim.
+     */
     public static function nonEmptyString(mixed $value): ?string
     {
-        return is_string($value) && $value !== '' ? $value : null;
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return $decoded === '' ? null : $decoded;
     }
 
     /**

@@ -7,9 +7,21 @@ test('lowercases scheme and host', function (): void {
         ->toBe('https://example.com/foo');
 });
 
-test('strips leading www. from host', function (): void {
+test('keeps www. in the URL — not every shop answers on its apex host', function (): void {
     expect(UrlNormalizer::normalize('https://www.example.com/foo'))
-        ->toBe('https://example.com/foo');
+        ->toBe('https://www.example.com/foo');
+});
+
+test('www and apex forms still dedupe to one shop', function (): void {
+    $withWww = UrlNormalizer::hash(UrlNormalizer::normalize('https://www.example.com/foo'));
+    $apex = UrlNormalizer::hash(UrlNormalizer::normalize('https://example.com/foo'));
+
+    expect($withWww)->toBe($apex);
+});
+
+test('the comparison host drops www., the URL host does not', function (): void {
+    expect(UrlNormalizer::normalizeHost('www.example.com'))->toBe('example.com')
+        ->and(UrlNormalizer::canonicalHost('www.example.com'))->toBe('www.example.com');
 });
 
 test('strips userinfo from authority', function (): void {

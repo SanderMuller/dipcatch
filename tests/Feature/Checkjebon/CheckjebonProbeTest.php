@@ -91,10 +91,10 @@ test('empty dataset fails with dataset_empty reason', function (): void {
 });
 
 test('lidl.nl URLs probe over the network through the Lidl adapter', function (): void {
-    // UrlNormalizer strips the `www.` prefix before the fetch.
+    // The URL keeps its `www.` host: that is what the shop serves.
     Http::fake([
-        'https://lidl.nl/robots.txt' => Http::response('', 404),
-        'https://lidl.nl/*' => Http::response(lidlPage(), 200),
+        'https://www.lidl.nl/robots.txt' => Http::response('', 404),
+        'https://www.lidl.nl/*' => Http::response(lidlPage(), 200),
     ]);
     Http::preventStrayRequests();
     $user = User::factory()->create();
