@@ -94,7 +94,7 @@ A suggestion is *trackable* when the app can price that chain's URL today. Verif
 | vomar | `VomarAdapter` (added 2026-09-01), Nuxt 2 SSR state | yes |
 | hoogvliet | Imperva challenge; the generic adapter had returned **22.33** for a 3.09 product | **no** |
 | plus | OutSystems SPA, data via signed POST endpoints | no |
-| dekamarkt | parses, but its dataset ids do not exist on the site | no — excluded entirely |
+| dekamarkt | `DekaMarktAdapter` (added 2026-09-01) prices a pasted URL; the dataset ids still do not exist on the site | not suggested, but trackable when the user pastes the URL |
 
 Trackability is a static map keyed by chain, not a probe at render time — a per-suggestion probe would burn the 6/min per-user probe budget in `ProbeShopUrl` (`app/Actions/Shops/ProbeShopUrl.php:46`) before the user clicked anything. Hoogvliet is listed as untrackable *despite* parsing, because a confidently wrong price is worse than no price.
 
@@ -266,6 +266,8 @@ Stop and report — do not improvise — if any of these proves false during imp
 8. **What does a GTIN mismatch do?** **Decision:** Warn on the product page; change nothing about pricing or alerts. **Rationale:** On the Feliway product all three shops carry different EANs at 27.99–57.72, which is worth surfacing — but excluding offers from the cheapest calculation would silently drop offers that may be correct.
 
 ## Findings
+
+- **DekaMarkt adapter (2026-09-01).** Same platform as Dirk, but its JSON-LD carries only Organization and WebSite data, so `DekaMarktAdapter` takes price and title from the Nuxt payload: a product record (`headerText`, `packaging`, `images`) and a price record (`normalPrice`, `offerPrice`, offer window), both keyed by `productId` and matched against the id in the URL. It reports the offer price while the window is open and the shelf price once it closes — verified against a live "1+1 GRATIS" page showing 1.59 with 1.95 struck through. This does not make DekaMarkt suggestible: the dataset's ids are a different space (they look like article numbers, matching the digits in the image filenames), so a suggestion still cannot build a link. A URL the user pastes is now tracked normally.
 
 - **Adapters added for Poiesz and Vomar (2026-09-01).** Both chains now price live and are marked trackable, so their suggestions carry a working Add button. Poiesz serves everything in the Nuxt `__NUXT_DATA__` payload the Dirk and Lidl adapters already decode — price, title, image, `packageDescription` and `ean` — matched on the id in the URL so recommended products cannot win. Vomar is Nuxt 2: its state sits in a minified `window.__NUXT__` IIFE, so `VomarAdapter` reads the `productDetails` object with targeted patterns, takes the price only when it is a literal (the minifier hoists repeated values into parameters), and falls back to the page `<h1>` when the name was hoisted. Hoogvliet got no adapter: it sits behind an Imperva challenge that the app's fetcher receives as a 212-byte shell, which is exactly how the generic adapter had produced 22.33 for a 3.09 product. The challenge markers are now in `ShopFetcher::BLOCK_MARKERS`, so such a page is a clean `Blocked` rather than a page to parse. Plus stays out: its OutSystems SPA has no stable public endpoint.
 

@@ -370,3 +370,42 @@ function vomarPage(string $price = '2.39', ?string $description = 'Aardappelgrat
 
     return '<html><body><h1> Ontbijtkoek </h1><script>' . $state . '</script></body></html>';
 }
+
+/**
+ * Trimmed replica of a dekamarkt.nl product page: the Nuxt `__NUXT_DATA__`
+ * flat-array payload with a product record (headerText, packaging, images)
+ * and a price record (normalPrice, offerPrice and the offer window), both
+ * keyed by productId. Its JSON-LD carries no product data (observed
+ * 2026-09-01), so a page without the payload has nothing to fall back on.
+ */
+function dekaMarktPage(
+    string $normalPrice = '1.95',
+    ?string $offerPrice = '1.59',
+    string $productId = '126549',
+    ?string $offerStart = '-1 day',
+    ?string $offerEnd = '+6 days',
+): string {
+    $payload = json_encode([
+        ['productId' => 1, 'headerText' => 2, 'packaging' => 3, 'images' => 4],
+        $productId,
+        'Knorr Kruidenmix airfryer knoflook kip',
+        '70 g',
+        [5],
+        ['image' => 6, 'mainImage' => 7],
+        'artikelen/492657_2026-08-25_14-04-01-473_57ec706c.png',
+        true,
+        [
+            'productId' => 1,
+            'normalPrice' => 9,
+            'offerPrice' => 10,
+            'startDate' => 11,
+            'endDate' => 12,
+        ],
+        (float) $normalPrice,
+        $offerPrice === null ? null : (float) $offerPrice,
+        $offerStart === null ? null : now()->modify($offerStart)->toIso8601String(),
+        $offerEnd === null ? null : now()->modify($offerEnd)->toIso8601String(),
+    ], JSON_THROW_ON_ERROR);
+
+    return '<html><body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';
+}

@@ -3,6 +3,7 @@
 use App\PriceAdapters\UserSelectorAdapter;
 use App\PriceAdapters\Hosts\AmazonAdapter;
 use App\PriceAdapters\Hosts\BolAdapter;
+use App\PriceAdapters\Hosts\DekaMarktAdapter;
 use App\PriceAdapters\Hosts\DirkAdapter;
 use App\PriceAdapters\Hosts\JumboAdapter;
 use App\PriceAdapters\Hosts\LidlAdapter;
@@ -73,6 +74,7 @@ return [
         UserSelectorAdapter::class,
         AmazonAdapter::class,
         BolAdapter::class,
+        DekaMarktAdapter::class,
         DirkAdapter::class,
         JumboAdapter::class,
         LidlAdapter::class,

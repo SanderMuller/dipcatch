@@ -40,7 +40,9 @@ final class SupermarketChains
      * artikel is niet gevonden", and the real `/producten/x/x/x/<id>`
      * pages use a different id space — five random dataset ids all miss,
      * while an id taken from dekamarkt.nl itself resolves (2026-09-01).
-     * A row nobody can open or track is noise.
+     * A row nobody can open or track is noise. `DekaMarktAdapter` prices
+     * those pages fine, so a URL the user pastes themselves is tracked;
+     * only the dataset-built link is unusable.
      *
      * @var list<string>
      */
