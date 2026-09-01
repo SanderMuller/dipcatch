@@ -4,7 +4,7 @@
         "codex",
         "copilot"
     ],
-    "cloud": false,
+    "cloud": true,
     "guidelines": true,
     "mcp": true,
     "nightwatch_mcp": false,
@@ -13,22 +13,15 @@
     ],
     "sail": false,
     "skills": [
+        "infer-conventions",
         "fortify-development",
         "laravel-best-practices",
+        "testing-best-practices",
+        "octane-development",
         "fluxui-development",
         "livewire-development",
-        "pest-testing",
+        "mcp-development",
         "tailwindcss-development",
-        "ai-guidelines",
-        "autoresearch",
-        "backend-quality",
-        "bug-fixing",
-        "code-review",
-        "codex-review",
-        "evaluate",
-        "implement-spec",
-        "pr-review-feedback",
-        "pre-release",
-        "write-spec"
+        "deploying-laravel-cloud"
     ]
 }
