@@ -56,3 +56,10 @@ test('a malformed EAN is dropped instead of stored', function (): void {
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->gtin)->toBeNull();
 });
+
+test('a URL without a product id is refused rather than priced from a recommendation', function (): void {
+    $result = $this->adapter->extract('https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/', poieszPage());
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('poiesz_no_product_id');
+});

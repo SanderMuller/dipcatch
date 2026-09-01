@@ -41,7 +41,16 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, ShopAdapter
             return ExtractionResult::failed('poiesz_no_payload');
         }
 
-        $record = self::productRecord($data, self::productIdFromUrl($url));
+        $productId = self::productIdFromUrl($url);
+
+        if ($productId === null) {
+            // Without an id there is nothing to match on, and the payload
+            // carries recommended products with the same shape — guessing
+            // would price a different article.
+            return ExtractionResult::failed('poiesz_no_product_id');
+        }
+
+        $record = self::productRecord($data, $productId);
 
         if ($record === null) {
             return ExtractionResult::failed('poiesz_no_product');
@@ -76,23 +85,26 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, ShopAdapter
     public static function handles(string $url): bool
     {
         $host = parse_url($url, PHP_URL_HOST);
-        $host = is_string($host) ? UrlNormalizer::normalizeHost($host) : '';
+
+        if (! is_string($host) || $host === '') {
+            return false;
+        }
+
+        $host = UrlNormalizer::normalizeHost($host);
 
         return $host === 'poiesz-supermarkten.nl' || str_ends_with($host, '.poiesz-supermarkten.nl');
     }
 
     /**
-     * The product record carries `price` alongside `name` and `id`. When the
-     * URL names an id, only that record counts — recommended products sit in
+     * The product record carries `price` alongside `name` and `id`. Only the
+     * record whose id matches the URL counts — recommended products sit in
      * the same payload with the same shape.
      *
      * @param  list<mixed>  $data
      * @return array<string, mixed>|null
      */
-    private static function productRecord(array $data, ?string $productId): ?array
+    private static function productRecord(array $data, string $productId): ?array
     {
-        $fallback = null;
-
         foreach ($data as $element) {
             if (! is_array($element) || ! isset($element['price'], $element['name'], $element['id'])) {
                 continue;
@@ -101,14 +113,12 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, ShopAdapter
             /** @var array<string, mixed> $element */
             $recordId = self::value($data, $element, 'id');
 
-            if ($productId !== null && (is_string($recordId) || is_int($recordId)) && (string) $recordId === $productId) {
+            if ((is_string($recordId) || is_int($recordId)) && (string) $recordId === $productId) {
                 return $element;
             }
-
-            $fallback ??= $element;
         }
 
-        return $productId === null ? $fallback : null;
+        return null;
     }
 
     /**

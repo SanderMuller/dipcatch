@@ -28,6 +28,9 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
 {
     private const string IMAGE_BASE = 'https://d3vricquk1sjgf.cloudfront.net/';
 
+    /** Scan cap for the product object; a real one is a few kB. */
+    private const int MAX_OBJECT_BYTES = 20_000;
+
     public function key(): string
     {
         return 'vomar';
@@ -43,6 +46,15 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
 
         if ($details === null) {
             return ExtractionResult::failed('vomar_no_product');
+        }
+
+        $articleNumber = self::literal($details, 'articleNumber');
+        $productId = self::productIdFromUrl($url);
+
+        // The URL id must be the article the state describes. Without this a
+        // page that ever embeds a second product could price the wrong one.
+        if ($productId !== null && $articleNumber !== null && $articleNumber !== $productId) {
+            return ExtractionResult::failed('vomar_product_mismatch');
         }
 
         $price = PriceNormalizer::fromMixed(self::literal($details, 'price'));
@@ -71,18 +83,71 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
     public static function handles(string $url): bool
     {
         $host = parse_url($url, PHP_URL_HOST);
-        $host = is_string($host) ? UrlNormalizer::normalizeHost($host) : '';
+
+        if (! is_string($host) || $host === '') {
+            return false;
+        }
+
+        $host = UrlNormalizer::normalizeHost($host);
 
         return $host === 'vomar.nl' || str_ends_with($host, '.vomar.nl');
     }
 
+    /**
+     * The `productDetails` object, cut at its own closing brace rather than
+     * at a fixed width: a window that overruns the object would read a
+     * neighbouring product's fields as if they belonged to this one.
+     */
     private static function productDetails(string $html): ?string
     {
-        if (preg_match('/productDetails:\{(.{0,4000})/s', $html, $m) !== 1) {
+        $start = strpos($html, 'productDetails:{');
+
+        if ($start === false) {
             return null;
         }
 
-        return $m[1];
+        $offset = $start + strlen('productDetails:{');
+        $depth = 1;
+        $inString = false;
+        $length = min(strlen($html), $offset + self::MAX_OBJECT_BYTES);
+
+        for ($i = $offset; $i < $length; $i++) {
+            $char = $html[$i];
+
+            if ($inString) {
+                if ($char === '\\') {
+                    $i++;
+                } elseif ($char === '"') {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($char === '"') {
+                $inString = true;
+            } elseif ($char === '{') {
+                $depth++;
+            } elseif ($char === '}' && --$depth === 0) {
+                return substr($html, $offset, $i - $offset);
+            }
+        }
+
+        return null;
+    }
+
+    private static function productIdFromUrl(string $url): ?string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if (! is_string($path)) {
+            return null;
+        }
+
+        $segments = array_values(array_filter(explode('/', $path), static fn (string $s): bool => $s !== ''));
+        $last = end($segments);
+
+        return is_string($last) && ctype_digit($last) ? $last : null;
     }
 
     /**

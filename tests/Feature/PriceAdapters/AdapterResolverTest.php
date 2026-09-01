@@ -109,7 +109,9 @@ test('persisted key ambiguous propagates as ambiguous (no silent fallback)', fun
         ->and($result->adapterKey)->toBe('persisted');
 });
 
-test('persisted key failed → full chain runs (does not stop)', function (): void {
+test('a host-specific persisted key that fails stops the chain', function (): void {
+    // A weaker adapter would otherwise read some other number off the page
+    // and present it as this product's price.
     $resolver = new AdapterResolver([
         fakeAdapter('persisted', ExtractionResult::failed('hint_failed')),
         fakeAdapter('fallback', ExtractionResult::success(snap('77.00'))),
@@ -117,7 +119,9 @@ test('persisted key failed → full chain runs (does not stop)', function (): vo
 
     $result = $resolver->resolve('https://x.test', '<html></html>', 'persisted');
 
-    expect($result->snapshot?->price)->toBe('77.00');
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('hint_failed')
+        ->and($result->adapterKey)->toBe('persisted');
 });
 
 test('container wires resolver from dipcatch.adapters config in order', function (): void {

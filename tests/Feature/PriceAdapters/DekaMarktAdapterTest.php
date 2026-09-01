@@ -40,8 +40,21 @@ test('uses the shelf price when there is no offer at all', function (): void {
     expect($this->adapter->extract(dekaMarktUrl(), $page)->snapshot?->price)->toBe('1.95');
 });
 
-test('an undated offer price is trusted rather than dropped', function (): void {
-    $page = dekaMarktPage(offerStart: null, offerEnd: null);
+test('an undated or unreadable offer window falls back to the shelf price', function (?string $start, ?string $end): void {
+    // The payload keeps last week's offer around, so an unusable window is
+    // not evidence of a live discount — trusting it would resurrect an
+    // expired price as a drop.
+    $page = dekaMarktPage(offerStart: $start, offerEnd: $end);
+
+    expect($this->adapter->extract(dekaMarktUrl(), $page)->snapshot?->price)->toBe('1.95');
+})->with([
+    'no dates at all' => [null, null],
+    'missing start' => [null, '+6 days'],
+    'missing end' => ['-1 day', null],
+]);
+
+test('an offer window given with an explicit timezone offset is honoured', function (): void {
+    $page = dekaMarktPage(offerStart: '-1 hour', offerEnd: '+1 hour');
 
     expect($this->adapter->extract(dekaMarktUrl(), $page)->snapshot?->price)->toBe('1.59');
 });
@@ -58,4 +71,11 @@ test('a page without the payload fails with a DekaMarkt-specific reason', functi
 
     expect($result->isSuccess())->toBeFalse()
         ->and($result->failureReason)->toBe('dekamarkt_no_payload');
+});
+
+test('a URL without a product id is refused rather than priced from a related product', function (): void {
+    $result = $this->adapter->extract('https://www.dekamarkt.nl/producten/x/x/x/', dekaMarktPage());
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('dekamarkt_no_product_id');
 });

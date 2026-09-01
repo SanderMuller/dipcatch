@@ -25,7 +25,7 @@ test('reads price, title, pack size, EAN and image from the Nuxt 2 state', funct
 });
 
 test('a minified name falls back to the page heading instead of the variable', function (): void {
-    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/467456', vomarPage(description: null));
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', vomarPage(description: null));
 
     expect($result->snapshot?->title)->toBe('Ontbijtkoek');
 });
@@ -51,4 +51,25 @@ test('a malformed EAN is dropped instead of stored', function (): void {
 
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->gtin)->toBeNull();
+});
+
+test('a second product object cannot leak its fields into this one', function (): void {
+    // The neighbour sits right after the tracked product's closing brace.
+    $html = str_replace(
+        '</script>',
+        ',{"other":{"articleNumber":999999,"description":"Other product","price":99.99}}</script>',
+        vomarPage(),
+    );
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->snapshot?->price)->toBe('2.39')
+        ->and($result->snapshot?->title)->toBe('Aardappelgratin Kaas');
+});
+
+test('a page describing a different article than the URL is refused', function (): void {
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', vomarPage(articleNumber: '888888'));
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_product_mismatch');
 });

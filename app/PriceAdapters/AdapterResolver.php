@@ -10,9 +10,11 @@ namespace App\PriceAdapters;
  *   - success   → stop the chain, return the snapshot.
  *
  * A persisted `adapter_key` (set from a prior successful check) is run first
- * as a hint, then the full chain runs as fallback if it skips or fails. This
- * gives stale persisted keys the chance to fall through silently to a
- * different adapter when host markup changes.
+ * as a hint. A generic key never short-circuits, so a host that later gained
+ * a dedicated adapter picks it up. A host-specific hint that skips (the URL
+ * moved to another host) falls through to the chain; one that fails or comes
+ * back ambiguous ends resolution, because a weaker adapter would otherwise
+ * read some other number off the page and call it this product's price.
  *
  * An optional {@see AdapterContext} carries user-supplied selectors and a
  * fallback currency; today only {@see UserSelectorAdapter} consumes it.
@@ -42,15 +44,19 @@ final readonly class AdapterResolver
 
         $result = $persisted->extract($url, $html, $context);
 
-        // Ambiguous from the hint means the page genuinely has multiple
-        // variants; falling through to a weaker adapter would silently
-        // pick the wrong one. Propagate the chooser instead.
-        if ($result->isSuccess() || $result->isAmbiguous()) {
+        // Only `skip` falls through: the adapter said the URL is not its
+        // host. Anything else is that host's own verdict.
+        //
+        // Ambiguous means the page genuinely has multiple variants, and a
+        // failure means the host's own extraction did not hold — in both
+        // cases a weaker adapter would pick a number off the page and
+        // present it as this product's price, which is how a wrong price
+        // reaches a drop alert. Fail loudly instead.
+        if (! $result->isSkip()) {
             return $result->withAdapterKey($persisted->key());
         }
 
-        // The hint already ran and failed or skipped — exclude it from the
-        // fallback chain.
+        // The hint already ran and skipped — exclude it from the chain.
         return $this->runChain($url, $html, $persistedKey, $context);
     }
 

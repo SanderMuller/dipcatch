@@ -47,6 +47,11 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
         }
 
         $productId = self::productIdFromUrl($url);
+
+        if ($productId === null) {
+            return ExtractionResult::failed('dekamarkt_no_product_id');
+        }
+
         $product = self::recordWith($data, ['productId', 'headerText', 'packaging'], $productId);
         $priceRecord = self::recordWith($data, ['productId', 'normalPrice'], $productId);
 
@@ -80,7 +85,12 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
     public static function handles(string $url): bool
     {
         $host = parse_url($url, PHP_URL_HOST);
-        $host = is_string($host) ? UrlNormalizer::normalizeHost($host) : '';
+
+        if (! is_string($host) || $host === '') {
+            return false;
+        }
+
+        $host = UrlNormalizer::normalizeHost($host);
 
         return $host === 'dekamarkt.nl' || str_ends_with($host, '.dekamarkt.nl');
     }
@@ -113,10 +123,11 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
         $start = self::date($data, $record, 'startDate');
         $end = self::date($data, $record, 'endDate');
 
+        // An undated or unparseable window is not evidence of a live offer.
+        // The payload keeps last week's offer price around, so trusting it
+        // would resurrect an expired discount as a price drop.
         if ($start === null || $end === null) {
-            // No window means the payload states an offer price without
-            // dating it; trust it rather than dropping a live discount.
-            return true;
+            return false;
         }
 
         return CarbonImmutable::now()->between($start, $end);
@@ -172,17 +183,15 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
     }
 
     /**
-     * The first record carrying every named key, preferring the one whose
-     * `productId` matches the URL — a page also carries related products.
+     * The record carrying every named key whose `productId` matches the URL.
+     * A page also carries related products, so nothing else may win.
      *
      * @param  list<mixed>  $data
      * @param  list<string>  $keys
      * @return array<string, mixed>|null
      */
-    private static function recordWith(array $data, array $keys, ?string $productId): ?array
+    private static function recordWith(array $data, array $keys, string $productId): ?array
     {
-        $fallback = null;
-
         foreach ($data as $element) {
             if (! is_array($element)) {
                 continue;
@@ -197,14 +206,12 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
             /** @var array<string, mixed> $element */
             $recordId = self::value($data, $element, 'productId');
 
-            if ($productId !== null && (is_string($recordId) || is_int($recordId)) && (string) $recordId === $productId) {
+            if ((is_string($recordId) || is_int($recordId)) && (string) $recordId === $productId) {
                 return $element;
             }
-
-            $fallback ??= $element;
         }
 
-        return $productId === null ? $fallback : null;
+        return null;
     }
 
     /**

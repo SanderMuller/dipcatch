@@ -282,3 +282,37 @@ test('a failed check never touches the pack columns', function (): void {
         ->and((string) $shop->pack_quantity)->toBe('250.00')
         ->and($shop->pack_unit)->toBe('g');
 });
+
+test('a host adapter that loses its payload fails the check instead of taking a stray number', function (): void {
+    // A Poiesz page stripped of its Nuxt payload but carrying JSON-LD for
+    // something else entirely: the recheck must not price that instead.
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => 'Unrelated banner product',
+        'offers' => ['@type' => 'Offer', 'price' => '99.99', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR);
+
+    Http::fake([
+        'https://webwinkel.poiesz-supermarkten.nl/robots.txt' => Http::response('', 404),
+        'https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/278550' => Http::response(
+            withJsonLd($json),
+            200,
+            ['Content-Type' => 'text/html'],
+        ),
+    ]);
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/278550',
+        'adapter_key' => 'poiesz',
+        'current_price' => '1.99',
+    ]);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+
+    expect($shop->last_status)->toBe(ScrapeStatus::ParseError)
+        ->and((string) $shop->current_price)->toBe('1.99')
+        ->and($shop->last_error)->toBe('poiesz_no_payload');
+});
