@@ -2,8 +2,10 @@
 
 namespace App\Filament\App\Resources\Products\Tables;
 
+use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
 use App\Support\MoneyFormatter;
+use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -24,6 +26,15 @@ class ProductsTable
     {
         return $table
             ->modifyQueryUsing(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->with('cheapestShop'))
+            ->emptyStateIcon(Heroicon::OutlinedShoppingBag)
+            ->emptyStateHeading('No products yet')
+            ->emptyStateDescription('Paste a product link from any webshop and DipCatch starts watching the price.')
+            ->emptyStateActions([
+                Action::make('track')
+                    ->label('Track a product')
+                    ->icon(Heroicon::Plus)
+                    ->url(ProductResource::getUrl('create')),
+            ])
             ->columns([
                 ImageColumn::make('image_url')
                     ->label('Image')

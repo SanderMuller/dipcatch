@@ -2,6 +2,7 @@
 
 use App\Filament\App\Pages\Dashboard;
 use App\Filament\App\Widgets\ActiveDropsTableWidget;
+use App\Filament\App\Widgets\NextStepsWidget;
 use App\Filament\App\Widgets\RecentNotificationsTableWidget;
 use App\Filament\App\Widgets\SavingsByMonthChartWidget;
 use App\Filament\App\Widgets\StatsOverviewWidget;
@@ -17,9 +18,13 @@ test('authenticated user can load /app dashboard', function (): void {
     $this->get('/app')->assertOk();
 });
 
-test('Dashboard page declares all four user widgets', function (): void {
-    $page = new Dashboard();
-    expect($page->getWidgets())->toBe([
+test('Dashboard page declares the next-steps checklist ahead of the four data widgets once products exist', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->for($user)->create();
+    $this->actingAs($user);
+
+    expect(new Dashboard()->getWidgets())->toBe([
+        NextStepsWidget::class,
         StatsOverviewWidget::class,
         ActiveDropsTableWidget::class,
         RecentNotificationsTableWidget::class,
