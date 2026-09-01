@@ -4,12 +4,14 @@ namespace App\Filament\App\Widgets;
 
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
+use App\Support\Favicon;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Support\HtmlString;
 
 class ActiveDropsTableWidget extends BaseWidget
 {
@@ -36,6 +38,7 @@ class ActiveDropsTableWidget extends BaseWidget
                     ->state(fn (Product $r): string => $r->currency . ' ' . ($r->last_notified_price ?? '—')),
                 TextColumn::make('cheapestShop.host')
                     ->label('Shop')
+                    ->formatStateUsing(fn (string $state): HtmlString => new HtmlString(Favicon::html($state)))
                     ->placeholder('—'),
                 TextColumn::make('last_notified_at')
                     ->label('Notified')

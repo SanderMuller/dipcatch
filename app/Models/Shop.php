@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
+use App\Support\Favicon;
 use App\Support\ImageUrl;
 use App\Support\PackSize;
 use App\Support\UrlNormalizer;
@@ -125,6 +126,11 @@ class Shop extends Model
     public function unitPriceLabel(): ?string
     {
         return $this->unitPrice() === null ? null : $this->packSize()?->label();
+    }
+
+    public function faviconUrl(): string
+    {
+        return Favicon::url($this->host);
     }
 
     private function packSize(): ?PackSize

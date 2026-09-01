@@ -72,7 +72,10 @@
                     <img src="{{ $snapshot['image_url'] }}" alt="" class="h-20 w-20 object-cover rounded" />
                 @endif
                 <div class="flex-1">
-                    <div class="text-sm text-zinc-500">{{ $host }}</div>
+                    <div class="flex items-center gap-1.5 text-sm text-zinc-500">
+                        <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
+                        {{ $host }}
+                    </div>
                     <div class="text-lg font-semibold mt-1 tabular-nums">
                         {{ $snapshot['currency'] }} {{ $snapshot['price'] }}
                         @if (! $snapshot['in_stock'])
@@ -189,9 +192,7 @@
                         @break
                     @case('not_in_dataset')
                         @php $njReason = $errorContext['reason'] ?? null; @endphp
-                        @if ($njReason === 'use_boodschaapje')
-                            Lidl prices come via boodschaapje.nl. Find the product on <a href="https://boodschaapje.nl" target="_blank" rel="noopener" class="font-semibold underline">boodschaapje.nl</a> and paste that URL instead.
-                        @elseif ($njReason === 'unrecognized_url')
+                        @if ($njReason === 'unrecognized_url')
                             No product id found in that URL. Paste a product page URL for this shop (not a category or search page).
                         @elseif ($njReason === 'dataset_empty')
                             The daily price dataset has not been loaded yet. Run <code>php artisan dipcatch:refresh-checkjebon</code> once.

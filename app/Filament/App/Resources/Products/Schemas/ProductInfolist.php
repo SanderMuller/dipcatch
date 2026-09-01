@@ -3,14 +3,16 @@
 namespace App\Filament\App\Resources\Products\Schemas;
 
 use App\Models\Product;
+use App\Support\Favicon;
 use App\Support\MoneyFormatter;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\HtmlString;
 
-class ProductInfolist
+final class ProductInfolist
 {
     public static function configure(Schema $schema): Schema
     {
@@ -37,6 +39,7 @@ class ProductInfolist
 
                         TextEntry::make('cheapestShop.host')
                             ->label('Cheapest at')
+                            ->formatStateUsing(fn (string $state): HtmlString => new HtmlString(Favicon::html($state)))
                             ->placeholder('—')
                             ->url(fn (Product $r): ?string => $r->cheapestShop?->url)
                             ->openUrlInNewTab()

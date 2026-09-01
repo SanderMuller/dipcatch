@@ -6,6 +6,7 @@ use App\Enums\ShopHealth;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Support\Favicon;
 use App\Support\MoneyFormatter;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -16,6 +17,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\HtmlString;
 
 /**
  * Admin triage of all offers across users. Filterable by health, active flag,
@@ -29,7 +31,10 @@ class ShopsTable
     {
         return $table
             ->columns([
-                TextColumn::make('host')->sortable()->searchable(),
+                TextColumn::make('host')
+                    ->formatStateUsing(fn (string $state): HtmlString => new HtmlString(Favicon::html($state)))
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('product.title')->label('Product')->limit(50)->searchable(),
                 TextColumn::make('product.user.email')->label('Owner')->searchable(),
                 TextColumn::make('current_price')
