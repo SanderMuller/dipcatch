@@ -40,7 +40,6 @@
         "hihaho/phpstan-rules": "^3.15.2",
         "hihaho/rector-rules": "^0.16.1",
         "larastan/larastan": "^3.10.0",
-        "laravel/boost": "^2.7",
         "laravel/mcp": "^0.8||^0.9.4",
         "laravel/pail": "^1.2.7",
         "laravel/pao": "^1.1.4",

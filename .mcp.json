@@ -1,12 +1,5 @@
 {
     "mcpServers": {
-        "laravel-boost": {
-            "command": "php",
-            "args": [
-                "artisan",
-                "boost:mcp"
-            ]
-        },
         "richter": {
             "command": "php",
             "args": [

@@ -47,6 +47,8 @@ return BoostConfig::configure()
         Tag::Github,
         'release-automation',
         'voice',
+        'laravel-cloud',
+        'hosting',
     ])
 
     // Project Conventions: fills the slot vocabulary that sandermuller/boost-skills
