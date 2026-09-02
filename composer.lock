@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ba189150bdedf048081943f7d53bd5c2",
+    "content-hash": "1f93e443482992f1109cbf835d216334",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -16000,16 +16000,16 @@
         },
         {
             "name": "sandermuller/laravel-fluent-validation-phpstan",
-            "version": "0.2.0",
+            "version": "0.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/SanderMuller/laravel-fluent-validation-phpstan.git",
-                "reference": "dc2b3941fa0955d80bed40926a4790d220cff0c5"
+                "reference": "9ea77b78993a5315d2932193791fd95394c8fe28"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SanderMuller/laravel-fluent-validation-phpstan/zipball/dc2b3941fa0955d80bed40926a4790d220cff0c5",
-                "reference": "dc2b3941fa0955d80bed40926a4790d220cff0c5",
+                "url": "https://api.github.com/repos/SanderMuller/laravel-fluent-validation-phpstan/zipball/9ea77b78993a5315d2932193791fd95394c8fe28",
+                "reference": "9ea77b78993a5315d2932193791fd95394c8fe28",
                 "shasum": ""
             },
             "require": {
@@ -16030,7 +16030,7 @@
                 "rector/rector": "^2.0",
                 "rector/type-perfect": "^2.0",
                 "sandermuller/boost-skills": "^1.9",
-                "sandermuller/laravel-fluent-validation": "^1.19.0",
+                "sandermuller/laravel-fluent-validation": "^1.33.0",
                 "sandermuller/package-boost-php": "^0.16.1",
                 "spaze/phpstan-disallowed-calls": "^4.10",
                 "symplify/phpstan-extensions": "^12.0.1",
@@ -16065,9 +16065,9 @@
             "homepage": "https://github.com/sandermuller/laravel-fluent-validation-phpstan",
             "support": {
                 "issues": "https://github.com/SanderMuller/laravel-fluent-validation-phpstan/issues",
-                "source": "https://github.com/SanderMuller/laravel-fluent-validation-phpstan/tree/0.2.0"
+                "source": "https://github.com/SanderMuller/laravel-fluent-validation-phpstan/tree/0.3.0"
             },
-            "time": "2026-06-09T07:03:59+00:00"
+            "time": "2026-07-20T17:47:16+00:00"
         },
         {
             "name": "sandermuller/laravel-fluent-validation-rector",
