@@ -45,7 +45,7 @@ final class MoneyFormatter
 }
 ```
 
-- `format()` uses a **worker-local** (static, lives for the Octane worker's lifetime — not per request) `NumberFormatter('en_US', NumberFormatter::CURRENCY)` and `formatCurrency((float) $amount, strtoupper($currency))`. `formatCurrency()` takes the code as an argument and does not depend on the formatter's currency attribute, so the shared instance is safe for `format()`. intl yields `€1.69`, `$1.69`, `£1.69`, `CHF 1.69`, `¥2` (JPY has zero decimals — intl handles minor units; the spec accepts intl's per-currency decimals rather than forcing two).
+- `format()` uses a **worker-local** (static, lives for the Octane worker's lifetime — not per request) `NumberFormatter('en_US', NumberFormatter::CURRENCY)` and `formatCurrency((float) $amount, strtoupper($currency))`. `formatCurrency()` takes the code as an argument and does not depend on the formatter's currency attribute, so the shared instance is safe for `format()`. intl yields `€1.69`, `$1.69`, `£1.69`, `CHF 1.69`, `¥200` (JPY has zero decimals — intl handles minor units; the spec accepts intl's per-currency decimals rather than forcing two).
 - Non-numeric `$amount` (defensive; callers pass DB decimals) renders `—`, same as null.
 - `symbol()` uses a **second, private** `NumberFormatter` instance (also worker-local) on which it calls `setTextAttribute(CURRENCY_CODE, …)` then `getSymbol(NumberFormatter::CURRENCY_SYMBOL)`; keeping the mutating call off the `format()` instance means neither method can observe the other's state. Verified locally: `EUR → €`, `CHF → CHF`. If intl reports an error (`getErrorCode() !== U_ZERO_ERROR`) after either call, the method falls back to the upper-cased code (`symbol()`) or `code + ' ' + number_format(…, 2, '.', ',')` (`format()`), so a broken ICU can never blank a price.
 - Under Octane both statics persist across requests; nothing request-specific is stored in them (locale is fixed `en_US`, currency is passed per call), so the persistence is harmless. The unit test alternates `symbol('EUR') → format('1.69','USD') → symbol('CHF') → format('200','JPY')` and asserts each result in sequence.
@@ -65,12 +65,23 @@ final class MoneyFormatter
 
 ### 2.3 Chart tooltips
 
-Tooltips are client-side. A PHP array cannot carry a JS function, so each chart widget returns its options as `Filament\Support\RawJs::make(<<<'JS' … JS)` (the `getOptions(): array | RawJs | null` signature in `vendor/filament/widgets/src/ChartWidget.php:103` allows it) with `plugins.tooltip.callbacks.label` prefixing the dataset's symbol — the symbol travels in the dataset (`'symbol' => MoneyFormatter::symbol(...)`) so the JS never needs a currency table. Any existing array options move into the same `RawJs` block. Implementer verifies in the browser that a hovered point reads `€1.69`.
+Tooltips are client-side. A PHP array cannot carry a JS function, so each chart widget returns its options as `Filament\Support\RawJs::make(<<<'JS' … JS)` (the `getOptions(): array | RawJs | null` signature in `vendor/filament/widgets/src/ChartWidget.php:103` allows it); any existing array options move into the same block. Every dataset — including `PriceHistoryChart`'s `Notified` marker dataset (`PriceHistoryChart.php:91-98`), which carries no currency today — gets a `currency` field with the ISO code. The tooltip `label` callback formats with the browser's own ICU:
+
+```js
+label: (ctx) => {
+    const value = ctx.parsed.y;
+    if (value === null || value === undefined) { return ctx.dataset.label; }
+    const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: ctx.dataset.currency }).format(value);
+    return `${ctx.dataset.label}: ${money}`;
+}
+```
+
+`Intl.NumberFormat('en-US', currency)` is the same CLDR rule set as PHP intl's `en_US` currency style, so grouping, minor units (`¥200`), negative placement (`-€1.69`) and symbol fallback (`CHF 1.69`) match the server without a currency table in JS. Dataset labels still use `MoneyFormatter::symbol()` server-side (`Cheapest (€)`). Browser assertions: hover a EUR point (`€1.69`), a JPY point on a test product (`¥200`), and a `Notified` marker (label plus the formatted price, never `undefined`).
 
 ### 2.4 Tests
 
 - Unit (`tests/Unit/Support/MoneyFormatterTest.php`): `EUR → €1.69`, `USD → $1,234.56`, `GBP → £0.99`, `JPY → ¥200`, `CHF → CHF 1.69` (code fallback with intl's own spacing), null → `—`, non-numeric → `—`, `symbol('EUR') === '€'`, lowercase code accepted.
-- Feature: the shops table, products table, infolist "Cheapest now", public share page, add-shop preview, active-drops widget (including the null case now rendering `—`, not `EUR —`), digest mail markdown, and the web-push body all contain `€1.69`-style strings and no `EUR 1.69`. A repo-wide **anti-bypass test** enforces the rule at the primitive level: no PHP or Blade file under `app/` and `resources/views/` may call `number_format(` except (a) `App\Support\MoneyFormatter` and (b) an explicit allowlist of non-money numeric formatting, initially the percentage renderers (`RecentNotificationsTableWidget` drop-percentage helper and the `drop_pct` cell in `price-drop-digest.blade.php`). The allowlist is a constant in the test, so adding a `number_format` anywhere else fails the suite with the file name; `sprintf`/interpolation variants without `number_format` are caught by the per-surface feature assertions above, which remain the primary coverage.
+- Feature: the shops table, products table, infolist "Cheapest now", public share page (body and `og:description`), add-shop preview, active-drops widget (including the null case now rendering `—`, not `EUR —`), recent-notifications widget (absolute drop), stats widget (empty state `€0.00`; mixed currencies `Also: $30.00`), digest mail markdown, and the web-push body all contain `€1.69`-style strings and no `EUR 1.69` / `USD 30.00`. A **presentation-layer tripwire test** (not a guarantee — the per-surface feature tests above are the real coverage) scans only presentation code: `app/Filament/**`, `app/Livewire/**`, `app/Notifications/**`, `app/Mail/**`, `resources/views/**`. In those files `number_format(` may appear only in an explicit allowlist held as a constant in the test: the two percentage renderers (`RecentNotificationsTableWidget` drop-percentage helper, the `drop_pct` cell in `price-drop-digest.blade.php`) and the decimal *serialisation* in `CreateProductFromUrl.php:77-78` (it writes threshold values, not display strings). Non-presentation code (`app/Actions`, `app/Console`, `app/Services`, `app/Support`) is out of scope — `SuggestShops.php:322`, `RefreshCheckjebonDatasetCommand.php:148`, `QueryTokens.php:90`, `PackSize.php:197` format numbers for matching or storage and must not go through `MoneyFormatter`. A new `number_format` in presentation code fails the suite naming the file; the implementer then either routes it through the formatter or extends the allowlist with a one-line reason.
 
 ## 3. Mobile
 
@@ -94,8 +105,8 @@ Symbol-first amounts are narrower than `EUR 1.69`, so no layout risk; the implem
 
 - [ ] Rewrite `MoneyFormatter::format()` on `NumberFormatter` (en_US, CURRENCY, memoised) and add `symbol()` — Section 2.1.
 - [ ] Route the eight bypass sites through the formatter — Section 2.2 table.
-- [ ] Chart tooltips/labels via dataset-carried symbol — Section 2.3; browser-verify a tooltip on the price-history chart and the savings chart.
-- [ ] Tests — Section 2.4, including the repo-wide anti-bypass test; update every existing assertion on money strings and currency labels: grep `tests/` for `EUR ` **and** for bare-code labels (`Cheapest (EUR)` in `PriceHistoryChartTest.php:47`, dataset label `EUR` in `SavingsByMonthChartWidgetTest.php:84`, `RecentNotificationsTableWidgetTest`).
+- [ ] Chart tooltips/labels via `RawJs` + dataset-carried currency — Section 2.3; browser-verify EUR, JPY and the `Notified` marker tooltip.
+- [ ] Tests — Section 2.4, including the presentation-layer tripwire test; update every existing assertion on money strings and currency labels: grep `tests/` for every code in `Iso4217::CODES` followed by a space (`EUR `, `USD 30.00` at `StatsOverviewWidgetTest.php:80`, …) **and** for bare-code labels (`Cheapest (EUR)` in `PriceHistoryChartTest.php:47`, dataset label `EUR` in `SavingsByMonthChartWidgetTest.php:84`, `RecentNotificationsTableWidgetTest`).
 - [ ] Browser check at 390 px and 1280 px: shops table, products list, infolist, public share page, add-shop preview, dashboard widgets; light and dark.
 
 ---
