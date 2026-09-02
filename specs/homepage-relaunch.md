@@ -48,7 +48,7 @@ Replace `$tracked` with three grocery notifications built from the shops DipCatc
 | 🧀 | Beemster Extra Belegen 48+ 150 g | dirk.nl | EUR 3.49 → **EUR 1.69** | EUR 11.27 /kg · cheapest of 3 shops |
 | 🧻 | Page toiletpapier 24 rollen | jumbo.com | EUR 12.99 → **EUR 9.99** | EUR 0.42 /stuk |
 
-Each card shows the shop favicon (`App\Support\Favicon::url($host)`) instead of the current "DipCatch" label, the product line, the drop line in emerald, and the unit-price line in muted text. Card 1 keeps the emerald ring. The mock container gets `role="img"` and an `aria-label` ("Example alerts: Lay's at ah.nl dropped to EUR 1.69, …") so screen readers get one sentence instead of nine fragments.
+Each card shows the shop favicon (`App\Support\Favicon::url($host)`) instead of the current "DipCatch" label, the product line, the drop line in emerald, and the unit-price line in muted text. Card 1 keeps the emerald ring. The mock container gets `role="img"` and an `aria-label` built in Blade from the same `$tracked` array — translated sentence template via `__()` and amounts via `MoneyFormatter::format()` — so it always matches the visible cards in language and format (for example `__('Example alerts: :items', …)` joined from per-card `__(':product at :shop dropped to :price')`). Tests assert the label in English and, in Phase 3, in Dutch, and that it contains the same formatted price as the first card.
 
 ## 3. Dutch Marketing Pages
 
@@ -84,7 +84,7 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 
 Checked at 390 × 844 (iPhone-class) first, then 768 and 1280. Requirements:
 
-- Hero: H1 at `text-4xl` wraps to at most three lines at 390 px; CTA button and the "Sign in" line stack without horizontal overflow; the "Works with" chips wrap (they do today) and the row is capped at two visual lines by hiding hosts beyond the first eight behind a "+4 more" chip below `sm` (all twelve show from `sm` up).
+- Hero: H1 at `text-4xl` wraps to at most three lines at 390 px; CTA button and the "Sign in" line stack without horizontal overflow; the "Works with" chips wrap (they do today) and the row is capped at two visual lines by hiding hosts beyond the first eight behind a dynamic "+N more" chip below `sm`, where N = `count($supportedShops) - 8` (all show from `sm` up; the chip is omitted when N ≤ 0). Shipped in `welcome.blade.php` already; the test asserts the computed N against the config list.
 - Phone mock: below `lg` it renders **under** the copy, centred, at `w-64`, without the `rotate-3` tilt (the tilt clips against the section edge at 390 px); above `lg` it keeps the current column and tilt. Text inside the mock never truncates a price.
 - Steps and FAQ: single column below `sm`; `<summary>` rows are at least 44 px tall (tap target) and the disclosure chevron sits inside the row, not in the gutter.
 - Header: logo, language toggle (Phase 3), appearance toggle and the CTA fit in one row at 390 px; if they do not, the CTA label shortens to "Sign up" below `sm` via a second span with `sm:hidden` / `hidden sm:inline`.
@@ -104,7 +104,7 @@ Checked at 390 × 844 (iPhone-class) first, then 768 and 1280. Requirements:
 | `?lang=fr` or `?lang=<script>` | Treated as absent: fixed default renders; no error, no reflection of the value into the page; `Accept-Language` has no effect (Phase `nl`, test) |
 | FAQ JSON-LD, answer text contains `</script>` | Encoded as `\u003C/script\u003E`; the script element does not end early (Phase `faq`, test) |
 | H1 wraps to more than three lines on 390 px | Adjust copy rather than shrinking type below `text-4xl` (Phase `hero`, browser check) |
-| 390 px viewport, either page | No horizontal overflow; mock untilted and stacked; chips capped at two lines (Phase `hero` and `nl`, browser check per Section 6) |
+| 390 px viewport, either page | No horizontal overflow; mock untilted and stacked; chips capped at eight + dynamic "+N more" (Phase `hero` and `nl`, browser check per Section 6) |
 
 ## Implementation
 
