@@ -16,6 +16,18 @@ use App\Support\UrlNormalizer;
 final readonly class EntityUrl
 {
     /**
+     * Query parameters that never identify a product: campaign and click
+     * tracking a shop appends to its own canonical URLs. Counting one of
+     * these as identifying would let a canonical entity carrying
+     * `?utm_source=mail` outrank the entity that names the variant.
+     *
+     * @var list<string>
+     */
+    private const array TRACKING = [
+        'gclid', 'fbclid', 'msclkid', 'srsltid', 'mc_cid', 'mc_eid', 'ref', 'referrer',
+    ];
+
+    /**
      * The paths must be equal, and every query parameter the entity states
      * must be present with the same value in the requested URL. Extra
      * parameters on the requested URL are ignored: they are the caller's
@@ -56,14 +68,17 @@ final readonly class EntityUrl
     }
 
     /**
-     * A match where the entity's own URL states the query that tells it
-     * apart — the variant the request asked for. An entity URL with no
-     * query names the page rather than a variant: it matches every variant
-     * request equally, so it must never beat the entry that names one.
+     * How precisely the entity's URL pins the request down: the number of
+     * query parameters it states. Zero means it names the page rather than
+     * a variant of it, and -1 means it is not this page at all.
+     *
+     * A count rather than a yes/no, because not every parameter identifies
+     * a variant: an entity URL carrying `?utm_source=mail` states one
+     * parameter, and must lose to the entry that also states the variant.
      */
-    public static function namesVariant(string $entityUrl, string $url): bool
+    public static function precision(string $entityUrl, string $url): int
     {
-        return self::query($entityUrl) !== [] && self::matches($entityUrl, $url);
+        return self::matches($entityUrl, $url) ? count(self::query($entityUrl)) : -1;
     }
 
     private static function host(string $url): ?string
@@ -93,6 +108,20 @@ final readonly class EntityUrl
 
         parse_str($query, $parsed);
 
+        foreach (array_keys($parsed) as $key) {
+            if (self::isTracking((string) $key)) {
+                unset($parsed[$key]);
+            }
+        }
+
         return $parsed;
+    }
+
+    private static function isTracking(string $key): bool
+    {
+        $key = strtolower($key);
+
+        return str_starts_with($key, 'utm_') || str_starts_with($key, '_ga')
+            || in_array($key, self::TRACKING, strict: true);
     }
 }

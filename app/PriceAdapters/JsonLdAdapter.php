@@ -34,7 +34,7 @@ final readonly class JsonLdAdapter implements ShopAdapter
         // the user instead of silently guessing. A variant the URL itself
         // names is not a guess, so a match ends the question — the variants
         // walked past on the way to it are not open options.
-        if (! $state->matched && $context?->variantKey === null && count($state->variants) > 1) {
+        if (! $state->identified() && $context?->variantKey === null && count($state->variants) > 1) {
             return ExtractionResult::ambiguous($state->variants);
         }
 
@@ -66,16 +66,15 @@ final readonly class JsonLdAdapter implements ShopAdapter
             }
 
             foreach (JsonLdEntities::expandGraph($decoded) as $entity) {
-                $matched = $searcher->consider($entity, $url, $context, $state);
-                if ($matched !== null) {
-                    return $matched;
-                }
+                $searcher->consider($entity, $url, $context, $state);
             }
 
             if ($state->shop === null && $state->product !== null && isset($state->product['offers'])) {
                 $state->shop = JsonLdEntities::pickOfferFromProduct($state->product['offers']);
             }
         }
+
+        $searcher->finish($state);
 
         return $state->fallback();
     }

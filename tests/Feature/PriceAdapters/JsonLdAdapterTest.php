@@ -622,3 +622,58 @@ test('a group whose variants all fit the request asks instead of picking one', f
     expect($result->isAmbiguous())->toBeTrue()
         ->and($result->variants)->toHaveCount(2);
 });
+
+test('a tracking parameter on an entity url does not make it the variant', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@graph' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Canonical',
+                // States one parameter, but not the one that picks a variant.
+                'url' => 'https://shop.test/p/1?utm_source=mail',
+                'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Blue',
+                'url' => 'https://shop.test/p/1?activeVariant=blue',
+                'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1?utm_source=mail&activeVariant=blue', withJsonLd($json));
+
+    expect($result->snapshot?->price)->toBe('20.00')
+        ->and($result->snapshot?->title)->toBe('Blue');
+});
+
+test('two entities fitting the request equally well are put to the user', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Group',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Small',
+                'productID' => 'v-1',
+                'url' => 'https://shop.test/p/1?colour=blue',
+                'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Large',
+                'productID' => 'v-2',
+                'url' => 'https://shop.test/p/1?size=xl',
+                'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1?colour=blue&size=xl', withJsonLd($json));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($result->variants)->toHaveCount(2);
+});

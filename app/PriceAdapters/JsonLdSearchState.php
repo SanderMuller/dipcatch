@@ -21,10 +21,26 @@ final class JsonLdSearchState
     public array $variants = [];
 
     /**
-     * True once an entity identified the requested page or variant. The
-     * variants collected on the way there are not an open question.
+     * The most precise entity that identified the request, and the score it
+     * reached. A tie means two entities are equally precise, so neither
+     * identifies anything.
+     *
+     * @var array{0: array<string, mixed>, 1: array<string, mixed>}|null
      */
-    public bool $matched = false;
+    public ?array $best = null;
+
+    public int $bestPrecision = 0;
+
+    public bool $tied = false;
+
+    /**
+     * Every entity that reached the top precision. More than one means the
+     * page does not say which of them the request asked for, so they are
+     * what the chooser offers.
+     *
+     * @var list<array{0: array<string, mixed>, 1: array<string, mixed>}>
+     */
+    public array $topMatches = [];
 
     /**
      * A Product whose URL names the page but not a variant of it. Held
@@ -42,10 +58,48 @@ final class JsonLdSearchState
      *
      * @return array{0: array<string, mixed>|null, 1: array<string, mixed>|null}
      */
+    /**
+     * Offer an entity that identifies the request. The most precise one
+     * wins, whatever order the document lists them in.
+     *
+     * @param  array{0: array<string, mixed>, 1: array<string, mixed>}  $match
+     */
+    public function offer(array $match, int $precision): void
+    {
+        if ($this->best === null || $precision > $this->bestPrecision) {
+            $this->best = $match;
+            $this->bestPrecision = $precision;
+            $this->tied = false;
+            $this->topMatches = [$match];
+
+            return;
+        }
+
+        if ($precision === $this->bestPrecision) {
+            $this->tied = true;
+            $this->topMatches[] = $match;
+        }
+    }
+
+    /** True when one entity identified the request more precisely than any other. */
+    public function identified(): bool
+    {
+        return $this->best !== null && ! $this->tied;
+    }
+
+    /**
+     * What the scan settled on: the entity that identified the request,
+     * else the weakest usable Product / ProductGroup pair — a group's own
+     * AggregateOffer stands in when no variant supplied an offer.
+     *
+     * @return array{0: array<string, mixed>|null, 1: array<string, mixed>|null}
+     */
     public function fallback(): array
     {
-        if ($this->namesPageOnly !== null) {
-            return $this->namesPageOnly;
+        $identified = $this->best ?? $this->namesPageOnly;
+
+        if ($identified !== null) {
+            return [$identified[0], $identified[1]];
         }
 
         $product = $this->product ?? $this->productGroup;

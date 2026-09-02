@@ -13,20 +13,22 @@ final readonly class JsonLdMatch
     public const array KEY_FIELDS = ['productID', 'sku', 'gtin13', 'gtin'];
 
     /**
-     * Whether the entity identifies the requested variant, rather than
-     * merely sitting on the requested page.
+     * How precisely this entity identifies what was asked for. A pinned
+     * variant key is the most precise answer there is; below it, the entity
+     * URL scores by how much of the request it states. Zero means it names
+     * the page but no variant of it.
      *
      * @param  array<string, mixed>  $entity
      */
-    public static function isStrong(array $entity, string $url, ?string $variantKey): bool
+    public static function precision(array $entity, string $url, ?string $variantKey): int
     {
         if ($variantKey !== null && self::keyMatches($entity, $variantKey)) {
-            return true;
+            return PHP_INT_MAX;
         }
 
         $entityUrl = JsonLdEntities::nonEmptyString($entity['url'] ?? null);
 
-        return $entityUrl !== null && EntityUrl::namesVariant($entityUrl, $url);
+        return $entityUrl === null ? -1 : EntityUrl::precision($entityUrl, $url);
     }
 
     /**
