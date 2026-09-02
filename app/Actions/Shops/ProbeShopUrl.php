@@ -13,6 +13,7 @@ use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\Exceptions\Blocked;
 use App\Services\ShopFetcher\Exceptions\HttpError;
+use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
@@ -86,6 +87,10 @@ final readonly class ProbeShopUrl
 
         try {
             $fetch = $this->fetcher->fetch($normalizedUrl);
+        } catch (NotServable $e) {
+            // Only reachable through a redirect: the pasted host passed the
+            // pre-fetch check, the host that answered did not.
+            return ProbeOutcome::failed(ProbeFailure::ShopNotServable, ['reason' => $e->reason]);
         } catch (RobotsDisallowed) {
             return ProbeOutcome::failed(ProbeFailure::RobotsDisallowed);
         } catch (Blocked) {

@@ -4,10 +4,12 @@ namespace App\Services\ShopFetcher;
 
 use App\Services\ShopFetcher\Exceptions\Blocked;
 use App\Services\ShopFetcher\Exceptions\HttpError;
+use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
 use App\Support\Config as DipConfig;
+use App\Support\UnservableShops;
 use App\Support\UrlNormalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
@@ -109,6 +111,16 @@ final readonly class ShopFetcher
         $effectiveHost = parse_url($finalUrl, PHP_URL_HOST);
         if (is_string($effectiveHost) && $effectiveHost !== '') {
             $finalHost = UrlNormalizer::normalizeHost($effectiveHost);
+        }
+
+        // The host that served the body decides, not the one the user
+        // pasted: coop.nl redirects every path to the plus.nl home page,
+        // which would otherwise reach the adapter chain as if it were a
+        // product page (verified 2026-09-02).
+        $unservable = UnservableShops::reasonFor($finalHost);
+
+        if ($unservable !== null) {
+            throw new NotServable($finalHost, $unservable);
         }
 
         return new FetchResult(

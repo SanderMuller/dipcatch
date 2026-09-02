@@ -2,6 +2,7 @@
 
 use App\Services\ShopFetcher\Exceptions\Blocked;
 use App\Services\ShopFetcher\Exceptions\HttpError;
+use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
@@ -161,4 +162,34 @@ test('an Imperva challenge served as 200 is a block, not a page to parse', funct
 
     expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://shop.test/p/1'))
         ->toThrow(Blocked::class);
+});
+
+test('a host that never serves its prices is refused after the fetch', function (): void {
+    Http::fake([
+        'https://www.plus.nl/robots.txt' => Http::response('', 404),
+        'https://www.plus.nl/product/fanta-1500-ml-991700' => Http::response('<html>app shell</html>', 200),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://www.plus.nl/product/fanta-1500-ml-991700'))
+        ->toThrow(NotServable::class);
+});
+
+test('the refusal reports as needs_js, the same dead end as a JS-rendered page', function (): void {
+    $exception = new NotServable('plus.nl', 'plus_spa');
+
+    expect($exception->code())->toBe('needs_js')
+        ->and($exception->reason)->toBe('plus_spa');
+});
+
+test('a redirect onto a host that never serves its prices is refused', function (): void {
+    RateLimiter::clear(ShopFetcher::throttleKey('coop.nl'));
+
+    Http::fake([
+        'https://www.coop.nl/robots.txt' => Http::response('', 404),
+        'https://www.coop.nl/product/wp01234/melk' => Http::response('', 301, ['Location' => 'https://www.plus.nl']),
+        'https://www.plus.nl' => Http::response('<html>plus</html>', 200),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://www.coop.nl/product/wp01234/melk'))
+        ->toThrow(NotServable::class);
 });

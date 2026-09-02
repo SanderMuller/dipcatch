@@ -316,3 +316,22 @@ test('a host adapter that loses its payload fails the check instead of taking a 
         ->and((string) $shop->current_price)->toBe('1.99')
         ->and($shop->last_error)->toBe('poiesz_no_payload');
 });
+
+test('a tracked shop whose host never serves its prices is recorded as needs_js', function (): void {
+    RateLimiter::clear(ShopFetcher::throttleKey('plus.nl'));
+
+    Http::fake([
+        'https://www.plus.nl/robots.txt' => Http::response('', 404),
+        'https://www.plus.nl/product/fanta-1500-ml-991700' => Http::response('<html>app shell</html>', 200),
+    ]);
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://www.plus.nl/product/fanta-1500-ml-991700',
+    ]);
+
+    CheckShopPrice::dispatchSync($shop);
+
+    expect(PriceCheck::query()->where('shop_id', $shop->id)->latest('id')->first()?->status)
+        ->toBe(ScrapeStatus::NeedsJs);
+});

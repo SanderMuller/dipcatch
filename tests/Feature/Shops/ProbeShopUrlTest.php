@@ -341,3 +341,20 @@ test('a shop that only answers on its www host is probed there, not on the apex'
         // The stored host still drops the prefix, so host comparisons hold.
         ->and($outcome->host)->toBe('shop-with-www.test');
 });
+
+test('a shop URL that redirects onto an unservable host is refused, not parsed', function (): void {
+    Http::fake([
+        'https://www.coop.nl/robots.txt' => Http::response('', 404),
+        'https://www.coop.nl/product/wp01234/melk' => Http::response('', 301, ['Location' => 'https://www.plus.nl']),
+        'https://www.plus.nl' => Http::response('<html>plus home page</html>', 200),
+    ]);
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $outcome = app(ProbeShopUrl::class)($product, 'https://www.coop.nl/product/wp01234/melk', $user);
+
+    expect($outcome->errorCode)->toBe(ProbeFailure::ShopNotServable)
+        ->and($outcome->context['reason'] ?? null)->toBe('plus_spa')
+        ->and($outcome->shouldOfferManualSelector())->toBeFalse();
+});
