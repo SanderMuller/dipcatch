@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Mail\Markdown;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Mail;
 
@@ -156,4 +157,64 @@ test('second run within the same digest window sends no new mail', function (): 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
     Mail::assertSent(PriceDropDigestMail::class, 1);
+});
+
+test('the digest table renders money as symbol-first, not the ISO code', function (): void {
+    $user = User::factory()->create([
+        'notify_via_email' => true,
+        'last_digest_sent_at' => null,
+        'timezone' => 'UTC',
+    ]);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create();
+
+    $event = PriceDropEvent::factory()
+        ->for($user)
+        ->for($product)
+        ->create([
+            'triggered_by_shop_id' => $shop->id,
+            'fired_at' => now()->subHours(3),
+            'currency' => 'EUR',
+            'new_price' => '1.69',
+            'drop_abs' => '0.30',
+            'drop_pct' => '15.0000',
+        ]);
+
+    // The digest template is rendered through the markdown renderer, which is
+    // what registers the `x-mail::` component namespace.
+    $html = (string) app(Markdown::class)->render('emails.price-drop-digest', [
+        'grouped' => collect([
+            $product->id => ['product' => $product, 'events' => collect([$event])],
+        ]),
+        'totalDrops' => 1,
+        'user' => $user,
+    ]);
+
+    expect($html)->toContain('€1.69')
+        ->and($html)->toContain('€0.30')
+        ->and($html)->not->toContain('EUR 1.69')
+        ->and($html)->toContain('15.0%');
+});
+
+test('the digest mailable renders end to end without the mail fake', function (): void {
+    Mail::swap(app('mail.manager'));
+
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create(['title' => 'Digest product']);
+    $shop = Shop::factory()->for($product)->create();
+    $events = PriceDropEvent::factory()->count(1)->for($user)->create([
+        'product_id' => $product->id,
+        'triggered_by_shop_id' => $shop->id,
+        'currency' => 'EUR',
+        'new_price' => '1.69',
+        'drop_abs' => '0.50',
+        'drop_pct' => '22.8',
+    ]);
+
+    // Regression: `Content(view:)` rendered the <x-mail::message> template
+    // outside the Markdown renderer, which throws "No hint path defined
+    // for [mail]" — invisible under Mail::fake().
+    $html = new PriceDropDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render();
+
+    expect($html)->toContain('Digest product')->toContain('€1.69');
 });
