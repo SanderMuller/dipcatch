@@ -31,8 +31,10 @@ final readonly class JsonLdAdapter implements ShopAdapter
 
         // Variant ambiguity wins over a weak fallback: when the page lists
         // multiple variants and the caller didn't pin one via context, ask
-        // the user instead of silently guessing.
-        if ($context?->variantKey === null && count($state->variants) > 1) {
+        // the user instead of silently guessing. A variant the URL itself
+        // names is not a guess, so a match ends the question — the variants
+        // walked past on the way to it are not open options.
+        if (! $state->matched && $context?->variantKey === null && count($state->variants) > 1) {
             return ExtractionResult::ambiguous($state->variants);
         }
 

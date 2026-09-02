@@ -11,9 +11,6 @@ namespace App\PriceAdapters;
  */
 final readonly class JsonLdEntitySearcher
 {
-    /** Schema.org variant identifiers we'll match against in order. */
-    private const array KEY_FIELDS = ['productID', 'sku', 'gtin13', 'gtin'];
-
     /**
      * Inspect a single entity. Returns a [product, offer] tuple if this
      * entity is a hard URL / variant-key match worth returning immediately,
@@ -29,11 +26,19 @@ final readonly class JsonLdEntitySearcher
         $variantKey = $context?->variantKey;
 
         if (in_array('Product', $types, strict: true)) {
-            $matched = self::tryMatch($entity, $url, $variantKey);
-            if ($matched !== null) {
+            $matched = JsonLdMatch::attempt($entity, $url, $variantKey);
+
+            if ($matched !== null && JsonLdMatch::isStrong($entity, $url, $variantKey)) {
+                $state->matched = true;
+
                 return $matched;
             }
-            $state->product ??= $entity;
+
+            if ($matched !== null) {
+                $state->namesPageOnly ??= $matched;
+            } else {
+                $state->product ??= $entity;
+            }
         }
 
         if (in_array('ProductGroup', $types, strict: true)) {
@@ -67,6 +72,8 @@ final readonly class JsonLdEntitySearcher
             return null;
         }
 
+        $matches = [];
+
         foreach ($variants as $variant) {
             if (! is_array($variant)) {
                 continue;
@@ -77,9 +84,18 @@ final readonly class JsonLdEntitySearcher
                 continue;
             }
 
-            $matched = self::tryMatch($variant, $url, $variantKey);
-            if ($matched !== null) {
+            $matched = JsonLdMatch::attempt($variant, $url, $variantKey);
+
+            if ($matched !== null && JsonLdMatch::isStrong($variant, $url, $variantKey)) {
+                $state->matched = true;
+
                 return $matched;
+            }
+
+            if ($matched !== null) {
+                $matches[] = $matched;
+
+                continue;
             }
 
             $candidate = self::candidateFor($variant);
@@ -90,48 +106,24 @@ final readonly class JsonLdEntitySearcher
             $state->product ??= $variant;
         }
 
-        return null;
-    }
+        // One variant whose URL fits the request identifies it, even when
+        // that URL names no variant of its own — a group listing a
+        // queryless entry is naming its default. Several fitting variants
+        // identify nothing, so they join the chooser instead.
+        if (count($matches) === 1) {
+            $state->matched = true;
 
-    /**
-     * @param  array<string, mixed>  $entity
-     * @return array{0: array<string, mixed>, 1: array<string, mixed>}|null
-     */
-    private static function tryMatch(array $entity, string $url, ?string $variantKey): ?array
-    {
-        $matches = ($variantKey !== null && self::keyMatches($entity, $variantKey))
-            || JsonLdEntities::urlMatches($entity, $url);
-
-        if (! $matches) {
-            return null;
+            return $matches[0];
         }
 
-        $shop = JsonLdEntities::pickOfferFromProduct($entity['offers'] ?? null);
-        if ($shop === null) {
-            return null;
-        }
-
-        return [$entity, $shop];
-    }
-
-    /**
-     * @param  array<string, mixed>  $entity
-     */
-    private static function keyMatches(array $entity, string $key): bool
-    {
-        foreach (self::KEY_FIELDS as $field) {
-            $value = $entity[$field] ?? null;
-            if (is_scalar($value) && (string) $value === $key) {
-                return true;
+        foreach ($matches as $match) {
+            $candidate = self::candidateFor($match[0]);
+            if ($candidate !== null) {
+                $state->variants[] = $candidate;
             }
         }
 
-        // Allow storing a full variant URL as the key.
-        if (JsonLdEntities::urlMatches($entity, $key)) {
-            return true;
-        }
-
-        return false;
+        return null;
     }
 
     /**
@@ -167,7 +159,7 @@ final readonly class JsonLdEntitySearcher
      */
     private static function variantKeyFor(array $variant): string
     {
-        foreach (self::KEY_FIELDS as $field) {
+        foreach (JsonLdMatch::KEY_FIELDS as $field) {
             $value = $variant[$field] ?? null;
             if (is_scalar($value)) {
                 $str = (string) $value;
