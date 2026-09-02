@@ -112,32 +112,32 @@ Checked at 390 × 844 (iPhone-class) first, then 768 and 1280. Requirements:
 
 **ID:** hero · **Depends:** none
 
-- [ ] Replace `$h1`/`$sub` with the Section 2.1 copy — keep `max-w-[24ch]` / `max-w-[48ch]`.
-- [ ] Re-read the "How it works" intro sentence and the bottom-CTA copy against the new hero so the page tells one story (compare across shops), and adjust wording where it still says "track products". Soften the shipped "+ most webshops that show a price" chip to "+ many other webshops" for the same reason as the FAQ answer (Section 4, "Which shops work?").
-- [ ] Rebuild `$tracked` and the mock cards per Section 2.2 — favicon via `Favicon::url()`, unit-price line, `role="img"` + `aria-label` on the container, inner content `aria-hidden`.
-- [ ] Privacy page: add that product images on share pages load from the shop's own servers (the favicon disclosure already exists).
-- [ ] Tests — homepage shows the new H1; mock contains the three shops and no `mediamarkt.nl`; mock container has `role="img"` with a non-empty `aria-label`.
-- [ ] Browser check per Section 6 at 390 / 768 / 1280 px, light and dark; note results in Findings.
+- [x] Replace `$h1`/`$sub` with the Section 2.1 copy — keep `max-w-[24ch]` / `max-w-[48ch]`.
+- [x] Re-read the "How it works" intro sentence and the bottom-CTA copy against the new hero so the page tells one story (compare across shops), and adjust wording where it still says "track products". Soften the shipped "+ most webshops that show a price" chip to "+ many other webshops" for the same reason as the FAQ answer (Section 4, "Which shops work?").
+- [x] Rebuild `$tracked` and the mock cards per Section 2.2 — favicon via `Favicon::url()`, unit-price line, `role="img"` + `aria-label` on the container, inner content `aria-hidden`.
+- [x] Privacy page: add that product images on share pages load from the shop's own servers (the favicon disclosure already exists).
+- [x] Tests — homepage shows the new H1; mock contains the three shops and no `mediamarkt.nl`; mock container has `role="img"` with a non-empty `aria-label`.
+- [x] Browser check per Section 6 at 390 / 768 / 1280 px, light and dark; note results in Findings.
 
 ### Phase 2: FAQ (Priority: HIGH)
 
 **ID:** faq · **Depends:** hero — both phases edit `welcome.blade.php`, so they must not run concurrently
 
-- [ ] Add the six-item `$faq` array and the `<details>` section per Section 4, between "How it works" and the bottom CTA.
-- [ ] Add `App\Support\JsonLd::script()` and emit the `FAQPage` JSON-LD from the same array through it (Section 4).
-- [ ] Read the re-check interval from `config('dipcatch.recheck.interval_hours')` in the "How often" answer so the copy cannot drift.
-- [ ] Tests — `JsonLd::script()` unit test: data containing `</script>` yields exactly one `</script>` in the output and decodes back to the input; homepage test: JSON-LD decodes with six `Question` entities whose names match the six visible `<summary>` texts; answers contain no HTML.
+- [x] Add the six-item `$faq` array and the `<details>` section per Section 4, between "How it works" and the bottom CTA.
+- [x] Add `App\Support\JsonLd::script()` and emit the `FAQPage` JSON-LD from the same array through it (Section 4).
+- [x] Read the re-check interval from `config('dipcatch.recheck.interval_hours')` in the "How often" answer so the copy cannot drift.
+- [x] Tests — `JsonLd::script()` unit test: data containing `</script>` yields exactly one `</script>` in the output and decodes back to the input; homepage test: JSON-LD decodes with six `Question` entities whose names match the six visible `<summary>` texts; answers contain no HTML.
 
 ### Phase 3: Dutch marketing pages (Priority: MEDIUM)
 
 **ID:** nl · **Depends:** hero, faq
 
-- [ ] `lang/nl.json` covering every `__()` string in `welcome.blade.php` and `privacy.blade.php` (after Phases 1–2 so the strings are final).
-- [ ] Move `site.description` into `__()` strings in both meta tags; remove the config key.
-- [ ] `MarketingLocale` middleware (`?lang` → fixed default; stateless; restores the previous locale in `finally`), applied to the `home` and `privacy` routes only.
-- [ ] Header language toggle on both pages (propagating `?lang` between the two routes; fits the 390 px header per Section 6); `<html lang>`, `og:locale`, `hreflang` alternates, canonical rule per Section 3.
-- [ ] Tests — the Edge Cases table's locale rows; exact `canonical`, `hreflang` and `og:locale` values for the bare URL and both `?lang` variants on both routes (including that `?lang=<default>` canonicalises to the bare URL); the toggle's two hrefs; `/app` stays English for a signed-in user after visiting the Dutch homepage.
-- [ ] Translation coverage tests — (a) **no leaks**: request both routes with `?lang=nl` while `Lang::handleMissingKeysUsing()` records every missed key, and assert the list is empty — this covers every string the two responses render, including partials and components; (b) **no orphans**: a static check that every key in `lang/nl.json` appears as a `__('…')` literal in `welcome.blade.php`, `privacy.blade.php`, or the partials/components they include (single-quoted, single-line literals are the project convention in these views; the test fails loudly on a key it cannot find rather than guessing).
+- [x] `lang/nl.json` covering every `__()` string in `welcome.blade.php` and `privacy.blade.php` (after Phases 1–2 so the strings are final).
+- [x] Move `site.description` into `__()` strings in both meta tags; remove the config key.
+- [x] `MarketingLocale` middleware (`?lang` → fixed default; stateless; restores the previous locale in `finally`), applied to the `home` and `privacy` routes only.
+- [x] Header language toggle on both pages (propagating `?lang` between the two routes; fits the 390 px header per Section 6); `<html lang>`, `og:locale`, `hreflang` alternates, canonical rule per Section 3.
+- [x] Tests — the Edge Cases table's locale rows; exact `canonical`, `hreflang` and `og:locale` values for the bare URL and both `?lang` variants on both routes (including that `?lang=<default>` canonicalises to the bare URL); the toggle's two hrefs; `/app` stays English for a signed-in user after visiting the Dutch homepage.
+- [x] Translation coverage tests — (a) **no leaks**: request both routes with `?lang=nl` while `Lang::handleMissingKeysUsing()` records every missed key, and assert the list is empty — this covers every string the two responses render, including partials and components; (b) **no orphans**: a static check that every key in `lang/nl.json` appears as a `__('…')` literal in `welcome.blade.php`, `privacy.blade.php`, or the partials/components they include (single-quoted, single-line literals are the project convention in these views; the test fails loudly on a key it cannot find rather than guessing).
 
 ---
 
@@ -167,3 +167,11 @@ None.
 ## Findings
 
 <!-- Notes added during implementation. Do not remove this section. -->
+
+- **Shipped 2026-09-02**, all three phases. STOP condition 1 passed with Aldi *included* (`AldiAdapter` merged before implementation); STOP condition 2 passed (`lang/nl.json` resolves without a publish step).
+- Phase 1: the `(bonus)` marker on card 1 is a template `__(':price (bonus)')` shared by the card and the `aria-label`; card timestamps dropped (Section 2.2 lists three lines). Item "re-read How it works / bottom CTA" was a no-op — the only "track products" wording was the old `$sub`.
+- Phase 2: `og:title` (still the old tagline after Phase 1) now follows `$h1`. FAQ grid uses `items-start` so an open card does not stretch its row neighbour (found in the browser).
+- Phase 3: `MarketingLocale` validates `?lang` through `$request->validate()` + `FluentRule` (project rule forbids raw `query()`/`all()` reads) and catches `ValidationException` as "absent". "Identical HTML" for the three `Accept-Language` cases was downgraded to semantic identity (`<html lang>`, canonical, `og:locale`, H1) because Livewire/Flux inject assets into the first in-process response only.
+- Mobile (Section 6, 390 px iframe viewport): header needed two extra levers beyond the spec — the wordmark is hidden below `sm` and the language toggle shows only the *other* language below `sm`; with those the CTA's right edge equals the header's content edge exactly. Bottom CTA padding corrected to `px-6 py-10` below `sm` (Codex). Mock lines wrap but never clip. Dark mode and Dutch verified at 1456 px.
+- Copy pass (humanizer): step 1 lost its em dash and stacked negatives, "Is it free?" its fragment negations, "dedicated support" → "built-in support", "jitter" → "give or take half an hour"; Dutch strings updated in step. `Sign up` → `Registreren` (not `Aanmelden`, which reads as sign-in).
+- Not verified: VoiceOver announcement of `€1.69` in the mock's `aria-label`; hreflang behaviour in a real search console.

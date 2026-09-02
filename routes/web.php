@@ -4,12 +4,13 @@ use App\Http\Controllers\AutoDetectTimezoneController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\PushSubscriptionController;
+use App\Http\Middleware\MarketingLocale;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome')->name('home');
-Route::view('privacy', 'privacy')->name('privacy');
+Route::view('/', 'welcome')->middleware(MarketingLocale::class)->name('home');
+Route::view('privacy', 'privacy')->middleware(MarketingLocale::class)->name('privacy');
 
 // Public product share page — no auth, throttled per IP, exact 32-char
 // alphanumeric slug. Lives outside the auth+verified group so guests

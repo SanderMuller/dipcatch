@@ -7,13 +7,13 @@ return [
     | Marketing site
     |--------------------------------------------------------------------------
     |
-    | Copy and contact details for the public pages (homepage, privacy).
+    | Contact details and shop list for the public pages (homepage, privacy).
+    | The marketing copy itself lives in the views, as `__()` strings, so it
+    | translates through `lang/nl.json`.
     | The contact address is shown in the footer and the privacy statement;
     | leave it empty to hide the contact link.
     |
     */
-
-    'description' => 'DipCatch watches the price of the groceries and products you buy anyway across Dutch supermarkets and webshops, compares shops on unit price, and alerts you when one drops.',
 
     'contact_email' => env('SITE_CONTACT_EMAIL'),
 
