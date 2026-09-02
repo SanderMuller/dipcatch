@@ -29,12 +29,13 @@ class ActiveDropsTableWidget extends BaseWidget
             ->query($this->scopedQuery())
             ->paginated(false)
             ->columns([
-                ImageColumn::make('image_url')->label('')->circular()->imageSize(36),
+                ImageColumn::make('image_url')->label('')->circular()->imageSize(36)->visibleFrom('md'),
                 TextColumn::make('title')->limit(60)->wrap(),
                 TextColumn::make('cheapest_price')
                     ->label('Now')
                     ->state(fn (Product $r): string => MoneyFormatter::format($r->cheapest_price === null ? null : (string) $r->cheapest_price, $r->currency)),
                 TextColumn::make('last_notified_price')
+                    ->visibleFrom('md')
                     ->label('Notified at')
                     ->state(fn (Product $r): string => MoneyFormatter::format($r->last_notified_price === null ? null : (string) $r->last_notified_price, $r->currency)),
                 TextColumn::make('cheapestShop.host')
@@ -42,6 +43,7 @@ class ActiveDropsTableWidget extends BaseWidget
                     ->formatStateUsing(fn (string $state): HtmlString => new HtmlString(Favicon::html($state)))
                     ->placeholder('—'),
                 TextColumn::make('last_notified_at')
+                    ->visibleFrom('md')
                     ->label('Notified')
                     ->since()
                     ->placeholder('—'),

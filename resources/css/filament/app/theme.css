@@ -5,3 +5,13 @@
 @source '../../../../resources/views/filament/app/**/*';
 @source '../../../../resources/views/filament/partials/**/*';
 @source '../../../../resources/views/livewire/**/*';
+
+/*
+ * Phones: bulk-select checkboxes cost ~40px per row on tables that barely
+ * fit a host, a price and two actions. Bulk actions stay a desktop feature.
+ */
+@media (max-width: 767px) {
+    .fi-ta-selection-cell {
+        display: none;
+    }
+}

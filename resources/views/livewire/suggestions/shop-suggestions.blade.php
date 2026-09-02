@@ -45,7 +45,7 @@
                             </p>
                         </div>
 
-                        <div class="flex shrink-0 items-center gap-2">
+                        <div class="flex w-full shrink-0 items-center gap-2 pl-8 sm:w-auto sm:pl-0">
                             @if ($suggestion->trackable)
                                 <button
                                     type="button"

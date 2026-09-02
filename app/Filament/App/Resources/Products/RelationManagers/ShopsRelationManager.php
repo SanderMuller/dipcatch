@@ -69,6 +69,7 @@ class ShopsRelationManager extends RelationManager
             ->emptyStateActions([])
             ->columns([
                 ImageColumn::make('image_url')
+                    ->visibleFrom('md')
                     ->label('')
                     ->state(fn (Shop $record): ?string => $record->safeImageUrl())
                     ->circular()
@@ -81,6 +82,7 @@ class ShopsRelationManager extends RelationManager
                     ->sortable(),
 
                 IconColumn::make('notes_indicator')
+                    ->visibleFrom('md')
                     ->label('')
                     ->state(fn (Shop $record): bool => self::hasNotes($record))
                     ->icon(fn (Shop $record): ?Heroicon => self::hasNotes($record) ? self::NOTES_ICON : null)
@@ -95,29 +97,30 @@ class ShopsRelationManager extends RelationManager
 
                 TextColumn::make('current_price')
                     ->label('Price')
-                    ->state(fn (Shop $record): string => MoneyFormatter::format(
-                        $record->current_price === null ? null : (string) $record->current_price,
-                        $record->currency,
-                    ))
+                    ->visibleFrom('md')
+                    ->state(fn (Shop $record): string => self::priceState($record))
                     ->sortable(),
 
                 TextColumn::make('unit_price')
                     ->label('Unit price')
-                    ->state(function (Shop $record): string {
-                        $unitPrice = $record->unitPrice();
+                    ->visibleFrom('md')
+                    ->state(fn (Shop $record): string => self::unitPriceState($record)),
 
-                        if ($unitPrice === null) {
-                            return '—';
-                        }
-
-                        return MoneyFormatter::format($unitPrice, $record->currency) . ' ' . $record->unitPriceLabel();
-                    }),
+                // Below md the two money columns collapse into one so the
+                // price and unit price stay visible without a horizontal scroll.
+                TextColumn::make('price_compact')
+                    ->label('Price')
+                    ->hiddenFrom('md')
+                    ->state(fn (Shop $record): string => self::priceState($record))
+                    ->description(fn (Shop $record): ?string => $record->unitPrice() === null ? null : self::unitPriceState($record)),
 
                 IconColumn::make('current_in_stock')
+                    ->visibleFrom('md')
                     ->label('In stock')
                     ->boolean(),
 
                 TextColumn::make('health')
+                    ->visibleFrom('md')
                     ->badge()
                     ->color(fn (ShopHealth $state): string => match ($state) {
                         ShopHealth::Ok => 'success',
@@ -126,6 +129,7 @@ class ShopsRelationManager extends RelationManager
                     }),
 
                 TextColumn::make('last_checked_at')
+                    ->visibleFrom('md')
                     ->label('Last checked')
                     ->since()
                     ->placeholder('Never')
@@ -144,6 +148,9 @@ class ShopsRelationManager extends RelationManager
                 Action::make('open')
                     ->icon(Heroicon::ArrowTopRightOnSquare)
                     ->label('Open')
+                    // Icon only below md so the row fits a phone; the label
+                    // stays for screen readers via the link's text.
+                    ->extraAttributes(['class' => 'max-md:[&_.fi-link-label]:sr-only'])
                     ->url(fn (Shop $record): string => $record->url)
                     ->openUrlInNewTab(),
 
@@ -295,6 +302,25 @@ class ShopsRelationManager extends RelationManager
         $livewire->dispatch('shop-added');
 
         self::notify('Shop URL updated and price re-checked', success: true);
+    }
+
+    private static function priceState(Shop $record): string
+    {
+        return MoneyFormatter::format(
+            $record->current_price === null ? null : (string) $record->current_price,
+            $record->currency,
+        );
+    }
+
+    private static function unitPriceState(Shop $record): string
+    {
+        $unitPrice = $record->unitPrice();
+
+        if ($unitPrice === null) {
+            return '—';
+        }
+
+        return MoneyFormatter::format($unitPrice, $record->currency) . ' ' . $record->unitPriceLabel();
     }
 
     private static function hasNotes(Shop $shop): bool

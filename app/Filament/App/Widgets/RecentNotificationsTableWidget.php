@@ -39,12 +39,14 @@ class RecentNotificationsTableWidget extends BaseWidget
                     ->url(fn (DatabaseNotification $n): ?string => $this->productUrl($n))
                     ->openUrlInNewTab(false),
                 TextColumn::make('drop_percent')
+                    ->visibleFrom('md')
                     ->label('Drop %')
                     ->state(fn (DatabaseNotification $n): string => self::formatPercent(self::field($n, 'drop_percent'))),
                 TextColumn::make('drop_absolute')
                     ->label('Drop (abs)')
                     ->state(fn (DatabaseNotification $n): string => self::dropAmount($n)),
                 TextColumn::make('created_at')
+                    ->visibleFrom('md')
                     ->label('Sent')
                     ->since(),
             ]);

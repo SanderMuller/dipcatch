@@ -43,6 +43,7 @@ class ProductsTable
             ])
             ->columns([
                 ImageColumn::make('image_url')
+                    ->visibleFrom('md')
                     ->label('Image')
                     ->circular()
                     ->imageSize(40),
@@ -62,6 +63,7 @@ class ProductsTable
                     ->sortable(),
 
                 TextColumn::make('cheapest_shop_unit_price')
+                    ->visibleFrom('md')
                     ->label('Unit price')
                     ->state(function (Product $record): string {
                         $unitPrice = $record->cheapestShop?->unitPrice();
@@ -74,11 +76,13 @@ class ProductsTable
                     }),
 
                 TextColumn::make('shops_count')
+                    ->visibleFrom('md')
                     ->label('Shops')
                     ->counts('shops')
                     ->sortable(),
 
                 IconColumn::make('active')
+                    ->visibleFrom('md')
                     ->boolean()
                     ->label('Active'),
             ])
@@ -88,7 +92,9 @@ class ProductsTable
             ->defaultSort('created_at', 'desc')
             ->recordActions([
                 ViewAction::make(),
-                EditAction::make(),
+                // Actions have no visibleFrom(); the app theme scans this file, so
+                // the utility classes compile.
+                EditAction::make()->extraAttributes(['class' => 'hidden md:inline-flex']),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
