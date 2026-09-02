@@ -94,8 +94,8 @@ test('conditional UPDATE on share_slug is a no-op when the stale precondition do
 
     $rows = Product::query()
         ->whereKey($product->getKey())
-        ->where('share_slug', 'stale-precondition-doesnt-match!!')
-        ->update(['share_slug' => 'attacker-overwrites-aaaaaaaaaaaaa']);
+        ->where('share_slug', 'stale-precondition-no-match-aaaa')
+        ->update(['share_slug' => 'attacker-overwrites-aaaaaaaaaaaa']);
 
     expect($rows)->toBe(0);
     expect($product->fresh()->share_slug)->toBe('current-slug-aaaaaaaaaaaaaaaaaaa');

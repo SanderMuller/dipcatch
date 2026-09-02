@@ -16,11 +16,17 @@ on:
 
 jobs:
   ci:
+    name: tests (${{ matrix.database }})
     runs-on: ubuntu-latest
     environment: Testing
     strategy:
+      fail-fast: false
       matrix:
         php-version: ['8.5']
+        # SQLite is the fast default; pgsql is the production engine and the
+        # only place engine-specific SQL (json operators, strict grouping,
+        # timestamptz) gets exercised.
+        database: [sqlite, pgsql]
 
     # The invitation and public-product routes throttle through
     # ThrottleRequestsWithRedis, which drives a DurationLimiter straight on the
@@ -35,6 +41,21 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      # Always started (a matrix cannot toggle services); only the pgsql leg
+      # points DB_CONNECTION at it.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dipcatch_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout code
@@ -46,7 +67,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
-          extensions: bcmath, redis, pdo_sqlite, sqlite3
+          extensions: bcmath, redis, pdo_sqlite, sqlite3, pdo_pgsql, pgsql, intl
           tools: composer:v2
           coverage: xdebug
 
@@ -77,4 +98,15 @@ jobs:
         run: npm run build
 
       - name: Run Tests
+        # phpunit.xml.dist pins sqlite/:memory: unless the variables already
+        # exist in the environment, so the pgsql leg exports them here.
+        env:
+          DB_CONNECTION: ${{ matrix.database }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: ${{ matrix.database == 'pgsql' && 'dipcatch_test' || ':memory:' }}
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          HEALTH_DB_CONNECTION: ${{ matrix.database }}
+          WEBPUSH_DB_CONNECTION: ${{ matrix.database }}
         run: ./vendor/bin/pest
