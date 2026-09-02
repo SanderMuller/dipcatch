@@ -27,6 +27,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
@@ -112,7 +113,8 @@ class ShopsRelationManager extends RelationManager
                     ->label('Price')
                     ->hiddenFrom('md')
                     ->state(fn (Shop $record): string => self::priceState($record))
-                    ->description(fn (Shop $record): ?string => $record->unitPrice() === null ? null : self::unitPriceState($record)),
+                    ->description(fn (Shop $record): ?string => $record->unitPrice() === null ? null : self::unitPriceState($record))
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('current_price', $direction === 'desc' ? 'desc' : 'asc')),
 
                 IconColumn::make('current_in_stock')
                     ->visibleFrom('md')
@@ -148,8 +150,7 @@ class ShopsRelationManager extends RelationManager
                 Action::make('open')
                     ->icon(Heroicon::ArrowTopRightOnSquare)
                     ->label('Open')
-                    // Icon only below md so the row fits a phone; the label
-                    // stays for screen readers via the link's text.
+                    // Icon only below md so the row fits a phone (label stays sr-only).
                     ->extraAttributes(['class' => 'max-md:[&_.fi-link-label]:sr-only'])
                     ->url(fn (Shop $record): string => $record->url)
                     ->openUrlInNewTab(),
