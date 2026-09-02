@@ -100,6 +100,7 @@ class ShopsRelationManager extends RelationManager
                     ->label('Price')
                     ->visibleFrom('md')
                     ->state(fn (Shop $record): string => self::priceState($record))
+                    ->description(fn (Shop $record): ?string => self::conditionalOfferState($record))
                     ->sortable(),
 
                 TextColumn::make('unit_price')
@@ -113,7 +114,7 @@ class ShopsRelationManager extends RelationManager
                     ->label('Price')
                     ->hiddenFrom('md')
                     ->state(fn (Shop $record): string => self::priceState($record))
-                    ->description(fn (Shop $record): ?string => $record->unitPrice() === null ? null : self::unitPriceState($record))
+                    ->description(fn (Shop $record): ?string => self::compactDescription($record))
                     ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('current_price', $direction === 'desc' ? 'desc' : 'asc')),
 
                 IconColumn::make('current_in_stock')
@@ -311,6 +312,31 @@ class ShopsRelationManager extends RelationManager
             $record->current_price === null ? null : (string) $record->current_price,
             $record->currency,
         );
+    }
+
+    /**
+     * The advertised offer a shopper may not be able to claim, shown beside
+     * the price it does not replace — "Bonus Box 15% korting · EUR 2,97".
+     */
+    private static function conditionalOfferState(Shop $record): ?string
+    {
+        $offer = $record->conditionalOffer();
+
+        if ($offer === null) {
+            return null;
+        }
+
+        return $offer->label . ' · ' . MoneyFormatter::format($offer->price, $record->currency);
+    }
+
+    private static function compactDescription(Shop $record): ?string
+    {
+        $lines = array_filter([
+            $record->unitPrice() === null ? null : self::unitPriceState($record),
+            self::conditionalOfferState($record),
+        ]);
+
+        return $lines === [] ? null : implode(' · ', $lines);
     }
 
     private static function unitPriceState(Shop $record): string

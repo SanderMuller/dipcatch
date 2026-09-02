@@ -8,6 +8,7 @@ use App\Models\PriceCheck;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
+use App\PriceAdapters\ConditionalOffer;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
@@ -136,6 +137,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
      * }
      */
     private function checkjebonOutcome(Shop $shop, CheckjebonSource $checkjebon): array
@@ -158,6 +161,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'fetch_result' => null,
                 'pack_size' => null,
                 'pack_size_authoritative' => false,
+                'conditional_offer' => null,
+                'conditional_offer_authoritative' => false,
             ];
         }
 
@@ -179,6 +184,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
      * }
      */
     private function sourceOutcome(ShopSnapshot $snapshot, string $adapterKey): array
@@ -196,6 +203,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'adapter_key' => $adapterKey,
             'fetch_result' => null,
             'pack_size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title),
+            'conditional_offer' => $snapshot->conditionalOffer,
+            'conditional_offer_authoritative' => $snapshot->conditionalOfferAuthoritative,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
         ];
     }
@@ -218,6 +227,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
      * }
      */
     private function fetchAndExtract(Shop $shop, ShopFetcher $fetcher, AdapterResolver $resolver): array
@@ -269,6 +280,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'fetch_result' => $fetch,
                 'pack_size' => null,
                 'pack_size_authoritative' => false,
+                'conditional_offer' => null,
+                'conditional_offer_authoritative' => false,
             ];
         }
 
@@ -290,6 +303,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             // Scraped adapters carry no structured size — the title is the
             // only source, and it is never authoritative.
             'pack_size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title),
+            'conditional_offer' => $snapshot->conditionalOffer,
+            'conditional_offer_authoritative' => $snapshot->conditionalOfferAuthoritative,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
         ];
     }
@@ -309,6 +324,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
      * }
      */
     private function failureOutcome(FetchException $e): array
@@ -333,6 +350,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'fetch_result' => null,
             'pack_size' => null,
             'pack_size_authoritative' => false,
+            'conditional_offer' => null,
+            'conditional_offer_authoritative' => false,
         ];
     }
 
@@ -351,6 +370,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
      * }
      */
     private function genericFailure(string $message): array
@@ -369,6 +390,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'fetch_result' => null,
             'pack_size' => null,
             'pack_size_authoritative' => false,
+            'conditional_offer' => null,
+            'conditional_offer_authoritative' => false,
         ];
     }
 
@@ -390,6 +413,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
      * }  $outcome
      */
     private function persist(Shop $shop, array $outcome): void
@@ -460,6 +485,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 if ($outcome['pack_size_authoritative'] || $packSize !== null) {
                     $updates['pack_quantity'] = $packSize?->quantity;
                     $updates['pack_unit'] = $packSize?->unit;
+                }
+
+                // Same rule as the GTIN: a source that reads conditional
+                // offers and finds none clears the stored one, so a campaign
+                // that ended stops being shown. A source with no such concept
+                // leaves it alone.
+                $offer = $outcome['conditional_offer'];
+                if ($offer !== null || $outcome['conditional_offer_authoritative']) {
+                    $updates['conditional_price'] = $offer?->price;
+                    $updates['conditional_label'] = $offer?->label;
+                    $updates['conditional_starts_at'] = $offer?->startsAt;
+                    $updates['conditional_ends_at'] = $offer?->endsAt;
                 }
             } else {
                 $updates['last_error'] = $outcome['error'];
