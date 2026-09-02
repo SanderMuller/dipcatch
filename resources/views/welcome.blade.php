@@ -4,6 +4,7 @@
     $authed = auth()->check();
     $primaryHref = $authed ? url('/app') : route('register');
     $headerLabel = $authed ? __('Open app') : __('Create account');
+    $headerLabelShort = $authed ? __('Open app') : __('Sign up');
     $contactEmail = config('site.contact_email');
     $steps = [
         ['n' => '01', 'title' => __('Paste a product link'), 'body' => __('DipCatch reads the title, image, price and pack size itself — no extension, no selectors, nothing to install.')],
@@ -46,7 +47,7 @@
                     </a>
                     <nav class="flex items-center gap-3">
                         <x-appearance-toggle />
-                        <a href="{{ $primaryHref }}" class="rounded-full bg-white/80 px-4 py-1.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/80 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900">{{ $headerLabel }}</a>
+                        <a href="{{ $primaryHref }}" class="whitespace-nowrap rounded-full bg-white/80 px-4 py-1.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/80 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900"><span class="sm:hidden">{{ $headerLabelShort }}</span><span class="hidden sm:inline">{{ $headerLabel }}</span></a>
                     </nav>
                 </header>
 
@@ -80,12 +81,15 @@
                                 <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Works with') }}</p>
                                 <ul class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($supportedShops as $shop)
-                                        <li class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800">
+                                        <li @class(['items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800', 'inline-flex' => $loop->index < 8, 'hidden sm:inline-flex' => $loop->index >= 8])>
                                             <img src="{{ $shop['favicon'] }}" alt="" loading="lazy" class="size-4 rounded-sm" />
                                             {{ $shop['host'] }}
                                         </li>
                                     @endforeach
-                                    <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">{{ __('+ most webshops that show a price') }}</li>
+                                    @if (count($supportedShops) > 8)
+                                        <li class="inline-flex items-center rounded-full px-3 py-1.5 text-sm text-zinc-500 sm:hidden dark:text-zinc-400">{{ __('+:count more', ['count' => count($supportedShops) - 8]) }}</li>
+                                    @endif
+                                    <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">{{ __('+ many other webshops') }}</li>
                                 </ul>
                             </div>
                         </div>
