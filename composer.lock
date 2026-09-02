@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ba189150bdedf048081943f7d53bd5c2",
+    "content-hash": "05d21778741f6b79436c2e6b77483a95",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -12463,16 +12463,16 @@
         },
         {
             "name": "hihaho/rector-rules",
-            "version": "0.16.1",
+            "version": "0.18.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hihaho/rector-rules.git",
-                "reference": "5649125c50834f30e56df150d4d0ee8c1976bb06"
+                "reference": "d97ea4d6da71ba17a4f5342464c61767b668143c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hihaho/rector-rules/zipball/5649125c50834f30e56df150d4d0ee8c1976bb06",
-                "reference": "5649125c50834f30e56df150d4d0ee8c1976bb06",
+                "url": "https://api.github.com/repos/hihaho/rector-rules/zipball/d97ea4d6da71ba17a4f5342464c61767b668143c",
+                "reference": "d97ea4d6da71ba17a4f5342464c61767b668143c",
                 "shasum": ""
             },
             "require": {
@@ -12496,7 +12496,6 @@
                 "phpstan/phpstan-phpunit": "^2.0",
                 "phpstan/phpstan-strict-rules": "^2.0",
                 "phpunit/phpunit": "^12.0",
-                "rector/type-perfect": "^2.0",
                 "sandermuller/boost-skills": "^2.4",
                 "sandermuller/package-boost-laravel": "^1.0",
                 "spaze/phpstan-disallowed-calls": "^4.10",
@@ -12549,7 +12548,7 @@
                 "issues": "https://github.com/hihaho/rector-rules/issues",
                 "source": "https://github.com/hihaho/rector-rules"
             },
-            "time": "2026-07-01T06:39:23+00:00"
+            "time": "2026-08-14T12:26:05+00:00"
         },
         {
             "name": "iamcal/sql-parser",
