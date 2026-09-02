@@ -34,7 +34,7 @@ Re-aims the homepage at what DipCatch actually is today: a Dutch supermarket pri
 ### 2.1 Copy (EN)
 
 - H1: **Same product, every supermarket, one alert.**
-- Sub: **DipCatch watches the groceries you buy anyway across AH, Jumbo, Dirk, Lidl, Aldi and more, compares them on price per kilo, and tells you when one drops.**
+- Sub: **DipCatch watches the groceries you buy anyway across AH, Jumbo, Dirk, Lidl and more, compares them on price per kilo, and tells you when one drops.** (Name only shops that pass STOP condition 2; add Aldi to the list once `AldiAdapter` is merged.)
 - Badge stays "Open beta". CTA stays "Create a free account" + verification note.
 
 The H1 must fit `max-w-[24ch]` at `sm:text-6xl` on two lines; the implementer checks this in the browser at 390 px, 768 px and 1280 px.
@@ -59,9 +59,10 @@ Under the hero CTA (guests only): **"See a live example →"** linking to `route
 
 - Add `lang/nl.json` with translations for every `__()` string in `welcome.blade.php` and `privacy.blade.php` only. The app panel is untouched. Configuration-backed copy moves into the views as `__()` strings so it translates too: `config('site.description')` is replaced by `__('DipCatch watches the price of …')` in both the meta description and `og:description` (the `description` key is removed from `config/site.php`).
 - **Explicit, stateless locale**: a `MarketingLocale` middleware on the `home` and `privacy` routes resolves the locale from `?lang=nl|en` only; any other or absent value gives the **fixed default** from Open Question 1. There is no `Accept-Language` negotiation: the bare URL always renders the same language, so crawlers, caches and humans see one stable default page, and `?lang=` URLs are the two stable variants. Nothing locale-related is written to the session. (The routes still carry Laravel's `web` middleware, so the ordinary session cookie is present as on every page — the privacy statement already describes it; the locale adds no state to it.) A malformed `?lang` value (`?lang=fr`, `?lang=<script>`) is treated as absent and never reflected into the page.
+- **Cache policy**: the two routes keep Laravel's default `Cache-Control: no-cache, private`; no shared/CDN caching is introduced by this spec, so the guest/signed-in CTA variants and the session cookie never meet a shared cache. A test asserts the header on both routes.
 - The middleware sets the locale with `App::setLocale()` and restores the previous locale in a `finally` block, so under Octane a Dutch marketing request cannot leak `nl` into the next request served by the same worker.
 - A small language toggle (NL / EN) next to the appearance toggle in the header of both pages; each option links to the current route with `?lang=`. Links between the two marketing pages propagate the current `?lang` value when one is present.
-- `<html lang>` and `og:locale` (`nl_NL` / `en_US`) follow the resolved locale. `hreflang` alternates in `<head>` of both pages: `nl` → `?lang=nl`, `en` → `?lang=en`, `x-default` → the bare URL. `<link rel="canonical">`: a `?lang=` URL points at itself; the bare URL points at the `?lang=` variant of the default language.
+- `<html lang>` and `og:locale` (`nl_NL` / `en_US`) follow the resolved locale. **Two representations per page, reciprocal**: the bare URL *is* the canonical default-language page; `?lang=<other>` is the canonical page of the other language; `?lang=<default>` is a duplicate whose canonical points at the bare URL. `hreflang` in `<head>` of every representation: `<default>` → bare URL, `<other>` → `?lang=<other>`, `x-default` → bare URL.
 - The Filament app and emails stay English; `App::setLocale` is scoped to the marketing routes via the middleware, so nothing else changes.
 
 ## 4. FAQ Section
@@ -70,8 +71,8 @@ Placed between "How it works" and the bottom CTA. Six items, native `<details>` 
 
 | Question | Answer (EN) | Traced to |
 |---|---|---|
-| Which shops work? | AH, Jumbo, Dirk, Lidl, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon.nl and Zooplus have dedicated support (Aldi joins the list only once `AldiAdapter` is merged — see STOP condition 3), including AH bonus and Dirk promo prices. Many other webshops publish product data (schema.org, Open Graph) that DipCatch can read; shops behind bot protection or with prices that only load in JavaScript may not work — you see the result before you confirm. | `config/dipcatch.php` adapters list; `config/site.php` supported hosts; `AhApiSource`, `DirkAdapter` |
-| How often are prices checked? | Automatically, about every 6 hours (the interval is `dipcatch.recheck.interval_hours`, default 6, plus up to 30 minutes of jitter); you never trigger a check yourself. | `config/dipcatch.php:57-60` |
+| Which shops work? | AH, Jumbo, Dirk, Lidl, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon.nl and Zooplus have dedicated support (Aldi joins the list only once `AldiAdapter` is merged — see STOP condition 2), including AH bonus and Dirk promo prices. Many other webshops publish product data (schema.org, Open Graph) that DipCatch can read; shops behind bot protection or with prices that only load in JavaScript may not work — you see the result before you confirm. | `config/dipcatch.php` adapters list; `config/site.php` supported hosts; `AhApiSource`, `DirkAdapter` |
+| How often are prices checked? | A shop is checked the moment you add it or change its link; after that DipCatch re-checks automatically about every 6 hours (`dipcatch.recheck.interval_hours`, default 6, plus up to 30 minutes of jitter). | `config/dipcatch.php:57-60`; `ProbeShopUrl` (probe on add); `ShopsRelationManager::handleEditUrl()` (check on URL change) |
 | Is it free? | Yes, during the beta. No card, no trial timer. | registration open (`config/fortify.php`), no billing code |
 | Do I need an extension or app? | No. Paste a link in the browser; alerts arrive by email digest, in-app bell, or browser push if you enable it. | `NotificationSettings` page; `notification-settings.blade.php` |
 | Can I compare different pack sizes? | Yes. When DipCatch can read the pack size, it shows a price per kilo, litre or piece next to that shop, so a 200 g and a 370 g bag compare fairly. | `App\Support\PackSize`, `Shop::unitPrice()` |
@@ -95,8 +96,8 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 | Signed-in user on the homepage | Locale logic still applies; app remains English after clicking "Open app" (Phase `nl`, test asserts `/app` renders English) |
 | Screen reader on the phone mock | One `aria-label` sentence; inner text is `aria-hidden` (Phase `hero`, manual check with VoiceOver noted in Findings) |
 | `?lang=en` / `?lang=nl` | That language renders regardless of headers (Phase `nl`, tests) |
-| Dutch marketing request then a non-marketing request in the same Octane worker | Second request renders English — locale restored in `finally`, also when the first request threw (Phase `nl`, test drives both through the kernel in one process) |
-| `?lang=fr` or `?lang=<script>` | Ignored; header/default decides; no error, no reflection of the value into the page (Phase `nl`, test) |
+| Dutch marketing request then a non-marketing request in the same Octane worker | Second request renders English — locale restored in `finally`, also when the first request threw (Phase `nl`: feature test drives both requests through the kernel in one process; a middleware unit test passes a `$next` that throws and asserts the locale is restored afterwards) |
+| `?lang=fr` or `?lang=<script>` | Treated as absent: fixed default renders; no error, no reflection of the value into the page; `Accept-Language` has no effect (Phase `nl`, test) |
 | FAQ JSON-LD, answer text contains `</script>` | Encoded as `\u003C/script\u003E`; the script element does not end early (Phase `faq`, test) |
 | H1 wraps to three lines on 390 px | Reduce to `text-4xl` at base (already) and check the `[24ch]` cap; adjust copy rather than shrinking type below `text-4xl` (Phase `hero`, browser check) |
 
@@ -110,6 +111,7 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 - [ ] Re-read the "How it works" intro sentence and the bottom-CTA copy against the new hero so the page tells one story (compare across shops), and adjust wording where it still says "track products". Soften the shipped "+ most webshops that show a price" chip to "+ many other webshops" for the same reason as the FAQ answer (Section 4, "Which shops work?").
 - [ ] Rebuild `$tracked` and the mock cards per Section 2.2 — favicon via `Favicon::url()`, unit-price line, `role="img"` + `aria-label` on the container, inner content `aria-hidden`.
 - [ ] Add `site.demo_share_slug` config + env example; render the "See a live example" link per Section 2.3 with the cached existence check.
+- [ ] Privacy page: extend the third-party list — product images on share pages load from the shop's own servers, and the shop favicons from Google's favicon service, so those hosts see the visitor's IP address. Accepted effect; no proxying (the favicon disclosure exists, the image one does not yet).
 - [ ] Tests — homepage shows the new H1; mock contains the three shops and no `mediamarkt.nl`; live-example link renders only with a valid slug that exists; after the share is revoked the link is still present within the cache window and gone once the cache entry (keyed on the configured slug) is cleared or expired.
 - [ ] Browser check at 390 / 768 / 1280 px, light and dark; note results in Findings.
 
@@ -130,7 +132,7 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 - [ ] Move `site.description` into `__()` strings in both meta tags; remove the config key.
 - [ ] `MarketingLocale` middleware (`?lang` → fixed default; stateless; restores the previous locale in `finally`), applied to the `home` and `privacy` routes only.
 - [ ] Header language toggle on both pages (propagating `?lang` between the two routes); `<html lang>`, `og:locale`, `hreflang` alternates, canonical rule per Section 3.
-- [ ] Tests — the Edge Cases table's locale rows; exact `canonical`, `hreflang` and `og:locale` values for the bare URL and both `?lang` variants on both routes; the toggle's two hrefs; `/app` stays English for a signed-in user after visiting the Dutch homepage.
+- [ ] Tests — the Edge Cases table's locale rows; exact `canonical`, `hreflang` and `og:locale` values for the bare URL and both `?lang` variants on both routes (including that `?lang=<default>` canonicalises to the bare URL); the toggle's two hrefs; `/app` stays English for a signed-in user after visiting the Dutch homepage.
 - [ ] Translation coverage tests — (a) **no leaks**: request both routes with `?lang=nl` while `Lang::handleMissingKeysUsing()` records every missed key, and assert the list is empty — this covers every string the two responses render, including partials and components; (b) **no orphans**: a static check that every key in `lang/nl.json` appears as a `__('…')` literal in `welcome.blade.php`, `privacy.blade.php`, or the partials/components they include (single-quoted, single-line literals are the project convention in these views; the test fails loudly on a key it cannot find rather than guessing).
 
 ---
@@ -140,7 +142,7 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 Stop and report — do not improvise — if any of these proves false during implementation:
 
 1. **The public share page renders for a guest with only `share_slug` set** — the live example depends on `PublicProductController` needing nothing else; if it requires auth or extra state, the link design changes.
-2. **Every host named in the FAQ and in `config('site.supported_hosts')` has a merged adapter or data source at implementation time** — if `AldiAdapter` (in progress elsewhere) has not landed, drop `aldi.nl` from both rather than promising it.
+2. **Every shop named anywhere on the marketing pages — hero copy, phone mock, FAQ, `config('site.supported_hosts')` — has a merged adapter or data source at implementation time** — if `AldiAdapter` (in progress elsewhere) has not landed, drop Aldi from all of them rather than promising it.
 3. **`__()` in Blade resolves through `lang/nl.json` without a `lang/` publish step** — Laravel 13 reads `lang/*.json` when the directory exists; if the app has `lang_path` customised, Phase 3 changes.
 
 ---
