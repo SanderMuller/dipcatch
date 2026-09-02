@@ -12,6 +12,7 @@ Re-aims the homepage at what DipCatch actually is today: a Dutch supermarket pri
 - **The live example is a real tracked product, referenced by its share slug via config** (`site.demo_share_slug`) — not a synthetic fixture. Rationale: the public share page (`routes/web.php:16`, `PublicProductController`) already renders real prices with favicons and unit prices; anything synthetic would be less convincing and needs maintenance. The product should live in a **dedicated demo account** (for example `demo@dipcatch.eu`) rather than the owner's personal account, so the homepage never exposes a personal watch list and the link survives personal clean-ups. If the config is empty, the link does not render — and Phase 1 is not *done* until the slug is set in production or the owner explicitly accepts shipping without the link (Open Question 3).
 - **The phone mock stays static HTML (no Livewire, no live data)** — a mock that always looks good beats a live widget that depends on today's promos. Amounts and shops in the mock are plausible but fixed; they are labelled as an example in an `aria-label`, not sold as live.
 - **Price display in the mock uses the app's `MoneyFormatter` style (`EUR 1.69`)**, so the homepage matches the app. Changing the app-wide format to `€ 1,69` is a separate decision (Open Question 2).
+- **The shop list in the FAQ and in `config('site.supported_hosts')` names only hosts with a merged adapter or data source** — `aldi.nl` is listed in `config/site.php` today ahead of the `AldiAdapter` that is in progress in another branch; the implementer re-checks `config/dipcatch.php` at implementation time and drops any host without one.
 - **FAQ content is written by the implementer from verified behaviour** — every answer below is traced to code (see Section 4) and the spec lists the exact claims. No marketing hyperbole; Simplified Technical English for the EN copy.
 
 ---
@@ -57,10 +58,10 @@ Under the hero CTA (guests only): **"See a live example →"** linking to `route
 ## 3. Dutch Marketing Pages
 
 - Add `lang/nl.json` with translations for every `__()` string in `welcome.blade.php` and `privacy.blade.php` only. The app panel is untouched. Configuration-backed copy moves into the views as `__()` strings so it translates too: `config('site.description')` is replaced by `__('DipCatch watches the price of …')` in both the meta description and `og:description` (the `description` key is removed from `config/site.php`).
-- **Stateless locale resolution** for the two marketing routes (`home`, `privacy`) — a `MarketingLocale` middleware sets the locale from, in order: `?lang=nl|en` query, the `Accept-Language` header (first tag `nl*` → `nl`, anything else → `en`), then the default from Open Question 1. Nothing is written to the session and no cookie is set: the pages stay public, cache-friendly, and the privacy statement's cookie description stays true. A malformed `?lang` value (`?lang=fr`, `?lang=<script>`) is ignored and falls through to the header.
-- Every response from the two routes sends `Vary: Accept-Language` so a shared cache never serves one language to the other. Laravel Cloud does not cache HTML by default; the header makes the contract explicit for any proxy in between.
+- **Explicit, stateless locale**: a `MarketingLocale` middleware on the `home` and `privacy` routes resolves the locale from `?lang=nl|en` only; any other or absent value gives the **fixed default** from Open Question 1. There is no `Accept-Language` negotiation: the bare URL always renders the same language, so crawlers, caches and humans see one stable default page, and `?lang=` URLs are the two stable variants. Nothing locale-related is written to the session. (The routes still carry Laravel's `web` middleware, so the ordinary session cookie is present as on every page — the privacy statement already describes it; the locale adds no state to it.) A malformed `?lang` value (`?lang=fr`, `?lang=<script>`) is treated as absent and never reflected into the page.
+- The middleware sets the locale with `App::setLocale()` and restores the previous locale in a `finally` block, so under Octane a Dutch marketing request cannot leak `nl` into the next request served by the same worker.
 - A small language toggle (NL / EN) next to the appearance toggle in the header of both pages; each option links to the current route with `?lang=`. Links between the two marketing pages propagate the current `?lang` value when one is present.
-- `<html lang>` and `og:locale` (`nl_NL` / `en_US`) follow the resolved locale. `hreflang` alternates in `<head>` of both pages: `nl` → `?lang=nl`, `en` → `?lang=en`, `x-default` → the bare URL. `<link rel="canonical">` on a `?lang=` URL points at itself; on the bare URL it points at the resolved language's `?lang=` variant. The bare URL is the only negotiated one and is deterministic given `Accept-Language` because nothing else feeds the decision.
+- `<html lang>` and `og:locale` (`nl_NL` / `en_US`) follow the resolved locale. `hreflang` alternates in `<head>` of both pages: `nl` → `?lang=nl`, `en` → `?lang=en`, `x-default` → the bare URL. `<link rel="canonical">`: a `?lang=` URL points at itself; the bare URL points at the `?lang=` variant of the default language.
 - The Filament app and emails stay English; `App::setLocale` is scoped to the marketing routes via the middleware, so nothing else changes.
 
 ## 4. FAQ Section
@@ -69,14 +70,14 @@ Placed between "How it works" and the bottom CTA. Six items, native `<details>` 
 
 | Question | Answer (EN) | Traced to |
 |---|---|---|
-| Which shops work? | AH, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon.nl and Zooplus have dedicated support, including AH bonus and Dirk promo prices. Many other webshops publish product data (schema.org, Open Graph) that DipCatch can read; shops behind bot protection or with prices that only load in JavaScript may not work — you see the result before you confirm. | `config/dipcatch.php` adapters list; `config/site.php` supported hosts; `AhApiSource`, `DirkAdapter` |
+| Which shops work? | AH, Jumbo, Dirk, Lidl, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon.nl and Zooplus have dedicated support (Aldi joins the list only once `AldiAdapter` is merged — see STOP condition 3), including AH bonus and Dirk promo prices. Many other webshops publish product data (schema.org, Open Graph) that DipCatch can read; shops behind bot protection or with prices that only load in JavaScript may not work — you see the result before you confirm. | `config/dipcatch.php` adapters list; `config/site.php` supported hosts; `AhApiSource`, `DirkAdapter` |
 | How often are prices checked? | Automatically, about every 6 hours (the interval is `dipcatch.recheck.interval_hours`, default 6, plus up to 30 minutes of jitter); you never trigger a check yourself. | `config/dipcatch.php:57-60` |
 | Is it free? | Yes, during the beta. No card, no trial timer. | registration open (`config/fortify.php`), no billing code |
 | Do I need an extension or app? | No. Paste a link in the browser; alerts arrive by email digest, in-app bell, or browser push if you enable it. | `NotificationSettings` page; `notification-settings.blade.php` |
 | Can I compare different pack sizes? | Yes. When DipCatch can read the pack size, it shows a price per kilo, litre or piece next to that shop, so a 200 g and a 370 g bag compare fairly. | `App\Support\PackSize`, `Shop::unitPrice()` |
-| Can I share a comparison? | Yes. Every product has an optional public page with the current prices per shop and a price-history chart once there is history; anyone with the link can view it, nothing about your account is shown. | `product-sharing-modal.blade.php`, `PublicProductController` |
+| Can I share a comparison? | Yes. Every product has an optional public page with the current prices per shop and, where available, a chart of the last 90 days of the cheapest price; anyone with the link can view it, nothing about your account is shown. | `product-sharing-modal.blade.php`, `PublicProductController` |
 
-Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Question`/`Answer` pairs) generated from the same array, so copy lives once. The JSON is emitted with `json_encode(..., JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)` (or `Js::from()`), never plain `json_encode`, so a `</script>` inside an answer cannot end the script element.
+Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Question`/`Answer` pairs) generated from the same array, so copy lives once. The JSON is emitted through a new `App\Support\JsonLd::script(array $data): HtmlString` helper that wraps `json_encode(..., JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)` in the `<script type="application/ld+json">` element — never plain `json_encode` in the view — so a `</script>` inside an answer cannot end the script element. The helper is the test seam: it is unit-tested with script-ending text; the view test only asserts the six questions are present in the decoded JSON.
 
 ## 5. Config and Tests
 
@@ -90,13 +91,12 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 |----------|----------|
 | `SITE_DEMO_SHARE_SLUG` unset or malformed | No live-example link renders (Phase `hero`, test) |
 | Demo product's share revoked (`share_slug` null) | Existence check fails → link hidden within 10 min (cache TTL) (Phase `hero`, test with cache cleared) |
-| Visitor with `Accept-Language: nl-NL,nl;q=0.9,en;q=0.8` | Locale `nl`; `<html lang="nl">`; `?lang=en` overrides for that request only (Phase `nl`, tests) |
-| Visitor with `Accept-Language: de` | Default locale from Open Question 1 (Phase `nl`, test) |
+| Bare URL, any `Accept-Language` (including none) | Always the default language (Open Question 1); identical HTML for `nl`, `de`, and absent headers (Phase `nl`, tests) |
 | Signed-in user on the homepage | Locale logic still applies; app remains English after clicking "Open app" (Phase `nl`, test asserts `/app` renders English) |
 | Screen reader on the phone mock | One `aria-label` sentence; inner text is `aria-hidden` (Phase `hero`, manual check with VoiceOver noted in Findings) |
-| Crawler requests `?lang=en` with `Accept-Language: nl` | English renders — the query wins (Phase `nl`, test) |
+| `?lang=en` / `?lang=nl` | That language renders regardless of headers (Phase `nl`, tests) |
+| Dutch marketing request then a non-marketing request in the same Octane worker | Second request renders English — locale restored in `finally`, also when the first request threw (Phase `nl`, test drives both through the kernel in one process) |
 | `?lang=fr` or `?lang=<script>` | Ignored; header/default decides; no error, no reflection of the value into the page (Phase `nl`, test) |
-| Response headers | `Vary: Accept-Language` on both routes (Phase `nl`, test) |
 | FAQ JSON-LD, answer text contains `</script>` | Encoded as `\u003C/script\u003E`; the script element does not end early (Phase `faq`, test) |
 | H1 wraps to three lines on 390 px | Reduce to `text-4xl` at base (already) and check the `[24ch]` cap; adjust copy rather than shrinking type below `text-4xl` (Phase `hero`, browser check) |
 
@@ -110,7 +110,7 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 - [ ] Re-read the "How it works" intro sentence and the bottom-CTA copy against the new hero so the page tells one story (compare across shops), and adjust wording where it still says "track products". Soften the shipped "+ most webshops that show a price" chip to "+ many other webshops" for the same reason as the FAQ answer (Section 4, "Which shops work?").
 - [ ] Rebuild `$tracked` and the mock cards per Section 2.2 — favicon via `Favicon::url()`, unit-price line, `role="img"` + `aria-label` on the container, inner content `aria-hidden`.
 - [ ] Add `site.demo_share_slug` config + env example; render the "See a live example" link per Section 2.3 with the cached existence check.
-- [ ] Tests — homepage shows the new H1; mock contains the three shops and no `mediamarkt.nl`; live-example link renders only with a valid slug that exists; cache hides it after revoke.
+- [ ] Tests — homepage shows the new H1; mock contains the three shops and no `mediamarkt.nl`; live-example link renders only with a valid slug that exists; after the share is revoked the link is still present within the cache window and gone once the cache entry (keyed on the configured slug) is cleared or expired.
 - [ ] Browser check at 390 / 768 / 1280 px, light and dark; note results in Findings.
 
 ### Phase 2: FAQ (Priority: HIGH)
@@ -118,9 +118,9 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 **ID:** faq · **Depends:** hero — both phases edit `welcome.blade.php`, so they must not run concurrently
 
 - [ ] Add the six-item `$faq` array and the `<details>` section per Section 4, between "How it works" and the bottom CTA.
-- [ ] Emit `FAQPage` JSON-LD from the same array with `JSON_HEX_TAG | JSON_HEX_AMP` (Section 4).
+- [ ] Add `App\Support\JsonLd::script()` and emit the `FAQPage` JSON-LD from the same array through it (Section 4).
 - [ ] Read the re-check interval from `config('dipcatch.recheck.interval_hours')` in the "How often" answer so the copy cannot drift.
-- [ ] Tests — six questions visible; JSON-LD is valid JSON with six `Question` entities; answers contain no HTML; an answer containing the literal text `</script>` (injected via the array in the test) renders exactly one `</script>` closing tag inside the document and the JSON still decodes.
+- [ ] Tests — `JsonLd::script()` unit test: data containing `</script>` yields exactly one `</script>` in the output and decodes back to the input; homepage test: JSON-LD decodes with six `Question` entities whose names match the six visible `<summary>` texts; answers contain no HTML.
 
 ### Phase 3: Dutch marketing pages (Priority: MEDIUM)
 
@@ -128,10 +128,10 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 
 - [ ] `lang/nl.json` covering every `__()` string in `welcome.blade.php` and `privacy.blade.php` (after Phases 1–2 so the strings are final).
 - [ ] Move `site.description` into `__()` strings in both meta tags; remove the config key.
-- [ ] `MarketingLocale` middleware (query → `Accept-Language` → default; stateless; `Vary: Accept-Language`), applied to the `home` and `privacy` routes only.
+- [ ] `MarketingLocale` middleware (`?lang` → fixed default; stateless; restores the previous locale in `finally`), applied to the `home` and `privacy` routes only.
 - [ ] Header language toggle on both pages (propagating `?lang` between the two routes); `<html lang>`, `og:locale`, `hreflang` alternates, canonical rule per Section 3.
 - [ ] Tests — the Edge Cases table's locale rows; exact `canonical`, `hreflang` and `og:locale` values for the bare URL and both `?lang` variants on both routes; the toggle's two hrefs; `/app` stays English for a signed-in user after visiting the Dutch homepage.
-- [ ] Translation coverage test — render both views in `nl` with `Lang::handleMissingKeysUsing()` recording every missed key and assert the list is empty (no leaks); then assert every key in `lang/nl.json` was requested during those two renders (no orphans). This uses the runtime translator, so multi-line calls and parameters are covered without regex extraction.
+- [ ] Translation coverage tests — (a) **no leaks**: request both routes with `?lang=nl` while `Lang::handleMissingKeysUsing()` records every missed key, and assert the list is empty — this covers every string the two responses render, including partials and components; (b) **no orphans**: a static check that every key in `lang/nl.json` appears as a `__('…')` literal in `welcome.blade.php`, `privacy.blade.php`, or the partials/components they include (single-quoted, single-line literals are the project convention in these views; the test fails loudly on a key it cannot find rather than guessing).
 
 ---
 
@@ -140,13 +140,14 @@ Each answer is at most three sentences. The FAQ gets `FAQPage` JSON-LD (`Questio
 Stop and report — do not improvise — if any of these proves false during implementation:
 
 1. **The public share page renders for a guest with only `share_slug` set** — the live example depends on `PublicProductController` needing nothing else; if it requires auth or extra state, the link design changes.
-2. **`__()` in Blade resolves through `lang/nl.json` without a `lang/` publish step** — Laravel 13 reads `lang/*.json` when the directory exists; if the app has `lang_path` customised, Phase 3 changes.
+2. **Every host named in the FAQ and in `config('site.supported_hosts')` has a merged adapter or data source at implementation time** — if `AldiAdapter` (in progress elsewhere) has not landed, drop `aldi.nl` from both rather than promising it.
+3. **`__()` in Blade resolves through `lang/nl.json` without a `lang/` publish step** — Laravel 13 reads `lang/*.json` when the directory exists; if the app has `lang_path` customised, Phase 3 changes.
 
 ---
 
 ## Open Questions
 
-1. **Default language for visitors without a Dutch `Accept-Language`: English or Dutch?** Every supported shop is Dutch, so NL-first is the natural default; English-first keeps the page readable for the beta testers who are not Dutch. The spec is written NL-first-neutral: Phase 3 needs this decided before the middleware's fallback is set.
+1. **Default language of the bare URL: Dutch or English?** Every supported shop is Dutch, so NL-first is the natural default; English-first keeps the page readable for beta testers who are not Dutch. Since there is no header negotiation, this choice decides what every first-time visitor sees. Phase 3 needs it before the middleware's fallback is set.
 2. **Should the app switch to `€ 1,69` style formatting?** `MoneyFormatter` renders `EUR 1.69` everywhere. Dutch users expect `€ 1,69`. This is an app-wide change (Filament tables, emails, share page, mock) and is not part of this spec; decide separately. The mock follows whatever the app does.
 3. **Which product is the live example, and in which account?** Blocks Phase 1's done-state. Recommended: create a dedicated demo account, track the Lay's product there with its four shops, enable sharing, and set `SITE_DEMO_SHARE_SLUG` on Laravel Cloud. Alternative: accept shipping Phase 1 with the link hidden.
 
