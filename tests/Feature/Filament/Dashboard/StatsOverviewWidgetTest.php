@@ -65,7 +65,7 @@ test('Lifetime savings sums drop_abs in user\'s default currency', function (): 
 
     livewire(StatsOverviewWidget::class)
         ->assertSeeText('Lifetime savings')
-        ->assertSeeText('EUR 25.00');
+        ->assertSeeText('€25.00');
 });
 
 test('Lifetime savings shows per-currency breakdown', function (): void {
@@ -76,8 +76,8 @@ test('Lifetime savings shows per-currency breakdown', function (): void {
     $this->actingAs($me);
 
     livewire(StatsOverviewWidget::class)
-        ->assertSeeText('EUR 10.00')
-        ->assertSeeText('USD 30.00')
+        ->assertSeeText('€10.00')
+        ->assertSeeText('$30.00')
         ->assertSeeText('FX not converted in v1');
 });
 
@@ -86,7 +86,7 @@ test('Lifetime savings empty state when no drops yet', function (): void {
     $this->actingAs($me);
 
     livewire(StatsOverviewWidget::class)
-        ->assertSeeText('EUR 0.00')
+        ->assertSeeText('€0.00')
         ->assertSeeText('No drops fired yet. Keep tracking.');
 });
 
@@ -98,5 +98,5 @@ test('cross-user isolation: another user\'s drops do not leak into savings sum',
     $this->actingAs($me);
 
     livewire(StatsOverviewWidget::class)
-        ->assertSeeText('EUR 0.00');
+        ->assertSeeText('€0.00');
 });

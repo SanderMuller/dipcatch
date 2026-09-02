@@ -3,8 +3,10 @@
 namespace App\Filament\App\Widgets;
 
 use App\Models\PriceDropEvent;
+use App\Support\MoneyFormatter;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 
 class SavingsByMonthChartWidget extends ChartWidget
@@ -27,7 +29,7 @@ class SavingsByMonthChartWidget extends ChartWidget
     }
 
     /**
-     * @return array{datasets: list<array{label: string, data: list<float>}>, labels: list<string>}
+     * @return array{datasets: list<array{label: string, currency: string, data: list<float>}>, labels: list<string>}
      */
     protected function getData(): array
     {
@@ -35,7 +37,7 @@ class SavingsByMonthChartWidget extends ChartWidget
     }
 
     /**
-     * @return array{datasets: list<array{label: string, data: list<float>}>, labels: list<string>}
+     * @return array{datasets: list<array{label: string, currency: string, data: list<float>}>, labels: list<string>}
      */
     public function computeData(): array
     {
@@ -58,7 +60,8 @@ class SavingsByMonthChartWidget extends ChartWidget
                 $row[] = $monthly[$key] ?? 0.0;
             }
             $datasets[] = [
-                'label' => $currency,
+                'label' => MoneyFormatter::symbol($currency) . ' saved',
+                'currency' => strtoupper($currency),
                 'data' => $row,
             ];
         }
@@ -72,6 +75,38 @@ class SavingsByMonthChartWidget extends ChartWidget
     protected function getType(): string
     {
         return 'bar';
+    }
+
+    /**
+     * A PHP array cannot carry a JS function, so the tooltip callback ships as
+     * RawJs. It formats with the browser's own ICU, using the `currency` field
+     * every dataset carries — the same CLDR rules PHP intl applies server-side.
+     */
+    protected function getOptions(): RawJs
+    {
+        return RawJs::make(<<<'JS'
+            {
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const value = ctx.parsed.y;
+                                if (value === null || value === undefined) {
+                                    return ctx.dataset.label;
+                                }
+
+                                const money = new Intl.NumberFormat('en-US', {
+                                    style: 'currency',
+                                    currency: ctx.dataset.currency,
+                                }).format(value);
+
+                                return `${ctx.dataset.label}: ${money}`;
+                            },
+                        },
+                    },
+                },
+            }
+            JS);
     }
 
     /**

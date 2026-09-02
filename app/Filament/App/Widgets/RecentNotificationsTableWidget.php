@@ -5,6 +5,7 @@ namespace App\Filament\App\Widgets;
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
+use App\Support\MoneyFormatter;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
@@ -42,10 +43,7 @@ class RecentNotificationsTableWidget extends BaseWidget
                     ->state(fn (DatabaseNotification $n): string => self::formatPercent(self::field($n, 'drop_percent'))),
                 TextColumn::make('drop_absolute')
                     ->label('Drop (abs)')
-                    ->state(fn (DatabaseNotification $n): string => self::formatMoney(
-                        self::field($n, 'currency'),
-                        self::field($n, 'drop_absolute'),
-                    )),
+                    ->state(fn (DatabaseNotification $n): string => self::dropAmount($n)),
                 TextColumn::make('created_at')
                     ->label('Sent')
                     ->since(),
@@ -83,6 +81,23 @@ class RecentNotificationsTableWidget extends BaseWidget
         return is_scalar($value) ? (string) $value : null;
     }
 
+    /**
+     * The column shows the size of the drop, so the stored (negative) delta is
+     * rendered as its absolute value.
+     */
+    private static function dropAmount(DatabaseNotification $notification): string
+    {
+        $amount = self::field($notification, 'drop_absolute');
+        if ($amount === null || $amount === '' || ! is_numeric($amount)) {
+            return '—';
+        }
+
+        return MoneyFormatter::format(
+            (string) abs((float) $amount),
+            self::field($notification, 'currency') ?? '',
+        );
+    }
+
     private static function formatPercent(?string $raw): string
     {
         if ($raw === null || $raw === '') {
@@ -90,14 +105,5 @@ class RecentNotificationsTableWidget extends BaseWidget
         }
 
         return sprintf('-%0.1f%%', abs((float) $raw));
-    }
-
-    private static function formatMoney(?string $currency, ?string $amount): string
-    {
-        if ($amount === null || $amount === '') {
-            return '—';
-        }
-
-        return ($currency ?? '') . ' ' . number_format(abs((float) $amount), 2, '.', ',');
     }
 }

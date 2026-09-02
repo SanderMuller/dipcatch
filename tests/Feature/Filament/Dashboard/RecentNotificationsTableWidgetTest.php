@@ -86,3 +86,17 @@ test('renders the empty state when there are no alerts', function (): void {
     livewire(RecentNotificationsTableWidget::class)
         ->assertSeeText('No alerts yet');
 });
+
+test('renders the absolute drop symbol-first, as a positive amount', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create();
+
+    seedDropNotification($me, $product, ['currency' => 'EUR', 'drop_absolute' => '-15.00']);
+
+    $this->actingAs($me);
+
+    livewire(RecentNotificationsTableWidget::class)
+        ->assertSeeText('€15.00')
+        ->assertDontSeeText('EUR 15.00')
+        ->assertDontSeeText('-€15.00');
+});

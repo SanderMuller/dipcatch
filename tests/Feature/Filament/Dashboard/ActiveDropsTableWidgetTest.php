@@ -47,3 +47,21 @@ test('renders the empty state when nothing is below threshold', function (): voi
     livewire(ActiveDropsTableWidget::class)
         ->assertSeeText('No active drops right now');
 });
+
+test('renders prices symbol-first, and a bare em dash when there is no cheapest price', function (): void {
+    $me = User::factory()->create();
+    Product::factory()->for($me)->create([
+        'currency' => 'EUR',
+        'cheapest_price' => null,
+        'last_notified_price' => '49.00',
+        'last_notified_at' => now(),
+    ]);
+
+    $this->actingAs($me);
+
+    livewire(ActiveDropsTableWidget::class)
+        ->assertSeeText('€49.00')
+        ->assertDontSeeText('EUR 49.00')
+        ->assertDontSeeText('EUR —')
+        ->assertTableColumnFormattedStateSet('cheapest_price', '—', Product::query()->firstOrFail());
+});

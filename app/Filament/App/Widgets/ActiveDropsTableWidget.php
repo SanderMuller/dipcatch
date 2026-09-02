@@ -5,6 +5,7 @@ namespace App\Filament\App\Widgets;
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
 use App\Support\Favicon;
+use App\Support\MoneyFormatter;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -32,10 +33,10 @@ class ActiveDropsTableWidget extends BaseWidget
                 TextColumn::make('title')->limit(60)->wrap(),
                 TextColumn::make('cheapest_price')
                     ->label('Now')
-                    ->state(fn (Product $r): string => $r->currency . ' ' . ($r->cheapest_price ?? '—')),
+                    ->state(fn (Product $r): string => MoneyFormatter::format($r->cheapest_price === null ? null : (string) $r->cheapest_price, $r->currency)),
                 TextColumn::make('last_notified_price')
                     ->label('Notified at')
-                    ->state(fn (Product $r): string => $r->currency . ' ' . ($r->last_notified_price ?? '—')),
+                    ->state(fn (Product $r): string => MoneyFormatter::format($r->last_notified_price === null ? null : (string) $r->last_notified_price, $r->currency)),
                 TextColumn::make('cheapestShop.host')
                     ->label('Shop')
                     ->formatStateUsing(fn (string $state): HtmlString => new HtmlString(Favicon::html($state)))

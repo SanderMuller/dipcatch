@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Filament\Support\RawJs;
 
 use function Pest\Livewire\livewire;
 
@@ -59,10 +60,10 @@ test('aggregates per-currency drops into the correct month buckets', function ()
         $byCurrency[$set['label']] = $set['data'];
     }
 
-    expect($byCurrency)->toHaveKey('EUR')
-        ->and(array_sum($byCurrency['EUR']))->toBe(20.0)
-        ->and($byCurrency)->toHaveKey('USD')
-        ->and(array_sum($byCurrency['USD']))->toBe(7.5);
+    expect($byCurrency)->toHaveKey('€ saved')
+        ->and(array_sum($byCurrency['€ saved']))->toBe(20.0)
+        ->and($byCurrency)->toHaveKey('$ saved')
+        ->and(array_sum($byCurrency['$ saved']))->toBe(7.5);
 });
 
 test('respects user scoping — only the current user\'s drops are counted', function (): void {
@@ -81,8 +82,19 @@ test('respects user scoping — only the current user\'s drops are counted', fun
     $widget = livewire(SavingsByMonthChartWidget::class)->instance();
     $data = $widget->computeData();
 
-    $eurDataset = collect($data['datasets'])->firstWhere('label', 'EUR');
+    $eurDataset = collect($data['datasets'])->firstWhere('label', '€ saved');
     assert(is_array($eurDataset));
 
     expect(array_sum($eurDataset['data']))->toBe(10.0);
+});
+
+test('chart options carry the currency-aware tooltip formatter', function (): void {
+    $options = (new ReflectionMethod(SavingsByMonthChartWidget::class, 'getOptions'))->invoke(new SavingsByMonthChartWidget());
+
+    expect($options)->toBeInstanceOf(RawJs::class);
+    assert($options instanceof RawJs);
+
+    expect($options->toHtml())
+        ->toContain('Intl.NumberFormat')
+        ->toContain('ctx.dataset.currency');
 });

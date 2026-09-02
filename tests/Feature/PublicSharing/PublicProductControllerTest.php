@@ -38,7 +38,7 @@ test('happy path: valid slug renders product summary + shop list', function (): 
 
     $response->assertOk()
         ->assertSee('Acme Headphones', escape: false)
-        ->assertSee('EUR 85.00', escape: false)
+        ->assertSee('€85.00', escape: false)
         ->assertSee('bol.com', escape: false);
 });
 
@@ -193,7 +193,7 @@ test('emits OG + Twitter meta tags with safeImageUrl-guarded image', function ()
     $response = $this->get('/p/' . str_repeat('a', 32));
 
     $response->assertSee('<meta property="og:title" content="Acme Headphones">', escape: false)
-        ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at EUR 85.00">', escape: false)
+        ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at €85.00">', escape: false)
         ->assertSee('<meta property="og:image" content="https://example.com/img.png">', escape: false)
         ->assertSee('<meta name="twitter:card" content="summary_large_image">', escape: false)
         ->assertSee('<meta name="twitter:image" content="https://example.com/img.png">', escape: false);
@@ -295,7 +295,7 @@ test('stale cheapest_price is suppressed when no shop is currently eligible', fu
 
     $response->assertOk()
         ->assertSee('No live price available right now', escape: false)
-        ->assertDontSee('EUR 85.00', escape: false)
+        ->assertDontSee('€85.00', escape: false)
         ->assertDontSee('gone.test', escape: false);
 });
 
@@ -312,7 +312,7 @@ test('shop with a pack size renders its unit price under the price', function ()
     $response = $this->get('/p/' . str_repeat('a', 32));
 
     $response->assertOk()
-        ->assertSee('EUR 8.45 /kg', escape: false);
+        ->assertSee('€8.45 /kg', escape: false);
 });
 
 test('shop without a pack size shows no unit price', function (): void {

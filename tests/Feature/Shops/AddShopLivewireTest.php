@@ -45,7 +45,9 @@ test('probe success shows preview state with snapshot data', function (): void {
         ->call('probe')
         ->assertSet('state', 'preview')
         ->assertSet('snapshot.price', '50.00')
-        ->assertSet('host', 'shop.example.com');
+        ->assertSet('host', 'shop.example.com')
+        ->assertSee('€50.00')
+        ->assertDontSee('EUR 50.00');
 });
 
 test('confirm persists offer + initial price_check + recomputes cheapest', function (): void {

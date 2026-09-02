@@ -26,7 +26,7 @@
                         <div class="text-xs text-zinc-500 truncate">{{ $variant['key'] }}</div>
                     </div>
                     <div class="text-sm font-semibold whitespace-nowrap tabular-nums">
-                        {{ $variant['currency'] }} {{ $variant['price'] }}
+                        {{ \App\Support\MoneyFormatter::format($variant['price'], $variant['currency']) }}
                     </div>
                 </label>
             @endforeach

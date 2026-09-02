@@ -150,7 +150,7 @@ test('toWebPush returns a WebPushMessage with title, body, icon and click url', 
 
     $payload = $message->toArray();
     expect($payload['title'])->toBe('Price drop: Acme Headphones')
-        ->and($payload['body'])->toBe('Acme Headphones is now EUR 85.00 at bol.com')
+        ->and($payload['body'])->toBe('Acme Headphones is now €85.00 at bol.com')
         ->and($payload['icon'])->toBe('https://example.com/img.png')
         ->and($payload['data'])->toMatchArray(['url' => $payload['data']['url']]);
 

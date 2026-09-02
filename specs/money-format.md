@@ -109,11 +109,11 @@ Symbol-first amounts are narrower than `EUR 1.69`, so no layout risk; the implem
 
 ## Implementation
 
-- [ ] Rewrite `MoneyFormatter::format()` on `NumberFormatter` (en_US, CURRENCY, memoised) and add `symbol()` — Section 2.1.
-- [ ] Route the eleven bypass sites through the formatter — Section 2.2 table.
-- [ ] Chart tooltips/labels via `RawJs` + dataset-carried currency — Section 2.3; browser-verify EUR, JPY and the `Notified` marker tooltip.
-- [ ] Tests — Section 2.4, including the presentation-layer tripwire test; update every existing assertion on money strings and currency labels: grep `tests/` for every code in `Iso4217::CODES` followed by a space (`EUR `, `USD 30.00` at `StatsOverviewWidgetTest.php:80`, …) **and** for bare-code labels (`Cheapest (EUR)` in `PriceHistoryChartTest.php:47`, dataset label `EUR` in `SavingsByMonthChartWidgetTest.php:84`, `RecentNotificationsTableWidgetTest`).
-- [ ] Browser check at 390 px and 1280 px: shops table, products list, infolist, public share page, add-shop preview, dashboard widgets; light and dark.
+- [x] Rewrite `MoneyFormatter::format()` on `NumberFormatter` (en_US, CURRENCY, memoised) and add `symbol()` — Section 2.1.
+- [x] Route the eleven bypass sites through the formatter — Section 2.2 table.
+- [x] Chart tooltips/labels via `RawJs` + dataset-carried currency — Section 2.3; browser-verify EUR, JPY and the `Notified` marker tooltip.
+- [x] Tests — Section 2.4, including the presentation-layer tripwire test; update every existing assertion on money strings and currency labels: grep `tests/` for every code in `Iso4217::CODES` followed by a space (`EUR `, `USD 30.00` at `StatsOverviewWidgetTest.php:80`, …) **and** for bare-code labels (`Cheapest (EUR)` in `PriceHistoryChartTest.php:47`, dataset label `EUR` in `SavingsByMonthChartWidgetTest.php:84`, `RecentNotificationsTableWidgetTest`).
+- [x] Browser check at 390 px and 1280 px: shops table, products list, infolist, public share page, add-shop preview, dashboard widgets; light and dark.
 
 ---
 
@@ -142,3 +142,9 @@ None.
 ## Findings
 
 <!-- Notes added during implementation. Do not remove this section. -->
+
+- **Shipped 2026-09-02.** `ext-intl` added to `composer.json` `require` (Codex review) so a deploy without the extension fails at install, not at first render.
+- Tripwire allowlist ended smaller than sketched: `sprintf('-%0.1f%%')` matches neither prohibited pattern and `RecentNotificationsTableWidget::formatMoney()` was deleted, so only `CreateProductFromUrl.php` (`number_format($defaults[`) and the digest `drop_pct` cell remain.
+- Browser check (Brave, 1456 px): dashboard stats `€1.80`, savings chart legend `€ saved`, tooltip `€ saved: €1.80`; product infolist `€1.69` / `€2.70`; shops table `€1.69`, `€11.27 /kg`; price-history tooltips `Cheapest (€): €3.49` and `Notified: €1.69` (no `undefined` on the marker dataset). JPY/CHF tooltips not driven live (no such product); covered by the unit tests and the `Intl.NumberFormat` option assertions.
+- Found and fixed while implementing: `PriceDropDigestMail` used `Content(view:)` for an `<x-mail::message>` template, which throws `No hint path defined for [mail]` outside `Mail::fake()` — production digests would have failed. Now `Content(markdown:)` with an end-to-end render test.
+- The shop-suggestions panel (another branch) renders dataset prices as `€ 3.29` by its own code; not in this spec's eleven sites — follow-up to route it through `MoneyFormatter`.

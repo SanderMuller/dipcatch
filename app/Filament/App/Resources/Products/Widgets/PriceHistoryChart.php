@@ -5,8 +5,10 @@ namespace App\Filament\App\Resources\Products\Widgets;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
+use App\Support\MoneyFormatter;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -79,7 +81,8 @@ class PriceHistoryChart extends ChartWidget
 
         $datasets = [
             [
-                'label' => 'Cheapest (' . $product->currency . ')',
+                'label' => 'Cheapest (' . MoneyFormatter::symbol($product->currency) . ')',
+                'currency' => strtoupper($product->currency),
                 'data' => $points,
                 'borderColor' => '#6366f1',
                 'stepped' => true,
@@ -90,6 +93,7 @@ class PriceHistoryChart extends ChartWidget
         if ($markers !== []) {
             $datasets[] = [
                 'label' => 'Notified',
+                'currency' => strtoupper($product->currency),
                 'data' => $markers,
                 'borderColor' => '#dc2626',
                 'backgroundColor' => '#dc2626',
@@ -107,6 +111,38 @@ class PriceHistoryChart extends ChartWidget
     protected function getType(): string
     {
         return 'line';
+    }
+
+    /**
+     * A PHP array cannot carry a JS function, so the tooltip callback ships as
+     * RawJs. It formats with the browser's own ICU, using the `currency` field
+     * every dataset carries — the same CLDR rules PHP intl applies server-side.
+     */
+    protected function getOptions(): RawJs
+    {
+        return RawJs::make(<<<'JS'
+            {
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const value = ctx.parsed.y;
+                                if (value === null || value === undefined) {
+                                    return ctx.dataset.label;
+                                }
+
+                                const money = new Intl.NumberFormat('en-US', {
+                                    style: 'currency',
+                                    currency: ctx.dataset.currency,
+                                }).format(value);
+
+                                return `${ctx.dataset.label}: ${money}`;
+                            },
+                        },
+                    },
+                },
+            }
+            JS);
     }
 
     /**

@@ -77,7 +77,7 @@
                         {{ $host }}
                     </div>
                     <div class="text-lg font-semibold mt-1 tabular-nums">
-                        {{ $snapshot['currency'] }} {{ $snapshot['price'] }}
+                        {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
                         @if (! $snapshot['in_stock'])
                             <span class="ml-2 inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Out of stock</span>
                         @endif

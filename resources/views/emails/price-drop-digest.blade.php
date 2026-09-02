@@ -22,7 +22,7 @@ Here's what changed since your last digest:
 | When | Shop | New price | Drop |
 |------|------|-----------|------|
 @foreach ($events as $event)
-| {{ $event->fired_at->setTimezone($user->timezone)->format('H:i') }} | {{ $event->triggeredByShop?->host ?? '—' }} | {{ $event->currency }} {{ number_format((float) $event->new_price, 2, '.', '') }} | {{ number_format((float) $event->drop_pct, 1, '.', '') }}% / {{ $event->currency }} {{ number_format((float) $event->drop_abs, 2, '.', '') }} |
+| {{ $event->fired_at->setTimezone($user->timezone)->format('H:i') }} | {{ $event->triggeredByShop?->host ?? '—' }} | {{ \App\Support\MoneyFormatter::format($event->new_price, $event->currency) }} | {{ number_format((float) $event->drop_pct, 1, '.', '') }}% / {{ \App\Support\MoneyFormatter::format($event->drop_abs, $event->currency) }} |
 @endforeach
 
 <x-mail::button :url="\App\Filament\App\Resources\Products\ProductResource::getUrl('view', ['record' => $product])">

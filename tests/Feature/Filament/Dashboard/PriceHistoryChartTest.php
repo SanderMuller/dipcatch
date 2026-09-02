@@ -5,6 +5,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
+use Filament\Support\RawJs;
 
 function makeChartFor(Product $product, string $range = '90'): PriceHistoryChart
 {
@@ -44,7 +45,7 @@ test('renders cheapest segments as a stepped line', function (): void {
 
     /** @var list<array<string, mixed>> $datasets */
     $datasets = $data['datasets'];
-    $cheapest = collect($datasets)->firstWhere('label', 'Cheapest (EUR)');
+    $cheapest = collect($datasets)->firstWhere('label', 'Cheapest (€)');
     assert(is_array($cheapest));
 
     expect($cheapest['data'])->toContain(100.0)
@@ -136,4 +137,15 @@ test('notification markers are scoped to the active range filter', function (): 
     assert(is_array($notifiedAll));
     expect($notifiedAll['data'])->toContain(50.0)
         ->and($notifiedAll['data'])->toContain(60.0);
+});
+
+test('chart options carry the currency-aware tooltip formatter', function (): void {
+    $options = (new ReflectionMethod(PriceHistoryChart::class, 'getOptions'))->invoke(new PriceHistoryChart());
+
+    expect($options)->toBeInstanceOf(RawJs::class);
+    assert($options instanceof RawJs);
+
+    expect($options->toHtml())
+        ->toContain('Intl.NumberFormat')
+        ->toContain('ctx.dataset.currency');
 });

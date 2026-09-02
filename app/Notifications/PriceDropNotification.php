@@ -6,6 +6,7 @@ use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Drops\DropOutcome;
+use App\Support\MoneyFormatter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -69,7 +70,7 @@ final class PriceDropNotification extends Notification implements ShouldQueue
 
     public function toWebPush(User $notifiable): WebPushMessage
     {
-        $priceLine = $this->product->currency . ' ' . $this->snapshotPrice;
+        $priceLine = MoneyFormatter::format($this->snapshotPrice, $this->product->currency);
         $body = $this->product->title . ' is now ' . $priceLine
             . ($this->snapshotHost !== null ? ' at ' . $this->snapshotHost : '');
 

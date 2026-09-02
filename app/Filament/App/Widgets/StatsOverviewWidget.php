@@ -5,6 +5,7 @@ namespace App\Filament\App\Widgets;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\MoneyFormatter;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -62,7 +63,7 @@ class StatsOverviewWidget extends BaseWidget
         $defaultCurrency = $this->userDefaultCurrency();
 
         if ($totals === []) {
-            return Stat::make('Lifetime savings', $defaultCurrency . ' 0.00')
+            return Stat::make('Lifetime savings', MoneyFormatter::format('0', $defaultCurrency))
                 ->description('No drops fired yet. Keep tracking.')
                 ->icon('heroicon-o-banknotes')
                 ->color('gray');
@@ -75,7 +76,7 @@ class StatsOverviewWidget extends BaseWidget
             $primary = $totals[$defaultCurrency];
         }
 
-        $primaryFormatted = $defaultCurrency . ' ' . number_format($primary, 2, '.', ',');
+        $primaryFormatted = MoneyFormatter::format((string) $primary, $defaultCurrency);
 
         $others = $totals;
         unset($others[$defaultCurrency]);
@@ -83,7 +84,7 @@ class StatsOverviewWidget extends BaseWidget
         $description = $others === []
             ? 'Total saved across all fired drops.'
             : 'Also: ' . collect($others)
-                ->map(fn (float $amount, string $code): string => $code . ' ' . number_format($amount, 2, '.', ','))
+                ->map(fn (float $amount, string $code): string => MoneyFormatter::format((string) $amount, $code))
                 ->values()
                 ->implode(' · ') . '  (FX not converted in v1)';
 
