@@ -3,6 +3,7 @@
 namespace App\Services\ShopFetcher;
 
 use App\Services\ShopFetcher\Exceptions\Blocked;
+use App\Services\ShopFetcher\Exceptions\FetchException;
 use App\Services\ShopFetcher\Exceptions\HttpError;
 use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
@@ -180,17 +181,46 @@ final readonly class ShopFetcher
                         'max' => 5,
                         'strict' => true,
                         // Validate redirect targets against the SSRF guard so a
-                        // public URL can't bounce us to 127.0.0.1 or AWS metadata.
-                        'on_redirect' => static function (RequestInterface $request, ResponseInterface $response, UriInterface $uri) use ($safety): void {
+                        // public URL can't bounce us to 127.0.0.1 or AWS metadata,
+                        // and against the target's own robots.txt — the rules
+                        // checked before the request belong to the host that was
+                        // asked, not to the host the redirect points at.
+                        'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $uri) use ($safety): void {
                             $safety->assertSafe((string) $uri);
+                            $this->assertRobotsAllows((string) $uri);
                         },
                     ],
                 ])
                 ->get($url);
         } catch (ConnectionException) {
             throw new TemporaryFailure(599);
+        } catch (FetchException $e) {
+            // A redirect the callbacks refused: keep the reason, which the
+            // caller turns into its own outcome.
+            throw $e;
         } catch (Throwable) {
             throw new HttpError(0);
+        }
+    }
+
+    /**
+     * Guard one redirect hop against the target host's robots.txt, before
+     * that request goes out.
+     */
+    private function assertRobotsAllows(string $url): void
+    {
+        $parsed = parse_url($url);
+
+        if ($parsed === false || ! isset($parsed['host'])) {
+            return;
+        }
+
+        $host = UrlNormalizer::normalizeHost($parsed['host']);
+        $path = $parsed['path'] ?? '/';
+        $scheme = strtolower($parsed['scheme'] ?? 'https');
+
+        if (! $this->robots->isAllowed($host, $path, $scheme)) {
+            throw new RobotsDisallowed("robots.txt disallows {$host}{$path}");
         }
     }
 

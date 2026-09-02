@@ -193,3 +193,36 @@ test('a redirect onto a host that never serves its prices is refused', function 
     expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://www.coop.nl/product/wp01234/melk'))
         ->toThrow(NotServable::class);
 });
+
+test('a redirect target is checked against its own robots.txt', function (): void {
+    RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('', 301, ['Location' => 'https://other.test/p/1']),
+        'https://other.test/robots.txt' => Http::response("User-agent: *\nDisallow: /p/", 200),
+        'https://other.test/p/1' => Http::response('<html>should never be read</html>', 200),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://shop.test/p/1'))
+        ->toThrow(RobotsDisallowed::class);
+
+    // The refusal happens before the disallowed page is requested.
+    Http::assertNotSent(static fn ($request): bool => $request->url() === 'https://other.test/p/1');
+});
+
+test('a redirect target its own robots.txt allows is followed', function (): void {
+    RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('', 301, ['Location' => 'https://other.test/p/1']),
+        'https://other.test/robots.txt' => Http::response("User-agent: *\nDisallow: /admin/", 200),
+        'https://other.test/p/1' => Http::response('<html>ok</html>', 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $result = app(ShopFetcher::class)->fetch('https://shop.test/p/1');
+
+    expect($result->host)->toBe('other.test')
+        ->and($result->html)->toContain('ok');
+});
