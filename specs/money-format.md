@@ -4,12 +4,12 @@
 
 ## Overview
 
-Every price in DipCatch renders as `EUR 1.69` today — the ISO code, a space, a dot decimal. Dutch users read supermarket prices as `€1,69`; non-Dutch beta testers read `€1.69`. The interview settled on **currency symbol + dot decimal** (`€1.69`, `$1.69`, `£1.69`) applied everywhere: Filament tables and infolists, unit prices, probe previews, the public share page, emails and the digest, push notifications, chart labels, and the homepage mock. One formatter owns the rule; the five places that concatenate the code by hand are routed through it.
+Every price in DipCatch renders as `EUR 1.69` today — the ISO code, a space, a dot decimal. Dutch users read supermarket prices as `€1,69`; non-Dutch beta testers read `€1.69`. The interview settled on **currency symbol + dot decimal** (`€1.69`, `$1.69`, `£1.69`) applied everywhere: Filament tables and infolists, unit prices, probe previews, the public share page, emails and the digest, push notifications, chart labels, and the homepage mock. One formatter owns the rule; the seven places that concatenate the code by hand are routed through it.
 
 ## Assumptions
 
 - **Symbols come from PHP `intl`** (`NumberFormatter` with the `en_US` locale in `CURRENCY` style, then the currency code passed per call) — installed in this project (`php -m` lists `intl`). A currency intl has no symbol for renders as its code plus a space (`CHF 1.69`), which is intl's own fallback, so unknown codes never break.
-- **Dot decimal, comma thousands, always two decimals**: `€1,234.56`. This is the `en_US` pattern; no locale switch per user, because the user's `default_currency` is a currency, not a locale, and the app UI is English.
+- **Dot decimal, comma thousands, intl's minor units per currency** (two for EUR/USD/GBP, zero for JPY): `€1,234.56`, `¥200`. This is the `en_US` pattern; no locale switch per user, because the user's `default_currency` is a currency, not a locale, and the app UI is English.
 - **No space between symbol and amount** (`€1.69`, not `€ 1.69`) — the `en_US` intl pattern; matches the user's chosen option label.
 - **Unit-price labels keep their form**: `€8.45 /kg`, `€0.42 /stuk` — the formatter renders the amount, `Shop::unitPriceLabel()` supplies the suffix, unchanged.
 - **Null stays `—`** (`MoneyFormatter::format(null, …)` today) and nothing else changes for missing prices.
@@ -44,7 +44,7 @@ final class MoneyFormatter
 
 - `format()` uses a per-request-memoised `NumberFormatter('en_US', NumberFormatter::CURRENCY)` and `formatCurrency((float) $amount, strtoupper($currency))`. intl yields `€1.69`, `$1.69`, `£1.69`, `CHF 1.69`, `¥2` (JPY has zero decimals — intl handles minor units; the spec accepts intl's per-currency decimals rather than forcing two).
 - Non-numeric `$amount` (defensive; callers pass DB decimals) renders `—`, same as null.
-- `symbol()` derives from the same formatter (`getSymbol(NumberFormatter::CURRENCY_SYMBOL)` after `setTextAttribute(CURRENCY_CODE, …)`), used by the chart labels.
+- `symbol()` derives from the same formatter (`getSymbol(NumberFormatter::CURRENCY_SYMBOL)` after `setTextAttribute(CURRENCY_CODE, …)`), used by the chart labels. Verified locally: `EUR → €`, `CHF → CHF`; `formatCurrency()` sets its own code per call, so a preceding `symbol()` call cannot leak into `format()`.
 - Under Octane the memoised formatter is a plain static; `NumberFormatter` is stateless between calls except the currency code, which `formatCurrency()` sets per call, so sharing is safe.
 
 ### 2.2 Route every site through it
@@ -61,7 +61,7 @@ final class MoneyFormatter
 
 ### 2.3 Chart tooltips
 
-Filament chart widgets pass Chart.js options as an array; tooltips are client-side. Each chart widget sets `options.plugins.tooltip.callbacks.label` to a small JS snippet that prefixes the dataset's symbol — the symbol travels in the dataset (`'symbol' => MoneyFormatter::symbol(...)`) so the JS never needs a currency table. Implementer verifies in the browser that a hovered point reads `€1.69`.
+Tooltips are client-side. A PHP array cannot carry a JS function, so each chart widget returns its options as `Filament\Support\RawJs::make(<<<'JS' … JS)` (the `getOptions(): array | RawJs | null` signature in `vendor/filament/widgets/src/ChartWidget.php:103` allows it) with `plugins.tooltip.callbacks.label` prefixing the dataset's symbol — the symbol travels in the dataset (`'symbol' => MoneyFormatter::symbol(...)`) so the JS never needs a currency table. Any existing array options move into the same `RawJs` block. Implementer verifies in the browser that a hovered point reads `€1.69`.
 
 ### 2.4 Tests
 
@@ -89,7 +89,7 @@ Symbol-first amounts are narrower than `EUR 1.69`, so no layout risk; the implem
 - [ ] Rewrite `MoneyFormatter::format()` on `NumberFormatter` (en_US, CURRENCY, memoised) and add `symbol()` — Section 2.1.
 - [ ] Route the seven bypass sites through the formatter — Section 2.2 table.
 - [ ] Chart tooltips/labels via dataset-carried symbol — Section 2.3; browser-verify a tooltip on the price-history chart and the savings chart.
-- [ ] Tests — Section 2.4, including the repo-wide anti-bypass test.
+- [ ] Tests — Section 2.4, including the repo-wide anti-bypass test; update every existing assertion that expects `EUR 1.69`-style strings (grep `EUR ` in `tests/`).
 - [ ] Browser check at 390 px and 1280 px: shops table, products list, infolist, public share page, add-shop preview, dashboard widgets; light and dark.
 
 ---
@@ -99,7 +99,7 @@ Symbol-first amounts are narrower than `EUR 1.69`, so no layout risk; the implem
 Stop and report — do not improvise — if any of these proves false during implementation:
 
 1. **PHP `intl` is available in production (Laravel Cloud) as it is locally** — the whole design rests on `NumberFormatter`; without it, fall back to a hand-written symbol map and report.
-2. **Filament chart widgets accept a JS tooltip callback via `getOptions()` in this Filament version** — if options are JSON-only (no functions), tooltips keep the default and only labels change; report the gap.
+2. **`RawJs` options render on both chart widgets without breaking their existing behaviour** (verified possible in the installed Filament: `getOptions(): array | RawJs | null`) — if a widget's current options cannot be expressed in the `RawJs` block, tooltips keep the default and only labels change; report the gap.
 
 ---
 
