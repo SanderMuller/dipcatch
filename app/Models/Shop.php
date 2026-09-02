@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\PriceAdapters\ConditionalOffer;
+use App\PriceAdapters\PromotionWindow;
 use App\Support\Favicon;
 use App\Support\ImageUrl;
 use App\Support\PackSize;
@@ -26,6 +27,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $conditional_label
  * @property CarbonInterface|null $conditional_starts_at
  * @property CarbonInterface|null $conditional_ends_at
+ * @property CarbonInterface|null $promotion_starts_at
+ * @property CarbonInterface|null $promotion_ends_at
+ * @property string|null $promotion_label
  */
 class Shop extends Model
 {
@@ -46,6 +50,8 @@ class Shop extends Model
             'conditional_price' => 'decimal:2',
             'conditional_starts_at' => 'datetime',
             'conditional_ends_at' => 'datetime',
+            'promotion_starts_at' => 'datetime',
+            'promotion_ends_at' => 'datetime',
             'initial_checked_at' => 'datetime',
             'last_checked_at' => 'datetime',
             'last_success_at' => 'datetime',
@@ -161,6 +167,26 @@ class Shop extends Model
         );
 
         return $offer->isLive() ? $offer : null;
+    }
+
+    /**
+     * How long the shop says this price runs. Unlike a conditional offer,
+     * an expired window is still returned: that a promotion has ended is
+     * exactly what makes the price on screen worth doubting.
+     */
+    public function promotionWindow(): ?PromotionWindow
+    {
+        $endsAt = $this->promotion_ends_at;
+
+        if ($endsAt === null) {
+            return null;
+        }
+
+        return PromotionWindow::make(
+            endsAt: $endsAt->toImmutable(),
+            startsAt: $this->promotion_starts_at?->toImmutable(),
+            label: $this->promotion_label,
+        );
     }
 
     public function faviconUrl(): string

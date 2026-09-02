@@ -8,9 +8,11 @@ use App\Jobs\CheckShopPrice;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Support\DutchDate;
 use App\Support\Favicon;
 use App\Support\MoneyFormatter;
 use App\Support\UrlNormalizer;
+use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -100,7 +102,7 @@ class ShopsRelationManager extends RelationManager
                     ->label('Price')
                     ->visibleFrom('md')
                     ->state(fn (Shop $record): string => self::priceState($record))
-                    ->description(fn (Shop $record): ?string => self::conditionalOfferState($record))
+                    ->description(fn (Shop $record): ?string => self::annotations($record))
                     ->sortable(),
 
                 TextColumn::make('unit_price')
@@ -333,10 +335,52 @@ class ShopsRelationManager extends RelationManager
     {
         $lines = array_filter([
             $record->unitPrice() === null ? null : self::unitPriceState($record),
+            self::annotations($record),
+        ]);
+
+        return $lines === [] ? null : implode(' · ', $lines);
+    }
+
+    /** Everything the price needs said about it, in one line. */
+    private static function annotations(Shop $record): ?string
+    {
+        $lines = array_filter([
+            self::promotionWindowState($record),
             self::conditionalOfferState($record),
         ]);
 
         return $lines === [] ? null : implode(' · ', $lines);
+    }
+
+    /**
+     * How long this price runs. Dates are rendered in the shop's own
+     * timezone: a window ending on the 6th is stored as 21:59:59 UTC, and
+     * formatting that instant as UTC would print the 6th correctly but a
+     * window *starting* the 8th is stored at 22:00 on the 7th — printed
+     * without converting, that reads "from 7 Sep".
+     */
+    private static function promotionWindowState(Shop $record): ?string
+    {
+        $window = $record->promotionWindow();
+
+        if ($window === null) {
+            return null;
+        }
+
+        $label = $window->label ?? 'Bonus';
+
+        if ($window->hasNotStarted()) {
+            return $label . ' from ' . self::shortDate($window->startsAt);
+        }
+
+        return $window->hasEnded()
+            ? $label . ' ended ' . self::shortDate($window->endsAt)
+            : $label . ' until ' . self::shortDate($window->endsAt);
+    }
+
+    private static function shortDate(?CarbonImmutable $moment): string
+    {
+        return $moment === null ? '' : $moment->setTimezone(DutchDate::ZONE)->format('j M');
     }
 
     private static function unitPriceState(Shop $record): string

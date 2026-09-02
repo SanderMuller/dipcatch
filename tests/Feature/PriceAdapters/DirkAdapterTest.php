@@ -36,3 +36,32 @@ test('fails with a dirk-specific reason when the page has no JSON-LD', function 
 
     expect($result->isSuccess())->toBeFalse();
 });
+
+test('reads the offer period behind the price', function (): void {
+    $result = new DirkAdapter()->extract('https://www.dirk.nl/boodschappen/x/x/x/115212', dirkPage());
+
+    expect($result->snapshot?->promotionWindow?->startsAt?->toDateString())->toBe('2026-08-26')
+        ->and($result->snapshot?->promotionWindow?->endsAt?->toDateString())->toBe('2026-09-08')
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});
+
+test('a price record for another offer does not lend its period to this price', function (): void {
+    // The payload prices 2.49 while the page sells at 1.69.
+    $html = dirkPage(price: '1.69', offerPrice: '2.49');
+
+    $result = new DirkAdapter()->extract('https://www.dirk.nl/boodschappen/x/x/x/115212', $html);
+
+    expect($result->snapshot?->price)->toBe('1.69')
+        ->and($result->snapshot?->promotionWindow)->toBeNull();
+});
+
+test('a page with no offer record reports no period', function (): void {
+    $result = new DirkAdapter()->extract(
+        'https://www.dirk.nl/boodschappen/x/x/x/115212',
+        dirkPage(offerPrice: null),
+    );
+
+    expect($result->snapshot?->price)->toBe('1.69')
+        ->and($result->snapshot?->promotionWindow)->toBeNull()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});

@@ -9,6 +9,7 @@ use App\Models\Shop;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ConditionalOffer;
+use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
@@ -139,6 +140,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   pack_size_authoritative: bool,
      *   conditional_offer: ?ConditionalOffer,
      *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }
      */
     private function checkjebonOutcome(Shop $shop, CheckjebonSource $checkjebon): array
@@ -163,6 +166,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'pack_size_authoritative' => false,
                 'conditional_offer' => null,
                 'conditional_offer_authoritative' => false,
+                'promotion_window' => null,
+                'promotion_window_authoritative' => false,
             ];
         }
 
@@ -186,6 +191,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   pack_size_authoritative: bool,
      *   conditional_offer: ?ConditionalOffer,
      *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }
      */
     private function sourceOutcome(ShopSnapshot $snapshot, string $adapterKey): array
@@ -205,6 +212,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'pack_size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title),
             'conditional_offer' => $snapshot->conditionalOffer,
             'conditional_offer_authoritative' => $snapshot->conditionalOfferAuthoritative,
+            'promotion_window' => $snapshot->promotionWindow,
+            'promotion_window_authoritative' => $snapshot->promotionWindowAuthoritative,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
         ];
     }
@@ -229,6 +238,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   pack_size_authoritative: bool,
      *   conditional_offer: ?ConditionalOffer,
      *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }
      */
     private function fetchAndExtract(Shop $shop, ShopFetcher $fetcher, AdapterResolver $resolver): array
@@ -282,6 +293,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'pack_size_authoritative' => false,
                 'conditional_offer' => null,
                 'conditional_offer_authoritative' => false,
+                'promotion_window' => null,
+                'promotion_window_authoritative' => false,
             ];
         }
 
@@ -305,6 +318,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'pack_size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title),
             'conditional_offer' => $snapshot->conditionalOffer,
             'conditional_offer_authoritative' => $snapshot->conditionalOfferAuthoritative,
+            'promotion_window' => $snapshot->promotionWindow,
+            'promotion_window_authoritative' => $snapshot->promotionWindowAuthoritative,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
         ];
     }
@@ -326,6 +341,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   pack_size_authoritative: bool,
      *   conditional_offer: ?ConditionalOffer,
      *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }
      */
     private function failureOutcome(FetchException $e): array
@@ -352,6 +369,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'pack_size_authoritative' => false,
             'conditional_offer' => null,
             'conditional_offer_authoritative' => false,
+            'promotion_window' => null,
+            'promotion_window_authoritative' => false,
         ];
     }
 
@@ -372,6 +391,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   pack_size_authoritative: bool,
      *   conditional_offer: ?ConditionalOffer,
      *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }
      */
     private function genericFailure(string $message): array
@@ -392,6 +413,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'pack_size_authoritative' => false,
             'conditional_offer' => null,
             'conditional_offer_authoritative' => false,
+            'promotion_window' => null,
+            'promotion_window_authoritative' => false,
         ];
     }
 
@@ -415,6 +438,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   pack_size_authoritative: bool,
      *   conditional_offer: ?ConditionalOffer,
      *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }  $outcome
      */
     private function persist(Shop $shop, array $outcome): void
@@ -491,12 +516,25 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 // offers and finds none clears the stored one, so a campaign
                 // that ended stops being shown. A source with no such concept
                 // leaves it alone.
+                // Same clearing rule again: a source that reads promotion
+                // fields and finds none ends the promotion on screen.
+                $window = $outcome['promotion_window'];
+                if ($window !== null || $outcome['promotion_window_authoritative']) {
+                    // Stored in UTC, the app's timezone. Eloquent writes a
+                    // date by formatting it, which prints the wall clock of
+                    // whatever zone it carries — an Amsterdam 23:59:59 would
+                    // land in the column as 23:59:59 UTC, two hours late.
+                    $updates['promotion_starts_at'] = $window?->startsAt?->utc();
+                    $updates['promotion_ends_at'] = $window?->endsAt->utc();
+                    $updates['promotion_label'] = $window?->label;
+                }
+
                 $offer = $outcome['conditional_offer'];
                 if ($offer !== null || $outcome['conditional_offer_authoritative']) {
                     $updates['conditional_price'] = $offer?->price;
                     $updates['conditional_label'] = $offer?->label;
-                    $updates['conditional_starts_at'] = $offer?->startsAt;
-                    $updates['conditional_ends_at'] = $offer?->endsAt;
+                    $updates['conditional_starts_at'] = $offer?->startsAt?->utc();
+                    $updates['conditional_ends_at'] = $offer?->endsAt?->utc();
                 }
             } else {
                 $updates['last_error'] = $outcome['error'];

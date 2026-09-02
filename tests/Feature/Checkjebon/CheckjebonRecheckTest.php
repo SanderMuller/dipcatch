@@ -216,3 +216,37 @@ test('a dataset recheck stores the dataset size', function (): void {
     expect((string) $shop->pack_quantity)->toBe('750.00')
         ->and($shop->pack_unit)->toBe('ml');
 });
+
+test('an AH bonus stores the period it runs for', function (): void {
+    Http::fake(ahApiProductFakes());
+
+    $result = app(AhApiSource::class)->resolve('https://ah.nl/producten/product/wi526381/lay-s-naturel');
+    $window = $result->snapshot?->promotionWindow;
+
+    expect($result->snapshot?->price)->toBe('1.69')
+        ->and($window?->label)->toBe('VOOR 1.69')
+        ->and($window?->startsAt?->toDateString())->toBe('2026-08-31')
+        ->and($window?->endsAt?->toDateString())->toBe('2026-09-06')
+        // The end is the Amsterdam close of that day, not midnight UTC.
+        ->and($window?->endsAt?->setTimezone('Europe/Amsterdam')->format('H:i:s'))->toBe('23:59:59');
+});
+
+test('a product with no bonus clears a stored period', function (): void {
+    // The live API omits the date keys entirely on a non-bonus product, so
+    // authority has to come from `isBonus` being present at all.
+    Http::fake(ahApiProductFakes(currentPrice: '3.49', isBonus: false));
+
+    $result = app(AhApiSource::class)->resolve('https://ah.nl/producten/product/wi409179/beemster');
+
+    expect($result->snapshot?->promotionWindow)->toBeNull()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});
+
+test('a bonus without dates yields no period rather than a guessed one', function (): void {
+    Http::fake(ahApiProductFakes(bonusStart: null, bonusEnd: null));
+
+    $result = app(AhApiSource::class)->resolve('https://ah.nl/producten/product/wi526381/lay-s-naturel');
+
+    expect($result->snapshot?->price)->toBe('1.69')
+        ->and($result->snapshot?->promotionWindow)->toBeNull();
+});

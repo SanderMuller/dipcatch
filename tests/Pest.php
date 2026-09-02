@@ -178,7 +178,7 @@ function ahApiDownFakes(): array
  *
  * @return array<string, PromiseInterface>
  */
-function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBonus = '2.19', bool $isBonus = true, string $title = "Lay's Naturel", ?string $salesUnitSize = '200 g'): array
+function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBonus = '2.19', bool $isBonus = true, string $title = "Lay's Naturel", ?string $salesUnitSize = '200 g', ?string $bonusStart = '2026-08-31', ?string $bonusEnd = '2026-09-06', ?string $bonusMechanism = 'VOOR 1.69'): array
 {
     $card = [
         'webshopId' => 526381,
@@ -194,6 +194,16 @@ function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBon
     // case the authority flag must treat as non-authoritative.
     if ($salesUnitSize !== null) {
         $card['salesUnitSize'] = $salesUnitSize;
+    }
+
+    // A product with no bonus omits the period keys, exactly as the live
+    // API does — the case where a finished bonus has to clear.
+    if ($isBonus) {
+        foreach (['bonusStartDate' => $bonusStart, 'bonusEndDate' => $bonusEnd, 'bonusMechanism' => $bonusMechanism] as $key => $value) {
+            if ($value !== null) {
+                $card[$key] = $value;
+            }
+        }
     }
 
     return [
@@ -213,8 +223,14 @@ function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBon
  * `Price` key plus the Nuxt `__NUXT_DATA__` flat-array payload carrying
  * `packaging` (observed 2026-09-01).
  */
-function dirkPage(string $price = '1.69', string $packaging = '150 g', string $productId = '115212'): string
-{
+function dirkPage(
+    string $price = '1.69',
+    string $packaging = '150 g',
+    string $productId = '115212',
+    ?string $offerPrice = '1.69',
+    string $offerStart = '2026-08-26',
+    string $offerEnd = '2026-09-08',
+): string {
     $jsonLd = json_encode([
         '@context' => 'http://schema.org/',
         '@type' => 'Product',
@@ -223,12 +239,21 @@ function dirkPage(string $price = '1.69', string $packaging = '150 g', string $p
     ], JSON_THROW_ON_ERROR);
 
     // Flat devalue array: index 0 = root dict, values are indices.
-    $payload = json_encode([
+    $records = [
         ['productId' => 1, 'headerText' => 2, 'packaging' => 3],
         $productId,
         'Beemster Kaas extra belegen 48+ plakken',
         $packaging,
-    ], JSON_THROW_ON_ERROR);
+    ];
+
+    if ($offerPrice !== null) {
+        $records[] = ['productId' => 1, 'offerPrice' => 5, 'startDate' => 6, 'endDate' => 7];
+        $records[] = (float) $offerPrice;
+        $records[] = $offerStart;
+        $records[] = $offerEnd;
+    }
+
+    $payload = json_encode($records, JSON_THROW_ON_ERROR);
 
     return '<html><head><script type="application/ld+json">' . $jsonLd . '</script></head>'
         . '<body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';
@@ -385,6 +410,7 @@ function dekaMarktPage(
     ?string $offerStart = '-1 day',
     ?string $offerEnd = '+6 days',
     ?string $conflictingPrice = null,
+    ?string $secondWindowEnd = null,
 ): string {
     $records = [
         ['productId' => 1, 'headerText' => 2, 'packaging' => 3, 'images' => 4],
@@ -412,6 +438,23 @@ function dekaMarktPage(
         // A second price record for the same article, stating another price.
         $records[] = ['productId' => 1, 'normalPrice' => count($records) + 1];
         $records[] = (float) $conflictingPrice;
+    }
+
+    if ($secondWindowEnd !== null) {
+        // A second record pricing the same as the first, but stating a
+        // different offer period — the case with no basis to pick one.
+        $base = count($records);
+        $records[] = [
+            'productId' => 1,
+            'normalPrice' => $base + 1,
+            'offerPrice' => $base + 2,
+            'startDate' => $base + 3,
+            'endDate' => $base + 4,
+        ];
+        $records[] = (float) $normalPrice;
+        $records[] = $offerPrice === null ? null : (float) $offerPrice;
+        $records[] = $offerStart === null ? null : now()->modify($offerStart)->toIso8601String();
+        $records[] = now()->modify($secondWindowEnd)->toIso8601String();
     }
 
     $payload = json_encode($records, JSON_THROW_ON_ERROR);

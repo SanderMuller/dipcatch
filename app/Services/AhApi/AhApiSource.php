@@ -3,8 +3,10 @@
 namespace App\Services\AhApi;
 
 use App\PriceAdapters\PriceNormalizer;
+use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\Checkjebon\CheckjebonResult;
+use App\Support\DutchDate;
 use App\Support\UrlNormalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
@@ -164,6 +166,33 @@ final readonly class AhApiSource
             ],
             packSize: $salesUnitSize,
             packSizeAuthoritative: $hasSalesUnitSize,
+            promotionWindow: self::promotionWindow($card),
+            // Authority keys on `isBonus`, never on the date fields: a
+            // product with no bonus answers `isBonus: false` and omits the
+            // dates, and that is exactly when a finished bonus must clear.
+            promotionWindowAuthoritative: array_key_exists('isBonus', $card),
+        );
+    }
+
+    /**
+     * The bonus period, read only when the card says a bonus is running.
+     * `bonusMechanism` is Albert Heijn's own wording for the offer
+     * ("VOOR 1.69") and travels as the window's label.
+     *
+     * @param  array<mixed>  $card
+     */
+    private static function promotionWindow(array $card): ?PromotionWindow
+    {
+        if (data_get($card, 'isBonus') !== true) {
+            return null;
+        }
+
+        $mechanism = data_get($card, 'bonusMechanism');
+
+        return PromotionWindow::make(
+            endsAt: DutchDate::endOfDay(data_get($card, 'bonusEndDate')),
+            startsAt: DutchDate::startOfDay(data_get($card, 'bonusStartDate')),
+            label: is_string($mechanism) ? $mechanism : null,
         );
     }
 

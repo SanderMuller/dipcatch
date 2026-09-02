@@ -139,6 +139,10 @@ final readonly class JsonLdAdapter implements ShopAdapter
             packSizeAuthoritative: $packSize !== null,
             gtin: Gtin::fromEntities([$product, $shop]),
             gtinAuthoritative: true,
+            promotionWindow: OfferValidity::windowFrom($shop),
+            // The offer supplied the price, so it speaks for the promotion
+            // too: an offer that no longer states an end date has none.
+            promotionWindowAuthoritative: true,
         ));
     }
 

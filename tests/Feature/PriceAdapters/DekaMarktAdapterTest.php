@@ -99,3 +99,36 @@ test('two price records that disagree for one article are refused', function ():
     expect($result->isSuccess())->toBeFalse()
         ->and($result->failureReason)->toBe('dekamarkt_ambiguous_price');
 });
+
+test('reports the offer period behind the offer price', function (): void {
+    $result = new DekaMarktAdapter()->extract('https://www.dekamarkt.nl/producten/x/x/x/126549', dekaMarktPage());
+
+    expect($result->snapshot?->price)->toBe('1.59')
+        ->and($result->snapshot?->promotionWindow?->isRunning())->toBeTrue()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});
+
+test('the shelf price carries no offer period', function (): void {
+    // The offer ended last week, so the adapter prices normalPrice — and
+    // last week's dates must not label that price a promotion.
+    $html = dekaMarktPageWithWindow(
+        start: now()->modify('-14 days')->toIso8601String(),
+        end: now()->modify('-7 days')->toIso8601String(),
+    );
+
+    $result = new DekaMarktAdapter()->extract('https://www.dekamarkt.nl/producten/x/x/x/126549', $html);
+
+    expect($result->snapshot?->price)->toBe('1.95')
+        ->and($result->snapshot?->promotionWindow)->toBeNull()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});
+
+test('records that price the same but state different periods yield no period', function (): void {
+    $result = new DekaMarktAdapter()->extract(
+        'https://www.dekamarkt.nl/producten/x/x/x/126549',
+        dekaMarktPage(secondWindowEnd: '+13 days'),
+    );
+
+    expect($result->snapshot?->price)->toBe('1.59')
+        ->and($result->snapshot?->promotionWindow)->toBeNull();
+});

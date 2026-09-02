@@ -6,6 +6,7 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\PriceNormalizer;
+use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\NuxtData;
@@ -63,12 +64,16 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
         }
 
         $prices = [];
+        $windows = [];
 
         foreach ($priceRecords as $record) {
             $candidate = PriceNormalizer::fromMixed(self::currentPrice($data, $record));
 
             if ($candidate !== null) {
                 $prices[$candidate] = true;
+                // Only the offer branch has a window: the shelf price is not
+                // a promotion, and last week's dates would label it as one.
+                $windows[] = self::offerIsRunning($data, $record) ? self::window($data, $record) : null;
             }
         }
 
@@ -87,6 +92,7 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
 
         $title = NuxtData::value($data, $product, 'headerText');
         $packaging = NuxtData::value($data, $product, 'packaging');
+        $window = self::agreedWindow($windows);
 
         return ExtractionResult::success(new ShopSnapshot(
             title: is_string($title) && $title !== '' ? $title : 'Unknown',
@@ -99,6 +105,8 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
             raw: ['source' => 'dekamarkt'],
             packSize: is_string($packaging) && $packaging !== '' ? $packaging : null,
             packSizeAuthoritative: true,
+            promotionWindow: $window,
+            promotionWindowAuthoritative: true,
         ));
     }
 
@@ -138,6 +146,57 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
         }
 
         return CarbonImmutable::now()->between($start, $end);
+    }
+
+    /**
+     * The record's own offer period, for a record whose offer is running.
+     *
+     * @param  list<mixed>  $data
+     * @param  array<string, mixed>  $record
+     */
+    private static function window(array $data, array $record): ?PromotionWindow
+    {
+        return PromotionWindow::make(
+            endsAt: self::date($data, $record, 'endDate'),
+            startsAt: self::date($data, $record, 'startDate'),
+        );
+    }
+
+    /**
+     * The window every accepted record agrees on. Records that price the
+     * same can still state different periods, and there is no basis to pick
+     * one — the price stands, the window does not.
+     *
+     * @param  list<?PromotionWindow>  $windows
+     */
+    private static function agreedWindow(array $windows): ?PromotionWindow
+    {
+        $first = $windows[0] ?? null;
+
+        foreach ($windows as $window) {
+            if (! self::sameWindow($first, $window)) {
+                return null;
+            }
+        }
+
+        return $first;
+    }
+
+    private static function sameWindow(?PromotionWindow $a, ?PromotionWindow $b): bool
+    {
+        if ($a === null || $b === null) {
+            return $a === null && $b === null;
+        }
+
+        if (! $a->endsAt->equalTo($b->endsAt)) {
+            return false;
+        }
+
+        if ($a->startsAt === null || $b->startsAt === null) {
+            return $a->startsAt === null && $b->startsAt === null;
+        }
+
+        return $a->startsAt->equalTo($b->startsAt);
     }
 
     /**

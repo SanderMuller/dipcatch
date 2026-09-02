@@ -6,8 +6,11 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\PriceNormalizer;
+use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
+use App\Support\DutchDate;
 use App\Support\NuxtData;
 
 /**
@@ -39,22 +42,14 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
         $snapshot = $result->snapshot;
         assert($snapshot instanceof ShopSnapshot);
 
-        $packaging = self::packagingFromNuxtPayload($html, HostUrl::lastNumericSegment($url));
-        if ($packaging === null) {
-            return $result;
-        }
+        $productId = HostUrl::lastNumericSegment($url);
+        $packaging = self::packagingFromNuxtPayload($html, $productId);
 
-        return ExtractionResult::success(new ShopSnapshot(
-            title: $snapshot->title,
-            imageUrl: $snapshot->imageUrl,
-            price: $snapshot->price,
-            currency: $snapshot->currency,
-            inStock: $snapshot->inStock,
-            raw: $snapshot->raw,
-            packSize: $packaging,
-            packSizeAuthoritative: true,
-            gtin: $snapshot->gtin,
-            gtinAuthoritative: $snapshot->gtinAuthoritative,
+        return ExtractionResult::success($snapshot->with(
+            packSize: $packaging ?? $snapshot->packSize,
+            packSizeAuthoritative: $packaging !== null ? true : null,
+            promotionWindow: self::promotionWindow($html, $productId, $snapshot->price),
+            promotionWindowAuthoritative: true,
         ));
     }
 
@@ -63,6 +58,44 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
      * `packaging`; `productId` disambiguates when related products ride
      * along.
      */
+    /**
+     * The offer period behind the price, when the payload holds a price
+     * record for this product whose offer price is the price the JSON-LD
+     * reported. A record that prices something else describes a different
+     * offer, and its dates would be attached to a price they do not cover.
+     */
+    private static function promotionWindow(string $html, ?string $productId, string $price): ?PromotionWindow
+    {
+        if ($productId === null) {
+            return null;
+        }
+
+        $data = NuxtData::decode($html);
+
+        if ($data === null) {
+            return null;
+        }
+
+        foreach (NuxtData::recordsFor($data, ['productId', 'offerPrice'], 'productId', $productId) as $record) {
+            $offer = PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'offerPrice'));
+
+            if ($offer === null || $offer !== $price) {
+                continue;
+            }
+
+            $window = PromotionWindow::make(
+                endsAt: DutchDate::endOfDay(NuxtData::value($data, $record, 'endDate')),
+                startsAt: DutchDate::startOfDay(NuxtData::value($data, $record, 'startDate')),
+            );
+
+            if ($window !== null) {
+                return $window;
+            }
+        }
+
+        return null;
+    }
+
     private static function packagingFromNuxtPayload(string $html, ?string $productId): ?string
     {
         $data = NuxtData::decode($html);

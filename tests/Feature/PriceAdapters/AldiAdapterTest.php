@@ -138,3 +138,18 @@ test('a validity bound this adapter cannot read refuses the price', function ():
 
     expect($this->adapter->extract($this->url, $html)->failureReason)->toBe('aldi_no_current_price');
 });
+
+test('reports the campaign period the price belongs to', function (): void {
+    $result = $this->adapter->extract($this->url, aldiPage());
+
+    expect($result->snapshot?->promotionWindow?->isRunning())->toBeTrue()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});
+
+test('a price with no stated window reports none', function (): void {
+    $result = $this->adapter->extract($this->url, aldiPage(validFrom: null, validUntil: null));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->promotionWindow)->toBeNull()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});

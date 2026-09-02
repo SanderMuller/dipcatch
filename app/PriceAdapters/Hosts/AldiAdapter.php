@@ -5,11 +5,9 @@ namespace App\PriceAdapters\Hosts;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
-use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\NextData;
-use Carbon\CarbonImmutable;
 
 /**
  * Host-specific adapter for aldi.nl. The pages carry no JSON-LD, no price
@@ -54,7 +52,7 @@ final readonly class AldiAdapter implements HostSpecificAdapter, ShopAdapter
             return ExtractionResult::failed('aldi_no_product');
         }
 
-        $price = self::currentPrice($product);
+        $price = AldiOffer::price($product);
 
         if ($price === null) {
             return ExtractionResult::failed('aldi_no_current_price');
@@ -73,6 +71,10 @@ final readonly class AldiAdapter implements HostSpecificAdapter, ShopAdapter
             raw: ['source' => 'aldi'],
             packSize: is_string($salesUnit) && trim($salesUnit) !== '' ? $salesUnit : null,
             packSizeAuthoritative: true,
+            // The price passed its window check, so that window is the one
+            // it belongs to.
+            promotionWindow: AldiOffer::window($product),
+            promotionWindowAuthoritative: true,
         ));
     }
 
@@ -135,68 +137,6 @@ final readonly class AldiAdapter implements HostSpecificAdapter, ShopAdapter
         }
 
         return null;
-    }
-
-    /**
-     * The price, but only while its window is open. The payload keeps the
-     * last campaign's price after it ends, so reporting it would present an
-     * expired price as today's.
-     *
-     * @param  array<mixed, mixed>  $product
-     */
-    private static function currentPrice(array $product): ?string
-    {
-        $current = $product['currentPrice'] ?? null;
-
-        if (! is_array($current)) {
-            return null;
-        }
-
-        $from = self::bound($current, 'validFrom');
-        $until = self::bound($current, 'validUntil');
-        $now = CarbonImmutable::now();
-
-        // Each bound is judged on its own: a record carrying only an end
-        // date still says when the price stops being current. A bound the
-        // payload states but this adapter cannot read may be hiding an
-        // expiry, so it refuses the price instead of assuming the window
-        // is open.
-        if ($from === false || $until === false) {
-            return null;
-        }
-
-        if ($from instanceof CarbonImmutable && $now->lessThan($from)) {
-            return null;
-        }
-
-        if ($until instanceof CarbonImmutable && $now->greaterThan($until)) {
-            return null;
-        }
-
-        return PriceNormalizer::fromMixed($current['priceValue'] ?? null);
-    }
-
-    /**
-     * A validity bound: the parsed instant, null when the payload omits it,
-     * or false when it states one this adapter cannot read.
-     *
-     * @param  array<mixed, mixed>  $price
-     */
-    private static function bound(array $price, string $key): CarbonImmutable|false|null
-    {
-        $value = $price[$key] ?? null;
-
-        if ($value === null) {
-            return null;
-        }
-
-        if (is_int($value)) {
-            return CarbonImmutable::createFromTimestampUTC($value);
-        }
-
-        return is_string($value) && ctype_digit($value)
-            ? CarbonImmutable::createFromTimestampUTC((int) $value)
-            : false;
     }
 
     /**

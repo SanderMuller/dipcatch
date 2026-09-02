@@ -47,5 +47,44 @@ final readonly class ShopSnapshot
          * expired campaign stops being shown.
          */
         public bool $conditionalOfferAuthoritative = false,
+        /** How long the shop says this price runs — see {@see PromotionWindow}. */
+        public ?PromotionWindow $promotionWindow = null,
+        /**
+         * True when the source reads promotion windows at all. An
+         * authoritative snapshot without one clears the stored window, so a
+         * promotion that ended stops being shown.
+         */
+        public bool $promotionWindowAuthoritative = false,
     ) {}
+
+    /**
+     * A copy with some fields replaced.
+     *
+     * Host adapters that augment a JSON-LD snapshot used to rebuild it field
+     * by field, which silently dropped every field added to this class
+     * afterwards — two adapters had to be edited for each one.
+     */
+    public function with(
+        ?string $packSize = null,
+        ?bool $packSizeAuthoritative = null,
+        ?PromotionWindow $promotionWindow = null,
+        ?bool $promotionWindowAuthoritative = null,
+    ): self {
+        return new self(
+            title: $this->title,
+            imageUrl: $this->imageUrl,
+            price: $this->price,
+            currency: $this->currency,
+            inStock: $this->inStock,
+            raw: $this->raw,
+            packSize: $packSize ?? $this->packSize,
+            packSizeAuthoritative: $packSizeAuthoritative ?? $this->packSizeAuthoritative,
+            gtin: $this->gtin,
+            gtinAuthoritative: $this->gtinAuthoritative,
+            conditionalOffer: $this->conditionalOffer,
+            conditionalOfferAuthoritative: $this->conditionalOfferAuthoritative,
+            promotionWindow: $promotionWindow ?? $this->promotionWindow,
+            promotionWindowAuthoritative: $promotionWindowAuthoritative ?? $this->promotionWindowAuthoritative,
+        );
+    }
 }
