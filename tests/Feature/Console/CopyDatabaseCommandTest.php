@@ -132,3 +132,22 @@ test('breaks the products ↔ shops foreign-key cycle and backfills cheapest_sho
 
     expect(DB::connection('copy_target')->table('products')->where('id', $product->id)->value('cheapest_shop_id'))->toBe($shop->id);
 });
+
+test('a failing copy leaves a truncated target untouched', function (): void {
+    seedSource();
+
+    DB::connection('copy_target')->table('users')->insert([
+        'name' => 'Keep me', 'email' => 'keep@example.test', 'password' => 'x', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    // Make the source violate a target constraint mid-copy: a shop whose
+    // product does not exist on the target once products fail to insert.
+    DB::connection('copy_source')->statement('PRAGMA foreign_keys = OFF');
+    DB::connection('copy_source')->table('shops')->update(['product_id' => '00000000-0000-0000-0000-000000000000']);
+
+    $this->artisan('dipcatch:copy-database', ['--from' => 'copy_source', '--to' => 'copy_target', '--truncate' => true])
+        ->assertFailed();
+
+    expect(DB::connection('copy_target')->table('users')->where('email', 'keep@example.test')->exists())->toBeTrue()
+        ->and(DB::connection('copy_target')->table('shops')->count())->toBe(0);
+});

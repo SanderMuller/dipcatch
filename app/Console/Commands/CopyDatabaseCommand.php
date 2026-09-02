@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
+use Throwable;
 
 /**
  * One-off engine migration: copies every application table from one
@@ -53,13 +54,42 @@ final class CopyDatabaseCommand extends Command implements Isolatable
             return self::SUCCESS;
         }
 
-        if (! $this->prepareTarget($to, $plan)) {
+        $truncate = (bool) $this->option('truncate');
+
+        if (! $truncate && ! $this->targetIsEmpty($to, $plan)) {
             return self::FAILURE;
         }
 
         $copier = new TableCopier($from, $to, Schema::connection($fromName), Schema::connection($toName), max(1, (int) $this->option('chunk')));
 
-        $to->transaction(function () use ($copier, $plan): void {
+        // Truncation, inserts and backfill share one transaction: a failure
+        // anywhere leaves the target exactly as it was.
+        try {
+            $this->copyInTransaction($to, $copier, $plan, $truncate);
+        } catch (Throwable $e) {
+            $this->components->error('Copy failed and was rolled back; the target is unchanged. ' . $e->getMessage());
+
+            return self::FAILURE;
+        }
+
+        if ($to->getDriverName() === 'pgsql') {
+            $copier->resetPostgresSequences($plan->order);
+            $this->components->info('PostgreSQL sequences reset past the copied ids.');
+        }
+
+        return $this->verify($plan, $from, $to);
+    }
+
+    private function copyInTransaction(Connection $to, TableCopier $copier, CopyPlan $plan, bool $truncate): void
+    {
+        $to->transaction(function () use ($to, $copier, $plan, $truncate): void {
+            if ($truncate) {
+                foreach (array_reverse($plan->order) as $table) {
+                    $to->table($table)->delete();
+                }
+                $this->components->info('Target tables emptied.');
+            }
+
             foreach ($plan->order as $table) {
                 $copied = $copier->copy($table, $plan->deferred[$table] ?? []);
                 $this->components->twoColumnDetail($table, number_format($copied) . ' rows');
@@ -70,13 +100,6 @@ final class CopyDatabaseCommand extends Command implements Isolatable
                 $this->components->twoColumnDetail($table . ' (backfill)', implode(', ', $columns));
             }
         });
-
-        if ($to->getDriverName() === 'pgsql') {
-            $copier->resetPostgresSequences($plan->order);
-            $this->components->info('PostgreSQL sequences reset past the copied ids.');
-        }
-
-        return $this->verify($plan, $from, $to);
     }
 
     private function describe(CopyPlan $plan, Connection $from, Connection $to): void
@@ -92,17 +115,8 @@ final class CopyDatabaseCommand extends Command implements Isolatable
         }
     }
 
-    private function prepareTarget(Connection $to, CopyPlan $plan): bool
+    private function targetIsEmpty(Connection $to, CopyPlan $plan): bool
     {
-        if ((bool) $this->option('truncate')) {
-            foreach (array_reverse($plan->order) as $table) {
-                $to->table($table)->delete();
-            }
-            $this->components->info('Target tables emptied.');
-
-            return true;
-        }
-
         foreach ($plan->order as $table) {
             if ($to->table($table)->exists()) {
                 $this->components->error("Target table {$table} is not empty; pass --truncate to replace its rows.");

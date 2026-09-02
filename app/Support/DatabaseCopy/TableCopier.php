@@ -41,7 +41,12 @@ final readonly class TableCopier
 
         $copied = 0;
 
-        $this->from->table($table)->orderBy($this->orderColumn($table))->chunk($this->chunk, function (Collection $rows) use ($table, $targetColumns, $booleanColumns, $deferredColumns, &$copied): void {
+        $query = $this->from->table($table);
+        foreach ($this->keyColumns($table) as $column) {
+            $query->orderBy($column);
+        }
+
+        $query->chunk($this->chunk, function (Collection $rows) use ($table, $targetColumns, $booleanColumns, $deferredColumns, &$copied): void {
             $batch = [];
             foreach ($rows as $row) {
                 $batch[] = $this->castRow((array) $row, $targetColumns, $booleanColumns, $deferredColumns);
@@ -62,18 +67,23 @@ final readonly class TableCopier
      */
     public function backfill(string $table, array $columns): void
     {
-        $key = $this->orderColumn($table);
+        $keys = $this->keyColumns($table);
 
-        $this->from->table($table)
-            ->select([$key, ...$columns])
-            ->whereNotNull($columns[0])
-            ->orderBy($key)
-            ->chunk($this->chunk, function (Collection $rows) use ($table, $key, $columns): void {
-                foreach ($rows as $row) {
-                    $row = (array) $row;
-                    $this->to->table($table)->where($key, $row[$key])->update(array_intersect_key($row, array_flip($columns)));
-                }
-            });
+        $query = $this->from->table($table)
+            ->select([...$keys, ...$columns])
+            ->whereNotNull($columns[0]);
+        foreach ($keys as $key) {
+            $query->orderBy($key);
+        }
+
+        $query->chunk($this->chunk, function (Collection $rows) use ($table, $keys, $columns): void {
+            foreach ($rows as $row) {
+                $row = (array) $row;
+                $this->to->table($table)
+                    ->where(array_intersect_key($row, array_flip($keys)))
+                    ->update(array_intersect_key($row, array_flip($columns)));
+            }
+        });
     }
 
     /**
@@ -131,17 +141,22 @@ final readonly class TableCopier
     }
 
     /**
-     * A stable order for chunking: the primary key when the table has one,
-     * else the first column.
+     * A stable, unique order for offset chunking: every primary-key column,
+     * or all columns when the table has no primary key.
+     *
+     * @return non-empty-list<string>
      */
-    private function orderColumn(string $table): string
+    private function keyColumns(string $table): array
     {
         foreach ($this->fromSchema->getIndexes($table) as $index) {
-            if ($index['primary'] === true && isset($index['columns'][0]) && is_string($index['columns'][0])) {
-                return $index['columns'][0];
+            $columns = array_values(array_filter($index['columns'], is_string(...)));
+            if ($index['primary'] === true && $columns !== []) {
+                return $columns;
             }
         }
 
-        return $this->fromSchema->getColumnListing($table)[0] ?? 'id';
+        $all = $this->fromSchema->getColumnListing($table);
+
+        return $all === [] ? ['id'] : $all;
     }
 }
