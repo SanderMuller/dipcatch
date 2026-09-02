@@ -124,6 +124,8 @@ final readonly class JsonLdAdapter implements ShopAdapter
         $imageUrl = JsonLdEntities::firstImageUrl($product['image'] ?? null)
             ?? JsonLdEntities::firstImageUrl($shop['image'] ?? null);
 
+        $packSize = UnitPriceSize::from($shop, $price);
+
         return ExtractionResult::success(new ShopSnapshot(
             title: $title,
             imageUrl: $imageUrl,
@@ -131,6 +133,10 @@ final readonly class JsonLdAdapter implements ShopAdapter
             currency: strtoupper($currency),
             inStock: self::extractInStock($shop),
             raw: ['offer' => $shop],
+            packSize: $packSize,
+            // Only when the offer stated one: otherwise the title fallback
+            // must stay available.
+            packSizeAuthoritative: $packSize !== null,
             gtin: Gtin::fromEntities([$product, $shop]),
             gtinAuthoritative: true,
         ));
