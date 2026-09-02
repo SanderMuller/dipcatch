@@ -59,7 +59,8 @@ final class HostUrl
         return $m[1];
     }
 
-    private static function lastSegment(string $url): ?string
+    /** The URL's last non-empty path segment. */
+    public static function lastSegment(string $url): ?string
     {
         $path = parse_url($url, PHP_URL_PATH);
 

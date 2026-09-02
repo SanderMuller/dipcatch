@@ -456,3 +456,88 @@ function sparPage(string $price = '2.45', ?string $packSize = '200 Gram'): strin
         . '<body>' . $subtitle . '<div id="product-offer"></div>'
         . '<p class="spar-paragraph__14-400">125 Gram</p></body></html>';
 }
+
+/**
+ * Trimmed replica of an aldi.nl product page: the Next.js `__NEXT_DATA__`
+ * payload, whose product record sits in a nested JSON string of API
+ * responses keyed `PRODUCT_DETAIL_GET` (observed 2026-09-02).
+ *
+ * @param  list<array<string, mixed>>|null  $products  Overrides the single default product.
+ */
+function aldiPage(
+    string $price = '2.49',
+    string $slug = 'granola-91244024',
+    ?string $validFrom = '-1 day',
+    ?string $validUntil = '+6 days',
+    bool $available = true,
+    ?array $products = null,
+): string {
+    $currentPrice = ['priceValue' => (float) $price];
+
+    if ($validFrom !== null && $validUntil !== null) {
+        $currentPrice['validFrom'] = now()->modify($validFrom)->getTimestamp();
+        $currentPrice['validUntil'] = now()->modify($validUntil)->getTimestamp();
+    }
+
+    $products ??= [[
+        'objectID' => '91244024',
+        'name' => 'Granola',
+        'productSlug' => $slug,
+        'assets' => [
+            ['type' => 'gallery', 'url' => 'https://s7g10.scene7.com/is/image/aldinord/variant_1244026'],
+            ['type' => 'primary', 'url' => 'https://s7g10.scene7.com/is/image/aldinord/91244024_week37'],
+        ],
+        'brandName' => 'JORDANS',
+        'salesUnit' => '500 g',
+        'isAvailable' => $available,
+        'currentPrice' => $currentPrice,
+    ]];
+
+    $apiData = json_encode([
+        ['PAGE_MGNL_GET', ['req' => [], 'res' => []]],
+        ['PRODUCT_DETAIL_GET', ['req' => ['locale' => 'nl'], 'res' => ['products' => $products]]],
+    ], JSON_THROW_ON_ERROR);
+
+    $nextData = json_encode([
+        'props' => ['pageProps' => ['apiData' => $apiData]],
+        'page' => '/product-detail/[product]',
+    ], JSON_THROW_ON_ERROR);
+
+    return '<html><body><script id="__NEXT_DATA__" type="application/json">' . $nextData . '</script></body></html>';
+}
+
+/**
+ * Trimmed replica of a dierapotheker.nl product page: the `#product-data`
+ * element the shop's own analytics reads, the quantity-discount table whose
+ * "vanaf 2" row holds the page's only `itemprop="price"`, and the
+ * `view_item` payload that names the variant (observed 2026-09-02).
+ */
+function dierapothekerPage(
+    string $price = '52.95',
+    string $tierPrice = '51.9',
+    ?string $variant = 'Navulling 3 x 48 ml',
+    string $availability = 'https://schema.org/InStock',
+): string {
+    $viewItem = $variant === null ? '' : 'dataLayer.push(' . json_encode([
+        'event' => 'view_item',
+        'ecommerce' => ['currency' => 'EUR', 'value' => (float) $price, 'items' => [[
+            'item_name' => 'Feliway Verdamper kat',
+            'price' => (float) $price,
+            'item_variant' => $variant,
+        ]]],
+    ], JSON_THROW_ON_ERROR) . ');';
+
+    return '<html><body>'
+        . '<div itemscope itemtype="https://schema.org/Product">'
+        . '<meta itemprop="name" content="Feliway Verdamper kat">'
+        . '<meta itemprop="gtin13" content="3411112291649">'
+        . '<div itemprop="offers" itemscope itemtype="https://schema.org/Offer">'
+        . '<meta itemprop="priceCurrency" content="">'
+        . '<meta itemprop="price" content="' . $tierPrice . '">vanaf <span>2</span>'
+        . '</div></div>'
+        . '<div id="product-data" data-product-number="9658" data-name="Feliway Verdamper Kat"'
+        . ' data-image="https://www.dierapotheker.nl/media/feliway.jpg" data-sku="9658"'
+        . ' data-currency="EUR" data-price="' . $price . '" data-availability="' . $availability . '"></div>'
+        . '<script>' . $viewItem . '</script>'
+        . '</body></html>';
+}

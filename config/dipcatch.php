@@ -1,9 +1,11 @@
 <?php declare(strict_types=1);
 
-use App\PriceAdapters\UserSelectorAdapter;
+use App\PriceAdapters\GenericAdapter;
+use App\PriceAdapters\Hosts\AldiAdapter;
 use App\PriceAdapters\Hosts\AmazonAdapter;
 use App\PriceAdapters\Hosts\BolAdapter;
 use App\PriceAdapters\Hosts\DekaMarktAdapter;
+use App\PriceAdapters\Hosts\DierapothekerAdapter;
 use App\PriceAdapters\Hosts\DirkAdapter;
 use App\PriceAdapters\Hosts\JumboAdapter;
 use App\PriceAdapters\Hosts\LidlAdapter;
@@ -14,7 +16,7 @@ use App\PriceAdapters\Hosts\ZooplusAdapter;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\MicrodataAdapter;
 use App\PriceAdapters\OpenGraphAdapter;
-use App\PriceAdapters\GenericAdapter;
+use App\PriceAdapters\UserSelectorAdapter;
 
 return [
 
@@ -73,9 +75,11 @@ return [
     // host-specific, then generic fallback. See AdapterResolver for semantics.
     'adapters' => [
         UserSelectorAdapter::class,
+        AldiAdapter::class,
         AmazonAdapter::class,
         BolAdapter::class,
         DekaMarktAdapter::class,
+        DierapothekerAdapter::class,
         DirkAdapter::class,
         JumboAdapter::class,
         LidlAdapter::class,
