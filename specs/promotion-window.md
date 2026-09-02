@@ -189,7 +189,7 @@ Runs alongside `sources-structured`, but only because `foundation` removed the c
 - [x] Render the window under the price in `ShopsRelationManager`, alongside the unit price and conditional offer. The renderer reads the shop's columns and never the source, so one implementation covers every phase-2 and phase-3 source.
 - [x] Running / not-started / ended / absent states, with the source's label when it gave one.
 - [x] Tests — each of the four states renders as specified, including a future window rendering "from" and never "ended"; a date-only Amsterdam start renders its own day rather than the day before; and a shop carrying both a promotion window and a conditional offer shows both.
-- [ ] Eye-verify in a browser against the real AH shop, which is in a bonus until 6 September: the row shows the window, the layout survives on a phone width, and no console errors appear.
+- [ ] Eye-verify in a browser against the real AH shop, which is in a bonus until 6 September: the row shows the window, the layout survives on a phone width, and no console errors appear. **BLOCKED — dipcatch.test has no logged-in session and this assistant does not enter credentials. Everything else is ready: the AH shop stores its window (ends 2026-09-06 23:59:59, label "VOOR 1.69") and the page to open is /app/products/01a059c1-5380-707a-ae0b-d3724ed2f111. Log in and the check takes a minute.**
 
 ---
 
