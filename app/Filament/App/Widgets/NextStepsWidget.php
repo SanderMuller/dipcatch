@@ -5,7 +5,6 @@ namespace App\Filament\App\Widgets;
 use App\Filament\App\Pages\NotificationSettings;
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
-use App\Models\Shop;
 use Filament\Widgets\Widget;
 
 /**
@@ -66,12 +65,15 @@ class NextStepsWidget extends Widget
         ];
     }
 
+    /**
+     * A correlated count, not `GROUP BY … HAVING`: MySQL's
+     * only_full_group_by rejects `select *` grouped by one column.
+     */
     private static function hasComparison(int|string|null $userId): bool
     {
-        return Shop::query()
-            ->whereIn('product_id', Product::query()->where('user_id', $userId)->select('id'))
-            ->groupBy('product_id')
-            ->havingRaw('COUNT(*) >= 2')
+        return Product::query()
+            ->where('user_id', $userId)
+            ->has('shops', '>=', 2)
             ->exists();
     }
 }
