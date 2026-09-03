@@ -7,6 +7,22 @@ use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use Filament\Support\RawJs;
 
+/**
+ * The dataset a chart plots under a given legend label.
+ *
+ * @return array<string, mixed>
+ */
+function chartSeries(Product $product, string $label, string $range = '90'): array
+{
+    foreach (makeChartFor($product, $range)->computeData()['datasets'] as $dataset) {
+        if (($dataset['label'] ?? null) === $label) {
+            return $dataset;
+        }
+    }
+
+    return [];
+}
+
 function makeChartFor(Product $product, string $range = '90'): PriceHistoryChart
 {
     $widget = new PriceHistoryChart();
@@ -161,10 +177,9 @@ test('the cheapest price is plotted per unit as well, on its own axis', function
         'ended_at' => null,
     ]);
 
-    $datasets = makeChartFor($product)->computeData()['datasets'];
-    $unit = collect($datasets)->firstWhere('label', 'Cheapest per kg (€)');
+    $unit = chartSeries($product, 'Cheapest per kg (€)');
 
-    expect($unit)->not->toBeNull()
+    expect($unit)->not->toBe([])
         ->and($unit['data'])->toBe([10.95, 10.95])
         ->and($unit['yAxisID'])->toBe('unit');
 });
@@ -192,11 +207,9 @@ test('a cheaper total that is worse value shows as two diverging lines', functio
         'ended_at' => null,
     ]);
 
-    $datasets = collect(makeChartFor($product)->computeData()['datasets']);
-
-    expect($datasets->firstWhere('label', 'Cheapest (€)')['data'])->toBe([1.99, 1.69, 1.69])
+    expect(chartSeries($product, 'Cheapest (€)')['data'])->toBe([1.99, 1.69, 1.69])
         // Down in euros, up per kilo — the point of the second line.
-        ->and($datasets->firstWhere('label', 'Cheapest per kg (€)')['data'])->toBe([5.38, 8.45, 8.45]);
+        ->and(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([5.38, 8.45, 8.45]);
 });
 
 test('shops that state no pack size get no unit line', function (): void {
@@ -210,9 +223,7 @@ test('shops that state no pack size get no unit line', function (): void {
         'ended_at' => null,
     ]);
 
-    $labels = collect(makeChartFor($product)->computeData()['datasets'])->pluck('label');
-
-    expect($labels)->not->toContain('Cheapest per kg (€)');
+    expect(chartSeries($product, 'Cheapest per kg (€)'))->toBe([]);
 });
 
 test('units that cannot share an axis leave gaps rather than wrong numbers', function (): void {
@@ -239,8 +250,6 @@ test('units that cannot share an axis leave gaps rather than wrong numbers', fun
         ]);
     }
 
-    $unit = collect(makeChartFor($product)->computeData()['datasets'])->firstWhere('label', 'Cheapest per kg (€)');
-
     // The per-piece segment is not a EUR/kg number, so it is a gap.
-    expect($unit['data'])->toBe([null, 10.95, 10.95, 10.95]);
+    expect(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([null, 10.95, 10.95, 10.95]);
 });

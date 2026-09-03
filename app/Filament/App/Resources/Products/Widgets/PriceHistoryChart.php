@@ -46,7 +46,7 @@ class PriceHistoryChart extends ChartWidget
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{datasets: list<array<string, mixed>>, labels: list<string>}
      */
     public function computeData(): array
     {
