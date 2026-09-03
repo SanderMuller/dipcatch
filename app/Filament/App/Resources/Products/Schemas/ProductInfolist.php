@@ -45,6 +45,11 @@ final class ProductInfolist
             ]);
     }
 
+    /**
+     * What the product is, in three lines: the picture, the name, and the
+     * facts as badges rather than as stacked label-and-value pairs — those
+     * made a short card tall and left it half empty beside the prices.
+     */
     private static function identity(): Section
     {
         return Section::make()
@@ -52,23 +57,28 @@ final class ProductInfolist
             ->schema([
                 ImageEntry::make('image_url')
                     ->hiddenLabel()
-                    ->imageSize(140)
+                    // A fixed box the whole pack fits inside: stretching it to
+                    // the card's width cropped a tall bag top and bottom.
+                    ->imageSize(180)
                     ->extraImgAttributes(['class' => 'rounded-lg object-contain']),
 
                 TextEntry::make('title')
                     ->hiddenLabel()
                     ->size('lg')
-                    ->weight('semibold'),
+                    ->weight('bold'),
 
-                TextEntry::make('shops_count')
-                    ->label('Tracked at')
-                    ->state(fn (Product $r): string => trans_choice(':count shop|:count shops', $r->shops->count())),
-
-                TextEntry::make('active')
-                    ->label('Tracking')
+                TextEntry::make('facts')
+                    ->hiddenLabel()
                     ->badge()
-                    ->state(fn (Product $r): string => $r->active ? 'Active' : 'Paused')
-                    ->color(fn (Product $r): string => $r->active ? 'success' : 'gray'),
+                    ->state(fn (Product $r): array => [
+                        trans_choice(':count shop|:count shops', $r->shops->count()),
+                        $r->active ? 'Active' : 'Paused',
+                    ])
+                    ->color(fn (string $state): string => match ($state) {
+                        'Active' => 'success',
+                        'Paused' => 'warning',
+                        default => 'gray',
+                    }),
             ]);
     }
 

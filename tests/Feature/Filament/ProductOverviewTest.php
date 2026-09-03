@@ -62,10 +62,11 @@ test('the overview says what the product is and how it is tracked', function ():
 
     livewire(ViewProduct::class, ['record' => $product->getKey()])
         ->assertSeeText("Lay's Naturel")
-        ->assertSeeText('Tracked at')
+        // Badges, not label-and-value pairs: the words carry their own
+        // meaning, and stacked pairs made the card twice as tall.
         ->assertSeeText('2 shops')
-        ->assertSeeText('Tracking')
         ->assertSeeText('Active')
+        ->assertDontSeeText('Tracked at')
         ->assertSeeText('Alerts below')
         ->assertSeeText('25.00 % · €1.60');
 });
