@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Models\PriceCheck;
@@ -548,6 +549,15 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $locked->forceFill($updates)->save();
 
             $locked->product?->recomputeCheapestShop((int) $check->id);
+
+            // Separate from the drop engine on purpose: a rival shop cutting
+            // its price changes the best value without changing which shop is
+            // cheapest, so the cheapest-price trigger would never see it.
+            $product = $locked->product;
+
+            if ($product !== null) {
+                app(DetectUnitPriceTarget::class)($product->refresh());
+            }
         });
     }
 

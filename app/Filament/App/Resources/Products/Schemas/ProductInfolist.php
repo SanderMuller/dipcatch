@@ -111,6 +111,15 @@ final class ProductInfolist
                     ->label('Alerts below')
                     ->columnSpanFull()
                     ->state(fn (Product $r): string => self::thresholds($r)),
+
+                TextEntry::make('unit_price_target')
+                    ->label('Unit price target')
+                    ->columnSpanFull()
+                    ->visible(fn (Product $r): bool => $r->unit_price_target !== null)
+                    ->state(fn (Product $r): string => MoneyFormatter::format(
+                        (string) $r->unit_price_target,
+                        $r->currency,
+                    ) . ' ' . ($r->bestValueShop()?->unitPriceLabel() ?? '')),
             ]);
     }
 

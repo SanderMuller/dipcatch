@@ -60,6 +60,13 @@ class ProductForm
                             ->step(0.01)
                             ->required(),
 
+                        TextInput::make('unit_price_target')
+                            ->label('Unit price target')
+                            ->helperText('Alert when the best value reaches this price per kg, litre or piece. Leave empty for no unit-price alert.')
+                            ->numeric()
+                            ->minValue(0.01)
+                            ->step(0.01),
+
                         Toggle::make('active')
                             ->label('Tracking active'),
                     ])
