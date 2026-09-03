@@ -31,6 +31,20 @@ final readonly class PromotionLabel
         return ($window->label ?? 'Bonus') . ' ' . self::deadline($shop);
     }
 
+    /**
+     * The shop that offers a price, and how long it lasts — "lidl.nl ·
+     * until 6 Sep". Just the host when the shop states no window, so a
+     * permanent price reads as one.
+     */
+    public static function withHost(?Shop $shop): ?string
+    {
+        if ($shop === null) {
+            return null;
+        }
+
+        return implode(' · ', array_filter([$shop->host, self::short($shop)]));
+    }
+
     /** The deadline alone: "until 6 Sep", "from 8 Sep", "ended 6 Sep". */
     public static function short(?Shop $shop): ?string
     {

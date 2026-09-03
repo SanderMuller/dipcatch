@@ -178,6 +178,29 @@ test('the list reads every shop once, not once per product row', function (): vo
     expect($queries)->toBeLessThanOrEqual(4);
 });
 
+test('the dashboard says how long the drop price lasts', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create([
+        'currency' => 'EUR',
+        'last_notified_price' => '1.79',
+        'last_notified_at' => now()->subHour(),
+    ]);
+
+    $ah = Shop::factory()->for($product)->create([
+        'url' => 'https://ah.nl/producten/product/wi6/x', 'currency' => 'EUR', 'current_price' => '1.69',
+        'pack_quantity' => '200.00', 'pack_unit' => 'g',
+    ]);
+    $ah->forceFill(['promotion_ends_at' => CarbonImmutable::parse('2036-09-06 21:59:59')])->save();
+    $product->forceFill(['cheapest_shop_id' => $ah->id, 'cheapest_price' => '1.69'])->save();
+
+    $this->actingAs($user);
+
+    livewire(ActiveDropsTableWidget::class)
+        ->assertSeeText('€1.69')
+        // The shop has its own column, so the price only needs the deadline.
+        ->assertSeeText('until 6 Sep');
+});
+
 test('the dashboard names the best value on an active drop', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([

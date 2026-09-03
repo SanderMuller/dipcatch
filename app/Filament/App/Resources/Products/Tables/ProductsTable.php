@@ -68,7 +68,7 @@ class ProductsTable
                     // Named the same way the best value is, so the two columns
                     // can be read against each other, with the deadline when
                     // the price is only good until a date.
-                    ->description(fn (Product $record): ?string => self::shopNote($record->cheapestShop))
+                    ->description(fn (Product $record): ?string => PromotionLabel::withHost($record->cheapestShop))
                     ->sortable(),
 
                 TextColumn::make('cheapest_shop_unit_price')
@@ -81,7 +81,7 @@ class ProductsTable
                     ->label('Best value')
                     ->state(fn (Product $record): string => self::unitPriceState($record->bestValueShop(), $record))
                     // Which shop it is, since it is often not the cheapest one.
-                    ->description(fn (Product $record): ?string => self::shopNote($record->bestValueShop())),
+                    ->description(fn (Product $record): ?string => PromotionLabel::withHost($record->bestValueShop())),
 
                 TextColumn::make('shops_count')
                     ->visibleFrom('md')
@@ -121,19 +121,6 @@ class ProductsTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
-    }
-
-    /**
-     * Where a quoted price comes from, and how long it lasts — "lidl.nl ·
-     * until 6 Sep". The deadline is left off when the shop states none.
-     */
-    private static function shopNote(?Shop $shop): ?string
-    {
-        if ($shop === null) {
-            return null;
-        }
-
-        return implode(' · ', array_filter([$shop->host, PromotionLabel::short($shop)]));
     }
 
     /**

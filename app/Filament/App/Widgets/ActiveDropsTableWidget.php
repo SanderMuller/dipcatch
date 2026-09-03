@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Support\Favicon;
 use App\Support\MoneyFormatter;
+use App\Support\PromotionLabel;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -34,13 +35,16 @@ class ActiveDropsTableWidget extends BaseWidget
                 TextColumn::make('title')->limit(60)->wrap(),
                 TextColumn::make('cheapest_price')
                     ->label('Now')
-                    ->state(fn (Product $r): string => MoneyFormatter::format($r->cheapest_price === null ? null : (string) $r->cheapest_price, $r->currency)),
+                    ->state(fn (Product $r): string => MoneyFormatter::format($r->cheapest_price === null ? null : (string) $r->cheapest_price, $r->currency))
+                    // The shop has its own column here, so only the deadline
+                    // is worth the line.
+                    ->description(fn (Product $r): ?string => PromotionLabel::short($r->cheapestShop)),
                 TextColumn::make('best_value')
                     ->visibleFrom('md')
                     ->label('Best value')
                     ->state(fn (Product $r): string => self::unitPriceState($r->bestValueShop(), $r))
                     // Which shop it is, since it is often not the cheapest one.
-                    ->description(fn (Product $r): ?string => $r->bestValueShop()?->host),
+                    ->description(fn (Product $r): ?string => PromotionLabel::withHost($r->bestValueShop())),
                 TextColumn::make('last_notified_price')
                     ->visibleFrom('md')
                     ->label('Notified at')
