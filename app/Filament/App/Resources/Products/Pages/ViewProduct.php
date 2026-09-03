@@ -3,7 +3,6 @@
 namespace App\Filament\App\Resources\Products\Pages;
 
 use App\Filament\App\Resources\Products\ProductResource;
-use App\Filament\App\Resources\Products\Widgets\PriceHistoryChart;
 use App\Models\Product;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -137,16 +136,6 @@ class ViewProduct extends ViewRecord
         }
 
         Notification::make()->title('Public sharing stopped')->success()->send();
-    }
-
-    /**
-     * @return list<class-string>
-     */
-    protected function getFooterWidgets(): array
-    {
-        return [
-            PriceHistoryChart::class,
-        ];
     }
 
     /**

@@ -6,15 +6,34 @@
 
 <div>
     @if ($suggestions === [] && $datasetIsUsable)
-        <p class="rounded-xl border border-gray-200 bg-white px-4 py-3 text-xs text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
+        <p class="text-xs text-gray-500 dark:text-gray-400">
             No other shops found for this product.
         </p>
     @endif
 
     @if ($suggestions !== [])
-        <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-white/5">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Also sold at</h3>
-            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+        {{--
+            A disclosure rather than an open panel: these are shops the user
+            has not chosen, and open they push the shops actually tracked —
+            and the price history above them — off the first screen. The
+            count keeps them discoverable while closed.
+        --}}
+        <details class="group rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/5">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+                <span class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+                    Also sold at
+                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                        {{ count($suggestions) }}
+                    </span>
+                </span>
+                <span class="text-xs font-medium text-primary-600 dark:text-primary-400">
+                    <span class="group-open:hidden">Show</span>
+                    <span class="hidden group-open:inline">Hide</span>
+                </span>
+            </summary>
+
+            <div class="px-4 pb-4">
+            <p class="text-xs text-gray-500 dark:text-gray-400">
                 Matched on name and pack size. Prices come from the daily dataset — the live price is fetched when you add the shop.
             </p>
 
@@ -79,6 +98,7 @@
                     </li>
                 @endforeach
             </ul>
-        </div>
+            </div>
+        </details>
     @endif
 </div>

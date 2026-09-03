@@ -2,101 +2,151 @@
 
 namespace App\Filament\App\Resources\Products\Schemas;
 
+use App\Filament\App\Resources\Products\Widgets\PriceHistoryChart;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Support\Favicon;
 use App\Support\MoneyFormatter;
+use App\Support\PromotionLabel;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\HtmlString;
 
+/**
+ * The product overview, read top to bottom: what it is, what it costs and
+ * where, how that price has moved, then the shops themselves.
+ *
+ * The two prices lead because they are the answer the page exists to give,
+ * and they are quoted the same way — amount, price per unit, shop, and how
+ * long it lasts — so the difference between cheapest and best value can be
+ * read without arithmetic.
+ */
 final class ProductInfolist
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Section::make()
+                Grid::make(3)
+                    ->columnSpanFull()
                     ->schema([
-                        ImageEntry::make('image_url')
-                            ->label('')
-                            ->circular()
-                            ->imageSize(120),
-
-                        TextEntry::make('title')->size('lg'),
+                        self::identity(),
+                        self::price(),
                     ]),
 
-                Section::make('Pricing')
-                    ->schema([
-                        TextEntry::make('cheapest_price')
-                            ->label('Cheapest now')
-                            ->state(fn (Product $r): string => MoneyFormatter::format(
-                                $r->cheapest_price === null ? null : (string) $r->cheapest_price,
-                                $r->currency,
-                            ))
-                            // The same measure the best value is stated in, so
-                            // the two lines can be read against each other.
-                            ->helperText(fn (Product $r): ?string => self::unitPrice($r->cheapestShop, $r)),
+                // Directly under the prices: the same number over time,
+                // which is what makes a price readable as high or low.
+                Livewire::make(PriceHistoryChart::class, fn (Product $record): array => ['record' => $record])
+                    ->columnSpanFull(),
+            ]);
+    }
 
-                        TextEntry::make('cheapestShop.host')
-                            ->label('Cheapest at')
-                            ->formatStateUsing(fn (string $state): HtmlString => new HtmlString(Favicon::html($state)))
-                            ->placeholder('—')
-                            ->url(fn (Product $r): ?string => $r->cheapestShop?->url)
-                            ->openUrlInNewTab()
-                            ->icon(fn (Product $r): ?Heroicon => $r->cheapestShop === null
-                                ? null
-                                : Heroicon::ArrowTopRightOnSquare)
-                            ->iconPosition('after'),
+    private static function identity(): Section
+    {
+        return Section::make()
+            ->columnSpan(1)
+            ->schema([
+                ImageEntry::make('image_url')
+                    ->hiddenLabel()
+                    ->imageSize(140)
+                    ->extraImgAttributes(['class' => 'rounded-lg object-contain']),
 
-                        TextEntry::make('best_value')
-                            ->label('Best value')
-                            ->state(fn (Product $r): string => self::unitPrice($r->bestValueShop(), $r) ?? '—')
-                            ->helperText('Lowest price per unit, which is not always the lowest price.'),
+                TextEntry::make('title')
+                    ->hiddenLabel()
+                    ->size('lg')
+                    ->weight('semibold'),
 
-                        TextEntry::make('best_value_shop')
-                            ->label('Best value at')
-                            ->state(fn (Product $r): ?string => $r->bestValueShop()?->host)
-                            ->formatStateUsing(fn (string $state): HtmlString => new HtmlString(Favicon::html($state)))
-                            ->placeholder('—')
-                            ->url(fn (Product $r): ?string => $r->bestValueShop()?->url)
-                            ->openUrlInNewTab()
-                            ->icon(fn (Product $r): ?Heroicon => $r->bestValueShop() === null
-                                ? null
-                                : Heroicon::ArrowTopRightOnSquare)
-                            ->iconPosition('after'),
+                TextEntry::make('shops_count')
+                    ->label('Tracked at')
+                    ->state(fn (Product $r): string => trans_choice(':count shop|:count shops', $r->shops->count())),
 
-                        TextEntry::make('drop_threshold_pct')
-                            ->label('Drop threshold (%)')
-                            ->state(fn (Product $r): string => $r->drop_threshold_pct === null
-                                ? '—'
-                                : $r->drop_threshold_pct . ' %'),
+                TextEntry::make('active')
+                    ->label('Tracking')
+                    ->badge()
+                    ->state(fn (Product $r): string => $r->active ? 'Active' : 'Paused')
+                    ->color(fn (Product $r): string => $r->active ? 'success' : 'gray'),
+            ]);
+    }
 
-                        TextEntry::make('drop_threshold_abs')
-                            ->label('Drop threshold (absolute)')
-                            ->state(fn (Product $r): string => MoneyFormatter::format(
-                                $r->drop_threshold_abs === null ? null : (string) $r->drop_threshold_abs,
-                                $r->currency,
-                            )),
+    private static function price(): Section
+    {
+        return Section::make('Price')
+            ->columnSpan(2)
+            ->columns(2)
+            ->schema([
+                TextEntry::make('cheapest_price')
+                    ->label('Cheapest now')
+                    ->size('lg')
+                    ->weight('bold')
+                    ->state(fn (Product $r): string => MoneyFormatter::format(
+                        $r->cheapest_price === null ? null : (string) $r->cheapest_price,
+                        $r->currency,
+                    ))
+                    ->helperText(fn (Product $r): ?HtmlString => self::priceNote($r->cheapestShop, $r)),
 
-                        TextEntry::make('active')
-                            ->label('Tracking')
-                            ->badge()
-                            ->state(fn (Product $r): string => $r->active ? 'Active' : 'Paused')
-                            ->color(fn (Product $r): string => $r->active ? 'success' : 'gray'),
-                    ])
-                    ->columns(),
+                TextEntry::make('best_value')
+                    ->label('Best value')
+                    ->size('lg')
+                    ->weight('bold')
+                    ->state(fn (Product $r): string => self::unitPrice($r->bestValueShop(), $r) ?? '—')
+                    ->helperText(fn (Product $r): HtmlString => self::bestValueNote($r)),
+
+                // Below the two answers, the settings that decide when an
+                // alert fires — worth seeing, not worth the same weight.
+                TextEntry::make('drop_threshold_pct')
+                    ->label('Alerts below')
+                    ->columnSpanFull()
+                    ->state(fn (Product $r): string => self::thresholds($r)),
             ]);
     }
 
     /**
-     * A shop's price per unit, with the unit it is measured in — "EUR 5.38
-     * /kg". Null when the shop states no pack size, because a price per
-     * nothing is not a number worth showing.
+     * What sits under the cheapest price: its price per unit, the shop, and
+     * how long it lasts.
      */
+    private static function priceNote(?Shop $shop, Product $product): ?HtmlString
+    {
+        if ($shop === null) {
+            return null;
+        }
+
+        return self::note([
+            self::unitPrice($shop, $product),
+            PromotionLabel::short($shop),
+        ], $shop);
+    }
+
+    private static function bestValueNote(Product $product): HtmlString
+    {
+        $shop = $product->bestValueShop();
+
+        if ($shop === null) {
+            return new HtmlString('No shop states a pack size yet.');
+        }
+
+        return self::note([
+            MoneyFormatter::format(
+                $shop->current_price === null ? null : (string) $shop->current_price,
+                $product->currency,
+            ),
+            PromotionLabel::short($shop),
+        ], $shop);
+    }
+
+    /**
+     * @param  array<int, ?string>  $parts
+     */
+    private static function note(array $parts, Shop $shop): HtmlString
+    {
+        return new HtmlString(
+            Favicon::html($shop->host) . ' ' . e(implode(' · ', array_filter($parts))),
+        );
+    }
+
     private static function unitPrice(?Shop $shop, Product $product): ?string
     {
         $unitPrice = $shop?->unitPrice();
@@ -106,5 +156,17 @@ final class ProductInfolist
         }
 
         return MoneyFormatter::format($unitPrice, $product->currency) . ' ' . $shop?->unitPriceLabel();
+    }
+
+    private static function thresholds(Product $product): string
+    {
+        $parts = array_filter([
+            $product->drop_threshold_pct === null ? null : $product->drop_threshold_pct . ' %',
+            $product->drop_threshold_abs === null
+                ? null
+                : MoneyFormatter::format((string) $product->drop_threshold_abs, $product->currency),
+        ]);
+
+        return $parts === [] ? 'Any drop' : implode(' · ', $parts);
     }
 }

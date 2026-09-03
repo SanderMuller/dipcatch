@@ -19,6 +19,10 @@ class PriceHistoryChart extends ChartWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    // Enough to read the shape of the line without pushing the shops off
+    // the page.
+    protected ?string $maxHeight = '260px';
+
     public ?Product $record = null;
 
     public ?string $filter = '90';
