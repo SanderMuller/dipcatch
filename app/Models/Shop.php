@@ -127,8 +127,15 @@ class Shop extends Model
      */
     public function unitPrice(): ?string
     {
-        $price = $this->current_price;
+        return $this->unitPriceFor($this->current_price);
+    }
 
+    /**
+     * Any amount stated per unit at this shop's pack size — a past price as
+     * readily as the current one.
+     */
+    public function unitPriceFor(mixed $price): ?string
+    {
         if (! is_string($price) && ! is_numeric($price)) {
             return null;
         }
@@ -143,6 +150,12 @@ class Shop extends Model
     public function unitPriceLabel(): ?string
     {
         return $this->unitPrice() === null ? null : $this->packSize()?->label();
+    }
+
+    /** `/kg`, `/l` or `/stuk` for this shop's pack, whatever its price. */
+    public function packUnitLabel(): ?string
+    {
+        return $this->packSize()?->label();
     }
 
     /**

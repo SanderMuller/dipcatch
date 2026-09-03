@@ -149,3 +149,98 @@ test('chart options carry the currency-aware tooltip formatter', function (): vo
         ->toContain('Intl.NumberFormat')
         ->toContain('ctx.dataset.currency');
 });
+
+test('the cheapest price is plotted per unit as well, on its own axis', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create(['pack_quantity' => '200.00', 'pack_unit' => 'g']);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '2.19',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $datasets = makeChartFor($product)->computeData()['datasets'];
+    $unit = collect($datasets)->firstWhere('label', 'Cheapest per kg (€)');
+
+    expect($unit)->not->toBeNull()
+        ->and($unit['data'])->toBe([10.95, 10.95])
+        ->and($unit['yAxisID'])->toBe('unit');
+});
+
+test('a cheaper total that is worse value shows as two diverging lines', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $small = Shop::factory()->for($product)->create([
+        'url' => 'https://ah.nl/p/1', 'pack_quantity' => '200.00', 'pack_unit' => 'g',
+    ]);
+    $large = Shop::factory()->for($product)->create([
+        'url' => 'https://lidl.nl/p/1', 'pack_quantity' => '370.00', 'pack_unit' => 'g',
+    ]);
+
+    // The price falls while the value gets worse: a smaller bag, cheaper.
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $large->id,
+        'cheapest_price' => '1.99',
+        'started_at' => now()->subDays(5),
+        'ended_at' => now()->subDay(),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $small->id,
+        'cheapest_price' => '1.69',
+        'started_at' => now()->subDay(),
+        'ended_at' => null,
+    ]);
+
+    $datasets = collect(makeChartFor($product)->computeData()['datasets']);
+
+    expect($datasets->firstWhere('label', 'Cheapest (€)')['data'])->toBe([1.99, 1.69, 1.69])
+        // Down in euros, up per kilo — the point of the second line.
+        ->and($datasets->firstWhere('label', 'Cheapest per kg (€)')['data'])->toBe([5.38, 8.45, 8.45]);
+});
+
+test('shops that state no pack size get no unit line', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create(['pack_quantity' => null, 'pack_unit' => null]);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '2.19',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $labels = collect(makeChartFor($product)->computeData()['datasets'])->pluck('label');
+
+    expect($labels)->not->toContain('Cheapest per kg (€)');
+});
+
+test('units that cannot share an axis leave gaps rather than wrong numbers', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $perKilo = Shop::factory()->for($product)->create([
+        'url' => 'https://a.test/p/1', 'pack_quantity' => '200.00', 'pack_unit' => 'g',
+    ]);
+    $perPiece = Shop::factory()->for($product)->create([
+        'url' => 'https://b.test/p/1', 'pack_quantity' => '4.00', 'pack_unit' => 'piece',
+    ]);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $perPiece->id,
+        'cheapest_price' => '2.00',
+        'started_at' => now()->subDays(5),
+        'ended_at' => now()->subDays(3),
+    ]);
+    foreach ([now()->subDays(3), now()->subDay()] as $index => $startedAt) {
+        ProductCheapestHistory::factory()->for($product)->create([
+            'cheapest_shop_id' => $perKilo->id,
+            'cheapest_price' => '2.19',
+            'started_at' => $startedAt,
+            'ended_at' => $index === 0 ? now()->subDay() : null,
+        ]);
+    }
+
+    $unit = collect(makeChartFor($product)->computeData()['datasets'])->firstWhere('label', 'Cheapest per kg (€)');
+
+    // The per-piece segment is not a EUR/kg number, so it is a gap.
+    expect($unit['data'])->toBe([null, 10.95, 10.95, 10.95]);
+});
