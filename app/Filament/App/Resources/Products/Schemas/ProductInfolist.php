@@ -48,6 +48,23 @@ final class ProductInfolist
                                 : Heroicon::ArrowTopRightOnSquare)
                             ->iconPosition('after'),
 
+                        TextEntry::make('best_value')
+                            ->label('Best value')
+                            ->state(fn (Product $r): string => self::bestValueState($r))
+                            ->helperText('Lowest price per unit, which is not always the lowest price.'),
+
+                        TextEntry::make('best_value_shop')
+                            ->label('Best value at')
+                            ->state(fn (Product $r): ?string => $r->bestValueShop()?->host)
+                            ->formatStateUsing(fn (string $state): HtmlString => new HtmlString(Favicon::html($state)))
+                            ->placeholder('—')
+                            ->url(fn (Product $r): ?string => $r->bestValueShop()?->url)
+                            ->openUrlInNewTab()
+                            ->icon(fn (Product $r): ?Heroicon => $r->bestValueShop() === null
+                                ? null
+                                : Heroicon::ArrowTopRightOnSquare)
+                            ->iconPosition('after'),
+
                         TextEntry::make('drop_threshold_pct')
                             ->label('Drop threshold (%)')
                             ->state(fn (Product $r): string => $r->drop_threshold_pct === null
@@ -69,5 +86,19 @@ final class ProductInfolist
                     ])
                     ->columns(),
             ]);
+    }
+
+    /**
+     * The best unit price, with the unit it is measured in — "EUR 5.38 /kg".
+     */
+    private static function bestValueState(Product $product): string
+    {
+        $shop = $product->bestValueShop();
+
+        if ($shop === null) {
+            return '—';
+        }
+
+        return MoneyFormatter::format($shop->unitPrice(), $product->currency) . ' ' . $shop->unitPriceLabel();
     }
 }

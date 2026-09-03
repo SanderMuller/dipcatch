@@ -265,8 +265,14 @@ function dirkPage(
  * points at a price record whose `packaging.text` holds the pack size
  * (observed 2026-09-01).
  */
-function lidlPage(string $price = '1.99', string $packaging = '370 g', int $productId = 10033095): string
-{
+function lidlPage(
+    string $price = '1.99',
+    string $packaging = '370 g',
+    int $productId = 10033095,
+    ?string $validFrom = '-3 days',
+    ?string $validUntil = '+3 days',
+    ?string $secondWindowUntil = null,
+): string {
     $jsonLd = json_encode([
         '@context' => 'http://schema.org',
         '@type' => 'Product',
@@ -275,7 +281,7 @@ function lidlPage(string $price = '1.99', string $packaging = '370 g', int $prod
     ], JSON_THROW_ON_ERROR);
 
     // Flat devalue array: object values are indices into the same array.
-    $payload = json_encode([
+    $records = [
         ['productId' => 1, 'price' => 2],
         $productId,
         ['price' => 3, 'packaging' => 4, 'currencyCode' => 6],
@@ -283,7 +289,27 @@ function lidlPage(string $price = '1.99', string $packaging = '370 g', int $prod
         ['text' => 5],
         $packaging,
         'EUR',
-    ], JSON_THROW_ON_ERROR);
+    ];
+
+    // The offer period as Lidl states it: a stock-availability badge
+    // ("Alleen in de winkel 31/08 - 06/09") with the timestamps beside it.
+    if ($validFrom !== null && $validUntil !== null) {
+        $base = count($records);
+        $records[] = ['badges' => $base + 1, 'validFrom' => $base + 2, 'validUntil' => $base + 3];
+        $records[] = [];
+        $records[] = now()->modify($validFrom)->getTimestamp();
+        $records[] = now()->modify($validUntil)->getTimestamp();
+    }
+
+    if ($secondWindowUntil !== null) {
+        $base = count($records);
+        $records[] = ['badges' => $base + 1, 'validFrom' => $base + 2, 'validUntil' => $base + 3];
+        $records[] = [];
+        $records[] = now()->modify($validFrom ?? '-3 days')->getTimestamp();
+        $records[] = now()->modify($secondWindowUntil)->getTimestamp();
+    }
+
+    $payload = json_encode($records, JSON_THROW_ON_ERROR);
 
     return '<html><head><script type="application/ld+json">' . $jsonLd . '</script></head>'
         . '<body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';

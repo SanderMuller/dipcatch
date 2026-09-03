@@ -36,3 +36,32 @@ test('fails with a lidl-specific reason when the page has no JSON-LD', function 
 
     expect($result->isSuccess())->toBeFalse();
 });
+
+test('reads the offer period from the in-store badge', function (): void {
+    $result = new LidlAdapter()->extract('https://www.lidl.nl/p/lay-s/p10033095', lidlPage());
+
+    expect($result->snapshot?->promotionWindow?->isRunning())->toBeTrue()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});
+
+test('a page stating no period reports none, and says so', function (): void {
+    $result = new LidlAdapter()->extract(
+        'https://www.lidl.nl/p/lay-s/p10033095',
+        lidlPage(validFrom: null, validUntil: null),
+    );
+
+    expect($result->snapshot?->price)->toBe('1.99')
+        ->and($result->snapshot?->promotionWindow)->toBeNull()
+        // Authoritative, so an offer that ended clears the stored period.
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});
+
+test('badges that disagree on the period yield none', function (): void {
+    $result = new LidlAdapter()->extract(
+        'https://www.lidl.nl/p/lay-s/p10033095',
+        lidlPage(secondWindowUntil: '+10 days'),
+    );
+
+    expect($result->snapshot?->price)->toBe('1.99')
+        ->and($result->snapshot?->promotionWindow)->toBeNull();
+});

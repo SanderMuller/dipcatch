@@ -129,6 +129,43 @@ class Product extends Model
      * Reference is computed BEFORE the lock so the 30-day window read does
      * not run inside the critical section.
      */
+    /**
+     * The shop with the lowest price per unit — the best value, which is not
+     * always the lowest price: a 370 g bag at EUR 1.99 beats a 200 g bag at
+     * EUR 1.69 by a third per kilo.
+     *
+     * Only shops that state a pack size can take part, and only those
+     * sharing one unit: EUR/kg and EUR/piece are not comparable numbers.
+     * When the sized shops disagree on the unit, the largest group wins.
+     */
+    public function bestValueShop(): ?Shop
+    {
+        $candidates = $this->shops
+            ->filter(fn (Shop $shop): bool => $shop->active
+                && $shop->current_in_stock
+                && $shop->health !== ShopHealth::Dead
+                && $shop->unitPrice() !== null);
+
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        $unit = $candidates->countBy(fn (Shop $shop): string => (string) $shop->pack_unit)
+            ->sortDesc()
+            ->keys()
+            ->first();
+
+        return $candidates
+            ->filter(fn (Shop $shop): bool => (string) $shop->pack_unit === $unit)
+            // Unit prices are two-decimal strings; compare them as numbers,
+            // with the oldest shop winning a tie so the answer is stable.
+            ->sortBy([
+                fn (Shop $a, Shop $b): int => (float) $a->unitPrice() <=> (float) $b->unitPrice(),
+                fn (Shop $a, Shop $b): int => $a->created_at <=> $b->created_at,
+            ])
+            ->first();
+    }
+
     public function recomputeCheapestShop(?int $triggeringPriceCheckId = null): void
     {
         $reference = app(Reference::class)->compute($this);

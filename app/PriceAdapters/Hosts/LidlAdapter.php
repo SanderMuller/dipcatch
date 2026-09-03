@@ -6,9 +6,11 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\NuxtData;
+use Carbon\CarbonImmutable;
 
 /**
  * Host-specific adapter for lidl.nl. Price, title, and image come from the
@@ -16,6 +18,12 @@ use App\Support\NuxtData;
  * payload: the product record's `price` points at a price record whose
  * `packaging.text` holds the size ("370 g"), so this adapter augments the
  * JSON-LD snapshot with it.
+ *
+ * The offer period lives further away still — in the stock-availability
+ * record's badge, which states it as "Alleen in de winkel 31/08 - 06/09"
+ * with `validFrom` / `validUntil` beside it (verified 2026-09-03). Lidl's
+ * JSON-LD carries no `priceValidUntil`, so without reading that badge a
+ * weekly action reads as a permanent price.
  */
 final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
 {
@@ -38,23 +46,55 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
         $snapshot = $result->snapshot;
         assert($snapshot instanceof ShopSnapshot);
 
+        $data = NuxtData::decode($html);
         $packaging = self::packagingFromNuxtPayload($html, HostUrl::lastSegmentDigits($url, 'p'));
-        if ($packaging === null) {
-            return $result;
+
+        return ExtractionResult::success($snapshot->with(
+            packSize: $packaging ?? $snapshot->packSize,
+            packSizeAuthoritative: $packaging !== null ? true : null,
+            promotionWindow: $data === null ? null : self::promotionWindow($data),
+            // The payload always carries the availability record; an offer
+            // that ended simply stops stating a period.
+            promotionWindowAuthoritative: $data !== null,
+        ));
+    }
+
+    /**
+     * The offer period, from the stock-availability badge that states it.
+     *
+     * A page can carry more than one badge; they agree in every page
+     * sampled, and when they do not there is no basis to pick one, so no
+     * period is reported.
+     *
+     * @param  list<mixed>  $data
+     */
+    private static function promotionWindow(array $data): ?PromotionWindow
+    {
+        $windows = [];
+
+        foreach ($data as $element) {
+            if (! is_array($element) || ! isset($element['validFrom'], $element['validUntil'])) {
+                continue;
+            }
+
+            $from = is_int($element['validFrom']) ? ($data[$element['validFrom']] ?? null) : null;
+            $until = is_int($element['validUntil']) ? ($data[$element['validUntil']] ?? null) : null;
+
+            if (is_int($from) && is_int($until)) {
+                $windows[$from . '-' . $until] = [$from, $until];
+            }
         }
 
-        return ExtractionResult::success(new ShopSnapshot(
-            title: $snapshot->title,
-            imageUrl: $snapshot->imageUrl,
-            price: $snapshot->price,
-            currency: $snapshot->currency,
-            inStock: $snapshot->inStock,
-            raw: $snapshot->raw,
-            packSize: $packaging,
-            packSizeAuthoritative: true,
-            gtin: $snapshot->gtin,
-            gtinAuthoritative: $snapshot->gtinAuthoritative,
-        ));
+        if (count($windows) !== 1) {
+            return null;
+        }
+
+        [$from, $until] = array_values($windows)[0];
+
+        return PromotionWindow::make(
+            endsAt: CarbonImmutable::createFromTimestampUTC($until),
+            startsAt: CarbonImmutable::createFromTimestampUTC($from),
+        );
     }
 
     /**
