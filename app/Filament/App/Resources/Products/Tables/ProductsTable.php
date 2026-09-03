@@ -4,6 +4,7 @@ namespace App\Filament\App\Resources\Products\Tables;
 
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Support\MoneyFormatter;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
@@ -25,7 +26,10 @@ class ProductsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->with('cheapestShop'))
+            // `shops` rides along for the best-value column, which reads
+            // every shop's unit price — one query for the page instead of one
+            // per row.
+            ->modifyQueryUsing(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->with(['cheapestShop', 'shops']))
             // Filament shows one empty state for both "nothing tracked yet"
             // and "search/filter matched nothing"; only the former gets the
             // onboarding copy and CTA.
@@ -65,15 +69,14 @@ class ProductsTable
                 TextColumn::make('cheapest_shop_unit_price')
                     ->visibleFrom('md')
                     ->label('Unit price')
-                    ->state(function (Product $record): string {
-                        $unitPrice = $record->cheapestShop?->unitPrice();
+                    ->state(fn (Product $record): string => self::unitPriceState($record->cheapestShop, $record)),
 
-                        if ($unitPrice === null) {
-                            return '—';
-                        }
-
-                        return MoneyFormatter::format($unitPrice, $record->currency) . ' ' . $record->cheapestShop?->unitPriceLabel();
-                    }),
+                TextColumn::make('best_value')
+                    ->visibleFrom('md')
+                    ->label('Best value')
+                    ->state(fn (Product $record): string => self::unitPriceState($record->bestValueShop(), $record))
+                    // Which shop it is, since it is often not the cheapest one.
+                    ->description(fn (Product $record): ?string => $record->bestValueShop()?->host),
 
                 TextColumn::make('shops_count')
                     ->visibleFrom('md')
@@ -113,6 +116,21 @@ class ProductsTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * A shop's price per unit — "EUR 5.38 /kg" — or a dash when the shop
+     * states no pack size.
+     */
+    private static function unitPriceState(?Shop $shop, Product $product): string
+    {
+        $unitPrice = $shop?->unitPrice();
+
+        if ($unitPrice === null) {
+            return '—';
+        }
+
+        return MoneyFormatter::format($unitPrice, $product->currency) . ' ' . $shop?->unitPriceLabel();
     }
 
     private static function hasNoProducts(): bool

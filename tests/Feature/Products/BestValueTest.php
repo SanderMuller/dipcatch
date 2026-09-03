@@ -1,10 +1,12 @@
 <?php declare(strict_types=1);
 
 use App\Enums\ShopHealth;
+use App\Filament\App\Resources\Products\Pages\ListProducts;
 use App\Filament\App\Resources\Products\Pages\ViewProduct;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -123,4 +125,53 @@ test('the product page shows the best value beside the cheapest price', function
         ->assertSeeText('Best value')
         ->assertSeeText('€5.38 /kg')
         ->assertSeeText('lidl.nl');
+});
+
+test('the products list shows the best value beside the cheapest price', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => "Lay's Naturel"]);
+
+    $ah = Shop::factory()->for($product)->create([
+        'url' => 'https://ah.nl/producten/product/wi9/x', 'currency' => 'EUR', 'current_price' => '1.69',
+        'pack_quantity' => '200.00', 'pack_unit' => 'g',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://lidl.nl/p/lay-s/p9', 'currency' => 'EUR', 'current_price' => '1.99',
+        'pack_quantity' => '370.00', 'pack_unit' => 'g',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $ah->id, 'cheapest_price' => '1.69'])->save();
+
+    $this->actingAs($user);
+
+    livewire(ListProducts::class)
+        ->assertSeeText('€1.69')
+        ->assertSeeText('€8.45 /kg')
+        ->assertSeeText('€5.38 /kg')
+        // Named, because the best value is usually not the cheapest shop.
+        ->assertSeeText('lidl.nl');
+});
+
+test('the list reads every shop once, not once per product row', function (): void {
+    $user = User::factory()->create();
+
+    foreach (range(1, 8) as $i) {
+        $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+        Shop::factory()->for($product)->create([
+            'url' => "https://shop{$i}.test/p/1", 'currency' => 'EUR', 'current_price' => '1.99',
+            'pack_quantity' => '370.00', 'pack_unit' => 'g',
+        ]);
+    }
+
+    $this->actingAs($user);
+
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+
+    livewire(ListProducts::class)->assertSeeText('€5.38 /kg');
+
+    // Eager loading makes this flat: eight products cost the same three
+    // queries as one. Reading shops per row would cost eight more.
+    expect($queries)->toBeLessThanOrEqual(4);
 });
