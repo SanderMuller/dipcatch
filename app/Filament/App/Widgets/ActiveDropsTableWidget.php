@@ -4,6 +4,7 @@ namespace App\Filament\App\Widgets;
 
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Support\Favicon;
 use App\Support\MoneyFormatter;
 use Filament\Actions\Action;
@@ -34,6 +35,12 @@ class ActiveDropsTableWidget extends BaseWidget
                 TextColumn::make('cheapest_price')
                     ->label('Now')
                     ->state(fn (Product $r): string => MoneyFormatter::format($r->cheapest_price === null ? null : (string) $r->cheapest_price, $r->currency)),
+                TextColumn::make('best_value')
+                    ->visibleFrom('md')
+                    ->label('Best value')
+                    ->state(fn (Product $r): string => self::unitPriceState($r->bestValueShop(), $r))
+                    // Which shop it is, since it is often not the cheapest one.
+                    ->description(fn (Product $r): ?string => $r->bestValueShop()?->host),
                 TextColumn::make('last_notified_price')
                     ->visibleFrom('md')
                     ->label('Notified at')
@@ -56,6 +63,21 @@ class ActiveDropsTableWidget extends BaseWidget
     }
 
     /**
+     * A shop's price per unit — "EUR 5.38 /kg" — or a dash when the shop
+     * states no pack size.
+     */
+    private static function unitPriceState(?Shop $shop, Product $product): string
+    {
+        $unitPrice = $shop?->unitPrice();
+
+        if ($unitPrice === null) {
+            return '—';
+        }
+
+        return MoneyFormatter::format($unitPrice, $product->currency) . ' ' . $shop?->unitPriceLabel();
+    }
+
+    /**
      * @return EloquentQueryBuilder<Product>
      */
     private function scopedQuery(): EloquentQueryBuilder
@@ -63,6 +85,9 @@ class ActiveDropsTableWidget extends BaseWidget
         return Product::query()
             ->where('user_id', auth()->id())
             ->whereNotNull('last_notified_price')
+            // `shops` for the best-value column, `cheapestShop` for the shop
+            // column: one query each for the widget, none per row.
+            ->with(['cheapestShop', 'shops'])
             ->latest('last_notified_at');
     }
 }

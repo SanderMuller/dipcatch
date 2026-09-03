@@ -64,6 +64,9 @@ class ProductsTable
                         $record->cheapest_price === null ? null : (string) $record->cheapest_price,
                         $record->currency,
                     ))
+                    // Named the same way the best value is, so the two columns
+                    // can be read against each other.
+                    ->description(fn (Product $record): ?string => $record->cheapestShop?->host)
                     ->sortable(),
 
                 TextColumn::make('cheapest_shop_unit_price')

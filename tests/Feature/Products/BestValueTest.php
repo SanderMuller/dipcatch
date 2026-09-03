@@ -3,6 +3,7 @@
 use App\Enums\ShopHealth;
 use App\Filament\App\Resources\Products\Pages\ListProducts;
 use App\Filament\App\Resources\Products\Pages\ViewProduct;
+use App\Filament\App\Widgets\ActiveDropsTableWidget;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -174,4 +175,31 @@ test('the list reads every shop once, not once per product row', function (): vo
     // Eager loading makes this flat: eight products cost the same three
     // queries as one. Reading shops per row would cost eight more.
     expect($queries)->toBeLessThanOrEqual(4);
+});
+
+test('the dashboard names the best value on an active drop', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create([
+        'currency' => 'EUR',
+        'title' => "Lay's Naturel",
+        'last_notified_price' => '1.79',
+        'last_notified_at' => now()->subHour(),
+    ]);
+
+    $ah = Shop::factory()->for($product)->create([
+        'url' => 'https://ah.nl/producten/product/wi7/x', 'currency' => 'EUR', 'current_price' => '1.69',
+        'pack_quantity' => '200.00', 'pack_unit' => 'g',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://lidl.nl/p/lay-s/p7', 'currency' => 'EUR', 'current_price' => '1.99',
+        'pack_quantity' => '370.00', 'pack_unit' => 'g',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $ah->id, 'cheapest_price' => '1.69'])->save();
+
+    $this->actingAs($user);
+
+    livewire(ActiveDropsTableWidget::class)
+        ->assertSeeText('€1.69')
+        ->assertSeeText('€5.38 /kg')
+        ->assertSeeText('lidl.nl');
 });

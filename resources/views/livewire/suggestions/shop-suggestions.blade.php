@@ -46,6 +46,13 @@
                         </div>
 
                         <div class="flex w-full shrink-0 items-center gap-2 pl-8 sm:w-auto sm:pl-0">
+                            {{-- Every row opens: a shopper may want to see the
+                                 product before tracking it, not only when
+                                 tracking is impossible. --}}
+                            <a href="{{ $suggestion->url }}" target="_blank" rel="noopener noreferrer" class="{{ $ghostBtn }}">
+                                Open
+                            </a>
+
                             @if ($suggestion->trackable)
                                 <button
                                     type="button"
@@ -56,9 +63,6 @@
                                     Add
                                 </button>
                             @else
-                                <a href="{{ $suggestion->url }}" target="_blank" rel="noopener noreferrer" class="{{ $ghostBtn }}">
-                                    Open
-                                </a>
                                 <button type="button" class="{{ $ghostBtn }}" disabled title="This shop cannot be price-checked yet.">
                                     Add
                                 </button>

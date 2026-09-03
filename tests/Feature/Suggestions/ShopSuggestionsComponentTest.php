@@ -44,7 +44,10 @@ test('it lists a trackable and an untrackable suggestion, each labelled', functi
         ->assertSee('PLUS')
         ->assertSee('dataset price € 3.69')
         ->assertSee('not trackable yet')
-        ->assertSee('https://www.plus.nl/product/beemster-plus-1');
+        ->assertSee('https://www.plus.nl/product/beemster-plus-1')
+        // Both rows link out: a shopper may want to see a product before
+        // tracking it, not only when tracking is impossible.
+        ->assertSee('https://www.spar.nl/beemster-spar-1/');
 });
 
 test('accepting a suggestion hands the url to the add-shop component', function (): void {
