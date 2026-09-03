@@ -7,6 +7,7 @@ use App\Filament\App\Widgets\ActiveDropsTableWidget;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
@@ -202,4 +203,46 @@ test('the dashboard names the best value on an active drop', function (): void {
         ->assertSeeText('€1.69')
         ->assertSeeText('€5.38 /kg')
         ->assertSeeText('lidl.nl');
+});
+
+test('the list says how long a quoted price lasts', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => "Lay's Naturel"]);
+
+    $ah = Shop::factory()->for($product)->create([
+        'url' => 'https://ah.nl/producten/product/wi5/x', 'currency' => 'EUR', 'current_price' => '1.69',
+        'pack_quantity' => '200.00', 'pack_unit' => 'g',
+    ]);
+    $ah->forceFill(['promotion_ends_at' => CarbonImmutable::parse('2036-09-06 21:59:59')])->save();
+
+    Shop::factory()->for($product)->create([
+        'url' => 'https://lidl.nl/p/lay-s/p5', 'currency' => 'EUR', 'current_price' => '1.99',
+        'pack_quantity' => '370.00', 'pack_unit' => 'g',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $ah->id, 'cheapest_price' => '1.69'])->save();
+
+    $this->actingAs($user);
+
+    livewire(ListProducts::class)
+        // The cheapest price is a bonus that runs out; the best value is not.
+        ->assertSeeText('ah.nl · until 6 Sep')
+        ->assertSeeText('lidl.nl')
+        ->assertDontSeeText('lidl.nl · until');
+});
+
+test('a shop with no promotion is named without a deadline', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/producten/x', 'currency' => 'EUR', 'current_price' => '2.19',
+        'pack_quantity' => '200.00', 'pack_unit' => 'g',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '2.19'])->save();
+
+    $this->actingAs($user);
+
+    livewire(ListProducts::class)
+        ->assertSeeText('jumbo.com')
+        ->assertDontSeeText('jumbo.com ·');
 });
