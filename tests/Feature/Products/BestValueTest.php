@@ -72,6 +72,27 @@ test('paused, dead and out-of-stock shops are left out', function (): void {
     expect($product->bestValueShop()?->host)->toBe('lidl.nl');
 });
 
+test('a cheapest shop with no pack size shows no unit price beside it', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $sizeless = Shop::factory()->for($product)->create([
+        'url' => 'https://dataset.test/p/1', 'currency' => 'EUR', 'current_price' => '0.99',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://lidl.nl/p/lay-s/p2', 'currency' => 'EUR', 'current_price' => '1.99',
+        'pack_quantity' => '370.00', 'pack_unit' => 'g',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $sizeless->id, 'cheapest_price' => '0.99'])->save();
+
+    $this->actingAs($user);
+
+    livewire(ViewProduct::class, ['record' => $product->refresh()->getKey()])
+        ->assertSeeText('€0.99')
+        // The best value still stands on its own.
+        ->assertSeeText('€5.38 /kg');
+});
+
 test('a product whose shops state no size has no best value', function (): void {
     $product = productWithShops(['a.test' => ['current_price' => '1.00']]);
 
@@ -97,6 +118,8 @@ test('the product page shows the best value beside the cheapest price', function
     livewire(ViewProduct::class, ['record' => $product->refresh()->getKey()])
         ->assertSeeText('Cheapest now')
         ->assertSeeText('€1.69')
+        // Both stated per kilo, so the gap between them can be read off.
+        ->assertSeeText('€8.45 /kg')
         ->assertSeeText('Best value')
         ->assertSeeText('€5.38 /kg')
         ->assertSeeText('lidl.nl');

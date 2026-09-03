@@ -3,6 +3,7 @@
 namespace App\Filament\App\Resources\Products\Schemas;
 
 use App\Models\Product;
+use App\Models\Shop;
 use App\Support\Favicon;
 use App\Support\MoneyFormatter;
 use Filament\Infolists\Components\ImageEntry;
@@ -35,7 +36,10 @@ final class ProductInfolist
                             ->state(fn (Product $r): string => MoneyFormatter::format(
                                 $r->cheapest_price === null ? null : (string) $r->cheapest_price,
                                 $r->currency,
-                            )),
+                            ))
+                            // The same measure the best value is stated in, so
+                            // the two lines can be read against each other.
+                            ->helperText(fn (Product $r): ?string => self::unitPrice($r->cheapestShop, $r)),
 
                         TextEntry::make('cheapestShop.host')
                             ->label('Cheapest at')
@@ -50,7 +54,7 @@ final class ProductInfolist
 
                         TextEntry::make('best_value')
                             ->label('Best value')
-                            ->state(fn (Product $r): string => self::bestValueState($r))
+                            ->state(fn (Product $r): string => self::unitPrice($r->bestValueShop(), $r) ?? '—')
                             ->helperText('Lowest price per unit, which is not always the lowest price.'),
 
                         TextEntry::make('best_value_shop')
@@ -89,16 +93,18 @@ final class ProductInfolist
     }
 
     /**
-     * The best unit price, with the unit it is measured in — "EUR 5.38 /kg".
+     * A shop's price per unit, with the unit it is measured in — "EUR 5.38
+     * /kg". Null when the shop states no pack size, because a price per
+     * nothing is not a number worth showing.
      */
-    private static function bestValueState(Product $product): string
+    private static function unitPrice(?Shop $shop, Product $product): ?string
     {
-        $shop = $product->bestValueShop();
+        $unitPrice = $shop?->unitPrice();
 
-        if ($shop === null) {
-            return '—';
+        if ($unitPrice === null) {
+            return null;
         }
 
-        return MoneyFormatter::format($shop->unitPrice(), $product->currency) . ' ' . $shop->unitPriceLabel();
+        return MoneyFormatter::format($unitPrice, $product->currency) . ' ' . $shop?->unitPriceLabel();
     }
 }
