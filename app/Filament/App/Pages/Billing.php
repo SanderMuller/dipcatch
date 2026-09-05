@@ -5,9 +5,9 @@ namespace App\Filament\App\Pages;
 use App\Billing\Entitlements;
 use App\Billing\Plan;
 use App\Billing\PlanLimits;
+use App\Billing\ProPrice;
 use App\Models\Product;
 use App\Models\User;
-use App\Support\MoneyFormatter;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -88,24 +88,16 @@ class Billing extends Page
 
     public function priceLabel(): string
     {
-        $currency = config('plans.stripe.pro_currency');
-        $amount = config('plans.stripe.pro_amount');
-
-        return MoneyFormatter::format(
-            is_numeric($amount) ? (string) $amount : '4.99',
-            is_string($currency) && $currency !== '' ? $currency : 'EUR',
-        );
+        return ProPrice::label();
     }
 
     public function trialDays(): int
     {
-        $days = config('plans.stripe.trial_days');
-
-        return is_numeric($days) ? (int) $days : 0;
+        return ProPrice::trialDays();
     }
 
     public function checkoutConfigured(): bool
     {
-        return is_string(config('plans.stripe.pro_price_id')) && config('plans.stripe.pro_price_id') !== '';
+        return ProPrice::isConfigured();
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Widgets;
 
 use App\Billing\Plan;
+use App\Billing\ProPrice;
 use App\Billing\ProUsers;
 use App\Models\StripePayment;
 use App\Support\MoneyFormatter;
@@ -96,7 +97,11 @@ class RevenueOverviewWidget extends BaseWidget
 
     private function netRevenue(): int
     {
-        return (int) StripePayment::query()->sum('amount');
+        // One currency only: adding cents of one currency to another would
+        // produce a number that means nothing.
+        return (int) StripePayment::query()
+            ->where('currency', $this->currency())
+            ->sum('amount');
     }
 
     private function churnLabel(int $cancelled, int $base): string
@@ -110,15 +115,11 @@ class RevenueOverviewWidget extends BaseWidget
 
     private function price(): float
     {
-        $amount = config('plans.stripe.pro_amount');
-
-        return is_numeric($amount) ? (float) $amount : 0.0;
+        return (float) ProPrice::amount();
     }
 
     private function currency(): string
     {
-        $currency = config('plans.stripe.pro_currency');
-
-        return mb_strtoupper(is_string($currency) && $currency !== '' ? $currency : 'EUR');
+        return mb_strtoupper(ProPrice::currency());
     }
 }

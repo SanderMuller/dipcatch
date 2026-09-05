@@ -8,6 +8,7 @@ use App\Models\StripeDispute;
 use App\Models\StripePayment;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -108,6 +109,46 @@ it('shows the owner each subscriber, their revenue and their disputes', function
         ->assertSee('Pro')
         // 499 paid minus a 100 refund, in euros.
         ->assertSee('3.99');
+});
+
+it('reads the subscriber list flat, not once per row', function (): void {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    foreach (range(1, 8) as $i) {
+        $customer = User::factory()->create(['stripe_id' => 'cus_flat' . $i]);
+        subscribeUser($customer);
+        StripePayment::factory()->create(['user_id' => $customer->id, 'stripe_id' => 'in_flat' . $i]);
+    }
+
+    $this->actingAs($admin);
+    Filament::setCurrentPanel('admin');
+
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+
+    livewire(ListSubscribers::class)->assertSee('Pro');
+
+    // The plan badge and the renewal date read the subscription rows that
+    // came with the page. Asking Stripe — or the database — per row would
+    // put the admin table into the rate limiter.
+    expect($queries)->toBeLessThanOrEqual(12);
+});
+
+it('leaves another currency out of the revenue figures', function (): void {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $customer = User::factory()->create(['stripe_id' => 'cus_2']);
+    StripePayment::factory()->create(['user_id' => $customer->id, 'amount' => 499, 'currency' => 'EUR']);
+    // Cents of one currency do not add to cents of another.
+    StripePayment::factory()->create(['user_id' => $customer->id, 'stripe_id' => 'in_usd', 'amount' => 10_000, 'currency' => 'USD']);
+
+    $this->actingAs($admin);
+    Filament::setCurrentPanel('admin');
+
+    livewire(ListSubscribers::class)
+        ->assertSee('4.99')
+        ->assertDontSee('104.99');
 });
 
 it('lists open chargebacks and hides closed ones by default', function (): void {

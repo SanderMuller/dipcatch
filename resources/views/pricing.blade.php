@@ -6,8 +6,8 @@
     $canonical = $locale === 'nl' ? route('pricing', ['lang' => 'nl']) : route('pricing');
     $free = \App\Billing\Entitlements::of(\App\Billing\Plan::Free);
     $pro = \App\Billing\Entitlements::of(\App\Billing\Plan::Pro);
-    $price = \App\Support\MoneyFormatter::format((string) config('plans.stripe.pro_amount', '4.99'), (string) config('plans.stripe.pro_currency', 'EUR'));
-    $trialDays = (int) config('plans.stripe.trial_days', 0);
+    $price = \App\Billing\ProPrice::label();
+    $trialDays = \App\Billing\ProPrice::trialDays();
     $authed = auth()->check();
     $ctaHref = $authed ? url('/app/billing') : route('register');
 @endphp
@@ -49,7 +49,7 @@
                 <div class="mt-10 grid gap-6 sm:grid-cols-2">
                     <section class="rounded-2xl bg-white/70 p-6 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/70 dark:ring-zinc-800">
                         <h2 class="text-lg font-semibold">{{ __('Free') }}</h2>
-                        <p class="mt-1 text-3xl font-semibold tracking-tight">{{ \App\Support\MoneyFormatter::symbol((string) config('plans.stripe.pro_currency', 'EUR')) }}0</p>
+                        <p class="mt-1 text-3xl font-semibold tracking-tight">{{ \App\Support\MoneyFormatter::symbol(\App\Billing\ProPrice::currency()) }}0</p>
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ __('No card, no expiry.') }}</p>
 
                         <ul class="mt-6 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">

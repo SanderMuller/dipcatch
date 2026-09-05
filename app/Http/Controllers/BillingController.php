@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Billing\Plan;
+use App\Billing\ProPrice;
 use App\Models\User;
-use App\Support\Config as ConfigHelper;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Laravel\Cashier\Checkout;
@@ -19,8 +19,7 @@ class BillingController extends Controller
     public function checkout(): Checkout|RedirectResponse
     {
         $user = $this->user();
-        $priceId = config('plans.stripe.pro_price_id');
-        $priceId = is_string($priceId) ? $priceId : '';
+        $priceId = ProPrice::priceId();
 
         if ($priceId === '') {
             return $this->failed('Checkout is not configured yet. No price has been set.');
@@ -30,7 +29,7 @@ class BillingController extends Controller
             return redirect('/app/billing');
         }
 
-        $trialDays = ConfigHelper::int('plans.stripe.trial_days', 0);
+        $trialDays = ProPrice::trialDays();
 
         try {
             $subscription = $user->newSubscription(Plan::SUBSCRIPTION_TYPE, $priceId);

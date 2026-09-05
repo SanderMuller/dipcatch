@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources\Subscribers\Tables;
 
 use App\Billing\Plan;
+use App\Billing\ProPrice;
 use App\Billing\ProUsers;
 use App\Models\User;
 use App\Support\MoneyFormatter;
@@ -25,7 +26,11 @@ class SubscribersTable
             // to Stripe while rendering.
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
                 ->with('subscriptions')
-                ->withSum('stripePayments as revenue_sum', 'amount')
+                ->withSum([
+                    // One currency only, matching the widget: cents of two
+                    // currencies do not add up to a number that means anything.
+                    'stripePayments as revenue_sum' => fn (Builder $q): Builder => $q->where('currency', ProPrice::currency()),
+                ], 'amount')
                 ->withCount(['stripeDisputes as open_disputes_count' => fn (Builder $q): Builder => $q->whereNull('closed_at')]))
             ->columns([
                 TextColumn::make('email')
@@ -53,7 +58,7 @@ class SubscribersTable
 
                 TextColumn::make('revenue_sum')
                     ->label('Net revenue')
-                    ->state(fn (User $record): string => MoneyFormatter::formatMinor(self::amount($record, 'revenue_sum'), self::currency()))
+                    ->state(fn (User $record): string => MoneyFormatter::formatMinor(self::amount($record, 'revenue_sum'), ProPrice::currency()))
                     ->sortable()
                     ->alignEnd(),
 
@@ -109,13 +114,6 @@ class SubscribersTable
         $value = $record->getAttribute($attribute);
 
         return is_numeric($value) ? (int) $value : 0;
-    }
-
-    private static function currency(): string
-    {
-        $currency = config('plans.stripe.pro_currency');
-
-        return is_string($currency) && $currency !== '' ? $currency : 'EUR';
     }
 
     private static function status(User $record): string
