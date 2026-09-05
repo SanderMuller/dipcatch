@@ -46,13 +46,29 @@ final class MoneyFormatter
     }
 
     /**
+     * Currencies Stripe states without a minor unit: JPY 500 is the string
+     * `500`, not 5.00. Dividing those by 100 undercharges the reader by a
+     * factor of a hundred.
+     *
+     * @see https://docs.stripe.com/currencies#zero-decimal
+     */
+    private const array ZERO_DECIMAL = [
+        'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG',
+        'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
+    ];
+
+    /**
      * Stripe states money in the currency's minor unit — 499 is EUR 4.99.
      * Converts and formats in one step, so no billing surface hand-rolls
      * the division.
      */
     public static function formatMinor(int $amount, string $currency): string
     {
-        return self::format(sprintf('%.2F', $amount / 100), $currency);
+        $code = strtoupper(trim($currency));
+
+        return in_array($code, self::ZERO_DECIMAL, true)
+            ? self::format((string) $amount, $code)
+            : self::format(sprintf('%.2F', $amount / 100), $code);
     }
 
     /**

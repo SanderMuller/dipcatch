@@ -7,6 +7,7 @@ use App\Billing\ProPrice;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Cashier\Checkout;
 use Throwable;
 
@@ -29,6 +30,16 @@ class BillingController extends Controller
             return redirect('/app/billing');
         }
 
+        // A double-click must not open two Checkout sessions: Stripe writes
+        // no local row until the webhook lands, so the isPro() check above
+        // cannot see a session already in flight. Completing both would
+        // charge the customer twice.
+        $lock = Cache::lock('billing:checkout:' . $user->id, 30);
+
+        if (! $lock->get()) {
+            return redirect('/app/billing');
+        }
+
         $trialDays = ProPrice::trialDays();
 
         try {
@@ -45,6 +56,8 @@ class BillingController extends Controller
         } catch (Throwable) {
             // Stripe down, wrong key, deleted price: the customer gets a
             // way forward instead of a 500.
+            $lock->release();
+
             return $this->failed('Stripe could not start the checkout. Please try again in a moment.');
         }
     }

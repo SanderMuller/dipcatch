@@ -8,7 +8,22 @@ use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Middleware\MarketingLocale;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
+use Laravel\Cashier\Http\Controllers\PaymentController as CashierPaymentController;
+use Laravel\Cashier\Http\Controllers\WebhookController as CashierWebhookController;
+use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
+
+// Cashier's own route registration is off (see AppServiceProvider): these
+// carry the signature middleware unconditionally, so an unsigned or
+// unverifiable webhook is refused rather than acted on.
+Route::prefix(Config::string('cashier.path', 'stripe'))->name('cashier.')->group(function (): void {
+    Route::post('webhook', [CashierWebhookController::class, 'handleWebhook'])
+        ->middleware(VerifyWebhookSignature::class)
+        ->name('webhook');
+
+    Route::get('payment/{id}', [CashierPaymentController::class, 'show'])->name('payment');
+});
 
 Route::view('/', 'welcome')->middleware(MarketingLocale::class)->name('home');
 Route::view('privacy', 'privacy')->middleware(MarketingLocale::class)->name('privacy');

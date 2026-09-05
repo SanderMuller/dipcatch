@@ -5,6 +5,7 @@ namespace App\Listeners;
 use App\Billing\ChargeOwnerResolver;
 use App\Models\StripeDispute;
 use App\Models\StripePayment;
+use App\Models\StripeWebhookEvent;
 use App\Models\User;
 use App\Notifications\BillingIncidentNotification;
 use App\Notifications\SubscriptionPaymentFailedNotification;
@@ -22,6 +23,17 @@ use Laravel\Cashier\Events\WebhookReceived;
  */
 class HandleStripeWebhook
 {
+    /**
+     * The events Cashier's controller leaves alone.
+     */
+    private const array HANDLED = [
+        'invoice.payment_succeeded',
+        'invoice.payment_failed',
+        'charge.refunded',
+        'charge.dispute.created',
+        'charge.dispute.closed',
+    ];
+
     public function __construct(private readonly ChargeOwnerResolver $owners) {}
 
     public function handle(WebhookReceived $event): void
@@ -30,6 +42,25 @@ class HandleStripeWebhook
         $type = is_string($payload['type'] ?? null) ? $payload['type'] : '';
         $object = is_array($payload['data']['object'] ?? null) ? $payload['data']['object'] : [];
 
+        if (! in_array($type, self::HANDLED, true)) {
+            return;
+        }
+
+        // The claim and the work share one transaction: a delivery that
+        // fails halfway rolls back its own claim, so Stripe's retry runs the
+        // whole thing again instead of finding it already marked done.
+        StripeWebhookEvent::handleOnce(
+            $this->string($payload, 'id'),
+            $type,
+            fn () => $this->dispatch($type, $object),
+        );
+    }
+
+    /**
+     * @param  array<mixed, mixed>  $object
+     */
+    private function dispatch(string $type, array $object): void
+    {
         match ($type) {
             'invoice.payment_succeeded' => $this->recordPayment($object),
             'invoice.payment_failed' => $this->paymentFailed($object),
@@ -97,24 +128,13 @@ class HandleStripeWebhook
      */
     private function disputeOpened(array $dispute): void
     {
-        $stripeId = $this->string($dispute, 'id');
+        $record = $this->upsertDispute($dispute);
 
-        if ($stripeId === '' || StripeDispute::query()->where('stripe_id', $stripeId)->exists()) {
+        if ($record === null || ! $record->wasRecentlyCreated) {
+            // The close already arrived and created the row. Nothing about
+            // this dispute is news any more.
             return;
         }
-
-        $user = $this->owners->forCharge($this->string($dispute, 'charge'));
-
-        $record = StripeDispute::create([
-            'user_id' => $user?->id,
-            'stripe_id' => $stripeId,
-            'stripe_charge_id' => $this->string($dispute, 'charge'),
-            'amount' => $this->int($dispute, 'amount'),
-            'currency' => $this->string($dispute, 'currency'),
-            'reason' => $this->string($dispute, 'reason'),
-            'status' => $this->string($dispute, 'status'),
-            'opened_at' => $this->timestamp($dispute, 'created'),
-        ]);
 
         // Pro stays until the dispute is lost — a bank can flag an honest
         // customer's payment, and taking the product away mid-dispute
@@ -127,9 +147,9 @@ class HandleStripeWebhook
      */
     private function disputeClosed(array $dispute): void
     {
-        $record = StripeDispute::query()
-            ->where('stripe_id', $this->string($dispute, 'id'))
-            ->first();
+        // Creates the row when the close arrives first: Stripe does not
+        // promise order, and a lost chargeback must still block the account.
+        $record = $this->upsertDispute($dispute);
 
         if ($record === null || ! $record->isOpen()) {
             return;
@@ -145,6 +165,49 @@ class HandleStripeWebhook
         ])->save();
 
         $this->alertOwners(BillingIncidentNotification::disputeClosed($record));
+    }
+
+    /**
+     * The dispute row for this payload, created if it is not there yet.
+     *
+     * An owner lookup needs one Stripe call and can fail. A row left
+     * unlinked is retried on the next event about the same dispute, so a
+     * momentary Stripe outage does not cost the account its block.
+     *
+     * @param  array<mixed, mixed>  $dispute
+     */
+    private function upsertDispute(array $dispute): ?StripeDispute
+    {
+        $stripeId = $this->string($dispute, 'id');
+
+        if ($stripeId === '') {
+            return null;
+        }
+
+        $charge = $this->string($dispute, 'charge');
+
+        $record = StripeDispute::query()->firstOrCreate(
+            ['stripe_id' => $stripeId],
+            [
+                'user_id' => $this->owners->forCharge($charge)?->id,
+                'stripe_charge_id' => $charge,
+                'amount' => $this->int($dispute, 'amount'),
+                'currency' => $this->string($dispute, 'currency'),
+                'reason' => $this->string($dispute, 'reason'),
+                'status' => $this->string($dispute, 'status'),
+                'opened_at' => $this->timestamp($dispute, 'created'),
+            ],
+        );
+
+        if ($record->user_id === null) {
+            $owner = $this->owners->forCharge($record->stripe_charge_id ?? $charge);
+
+            if ($owner !== null) {
+                $record->forceFill(['user_id' => $owner->id])->save();
+            }
+        }
+
+        return $record;
     }
 
     /**

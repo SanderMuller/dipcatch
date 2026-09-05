@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\BillingIncidentNotification;
 use App\Notifications\SubscriptionPaymentFailedNotification;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Laravel\Cashier\Events\WebhookReceived;
 
 /**
@@ -26,9 +27,17 @@ function resolveChargesTo(?User $user): void
     });
 }
 
-function webhook(string $type, array $object): void
+/**
+ * One delivery. Stripe gives every delivery its own event id, and sends the
+ * same id again when it redelivers — pass `$eventId` to replay one.
+ */
+function webhook(string $type, array $object, ?string $eventId = null): void
 {
-    event(new WebhookReceived(['type' => $type, 'data' => ['object' => $object]]));
+    event(new WebhookReceived([
+        'id' => $eventId ?? 'evt_' . Str::random(16),
+        'type' => $type,
+        'data' => ['object' => $object],
+    ]));
 }
 
 function customer(): User
@@ -41,8 +50,8 @@ it('records a paid invoice once, however often Stripe redelivers it', function (
 
     $payload = ['id' => 'in_1', 'customer' => 'cus_test123', 'amount_paid' => 499, 'currency' => 'eur', 'created' => now()->timestamp];
 
-    webhook('invoice.payment_succeeded', $payload);
-    webhook('invoice.payment_succeeded', $payload);
+    webhook('invoice.payment_succeeded', $payload, 'evt_paid');
+    webhook('invoice.payment_succeeded', $payload, 'evt_paid');
 
     expect(StripePayment::query()->count())->toBe(1);
 
@@ -61,8 +70,8 @@ it('records a refund as negative money and tells the owner once', function (): v
 
     $payload = ['id' => 'ch_1', 'customer' => 'cus_test123', 'amount_refunded' => 499, 'currency' => 'eur', 'created' => now()->timestamp];
 
-    webhook('charge.refunded', $payload);
-    webhook('charge.refunded', $payload);
+    webhook('charge.refunded', $payload, 'evt_refund');
+    webhook('charge.refunded', $payload, 'evt_refund');
 
     expect(StripePayment::query()->where('kind', StripePayment::KIND_REFUND)->count())->toBe(1)
         ->and(StripePayment::query()->sum('amount'))->toBe(-499);
@@ -121,13 +130,43 @@ it('restores pro when a chargeback is won', function (): void {
     expect($user->fresh()?->billing_blocked_at)->toBeNull();
 });
 
-it('ignores the close of a dispute it never saw', function (): void {
+it('blocks the account when the close arrives before the open', function (): void {
     Notification::fake();
 
-    webhook('charge.dispute.closed', ['id' => 'dp_unknown', 'status' => 'lost']);
+    $user = customer();
+    resolveChargesTo($user);
 
-    expect(StripeDispute::query()->count())->toBe(0);
-    Notification::assertNothingSent();
+    // Stripe promises delivery, not order.
+    webhook('charge.dispute.closed', ['id' => 'dp_ooo', 'charge' => 'ch_ooo', 'amount' => 499, 'currency' => 'eur', 'status' => 'lost']);
+
+    expect(StripeDispute::query()->count())->toBe(1)
+        ->and($user->fresh()?->billing_blocked_at)->not->toBeNull();
+
+    // The create event then arrives for a dispute already closed and lost.
+    webhook('charge.dispute.created', ['id' => 'dp_ooo', 'charge' => 'ch_ooo', 'amount' => 499, 'currency' => 'eur', 'status' => 'needs_response', 'created' => now()->timestamp]);
+
+    expect(StripeDispute::query()->count())->toBe(1)
+        ->and(StripeDispute::query()->firstOrFail()->isLost())->toBeTrue()
+        ->and($user->fresh()?->billing_blocked_at)->not->toBeNull();
+});
+
+it('links the owner on a later event when the first Stripe lookup failed', function (): void {
+    Notification::fake();
+
+    $user = customer();
+    // The lookup fails: Stripe is down, or the charge is not readable yet.
+    resolveChargesTo(null);
+
+    webhook('charge.dispute.created', ['id' => 'dp_retry', 'charge' => 'ch_retry', 'amount' => 499, 'currency' => 'eur', 'status' => 'needs_response', 'created' => now()->timestamp]);
+
+    expect(StripeDispute::query()->firstOrFail()->user_id)->toBeNull();
+
+    // Stripe answers the next time, and the lost dispute still blocks.
+    resolveChargesTo($user);
+    webhook('charge.dispute.closed', ['id' => 'dp_retry', 'charge' => 'ch_retry', 'status' => 'lost']);
+
+    expect(StripeDispute::query()->firstOrFail()->user_id)->toBe($user->id)
+        ->and($user->fresh()?->billing_blocked_at)->not->toBeNull();
 });
 
 it('does not re-close a dispute Stripe redelivers', function (): void {
@@ -139,6 +178,18 @@ it('does not re-close a dispute Stripe redelivers', function (): void {
     webhook('charge.dispute.closed', ['id' => 'dp_3', 'status' => 'lost']);
 
     Notification::assertNothingSent();
+});
+
+it('sends one alert when Stripe redelivers the same failed payment', function (): void {
+    Notification::fake();
+
+    $user = customer();
+    $payload = ['id' => 'in_2', 'customer' => 'cus_test123', 'amount_due' => 499, 'currency' => 'eur'];
+
+    webhook('invoice.payment_failed', $payload, 'evt_failed');
+    webhook('invoice.payment_failed', $payload, 'evt_failed');
+
+    Notification::assertSentToTimes($user, SubscriptionPaymentFailedNotification::class, 1);
 });
 
 it('counts a second partial refund on the same charge', function (): void {

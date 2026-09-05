@@ -7,8 +7,9 @@ return [
     | Plans
     |--------------------------------------------------------------------------
     |
-    | Entitlements per plan. `App\Billing\Entitlements` is the only reader —
-    | never branch on the plan directly in a feature.
+    | Entitlements per plan. `App\Billing\Entitlements` is the only reader of
+    | this section — never branch on the plan directly in a feature. The
+    | `stripe` section below is pricing, read only by `App\Billing\ProPrice`.
     |
     | `max_products` and `max_shops_per_product` accept `null` for unlimited.
     |

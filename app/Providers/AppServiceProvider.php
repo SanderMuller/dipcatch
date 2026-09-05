@@ -68,6 +68,12 @@ final class AppServiceProvider extends ServiceProvider
         // ends the subscription when the retries run out, and that does
         // drop the account.
         Cashier::keepPastDueSubscriptionsActive();
+
+        // Cashier attaches its signature middleware only when a secret is
+        // set, so a deployment that forgets STRIPE_WEBHOOK_SECRET accepts
+        // forged billing events. routes/web.php registers the same endpoints
+        // with verification always on, which fails closed instead.
+        Cashier::ignoreRoutes();
     }
 
     protected function configureDefaults(): void

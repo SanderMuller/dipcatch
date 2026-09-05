@@ -6,9 +6,12 @@ use App\Models\User;
 use App\Support\Config;
 
 /**
- * The single reader of `config/plans.php`. Every feature asks this class
- * what a user may do — no feature branches on the plan itself, and no
- * feature reads the Stripe subscription state directly.
+ * The single reader of the plan entitlements in `config/plans.php`. Every
+ * feature asks this class what a user may do — no feature branches on the
+ * plan itself, and no feature reads the Stripe subscription state directly.
+ *
+ * The `stripe` section of that file is pricing, not entitlement, and has
+ * its own single reader in {@see ProPrice}.
  */
 final readonly class Entitlements
 {
