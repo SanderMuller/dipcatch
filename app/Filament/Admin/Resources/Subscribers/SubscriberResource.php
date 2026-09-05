@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Subscribers;
 
+use App\Billing\BillingGate;
 use App\Filament\Admin\Resources\Subscribers\Pages\ListSubscribers;
 use App\Filament\Admin\Resources\Subscribers\Tables\SubscribersTable;
 use App\Models\User;
@@ -27,6 +28,16 @@ class SubscriberResource extends Resource
     protected static ?string $navigationLabel = 'Subscribers';
 
     protected static ?string $modelLabel = 'subscriber';
+
+    /**
+     * Before Stripe is configured these screens can only ever be empty.
+     * They come back the moment the shop opens; the routes stay reachable
+     * for anyone who bookmarked them.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return BillingGate::isConfigured();
+    }
 
     public static function table(Table $table): Table
     {

@@ -10,6 +10,7 @@
     $trialDays = \App\Billing\ProPrice::trialDays();
     $authed = auth()->check();
     $ctaHref = $authed ? url('/app/billing') : route('register');
+    $onSale = \App\Billing\BillingGate::isOpen();
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
@@ -68,7 +69,11 @@
                         <h2 class="text-lg font-semibold">{{ __('Pro') }}</h2>
                         <p class="mt-1 text-3xl font-semibold tracking-tight">{{ $price }}<span class="text-base font-normal text-zinc-500 dark:text-zinc-400"> / {{ __('month') }}</span></p>
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                            {{ $trialDays > 0 ? __(':days days free, cancel any time.', ['days' => $trialDays]) : __('Cancel any time.') }}
+                            @if ($onSale)
+                                {{ $trialDays > 0 ? __(':days days free, cancel any time.', ['days' => $trialDays]) : __('Cancel any time.') }}
+                            @else
+                                {{ __('Not on sale yet.') }}
+                            @endif
                         </p>
 
                         <ul class="mt-6 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
@@ -79,9 +84,15 @@
                             <li>{{ __('A higher alert ceiling') }}</li>
                         </ul>
 
-                        <a href="{{ $ctaHref }}" class="mt-8 inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200">
-                            {{ $authed ? __('Upgrade to Pro') : __('Start with Pro') }}
-                        </a>
+                        @if ($onSale)
+                            <a href="{{ $ctaHref }}" class="mt-8 inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200">
+                                {{ $authed ? __('Upgrade to Pro') : __('Start with Pro') }}
+                            </a>
+                        @else
+                            <p class="mt-8 inline-flex items-center rounded-full bg-zinc-900/5 px-5 py-2.5 text-sm font-medium text-zinc-500 ring-1 ring-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:ring-zinc-800">
+                                {{ __('Coming soon') }}
+                            </p>
+                        @endif
                     </section>
                 </div>
 

@@ -2,6 +2,7 @@
 
 namespace App\Filament\App\Pages;
 
+use App\Billing\BillingGate;
 use App\Billing\Entitlements;
 use App\Billing\Plan;
 use App\Billing\PlanLimits;
@@ -105,8 +106,8 @@ class Billing extends Page
         return ProPrice::trialDays() > 0 && $this->user()->qualifiesForTrial();
     }
 
-    public function checkoutConfigured(): bool
+    public function canUpgrade(): bool
     {
-        return ProPrice::isConfigured();
+        return BillingGate::isOpen() && ! $this->isBlocked();
     }
 }

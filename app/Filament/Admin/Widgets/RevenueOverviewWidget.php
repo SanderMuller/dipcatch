@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Widgets;
 
+use App\Billing\BillingGate;
 use App\Billing\Plan;
 use App\Billing\ProPrice;
 use App\Billing\ProUsers;
@@ -21,6 +22,11 @@ use Laravel\Cashier\Subscription;
 class RevenueOverviewWidget extends BaseWidget
 {
     protected static bool $isLazy = false;
+
+    public static function canView(): bool
+    {
+        return BillingGate::isConfigured();
+    }
 
     /**
      * @return list<Stat>

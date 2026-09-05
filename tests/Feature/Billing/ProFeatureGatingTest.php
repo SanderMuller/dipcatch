@@ -83,7 +83,7 @@ it('refuses checkout when no stripe price is configured', function (): void {
 });
 
 it('sends an already-pro customer back instead of selling twice', function (): void {
-    config()->set('plans.stripe.pro_price_id', 'price_test');
+    configureStripe();
 
     $user = User::factory()->create();
     subscribeUser($user);
@@ -94,7 +94,7 @@ it('sends an already-pro customer back instead of selling twice', function (): v
 });
 
 it('refuses to sell a second subscription to a blocked customer', function (): void {
-    config()->set('plans.stripe.pro_price_id', 'price_test');
+    configureStripe();
 
     // A lost chargeback makes isPro() false while Stripe still bills the
     // subscription. Selling again would charge them twice.
@@ -108,7 +108,7 @@ it('refuses to sell a second subscription to a blocked customer', function (): v
 });
 
 it('sends an active subscriber back rather than starting a second checkout', function (): void {
-    config()->set('plans.stripe.pro_price_id', 'price_test');
+    configureStripe();
 
     $user = User::factory()->create();
     subscribeUser($user, 'past_due');
@@ -119,7 +119,7 @@ it('sends an active subscriber back rather than starting a second checkout', fun
 });
 
 it('does not open a second checkout while one is already paid for', function (): void {
-    config()->set('plans.stripe.pro_price_id', 'price_test');
+    configureStripe();
 
     // Stripe has taken the money; Cashier writes no row until the webhook
     // lands. Starting another checkout here is the double charge.
@@ -141,7 +141,7 @@ it('does not open a second checkout while one is already paid for', function ():
 });
 
 it('resumes a checkout session the customer left open', function (): void {
-    config()->set('plans.stripe.pro_price_id', 'price_test');
+    configureStripe();
 
     $user = User::factory()->create(['stripe_checkout_session_id' => 'cs_open']);
 

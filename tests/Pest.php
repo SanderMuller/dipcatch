@@ -636,3 +636,17 @@ function subscribeUser(
         'ends_at' => $endsAt,
     ]);
 }
+
+/**
+ * Everything Stripe needs before `BillingGate` will let the app sell. The
+ * webhook secret is on the list because without it every webhook is
+ * refused, so a completed payment would never become a subscription.
+ */
+function configureStripe(): void
+{
+    config()->set('cashier.key', 'pk_test_1');
+    config()->set('cashier.secret', 'sk_test_1');
+    config()->set('cashier.webhook.secret', 'whsec_1');
+    config()->set('plans.stripe.pro_price_id', 'price_1');
+    config()->set('plans.enabled', null);
+}

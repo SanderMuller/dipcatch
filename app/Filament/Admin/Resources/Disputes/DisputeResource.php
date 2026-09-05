@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Disputes;
 
+use App\Billing\BillingGate;
 use App\Filament\Admin\Resources\Disputes\Pages\ListDisputes;
 use App\Filament\Admin\Resources\Disputes\Tables\DisputesTable;
 use App\Models\StripeDispute;
@@ -24,6 +25,16 @@ class DisputeResource extends Resource
     protected static ?string $navigationLabel = 'Chargebacks';
 
     protected static ?string $modelLabel = 'chargeback';
+
+    /**
+     * Before Stripe is configured these screens can only ever be empty.
+     * They come back the moment the shop opens; the routes stay reachable
+     * for anyone who bookmarked them.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return BillingGate::isConfigured();
+    }
 
     public static function table(Table $table): Table
     {

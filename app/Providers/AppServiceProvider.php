@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Actions\Suggestions\SuggestShops;
+use App\Health\BillingConfigurationCheck;
 use App\Health\CheckjebonFreshnessCheck;
 use App\Health\LastSuccessfulScrapeCheck;
 use App\Health\StripeWebhookSecretCheck;
@@ -107,6 +108,7 @@ final class AppServiceProvider extends ServiceProvider
             CpuLoadCheck::new(),
             SecurityAdvisoriesCheck::new(),
             StripeWebhookSecretCheck::new(),
+            BillingConfigurationCheck::new(),
             LastSuccessfulScrapeCheck::new()
                 ->warnAfterHours(48)
                 ->failAfterHours(96),

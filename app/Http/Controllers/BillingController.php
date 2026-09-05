@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Billing\BillingGate;
 use App\Billing\CheckoutSessions;
 use App\Billing\Plan;
 use App\Billing\ProPrice;
@@ -20,12 +21,12 @@ class BillingController extends Controller
 {
     public function checkout(): Checkout|RedirectResponse
     {
+        if (! BillingGate::isOpen()) {
+            return $this->failed('Pro is not on sale yet.');
+        }
+
         $user = $this->user();
         $priceId = ProPrice::priceId();
-
-        if ($priceId === '') {
-            return $this->failed('Checkout is not configured yet. No price has been set.');
-        }
 
         // Not `isPro()`: a lost chargeback deliberately makes that false
         // while Stripe still bills an active subscription. Selling a second

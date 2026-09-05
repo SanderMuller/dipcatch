@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use function Pest\Livewire\livewire;
 
 it('shows a free account its usage and the upgrade route', function (): void {
-    config()->set('plans.stripe.pro_price_id', 'price_test');
+    configureStripe();
 
     $user = User::factory()->create();
     Product::factory()->count(3)->create(['user_id' => $user->id]);
@@ -56,7 +56,7 @@ it('warns a past due account, keeps its Pro, and does not threaten its data', fu
 });
 
 it('says why pro is off after a lost chargeback, and offers no way to buy again', function (): void {
-    config()->set('plans.stripe.pro_price_id', 'price_test');
+    configureStripe();
 
     $user = User::factory()->create(['billing_blocked_at' => now()]);
     subscribeUser($user);
@@ -71,7 +71,7 @@ it('says why pro is off after a lost chargeback, and offers no way to buy again'
 });
 
 it('does not promise a trial to a former subscriber', function (): void {
-    config()->set('plans.stripe.pro_price_id', 'price_test');
+    configureStripe();
 
     $user = User::factory()->create();
     subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subDay());

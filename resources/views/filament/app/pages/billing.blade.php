@@ -88,7 +88,7 @@
                 <x-filament::button tag="a" :href="route('billing.portal')" color="gray">
                     Manage subscription
                 </x-filament::button>
-            @elseif ($this->checkoutConfigured() && ! $this->isBlocked())
+            @elseif ($this->canUpgrade())
                 <x-filament::button tag="a" :href="route('billing.checkout')">
                     @if ($this->offersTrial())
                         Start {{ $this->trialDays() }}-day trial
@@ -96,8 +96,8 @@
                         Upgrade to Pro
                     @endif
                 </x-filament::button>
-            @else
-                <p class="text-sm text-gray-500 dark:text-gray-400">Pro is not available yet.</p>
+            @elseif (! $this->isBlocked())
+                <p class="text-sm text-gray-500 dark:text-gray-400">Pro is not on sale yet.</p>
             @endif
 
             <x-filament::button tag="a" href="{{ route('pricing') }}" color="gray" outlined>
@@ -106,7 +106,7 @@
         </div>
     </x-filament::section>
 
-    @unless ($isPro)
+    @if (! $isPro && $this->canUpgrade())
         <x-filament::section>
             <x-slot name="heading">What Pro adds</x-slot>
 
@@ -117,5 +117,5 @@
                 <li>A higher alert ceiling, so a busy week is not silently capped.</li>
             </ul>
         </x-filament::section>
-    @endunless
+    @endif
 </x-filament-panels::page>

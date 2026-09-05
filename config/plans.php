@@ -4,6 +4,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Selling
+    |--------------------------------------------------------------------------
+    |
+    | Null lets `App\Billing\BillingGate` decide from the Stripe settings
+    | below: no keys, no shop. Set BILLING_ENABLED=false to keep the shop
+    | shut on an environment that is otherwise fully configured — a staging
+    | copy with live keys, for instance.
+    |
+    | The gate closes the shop only. Entitlements are untouched, so an
+    | account granted Pro by hand keeps it.
+    |
+    */
+
+    'enabled' => match (env('BILLING_ENABLED')) {
+        null, '' => null,
+        default => filter_var(env('BILLING_ENABLED'), FILTER_VALIDATE_BOOLEAN),
+    },
+
+    /*
+    |--------------------------------------------------------------------------
     | Plans
     |--------------------------------------------------------------------------
     |
