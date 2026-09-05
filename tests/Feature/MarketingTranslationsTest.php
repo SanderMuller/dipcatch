@@ -47,6 +47,8 @@ test('lang/nl.json carries no key the marketing views no longer use', function (
         resource_path('views/pricing.blade.php'),
         resource_path('views/partials/head.blade.php'),
         resource_path('views/components/appearance-toggle.blade.php'),
+        resource_path('views/components/marketing-header.blade.php'),
+        resource_path('views/components/marketing-header/language.blade.php'),
     ];
 
     $sources = array_map(static fn (string $file): string => (string) file_get_contents($file), $files);
