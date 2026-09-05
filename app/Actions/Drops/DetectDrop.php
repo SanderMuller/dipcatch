@@ -9,12 +9,12 @@ use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\DropEvaluator;
 use App\Services\Drops\DropOutcome;
+use App\Services\Drops\NotificationBudget;
 use App\Services\Drops\Reference;
 use App\Services\Drops\ReferenceValue;
 use App\Support\Numeric;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
 
 final readonly class DetectDrop
 {
@@ -197,22 +197,6 @@ final readonly class DetectDrop
 
     private function withinHourlyLimit(User $user): bool
     {
-        // Per plan: the cap exists to stop a buggy product spamming one
-        // user, so a Pro account gets a higher ceiling, not no ceiling.
-        $limit = $user->entitlements()->notificationsHourlyLimit();
-
-        if ($limit <= 0) {
-            return true;
-        }
-
-        $key = "notify:user:{$user->id}";
-
-        if (RateLimiter::tooManyAttempts($key, $limit)) {
-            return false;
-        }
-
-        RateLimiter::hit($key, decaySeconds: 3600);
-
-        return true;
+        return app(NotificationBudget::class)->allows($user);
     }
 }

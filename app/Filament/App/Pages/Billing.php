@@ -96,6 +96,15 @@ class Billing extends Page
         return ProPrice::trialDays();
     }
 
+    /**
+     * A former subscriber gets no second free fortnight, so the button must
+     * not promise one — checkout would create a paid subscription instead.
+     */
+    public function offersTrial(): bool
+    {
+        return ProPrice::trialDays() > 0 && $this->user()->qualifiesForTrial();
+    }
+
     public function checkoutConfigured(): bool
     {
         return ProPrice::isConfigured();

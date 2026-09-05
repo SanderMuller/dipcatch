@@ -150,6 +150,24 @@ it('blocks the account when the close arrives before the open', function (): voi
         ->and($user->fresh()?->billing_blocked_at)->not->toBeNull();
 });
 
+it('blocks the account when the owner is only linked after a lost close', function (): void {
+    Notification::fake();
+
+    $user = customer();
+    // The close lands first AND the owner lookup fails: the row is stored
+    // lost but unlinked, and no redelivery will revisit it.
+    resolveChargesTo(null);
+    webhook('charge.dispute.closed', ['id' => 'dp_late', 'charge' => 'ch_late', 'amount' => 499, 'currency' => 'eur', 'status' => 'lost']);
+
+    expect($user->fresh()?->billing_blocked_at)->toBeNull();
+
+    // The create event arrives and Stripe answers this time.
+    resolveChargesTo($user);
+    webhook('charge.dispute.created', ['id' => 'dp_late', 'charge' => 'ch_late', 'amount' => 499, 'currency' => 'eur', 'status' => 'needs_response', 'created' => now()->timestamp]);
+
+    expect($user->fresh()?->billing_blocked_at)->not->toBeNull();
+});
+
 it('links the owner on a later event when the first Stripe lookup failed', function (): void {
     Notification::fake();
 

@@ -62,13 +62,16 @@ class PlanLimits
      */
     public function guardProduct(User $user): void
     {
+        // Lock first, then decide. Reading the plan before the lock lets a
+        // chargeback land in between, so an account could commit a creation
+        // on an entitlement it had already lost.
+        $this->lock($user);
+
         $limit = $user->entitlements()->maxProducts();
 
         if ($limit === null) {
             return;
         }
-
-        $this->lock($user);
 
         if ($this->countProducts($user) >= $limit) {
             throw PlanLimitReached::products($limit);
@@ -81,24 +84,40 @@ class PlanLimits
     public function guardShop(Product $product): void
     {
         $user = $product->user;
-        $limit = $user?->entitlements()->maxShopsPerProduct();
 
-        if ($user === null || $limit === null) {
+        if ($user === null) {
             return;
         }
 
         $this->lock($user);
+
+        $limit = $user->entitlements()->maxShopsPerProduct();
+
+        if ($limit === null) {
+            return;
+        }
 
         if ($this->countShops($product) >= $limit) {
             throw PlanLimitReached::shops($limit);
         }
     }
 
+    /**
+     * Only meaningful inside a transaction; outside one the row lock is
+     * released immediately and the guard degrades to a plain count.
+     *
+     * Refreshes the model too: the locked row is the current truth, and the
+     * entitlement decision that follows must read that, not a copy loaded
+     * before a concurrent writer touched it.
+     */
     private function lock(User $user): void
     {
-        // Only meaningful inside a transaction; outside one the row lock is
-        // released immediately and the guard degrades to a plain count.
-        User::query()->whereKey($user->getKey())->lockForUpdate()->first();
+        $locked = User::query()->whereKey($user->getKey())->lockForUpdate()->first();
+
+        if ($locked !== null) {
+            $user->setRawAttributes($locked->getAttributes(), true);
+            $user->unsetRelation('subscriptions');
+        }
     }
 
     private function countProducts(User $user): int

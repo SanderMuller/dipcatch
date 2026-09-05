@@ -68,6 +68,19 @@ it('does not let a pro backlog starve free accounts', function (): void {
     Queue::assertPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($freeShop));
 });
 
+it('gives the pro cadence to an account-level trial, as plan() does', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create(['trial_ends_at' => CarbonImmutable::now()->addDays(7)]);
+    $shop = shopFor($user, CarbonImmutable::now()->subHours(3));
+
+    expect($user->isPro())->toBeTrue();
+
+    $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
+
+    Queue::assertPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($shop));
+});
+
 it('drops a blocked account back to the free cadence', function (): void {
     Queue::fake();
 

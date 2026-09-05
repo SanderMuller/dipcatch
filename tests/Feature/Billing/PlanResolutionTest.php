@@ -62,6 +62,15 @@ it('blocks pro when a chargeback was lost, even on an active subscription', func
     expect($user->plan())->toBe(Plan::Free);
 });
 
+it('ends pro for an unpaid subscription even inside a future grace period', function (): void {
+    // `valid()` alone would say yes here, while the scheduler's SQL says no.
+    // One account cannot have two answers.
+    $user = User::factory()->create();
+    subscribeUser($user, 'unpaid', endsAt: CarbonImmutable::now()->addDays(10));
+
+    expect($user->plan())->toBe(Plan::Free);
+});
+
 it('reads the free limits from config', function (): void {
     $entitlements = Entitlements::of(Plan::Free);
 

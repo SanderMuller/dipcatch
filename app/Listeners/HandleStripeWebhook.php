@@ -204,6 +204,14 @@ class HandleStripeWebhook
 
             if ($owner !== null) {
                 $record->forceFill(['user_id' => $owner->id])->save();
+                $record->setRelation('user', $owner);
+
+                // The row may already be closed and lost: it was created
+                // without an owner, so nothing has applied its block yet,
+                // and no redelivery will — the close event id is claimed.
+                if (! $record->isOpen()) {
+                    $owner->forceFill(['billing_blocked_at' => $this->blockUntil($record)])->save();
+                }
             }
         }
 

@@ -88,9 +88,9 @@
                 <x-filament::button tag="a" :href="route('billing.portal')" color="gray">
                     Manage subscription
                 </x-filament::button>
-            @elseif ($this->checkoutConfigured())
+            @elseif ($this->checkoutConfigured() && ! $this->isBlocked())
                 <x-filament::button tag="a" :href="route('billing.checkout')">
-                    @if ($this->trialDays() > 0)
+                    @if ($this->offersTrial())
                         Start {{ $this->trialDays() }}-day trial
                     @else
                         Upgrade to Pro

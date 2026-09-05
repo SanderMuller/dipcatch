@@ -26,6 +26,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property string $password
  * @property bool $is_admin
  * @property CarbonImmutable|null $billing_blocked_at
+ * @property string|null $stripe_checkout_session_id
  * @property string $default_currency
  * @property bool $notify_via_email
  * @property bool $notify_via_filament

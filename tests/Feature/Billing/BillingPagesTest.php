@@ -55,14 +55,33 @@ it('warns a past due account, keeps its Pro, and does not threaten its data', fu
         ->assertSee('Manage subscription');
 });
 
-it('says why pro is off after a lost chargeback', function (): void {
+it('says why pro is off after a lost chargeback, and offers no way to buy again', function (): void {
+    config()->set('plans.stripe.pro_price_id', 'price_test');
+
     $user = User::factory()->create(['billing_blocked_at' => now()]);
     subscribeUser($user);
 
     $this->actingAs($user);
     Filament::setCurrentPanel('app');
 
-    livewire(Billing::class)->assertSee('Pro is paused after a chargeback');
+    livewire(Billing::class)
+        ->assertSee('Pro is paused after a chargeback')
+        ->assertDontSee('Start 14-day trial')
+        ->assertDontSee('Upgrade to Pro');
+});
+
+it('does not promise a trial to a former subscriber', function (): void {
+    config()->set('plans.stripe.pro_price_id', 'price_test');
+
+    $user = User::factory()->create();
+    subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subDay());
+
+    $this->actingAs($user);
+    Filament::setCurrentPanel('app');
+
+    livewire(Billing::class)
+        ->assertSee('Upgrade to Pro')
+        ->assertDontSee('Start 14-day trial');
 });
 
 it('serves the public pricing page to a guest', function (): void {

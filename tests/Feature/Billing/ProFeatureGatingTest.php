@@ -91,6 +91,31 @@ it('sends an already-pro customer back instead of selling twice', function (): v
         ->assertRedirect('/app/billing');
 });
 
+it('refuses to sell a second subscription to a blocked customer', function (): void {
+    config()->set('plans.stripe.pro_price_id', 'price_test');
+
+    // A lost chargeback makes isPro() false while Stripe still bills the
+    // subscription. Selling again would charge them twice.
+    $user = User::factory()->create(['billing_blocked_at' => now()]);
+
+    $this->actingAs($user)
+        ->get('/billing/checkout')
+        ->assertRedirect('/app/billing');
+
+    expect($user->fresh()?->stripe_checkout_session_id)->toBeNull();
+});
+
+it('sends an active subscriber back rather than starting a second checkout', function (): void {
+    config()->set('plans.stripe.pro_price_id', 'price_test');
+
+    $user = User::factory()->create();
+    subscribeUser($user, 'past_due');
+
+    $this->actingAs($user)
+        ->get('/billing/checkout')
+        ->assertRedirect('/app/billing');
+});
+
 it('sends a customer with no stripe account back from the portal', function (): void {
     $this->actingAs(User::factory()->create())
         ->get('/billing/portal')

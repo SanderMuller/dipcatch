@@ -15,6 +15,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 trait Subscribes
 {
+    /**
+     * Stripe statuses that end the entitlement outright, matching the ones
+     * Cashier's `active()` scope excludes.
+     */
+    private const array ENDED_STATUSES = ['unpaid', 'incomplete_expired'];
+
     public function plan(): Plan
     {
         if ($this->billing_blocked_at !== null) {
@@ -30,10 +36,17 @@ trait Subscribes
             return $this->onTrial() ? Plan::Pro : Plan::Free;
         }
 
+        // Stripe has given up collecting. `valid()` would still say yes
+        // while `ends_at` is in the future, and `ProUsers` — which the
+        // scheduler reads — would say no. Two answers for one account.
+        if (in_array($subscription->stripe_status, self::ENDED_STATUSES, true)) {
+            return Plan::Free;
+        }
+
         // `valid()` covers active, trialing and the cancelled-but-not-yet-
         // expired grace period. `keepPastDueSubscriptionsActive()` in
         // AppServiceProvider adds past due, so Pro survives the dunning
-        // retries; Stripe moving the subscription to unpaid ends it.
+        // retries.
         return $subscription->valid() ? Plan::Pro : Plan::Free;
     }
 
