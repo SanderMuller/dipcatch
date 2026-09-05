@@ -94,7 +94,10 @@
             <footer class="mx-auto w-full max-w-3xl px-6 pb-10 lg:px-8">
                 <div class="flex flex-col items-center justify-between gap-3 border-t border-zinc-200 pt-6 text-sm text-zinc-500 sm:flex-row dark:border-zinc-800 dark:text-zinc-400">
                     <p>&copy; {{ date('Y') }} {{ config('app.name') }}</p>
-                    <a href="{{ route('home', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Back to the homepage') }}</a>
+                    <div class="flex items-center gap-5">
+                        <a href="{{ route('pricing', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Pricing') }}</a>
+                        <a href="{{ route('home', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Back to the homepage') }}</a>
+                    </div>
                 </div>
             </footer>
         </div>

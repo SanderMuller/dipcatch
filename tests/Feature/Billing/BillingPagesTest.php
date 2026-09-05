@@ -67,6 +67,17 @@ it('serves the public pricing page to a guest', function (): void {
         ->assertSee('20 products');
 });
 
+it('links to the pricing page from the marketing site', function (): void {
+    $this->get('/')->assertOk()->assertSee(route('pricing'));
+});
+
+it('shows the pricing page in Dutch', function (): void {
+    $this->get('/pricing?lang=nl')
+        ->assertOk()
+        ->assertSee('Onbeperkt producten')
+        ->assertSee('20 producten');
+});
+
 it('keeps the admin subscriber list away from a normal user', function (): void {
     $this->actingAs(User::factory()->create())
         ->get('/admin/subscribers')

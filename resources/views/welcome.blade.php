@@ -245,6 +245,7 @@
                     <div class="flex flex-col items-center justify-between gap-3 border-t border-zinc-200 pt-6 text-sm text-zinc-500 sm:flex-row dark:border-zinc-800 dark:text-zinc-400">
                         <p>&copy; {{ date('Y') }} {{ config('app.name') }}</p>
                         <nav class="flex items-center gap-5" aria-label="{{ __('Footer') }}">
+                            <a href="{{ route('pricing', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Pricing') }}</a>
                             <a href="{{ route('privacy', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Privacy') }}</a>
                             @if (filled($contactEmail))
                                 <a href="mailto:{{ $contactEmail }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Contact') }}</a>
