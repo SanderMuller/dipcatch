@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Billing\CheckoutSessions;
 use App\Billing\Plan;
 use App\Billing\ProPrice;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Cache;
-use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Checkout;
 use Throwable;
 
@@ -48,10 +48,10 @@ class BillingController extends Controller
         }
 
         try {
-            $open = $this->resumeOpenSession($user);
+            $pending = $this->pendingSession($user);
 
-            if ($open !== null) {
-                return redirect($open);
+            if ($pending instanceof RedirectResponse) {
+                return $pending;
             }
 
             return $this->startCheckout($user, $priceId);
@@ -100,30 +100,48 @@ class BillingController extends Controller
     }
 
     /**
-     * The URL of a Checkout session this account already has open, if there
-     * is one. The lock above only survives 30 seconds, while a session lives
-     * for hours — without this, a customer who comes back later could
-     * complete two sessions and be billed twice.
+     * What to do about a Checkout session this account already started.
+     * Null means there is nothing in flight and a new one may begin.
+     *
+     * The lock above only survives 30 seconds while a session lives for
+     * hours, and Cashier writes no subscription row until the webhook lands.
+     * Without this, one customer could complete two sessions and be billed
+     * twice.
      */
-    private function resumeOpenSession(User $user): ?string
+    private function pendingSession(User $user): ?RedirectResponse
     {
         $sessionId = $user->stripe_checkout_session_id;
 
-        if (! is_string($sessionId) || $sessionId === '') {
-            return null;
-        }
-
         // A session Stripe cannot tell us about is not a reason to refuse a
-        // customer: fall through and start a fresh one.
-        try {
-            $session = Cashier::stripe()->checkout->sessions->retrieve($sessionId, []);
-        } catch (Throwable) {
+        // customer: `find()` answers null and a fresh session begins.
+        $session = is_string($sessionId)
+            ? app(CheckoutSessions::class)->find($sessionId)
+            : null;
+
+        if ($session === null) {
             return null;
         }
 
-        return $session->status === 'open' && is_string($session->url)
-            ? $session->url
+        // Paid, but the subscription webhook has not arrived yet. Starting
+        // a second checkout here is exactly the double charge to avoid.
+        if ($session->isPaid()) {
+            return $this->notice('Your payment went through. Pro appears here as soon as Stripe confirms it — usually within a minute.');
+        }
+
+        return $session->isOpen() && $session->url !== null
+            ? redirect($session->url)
             : null;
+    }
+
+    private function notice(string $message): RedirectResponse
+    {
+        Notification::make()
+            ->info()
+            ->title('Almost there')
+            ->body($message)
+            ->send();
+
+        return redirect('/app/billing');
     }
 
     private function failed(string $message): RedirectResponse

@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Billing\ChargeOwnerResolver;
+use App\Jobs\RelinkStripeDispute;
 use App\Models\StripeDispute;
 use App\Models\StripePayment;
 use App\Models\StripeWebhookEvent;
@@ -27,6 +28,7 @@ class HandleStripeWebhook
      * The events Cashier's controller leaves alone.
      */
     private const array HANDLED = [
+        'customer.subscription.created',
         'invoice.payment_succeeded',
         'invoice.payment_failed',
         'charge.refunded',
@@ -62,6 +64,7 @@ class HandleStripeWebhook
     private function dispatch(string $type, array $object): void
     {
         match ($type) {
+            'customer.subscription.created' => $this->subscriptionStarted($object),
             'invoice.payment_succeeded' => $this->recordPayment($object),
             'invoice.payment_failed' => $this->paymentFailed($object),
             'charge.refunded' => $this->recordRefund($object),
@@ -69,6 +72,19 @@ class HandleStripeWebhook
             'charge.dispute.closed' => $this->disputeClosed($object),
             default => null,
         };
+    }
+
+    /**
+     * The checkout is over, so the session it was started from is no longer
+     * pending — the next upgrade attempt must not resume it.
+     *
+     * @param  array<mixed, mixed>  $subscription
+     */
+    private function subscriptionStarted(array $subscription): void
+    {
+        $this->owners->forCustomer($this->string($subscription, 'customer'))
+            ?->forceFill(['stripe_checkout_session_id' => null])
+            ->save();
     }
 
     /**
@@ -88,7 +104,8 @@ class HandleStripeWebhook
             amount: $amount,
             currency: $this->string($invoice, 'currency'),
             user: $this->owners->forCustomer($this->string($invoice, 'customer')),
-            at: $this->timestamp($invoice, 'created'),
+            // An invoice can settle days after it was raised.
+            at: $this->paidAt($invoice),
         );
     }
 
@@ -115,7 +132,8 @@ class HandleStripeWebhook
             amount: -$amount,
             currency: $this->string($charge, 'currency'),
             user: $user,
-            at: $this->timestamp($charge, 'created'),
+            // A refund can follow its charge by months.
+            at: $this->refundedAt($charge),
         );
 
         if ($rise > 0) {
@@ -163,6 +181,12 @@ class HandleStripeWebhook
         $record->user?->forceFill([
             'billing_blocked_at' => $this->blockUntil($record),
         ])->save();
+
+        if ($record->user_id === null) {
+            // Nothing else will revisit this: Stripe promises no further
+            // event after a close, and this event id is already claimed.
+            RelinkStripeDispute::dispatch($record->id);
+        }
 
         $this->alertOwners(BillingIncidentNotification::disputeClosed($record));
     }
@@ -242,6 +266,17 @@ class HandleStripeWebhook
      */
     private function paymentFailed(array $invoice): void
     {
+        // A failure event delivered after the success event for the same
+        // invoice would tell the customer to fix a card that has paid.
+        $settled = StripePayment::query()
+            ->where('stripe_id', $this->string($invoice, 'id'))
+            ->where('kind', StripePayment::KIND_PAYMENT)
+            ->exists();
+
+        if ($settled) {
+            return;
+        }
+
         $user = $this->owners->forCustomer($this->string($invoice, 'customer'));
 
         $user?->notify(new SubscriptionPaymentFailedNotification(
@@ -275,10 +310,19 @@ class HandleStripeWebhook
             return abs($amount);
         }
 
-        $rise = abs($amount) - abs($payment->amount);
+        // Two refund events for one charge can arrive together. Reading the
+        // stored total without a lock lets the smaller one win and the
+        // recorded refund go backwards, overstating revenue.
+        $locked = StripePayment::query()->whereKey($payment->getKey())->lockForUpdate()->first();
+
+        if ($locked === null) {
+            return 0;
+        }
+
+        $rise = abs($amount) - abs($locked->amount);
 
         if ($rise > 0) {
-            $payment->forceFill(['amount' => $amount, 'occurred_at' => $at])->save();
+            $locked->forceFill(['amount' => $amount, 'occurred_at' => $at])->save();
         }
 
         return max(0, $rise);
@@ -311,6 +355,48 @@ class HandleStripeWebhook
         $value = $data[$key] ?? null;
 
         return is_numeric($value) ? (int) $value : 0;
+    }
+
+    /**
+     * When the invoice was actually paid, falling back to when it was
+     * raised if Stripe did not say.
+     *
+     * @param  array<mixed, mixed>  $invoice
+     */
+    private function paidAt(array $invoice): CarbonImmutable
+    {
+        $transitions = $invoice['status_transitions'] ?? null;
+
+        if (is_array($transitions) && is_numeric($transitions['paid_at'] ?? null)) {
+            return CarbonImmutable::createFromTimestampUTC((int) $transitions['paid_at']);
+        }
+
+        return $this->timestamp($invoice, 'created');
+    }
+
+    /**
+     * When the most recent refund on this charge happened.
+     *
+     * @param  array<mixed, mixed>  $charge
+     */
+    private function refundedAt(array $charge): CarbonImmutable
+    {
+        $refunds = $charge['refunds']['data'] ?? null;
+        $latest = 0;
+
+        if (is_array($refunds)) {
+            foreach ($refunds as $refund) {
+                $created = is_array($refund) ? ($refund['created'] ?? null) : null;
+
+                if (is_numeric($created)) {
+                    $latest = max($latest, (int) $created);
+                }
+            }
+        }
+
+        return $latest > 0
+            ? CarbonImmutable::createFromTimestampUTC($latest)
+            : $this->timestamp($charge, 'created');
     }
 
     /**

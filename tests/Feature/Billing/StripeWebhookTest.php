@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Billing\ChargeOwnerResolver;
+use App\Jobs\RelinkStripeDispute;
 use App\Models\Product;
 use App\Models\StripeDispute;
 use App\Models\StripePayment;
@@ -8,6 +9,7 @@ use App\Models\User;
 use App\Notifications\BillingIncidentNotification;
 use App\Notifications\SubscriptionPaymentFailedNotification;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Events\WebhookReceived;
 
@@ -240,6 +242,70 @@ it('keeps an account blocked when it wins one chargeback but lost another', func
     webhook('charge.dispute.closed', ['id' => 'dp_open', 'status' => 'won']);
 
     expect($user->fresh()?->billing_blocked_at)->not->toBeNull();
+});
+
+it('queues a retry when a lost dispute cannot be linked to an account', function (): void {
+    Notification::fake();
+    Queue::fake();
+
+    // Nothing else would revisit it: Stripe promises no further event after
+    // a close, and this event id is already claimed.
+    resolveChargesTo(null);
+
+    webhook('charge.dispute.closed', ['id' => 'dp_orphan', 'charge' => 'ch_orphan', 'amount' => 499, 'currency' => 'eur', 'status' => 'lost']);
+
+    Queue::assertPushed(RelinkStripeDispute::class);
+});
+
+it('blocks the account when the queued retry finally links it', function (): void {
+    Notification::fake();
+
+    $user = customer();
+    $dispute = StripeDispute::factory()->lost()->create(['user_id' => null, 'stripe_charge_id' => 'ch_orphan']);
+
+    resolveChargesTo($user);
+    new RelinkStripeDispute($dispute->id)->handle(app(ChargeOwnerResolver::class));
+
+    expect($dispute->fresh()?->user_id)->toBe($user->id)
+        ->and($user->fresh()?->billing_blocked_at)->not->toBeNull();
+});
+
+it('does not warn about a card that already paid the invoice', function (): void {
+    Notification::fake();
+
+    $user = customer();
+
+    // The success lands first; the failure event for the same invoice is
+    // delivered late.
+    webhook('invoice.payment_succeeded', ['id' => 'in_late', 'customer' => 'cus_test123', 'amount_paid' => 499, 'currency' => 'eur', 'created' => now()->timestamp]);
+    webhook('invoice.payment_failed', ['id' => 'in_late', 'customer' => 'cus_test123', 'amount_due' => 499, 'currency' => 'eur']);
+
+    Notification::assertNotSentTo($user, SubscriptionPaymentFailedNotification::class);
+});
+
+it('dates money by when it moved, not when the object was raised', function (): void {
+    customer();
+
+    $raised = now()->subDays(9);
+    $settled = now()->subDay();
+
+    webhook('invoice.payment_succeeded', [
+        'id' => 'in_dates', 'customer' => 'cus_test123', 'amount_paid' => 499, 'currency' => 'eur',
+        'created' => $raised->timestamp,
+        'status_transitions' => ['paid_at' => $settled->timestamp],
+    ]);
+
+    webhook('charge.refunded', [
+        'id' => 'ch_dates', 'customer' => 'cus_test123', 'amount_refunded' => 499, 'currency' => 'eur',
+        'created' => $raised->timestamp,
+        'refunds' => ['data' => [['created' => $settled->timestamp]]],
+    ]);
+
+    $payment = StripePayment::query()->where('kind', StripePayment::KIND_PAYMENT)->firstOrFail();
+    $refund = StripePayment::query()->where('kind', StripePayment::KIND_REFUND)->firstOrFail();
+
+    expect($payment->occurred_at)->toBeSameTimestampAs($settled)
+        ->and($refund->occurred_at)->toBeSameTimestampAs($settled);
 });
 
 it('tells the customer when the card is declined', function (): void {

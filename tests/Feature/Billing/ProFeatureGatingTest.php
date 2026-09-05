@@ -1,6 +1,8 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Drops\DetectUnitPriceTarget;
+use App\Billing\CheckoutSession;
+use App\Billing\CheckoutSessions;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -114,6 +116,45 @@ it('sends an active subscriber back rather than starting a second checkout', fun
     $this->actingAs($user)
         ->get('/billing/checkout')
         ->assertRedirect('/app/billing');
+});
+
+it('does not open a second checkout while one is already paid for', function (): void {
+    config()->set('plans.stripe.pro_price_id', 'price_test');
+
+    // Stripe has taken the money; Cashier writes no row until the webhook
+    // lands. Starting another checkout here is the double charge.
+    $user = User::factory()->create(['stripe_checkout_session_id' => 'cs_done']);
+
+    app()->instance(CheckoutSessions::class, new class extends CheckoutSessions {
+        public function find(string $sessionId): CheckoutSession
+        {
+            return new CheckoutSession('complete', url: null);
+        }
+    });
+
+    $this->actingAs($user)
+        ->get('/billing/checkout')
+        ->assertRedirect('/app/billing');
+
+    // No new session was started: the stored one is still the only one.
+    expect($user->fresh()?->stripe_checkout_session_id)->toBe('cs_done');
+});
+
+it('resumes a checkout session the customer left open', function (): void {
+    config()->set('plans.stripe.pro_price_id', 'price_test');
+
+    $user = User::factory()->create(['stripe_checkout_session_id' => 'cs_open']);
+
+    app()->instance(CheckoutSessions::class, new class extends CheckoutSessions {
+        public function find(string $sessionId): CheckoutSession
+        {
+            return new CheckoutSession('open', url: 'https://checkout.stripe.test/cs_open');
+        }
+    });
+
+    $this->actingAs($user)
+        ->get('/billing/checkout')
+        ->assertRedirect('https://checkout.stripe.test/cs_open');
 });
 
 it('sends a customer with no stripe account back from the portal', function (): void {

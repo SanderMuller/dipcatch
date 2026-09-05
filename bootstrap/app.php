@@ -46,12 +46,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             StrictTransportSecurity::class,
         ]);
-
-        // Stripe posts server to server and holds no session token. The
-        // signature middleware on the route is what authenticates it.
-        $middleware->preventRequestForgery(except: [
-            'stripe/*',
-        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

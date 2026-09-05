@@ -7,6 +7,7 @@ use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Middleware\MarketingLocale;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +21,12 @@ use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
 Route::prefix(Config::string('cashier.path', 'stripe'))->name('cashier.')->group(function (): void {
     Route::post('webhook', [CashierWebhookController::class, 'handleWebhook'])
         ->middleware(VerifyWebhookSignature::class)
+        // Stripe posts server to server and holds no session token; the
+        // signature above is what authenticates it. Excluded here rather
+        // than by path in bootstrap/app.php, which cannot read the
+        // configured Cashier path — a custom CASHIER_PATH would then fail
+        // every correctly signed webhook on CSRF.
+        ->withoutMiddleware(PreventRequestForgery::class)
         ->name('webhook');
 
     Route::get('payment/{id}', [CashierPaymentController::class, 'show'])->name('payment');
