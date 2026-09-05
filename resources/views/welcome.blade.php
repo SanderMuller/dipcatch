@@ -220,10 +220,16 @@
 
                     @guest
                         <section class="pb-20">
-                            <div class="rounded-3xl bg-zinc-900 px-6 py-10 text-center text-white ring-1 ring-zinc-800 sm:px-12 sm:py-12 dark:bg-zinc-900/80">
-                                <h2 class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{{ __('Stop checking prices by hand.') }}</h2>
-                                <p class="mx-auto mt-3 max-w-[48ch] text-pretty text-zinc-300">{{ __('Add the products you buy anyway and let DipCatch tell you where they are cheapest this week.') }}</p>
-                                <a href="{{ route('register') }}" class="mt-8 inline-flex items-center rounded-full bg-white px-5 py-2.5 text-sm font-medium text-zinc-900 shadow-md hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
+                            {{-- The page is built from translucent cards over the
+                                 gradient, headed left, with amber as its accent.
+                                 A solid dark slab with centred text was none of
+                                 those things, so it read as a foreign block. --}}
+                            <div class="flex flex-col gap-6 rounded-2xl bg-amber-100/70 p-8 ring-1 ring-amber-200 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:p-10 dark:bg-amber-950/30 dark:ring-amber-900/50">
+                                <div>
+                                    <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Stop checking prices by hand.') }}</h2>
+                                    <p class="mt-3 max-w-[48ch] text-pretty text-zinc-600 dark:text-zinc-300">{{ __('Add the products you buy anyway and let DipCatch tell you where they are cheapest this week.') }}</p>
+                                </div>
+                                <a href="{{ route('register') }}" class="inline-flex shrink-0 items-center self-start rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 sm:self-auto dark:bg-white dark:text-zinc-900 dark:shadow-none dark:hover:bg-zinc-200">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
                             </div>
                         </section>
                     @endguest
