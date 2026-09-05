@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\Subscribes;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use Laravel\Cashier\Billable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
@@ -23,6 +25,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property CarbonImmutable|null $email_verified_at
  * @property string $password
  * @property bool $is_admin
+ * @property CarbonImmutable|null $billing_blocked_at
  * @property string $default_currency
  * @property bool $notify_via_email
  * @property bool $notify_via_filament
@@ -42,7 +45,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
 class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasPushSubscriptions, Notifiable, TwoFactorAuthenticatable;
+    use Billable, HasFactory, HasPushSubscriptions, Notifiable, Subscribes, TwoFactorAuthenticatable;
 
     /**
      * @return array<string, string>
@@ -53,6 +56,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'billing_blocked_at' => 'datetime',
             'notify_via_email' => 'boolean',
             'notify_via_filament' => 'boolean',
             'notify_via_push' => 'boolean',

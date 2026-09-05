@@ -11,7 +11,6 @@ use App\Services\Drops\DropEvaluator;
 use App\Services\Drops\DropOutcome;
 use App\Services\Drops\Reference;
 use App\Services\Drops\ReferenceValue;
-use App\Support\Config as DipConfig;
 use App\Support\Numeric;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -198,7 +197,9 @@ final readonly class DetectDrop
 
     private function withinHourlyLimit(User $user): bool
     {
-        $limit = DipConfig::int('dipcatch.notifications.user_hourly_limit', 30);
+        // Per plan: the cap exists to stop a buggy product spamming one
+        // user, so a Pro account gets a higher ceiling, not no ceiling.
+        $limit = $user->entitlements()->notificationsHourlyLimit();
 
         if ($limit <= 0) {
             return true;

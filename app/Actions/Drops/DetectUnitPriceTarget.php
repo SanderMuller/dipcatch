@@ -32,7 +32,10 @@ final readonly class DetectUnitPriceTarget
     {
         $target = $product->unit_price_target;
 
-        if ($target === null) {
+        // A unit-price target is a Pro feature. A free account keeps its
+        // stored target — it starts working again on upgrade — but is not
+        // alerted on it.
+        if ($target === null || $product->user?->entitlements()->allowsUnitPriceAlerts() !== true) {
             return;
         }
 

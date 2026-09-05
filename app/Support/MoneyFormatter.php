@@ -46,6 +46,16 @@ final class MoneyFormatter
     }
 
     /**
+     * Stripe states money in the currency's minor unit — 499 is EUR 4.99.
+     * Converts and formats in one step, so no billing surface hand-rolls
+     * the division.
+     */
+    public static function formatMinor(int $amount, string $currency): string
+    {
+        return self::format(sprintf('%.2F', $amount / 100), $currency);
+    }
+
+    /**
      * The currency symbol intl uses — `€`, `$`, `£` — or the code itself when
      * intl has no symbol for it (`CHF`) or the code is not one we support.
      */

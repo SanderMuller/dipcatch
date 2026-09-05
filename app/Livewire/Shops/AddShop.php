@@ -3,10 +3,13 @@
 namespace App\Livewire\Shops;
 
 use App\Actions\Shops\ProbeShopUrl;
+use App\Billing\PlanLimitReached;
+use App\Billing\PlanLimits;
 use App\Enums\ScrapeStatus;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\PriceCheck;
 use App\Models\Product;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
@@ -81,52 +84,67 @@ class AddShop extends Component
         $variantKey = $this->chosenVariantKey;
         $packSize = $this->snapshotPackSize();
 
-        $offerId = DB::transaction(function () use (
-            $snapshotPrice,
-            $snapshotCurrency,
-            $snapshotInStock,
-            $priceSelector,
-            $titleSelector,
-            $imageSelector,
-            $imageUrl,
-            $gtin,
-            $variantKey,
-            $packSize,
-        ): string {
-            $shop = $this->product->shops()->create([
-                'url' => $this->normalizedUrl,
-                'adapter_key' => $this->adapterKey,
-                'price_selector' => $priceSelector,
-                'title_selector' => $titleSelector,
-                'image_selector' => $imageSelector,
-                'image_url' => $imageUrl,
-                'gtin' => $gtin,
-                'variant_key' => $variantKey,
-                'pack_quantity' => $packSize?->quantity,
-                'pack_unit' => $packSize?->unit,
-                'currency' => $snapshotCurrency,
-                'initial_price' => $snapshotPrice,
-                'initial_checked_at' => now(),
-                'current_price' => $snapshotPrice,
-                'current_in_stock' => $snapshotInStock,
-                'last_checked_at' => now(),
-                'last_success_at' => now(),
-                'last_status' => ScrapeStatus::Ok->value,
-            ]);
+        try {
+            $offerId = DB::transaction(function () use (
+                $snapshotPrice,
+                $snapshotCurrency,
+                $snapshotInStock,
+                $priceSelector,
+                $titleSelector,
+                $imageSelector,
+                $imageUrl,
+                $gtin,
+                $variantKey,
+                $packSize,
+            ): string {
+                // Inside the transaction: the guard locks the owner row, so two
+                // tabs confirming at the same moment cannot both pass the count.
+                app(PlanLimits::class)->guardShop($this->product);
 
-            $check = PriceCheck::create([
-                'shop_id' => $shop->id,
-                'price' => $snapshotPrice,
-                'currency' => $snapshotCurrency,
-                'in_stock' => $snapshotInStock,
-                'status' => ScrapeStatus::Ok->value,
-                'checked_at' => now(),
-            ]);
+                $shop = $this->product->shops()->create([
+                    'url' => $this->normalizedUrl,
+                    'adapter_key' => $this->adapterKey,
+                    'price_selector' => $priceSelector,
+                    'title_selector' => $titleSelector,
+                    'image_selector' => $imageSelector,
+                    'image_url' => $imageUrl,
+                    'gtin' => $gtin,
+                    'variant_key' => $variantKey,
+                    'pack_quantity' => $packSize?->quantity,
+                    'pack_unit' => $packSize?->unit,
+                    'currency' => $snapshotCurrency,
+                    'initial_price' => $snapshotPrice,
+                    'initial_checked_at' => now(),
+                    'current_price' => $snapshotPrice,
+                    'current_in_stock' => $snapshotInStock,
+                    'last_checked_at' => now(),
+                    'last_success_at' => now(),
+                    'last_status' => ScrapeStatus::Ok->value,
+                ]);
 
-            $this->product->recomputeCheapestShop((int) $check->id);
+                $check = PriceCheck::create([
+                    'shop_id' => $shop->id,
+                    'price' => $snapshotPrice,
+                    'currency' => $snapshotCurrency,
+                    'in_stock' => $snapshotInStock,
+                    'status' => ScrapeStatus::Ok->value,
+                    'checked_at' => now(),
+                ]);
 
-            return (string) $shop->id;
-        });
+                $this->product->recomputeCheapestShop((int) $check->id);
+
+                return (string) $shop->id;
+            });
+        } catch (PlanLimitReached $e) {
+            Notification::make()
+                ->warning()
+                ->title('Plan limit reached')
+                ->body($e->getMessage())
+                ->persistent()
+                ->send();
+
+            return;
+        }
 
         $this->dispatch('shop-added', offerId: $offerId);
         $this->resetProbeState();

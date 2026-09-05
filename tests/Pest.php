@@ -1,16 +1,20 @@
 <?php declare(strict_types=1);
 
+use App\Billing\Plan;
 use App\Filament\App\Resources\Products\Pages\ViewProduct;
 use App\Filament\App\Resources\Products\RelationManagers\ShopsRelationManager;
 use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
 use App\Models\Product;
+use App\Models\User;
+use Carbon\CarbonImmutable;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Translation\PotentiallyTranslatedString;
+use Laravel\Cashier\Subscription;
 use Livewire\Features\SupportTesting\Testable;
 use Pest\Expectation;
 use PHPUnit\Framework\Assert;
@@ -609,4 +613,26 @@ function dierapothekerPage(
         . ' data-currency="EUR" data-price="' . $price . '" data-availability="' . $availability . '"></div>'
         . '<script>' . $viewItem . '</script>'
         . '</body></html>';
+}
+
+/**
+ * Give a user a Cashier subscription row. Stripe is never called in the
+ * suite — these rows are what the entitlement layer reads, so they are how
+ * a plan state is set up.
+ */
+function subscribeUser(
+    User $user,
+    string $status = 'active',
+    ?CarbonImmutable $endsAt = null,
+    ?CarbonImmutable $trialEndsAt = null,
+): Subscription {
+    return Subscription::factory()->create([
+        'user_id' => $user->id,
+        'type' => Plan::SUBSCRIPTION_TYPE,
+        'stripe_status' => $status,
+        'stripe_price' => 'price_pro',
+        'quantity' => 1,
+        'trial_ends_at' => $trialEndsAt,
+        'ends_at' => $endsAt,
+    ]);
 }
