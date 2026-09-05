@@ -38,12 +38,21 @@ it('drops to free once the cancelled period has ended', function (): void {
     expect($user->plan())->toBe(Plan::Free);
 });
 
-it('drops to free while past due', function (): void {
+it('keeps pro through the dunning retries while past due', function (): void {
+    // A declined card is usually an expired card. Stripe keeps retrying, the
+    // app asks the customer to fix it, and Pro survives until Stripe gives up.
     $user = User::factory()->create();
     subscribeUser($user, 'past_due');
 
-    expect($user->plan())->toBe(Plan::Free)
+    expect($user->plan())->toBe(Plan::Pro)
         ->and($user->isPastDue())->toBeTrue();
+});
+
+it('ends pro once Stripe gives up on the retries', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user, 'unpaid');
+
+    expect($user->plan())->toBe(Plan::Free);
 });
 
 it('blocks pro when a chargeback was lost, even on an active subscription', function (): void {

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Cashier\Cashier;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
 use Spatie\Health\Checks\Checks\CacheCheck;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
@@ -53,10 +54,21 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->registerHealthChecks();
+        $this->configureBilling();
 
         Gate::define('viewQueueInsights', static fn (): bool => app()->isLocal());
 
         Gate::define('retryFailedJobs', static fn (): bool => app()->isLocal());
+    }
+
+    protected function configureBilling(): void
+    {
+        // Keep Pro through Stripe's dunning retries. A declined card is
+        // usually an expired card, not a decision to stop paying, and the
+        // app already tells the customer to fix it. Stripe ends the
+        // subscription itself when the retries run out, and that does drop
+        // the account to free.
+        Cashier::keepPastDueSubscriptionsActive();
     }
 
     protected function configureDefaults(): void

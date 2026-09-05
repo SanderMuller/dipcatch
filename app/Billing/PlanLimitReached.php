@@ -13,11 +13,19 @@ final class PlanLimitReached extends RuntimeException
 {
     public static function products(int $limit): self
     {
-        return new self(__('Your plan tracks up to :limit products. Upgrade to Pro for unlimited products, or remove one first.', ['limit' => $limit]));
+        return new self(trans_choice(
+            'Your plan tracks one product. Upgrade to Pro for unlimited products, or remove it first.|Your plan tracks up to :limit products. Upgrade to Pro for unlimited products, or remove one first.',
+            $limit,
+            ['limit' => $limit],
+        ));
     }
 
     public static function shops(int $limit): self
     {
-        return new self(__('Your plan compares up to :limit shops per product. Upgrade to Pro for unlimited shops, or remove one first.', ['limit' => $limit]));
+        return new self(trans_choice(
+            'Your plan compares one shop per product. Upgrade to Pro for unlimited shops, or remove it first.|Your plan compares up to :limit shops per product. Upgrade to Pro for unlimited shops, or remove one first.',
+            $limit,
+            ['limit' => $limit],
+        ));
     }
 }

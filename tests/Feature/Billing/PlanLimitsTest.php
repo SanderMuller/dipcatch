@@ -36,6 +36,16 @@ it('lets a pro account past the product limit', function (): void {
     expect(app(PlanLimits::class)->remainingProducts($user))->toBeNull();
 });
 
+it('names the limit in the singular when the plan allows one', function (): void {
+    config()->set('plans.free.max_products', 1);
+
+    $user = User::factory()->create();
+    Product::factory()->create(['user_id' => $user->id]);
+
+    expect(fn () => app(PlanLimits::class)->guardProduct($user))
+        ->toThrow(PlanLimitReached::class, 'Your plan tracks one product. Upgrade to Pro for unlimited products, or remove it first.');
+});
+
 it('blocks the fifth shop on a free account', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id]);

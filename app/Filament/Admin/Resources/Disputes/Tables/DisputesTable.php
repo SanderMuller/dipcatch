@@ -10,6 +10,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 
 class DisputesTable
 {
@@ -30,6 +31,9 @@ class DisputesTable
 
                 TextColumn::make('status')
                     ->badge()
+                    // Stripe's own vocabulary — `needs_response`,
+                    // `warning_closed` — reads as machine output in a table.
+                    ->formatStateUsing(fn (string $state): string => Str::headline($state))
                     ->color(fn (StripeDispute $record): string => match (true) {
                         $record->isLost() => 'danger',
                         $record->status === StripeDispute::STATUS_WON => 'success',
@@ -37,6 +41,7 @@ class DisputesTable
                     }),
 
                 TextColumn::make('reason')
+                    ->formatStateUsing(fn (string $state): string => Str::headline($state))
                     ->placeholder('—')
                     ->toggleable(),
 

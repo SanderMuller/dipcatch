@@ -38,7 +38,7 @@ it('offers a pro account the stripe portal instead of checkout', function (): vo
         ->assertDontSee('Upgrade to Pro');
 });
 
-it('warns a past due account without threatening its data', function (): void {
+it('warns a past due account, keeps its Pro, and does not threaten its data', function (): void {
     $user = User::factory()->create();
     subscribeUser($user, 'past_due');
 
@@ -47,7 +47,9 @@ it('warns a past due account without threatening its data', function (): void {
 
     livewire(Billing::class)
         ->assertSee('Your last payment did not go through')
-        ->assertSee('Your tracked products keep working either way.');
+        ->assertSee('Your tracked products keep working either way.')
+        // The banner says "keep Pro", so the plan must still read Pro.
+        ->assertSee('Manage subscription');
 });
 
 it('says why pro is off after a lost chargeback', function (): void {
