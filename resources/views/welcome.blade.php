@@ -111,12 +111,18 @@
                         </span>
                         <span class="hidden sm:inline">{{ config('app.name') }}</span>
                     </a>
-                    <nav class="flex items-center gap-2 sm:gap-3">
+                    {{-- Wraps rather than overflows: the bar now carries a
+                         sign-in link as well, and the narrowest phones have
+                         no room left on one line. --}}
+                    <nav class="flex flex-wrap items-center justify-end gap-y-2 gap-x-2 sm:gap-x-3">
                         <div class="flex items-center rounded-full bg-white/80 p-0.5 text-[0.6875rem] font-semibold ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/80 dark:ring-zinc-800" role="group" aria-label="{{ __('Language') }}">
                             <a href="{{ route('home', ['lang' => 'nl']) }}" hreflang="nl" lang="nl" aria-label="Nederlands" @if ($locale === 'nl') aria-current="true" @endif @class(['rounded-full px-2 py-1 uppercase', 'hidden sm:inline-block bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' => $locale === 'nl', 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100' => $locale !== 'nl'])>nl</a>
                             <a href="{{ route('home', ['lang' => 'en']) }}" hreflang="en" lang="en" aria-label="English" @if ($locale === 'en') aria-current="true" @endif @class(['rounded-full px-2 py-1 uppercase', 'hidden sm:inline-block bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' => $locale === 'en', 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100' => $locale !== 'en'])>en</a>
                         </div>
                         <x-appearance-toggle />
+                        @guest
+                            <a href="{{ route('login') }}" class="whitespace-nowrap px-1 py-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 sm:px-2 dark:text-zinc-400 dark:hover:text-zinc-100">{{ __('Sign in') }}</a>
+                        @endguest
                         <a href="{{ $primaryHref }}" class="whitespace-nowrap rounded-full bg-white/80 px-3 py-1.5 text-sm sm:px-4 font-medium text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/80 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900"><span class="sm:hidden">{{ $headerLabelShort }}</span><span class="hidden sm:inline">{{ $headerLabel }}</span></a>
                     </nav>
                 </header>
