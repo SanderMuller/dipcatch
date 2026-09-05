@@ -52,6 +52,11 @@ class RevenueOverviewWidget extends BaseWidget
                 ->description('All payments minus refunds')
                 ->icon('heroicon-o-receipt-percent')
                 ->color('gray'),
+
+            Stat::make('Trial conversion', $this->conversionLabel())
+                ->description('Ended trials that stayed')
+                ->icon('heroicon-o-sparkles')
+                ->color('info'),
         ];
     }
 
@@ -60,12 +65,18 @@ class RevenueOverviewWidget extends BaseWidget
         return DB::query()->fromSub(ProUsers::ids(), 'pro')->count();
     }
 
+    /**
+     * `keepPastDueSubscriptionsActive()` keeps a failed payment entitled to
+     * Pro, which is a product decision, not revenue — MRR counts the money
+     * Stripe is actually collecting.
+     */
     private function payingCount(): int
     {
         return Subscription::query()
             ->where('type', Plan::SUBSCRIPTION_TYPE)
             ->active()
             ->notOnTrial()
+            ->where('stripe_status', '!=', 'past_due')
             ->count();
     }
 
@@ -93,6 +104,28 @@ class RevenueOverviewWidget extends BaseWidget
             ->whereNotNull('ends_at')
             ->where('ends_at', '>=', CarbonImmutable::now()->startOfMonth())
             ->count();
+    }
+
+    /**
+     * Of the trials that have run out, how many are still subscribed. A
+     * trial still running has not answered the question yet.
+     */
+    private function conversionLabel(): string
+    {
+        $ended = Subscription::query()
+            ->where('type', Plan::SUBSCRIPTION_TYPE)
+            ->whereNotNull('trial_ends_at')
+            ->where('trial_ends_at', '<', CarbonImmutable::now());
+
+        $total = (clone $ended)->count();
+
+        if ($total === 0) {
+            return '—';
+        }
+
+        $stayed = $ended->active()->count();
+
+        return round($stayed / $total * 100) . '%';
     }
 
     private function netRevenue(): int

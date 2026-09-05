@@ -2,11 +2,13 @@
 
 use App\Filament\Admin\Resources\Disputes\Pages\ListDisputes;
 use App\Filament\Admin\Resources\Subscribers\Pages\ListSubscribers;
+use App\Filament\Admin\Widgets\RevenueOverviewWidget;
 use App\Filament\App\Pages\Billing;
 use App\Models\Product;
 use App\Models\StripeDispute;
 use App\Models\StripePayment;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 
@@ -109,6 +111,33 @@ it('shows the owner each subscriber, their revenue and their disputes', function
         ->assertSee('Pro')
         // 499 paid minus a 100 refund, in euros.
         ->assertSee('3.99');
+});
+
+it('keeps a failed payment out of MRR and reports trial conversion', function (): void {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    // Two paying, one past due (entitled to Pro, but collecting nothing).
+    subscribeUser(User::factory()->create());
+    subscribeUser(User::factory()->create());
+    subscribeUser(User::factory()->create(), 'past_due');
+
+    // Two trials have run out: one stayed, one cancelled.
+    subscribeUser(User::factory()->create(), 'active', trialEndsAt: CarbonImmutable::now()->subDays(3));
+    subscribeUser(
+        User::factory()->create(),
+        'canceled',
+        endsAt: CarbonImmutable::now()->subDay(),
+        trialEndsAt: CarbonImmutable::now()->subDays(3),
+    );
+
+    $this->actingAs($admin);
+    Filament::setCurrentPanel('admin');
+
+    livewire(RevenueOverviewWidget::class)
+        // Three subscriptions are past their trial and not cancelled, but
+        // the past-due one pays nothing: 3 x EUR 4.99, not 4.
+        ->assertSee('14.97')
+        ->assertSee('50%');
 });
 
 it('reads the subscriber list flat, not once per row', function (): void {
