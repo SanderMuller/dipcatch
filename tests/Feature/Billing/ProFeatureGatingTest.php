@@ -5,6 +5,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\UnitPriceTargetNotification;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Notification;
 
 function productAtTarget(User $user): Product
@@ -58,6 +59,17 @@ it('keeps the stored target of a free account so an upgrade turns it back on', f
     app(DetectUnitPriceTarget::class)($product);
 
     expect($product->fresh()?->unit_price_target)->not->toBeNull();
+});
+
+it('offers a trial only to an account that never had this subscription', function (): void {
+    $fresh = User::factory()->create();
+
+    expect($fresh->qualifiesForTrial())->toBeTrue();
+
+    subscribeUser($fresh, 'canceled', endsAt: CarbonImmutable::now()->subDay());
+
+    // Cancelling and coming back must not hand out a second free fortnight.
+    expect($fresh->fresh()?->qualifiesForTrial())->toBeFalse();
 });
 
 it('refuses checkout when no stripe price is configured', function (): void {

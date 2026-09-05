@@ -31,7 +31,9 @@ trait Subscribes
         }
 
         // `valid()` covers active, trialing and the cancelled-but-not-yet-
-        // expired grace period. It excludes past due once the retries run out.
+        // expired grace period. `keepPastDueSubscriptionsActive()` in
+        // AppServiceProvider adds past due, so Pro survives the dunning
+        // retries; Stripe moving the subscription to unpaid ends it.
         return $subscription->valid() ? Plan::Pro : Plan::Free;
     }
 
@@ -43,6 +45,17 @@ trait Subscribes
     public function entitlements(): Entitlements
     {
         return Entitlements::for($this);
+    }
+
+    /**
+     * A trial is for people who have never had this subscription. Cancelling
+     * and re-subscribing must not hand out a second free fortnight.
+     */
+    public function qualifiesForTrial(): bool
+    {
+        return $this->subscriptions()
+            ->where('type', Plan::SUBSCRIPTION_TYPE)
+            ->doesntExist();
     }
 
     public function isPastDue(): bool

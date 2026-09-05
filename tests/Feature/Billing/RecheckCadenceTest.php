@@ -50,6 +50,24 @@ it('still rechecks a free shop once its own interval has passed', function (): v
     Queue::assertPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($shop));
 });
 
+it('does not let a pro backlog starve free accounts', function (): void {
+    Queue::fake();
+
+    // One tick of capacity, and more due Pro work than fits. The free shop
+    // is the oldest, so a fair queue takes it first.
+    config()->set('dipcatch.scheduler.batch_size', 1);
+
+    $pro = proUser();
+    shopFor($pro, CarbonImmutable::now()->subHours(3));
+    shopFor($pro, CarbonImmutable::now()->subHours(4));
+    $freeShop = shopFor(User::factory()->create(), CarbonImmutable::now()->subDays(2));
+
+    $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
+
+    Queue::assertPushed(CheckShopPrice::class, 1);
+    Queue::assertPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($freeShop));
+});
+
 it('drops a blocked account back to the free cadence', function (): void {
     Queue::fake();
 

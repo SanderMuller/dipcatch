@@ -63,11 +63,10 @@ final class AppServiceProvider extends ServiceProvider
 
     protected function configureBilling(): void
     {
-        // Keep Pro through Stripe's dunning retries. A declined card is
-        // usually an expired card, not a decision to stop paying, and the
-        // app already tells the customer to fix it. Stripe ends the
-        // subscription itself when the retries run out, and that does drop
-        // the account to free.
+        // Keep Pro through Stripe's dunning retries: a declined card is
+        // usually an expired card, not a decision to stop paying. Stripe
+        // ends the subscription when the retries run out, and that does
+        // drop the account.
         Cashier::keepPastDueSubscriptionsActive();
     }
 

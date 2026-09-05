@@ -19,7 +19,6 @@ class BillingController extends Controller
     public function checkout(): Checkout|RedirectResponse
     {
         $user = $this->user();
-        // The key exists but is null until a Stripe price is configured.
         $priceId = config('plans.stripe.pro_price_id');
         $priceId = is_string($priceId) ? $priceId : '';
 
@@ -36,7 +35,7 @@ class BillingController extends Controller
         try {
             $subscription = $user->newSubscription(Plan::SUBSCRIPTION_TYPE, $priceId);
 
-            if ($trialDays > 0 && ! $user->hasEverSubscribedTo(Plan::SUBSCRIPTION_TYPE)) {
+            if ($trialDays > 0 && $user->qualifiesForTrial()) {
                 $subscription->trialDays($trialDays);
             }
 
@@ -45,8 +44,8 @@ class BillingController extends Controller
                 'cancel_url' => url('/app/billing?checkout=cancelled'),
             ]);
         } catch (Throwable) {
-            // Stripe is down, the key is wrong, the price was deleted. The
-            // customer gets a way forward instead of a 500.
+            // Stripe down, wrong key, deleted price: the customer gets a
+            // way forward instead of a 500.
             return $this->failed('Stripe could not start the checkout. Please try again in a moment.');
         }
     }

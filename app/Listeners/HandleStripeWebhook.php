@@ -74,7 +74,10 @@ class HandleStripeWebhook
 
         $user = $this->owners->forCustomer($this->string($charge, 'customer'));
 
-        $stored = $this->storeMoney(
+        // Stripe reports the running total refunded on the charge, not the
+        // single refund, and sends the event again for each partial refund.
+        // Storing the total keeps the sum right; only a rise is news.
+        $rise = $this->storeMoney(
             id: $this->string($charge, 'id'),
             kind: StripePayment::KIND_REFUND,
             // Negative so a sum over the table is net revenue.
@@ -84,8 +87,8 @@ class HandleStripeWebhook
             at: $this->timestamp($charge, 'created'),
         );
 
-        if ($stored) {
-            $this->alertOwners(BillingIncidentNotification::refund($amount, $this->string($charge, 'currency'), $user));
+        if ($rise > 0) {
+            $this->alertOwners(BillingIncidentNotification::refund($rise, $this->string($charge, 'currency'), $user));
         }
     }
 
@@ -137,15 +140,30 @@ class HandleStripeWebhook
             'closed_at' => now(),
         ])->save();
 
-        $user = $record->user;
-
-        if ($user !== null) {
-            $user->forceFill([
-                'billing_blocked_at' => $record->isLost() ? now() : null,
-            ])->save();
-        }
+        $record->user?->forceFill([
+            'billing_blocked_at' => $this->blockUntil($record),
+        ])->save();
 
         $this->alertOwners(BillingIncidentNotification::disputeClosed($record));
+    }
+
+    /**
+     * A won dispute only lifts the block when nothing else is still holding
+     * it — an account with two chargebacks, one lost, stays blocked.
+     */
+    private function blockUntil(StripeDispute $record): ?CarbonImmutable
+    {
+        if ($record->isLost()) {
+            return CarbonImmutable::now();
+        }
+
+        $otherLost = StripeDispute::query()
+            ->where('user_id', $record->user_id)
+            ->whereKeyNot($record->getKey())
+            ->where('status', StripeDispute::STATUS_LOST)
+            ->exists();
+
+        return $otherLost ? CarbonImmutable::now() : null;
     }
 
     /**
@@ -162,13 +180,14 @@ class HandleStripeWebhook
     }
 
     /**
-     * Returns false when the row already existed, so a redelivered webhook
-     * neither double-counts revenue nor re-alerts.
+     * Records the running total for one Stripe object and returns how much
+     * that total grew, in minor units. A redelivered webhook grows it by
+     * nothing, so it neither double-counts revenue nor re-alerts.
      */
-    private function storeMoney(string $id, string $kind, int $amount, string $currency, ?User $user, CarbonImmutable $at): bool
+    private function storeMoney(string $id, string $kind, int $amount, string $currency, ?User $user, CarbonImmutable $at): int
     {
         if ($id === '') {
-            return false;
+            return 0;
         }
 
         $payment = StripePayment::query()->firstOrCreate(
@@ -181,7 +200,17 @@ class HandleStripeWebhook
             ],
         );
 
-        return $payment->wasRecentlyCreated;
+        if ($payment->wasRecentlyCreated) {
+            return abs($amount);
+        }
+
+        $rise = abs($amount) - abs($payment->amount);
+
+        if ($rise > 0) {
+            $payment->forceFill(['amount' => $amount, 'occurred_at' => $at])->save();
+        }
+
+        return max(0, $rise);
     }
 
     private function alertOwners(BillingIncidentNotification $notification): void

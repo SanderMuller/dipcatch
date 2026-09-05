@@ -136,8 +136,6 @@ class CreateProductFromUrl extends Component
                 $variantKey,
                 $packSize,
             ): Product {
-                // Inside the transaction: the guard locks the owner row, so two
-                // tabs confirming at the same moment cannot both pass the count.
                 app(PlanLimits::class)->guardProduct($this->currentUser());
 
                 $product = Product::query()->create([

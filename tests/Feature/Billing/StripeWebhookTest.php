@@ -141,6 +141,38 @@ it('does not re-close a dispute Stripe redelivers', function (): void {
     Notification::assertNothingSent();
 });
 
+it('counts a second partial refund on the same charge', function (): void {
+    Notification::fake();
+
+    $admin = User::factory()->create(['is_admin' => true]);
+    customer();
+
+    // Stripe reports the running total on the charge, so a second partial
+    // refund arrives as the same event id with a larger amount.
+    webhook('charge.refunded', ['id' => 'ch_1', 'customer' => 'cus_test123', 'amount_refunded' => 200, 'currency' => 'eur', 'created' => now()->timestamp]);
+    webhook('charge.refunded', ['id' => 'ch_1', 'customer' => 'cus_test123', 'amount_refunded' => 499, 'currency' => 'eur', 'created' => now()->timestamp]);
+
+    expect(StripePayment::query()->where('kind', StripePayment::KIND_REFUND)->count())->toBe(1)
+        ->and(StripePayment::query()->sum('amount'))->toBe(-499);
+
+    // Two alerts: the first refund, then the rise. Not three.
+    Notification::assertSentToTimes($admin, BillingIncidentNotification::class, 2);
+});
+
+it('keeps an account blocked when it wins one chargeback but lost another', function (): void {
+    Notification::fake();
+
+    $user = customer();
+    resolveChargesTo($user);
+    StripeDispute::factory()->lost()->create(['user_id' => $user->id, 'stripe_id' => 'dp_lost']);
+    StripeDispute::factory()->create(['user_id' => $user->id, 'stripe_id' => 'dp_open']);
+    $user->forceFill(['billing_blocked_at' => now()])->save();
+
+    webhook('charge.dispute.closed', ['id' => 'dp_open', 'status' => 'won']);
+
+    expect($user->fresh()?->billing_blocked_at)->not->toBeNull();
+});
+
 it('tells the customer when the card is declined', function (): void {
     Notification::fake();
 
