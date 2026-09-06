@@ -6,15 +6,20 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\UnitPriceTargetNotification;
+use App\Services\Drops\NotificationBudget;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * A product tracked at two shops: a 200 g bag and a 370 g bag.
+ * A product tracked at two shops: a 200 g bag and a 370 g bag. The owner is
+ * on Pro, because the unit-price target is a Pro feature — the free-plan
+ * behaviour has its own test in tests/Feature/Billing.
  */
 function targetProduct(?string $target, string $lidlPrice = '1.99'): Product
 {
     $user = User::factory()->create(['notify_via_filament' => true]);
+    subscribeUser($user);
     $product = Product::factory()->for($user)->create([
         'currency' => 'EUR',
         'unit_price_target' => $target,
@@ -101,6 +106,7 @@ test('rising back above the target arms the alert again', function (): void {
 
 test('a product whose shops state no pack size cannot reach a target', function (): void {
     $user = User::factory()->create(['notify_via_filament' => true]);
+    subscribeUser($user);
     $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'unit_price_target' => '5.50']);
     Shop::factory()->for($product)->create([
         'url' => 'https://dataset.test/p/1', 'currency' => 'EUR', 'current_price' => '0.99',
@@ -115,6 +121,7 @@ test('the message states the unit price, the pack price and the shop', function 
     // Built here rather than read off nullable accessors, so the message is
     // asserted against known values.
     $user = User::factory()->create(['notify_via_filament' => true]);
+    subscribeUser($user);
     $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'unit_price_target' => '5.50']);
     $shop = Shop::factory()->for($product)->create([
         'url' => 'https://lidl.nl/p/1', 'currency' => 'EUR', 'current_price' => '1.99',
@@ -141,6 +148,7 @@ test('a price check on any shop can fire the target, not only the cheapest', fun
     ]);
 
     $user = User::factory()->create(['notify_via_filament' => true]);
+    subscribeUser($user);
     $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'unit_price_target' => '5.50']);
 
     // The cheapest shop, which this check does not touch.
@@ -162,4 +170,19 @@ test('a price check on any shop can fire the target, not only the cheapest', fun
     // the best value fell to €5.38/kg.
     expect($product->refresh()->cheapest_price)->toBe('1.69');
     Notification::assertSentTo($user, UnitPriceTargetNotification::class);
+});
+
+test('the unit-price alert obeys the same hourly ceiling as a drop alert', function (): void {
+    // The owner is on Pro, so it is the Pro ceiling that must bind.
+    config()->set('plans.pro.notifications_hourly_limit', 1);
+
+    $product = targetProduct('5.50');
+    $user = $product->user()->sole();
+
+    // Spend the single hourly allowance.
+    RateLimiter::hit(NotificationBudget::key($user), 3600);
+
+    app(DetectUnitPriceTarget::class)($product);
+
+    Notification::assertNothingSent();
 });

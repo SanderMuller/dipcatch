@@ -2,6 +2,7 @@
 
 namespace App\Filament\App\Resources\Products\RelationManagers;
 
+use App\Billing\PlanLimits;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Jobs\CheckShopPrice;
@@ -63,9 +64,19 @@ class ShopsRelationManager extends RelationManager
     {
         return $table
             ->heading(null)
-            ->header(fn (RelationManager $livewire): View => view('filament.partials.add-shop-header', [
-                'product' => $livewire->getOwnerRecord(),
-            ]))
+            ->header(function (RelationManager $livewire): View {
+                /** @var Product $product */
+                $product = $livewire->getOwnerRecord();
+
+                return view('filament.partials.add-shop-header', [
+                    'product' => $product,
+                    // The plan is answered here, not in the view: the header
+                    // must show the ceiling before someone probes a URL only
+                    // to be refused on Confirm.
+                    'shopLimit' => $product->user?->entitlements()->maxShopsPerProduct(),
+                    'canAddShop' => app(PlanLimits::class)->canAddShop($product),
+                ]);
+            })
             ->emptyStateHeading('No shops yet')
             ->emptyStateDescription('Paste a product URL from any webshop to start tracking its price.')
             ->emptyStateActions([])

@@ -19,11 +19,13 @@ test('the Dutch marketing pages render no untranslated string', function (): voi
         // Guests and members see different copy, so drive both.
         $this->get(route('home', ['lang' => 'nl']))->assertOk();
         $this->get(route('privacy', ['lang' => 'nl']))->assertOk();
+        $this->get(route('pricing', ['lang' => 'nl']))->assertOk();
 
         $this->actingAs(User::factory()->create());
 
         $this->get(route('home', ['lang' => 'nl']))->assertOk();
         $this->get(route('privacy', ['lang' => 'nl']))->assertOk();
+        $this->get(route('pricing', ['lang' => 'nl']))->assertOk();
     } finally {
         Lang::handleMissingKeysUsing(null);
     }
@@ -36,14 +38,17 @@ test('the Dutch marketing pages render no untranslated string', function (): voi
 });
 
 test('lang/nl.json carries no key the marketing views no longer use', function (): void {
-    // The two marketing views plus everything they include. The views write
+    // The marketing views plus everything they include. The views write
     // every translated string as a single-quoted, single-line `__('…')`
     // literal, so a verbatim substring match is exact.
     $files = [
         resource_path('views/welcome.blade.php'),
         resource_path('views/privacy.blade.php'),
+        resource_path('views/pricing.blade.php'),
         resource_path('views/partials/head.blade.php'),
         resource_path('views/components/appearance-toggle.blade.php'),
+        resource_path('views/components/marketing-header.blade.php'),
+        resource_path('views/components/marketing-header/language.blade.php'),
     ];
 
     $sources = array_map(static fn (string $file): string => (string) file_get_contents($file), $files);

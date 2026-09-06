@@ -154,28 +154,33 @@ test('the products list shows the best value beside the cheapest price', functio
 });
 
 test('the list reads every shop once, not once per product row', function (): void {
-    $user = User::factory()->create();
+    $render = function (int $products): int {
+        $user = User::factory()->create();
 
-    foreach (range(1, 8) as $i) {
-        $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
-        Shop::factory()->for($product)->create([
-            'url' => "https://shop{$i}.test/p/1", 'currency' => 'EUR', 'current_price' => '1.99',
-            'pack_quantity' => '370.00', 'pack_unit' => 'g',
-        ]);
-    }
+        foreach (range(1, $products) as $i) {
+            $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+            Shop::factory()->for($product)->create([
+                'url' => "https://shop{$i}.test/p/1", 'currency' => 'EUR', 'current_price' => '1.99',
+                'pack_quantity' => '370.00', 'pack_unit' => 'g',
+            ]);
+        }
 
-    $this->actingAs($user);
+        $this->actingAs($user);
 
-    $queries = 0;
-    DB::listen(function () use (&$queries): void {
-        $queries++;
-    });
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
 
-    livewire(ListProducts::class)->assertSeeText('€5.38 /kg');
+        livewire(ListProducts::class)->assertSeeText('€5.38 /kg');
 
-    // Eager loading makes this flat: eight products cost the same three
-    // queries as one. Reading shops per row would cost eight more.
-    expect($queries)->toBeLessThanOrEqual(4);
+        return $queries;
+    };
+
+    // Flatness is the property worth guarding, so the test compares two
+    // sizes rather than trusting a threshold: a fixed cost may be added to
+    // the page, but reading shops per row would cost eight more here.
+    expect($render(4))->toBe($render(12));
 });
 
 test('the dashboard says how long the drop price lasts', function (): void {

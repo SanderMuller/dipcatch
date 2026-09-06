@@ -12,6 +12,7 @@
         "aws/aws-sdk-php": "^3.394",
         "filament/filament": "^5.7.6",
         "laravel-notification-channels/webpush": "^10.5",
+        "laravel/cashier": "^16.8",
         "laravel/fortify": "^1.39.0",
         "laravel/framework": "^13.29",
         "laravel/octane": "^2.19",
@@ -70,6 +71,9 @@
         "symplify/phpstan-rules": "^14.13.1",
         "tomasvotruba/cognitive-complexity": "^1.2",
         "tomasvotruba/type-coverage": "^2.3.6"
+    },
+    "replace": {
+        "symfony/polyfill-intl-icu": "*"
     },
     "autoload": {
         "psr-4": {

@@ -3,12 +3,15 @@
 namespace App\Livewire\Products;
 
 use App\Actions\Shops\ProbeOutcome;
+use App\Billing\PlanLimitReached;
+use App\Billing\PlanLimits;
 use App\Enums\ScrapeStatus;
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\User;
 use App\Services\Drops\TierDefaults;
 use App\Support\UrlNormalizer;
 use Filament\Notifications\Notification;
@@ -16,6 +19,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Livewire\Component;
+use RuntimeException;
 use SanderMuller\FluentValidation\FluentRule;
 use SanderMuller\FluentValidation\HasFluentValidation;
 
@@ -119,62 +123,75 @@ class CreateProductFromUrl extends Component
         $variantKey = $this->chosenVariantKey;
         $packSize = $this->snapshotPackSize();
 
-        $product = DB::transaction(function () use (
-            $snapshotPrice,
-            $snapshotCurrency,
-            $snapshotInStock,
-            $priceSelector,
-            $titleSelector,
-            $imageSelector,
-            $shopImageUrl,
-            $gtin,
-            $variantKey,
-            $packSize,
-        ): Product {
-            $product = Product::query()->create([
-                'user_id' => auth()->id(),
-                'title' => trim($this->title),
-                'image_url' => trim($this->imageUrl) !== '' ? trim($this->imageUrl) : null,
-                'currency' => $snapshotCurrency,
-                'drop_threshold_pct' => $this->thresholdPct,
-                'drop_threshold_abs' => $this->thresholdAbs,
-                'active' => true,
-            ]);
+        try {
+            $product = DB::transaction(function () use (
+                $snapshotPrice,
+                $snapshotCurrency,
+                $snapshotInStock,
+                $priceSelector,
+                $titleSelector,
+                $imageSelector,
+                $shopImageUrl,
+                $gtin,
+                $variantKey,
+                $packSize,
+            ): Product {
+                app(PlanLimits::class)->guardProduct($this->currentUser());
 
-            $shop = $product->shops()->create([
-                'url' => $this->normalizedUrl,
-                'adapter_key' => $this->adapterKey,
-                'price_selector' => $priceSelector,
-                'title_selector' => $titleSelector,
-                'image_selector' => $imageSelector,
-                'image_url' => $shopImageUrl,
-                'gtin' => $gtin,
-                'variant_key' => $variantKey,
-                'pack_quantity' => $packSize?->quantity,
-                'pack_unit' => $packSize?->unit,
-                'currency' => $snapshotCurrency,
-                'initial_price' => $snapshotPrice,
-                'initial_checked_at' => now(),
-                'current_price' => $snapshotPrice,
-                'current_in_stock' => $snapshotInStock,
-                'last_checked_at' => now(),
-                'last_success_at' => now(),
-                'last_status' => ScrapeStatus::Ok->value,
-            ]);
+                $product = Product::query()->create([
+                    'user_id' => auth()->id(),
+                    'title' => trim($this->title),
+                    'image_url' => trim($this->imageUrl) !== '' ? trim($this->imageUrl) : null,
+                    'currency' => $snapshotCurrency,
+                    'drop_threshold_pct' => $this->thresholdPct,
+                    'drop_threshold_abs' => $this->thresholdAbs,
+                    'active' => true,
+                ]);
 
-            $check = PriceCheck::create([
-                'shop_id' => $shop->id,
-                'price' => $snapshotPrice,
-                'currency' => $snapshotCurrency,
-                'in_stock' => $snapshotInStock,
-                'status' => ScrapeStatus::Ok->value,
-                'checked_at' => now(),
-            ]);
+                $shop = $product->shops()->create([
+                    'url' => $this->normalizedUrl,
+                    'adapter_key' => $this->adapterKey,
+                    'price_selector' => $priceSelector,
+                    'title_selector' => $titleSelector,
+                    'image_selector' => $imageSelector,
+                    'image_url' => $shopImageUrl,
+                    'gtin' => $gtin,
+                    'variant_key' => $variantKey,
+                    'pack_quantity' => $packSize?->quantity,
+                    'pack_unit' => $packSize?->unit,
+                    'currency' => $snapshotCurrency,
+                    'initial_price' => $snapshotPrice,
+                    'initial_checked_at' => now(),
+                    'current_price' => $snapshotPrice,
+                    'current_in_stock' => $snapshotInStock,
+                    'last_checked_at' => now(),
+                    'last_success_at' => now(),
+                    'last_status' => ScrapeStatus::Ok->value,
+                ]);
 
-            $product->recomputeCheapestShop((int) $check->id);
+                $check = PriceCheck::create([
+                    'shop_id' => $shop->id,
+                    'price' => $snapshotPrice,
+                    'currency' => $snapshotCurrency,
+                    'in_stock' => $snapshotInStock,
+                    'status' => ScrapeStatus::Ok->value,
+                    'checked_at' => now(),
+                ]);
 
-            return $product;
-        });
+                $product->recomputeCheapestShop((int) $check->id);
+
+                return $product;
+            });
+        } catch (PlanLimitReached $e) {
+            Notification::make()
+                ->warning()
+                ->title('Plan limit reached')
+                ->body($e->getMessage())
+                ->persistent()
+                ->send();
+
+            return;
+        }
 
         Notification::make()
             ->success()
@@ -183,6 +200,21 @@ class CreateProductFromUrl extends Component
             ->send();
 
         $this->redirect(ProductResource::getUrl('view', ['record' => $product], panel: 'app'));
+    }
+
+    /**
+     * Livewire re-hydrates the component per request; the guard needs the
+     * authenticated model, not the id.
+     */
+    private function currentUser(): User
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            throw new RuntimeException('Product creation requires an authenticated user.');
+        }
+
+        return $user;
     }
 
     public function cancel(): void

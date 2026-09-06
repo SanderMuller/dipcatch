@@ -100,26 +100,14 @@
     </head>
     <body class="min-h-dvh bg-linear-to-br from-amber-50 to-rose-50 bg-fixed text-zinc-900 antialiased dark:from-zinc-950 dark:to-zinc-950 dark:text-zinc-50">
         <div class="isolate flex min-h-dvh flex-col">
+            {{-- Outside the overflow-hidden wrapper below: an ancestor that
+                 hides overflow turns off `position: sticky`. --}}
+            <x-marketing-header />
+
             <div class="relative flex flex-1 flex-col overflow-hidden">
                 <div aria-hidden="true" class="pointer-events-none absolute -top-40 -left-40 size-[28rem] rounded-full bg-amber-200/40 blur-3xl dark:hidden"></div>
                 <div aria-hidden="true" class="pointer-events-none absolute right-0 -bottom-32 size-[28rem] rounded-full bg-rose-200/40 blur-3xl dark:hidden"></div>
 
-                <header class="relative mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
-                    <a href="{{ route('home', $langQuery) }}" aria-label="{{ __('Homepage') }}" class="flex items-center gap-2 font-semibold">
-                        <span class="flex aspect-square size-8 items-center justify-center rounded-xl bg-white p-0.5 dark:bg-white">
-                            <x-app-logo-icon class="size-7" />
-                        </span>
-                        <span class="hidden sm:inline">{{ config('app.name') }}</span>
-                    </a>
-                    <nav class="flex items-center gap-2 sm:gap-3">
-                        <div class="flex items-center rounded-full bg-white/80 p-0.5 text-[0.6875rem] font-semibold ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/80 dark:ring-zinc-800" role="group" aria-label="{{ __('Language') }}">
-                            <a href="{{ route('home', ['lang' => 'nl']) }}" hreflang="nl" lang="nl" aria-label="Nederlands" @if ($locale === 'nl') aria-current="true" @endif @class(['rounded-full px-2 py-1 uppercase', 'hidden sm:inline-block bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' => $locale === 'nl', 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100' => $locale !== 'nl'])>nl</a>
-                            <a href="{{ route('home', ['lang' => 'en']) }}" hreflang="en" lang="en" aria-label="English" @if ($locale === 'en') aria-current="true" @endif @class(['rounded-full px-2 py-1 uppercase', 'hidden sm:inline-block bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' => $locale === 'en', 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100' => $locale !== 'en'])>en</a>
-                        </div>
-                        <x-appearance-toggle />
-                        <a href="{{ $primaryHref }}" class="whitespace-nowrap rounded-full bg-white/80 px-3 py-1.5 text-sm sm:px-4 font-medium text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/80 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900"><span class="sm:hidden">{{ $headerLabelShort }}</span><span class="hidden sm:inline">{{ $headerLabel }}</span></a>
-                    </nav>
-                </header>
 
                 <main class="relative mx-auto w-full max-w-7xl px-6 lg:px-8">
                     <section class="grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-12 lg:gap-12">
@@ -232,10 +220,16 @@
 
                     @guest
                         <section class="pb-20">
-                            <div class="rounded-3xl bg-zinc-900 px-6 py-10 text-center text-white ring-1 ring-zinc-800 sm:px-12 sm:py-12 dark:bg-zinc-900/80">
-                                <h2 class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">{{ __('Stop checking prices by hand.') }}</h2>
-                                <p class="mx-auto mt-3 max-w-[48ch] text-pretty text-zinc-300">{{ __('Add the products you buy anyway and let DipCatch tell you where they are cheapest this week.') }}</p>
-                                <a href="{{ route('register') }}" class="mt-8 inline-flex items-center rounded-full bg-white px-5 py-2.5 text-sm font-medium text-zinc-900 shadow-md hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
+                            {{-- The page is built from translucent cards over the
+                                 gradient, headed left, with amber as its accent.
+                                 A solid dark slab with centred text was none of
+                                 those things, so it read as a foreign block. --}}
+                            <div class="flex flex-col gap-6 rounded-2xl bg-amber-100/70 p-8 ring-1 ring-amber-200 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:p-10 dark:bg-amber-950/30 dark:ring-amber-900/50">
+                                <div>
+                                    <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Stop checking prices by hand.') }}</h2>
+                                    <p class="mt-3 max-w-[48ch] text-pretty text-zinc-600 dark:text-zinc-300">{{ __('Add the products you buy anyway and let DipCatch tell you where they are cheapest this week.') }}</p>
+                                </div>
+                                <a href="{{ route('register') }}" class="inline-flex shrink-0 items-center self-start rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 sm:self-auto dark:bg-white dark:text-zinc-900 dark:shadow-none dark:hover:bg-zinc-200">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
                             </div>
                         </section>
                     @endguest
@@ -245,6 +239,7 @@
                     <div class="flex flex-col items-center justify-between gap-3 border-t border-zinc-200 pt-6 text-sm text-zinc-500 sm:flex-row dark:border-zinc-800 dark:text-zinc-400">
                         <p>&copy; {{ date('Y') }} {{ config('app.name') }}</p>
                         <nav class="flex items-center gap-5" aria-label="{{ __('Footer') }}">
+                            <a href="{{ route('pricing', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Pricing') }}</a>
                             <a href="{{ route('privacy', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Privacy') }}</a>
                             @if (filled($contactEmail))
                                 <a href="mailto:{{ $contactEmail }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Contact') }}</a>

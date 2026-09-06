@@ -5,6 +5,7 @@ namespace App\Actions\Drops;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Notifications\UnitPriceTargetNotification;
+use App\Services\Drops\NotificationBudget;
 use App\Support\Numeric;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +33,10 @@ final readonly class DetectUnitPriceTarget
     {
         $target = $product->unit_price_target;
 
-        if ($target === null) {
+        // A unit-price target is a Pro feature. A free account keeps its
+        // stored target — it starts working again on upgrade — but is not
+        // alerted on it.
+        if ($target === null || $product->user?->entitlements()->allowsUnitPriceAlerts() !== true) {
             return;
         }
 
@@ -91,6 +95,15 @@ final readonly class DetectUnitPriceTarget
 
     private function notify(Product $product, Shop $shop, string $unitPrice): void
     {
+        $user = $product->user;
+
+        // The same hourly ceiling the drop alerts obey. Without this a Pro
+        // account with unlimited products could pass its own cap through
+        // this door.
+        if ($user === null || ! app(NotificationBudget::class)->allows($user)) {
+            return;
+        }
+
         // Claim the send first: two workers finishing checks together would
         // otherwise both see an unlatched product and both notify.
         $claimed = Product::query()
@@ -110,8 +123,8 @@ final readonly class DetectUnitPriceTarget
 
         $product->refresh();
 
-        DB::afterCommit(function () use ($product, $shop, $unitPrice): void {
-            $product->user?->notify(new UnitPriceTargetNotification($product, $shop, $unitPrice));
+        DB::afterCommit(function () use ($product, $shop, $unitPrice, $user): void {
+            $user->notify(new UnitPriceTargetNotification($product, $shop, $unitPrice));
         });
     }
 }
