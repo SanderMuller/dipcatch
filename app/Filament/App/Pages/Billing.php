@@ -110,4 +110,15 @@ class Billing extends Page
     {
         return BillingGate::isOpen() && ! $this->isBlocked();
     }
+
+    /**
+     * Anyone Stripe knows about can reach the portal, whatever their plan
+     * says. A lost chargeback drops the account to Free while Stripe keeps
+     * billing the subscription — hiding the portal there would leave
+     * someone paying with no way to stop.
+     */
+    public function canManageBilling(): bool
+    {
+        return $this->user()->stripe_id !== null;
+    }
 }

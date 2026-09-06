@@ -27,9 +27,14 @@ class DisputeResource extends Resource
     protected static ?string $modelLabel = 'chargeback';
 
     /**
-     * Before Stripe is configured these screens can only ever be empty.
-     * They come back the moment the shop opens; the routes stay reachable
-     * for anyone who bookmarked them.
+     * Before Stripe is configured this screen can only ever be empty, so it
+     * stays out of the navigation.
+     *
+     * It follows `isConfigured()` rather than `isOpen()` on purpose: an
+     * owner who switches selling off with BILLING_ENABLED still has
+     * customers, invoices and chargebacks to manage. The route also stays
+     * reachable by URL for the same reason — this hides an empty screen,
+     * it does not restrict access.
      */
     public static function shouldRegisterNavigation(): bool
     {

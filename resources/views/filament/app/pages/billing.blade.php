@@ -84,11 +84,13 @@
         </div>
 
         <div class="mt-6 flex flex-wrap gap-3">
-            @if ($isPro)
+            @if ($this->canManageBilling())
                 <x-filament::button tag="a" :href="route('billing.portal')" color="gray">
                     Manage subscription
                 </x-filament::button>
-            @elseif ($this->canUpgrade())
+            @endif
+
+            @if (! $isPro && $this->canUpgrade())
                 <x-filament::button tag="a" :href="route('billing.checkout')">
                     @if ($this->offersTrial())
                         Start {{ $this->trialDays() }}-day trial
@@ -96,7 +98,7 @@
                         Upgrade to Pro
                     @endif
                 </x-filament::button>
-            @elseif (! $this->isBlocked())
+            @elseif (! $this->isBlocked() && ! $isPro)
                 <p class="text-sm text-gray-500 dark:text-gray-400">Pro is not on sale yet.</p>
             @endif
 

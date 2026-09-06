@@ -81,7 +81,7 @@ it('offers the upgrade once the shop opens', function (): void {
 it('refuses checkout while the shop is shut', function (): void {
     // A price on its own is not enough to sell: a payment with no webhook
     // secret would never become a subscription.
-    config()->set('plans.stripe.pro_price_id', 'price_1');
+    configureStripe();
     config()->set('cashier.webhook.secret', null);
 
     $user = User::factory()->create();
@@ -90,7 +90,31 @@ it('refuses checkout while the shop is shut', function (): void {
         ->get('/billing/checkout')
         ->assertRedirect('/app/billing');
 
-    expect($user->fresh()?->stripe_checkout_session_id)->toBeNull();
+    // The gate's own message, not merely a redirect: without the gate the
+    // Stripe call would fail and land the customer in the same place.
+    expect(session()->get('filament.notifications'))->not->toBeNull();
+
+    $notifications = json_encode(session()->get('filament.notifications'), JSON_THROW_ON_ERROR);
+
+    expect($notifications)->toContain('Pro is not on sale yet.')
+        ->and($user->fresh()?->stripe_checkout_session_id)->toBeNull();
+});
+
+it('lets an account Stripe already bills reach the portal while blocked', function (): void {
+    // A lost chargeback drops the plan to Free while Stripe keeps billing.
+    // Losing the portal there would leave someone paying with no way out.
+    $user = User::factory()->create([
+        'stripe_id' => 'cus_blocked',
+        'billing_blocked_at' => now(),
+    ]);
+    subscribeUser($user);
+
+    $this->actingAs($user);
+    Filament::setCurrentPanel('app');
+
+    livewire(Billing::class)
+        ->assertSee('Manage subscription')
+        ->assertDontSee('Upgrade to Pro');
 });
 
 it('says coming soon on the public pricing page', function (): void {

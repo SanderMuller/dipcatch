@@ -13,6 +13,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Str;
 use Illuminate\Translation\PotentiallyTranslatedString;
 use Laravel\Cashier\Subscription;
 use Livewire\Features\SupportTesting\Testable;
@@ -626,6 +627,13 @@ function subscribeUser(
     ?CarbonImmutable $endsAt = null,
     ?CarbonImmutable $trialEndsAt = null,
 ): Subscription {
+    // Cashier creates the Stripe customer before the subscription, so a
+    // subscription without one cannot exist. Tests that skipped it made
+    // the billing portal look unreachable for a real subscriber.
+    if ($user->stripe_id === null) {
+        $user->forceFill(['stripe_id' => 'cus_' . Str::random(14)])->save();
+    }
+
     return Subscription::factory()->create([
         'user_id' => $user->id,
         'type' => Plan::SUBSCRIPTION_TYPE,

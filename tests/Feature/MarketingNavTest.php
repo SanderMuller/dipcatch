@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Support\Str;
+use Symfony\Component\DomCrawler\Crawler;
 
 it('offers a guest both a way in and a way to join', function (): void {
     $response = $this->get('/');
@@ -12,11 +12,23 @@ it('offers a guest both a way in and a way to join', function (): void {
         ->assertSee('Sign in');
 });
 
+/**
+ * @return list<string>
+ */
+function hrefsWithin(string $html, string $selector): array
+{
+    return new Crawler($html)->filter($selector)->each(
+        static fn (Crawler $node): string => (string) $node->attr('href'),
+    );
+}
+
 it('links the pricing page from the header of every marketing page', function (): void {
     foreach (['/', '/pricing', '/privacy'] as $url) {
-        $this->get($url)
-            ->assertOk()
-            ->assertSee(route('pricing'), escape: false);
+        $html = (string) $this->get($url)->assertOk()->getContent();
+
+        // Scoped to the header: every page also links pricing from its
+        // footer, so a page-wide assertion would pass with no header link.
+        expect(hrefsWithin($html, 'header a'))->toContain(route('pricing'));
     }
 });
 
@@ -29,16 +41,14 @@ it('marks the current page in the header nav', function (): void {
 it('carries a mobile menu with the same links as the bar', function (): void {
     // The bar hides its nav, language and sign-in below `md`, so everything
     // it drops has to live in the panel behind the toggle.
-    $response = $this->get('/')->assertOk();
-    $html = $response->getContent();
+    $html = (string) $this->get('/')->assertOk()->getContent();
 
-    expect($html)->toBeString()
-        ->toContain('aria-controls="marketing-menu"')
-        ->toContain('id="marketing-menu"');
+    expect($html)->toContain('aria-controls="marketing-menu"');
 
-    $panel = Str::after((string) $html, 'id="marketing-menu"');
-
-    expect($panel)->toContain(route('pricing'))
+    // Scoped to the panel itself, not the rest of the page: the hero and
+    // the footer carry these links too.
+    expect(hrefsWithin($html, '#marketing-menu a'))
+        ->toContain(route('pricing'))
         ->toContain(route('login'));
 });
 

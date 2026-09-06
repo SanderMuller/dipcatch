@@ -13,7 +13,13 @@ return [
     | copy with live keys, for instance.
     |
     | The gate closes the shop only. Entitlements are untouched, so an
-    | account granted Pro by hand keeps it.
+    | account granted Pro by hand keeps it, and anyone Stripe already bills
+    | keeps reaching the billing portal.
+    |
+    | Closing the gate stops new checkouts. It cannot retract a Stripe
+    | Checkout session that is already open — those live for hours and can
+    | still be completed. Cancel them in Stripe if a closure must be
+    | immediate.
     |
     */
 
