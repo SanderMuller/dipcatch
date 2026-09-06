@@ -8,7 +8,6 @@
     },
     "dependencies": {
         "@tailwindcss/vite": "^4.3.0",
-        "autoprefixer": "^10.4.20",
         "concurrently": "^10.0.5",
         "laravel-vite-plugin": "^3.0.0",
         "tailwindcss": "^4.3.0",
@@ -18,5 +17,8 @@
         "@rollup/rollup-linux-x64-gnu": "4.9.5",
         "@tailwindcss/oxide-linux-x64-gnu": "^4.0.1",
         "lightningcss-linux-x64-gnu": "^1.29.1"
+    },
+    "devDependencies": {
+        "playwright": "^1.63.0"
     }
 }
