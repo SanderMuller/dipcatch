@@ -4,6 +4,7 @@ use App\Billing\Entitlements;
 use App\Billing\Plan;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 
 it('puts a user with no subscription on the free plan', function (): void {
     expect(User::factory()->create()->plan())->toBe(Plan::Free);
@@ -69,6 +70,21 @@ it('ends pro for an unpaid subscription even inside a future grace period', func
     subscribeUser($user, 'unpaid', endsAt: CarbonImmutable::now()->addDays(10));
 
     expect($user->plan())->toBe(Plan::Free);
+});
+
+it('grants pro on a hand-granted trial read back from the database', function (): void {
+    User::factory()->create([
+        'email' => 'granted@example.test',
+        'trial_ends_at' => CarbonImmutable::now()->addDays(30),
+    ]);
+
+    // Fresh from the database, not the in-memory model the factory returned:
+    // without a datetime cast `trial_ends_at` arrives as a string and
+    // Cashier's `onTrial()` fatals on it.
+    $user = User::query()->where('email', 'granted@example.test')->firstOrFail();
+
+    expect($user->trial_ends_at)->toBeInstanceOf(CarbonInterface::class)
+        ->and($user->plan())->toBe(Plan::Pro);
 });
 
 it('reads the free limits from config', function (): void {

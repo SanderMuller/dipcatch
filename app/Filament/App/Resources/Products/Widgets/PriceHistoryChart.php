@@ -63,9 +63,13 @@ class PriceHistoryChart extends ChartWidget
             return $reason;
         }
 
-        return new HtmlString(
-            e($reason) . ' <a href="' . e(url('/app/billing')) . '" class="fi-link fi-size-sm">Compare plans</a>',
-        );
+        // Rendered through Filament's own link component: hand-written
+        // `fi-link` classes carry none of the colour custom properties, so
+        // the link came out looking like the sentence around it.
+        return new HtmlString(view('filament.partials.history-depth-notice', [
+            'reason' => $reason,
+            'billingUrl' => url('/app/billing'),
+        ])->render());
     }
 
     /**
@@ -241,47 +245,9 @@ class PriceHistoryChart extends ChartWidget
         return 'line';
     }
 
-    /**
-     * A PHP array cannot carry a JS function, so the tooltip callback ships as
-     * RawJs. It formats with the browser's own ICU, using the `currency` field
-     * every dataset carries — the same CLDR rules PHP intl applies server-side.
-     */
     protected function getOptions(): RawJs
     {
-        return RawJs::make(<<<'JS'
-            {
-                scales: {
-                    y: {
-                        position: 'left',
-                        title: { display: true, text: 'Price' },
-                    },
-                    unit: {
-                        position: 'right',
-                        title: { display: true, text: 'Per unit' },
-                        grid: { drawOnChartArea: false },
-                    },
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => {
-                                const value = ctx.parsed.y;
-                                if (value === null || value === undefined) {
-                                    return ctx.dataset.label;
-                                }
-
-                                const money = new Intl.NumberFormat('en-US', {
-                                    style: 'currency',
-                                    currency: ctx.dataset.currency,
-                                }).format(value);
-
-                                return `${ctx.dataset.label}: ${money}`;
-                            },
-                        },
-                    },
-                },
-            }
-            JS);
+        return PriceHistoryChartOptions::forProduct($this->record);
     }
 
     /**

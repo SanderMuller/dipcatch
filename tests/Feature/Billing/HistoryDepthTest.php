@@ -147,7 +147,10 @@ it('tells a free account why the long ranges are missing', function (): void {
 
     livewire(PriceHistoryChart::class, ['record' => $product, 'pageClass' => ViewProduct::class])
         ->assertSee('Your plan shows the last 90 days')
-        ->assertSee('Compare plans');
+        ->assertSee('Compare plans')
+        // Hand-written `fi-link` classes carry no colour, so the link
+        // rendered as plain sentence text.
+        ->assertSee('fi-color-primary', escape: false);
 });
 
 it('does not advertise pro while the shop is shut', function (): void {

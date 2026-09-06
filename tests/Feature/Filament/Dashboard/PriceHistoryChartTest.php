@@ -171,6 +171,87 @@ test('chart options carry the currency-aware tooltip formatter', function (): vo
         ->toContain('ctx.dataset.currency');
 });
 
+test('the x axis renders dates, not full timestamps, and thins its ticks', function (): void {
+    $options = (new ReflectionMethod(PriceHistoryChart::class, 'getOptions'))->invoke(new PriceHistoryChart());
+    assert($options instanceof RawJs);
+
+    // The label keeps the full stamp for the tooltip; the axis shows the
+    // date. A rotated stamp ate two thirds of the plot at phone width.
+    expect($options->toHtml())
+        ->toContain('getLabelForValue')
+        ->toContain('slice(0, 10)')
+        ->toContain('maxRotation: 0')
+        ->toContain('maxTicksLimit');
+});
+
+test('the per-unit axis is left out when no shop states a pack size', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create(['pack_quantity' => null, 'pack_unit' => null]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '2.00',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $options = (new ReflectionMethod(PriceHistoryChart::class, 'getOptions'))->invoke(makeChartFor($product));
+    assert($options instanceof RawJs);
+
+    expect($options->toHtml())->not->toContain('Per unit');
+});
+
+test('the per-unit axis appears once a shop states a pack size', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create(['pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '2.00',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $options = (new ReflectionMethod(PriceHistoryChart::class, 'getOptions'))->invoke(makeChartFor($product));
+    assert($options instanceof RawJs);
+
+    expect($options->toHtml())->toContain('Per unit');
+});
+
+test('the per-unit axis stays declared when the range in view shows no unit data', function (): void {
+    // A range change updates the datasets but never re-sends the options, so
+    // the axis has to be decided for the product, not for the range.
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $plain = Shop::factory()->for($product)->create([
+        'url' => 'https://plain.test/p/1', 'pack_quantity' => null, 'pack_unit' => null,
+    ]);
+    $perKilo = Shop::factory()->for($product)->create([
+        'url' => 'https://kilo.test/p/1', 'pack_quantity' => '200.00', 'pack_unit' => 'g',
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $perKilo->id,
+        'cheapest_price' => '2.00',
+        'started_at' => now()->subDays(400),
+        'ended_at' => now()->subDays(300),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $plain->id,
+        'cheapest_price' => '3.00',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $chart = makeChartFor($product, '30');
+    $options = (new ReflectionMethod(PriceHistoryChart::class, 'getOptions'))->invoke($chart);
+    assert($options instanceof RawJs);
+
+    $unitSeries = array_filter(
+        $chart->computeData()['datasets'],
+        fn (array $dataset): bool => ($dataset['yAxisID'] ?? null) === 'unit',
+    );
+
+    expect($unitSeries)->toBe([])
+        ->and($options->toHtml())->toContain('Per unit');
+});
+
 test('the cheapest price is plotted per unit as well, on its own axis', function (): void {
     $product = Product::factory()->create(['currency' => 'EUR']);
     $shop = Shop::factory()->for($product)->create(['pack_quantity' => '200.00', 'pack_unit' => 'g']);

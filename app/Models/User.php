@@ -26,6 +26,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property string $password
  * @property bool $is_admin
  * @property CarbonImmutable|null $billing_blocked_at
+ * @property CarbonImmutable|null $trial_ends_at
  * @property string|null $stripe_checkout_session_id
  * @property string $default_currency
  * @property bool $notify_via_email
@@ -58,6 +59,9 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'billing_blocked_at' => 'datetime',
+            // Cashier reads this one directly (`onTrial()` calls `isFuture()`
+            // on it), and it is not in the model's own casts by default.
+            'trial_ends_at' => 'datetime',
             'notify_via_email' => 'boolean',
             'notify_via_filament' => 'boolean',
             'notify_via_push' => 'boolean',
