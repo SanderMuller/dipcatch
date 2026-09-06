@@ -15,7 +15,8 @@ namespace App\Billing;
  * keeps a fully configured staging environment from selling.
  *
  * This gate is about the shop, not about entitlements. Granting Pro by hand
- * — an account-level `trial_ends_at` — keeps working with the shop closed.
+ * — a comp, or an account-level `trial_ends_at` — keeps working with the
+ * shop closed.
  */
 final class BillingGate
 {

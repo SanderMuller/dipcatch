@@ -22,17 +22,18 @@ final class ProUsers
             ->select('users.id')
             ->whereNull('billing_blocked_at')
             ->where(function (QueryBuilder $query): void {
-                // The same two ways `Subscribes::plan()` grants Pro: a live
-                // subscription, or a trial granted on the account itself.
-                // If these two disagree, the scheduler and the admin count
-                // stop matching what the customer is told.
+                // The same three ways `Subscribes::plan()` grants Pro: a
+                // live subscription, a trial granted on the account itself,
+                // or a comp. If these disagree, the scheduler and the admin
+                // count stop matching what the customer is told.
                 $query
                     ->whereIn('id', Subscription::query()
                         ->select('user_id')
                         ->where('type', Plan::SUBSCRIPTION_TYPE)
                         ->active()
                         ->toBase())
-                    ->orWhere('trial_ends_at', '>', now());
+                    ->orWhere('trial_ends_at', '>', now())
+                    ->orWhere('comped_until', '>', now());
             });
     }
 }

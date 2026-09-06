@@ -15,9 +15,9 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 
 ## Post-launch refactors + features
 
-- **[seo-and-ai-discoverability.md](seo-and-ai-discoverability.md)** — P1/P2 of the 2026-09-06 SEO audit: robots.txt opens `/register` and states an AI-crawler policy, sitemap and `llms.txt` routes, shared head partial with OG/Twitter, `Organization`/`WebSite`/`SoftwareApplication`/`Offer` JSON-LD, `dipcatch.eu` identity plus a `/bot` page, and copy repositioned to repeat purchases. Implemented and eye-verified; not deployed. Fixed a live bug where Laravel 13's `@context` Blade directive made the homepage JSON-LD unparseable.
+- **[seo-and-ai-discoverability.md](seo-and-ai-discoverability.md)** — P1/P2 of the 2026-09-06 SEO audit: robots.txt opens `/register` and states an AI-crawler policy, sitemap and `llms.txt` routes, shared head partial with OG/Twitter, `Organization`/`WebSite`/`SoftwareApplication`/`Offer` JSON-LD, `dipcatch.eu` identity plus a `/bot` page, and copy repositioned to repeat purchases. Shipped 2026-09-06. Fixed a live bug where Laravel 13's `@context` Blade directive made the homepage JSON-LD unparseable.
 
-- **[landing-pages-and-marketing-polish.md](landing-pages-and-marketing-polish.md)** — use-case landing pages (`/price-alerts/{slug}`), branded 404/500/503 views, and marketing markup cleanup judged against the Markdown twin. Laravel Cloud's Markdown for Agents is already enabled at the edge, so no application code renders Markdown. Follows the spec above.
+- **[landing-pages-and-marketing-polish.md](landing-pages-and-marketing-polish.md)** — use-case landing pages (`/price-alerts/{slug}`), branded 404/500 views, and marketing markup cleanup judged against the Markdown twin. Laravel Cloud's Markdown for Agents is already enabled at the edge, so no application code renders Markdown. Follows the spec above. Shipped 2026-09-06; the 503 was dropped because nothing invokes `errors::503`. Two ops tasks stay open in the Laravel Cloud dashboard.
 
 - **[unit-pricing.md](unit-pricing.md)** — normalized unit price (€/kg, €/l, €/stuk) per shop, parsed from source size data with title fallback; shown on shops table, previews, public page, products list.
 
@@ -29,6 +29,10 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 - ~~`timezone-autodetect.md`~~ — ✅ shipped (`users.timezone_detected_at` + browser `Intl` detection on first authenticated page load; atomic conditional UPDATE so explicit save in NotificationSettings can't be clobbered).
 - ~~`url-first-product-creation.md`~~ — ✅ shipped (paste-URL-first create flow: probe fills title/image, tier-default thresholds, one Confirm creates product + first shop; manual form kept at `/create-manual`).
 - ~~`public-product-sharing.md`~~ — ✅ shipped (per-product `share_slug` + public `/p/{slug}` route, Chart.js price-history + OG/Twitter meta, atomic conditional UPDATE on share/rotate/stop to refuse last-writer-wins between owner tabs, SRI-pinned CDN scripts).
+
+- **[mcp-server.md](mcp-server.md)** — an MCP server so a user can drive their own account from an assistant: list and create products, attach shops, read prices and history. `laravel/mcp` with Passport OAuth, copied from the sibling `macrocrumb` app. No admin tools. Most of the work is extracting the add-product and add-shop logic out of two Livewire components so a tool and a web request run the same code.
+
+- **[superadmin-and-comped-accounts.md](superadmin-and-comped-accounts.md)** — a Users screen in the existing admin panel showing every account and its plan, plus comped Pro accounts via a `comped_until` column taught to both `Subscribes::plan()` and `ProUsers::ids()`.
 
 ## Decisions (locked)
 

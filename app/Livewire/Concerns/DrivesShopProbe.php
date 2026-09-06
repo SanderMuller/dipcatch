@@ -4,11 +4,11 @@ namespace App\Livewire\Concerns;
 
 use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
+use App\Actions\Shops\ShopDraft;
 use App\Models\Product;
 use App\Models\User;
 use App\PriceAdapters\ShopSnapshot;
 use App\PriceAdapters\VariantCandidate;
-use App\Support\ImageUrl;
 use App\Support\PackSize;
 
 /**
@@ -132,7 +132,14 @@ trait DrivesShopProbe
             return;
         }
 
-        $outcome = $probe($this->probeSubject(), $url, $actor, $selectors, $currency, $variantKey);
+        // Rebuilt as a constant array of narrowed values: the probe's
+        // `$selectors` is a sealed shape, and reading a trait parameter gives
+        // no shape back, so each key is checked rather than assumed.
+        $outcome = $probe($this->probeSubject(), $url, $actor, [
+            'price' => self::selector($selectors, 'price'),
+            'title' => self::selector($selectors, 'title'),
+            'image' => self::selector($selectors, 'image'),
+        ], $currency, $variantKey);
 
         match (true) {
             $outcome->isSuccess() => $this->showPreview($outcome),
@@ -167,36 +174,53 @@ trait DrivesShopProbe
         $this->chosenVariantKey ??= $this->variants[0]['key'] ?? null;
     }
 
-    protected function snapshotGtin(): ?string
+    /**
+     * The preview templates show the pack size before anything is written.
+     * Read off the draft, so there is one parse rather than two.
+     */
+    public function snapshotPackSize(): ?PackSize
     {
-        $gtin = $this->snapshot['gtin'] ?? null;
-
-        return is_string($gtin) && $gtin !== '' ? $gtin : null;
-    }
-
-    protected function snapshotImageUrl(): ?string
-    {
-        $image = $this->snapshot['image_url'] ?? null;
-
-        return is_string($image) && $image !== '' ? $image : null;
+        return $this->shopDraft()->packSize;
     }
 
     /**
-     * Pack size behind the previewed snapshot: the transported structured
-     * size, with the title fallback only for non-authoritative sources.
+     * The draft behind the previewed snapshot. Reading the snapshot lives in
+     * {@see ShopDraft} so an MCP tool builds the same thing; this only adds
+     * the form state around it.
      */
-    protected function snapshotPackSize(): ?PackSize
+    protected function shopDraft(): ShopDraft
     {
-        $snapshot = $this->snapshot ?? [];
+        $manual = $this->adapterKey === 'user-selector';
 
-        $packSize = $snapshot['pack_size'] ?? null;
-        $title = $snapshot['title'] ?? null;
+        // Livewire rehydrates public properties from JSON, so narrow the key
+        // type rather than trusting what came back over the wire.
+        $snapshot = [];
 
-        return PackSize::resolve(
-            is_string($packSize) ? $packSize : null,
-            (bool) ($snapshot['pack_size_authoritative'] ?? false),
-            is_string($title) ? $title : null,
+        foreach ($this->snapshot ?? [] as $key => $value) {
+            if (is_string($key)) {
+                $snapshot[$key] = $value;
+            }
+        }
+
+        return ShopDraft::fromSnapshot(
+            snapshot: $snapshot,
+            url: (string) $this->normalizedUrl,
+            adapterKey: (string) $this->adapterKey,
+            priceSelector: $manual ? trim($this->priceSelector) : null,
+            titleSelector: $manual ? (trim($this->titleSelector) ?: null) : null,
+            imageSelector: $manual ? (trim($this->imageSelector) ?: null) : null,
+            variantKey: $this->chosenVariantKey,
         );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $selectors
+     */
+    private static function selector(array $selectors, string $key): ?string
+    {
+        $value = $selectors[$key] ?? null;
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     private function showPreview(ProbeOutcome $outcome): void
@@ -205,16 +229,7 @@ trait DrivesShopProbe
         assert($snapshot instanceof ShopSnapshot);
 
         $this->state = 'preview';
-        $this->snapshot = [
-            'title' => $snapshot->title,
-            'image_url' => ImageUrl::absolute($snapshot->imageUrl, $outcome->normalizedUrl ?? ''),
-            'gtin' => $snapshot->gtin,
-            'price' => $snapshot->price,
-            'currency' => $snapshot->currency,
-            'in_stock' => $snapshot->inStock,
-            'pack_size' => $snapshot->packSize,
-            'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
-        ];
+        $this->snapshot = ShopDraft::flatten($outcome);
         $this->normalizedUrl = $outcome->normalizedUrl;
         $this->host = $outcome->host;
         $this->adapterKey = $outcome->adapterKey;

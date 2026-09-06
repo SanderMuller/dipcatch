@@ -10,12 +10,17 @@ use App\Health\StripeWebhookSecretCheck;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ShopAdapter;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Cashier\Cashier;
+use Laravel\Passport\Passport;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
 use Spatie\Health\Checks\Checks\CacheCheck;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
@@ -69,6 +74,16 @@ final class AppServiceProvider extends ServiceProvider
         // ends the subscription when the retries run out, and that does
         // drop the account.
         Cashier::keepPastDueSubscriptionsActive();
+
+        // Per token owner, falling back to IP for an unauthenticated probe.
+        RateLimiter::for('mcp', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($request->user()?->getAuthIdentifier() ?? $request->ip()));
+
+        // The screen a user sees when an assistant asks for access to their
+        // DipCatch account.
+        Passport::authorizationView(
+            fn (array $parameters): Response => response()->view('mcp.authorize', $parameters),
+        );
 
         // Cashier attaches its signature middleware only when a secret is
         // set, so a deployment that forgets STRIPE_WEBHOOK_SECRET accepts

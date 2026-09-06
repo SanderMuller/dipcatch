@@ -11,11 +11,14 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Passport\Contracts\OAuthenticatable;
+use Laravel\Passport\HasApiTokens;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 
 /**
@@ -26,6 +29,8 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property string $password
  * @property bool $is_admin
  * @property CarbonImmutable|null $billing_blocked_at
+ * @property CarbonImmutable|null $comped_until
+ * @property string|null $comped_reason
  * @property CarbonImmutable|null $trial_ends_at
  * @property string|null $stripe_checkout_session_id
  * @property string $default_currency
@@ -44,10 +49,10 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  */
 #[Fillable(['name', 'email', 'password', 'is_admin', 'timezone'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements FilamentUser, MustVerifyEmail
+class User extends Authenticatable implements FilamentUser, MustVerifyEmail, OAuthenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use Billable, HasFactory, HasPushSubscriptions, Notifiable, Subscribes, TwoFactorAuthenticatable;
+    use Billable, HasApiTokens, HasFactory, HasPushSubscriptions, Notifiable, Subscribes, TwoFactorAuthenticatable;
 
     /**
      * @return array<string, string>
@@ -59,6 +64,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'billing_blocked_at' => 'datetime',
+            'comped_until' => 'datetime',
             // Cashier reads this one directly (`onTrial()` calls `isFuture()`
             // on it), and it is not in the model's own casts by default.
             'trial_ends_at' => 'datetime',
@@ -68,6 +74,16 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'last_digest_sent_at' => 'datetime',
             'timezone_detected_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The products this account tracks.
+     *
+     * @return HasMany<Product, $this>
+     */
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
     }
 
     public function canAccessPanel(Panel $panel): bool

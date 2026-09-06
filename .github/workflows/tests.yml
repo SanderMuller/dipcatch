@@ -97,6 +97,12 @@ jobs:
       - name: Generate Application Key
         run: php artisan key:generate
 
+      - name: Generate Passport Keys
+        # The MCP server authenticates with Passport, and its guard cannot
+        # parse a bearer token without these. They are gitignored, so CI
+        # makes its own each run.
+        run: php artisan passport:keys --force
+
       - name: Build Assets
         run: npm run build
 

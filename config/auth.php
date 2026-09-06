@@ -44,6 +44,14 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // Bearer tokens for the MCP server only. Nothing else authenticates
+        // this way, and `web` stays the default guard: both Filament panels
+        // and Fortify pin themselves to it explicitly.
+        'api' => [
+            'driver' => 'passport',
+            'provider' => 'users',
+        ],
     ],
 
     /*

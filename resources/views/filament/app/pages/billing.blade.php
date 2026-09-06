@@ -45,7 +45,9 @@
                 {{ $isPro ? 'Pro' : 'Free' }}
             </x-filament::badge>
 
-            @if ($this->isOnTrial())
+            @if ($this->isComped())
+                <span class="text-sm text-gray-500 dark:text-gray-400">Pro on us — nothing to pay</span>
+            @elseif ($this->isOnTrial())
                 <span class="text-sm text-gray-500 dark:text-gray-400">Trial ends {{ $endsAt }}</span>
             @elseif ($this->isCancelling())
                 <span class="text-sm text-gray-500 dark:text-gray-400">Cancelled — Pro until {{ $endsAt }}</span>

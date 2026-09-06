@@ -45,3 +45,6 @@ _ide_helper_models.php
 **/caddy
 frankenphp
 frankenphp-worker.php
+
+# Eye-verify session state: holds a live cookie.
+.github/eye-verify/admin-state.json

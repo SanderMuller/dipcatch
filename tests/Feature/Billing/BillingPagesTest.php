@@ -211,3 +211,27 @@ it('lists open chargebacks and hides closed ones by default', function (): void 
         ->assertCanSeeTableRecords([$open])
         ->assertCanNotSeeTableRecords([$closed]);
 });
+
+test('a comped account is not told it is being billed', function (): void {
+    // isOnTrial() reads the subscription's trial, so before the comped branch
+    // existed this page fell through to "€X per month" for an account that
+    // pays nothing.
+    $user = User::factory()->create(['comped_until' => CarbonImmutable::now()->addYear()]);
+
+    $this->actingAs($user);
+
+    $content = (string) $this->get('/app/billing')->assertOk()->getContent();
+
+    expect($content)->toContain('Pro on us')
+        ->and($content)->not->toContain('per month');
+});
+
+test('a comped account with no Stripe customer is offered no billing portal', function (): void {
+    $user = User::factory()->create(['comped_until' => CarbonImmutable::now()->addYear()]);
+
+    expect($user->stripe_id)->toBeNull();
+
+    $this->actingAs($user);
+
+    $this->get('/app/billing')->assertOk()->assertDontSee('billing/portal', escape: false);
+});

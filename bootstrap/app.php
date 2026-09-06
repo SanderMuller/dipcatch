@@ -8,6 +8,8 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Laravel\Passport\Http\Middleware\CheckToken;
+use Laravel\Passport\Http\Middleware\CheckTokenForAnyScope;
 use SanderMuller\QueueInsights\Console\QueueInsightsSnapshotCommand;
 use Zae\StrictTransportSecurity\Middleware\L5\StrictTransportSecurity;
 
@@ -45,6 +47,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             StrictTransportSecurity::class,
+        ]);
+
+        // Laravel 11+ stopped aliasing Passport's middleware, and the MCP
+        // route needs `scopes` to enforce `mcp:use`. Without it `auth:api`
+        // accepts any Passport token, for any client, on every tool.
+        $middleware->alias([
+            'scopes' => CheckToken::class,
+            'scope' => CheckTokenForAnyScope::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

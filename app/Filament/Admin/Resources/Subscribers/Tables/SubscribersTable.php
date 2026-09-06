@@ -44,7 +44,7 @@ class SubscribersTable
                     ->state(fn (User $record): string => self::status($record))
                     ->color(fn (string $state): string => match ($state) {
                         'Pro' => 'success',
-                        'Trial' => 'info',
+                        'Trial', 'Comped' => 'info',
                         'Cancelling' => 'warning',
                         'Past due' => 'danger',
                         'Blocked' => 'danger',
@@ -116,10 +116,21 @@ class SubscribersTable
         return is_numeric($value) ? (int) $value : 0;
     }
 
-    private static function status(User $record): string
+    /**
+     * One of the three places that decide whether an account reads as Pro —
+     * see `ProUsers`. Public so a test can assert it agrees with the other
+     * two, rather than only through a rendered table.
+     */
+    public static function status(User $record): string
     {
         if ($record->billing_blocked_at !== null) {
             return 'Blocked';
+        }
+
+        // Same order as `Subscribes::plan()`. Without this a comped account
+        // reads Free here while the Pro filter above counts it as Pro.
+        if ($record->comped_until !== null && $record->comped_until->isFuture()) {
+            return 'Comped';
         }
 
         $subscription = $record->subscription(Plan::SUBSCRIPTION_TYPE);

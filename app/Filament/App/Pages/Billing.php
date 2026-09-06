@@ -72,6 +72,18 @@ class Billing extends Page
         return $date?->timezone($this->user()->timezone ?: 'Europe/Amsterdam')->isoFormat('D MMMM YYYY');
     }
 
+    /**
+     * Pro without paying for it. `isOnTrial()` reads the subscription's trial
+     * and so is false here, which is why a comped account otherwise falls
+     * through to the "per month" line and gets told it is being billed.
+     */
+    public function isComped(): bool
+    {
+        $compedUntil = $this->user()->comped_until;
+
+        return $compedUntil !== null && $compedUntil->isFuture();
+    }
+
     public function isCancelling(): bool
     {
         return $this->user()->subscription(Plan::SUBSCRIPTION_TYPE)?->onGracePeriod() === true;

@@ -45,7 +45,7 @@ class RevenueOverviewWidget extends BaseWidget
                 ->color('success'),
 
             Stat::make('Pro accounts', $this->proCount())
-                ->description('Entitled to Pro right now')
+                ->description($this->proDescription())
                 ->icon('heroicon-o-user-group')
                 ->color('primary'),
 
@@ -69,6 +69,20 @@ class RevenueOverviewWidget extends BaseWidget
     private function proCount(): int
     {
         return DB::query()->fromSub(ProUsers::ids(), 'pro')->count();
+    }
+
+    /**
+     * Comps count towards this stat, because they really are entitled. Naming
+     * them keeps the number from reading as demand — every money figure below
+     * reads the subscription and payment tables directly and is unaffected.
+     */
+    private function proDescription(): string
+    {
+        $comped = DB::table('users')->where('comped_until', '>', now())->count();
+
+        return $comped === 0
+            ? 'Entitled to Pro right now'
+            : 'Entitled to Pro right now, ' . $comped . ' of them comped';
     }
 
     /**

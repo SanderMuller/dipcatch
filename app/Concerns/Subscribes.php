@@ -27,6 +27,12 @@ trait Subscribes
             return Plan::Free;
         }
 
+        // Blocked beats comped on purpose: an account blocked for a lost
+        // chargeback does not get Pro back because someone comped it once.
+        if ($this->comped_until !== null && $this->comped_until->isFuture()) {
+            return Plan::Pro;
+        }
+
         $subscription = $this->subscription(Plan::SUBSCRIPTION_TYPE);
 
         if ($subscription === null) {

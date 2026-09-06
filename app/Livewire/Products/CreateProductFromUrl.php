@@ -2,10 +2,10 @@
 
 namespace App\Livewire\Products;
 
+use App\Actions\Products\CreateProductWithShop;
+use App\Actions\Products\ProductDraft;
 use App\Actions\Shops\ProbeOutcome;
 use App\Billing\PlanLimitReached;
-use App\Billing\PlanLimits;
-use App\Enums\ScrapeStatus;
 use App\Filament\App\Resources\Products\ProductResource;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\PriceCheck;
@@ -16,7 +16,6 @@ use App\Services\Drops\TierDefaults;
 use App\Support\UrlNormalizer;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Livewire\Component;
 use RuntimeException;
@@ -108,80 +107,17 @@ class CreateProductFromUrl extends Component
 
         $this->validate();
 
-        $rawPrice = $this->snapshot['price'] ?? '';
-        $rawCurrency = $this->snapshot['currency'] ?? '';
-        $snapshotPrice = is_string($rawPrice) ? $rawPrice : '';
-        $snapshotCurrency = is_string($rawCurrency) ? $rawCurrency : '';
-        $snapshotInStock = (bool) ($this->snapshot['in_stock'] ?? true);
+        $shop = $this->shopDraft();
 
-        $usedManualSelector = $this->adapterKey === 'user-selector';
-        $priceSelector = $usedManualSelector ? trim($this->priceSelector) : null;
-        $titleSelector = $usedManualSelector ? (trim($this->titleSelector) ?: null) : null;
-        $imageSelector = $usedManualSelector ? (trim($this->imageSelector) ?: null) : null;
-        $shopImageUrl = $this->snapshotImageUrl();
-        $gtin = $this->snapshotGtin();
-        $variantKey = $this->chosenVariantKey;
-        $packSize = $this->snapshotPackSize();
+        $draft = new ProductDraft(
+            title: trim($this->title),
+            imageUrl: trim($this->imageUrl) !== '' ? trim($this->imageUrl) : null,
+            dropThresholdPct: $this->thresholdPct,
+            dropThresholdAbs: $this->thresholdAbs,
+        );
 
         try {
-            $product = DB::transaction(function () use (
-                $snapshotPrice,
-                $snapshotCurrency,
-                $snapshotInStock,
-                $priceSelector,
-                $titleSelector,
-                $imageSelector,
-                $shopImageUrl,
-                $gtin,
-                $variantKey,
-                $packSize,
-            ): Product {
-                app(PlanLimits::class)->guardProduct($this->currentUser());
-
-                $product = Product::query()->create([
-                    'user_id' => auth()->id(),
-                    'title' => trim($this->title),
-                    'image_url' => trim($this->imageUrl) !== '' ? trim($this->imageUrl) : null,
-                    'currency' => $snapshotCurrency,
-                    'drop_threshold_pct' => $this->thresholdPct,
-                    'drop_threshold_abs' => $this->thresholdAbs,
-                    'active' => true,
-                ]);
-
-                $shop = $product->shops()->create([
-                    'url' => $this->normalizedUrl,
-                    'adapter_key' => $this->adapterKey,
-                    'price_selector' => $priceSelector,
-                    'title_selector' => $titleSelector,
-                    'image_selector' => $imageSelector,
-                    'image_url' => $shopImageUrl,
-                    'gtin' => $gtin,
-                    'variant_key' => $variantKey,
-                    'pack_quantity' => $packSize?->quantity,
-                    'pack_unit' => $packSize?->unit,
-                    'currency' => $snapshotCurrency,
-                    'initial_price' => $snapshotPrice,
-                    'initial_checked_at' => now(),
-                    'current_price' => $snapshotPrice,
-                    'current_in_stock' => $snapshotInStock,
-                    'last_checked_at' => now(),
-                    'last_success_at' => now(),
-                    'last_status' => ScrapeStatus::Ok->value,
-                ]);
-
-                $check = PriceCheck::create([
-                    'shop_id' => $shop->id,
-                    'price' => $snapshotPrice,
-                    'currency' => $snapshotCurrency,
-                    'in_stock' => $snapshotInStock,
-                    'status' => ScrapeStatus::Ok->value,
-                    'checked_at' => now(),
-                ]);
-
-                $product->recomputeCheapestShop((int) $check->id);
-
-                return $product;
-            });
+            $product = app(CreateProductWithShop::class)($this->currentUser(), $draft, $shop);
         } catch (PlanLimitReached $e) {
             Notification::make()
                 ->warning()
