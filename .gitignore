@@ -26,6 +26,8 @@ yarn-error.log
 /.zed
 /.cache
 /.codex
+/specs
+/internal
 /storage/debugbar
 _ide_helper.php
 _ide_helper_models.php
