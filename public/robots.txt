@@ -1,8 +1,44 @@
 User-agent: *
-Disallow: /app
+Disallow: /app/
+Disallow: /app$
+Disallow: /admin
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /two-factor-challenge
+Disallow: /invite/
+Disallow: /user/
+Disallow: /stripe/
+Disallow: /settings
+Disallow: /dashboard
+Allow: /
+
+# AI crawlers, search and training alike. Read /llms.txt for what this site is.
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-User
+User-agent: Claude-SearchBot
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+Disallow: /app/
+Disallow: /app$
 Disallow: /admin
 Disallow: /login
 Disallow: /register
 Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /two-factor-challenge
 Disallow: /invite/
+Disallow: /user/
+Disallow: /stripe/
+Disallow: /settings
+Disallow: /dashboard
+Disallow: /p/
 Allow: /
+
+Sitemap: https://dipcatch.eu/sitemap.xml

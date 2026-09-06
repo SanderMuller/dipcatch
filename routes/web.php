@@ -3,14 +3,21 @@
 use App\Http\Controllers\AutoDetectTimezoneController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\LlmsTxtController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\PushSubscriptionController;
+use App\Http\Controllers\SitemapController;
+use App\Http\Controllers\UseCasePageController;
 use App\Http\Middleware\MarketingLocale;
+use App\Support\UseCases;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Cashier\Http\Controllers\PaymentController as CashierPaymentController;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierWebhookController;
 use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
@@ -35,6 +42,41 @@ Route::prefix(Config::string('cashier.path', 'stripe'))->name('cashier.')->group
 Route::view('/', 'welcome')->middleware(MarketingLocale::class)->name('home');
 Route::view('privacy', 'privacy')->middleware(MarketingLocale::class)->name('privacy');
 Route::view('pricing', 'pricing')->middleware(MarketingLocale::class)->name('pricing');
+
+// One landing page per repeat-purchase category. The slug is constrained to
+// the configured set so an unknown one 404s in the router, and the page never
+// renders empty.
+Route::get('price-alerts/{slug}', UseCasePageController::class)
+    ->where('slug', UseCases::slugPattern())
+    ->middleware(MarketingLocale::class)
+    ->name('use-case');
+
+// Crawler-facing endpoints. Both drop the session middleware so the response
+// carries no Set-Cookie: Cloudflare will not cache a response that sets one,
+// and these are the two URLs where caching actually helps. The HSTS header
+// appended in bootstrap/app.php stays on — it sets no cookie.
+Route::get('sitemap.xml', SitemapController::class)
+    ->withoutMiddleware([
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        PreventRequestForgery::class,
+    ])
+    ->name('sitemap');
+
+Route::get('llms.txt', LlmsTxtController::class)
+    ->withoutMiddleware([
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        PreventRequestForgery::class,
+    ])
+    ->name('llms');
+
+// Advertised in the scraper's own user agent, so shop operators who look it
+// up land on a page that explains the crawler. English only, no locale
+// middleware: the readers are operators, not customers.
+Route::view('bot', 'bot')->name('bot');
 
 // Public product share page — no auth, throttled per IP, exact 32-char
 // alphanumeric slug. Lives outside the auth+verified group so guests

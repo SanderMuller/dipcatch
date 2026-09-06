@@ -9,7 +9,7 @@ namespace App\Support;
 final readonly class SupportedShops
 {
     /**
-     * @return list<array{host: string, favicon: string}>
+     * @return list<array{host: string, favicon: string, name: string}>
      */
     public static function rows(): array
     {
@@ -21,9 +21,29 @@ final readonly class SupportedShops
                 continue;
             }
 
-            $rows[] = ['host' => $host, 'favicon' => Favicon::url($host, 32)];
+            $rows[] = [
+                'host' => $host,
+                'favicon' => Favicon::url($host, 32),
+                'name' => self::name($host),
+            ];
         }
 
         return $rows;
+    }
+
+    /**
+     * The shop's name as people say it, or the host when nobody has named it.
+     */
+    private static function name(string $host): string
+    {
+        $names = config('site.shop_names');
+
+        if (! is_array($names)) {
+            return $host;
+        }
+
+        $name = $names[$host] ?? null;
+
+        return is_string($name) && $name !== '' ? $name : $host;
     }
 }

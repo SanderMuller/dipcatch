@@ -4,6 +4,13 @@
     // The language links must return to the page the reader is on, so the
     // header works on every marketing page without being told which.
     $route = Route::currentRouteName() ?? 'home';
+    // Only the parameters the URI declares: `Route::view()` registers `view`
+    // and `status` as route defaults, and `parameters()` hands those back too,
+    // which leaked `?view=welcome&status=200` into every language link.
+    $currentRoute = request()->route();
+    $routeParams = $currentRoute === null
+        ? []
+        : array_intersect_key($currentRoute->parameters(), array_flip($currentRoute->parameterNames()));
     $locale = app()->getLocale();
     $langQuery = \App\Http\Middleware\MarketingLocale::requested(request()) === null
         ? []
@@ -48,7 +55,7 @@
 
         <div class="flex items-center gap-2 sm:gap-3">
             <div class="hidden items-center gap-2 sm:gap-3 md:flex">
-                <x-marketing-header.language :route="$route" :locale="$locale" />
+                <x-marketing-header.language :route="$route" :route-params="$routeParams" :locale="$locale" />
                 <x-appearance-toggle />
             </div>
 
@@ -96,7 +103,7 @@
             @endguest
 
             <div class="mt-3 flex items-center justify-between border-t border-zinc-200/70 pt-4 dark:border-zinc-800/70">
-                <x-marketing-header.language :route="$route" :locale="$locale" />
+                <x-marketing-header.language :route="$route" :route-params="$routeParams" :locale="$locale" />
                 <x-appearance-toggle />
             </div>
         </div>

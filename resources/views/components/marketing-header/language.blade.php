@@ -1,4 +1,4 @@
-@props(['route', 'locale'])
+@props(['route', 'locale', 'routeParams' => []])
 
 <div class="flex items-center rounded-full bg-white/80 p-0.5 text-[0.6875rem] font-semibold ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/80 dark:ring-zinc-800" role="group" aria-label="{{ __('Language') }}">
     @foreach (['nl' => 'Nederlands', 'en' => 'English'] as $code => $label)
@@ -6,7 +6,7 @@
              assert this pair to prove the toggle points at this page's own
              two representations, not another page's. --}}
         <a
-            href="{{ route($route, ['lang' => $code]) }}" hreflang="{{ $code }}"
+            href="{{ route($route, [...$routeParams, 'lang' => $code]) }}" hreflang="{{ $code }}"
             lang="{{ $code }}"
             aria-label="{{ $label }}"
             @if ($locale === $code) aria-current="true" @endif

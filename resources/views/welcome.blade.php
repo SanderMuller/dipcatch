@@ -6,9 +6,9 @@
     $requestedLang = \App\Http\Middleware\MarketingLocale::requested(request());
     $langQuery = $requestedLang === null ? [] : ['lang' => $requestedLang];
     $canonical = $locale === 'nl' ? route('home', ['lang' => 'nl']) : route('home');
-    $description = __('DipCatch watches the price of the groceries and products you buy anyway across Dutch supermarkets and webshops, compares shops on unit price, and alerts you when one drops.');
-    $h1 = __('Same product, every supermarket, one alert.');
-    $sub = __('DipCatch watches the groceries you buy anyway across AH, Jumbo, Dirk, Lidl, Aldi and more, compares them on price per kilo, and tells you when one drops.');
+    $description = __('DipCatch tracks the price of anything you buy more than once, across Dutch supermarkets and webshops. It compares shops on unit price and tells you when one drops.');
+    $h1 = __('Same product, every shop, one alert.');
+    $sub = __('DipCatch watches the coffee, cat food and vacuum filters you buy anyway at Albert Heijn, Jumbo, bol.com, Zooplus and more, compares them on price per kilo or per piece, and tells you when one drops.');
     $authed = auth()->check();
     $primaryHref = $authed ? url('/app') : route('register');
     $headerLabel = $authed ? __('Open app') : __('Create account');
@@ -47,13 +47,17 @@
             'unit' => __(':price /stuk', ['price' => $money('0.42')]),
         ],
     ];
+    $freeProducts = \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->maxProducts();
     $faq = [
-        ['q' => __('Which shops work?'), 'a' => __('DipCatch has built-in support for AH, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon.nl and Zooplus, including AH bonus and Dirk promo prices. Many other webshops publish their product data in a form DipCatch can read. Shops that block bots or only load prices with JavaScript may not work, and you see the result before you confirm.')],
+        ['q' => __('Which shops work?'), 'a' => __('DipCatch has built-in support for Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon.nl and Zooplus, including AH Bonus and Dirk promo prices. Many other webshops publish their product data in a form DipCatch can read. Shops that block bots or only load prices with JavaScript may not work. You see the result before you confirm.')],
         ['q' => __('How often are prices checked?'), 'a' => __('A shop is checked the moment you add it or change its link. After that DipCatch re-checks it about every :hours hours, give or take half an hour.', ['hours' => config('dipcatch.recheck.interval_hours', 6)])],
-        ['q' => __('Is it free?'), 'a' => __('Yes, during the beta. You do not need a card and there is no trial that runs out.')],
+        ['q' => __('Is it free?'), 'a' => $freeProducts === null
+            ? __('Yes. The free plan has no product limit, you do not need a card, and there is no trial that runs out.')
+            : __('Yes, for your first :count products. You do not need a card, and there is no trial that runs out. Pro lifts the limit when you want more.', ['count' => $freeProducts])],
         ['q' => __('Do I need an extension or app?'), 'a' => __('No. You paste a link in your browser. Alerts arrive as a daily email digest, under the bell in the app, or as a browser push if you turn that on.')],
         ['q' => __('Can I compare different pack sizes?'), 'a' => __('Yes. When DipCatch can read the pack size, it shows a price per kilo, litre or piece next to that shop, so a 200 g and a 370 g bag compare fairly.')],
         ['q' => __('Can I share a comparison?'), 'a' => __('Yes. Every product has an optional public page with the current price per shop and, where there is history, a chart of the cheapest price over the last 90 days. Anyone with the link can view it. It shows nothing about your account.')],
+        ['q' => __('How do I know when a product is cheaper somewhere else?'), 'a' => __('Paste the link from the shop you buy at now, then add the same product from the others. DipCatch tells you when the cheapest one drops past your threshold.')],
     ];
     $mockLabel = __('Example alerts: :items', [
         'items' => implode('. ', array_map(
@@ -71,32 +75,16 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
     <head>
-        @include('partials.head', ['title' => __('Supermarket price alerts for the Netherlands')])
-        <meta name="description" content="{{ $description }}">
-        <link rel="canonical" href="{{ $canonical }}">
+        @include('partials.head', [
+            'title' => __('Price alerts for the things you buy anyway'),
+            'description' => $description,
+            'canonical' => $canonical,
+            'ogTitle' => config('app.name') . ' — ' . $h1,
+        ])
         <link rel="alternate" hreflang="en" href="{{ route('home') }}">
         <link rel="alternate" hreflang="nl" href="{{ route('home', ['lang' => 'nl']) }}">
         <link rel="alternate" hreflang="x-default" href="{{ route('home') }}">
-        <meta property="og:type" content="website">
-        <meta property="og:site_name" content="{{ config('app.name') }}">
-        <meta property="og:title" content="{{ config('app.name') . ' — ' . $h1 }}">
-        <meta property="og:description" content="{{ $description }}">
-        <meta property="og:url" content="{{ $canonical }}">
-        <meta property="og:locale" content="{{ $locale === 'nl' ? 'nl_NL' : 'en_US' }}">
-        <meta property="og:image" content="{{ asset('apple-touch-icon.png') }}">
-        <meta name="twitter:card" content="summary">
-        {{ \App\Support\JsonLd::script([
-            '@context' => 'https://schema.org',
-            '@type' => 'FAQPage',
-            'mainEntity' => array_map(static fn (array $item): array => [
-                '@type' => 'Question',
-                'name' => $item['q'],
-                'acceptedAnswer' => [
-                    '@type' => 'Answer',
-                    'text' => $item['a'],
-                ],
-            ], $faq),
-        ]) }}
+        {{ \App\Support\JsonLd::script(\App\Support\StructuredData::home($faq, $canonical, $description)) }}
     </head>
     <body class="min-h-dvh bg-linear-to-br from-amber-50 to-rose-50 bg-fixed text-zinc-900 antialiased dark:from-zinc-950 dark:to-zinc-950 dark:text-zinc-50">
         <div class="isolate flex min-h-dvh flex-col">
@@ -140,15 +128,25 @@
                                 <ul class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($supportedShops as $shop)
                                         <li @class(['items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800', 'inline-flex' => $loop->index < 8, 'hidden sm:inline-flex' => $loop->index >= 8])>
-                                            <img src="{{ $shop['favicon'] }}" alt="" loading="lazy" class="size-4 rounded-sm" />
-                                            {{ $shop['host'] }}
+                                            {{-- Background image, not an <img>: the edge Markdown twin emits an
+                                                 image reference even for an empty alt. --}}
+                                            <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
+                                            <span title="{{ $shop['name'] }}">{{ $shop['host'] }}</span>
                                         </li>
                                     @endforeach
-                                    @if (count($supportedShops) > 8)
-                                        <li class="inline-flex items-center rounded-full px-3 py-1.5 text-sm text-zinc-500 sm:hidden dark:text-zinc-400">{{ __('+:count more', ['count' => count($supportedShops) - 8]) }}</li>
-                                    @endif
-                                    <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">{{ __('+ many other webshops') }}</li>
+                                    <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">{{ __('and many other webshops') }}</li>
                                 </ul>
+
+                                @php($useCases = \App\Support\UseCases::all())
+
+                                @if ($useCases !== [])
+                                    <nav class="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400" aria-label="{{ __('Price alerts by category') }}">
+                                        <span class="font-medium text-zinc-700 dark:text-zinc-300">{{ __('Price alerts for') }}</span>
+                                        @foreach ($useCases as $useCase)
+                                            <a href="{{ route('use-case', [...$langQuery, 'slug' => $useCase->slug]) }}" class="underline underline-offset-4 hover:text-zinc-900 dark:hover:text-zinc-100">{{ $useCase->heading }}</a>
+                                        @endforeach
+                                    </nav>
+                                @endif
                             </div>
                         </div>
 
@@ -157,18 +155,22 @@
                                 <div aria-hidden="true" class="rounded-[2.5rem] bg-zinc-900 p-3 shadow-2xl ring-1 ring-zinc-800 dark:shadow-none">
                                     <div class="rounded-[2rem] bg-linear-to-br from-amber-100 via-rose-100 to-violet-100 p-4 pt-12 dark:from-zinc-800 dark:via-zinc-800 dark:to-zinc-900">
                                         <div class="absolute top-5 right-0 left-0 flex items-center justify-between px-8 font-semibold text-zinc-900 tabular-nums dark:text-zinc-100">
-                                            <span class="text-xs">9:41</span>
+                                            {{-- Painted with CSS so the phone chrome is not text in the Markdown
+                                                 twin, which converts regardless of aria-hidden. The value must be a
+                                                 CSS-safe literal: the browser decodes Blade's escaping before CSS
+                                                 parses the attribute, so an apostrophe would break the declaration. --}}
+                                            <span style="--label: '9:41'" class="text-xs before:content-[var(--label)]"></span>
                                             <span class="size-3 rounded-full bg-zinc-900 dark:bg-zinc-100"></span>
-                                            <span class="text-xs">DipCatch</span>
+                                            <span style="--label: 'DipCatch'" class="text-xs before:content-[var(--label)]"></span>
                                         </div>
                                         <div class="space-y-2.5">
                                             @foreach ($tracked as $i => $p)
                                                 <div class="rounded-2xl bg-white/95 p-3 shadow-sm ring-1 ring-zinc-200 backdrop-blur-sm @if ($i === 0) ring-emerald-300 dark:ring-emerald-800 @endif dark:bg-zinc-900/95 dark:shadow-none dark:ring-zinc-800">
                                                     <div class="flex items-start gap-2.5">
-                                                        <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-lg dark:bg-emerald-950/60">{{ $p['icon'] }}</span>
+                                                        <span style="--icon: '{{ $p['icon'] }}'" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-lg before:content-[var(--icon)] dark:bg-emerald-950/60"></span>
                                                         <div class="min-w-0 flex-1">
                                                             <div class="flex items-center gap-1.5">
-                                                                <img src="{{ \App\Support\Favicon::url($p['shop'], 32) }}" alt="" loading="lazy" class="size-3.5 shrink-0 rounded-sm" />
+                                                                <span style="background-image: url('{{ \App\Support\Favicon::url($p['shop'], 32) }}')" class="size-3.5 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
                                                                 <p class="text-[0.625rem] font-semibold text-zinc-500 dark:text-zinc-400">{{ $p['shop'] }}</p>
                                                             </div>
                                                             <p class="mt-0.5 text-xs">{{ $p['name'] }}</p>
@@ -188,17 +190,17 @@
                     </section>
 
                     <section id="how-it-works" class="py-20">
-                        <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('How it works') }}</h2>
+                        <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('How a price alert works') }}</h2>
                         <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('Add a product and set a threshold. DipCatch does the checking, so you do not need a browser extension.') }}</p>
-                        <dl class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        <ol class="mt-10 grid list-none gap-6 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach ($steps as $step)
-                                <div class="rounded-2xl bg-white/80 p-6 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:ring-zinc-800">
-                                    <span class="inline-flex size-9 items-center justify-center rounded-full bg-amber-100 font-mono text-sm font-semibold text-amber-800 tabular-nums dark:bg-amber-950/60 dark:text-amber-300">{{ $step['n'] }}</span>
-                                    <dt class="mt-4 text-base font-semibold">{{ $step['title'] }}</dt>
-                                    <dd class="mt-2 text-sm text-pretty text-zinc-600 dark:text-zinc-400">{{ $step['body'] }}</dd>
-                                </div>
+                                <li class="rounded-2xl bg-white/80 p-6 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:ring-zinc-800">
+                                    <span aria-hidden="true" class="inline-flex size-9 items-center justify-center rounded-full bg-amber-100 font-mono text-sm font-semibold text-amber-800 tabular-nums dark:bg-amber-950/60 dark:text-amber-300">{{ $step['n'] }}</span>
+                                    <h3 class="mt-4 text-base font-semibold">{{ $step['title'] }}</h3>
+                                    <p class="mt-2 text-sm text-pretty text-zinc-600 dark:text-zinc-400">{{ $step['body'] }}</p>
+                                </li>
                             @endforeach
-                        </dl>
+                        </ol>
                     </section>
 
                     <section id="faq" class="py-20">
@@ -236,16 +238,7 @@
                 </main>
 
                 <footer class="relative mx-auto mt-auto w-full max-w-7xl px-6 pb-10 lg:px-8">
-                    <div class="flex flex-col items-center justify-between gap-3 border-t border-zinc-200 pt-6 text-sm text-zinc-500 sm:flex-row dark:border-zinc-800 dark:text-zinc-400">
-                        <p>&copy; {{ date('Y') }} {{ config('app.name') }}</p>
-                        <nav class="flex items-center gap-5" aria-label="{{ __('Footer') }}">
-                            <a href="{{ route('pricing', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Pricing') }}</a>
-                            <a href="{{ route('privacy', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Privacy') }}</a>
-                            @if (filled($contactEmail))
-                                <a href="mailto:{{ $contactEmail }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Contact') }}</a>
-                            @endif
-                        </nav>
-                    </div>
+                    <x-marketing-footer-links :lang-query="$langQuery" :contact-email="$contactEmail" />
                 </footer>
             </div>
         </div>

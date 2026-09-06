@@ -24,7 +24,7 @@ Track product prices across the web. Get notified when a price drops more than y
 ## Stack
 
 - PHP 8.5 + Laravel 13
-- Filament v5 (admin panel + user-facing app panel) + Fortify auth (invite-only)
+- Filament v5 (admin panel + user-facing app panel) + Fortify auth (open registration, invitations optional)
 - Livewire 4 + Flux 2
 - Postgres on Laravel Cloud
 - HTTP-only fetching via `ShopFetcher` (robots.txt + SSRF guard + WAF detection + per-host rate limit + body cap), with a chain-of-responsibility `AdapterResolver` over price extractors — no headless browser in v1
@@ -61,7 +61,7 @@ DipCatch targets [Laravel Cloud](https://cloud.laravel.com/) — fully managed, 
 
 | Key                              | Purpose                                                     |
 |----------------------------------|-------------------------------------------------------------|
-| `APP_URL`                        | Public base URL (used in invitation + push payload links).  |
+| `APP_URL`                        | Public base URL (used in invitation + push payload links). Production: `https://dipcatch.eu`. |
 | `APP_KEY`                        | Standard Laravel key.                                       |
 | `DATABASE_URL`                   | Auto-injected by Laravel Cloud.                             |
 | `MAIL_*`                         | Mail provider for invites + drop notifications + alerts.    |

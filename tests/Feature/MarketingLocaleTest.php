@@ -13,7 +13,7 @@ test('the bare marketing URL renders English whatever Accept-Language says', fun
     foreach ([$withoutHeader, $dutchHeader, $germanHeader] as $response) {
         $response->assertSee('<html lang="en"', escape: false)
             ->assertDontSee('<html lang="nl"', escape: false)
-            ->assertSee('Same product, every supermarket, one alert.')
+            ->assertSee('Same product, every shop, one alert.')
             ->assertSee('<link rel="canonical" href="' . route('home') . '">', escape: false)
             ->assertSee('<meta property="og:locale" content="en_US">', escape: false)
             ->assertDontSee('Zelfde product', escape: false);
@@ -32,12 +32,12 @@ test('?lang=nl renders Dutch and ?lang=en renders English', function (): void {
     $this->get(route('home', ['lang' => 'nl']))
         ->assertOk()
         ->assertSee('<html lang="nl"', escape: false)
-        ->assertSee('Zelfde product, elke supermarkt, één melding.', escape: false);
+        ->assertSee('Zelfde product, elke winkel, één melding.', escape: false);
 
     $this->get(route('home', ['lang' => 'en']))
         ->assertOk()
         ->assertSee('<html lang="en"', escape: false)
-        ->assertSee('Same product, every supermarket, one alert.');
+        ->assertSee('Same product, every shop, one alert.');
 
     $this->get(route('privacy', ['lang' => 'nl']))
         ->assertOk()
@@ -49,7 +49,7 @@ test('a malformed ?lang value renders English and never reaches the page', funct
     $response = $this->get('/?lang=' . urlencode($value))->assertOk();
 
     $response->assertSee('<html lang="en"', escape: false)
-        ->assertSee('Same product, every supermarket, one alert.');
+        ->assertSee('Same product, every shop, one alert.');
 
     $content = (string) $response->getContent();
 
@@ -102,7 +102,23 @@ test('both marketing pages carry a language toggle linking to their own two repr
         ->assertOk()
         ->assertSee('href="' . route('privacy', ['lang' => 'nl']) . '" hreflang="nl"', escape: false)
         ->assertSee('href="' . route('privacy', ['lang' => 'en']) . '" hreflang="en"', escape: false);
+
+    // A use-case page carries a slug, so the toggle has to rebuild the URL from
+    // the route's parameters rather than its name alone.
+    $this->get('/price-alerts/coffee')
+        ->assertOk()
+        ->assertSee('href="' . route('use-case', ['slug' => 'coffee', 'lang' => 'nl']) . '" hreflang="nl"', escape: false);
 });
+
+test('the language toggle leaks no route defaults into its URLs', function (string $url): void {
+    // `Route::view()` registers `view` and `status` as route defaults, and
+    // Route::parameters() hands them back with the real ones. Interpolating
+    // those produced `?view=welcome&status=200&lang=nl` on every page.
+    $content = (string) $this->get($url)->assertOk()->getContent();
+
+    expect($content)->not->toContain('view=welcome')
+        ->and($content)->not->toContain('status=200');
+})->with(['homepage' => '/', 'pricing' => '/pricing', 'privacy' => '/privacy', 'use case' => '/price-alerts/coffee']);
 
 test('links between the marketing pages carry the current ?lang value', function (): void {
     $this->get(route('home', ['lang' => 'nl']))

@@ -1,4 +1,4 @@
-<x-layouts::auth :title="__('Accept your invitation')">
+<x-layouts::auth :title="__('Accept your invitation')" robots="noindex">
     <div class="flex flex-col gap-6">
         <x-auth-header
             :title="__('Welcome to DipCatch')"

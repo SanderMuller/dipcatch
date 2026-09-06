@@ -15,6 +15,10 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 
 ## Post-launch refactors + features
 
+- **[seo-and-ai-discoverability.md](seo-and-ai-discoverability.md)** — P1/P2 of the 2026-09-06 SEO audit: robots.txt opens `/register` and states an AI-crawler policy, sitemap and `llms.txt` routes, shared head partial with OG/Twitter, `Organization`/`WebSite`/`SoftwareApplication`/`Offer` JSON-LD, `dipcatch.eu` identity plus a `/bot` page, and copy repositioned to repeat purchases. Implemented and eye-verified; not deployed. Fixed a live bug where Laravel 13's `@context` Blade directive made the homepage JSON-LD unparseable.
+
+- **[landing-pages-and-marketing-polish.md](landing-pages-and-marketing-polish.md)** — use-case landing pages (`/price-alerts/{slug}`), branded 404/500/503 views, and marketing markup cleanup judged against the Markdown twin. Laravel Cloud's Markdown for Agents is already enabled at the edge, so no application code renders Markdown. Follows the spec above.
+
 - **[unit-pricing.md](unit-pricing.md)** — normalized unit price (€/kg, €/l, €/stuk) per shop, parsed from source size data with title fallback; shown on shops table, previews, public page, products list.
 
 - ~~`multi-webshop-price-tracking.md`~~ — ✅ shipped (Product/Shop split, adapter chain, per-shop checks, ProductCheapestHistory timeline).
@@ -35,7 +39,7 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 - **Failed-job alerts:** `spatie/laravel-failed-job-monitor` (already installed); no custom command.
 - **Health checks:** `shuvroroy/filament-spatie-laravel-health` panel + custom `LastSuccessfulScrapeCheck`.
 - **Validation:** `sandermuller/laravel-fluent-validation` idiom.
-- **Auth:** invite-only (admin creates users in Filament admin panel). Fortify owns login routes; both panels delegate to it.
+- **Auth:** open registration via Fortify; invitations remain for admin-created users. Fortify owns login routes; both panels delegate to it.
 - **Panel access:** `User::canAccessPanel(Panel $panel)` — AppPanel for any auth user, AdminPanel for `is_admin`.
 - **Currency:** detect per product (scraper-detected wins, user can override); per-user `default_currency` derived from locale.
 - **FX:** out of scope for v1. Lifetime savings widget groups per currency; tier defaults are currency-blind.

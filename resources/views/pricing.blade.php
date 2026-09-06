@@ -11,17 +11,25 @@
     $authed = auth()->check();
     $ctaHref = $authed ? url('/app/billing') : route('register');
     $onSale = \App\Billing\BillingGate::isOpen();
+    // maxProducts() is nullable, where null means unlimited, so it cannot be
+    // interpolated without a branch.
+    $freeProducts = $free->maxProducts();
+    $description = $freeProducts === null
+        ? __('DipCatch is free, with no limit on how much you track. Pro checks prices more often.')
+        : __('DipCatch is free for :count products. Pro removes the limits and checks prices more often.', ['count' => $freeProducts]);
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
     <head>
-        @include('partials.head', ['title' => __('Pricing')])
-        <meta name="description" content="{{ __('DipCatch is free for 20 products. Pro removes the limits and checks prices more often.') }}">
-        <link rel="canonical" href="{{ $canonical }}">
+        @include('partials.head', [
+            'title' => __('Pricing'),
+            'description' => $description,
+            'canonical' => $canonical,
+        ])
         <link rel="alternate" hreflang="en" href="{{ route('pricing') }}">
         <link rel="alternate" hreflang="nl" href="{{ route('pricing', ['lang' => 'nl']) }}">
         <link rel="alternate" hreflang="x-default" href="{{ route('pricing') }}">
-        <meta property="og:locale" content="{{ $locale === 'nl' ? 'nl_NL' : 'en_US' }}">
+        {{ \App\Support\JsonLd::script(\App\Support\StructuredData::pricing($description)) }}
     </head>
     <body class="min-h-dvh bg-linear-to-br from-amber-50 to-rose-50 bg-fixed text-zinc-900 antialiased dark:from-zinc-950 dark:to-zinc-950 dark:text-zinc-50">
         <div class="flex min-h-dvh flex-col">
@@ -91,10 +99,7 @@
             </main>
 
             <footer class="mx-auto w-full max-w-4xl px-6 pb-10 lg:px-8">
-                <div class="flex flex-col items-center justify-between gap-3 border-t border-zinc-200 pt-6 text-sm text-zinc-500 sm:flex-row dark:border-zinc-800 dark:text-zinc-400">
-                    <p>&copy; {{ date('Y') }} {{ config('app.name') }}</p>
-                    <a href="{{ route('home', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Back to the homepage') }}</a>
-                </div>
+                <x-marketing-footer-links :lang-query="$langQuery" :contact-email="config('site.contact_email')" :home="true" />
             </footer>
         </div>
 

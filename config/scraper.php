@@ -2,7 +2,7 @@
 
 return [
 
-    'user_agent' => env('SCRAPER_USER_AGENT', 'DipCatchBot/1.0 (+https://dipcatch.app/bot)'),
+    'user_agent' => env('SCRAPER_USER_AGENT', 'DipCatchBot/1.0 (+https://dipcatch.eu/bot)'),
 
     'timeout' => 15,
 

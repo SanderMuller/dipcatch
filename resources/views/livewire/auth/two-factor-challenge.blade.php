@@ -1,4 +1,4 @@
-<x-layouts::auth :title="__('Two-factor authentication')">
+<x-layouts::auth :title="__('Two-factor authentication')" robots="noindex">
     <div class="flex flex-col gap-6">
         <div
             class="relative w-full h-auto"
@@ -31,7 +31,10 @@
             </div>
 
             <div x-show="showRecoveryInput">
+                {{-- The alternate of the heading above, not a second page
+                     heading, so it stays below it in the outline. --}}
                 <x-auth-header
+                    :level="2"
                     :title="__('Recovery code')"
                     :description="__('Please confirm access to your account by entering one of your emergency recovery codes.')"
                 />

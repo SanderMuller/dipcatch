@@ -10,7 +10,7 @@ test('the homepage carries SEO and sharing meta', function (): void {
         ->assertSee('<meta name="description"', escape: false)
         ->assertSee('property="og:title"', escape: false)
         ->assertSee('rel="canonical"', escape: false)
-        ->assertSee('Supermarket price alerts for the Netherlands');
+        ->assertSee('Price alerts for the things you buy anyway');
 });
 
 test('guests see the supported shops, a bottom call to action, and the footer links', function (): void {
@@ -63,8 +63,8 @@ test('robots.txt keeps crawlers out of the app but allows the public pages', fun
 test('the hero leads with the compare-across-shops headline', function (): void {
     $this->get(route('home'))
         ->assertOk()
-        ->assertSee('Same product, every supermarket, one alert.')
-        ->assertSee('compares them on price per kilo');
+        ->assertSee('Same product, every shop, one alert.')
+        ->assertSee('compares them on price per kilo or per piece');
 });
 
 test('the phone mock shows grocery examples from supported shops only', function (): void {
@@ -104,14 +104,62 @@ test('the phone mock is an informative image with a label matching the cards', f
         ->assertSee(e($unit), escape: false);
 });
 
-test('the mobile shop chips fall back to a count of the remaining hosts', function (): void {
+test('the homepage renders no decorative image element', function (): void {
+    // A decorative <img alt=""> still becomes a bare `![](…)` reference in the
+    // Markdown twin Cloudflare serves to assistants. The shop favicons and the
+    // phone mock's per-card favicons are therefore background images. The
+    // logo keeps its <img>: it has a real alt and converts to `![DipCatch]`.
+    $content = (string) $this->get(route('home'))->assertOk()->getContent();
+
+    preg_match_all('#<img[^>]*>#', $content, $matches);
+
+    foreach ($matches[0] as $tag) {
+        // A missing alt converts the same way an empty one does, so require a
+        // non-empty alt rather than only rejecting the empty spelling.
+        expect($tag)->toMatch('#alt="[^"]+"#');
+    }
+});
+
+test('the phone mock contributes no chrome to the page text', function (): void {
+    // The converter ignores aria-hidden and role="img", so the only way the
+    // fake status bar stays out of the Markdown is to not be a text node.
+    $text = strip_tags((string) $this->get(route('home'))->assertOk()->getContent());
+
+    expect($text)->not->toContain('9:41')
+        ->and($text)->not->toContain('🥔')
+        ->and($text)->not->toContain('🧀')
+        ->and($text)->not->toContain('🧻');
+});
+
+test('each tracked example still carries its icon', function (): void {
+    // Guards the JIT trap: a `content-['{{ $p['icon'] }}']` utility is never
+    // scanned by Tailwind and would compile to nothing, silently dropping the
+    // emoji. A custom property survives, so assert the property is emitted.
+    $content = (string) $this->get(route('home'))->assertOk()->getContent();
+
+    foreach (['🥔', '🧀', '🧻'] as $icon) {
+        expect($content)->toContain("--icon: '" . $icon . "'");
+    }
+
+    // The property alone paints nothing. Without the utility that reads it the
+    // emoji vanish, which is the exact failure the custom property avoids.
+    expect(substr_count($content, 'before:content-[var(--icon)]'))->toBe(3)
+        ->and(substr_count($content, 'before:content-[var(--label)]'))->toBe(2);
+});
+
+test('the shop list names every supported host without contradicting itself', function (): void {
     $hosts = SupportedShops::rows();
 
-    expect(count($hosts))->toBeGreaterThan(8);
+    $content = (string) $this->get(route('home'))->assertOk()->getContent();
 
-    $this->get(route('home'))
-        ->assertOk()
-        ->assertSee('+' . (count($hosts) - 8) . ' more');
+    foreach ($hosts as $shop) {
+        expect($content)->toContain($shop['host']);
+    }
+
+    // The overflow pill used to say "+4 more" directly under all twelve names,
+    // which read as a contradiction once the page was flattened to Markdown.
+    expect($content)->not->toContain(' more<')
+        ->and($content)->toContain(__('and many other webshops'));
 });
 
 test('the privacy page explains that shared product images load from the shop', function (): void {
@@ -120,7 +168,7 @@ test('the privacy page explains that shared product images load from the shop', 
         ->assertSee('loaded straight from the shop’s own servers', escape: false);
 });
 
-test('the FAQ section shows six questions', function (): void {
+test('the FAQ section shows every question the page defines', function (): void {
     $response = $this->get(route('home'))->assertOk();
 
     $response->assertSee('Which shops work?')
@@ -131,20 +179,31 @@ test('the FAQ section shows six questions', function (): void {
         ->assertSee('Can I share a comparison?');
 });
 
-test('the FAQ JSON-LD matches the six visible questions and has plain-text answers', function (): void {
+test('the FAQ JSON-LD matches the visible questions and has plain-text answers', function (): void {
     $content = $this->get(route('home'))->assertOk()->getContent();
 
     $found = preg_match('#<script type="application/ld\+json">(.*?)</script>#s', (string) $content, $matches);
 
     expect($found)->toBe(1);
 
-    $jsonLd = json_decode($matches[1] ?? '', true, 512, JSON_THROW_ON_ERROR);
+    $graph = json_decode($matches[1] ?? '', true, 512, JSON_THROW_ON_ERROR);
 
-    expect($jsonLd)->toBeArray()
-        ->and($jsonLd['@type'] ?? null)->toBe('FAQPage');
+    // The homepage ships one graph, so find the FAQ node by its type rather
+    // than by position: adding a node must not move the goalposts.
+    expect($graph)->toBeArray()
+        ->and($graph['@context'] ?? null)->toBe('https://schema.org');
 
-    $entities = $jsonLd['mainEntity'] ?? null;
-    expect($entities)->toBeArray()->toHaveCount(6);
+    assert(is_array($graph));
+    $nodes = $graph['@graph'] ?? [];
+    assert(is_array($nodes));
+
+    $faqPage = collect($nodes)->firstWhere('@type', 'FAQPage');
+
+    expect($faqPage)->toBeArray();
+    assert(is_array($faqPage));
+
+    $entities = $faqPage['mainEntity'] ?? null;
+    expect($entities)->toBeArray();
     assert(is_array($entities));
 
     preg_match_all('#<summary[^>]*>\s*<span>(.*?)</span>#s', (string) $content, $summaryMatches);
@@ -153,7 +212,8 @@ test('the FAQ JSON-LD matches the six visible questions and has plain-text answe
         $summaryMatches[1],
     );
 
-    expect($visibleQuestions)->toHaveCount(6);
+    expect($entities)->toHaveCount(count($visibleQuestions))
+        ->and($visibleQuestions)->not->toBeEmpty();
 
     foreach (array_values($entities) as $index => $question) {
         expect($question['@type'])->toBe('Question')
@@ -169,4 +229,49 @@ test('the "how often" FAQ answer reads the recheck interval from config', functi
     $this->get(route('home'))
         ->assertOk()
         ->assertSee('about every 6 hours');
+});
+
+test('the homepage speaks about repeat purchases, not only supermarkets', function (): void {
+    // The product tracks anything that runs out: groceries, pet food,
+    // filters. Copy that says "supermarket" only sells half of it.
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('Price alerts for the things you buy anyway')
+        ->assertSee('vacuum filters')
+        ->assertSee('cat food');
+});
+
+test('shop pills carry the brand name a person would search for', function (): void {
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('title="Albert Heijn"', escape: false)
+        ->assertSee('ah.nl');
+});
+
+test('a host nobody has named falls back to the host itself', function (): void {
+    config()->set('site.supported_hosts', ['unnamed-shop.example']);
+    config()->set('site.shop_names', []);
+
+    $rows = SupportedShops::rows();
+
+    expect($rows[0]['name'])->toBe('unnamed-shop.example');
+});
+
+test('the how-it-works steps are headings so the page has an outline', function (): void {
+    $content = (string) $this->get(route('home'))->assertOk()->getContent();
+
+    expect(substr_count($content, '<h3'))->toBeGreaterThanOrEqual(3)
+        ->and($content)->not->toContain('<dt class="mt-4 text-base font-semibold">');
+});
+
+test('the free-plan answer quotes the limit the app actually enforces', function (): void {
+    config()->set('plans.free.max_products', 7);
+
+    $this->get(route('home'))->assertOk()->assertSee('your first 7 products');
+});
+
+test('the FAQ answers how to catch a lower price at another shop', function (): void {
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('How do I know when a product is cheaper somewhere else?');
 });

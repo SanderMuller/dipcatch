@@ -13,7 +13,7 @@ test('guests see the homepage with the register CTA', function (): void {
     $response = $this->get(route('home'));
 
     $response->assertOk();
-    $response->assertSee('Same product, every supermarket, one alert.', escape: false);
+    $response->assertSee('Same product, every shop, one alert.', escape: false);
     $response->assertSee('Create a free account');
     $response->assertSee(route('register'));
     $response->assertSee(route('login'));
