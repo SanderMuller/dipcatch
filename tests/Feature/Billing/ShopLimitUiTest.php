@@ -40,7 +40,10 @@ it('takes the add button away at the limit rather than refusing on confirm', fun
 
     livewire(ShopsRelationManager::class, ['ownerRecord' => $product, 'pageClass' => ViewProduct::class])
         ->assertDontSee('Add a shop')
-        ->assertSee('Your plan compares up to 4 shops per product. This one has 4.')
+        ->assertSee('This product is at its shop limit')
+        ->assertSee('Your plan compares up to 4 shops per product, and this one has 4.')
+        // The promise the limit rests on, said where it matters.
+        ->assertSee('All of them keep being checked')
         ->assertSee('Compare plans');
 });
 
@@ -51,7 +54,7 @@ it('says so plainly on a product that already sits over the limit', function ():
 
     livewire(ShopsRelationManager::class, ['ownerRecord' => $product, 'pageClass' => ViewProduct::class])
         ->assertDontSee('Add a shop')
-        ->assertSee('This one has 5.');
+        ->assertSee('and this one has 5.');
 });
 
 it('keeps every existing shop listed and checkable over the limit', function (): void {
