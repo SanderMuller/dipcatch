@@ -107,6 +107,39 @@ it('shows that same segment to a pro account', function (): void {
         ->and(plotsTheOldSegment(chartFor($product, '365')))->toBeTrue();
 });
 
+it('plots a segment older than a year only under all time', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = productWithOldHistory($user);
+    $shop = Shop::query()->where('product_id', $product->id)->firstOrFail();
+
+    // Older than every named range, so it separates "All time" from 365 days
+    // — the pair the free plan cannot reach at all.
+    ProductCheapestHistory::create([
+        'product_id' => $product->id,
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '42.42',
+        'started_at' => CarbonImmutable::now()->subDays(500),
+        'ended_at' => CarbonImmutable::now()->subDays(450),
+    ]);
+    $this->actingAs($user);
+
+    $plotsTheAncientSegment = function (string $filter) use ($product): bool {
+        $prices = chartFor($product, $filter)->computeData()['datasets'][0]['data'] ?? [];
+
+        foreach ((array) $prices as $price) {
+            if (is_numeric($price) && abs((float) $price - 42.42) < 0.001) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    expect($plotsTheAncientSegment('all'))->toBeTrue()
+        ->and($plotsTheAncientSegment('365'))->toBeFalse();
+});
+
 it('reveals stored history the moment an account upgrades', function (): void {
     $user = User::factory()->create();
     $product = productWithOldHistory($user);

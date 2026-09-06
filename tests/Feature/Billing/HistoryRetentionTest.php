@@ -90,6 +90,45 @@ it('keeps what was accumulated after the account cancels', function (): void {
         ->and($product->refresh()->history_kept_from?->timestamp)->toBe($stamp?->timestamp);
 });
 
+it('stamps a product created between two nightly runs', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user);
+
+    $this->artisan('dipcatch:prune-checks')->assertSuccessful();
+
+    // Bought yesterday, tracked today: the first run never saw it.
+    $product = agedProduct($user);
+    $product->forceFill(['history_kept_from' => null])->save();
+
+    $this->artisan('dipcatch:prune-checks')->assertSuccessful();
+
+    expect($product->refresh()->history_kept_from)->not->toBeNull()
+        ->and(oldSegmentsFor($product))->toBe(1);
+});
+
+it('gives back the full history when a cancelled account resubscribes', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = agedProduct($user);
+
+    $this->artisan('dipcatch:prune-checks')->assertSuccessful();
+
+    Subscription::query()
+        ->where('user_id', $user->id)
+        ->update(['stripe_status' => 'canceled', 'ends_at' => now()->subDay()]);
+    $this->artisan('dipcatch:prune-checks')->assertSuccessful();
+
+    Subscription::query()
+        ->where('user_id', $user->id)
+        ->update(['stripe_status' => 'active', 'ends_at' => null]);
+
+    // Nothing was deleted while they were away, so the range that reads it
+    // has something to show the moment it comes back.
+    expect($user->fresh()?->isPro())->toBeTrue()
+        ->and(oldSegmentsFor($product))->toBe(1)
+        ->and(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(1);
+});
+
 it('never moves a stamp once written', function (): void {
     $user = User::factory()->create();
     subscribeUser($user);
