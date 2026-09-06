@@ -7,6 +7,7 @@ use App\Enums\ShopHealth;
 use App\Services\Drops\Reference;
 use App\Support\ImageUrl;
 use App\Support\Numeric;
+use Carbon\CarbonImmutable;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * @property CarbonImmutable|null $history_kept_from
+ */
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
@@ -38,6 +42,7 @@ class Product extends Model
             'unit_price_notified_at' => 'datetime',
             'last_notified_price' => 'decimal:2',
             'last_notified_at' => 'datetime',
+            'history_kept_from' => 'datetime',
             'active' => 'boolean',
         ];
     }

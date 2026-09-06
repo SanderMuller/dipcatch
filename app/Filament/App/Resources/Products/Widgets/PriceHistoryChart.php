@@ -2,6 +2,10 @@
 
 namespace App\Filament\App\Resources\Products\Widgets;
 
+use App\Billing\BillingGate;
+use App\Billing\Entitlements;
+use App\Billing\HistoryWindow;
+use App\Billing\Plan;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
@@ -11,7 +15,9 @@ use Carbon\CarbonInterface;
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\HtmlString;
 
 class PriceHistoryChart extends ChartWidget
 {
@@ -28,16 +34,54 @@ class PriceHistoryChart extends ChartWidget
     public ?string $filter = '90';
 
     /**
+     * The ranges this account may read. The menu tells the truth, but it is
+     * not the enforcement point — `$filter` is public, so its value arrives
+     * from the client. `windowStart()` clamps whatever turns up.
+     *
      * @return array<int|string, bool|float|int|string>|null
      */
     protected function getFilters(): ?array
     {
-        return [
-            '30' => 'Last 30 days',
-            '90' => 'Last 90 days',
-            '365' => 'Last 365 days',
-            'all' => 'All time',
-        ];
+        return HistoryWindow::filters($this->historyDays());
+    }
+
+    /**
+     * Says why the long ranges are missing, and offers the way to them only
+     * when there is something to buy.
+     */
+    public function getDescription(): string|Htmlable|null
+    {
+        $maxDays = $this->historyDays();
+
+        if ($maxDays === null) {
+            return null;
+        }
+
+        $reason = "Your plan shows the last {$maxDays} days. Pro shows the full history.";
+
+        if (! BillingGate::isOpen()) {
+            return $reason;
+        }
+
+        return new HtmlString(
+            e($reason) . ' <a href="' . e(url('/app/billing')) . '" class="fi-link fi-size-sm">Compare plans</a>',
+        );
+    }
+
+    /**
+     * Null when the account may read everything.
+     *
+     * An unknown owner falls back to the free ceiling rather than to
+     * unlimited: a gate that opens when it cannot identify who is asking is
+     * not a gate.
+     */
+    private function historyDays(): ?int
+    {
+        $user = $this->record?->user;
+
+        return $user === null
+            ? Entitlements::of(Plan::Free)->historyDays()
+            : $user->entitlements()->historyDays();
     }
 
     protected function getData(): array
@@ -270,14 +314,7 @@ class PriceHistoryChart extends ChartWidget
      */
     private function windowStart(): ?CarbonImmutable
     {
-        $filter = $this->filter ?? '90';
-        if ($filter === 'all') {
-            return null;
-        }
-
-        $days = max(1, (int) $filter);
-
-        return CarbonImmutable::now()->subDays($days);
+        return HistoryWindow::start($this->historyDays(), $this->filter);
     }
 
     private static function formatStamp(CarbonInterface $dt): string

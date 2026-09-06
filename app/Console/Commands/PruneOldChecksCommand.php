@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Billing\ProUsers;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
@@ -12,6 +13,9 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 #[Signature('dipcatch:prune-checks')]
 #[Description('Prune price_checks / price_drop_events / cheapest_history older than 365 days, keeping at least 50 most-recent rows per offer/product.')]
@@ -25,17 +29,20 @@ class PruneOldChecksCommand extends Command
 
     public function handle(): int
     {
+        $this->stampKeptHistory();
+
         $cutoff = now()->subDays(self::RETAIN_DAYS);
         $checksDeleted = 0;
         $eventsDeleted = 0;
         $segmentsDeleted = 0;
 
         Product::query()
-            ->select('id')
+            ->select(['id', 'history_kept_from'])
             ->lazyById(500)
             ->each(function (Product $product) use ($cutoff, &$eventsDeleted, &$segmentsDeleted): void {
-                $eventsDeleted += $this->pruneDropEvents($product->id, $cutoff);
-                $segmentsDeleted += $this->pruneCheapestHistory($product->id, $cutoff);
+                $keptFrom = $product->history_kept_from;
+                $eventsDeleted += $this->pruneDropEvents($product->id, $cutoff, $keptFrom);
+                $segmentsDeleted += $this->pruneCheapestHistory($product->id, $cutoff, $keptFrom);
             });
 
         Shop::query()
@@ -50,7 +57,43 @@ class PruneOldChecksCommand extends Command
         return self::SUCCESS;
     }
 
-    private function pruneDropEvents(string $productId, DateTimeInterface $cutoff): int
+    /**
+     * Marks the point from which an entitled account's history is kept for
+     * good. One statement over the `ProUsers::ids()` subquery rather than a
+     * plan lookup per product, and `history_kept_from IS NULL` makes it
+     * write-once: cancelling stops new products being stamped, it never
+     * retracts a stamp already there.
+     *
+     * The stamp is the product's own `created_at`, not the moment it was
+     * written. Stamping "now" would protect nothing that already exists,
+     * so a subscriber's first year would still be pruned away as it aged
+     * past the cutoff — the opposite of what they are paying for.
+     */
+    private function stampKeptHistory(): void
+    {
+        Product::query()
+            ->whereNull('history_kept_from')
+            ->whereIn('user_id', ProUsers::ids())
+            ->update(['history_kept_from' => DB::raw('created_at')]);
+    }
+
+    /**
+     * Rows dated at or after the product's `history_kept_from` are kept
+     * whatever the owner's plan is tonight — that stamp is the promise that
+     * a downgrade takes nothing away.
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     */
+    private function exceptKeptHistory(Builder $query, ?DateTimeInterface $keptFrom, string $column): void
+    {
+        if ($keptFrom !== null) {
+            $query->where($column, '<', $keptFrom);
+        }
+    }
+
+    private function pruneDropEvents(string $productId, DateTimeInterface $cutoff, ?DateTimeInterface $keptFrom): int
     {
         $keepIds = PriceDropEvent::query()
             ->where('product_id', $productId)
@@ -59,11 +102,14 @@ class PruneOldChecksCommand extends Command
             ->pluck('id')
             ->all();
 
-        $deleted = PriceDropEvent::query()
+        $query = PriceDropEvent::query()
             ->where('product_id', $productId)
             ->where('fired_at', '<', $cutoff)
-            ->whereNotIn('id', $keepIds)
-            ->delete();
+            ->whereNotIn('id', $keepIds);
+
+        $this->exceptKeptHistory($query, $keptFrom, 'fired_at');
+
+        $deleted = $query->delete();
 
         return is_int($deleted) ? $deleted : 0;
     }
@@ -113,13 +159,16 @@ class PruneOldChecksCommand extends Command
      * (`ended_at = null`) is never pruned so the live cheapest state is
      * always queryable.
      */
-    private function pruneCheapestHistory(string $productId, DateTimeInterface $cutoff): int
+    private function pruneCheapestHistory(string $productId, DateTimeInterface $cutoff, ?DateTimeInterface $keptFrom): int
     {
-        $deleted = ProductCheapestHistory::query()
+        $query = ProductCheapestHistory::query()
             ->where('product_id', $productId)
             ->whereNotNull('ended_at')
-            ->where('ended_at', '<', $cutoff)
-            ->delete();
+            ->where('ended_at', '<', $cutoff);
+
+        $this->exceptKeptHistory($query, $keptFrom, 'ended_at');
+
+        $deleted = $query->delete();
 
         return is_int($deleted) ? $deleted : 0;
     }

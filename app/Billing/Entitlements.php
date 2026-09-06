@@ -57,6 +57,14 @@ final readonly class Entitlements
         return $this->number('notifications_hourly_limit', 'dipcatch.notifications.user_hourly_limit', 30);
     }
 
+    /**
+     * Days of price history the account may read. Null means unlimited.
+     */
+    public function historyDays(): ?int
+    {
+        return $this->limit('history_days');
+    }
+
     public function allowsUnitPriceAlerts(): bool
     {
         return $this->value('unit_price_alerts') === true;

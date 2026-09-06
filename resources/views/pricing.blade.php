@@ -45,6 +45,7 @@
                             <li>{{ __(':count shops per product', ['count' => $free->maxShopsPerProduct()]) }}</li>
                             <li>{{ __('Prices checked every :hours hours', ['hours' => $free->recheckIntervalHours()]) }}</li>
                             <li>{{ __('Price drop alerts and the daily digest') }}</li>
+                            <li>{{ __(':days days of price history', ['days' => $free->historyDays()]) }}</li>
                         </ul>
 
                         <a href="{{ $ctaHref }}" class="mt-8 inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200">
@@ -69,6 +70,7 @@
                             <li>{{ __('Prices checked every :hours hours', ['hours' => $pro->recheckIntervalHours()]) }}</li>
                             <li>{{ __('Unit price alerts — your target per kilo, litre or piece') }}</li>
                             <li>{{ __('A higher alert ceiling') }}</li>
+                            <li>{{ __('Full price history, kept for as long as you subscribe') }}</li>
                         </ul>
 
                         @if ($onSale)

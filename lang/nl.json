@@ -108,5 +108,7 @@
     "Coming soon": "Binnenkort",
     "Main": "Hoofdmenu",
     "Menu": "Menu",
-    "Close menu": "Menu sluiten"
+    "Close menu": "Menu sluiten",
+    ":days days of price history": ":days dagen prijsgeschiedenis",
+    "Full price history, kept for as long as you subscribe": "Volledige prijsgeschiedenis, bewaard zolang je abonnement loopt"
 }

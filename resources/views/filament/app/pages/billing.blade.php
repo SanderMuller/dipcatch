@@ -116,6 +116,7 @@
                 <li>Unlimited products, and unlimited shops to compare per product.</li>
                 <li>Prices checked every {{ \App\Billing\Entitlements::of(\App\Billing\Plan::Pro)->recheckIntervalHours() }} hours instead of {{ \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->recheckIntervalHours() }}.</li>
                 <li>Unit price alerts — be told when a product reaches your target per kilo, litre or piece.</li>
+                <li>Full price history, kept for as long as you subscribe — free shows the last {{ \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->historyDays() }} days.</li>
                 <li>A higher alert ceiling, so a busy week is not silently capped.</li>
             </ul>
         </x-filament::section>

@@ -104,6 +104,11 @@ test('notification markers are scoped to the active range filter', function (): 
     $product = Product::factory()->create(['currency' => 'EUR']);
     $shop = Shop::factory()->for($product)->create();
 
+    // The owner needs Pro for "All time" to mean all time: a free account's
+    // window is capped at its plan's history days, which is what the second
+    // half of this test would otherwise be measuring.
+    subscribeUser($product->user()->sole());
+
     // Two segments so each event lands on its own (notificationMarkers
     // collapses multiple events on the same segment to the last one — pre-
     // existing limitation, not what this test asserts about).
