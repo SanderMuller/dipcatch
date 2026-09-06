@@ -67,13 +67,49 @@ test('writes a history segment when cheapest changes', function (): void {
     expect($product->cheapestHistory()->count())->toBe(2);
 
     /** @var ProductCheapestHistory $closed */
-    $closed = $product->cheapestHistory()->oldest('started_at')->first();
+    $closed = $product->cheapestHistory()->inOrder()->first();
     expect($closed->ended_at)->not->toBeNull();
 
     /** @var ProductCheapestHistory $open */
-    $open = $product->cheapestHistory()->latest('started_at')->first();
+    $open = $product->cheapestHistory()->newestFirst()->first();
     expect($open->ended_at)->toBeNull()
         ->and((string) $open->cheapest_price)->toBe('80.00');
+});
+
+test('two segments written in the same second still order deterministically', function (): void {
+    // `started_at` is a whole-second timestamp, so both segments below carry
+    // the identical value. Ordering on it alone let the database pick: SQLite
+    // returned the insert order and Postgres the reverse, so this suite passed
+    // on one driver and failed on the other.
+    $product = Product::factory()->create();
+    Shop::factory()->for($product)->create(['current_price' => '100.00']);
+    $product->recomputeCheapestShop();
+    Shop::factory()->for($product)->create(['current_price' => '80.00']);
+    $product->recomputeCheapestShop();
+
+    $segments = $product->cheapestHistory()->inOrder()->get();
+
+    expect($segments)->toHaveCount(2);
+
+    $startedAt = [];
+    $prices = [];
+
+    foreach ($segments as $segment) {
+        $startedAt[] = $segment->started_at?->toDateTimeString() ?? '';
+        $prices[] = (string) $segment->cheapest_price;
+    }
+
+    // The premise: both rows carry the same second, so ordering on
+    // `started_at` alone has no defined winner.
+    expect($startedAt[0])->not->toBe('')
+        ->and($startedAt[0])->toBe($startedAt[1]);
+
+    expect($prices)->toBe(['100.00', '80.00']);
+
+    $newest = $product->cheapestHistory()->newestFirst()->first();
+
+    expect($newest)->not->toBeNull()
+        ->and((string) $newest?->cheapest_price)->toBe('80.00');
 });
 
 test('does not write a new segment when nothing changed', function (): void {
@@ -99,7 +135,7 @@ test('clears cheapest when all offers become ineligible', function (): void {
         ->and($product->cheapest_price)->toBeNull();
 
     /** @var ProductCheapestHistory $latest */
-    $latest = $product->cheapestHistory()->latest('started_at')->first();
+    $latest = $product->cheapestHistory()->newestFirst()->first();
     expect($latest->cheapest_price)->toBeNull()
         ->and($latest->ended_at)->toBeNull();
 });

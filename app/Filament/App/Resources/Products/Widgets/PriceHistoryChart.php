@@ -256,7 +256,7 @@ class PriceHistoryChart extends ChartWidget
     private function segmentsFor(Product $product): EloquentCollection
     {
         $query = $product->cheapestHistory()
-            ->oldest('started_at');
+            ->inOrder();
 
         $windowStart = $this->windowStart();
         if ($windowStart !== null) {

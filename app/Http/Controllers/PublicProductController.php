@@ -72,7 +72,7 @@ final class PublicProductController extends Controller
             ->select(['cheapest_price', 'started_at', 'ended_at'])
             ->where('product_id', $product->id)
             ->where('started_at', '>=', $cutoff)
-            ->oldest('started_at')
+            ->inOrder()
             ->get();
 
         $points = [];

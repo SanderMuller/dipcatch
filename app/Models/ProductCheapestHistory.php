@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use Database\Factories\ProductCheapestHistoryFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,6 +33,32 @@ class ProductCheapestHistory extends Model
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Segments in the order they were written.
+     *
+     * `started_at` is a whole-second timestamp, so two segments recorded in
+     * the same second tie. Ordering on it alone leaves the winner to the
+     * database — SQLite and Postgres disagree — so `id` breaks the tie.
+     *
+     * @param  Builder<$this>  $query
+     */
+    #[Scope]
+    protected function inOrder(Builder $query): void
+    {
+        $query->orderBy('started_at')->orderBy('id');
+    }
+
+    /**
+     * Segments newest first. See {@see inOrder} for why `id` is here.
+     *
+     * @param  Builder<$this>  $query
+     */
+    #[Scope]
+    protected function newestFirst(Builder $query): void
+    {
+        $query->orderByDesc('started_at')->orderByDesc('id');
     }
 
     /**
