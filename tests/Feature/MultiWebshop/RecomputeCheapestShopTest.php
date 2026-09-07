@@ -125,6 +125,18 @@ test('does not write a new segment when nothing changed', function (): void {
     expect($product->cheapestHistory()->count())->toBe($first);
 });
 
+test('an offer in a different currency cannot win the comparison', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $eur = Shop::factory()->for($product)->create(['current_price' => '10.00', 'currency' => 'EUR']);
+    // Drifted row: numerically cheaper, but priced in a different currency.
+    Shop::factory()->for($product)->create(['current_price' => '9.00', 'currency' => 'GBP']);
+
+    $product->recomputeCheapestShop();
+
+    expect($product->cheapest_shop_id)->toBe($eur->id)
+        ->and((string) $product->cheapest_price)->toBe('10.00');
+});
+
 test('clears cheapest when all offers become ineligible', function (): void {
     $product = Product::factory()->create();
     $shop = Shop::factory()->for($product)->create(['current_price' => '100.00']);

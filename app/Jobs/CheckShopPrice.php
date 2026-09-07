@@ -458,6 +458,19 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
             $status = $outcome['status'];
 
+            $reported = strtoupper(trim((string) ($outcome['currency'] ?? '')));
+            $expected = strtoupper(trim($locked->currency));
+
+            // A shop that starts quoting another currency is not a cheaper shop. The
+            // add path already refuses this (ProbeShopUrl, ProbeFailure::CurrencyMismatch);
+            // without the same check here the offer competes numerically against the
+            // others and fires a drop alert for a price that does not exist.
+            // An empty currency is no signal at all, not a mismatch — some adapters
+            // legitimately return none.
+            if ($status === ScrapeStatus::Ok && $reported !== '' && $reported !== $expected) {
+                $status = ScrapeStatus::CurrencyMismatch;
+            }
+
             $check = PriceCheck::create([
                 'shop_id' => $locked->id,
                 'price' => $outcome['price'],
@@ -474,7 +487,9 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 $updates += [
                     'current_price' => $outcome['price'],
                     'current_in_stock' => (bool) ($outcome['in_stock'] ?? true),
-                    'currency' => $outcome['currency'] ?? $locked->currency,
+                    // An empty currency is no signal at all — keep the last known one
+                    // rather than blanking the column.
+                    'currency' => $reported !== '' ? $reported : $locked->currency,
                     'last_success_at' => $now,
                     'last_error' => null,
                     'consecutive_failures' => 0,

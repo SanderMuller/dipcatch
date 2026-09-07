@@ -152,19 +152,22 @@ class Product extends Model
             ->filter(fn (Shop $shop): bool => $shop->active
                 && $shop->current_in_stock
                 && $shop->health !== ShopHealth::Dead
+                && $shop->currency === $this->currency
                 && $shop->unitPrice() !== null);
 
         if ($candidates->isEmpty()) {
             return null;
         }
 
-        $unit = $candidates->countBy(fn (Shop $shop): string => (string) $shop->pack_unit)
+        // Group by unit AND currency: a EUR/kg figure and a (drifted) GBP/kg
+        // figure are not comparable numbers even though the unit matches.
+        $group = $candidates->countBy(fn (Shop $shop): string => (string) $shop->pack_unit . '|' . $shop->currency)
             ->sortDesc()
             ->keys()
             ->first();
 
         return $candidates
-            ->filter(fn (Shop $shop): bool => (string) $shop->pack_unit === $unit)
+            ->filter(fn (Shop $shop): bool => (string) $shop->pack_unit . '|' . $shop->currency === $group)
             // Unit prices are two-decimal strings; compare them as numbers,
             // with the oldest shop winning a tie so the answer is stable.
             ->sortBy([
@@ -195,6 +198,7 @@ class Product extends Model
                 ->where('active', true)
                 ->where('current_in_stock', true)
                 ->where('health', '!=', ShopHealth::Dead->value)
+                ->where('currency', $locked->currency)
                 ->whereNotNull('current_price')
                 ->orderBy('current_price')
                 // Stable tie-break: among equal prices the offer added first

@@ -4,14 +4,20 @@ use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Jobs\CheckShopPrice;
 use App\Models\PriceCheck;
+use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
+use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
+use App\PriceAdapters\ExtractionResult;
+use App\PriceAdapters\ShopAdapter;
+use App\PriceAdapters\ShopSnapshot;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\ShopFetcher;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 
 function fakeJsonLdResponse(string $host, string $path, string $price = '60.00', string $currency = 'EUR', string $name = 'X'): array
@@ -334,4 +340,102 @@ test('a tracked shop whose host never serves its prices is recorded as needs_js'
 
     expect(PriceCheck::query()->where('shop_id', $shop->id)->latest('id')->first()?->status)
         ->toBe(ScrapeStatus::NeedsJs);
+});
+
+test('a currency mismatch does not overwrite the price', function (): void {
+    Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '9.00', 'GBP'));
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.test/p/1',
+        'current_price' => '10.00',
+        'currency' => 'EUR',
+        'consecutive_failures' => 0,
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '10.00'])->save();
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+    expect((string) $shop->current_price)->toBe('10.00')
+        ->and($shop->currency)->toBe('EUR')
+        ->and($shop->last_status)->toBe(ScrapeStatus::CurrencyMismatch)
+        ->and($shop->consecutive_failures)->toBe(1);
+});
+
+test('a currency mismatch fires no drop event and no notification', function (): void {
+    Notification::fake();
+
+    Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '9.00', 'GBP'));
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.test/p/1',
+        'current_price' => '10.00',
+        'currency' => 'EUR',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '10.00'])->save();
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    expect(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(0);
+    Notification::assertNothingSent();
+});
+
+test('surrounding whitespace and lowercase in the reported currency do not trigger a mismatch', function (): void {
+    Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '60.00', ' eur '));
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.test/p/1',
+        'current_price' => '10.00',
+        'currency' => 'EUR',
+    ]);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+    expect($shop->last_status)->toBe(ScrapeStatus::Ok)
+        ->and((string) $shop->current_price)->toBe('60.00');
+});
+
+test('an empty currency is no signal and does not trigger a mismatch', function (): void {
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('<html></html>', 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $fakeAdapter = new class implements ShopAdapter {
+        public function key(): string
+        {
+            return 'fake-empty-currency';
+        }
+
+        public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
+        {
+            return ExtractionResult::success(new ShopSnapshot(
+                title: 'X',
+                imageUrl: null,
+                price: '9.00',
+                currency: '',
+                inStock: true,
+            ));
+        }
+    };
+
+    app()->instance(AdapterResolver::class, new AdapterResolver([$fakeAdapter]));
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.test/p/1',
+        'current_price' => '10.00',
+        'currency' => 'EUR',
+    ]);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+    expect($shop->last_status)->toBe(ScrapeStatus::Ok)
+        ->and((string) $shop->current_price)->toBe('9.00')
+        ->and($shop->currency)->toBe('EUR');
 });
