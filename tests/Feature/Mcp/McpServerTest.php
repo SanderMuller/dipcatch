@@ -97,16 +97,21 @@ function sqlstate(string $code): PDOException
     };
 }
 
-function authorizeRouteRequest(): Request
+function passportRequest(string $path = '/oauth/authorize', string $name = 'passport.authorizations.authorize'): Request
 {
-    $request = Request::create('/oauth/authorize');
+    $request = Request::create($path);
 
     $request->setRouteResolver(fn (): Route => tap(
-        new Route(['GET'], 'oauth/authorize', []),
-        fn (Route $route) => $route->name('passport.authorizations.authorize'),
+        new Route(['GET'], ltrim($path, '/'), []),
+        fn (Route $route) => $route->name($name),
     ));
 
     return $request;
+}
+
+function clientLookupFailure(string $sqlstate, string $sql = 'select * from "oauth_clients" where "id" = ?'): QueryException
+{
+    return new QueryException('pgsql', $sql, [], sqlstate($sqlstate));
 }
 
 it('turns a malformed client_id into a 400 rather than a 500', function (): void {
@@ -114,20 +119,54 @@ it('turns a malformed client_id into a 400 rather than a 500', function (): void
     // SQLSTATE 22P02 inside Passport and escapes as a 500 on a public
     // endpoint. Reproduced against PostgreSQL 17 before writing the handler;
     // SQLite casts silently, so the behaviour itself is Postgres-only.
-    $handled = app(ExceptionHandler::class)->render(
-        authorizeRouteRequest(),
-        new QueryException('pgsql', 'select 1', [], sqlstate('22P02')),
-    );
+    $handled = app(ExceptionHandler::class)->render(passportRequest(), clientLookupFailure('22P02'));
 
     expect($handled->getStatusCode())->toBe(400);
+});
+
+it('covers the token routes, not only authorize', function (): void {
+    // The sibling app found this: a guard matched only on the authorize route
+    // left POST /oauth/token answering 500 for the same malformed client_id.
+    foreach ([
+        ['/oauth/token', 'passport.token'],
+        ['/oauth/token/refresh', 'passport.token.refresh'],
+        ['/oauth/authorize', 'passport.authorizations.approve'],
+    ] as [$path, $name]) {
+        $handled = app(ExceptionHandler::class)->render(
+            passportRequest($path, $name),
+            clientLookupFailure('22P02'),
+        );
+
+        expect($handled->getStatusCode())->toBe(400);
+    }
+});
+
+it('does not claim a bad client_id when some other uuid on the route is malformed', function (): void {
+    // Keying on the SQLSTATE and the route alone would report any uuid cast
+    // failure on a Passport route as the client's identifier being wrong.
+    $handled = app(ExceptionHandler::class)->render(
+        passportRequest(),
+        clientLookupFailure('22P02', 'select * from "oauth_auth_codes" where "id" = ?'),
+    );
+
+    expect($handled->getStatusCode())->toBe(500);
+});
+
+it('leaves non-Passport routes alone', function (): void {
+    $handled = app(ExceptionHandler::class)->render(
+        passportRequest('/', 'home'),
+        clientLookupFailure('22P02'),
+    );
+
+    expect($handled->getStatusCode())->toBe(500);
 });
 
 it('leaves every other database error alone', function (): void {
     // Narrow on purpose: a database fault that is not a malformed uuid must
     // stay a 500 rather than be dressed up as the client's mistake.
     $handled = app(ExceptionHandler::class)->render(
-        authorizeRouteRequest(),
-        new QueryException('pgsql', 'select 1', [], sqlstate('08006')),
+        passportRequest(),
+        clientLookupFailure('08006'),
     );
 
     expect($handled->getStatusCode())->toBe(500);

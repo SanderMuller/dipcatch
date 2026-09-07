@@ -62,16 +62,22 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // `oauth_clients.id` is a native uuid, so on Postgres a malformed
-        // `client_id` raises SQLSTATE 22P02 inside Passport's own controller
-        // and escapes as a 500 on a public endpoint. SQLite casts silently,
-        // so no test would ever see it. Narrow on purpose: this one route,
-        // this one SQLSTATE — anything else stays a 500, because a database
-        // error that is not this should not be dressed up as a bad request.
+        // `client_id` raises SQLSTATE 22P02 inside Passport's own controllers
+        // and escapes as a 500 on public endpoints. SQLite casts silently, so
+        // no test against the default driver would ever see it.
+        //
+        // Narrowed three ways rather than on the route alone: the SQLSTATE,
+        // a Passport route, and the failing statement actually touching
+        // `oauth_clients`. Without that last check a second uuid parameter on
+        // one of these routes would be reported as a bad `client_id`.
         $exceptions->render(function (QueryException $e, Request $request): ?Response {
-            $isMalformedUuid = $e->getCode() === '22P02';
-            $isAuthorizeRoute = $request->route()?->getName() === 'passport.authorizations.authorize';
+            $routeName = $request->route()?->getName() ?? '';
 
-            if (! $isMalformedUuid || ! $isAuthorizeRoute) {
+            $isMalformedUuid = $e->getCode() === '22P02';
+            $isPassportRoute = str_starts_with($routeName, 'passport.');
+            $isClientLookup = str_contains($e->getSql(), 'oauth_clients');
+
+            if (! $isMalformedUuid || ! $isPassportRoute || ! $isClientLookup) {
                 return null;
             }
 
