@@ -3,6 +3,7 @@
 namespace App\Mcp\Support;
 
 use App\Actions\Shops\ShopDraft;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
 use JsonException;
@@ -30,7 +31,7 @@ final readonly class DraftToken
     {
         return Crypt::encryptString((string) json_encode([
             'v' => 1,
-            'at' => time(),
+            'at' => CarbonImmutable::now()->getTimestamp(),
             'snapshot' => $snapshot,
             'url' => $url,
             'adapterKey' => $adapterKey,
@@ -55,7 +56,7 @@ final readonly class DraftToken
 
         $issuedAt = $payload['at'] ?? null;
 
-        if (! is_int($issuedAt) || $issuedAt + self::TTL_SECONDS < time()) {
+        if (! is_int($issuedAt) || $issuedAt + self::TTL_SECONDS < CarbonImmutable::now()->getTimestamp()) {
             return null;
         }
 

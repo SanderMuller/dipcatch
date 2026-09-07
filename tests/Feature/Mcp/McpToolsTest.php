@@ -185,3 +185,45 @@ it('will not add a shop to another users product', function (): void {
 
     expect($theirs->shops()->count())->toBe(0);
 });
+
+it('refuses a draft that expired between showing it and confirming it', function (): void {
+    // The whole point of the token is that confirm writes what the user was
+    // shown. A stale one must say so rather than silently re-fetching and
+    // storing a price nobody approved.
+    $me = User::factory()->create();
+
+    $draft = DraftToken::issue(
+        ['title' => 'Coffee', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
+        'https://ah.nl/p/coffee',
+        'ah',
+        variantKey: null,
+    );
+
+    $this->travel(16)->minutes();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $draft, 'confirm' => true])
+        ->assertHasErrors()
+        ->assertSee('expired');
+
+    expect($me->products()->count())->toBe(0);
+});
+
+it('still accepts a draft inside its window', function (): void {
+    $me = User::factory()->create();
+
+    $draft = DraftToken::issue(
+        ['title' => 'Coffee', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
+        'https://ah.nl/p/coffee',
+        'ah',
+        variantKey: null,
+    );
+
+    $this->travel(14)->minutes();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $draft, 'confirm' => true])
+        ->assertOk();
+
+    expect($me->products()->count())->toBe(1);
+});
