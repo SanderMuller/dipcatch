@@ -1,6 +1,11 @@
 <?php declare(strict_types=1);
 
 use App\Mcp\Servers\DipCatchServer;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
+use Illuminate\Support\Str;
 use Laravel\Passport\Http\Middleware\CheckToken;
 use Laravel\Passport\Token;
 
@@ -75,4 +80,63 @@ it('exposes every tool under a readable name', function (): void {
         expect($name)->toMatch('/^[a-z_]+$/')
             ->and($name)->not->toContain('tool');
     }
+});
+
+/**
+ * A driver error carrying a real SQLSTATE. PDOException stores the code on
+ * Exception's protected property, so it can only be set from a subclass.
+ */
+function sqlstate(string $code): PDOException
+{
+    return new class ($code) extends PDOException {
+        public function __construct(string $sqlstate)
+        {
+            parent::__construct('invalid input syntax for type uuid');
+            $this->code = $sqlstate;
+        }
+    };
+}
+
+function authorizeRouteRequest(): Request
+{
+    $request = Request::create('/oauth/authorize');
+
+    $request->setRouteResolver(fn (): Route => tap(
+        new Route(['GET'], 'oauth/authorize', []),
+        fn (Route $route) => $route->name('passport.authorizations.authorize'),
+    ));
+
+    return $request;
+}
+
+it('turns a malformed client_id into a 400 rather than a 500', function (): void {
+    // oauth_clients.id is a native uuid, so on Postgres a non-uuid raises
+    // SQLSTATE 22P02 inside Passport and escapes as a 500 on a public
+    // endpoint. Reproduced against PostgreSQL 17 before writing the handler;
+    // SQLite casts silently, so the behaviour itself is Postgres-only.
+    $handled = app(ExceptionHandler::class)->render(
+        authorizeRouteRequest(),
+        new QueryException('pgsql', 'select 1', [], sqlstate('22P02')),
+    );
+
+    expect($handled->getStatusCode())->toBe(400);
+});
+
+it('leaves every other database error alone', function (): void {
+    // Narrow on purpose: a database fault that is not a malformed uuid must
+    // stay a 500 rather than be dressed up as the client's mistake.
+    $handled = app(ExceptionHandler::class)->render(
+        authorizeRouteRequest(),
+        new QueryException('pgsql', 'select 1', [], sqlstate('08006')),
+    );
+
+    expect($handled->getStatusCode())->toBe(500);
+});
+
+it('lets a well-formed client_id through to Passport', function (): void {
+    // Not asserting the outcome, only that this middleware is not the thing
+    // standing in the way: an unknown-but-valid uuid is Passport's business.
+    $response = $this->get('/oauth/authorize?client_id=' . Str::uuid() . '&redirect_uri=https://example.test&response_type=code');
+
+    expect($response->getStatusCode())->not->toBe(400);
 });
