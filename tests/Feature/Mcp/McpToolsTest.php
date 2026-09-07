@@ -31,13 +31,17 @@ it('answers for another users product exactly as for one that never existed', fu
     $me = User::factory()->create();
     $theirs = Product::factory()->create();
 
+    // "Exactly" is the whole point: a different message for a real id that
+    // belongs to someone else turns the endpoint into an existence oracle.
+    // The same literal on both branches: a distinct message for a real id
+    // belonging to someone else would make the endpoint an existence oracle.
     DipCatchServer::actingAs($me)
         ->tool(GetProductTool::class, ['product_id' => (string) $theirs->id])
-        ->assertHasErrors();
+        ->assertHasErrors(['No such product.']);
 
     DipCatchServer::actingAs($me)
         ->tool(GetProductTool::class, ['product_id' => (string) Str::uuid()])
-        ->assertHasErrors();
+        ->assertHasErrors(['No such product.']);
 });
 
 it('rejects a malformed product id before it reaches the database', function (): void {
@@ -138,6 +142,7 @@ it('refuses to create a product past the plan limit, and writes nothing', functi
     Product::factory()->count($limit)->create(['user_id' => $me->id]);
 
     $draft = DraftToken::issue(
+        $me,
         ['title' => 'Coffee', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
         'https://ah.nl/p/x',
         'ah',
@@ -155,6 +160,7 @@ it('creates the product when a valid draft is confirmed', function (): void {
     $me = User::factory()->create();
 
     $draft = DraftToken::issue(
+        $me,
         ['title' => 'Coffee 500 g', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
         'https://ah.nl/p/coffee',
         'ah',
@@ -193,6 +199,7 @@ it('refuses a draft that expired between showing it and confirming it', function
     $me = User::factory()->create();
 
     $draft = DraftToken::issue(
+        $me,
         ['title' => 'Coffee', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
         'https://ah.nl/p/coffee',
         'ah',
@@ -213,6 +220,7 @@ it('still accepts a draft inside its window', function (): void {
     $me = User::factory()->create();
 
     $draft = DraftToken::issue(
+        $me,
         ['title' => 'Coffee', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
         'https://ah.nl/p/coffee',
         'ah',
@@ -226,4 +234,27 @@ it('still accepts a draft inside its window', function (): void {
         ->assertOk();
 
     expect($me->products()->count())->toBe(1);
+});
+
+it('will not let one account spend a draft issued to another', function (): void {
+    // The token records that a particular user approved what they were shown.
+    // Without the binding it is a bearer credential for whoever holds it.
+    $issuer = User::factory()->create();
+
+    $draft = DraftToken::issue(
+        $issuer,
+        ['title' => 'Coffee', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
+        'https://ah.nl/p/coffee',
+        'ah',
+        variantKey: null,
+    );
+
+    $other = User::factory()->create();
+
+    DipCatchServer::actingAs($other)
+        ->tool(CreateProductTool::class, ['draft' => $draft, 'confirm' => true])
+        ->assertHasErrors();
+
+    expect($other->products()->count())->toBe(0)
+        ->and($issuer->products()->count())->toBe(0);
 });

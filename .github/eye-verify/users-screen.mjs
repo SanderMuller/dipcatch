@@ -33,7 +33,6 @@ for (const scheme of ['light', 'dark']) {
         const scroll = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
         check(`${tag} · no horizontal page scroll`, scroll === false);
 
-        // Open the comp modal and confirm both fields are there and reachable.
         const compButton = page.getByRole('button', { name: /^Comp$/ }).first();
         if (await compButton.count() > 0) {
             await compButton.click();

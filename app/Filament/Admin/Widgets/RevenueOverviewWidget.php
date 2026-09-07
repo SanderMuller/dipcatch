@@ -78,7 +78,10 @@ class RevenueOverviewWidget extends BaseWidget
      */
     private function proDescription(): string
     {
-        $comped = DB::table('users')->where('comped_until', '>', now())->count();
+        $comped = DB::table('users')
+            ->whereNull('billing_blocked_at')
+            ->where('comped_until', '>', now())
+            ->count();
 
         return $comped === 0
             ? 'Entitled to Pro right now'

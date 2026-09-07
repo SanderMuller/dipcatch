@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  * stop matching what the customer is told", so every case below asserts all
  * three at once rather than trusting one.
  *
- * @return array{plan: bool, sql: bool, label: string}
+ * @return array{plan: bool, sql: bool, label: string, comped: bool}
  */
 function proAnswers(User $user): array
 {
@@ -25,29 +25,32 @@ function proAnswers(User $user): array
         ->where('id', $user->getKey())
         ->exists();
 
+    $fresh = $user->fresh() ?? $user;
+
     return [
-        'plan' => $user->fresh()?->plan() === Plan::Pro,
+        'plan' => $fresh->plan() === Plan::Pro,
         'sql' => $inProUsers,
-        'label' => SubscribersTable::status($user->fresh() ?? $user),
+        'label' => SubscribersTable::status($fresh),
+        'comped' => $fresh->isComped(),
     ];
 }
 
 it('grants pro for a comp that has not expired', function (): void {
     $user = User::factory()->create(['comped_until' => CarbonImmutable::now()->addMonth()]);
 
-    expect(proAnswers($user))->toBe(['plan' => true, 'sql' => true, 'label' => 'Comped']);
+    expect(proAnswers($user))->toBe(['plan' => true, 'sql' => true, 'label' => 'Comped', 'comped' => true]);
 });
 
 it('grants pro for a comp with no end date', function (): void {
     $user = User::factory()->create(['comped_until' => Plan::COMPED_FOREVER]);
 
-    expect(proAnswers($user))->toBe(['plan' => true, 'sql' => true, 'label' => 'Comped']);
+    expect(proAnswers($user))->toBe(['plan' => true, 'sql' => true, 'label' => 'Comped', 'comped' => true]);
 });
 
 it('stops granting pro once a comp has expired', function (): void {
     $user = User::factory()->create(['comped_until' => CarbonImmutable::now()->subDay()]);
 
-    expect(proAnswers($user))->toBe(['plan' => false, 'sql' => false, 'label' => 'Free']);
+    expect(proAnswers($user))->toBe(['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false]);
 });
 
 it('keeps a blocked account on free even while it is comped', function (): void {
@@ -57,7 +60,7 @@ it('keeps a blocked account on free even while it is comped', function (): void 
         'comped_until' => Plan::COMPED_FOREVER,
     ]);
 
-    expect(proAnswers($user))->toBe(['plan' => false, 'sql' => false, 'label' => 'Blocked']);
+    expect(proAnswers($user))->toBe(['plan' => false, 'sql' => false, 'label' => 'Blocked', 'comped' => false]);
 });
 
 it('leaves a paying subscription untouched when the account is also comped', function (): void {
@@ -72,11 +75,11 @@ it('leaves a paying subscription untouched when the account is also comped', fun
 it('agrees across all three readers at the moment a comp expires', function (): void {
     $user = User::factory()->create(['comped_until' => CarbonImmutable::now()->addHour()]);
 
-    expect(proAnswers($user))->toBe(['plan' => true, 'sql' => true, 'label' => 'Comped']);
+    expect(proAnswers($user))->toBe(['plan' => true, 'sql' => true, 'label' => 'Comped', 'comped' => true]);
 
     $this->travel(2)->hours();
 
-    expect(proAnswers($user))->toBe(['plan' => false, 'sql' => false, 'label' => 'Free']);
+    expect(proAnswers($user))->toBe(['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false]);
 });
 
 it('deletes nothing when an account already over the free limit is comped', function (): void {
@@ -129,4 +132,21 @@ it('keeps the history stamp after a comp ends, because the stamp never retracts'
 
     expect($product->fresh()?->history_kept_from)->not->toBeNull()
         ->and($user->fresh()?->plan())->toBe(Plan::Free);
+});
+
+test('a blocked account that is also comped reads as blocked everywhere', function (): void {
+    // Four screens re-derived "comped" without the blocked precedence, so this
+    // account showed a Free badge and "Pro on us — nothing to pay" on the same
+    // line of the billing page.
+    $user = User::factory()->create([
+        'billing_blocked_at' => CarbonImmutable::now(),
+        'comped_until' => Plan::COMPED_FOREVER,
+    ]);
+
+    $this->actingAs($user);
+
+    $content = (string) $this->get('/app/billing')->assertOk()->getContent();
+
+    expect($content)->not->toContain('Pro on us')
+        ->and($user->isComped())->toBeFalse();
 });

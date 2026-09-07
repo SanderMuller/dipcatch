@@ -48,7 +48,7 @@ class CreateProductTool extends Tool
         $user = $this->user($request);
 
         if (($validated['confirm'] ?? false) === true) {
-            $draft = DraftToken::open($this->str($validated, 'draft'));
+            $draft = DraftToken::open($user, $this->str($validated, 'draft'));
 
             if ($draft === null) {
                 return Response::error('That draft has expired. Call create_product again without confirm to re-read the page.');
@@ -82,7 +82,7 @@ class CreateProductTool extends Tool
         return Response::structured([
             'found' => $this->reporter->preview($snapshot, $outcome),
             'already_tracked_as' => $this->existingTitle($user->getKey(), $outcome->normalizedUrl),
-            'draft' => DraftToken::issue($snapshot, (string) $outcome->normalizedUrl, (string) $outcome->adapterKey, $variantKey),
+            'draft' => DraftToken::issue($user, $snapshot, (string) $outcome->normalizedUrl, (string) $outcome->adapterKey, $variantKey),
             'next' => 'Show this to the user. If they agree, call create_product again with the draft and confirm: true.',
         ]);
     }

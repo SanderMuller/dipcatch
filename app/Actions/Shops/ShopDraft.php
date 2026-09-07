@@ -61,8 +61,7 @@ final readonly class ShopDraft
 
     /**
      * Builds a draft from a flattened preview snapshot plus the form state
-     * around it. The three `snapshot*` readers used to live in
-     * `DrivesShopProbe`, where only Livewire could reach them.
+     * around it.
      *
      * @param  array<string, mixed>  $snapshot
      */

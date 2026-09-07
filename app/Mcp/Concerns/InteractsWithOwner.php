@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Laravel\Mcp\Request;
 
@@ -38,6 +39,17 @@ trait InteractsWithOwner
         $value = $validated[$key] ?? null;
 
         return is_string($value) ? $value : $default;
+    }
+
+    /**
+     * A model's key as the string it is. `getKey()` is typed mixed, and these
+     * are uuid columns.
+     */
+    protected function key(Model $model): string
+    {
+        $key = $model->getKey();
+
+        return is_scalar($key) ? (string) $key : '';
     }
 
     protected function ownedProduct(Request $request, string $id): ?Product

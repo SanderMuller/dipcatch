@@ -77,13 +77,10 @@ test('writes a history segment when cheapest changes', function (): void {
 });
 
 test('two segments written in the same second still order deterministically', function (): void {
-    // `started_at` is a whole-second timestamp, so two segments written in one
-    // second carry the identical value. Ordering on it alone let the database
-    // pick: SQLite returned the insert order and Postgres the reverse, so this
-    // suite passed on one driver and failed on the other.
-    //
-    // Time is frozen because a slow runner can straddle a second boundary,
-    // which would make the tie itself intermittent and this test flaky.
+    // `started_at` is whole seconds, so two segments written in one second tie.
+    // Ordering on it alone let the database pick, and the drivers disagreed.
+    // Time is frozen so a slow runner cannot straddle the boundary and make
+    // the tie itself intermittent.
     $this->freezeTime();
 
     $product = Product::factory()->create();

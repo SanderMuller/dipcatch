@@ -1,12 +1,14 @@
 <?php declare(strict_types=1);
 
 use App\Mcp\Servers\DipCatchServer;
+use App\Models\User;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Str;
 use Laravel\Passport\Http\Middleware\CheckToken;
+use Laravel\Passport\Passport;
 use Laravel\Passport\Token;
 
 /**
@@ -38,6 +40,23 @@ it('guards the endpoint with the mcp:use scope, not merely with authentication',
     expect($route)->not->toBeNull()
         ->and($route?->gatherMiddleware())->toContain('auth:api')
         ->and($route?->gatherMiddleware())->toContain('scopes:mcp:use');
+});
+
+it('refuses a token that carries no mcp:use scope', function (): void {
+    // The middleware-string assertion above proves the guard is attached.
+    // This proves it actually rejects: `actingAs` on the server bypasses the
+    // HTTP stack entirely, so without this nothing exercised Passport at all.
+    Passport::actingAs(User::factory()->create(), []);
+
+    $this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list'])
+        ->assertForbidden();
+});
+
+it('accepts a token that carries it', function (): void {
+    Passport::actingAs(User::factory()->create(), ['mcp:use']);
+
+    $this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list'])
+        ->assertOk();
 });
 
 it('registers the scope middleware alias, since Laravel does not alias Passport for us', function (): void {
@@ -125,8 +144,8 @@ it('turns a malformed client_id into a 400 rather than a 500', function (): void
 });
 
 it('covers the token routes, not only authorize', function (): void {
-    // The sibling app found this: a guard matched only on the authorize route
-    // left POST /oauth/token answering 500 for the same malformed client_id.
+    // Matching only the authorize route leaves POST /oauth/token answering
+    // 500 for the same malformed client_id.
     foreach ([
         ['/oauth/token', 'passport.token'],
         ['/oauth/token/refresh', 'passport.token.refresh'],
@@ -173,9 +192,11 @@ it('leaves every other database error alone', function (): void {
 });
 
 it('lets a well-formed client_id through to Passport', function (): void {
-    // Not asserting the outcome, only that this middleware is not the thing
-    // standing in the way: an unknown-but-valid uuid is Passport's business.
+    // An unknown but well-formed client is Passport's business, not ours.
     $response = $this->get('/oauth/authorize?client_id=' . Str::uuid() . '&redirect_uri=https://example.test&response_type=code');
 
-    expect($response->getStatusCode())->not->toBe(400);
+    // Was `not->toBe(400)`, which also passes on a 500 — and this is the only
+    // test that reaches the real authorize route rather than rendering the
+    // consent blade with fabricated parameters.
+    expect($response->getStatusCode())->toBeLessThan(500);
 });

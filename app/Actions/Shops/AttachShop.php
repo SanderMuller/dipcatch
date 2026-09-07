@@ -30,21 +30,7 @@ final readonly class AttachShop
             // guard locks the owner row so two racing requests serialise.
             $this->limits->guardShop($product);
 
-            $shop = $this->write($product, $draft);
-
-            $check = PriceCheck::create([
-                'shop_id' => $shop->id,
-                'price' => $draft->price,
-                'currency' => $draft->currency,
-                'in_stock' => $draft->inStock,
-                'status' => ScrapeStatus::Ok->value,
-                'checked_at' => now(),
-            ]);
-
-            // With the triggering id, not bare: drop detection reads it.
-            $product->recomputeCheapestShop((int) $check->id);
-
-            return $shop;
+            return $this->record($product, $draft);
         });
     }
 
@@ -54,6 +40,14 @@ final readonly class AttachShop
      * run, and a product with no shops cannot be over the shop limit.
      */
     public function firstShopOf(Product $product, ShopDraft $draft): Shop
+    {
+        return $this->record($product, $draft);
+    }
+
+    /**
+     * The shop row, its first price check, and the recompute that reads it.
+     */
+    private function record(Product $product, ShopDraft $draft): Shop
     {
         $shop = $this->write($product, $draft);
 
@@ -66,6 +60,7 @@ final readonly class AttachShop
             'checked_at' => now(),
         ]);
 
+        // With the triggering id, not bare: drop detection reads it.
         $product->recomputeCheapestShop((int) $check->id);
 
         return $shop;

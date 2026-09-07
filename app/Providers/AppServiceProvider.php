@@ -75,7 +75,8 @@ final class AppServiceProvider extends ServiceProvider
         // drop the account.
         Cashier::keepPastDueSubscriptionsActive();
 
-        // Per token owner, falling back to IP for an unauthenticated probe.
+        // Per token owner. The limiter sits behind `auth:api`, so an
+        // unauthenticated request never reaches it and needs no IP fallback.
         RateLimiter::for('mcp', fn (Request $request): Limit => Limit::perMinute(60)
             ->by($request->user()?->getAuthIdentifier() ?? $request->ip()));
 

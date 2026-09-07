@@ -77,7 +77,11 @@ class UsersTable
 
                 Filter::make('comped')
                     ->label('Comped')
-                    ->query(fn (Builder $query): Builder => $query->where('comped_until', '>', now())),
+                    // Blocked accounts are not entitled, so they are not comped
+                    // either — the same precedence `User::isComped()` applies.
+                    ->query(fn (Builder $query): Builder => $query
+                        ->whereNull('billing_blocked_at')
+                        ->where('comped_until', '>', now())),
 
                 Filter::make('blocked')
                     ->label('Billing blocked')
@@ -105,9 +109,7 @@ class UsersTable
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalDescription('The account drops to Free immediately. History already kept stays kept.')
-                    ->visible(fn (User $record): bool => self::actorIsAdmin()
-                        && $record->comped_until !== null
-                        && $record->comped_until->isFuture())
+                    ->visible(fn (User $record): bool => self::actorIsAdmin() && $record->isComped())
                     ->action(self::endComp(...)),
             ])
             ->defaultSort('created_at', 'desc');
@@ -171,7 +173,7 @@ class UsersTable
             return 'Blocked';
         }
 
-        if ($record->comped_until !== null && $record->comped_until->isFuture()) {
+        if ($record->isComped()) {
             return 'Comp';
         }
 

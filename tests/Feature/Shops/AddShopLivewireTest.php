@@ -9,27 +9,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
 
-function fakeJsonLdOffer(string $url = 'https://shop.example.com/p/1', string $price = '50.00', string $currency = 'EUR', string $name = 'Demo Item'): array
-{
-    $host = parse_url($url, PHP_URL_HOST) ?: 'shop.example.com';
-    $json = json_encode([
-        '@type' => 'Product',
-        'name' => $name,
-        'image' => 'https://shop.example.com/img.jpg',
-        'offers' => [
-            '@type' => 'Shop',
-            'price' => $price,
-            'priceCurrency' => $currency,
-            'availability' => 'https://schema.org/InStock',
-        ],
-    ], JSON_THROW_ON_ERROR);
-
-    return [
-        "https://{$host}/robots.txt" => Http::response('', 404),
-        $url => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
-    ];
-}
-
 beforeEach(function (): void {
     Cache::flush();
     RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');

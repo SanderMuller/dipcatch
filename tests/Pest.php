@@ -621,6 +621,33 @@ function dierapothekerPage(
  * suite — these rows are what the entitlement layer reads, so they are how
  * a plan state is set up.
  */
+/**
+ * A shop page serving a JSON-LD offer, plus the robots.txt the fetcher reads
+ * first. Shared: both the Livewire flow and the MCP tools probe through it.
+ *
+ * @return array<string, mixed>
+ */
+function fakeJsonLdOffer(string $url = 'https://shop.example.com/p/1', string $price = '50.00', string $currency = 'EUR', string $name = 'Demo Item'): array
+{
+    $host = parse_url($url, PHP_URL_HOST) ?: 'shop.example.com';
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => $name,
+        'image' => 'https://shop.example.com/img.jpg',
+        'offers' => [
+            '@type' => 'Shop',
+            'price' => $price,
+            'priceCurrency' => $currency,
+            'availability' => 'https://schema.org/InStock',
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    return [
+        "https://{$host}/robots.txt" => Http::response('', 404),
+        $url => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ];
+}
+
 function subscribeUser(
     User $user,
     string $status = 'active',

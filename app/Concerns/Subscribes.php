@@ -21,15 +21,27 @@ trait Subscribes
      */
     private const array ENDED_STATUSES = ['unpaid', 'incomplete_expired'];
 
+    /**
+     * Pro as a gift rather than a payment.
+     *
+     * Blocked beats comped on purpose: an account blocked for a lost
+     * chargeback does not get Pro back because someone comped it once. That
+     * precedence lives here so no screen can re-derive it and disagree.
+     */
+    public function isComped(): bool
+    {
+        return $this->billing_blocked_at === null
+            && $this->comped_until !== null
+            && $this->comped_until->isFuture();
+    }
+
     public function plan(): Plan
     {
         if ($this->billing_blocked_at !== null) {
             return Plan::Free;
         }
 
-        // Blocked beats comped on purpose: an account blocked for a lost
-        // chargeback does not get Pro back because someone comped it once.
-        if ($this->comped_until !== null && $this->comped_until->isFuture()) {
+        if ($this->isComped()) {
             return Plan::Pro;
         }
 

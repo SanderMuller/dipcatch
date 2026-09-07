@@ -79,9 +79,7 @@ class Billing extends Page
      */
     public function isComped(): bool
     {
-        $compedUntil = $this->user()->comped_until;
-
-        return $compedUntil !== null && $compedUntil->isFuture();
+        return $this->user()->isComped();
     }
 
     public function isCancelling(): bool

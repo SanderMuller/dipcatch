@@ -48,10 +48,14 @@ class AddShopTool extends Tool
         }
 
         if (($validated['confirm'] ?? false) === true) {
-            $draft = DraftToken::open($this->str($validated, 'draft'));
+            $draft = DraftToken::open($this->user($request), $this->str($validated, 'draft'), $this->key($product));
 
             if ($draft === null) {
                 return Response::error('That draft has expired. Call add_shop again without confirm to re-read the page.');
+            }
+
+            if ($product->shops()->where('url', $draft->url)->exists()) {
+                return Response::error('That shop is already tracked on this product.');
             }
 
             try {
@@ -79,7 +83,7 @@ class AddShopTool extends Tool
 
         return Response::structured([
             'found' => $this->reporter->preview($snapshot, $outcome),
-            'draft' => DraftToken::issue($snapshot, (string) $outcome->normalizedUrl, (string) $outcome->adapterKey, $variantKey),
+            'draft' => DraftToken::issue($this->user($request), $snapshot, (string) $outcome->normalizedUrl, (string) $outcome->adapterKey, $variantKey, $this->key($product)),
             'next' => 'Show this to the user. If they agree, call add_shop again with the draft and confirm: true.',
         ]);
     }

@@ -31,7 +31,6 @@ await p.reload({ waitUntil: 'networkidle' });
 row = await rowFor(email).innerText();
 check('survives a reload', row.includes('Pro') && row.includes('Eye verify run'), row.replace(/\s+/g, ' '));
 
-// And back again.
 await rowFor(email).getByRole('button', { name: /End comp/ }).click();
 await p.waitForTimeout(400);
 await p.getByRole('button', { name: /Confirm|End comp/ }).last().click();

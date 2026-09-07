@@ -127,9 +127,9 @@ class SubscribersTable
             return 'Blocked';
         }
 
-        // Same order as `Subscribes::plan()`. Without this a comped account
-        // reads Free here while the Pro filter above counts it as Pro.
-        if ($record->comped_until !== null && $record->comped_until->isFuture()) {
+        // Without this a comped account reads Free here while the Pro filter
+        // above counts it as Pro.
+        if ($record->isComped()) {
             return 'Comped';
         }
 

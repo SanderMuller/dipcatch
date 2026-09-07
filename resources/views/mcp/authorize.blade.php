@@ -34,6 +34,17 @@
                     </ul>
                 @endif
 
+                {{-- Anyone may register a client under any name, so the name
+                     alone is not identity. The host it sends you back to is
+                     the part a reader can actually check. --}}
+                @php($redirectHost = parse_url($client->redirect_uris[0] ?? '', PHP_URL_HOST))
+
+                @if (is_string($redirectHost))
+                    <p class="mt-4 text-sm text-zinc-600 dark:text-zinc-300">
+                        {{ __('It will send you back to :host. Only continue if you recognise that.', ['host' => $redirectHost]) }}
+                    </p>
+                @endif
+
                 <p class="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
                     {{ __('You can withdraw this at any time from Connections in your account.') }}
                 </p>

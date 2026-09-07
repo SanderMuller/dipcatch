@@ -6,6 +6,7 @@ use App\Mcp\Concerns\InteractsWithOwner;
 use App\Mcp\Support\ProductPresenter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -38,12 +39,13 @@ class RemoveShopTool extends Tool
             return Response::error('No such shop.');
         }
 
-        $shop->delete();
-
-        // Shop::booted() has no deleted hook — on the web this recompute lives
-        // in a Filament action, so a tool has to do it itself or the product
-        // keeps pointing at a shop that is gone.
-        $product->recomputeCheapestShop();
+        // One transaction: `Shop::booted()` has no deleted hook, so the
+        // recompute is this tool's job, and a failure between the two would
+        // leave `cheapest_shop_id` pointing at a row that no longer exists.
+        DB::transaction(function () use ($shop, $product): void {
+            $shop->delete();
+            $product->recomputeCheapestShop();
+        });
         $product->refresh()->load('shops');
 
         return Response::structured($this->presenter->detail($product));

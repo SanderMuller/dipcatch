@@ -8,6 +8,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -122,6 +123,8 @@ test('a comped account with a live subscription is allowed, and both survive', f
 });
 
 test('the products count does not add a query per row', function (): void {
+    // Previously this asserted only assertOk(): deleting the eager load from
+    // UsersTable left it green. Now the query count is the assertion.
     $this->actingAs(User::factory()->admin()->create());
 
     $users = User::factory()->count(5)->create();
@@ -130,7 +133,27 @@ test('the products count does not add a query per row', function (): void {
         Product::factory()->count(2)->create(['user_id' => $user->id]);
     }
 
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+
+    livewire(ListUsers::class)->assertOk()->assertCanSeeTableRecords($users);
+
+    // Six accounts on the page. Without ->with('subscriptions')->withCount()
+    // this climbs with the row count; with them it does not.
+    expect($queries)->toBeLessThan(15);
+});
+
+test('a non-admin cannot invoke the comp action even if they reach the page', function (): void {
+    // The panel gate is one layer; the action checks is_admin itself so it
+    // stays safe if it is ever reused outside this panel.
+    $target = User::factory()->create();
+
+    $this->actingAs(User::factory()->create());
+
     livewire(ListUsers::class)
-        ->assertOk()
-        ->assertCanSeeTableRecords($users);
+        ->assertActionHidden(TestAction::make('comp')->table($target));
+
+    expect($target->fresh()?->comped_until)->toBeNull();
 });
