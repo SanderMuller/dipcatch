@@ -48,3 +48,9 @@ frankenphp-worker.php
 
 # Eye-verify session state: holds a live cookie.
 .github/eye-verify/admin-state.json
+
+# Laravel Cloud CLI repo defaults (app/environment ids, no secrets).
+/.cloud
+
+# Subagent memory (memory: project in .claude/agents/*.md).
+.claude/agent-memory
