@@ -32,6 +32,9 @@ final readonly class StockText
         'tijdelijk niet beschikbaar',
         'momenteel niet leverbaar',
         'tijdelijk uitverkocht',
+        'tijdelijk niet in voorraad',
+        'momenteel uitverkocht',
+        'niet meer op voorraad',
         'niet meer leverbaar',
         'niet op voorraad',
     ];

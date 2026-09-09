@@ -262,3 +262,20 @@ test('text about anything but the product leaves stock unknown', function (): vo
         expect($resolver->resolve('https://x.test', $page)->snapshot?->inStock)->toBeNull();
     }
 });
+
+test('the Flemish and backorder phrasings a peer session reported are read too', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $phrases = [
+        'tijdelijk niet in voorraad',
+        'momenteel uitverkocht',
+        'niet meer op voorraad',
+    ];
+
+    foreach ($phrases as $phrase) {
+        $result = $resolver->resolve('https://x.test', "<p>{$phrase}</p>");
+
+        expect($result->snapshot?->inStock)->toBeFalse()
+            ->and($result->snapshot?->stockSignal)->toBe('text: ' . $phrase);
+    }
+});
