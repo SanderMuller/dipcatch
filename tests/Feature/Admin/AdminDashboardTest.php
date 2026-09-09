@@ -111,13 +111,24 @@ it('separates the 24-hour alert count from the 7-day one', function (): void {
     $widget = new OperationsOverviewWidget();
     $stats = (new ReflectionMethod(OperationsOverviewWidget::class, 'getStats'))->invoke($widget);
 
-    $alerts = collect($stats)->first(
-        fn (Stat $stat): bool => $stat->getLabel() === 'Drops alerted (24h)',
-    );
+    $alerts = null;
 
-    expect($alerts)->not->toBeNull()
-        ->and((string) $alerts->getValue())->toBe('1')
-        ->and((string) $alerts->getDescription())->toBe('2 in the last 7 days');
+    foreach ((is_array($stats) ? $stats : []) as $stat) {
+        if ($stat instanceof Stat && $stat->getLabel() === 'Drops alerted (24h)') {
+            $alerts = $stat;
+
+            break;
+        }
+    }
+
+    expect($alerts)->toBeInstanceOf(Stat::class);
+    assert($alerts instanceof Stat);
+
+    $value = $alerts->getValue();
+    $description = $alerts->getDescription();
+
+    expect(is_scalar($value) ? (string) $value : '')->toBe('1')
+        ->and(is_string($description) ? $description : '')->toBe('2 in the last 7 days');
 });
 
 it('leaves a paused product out of the operational numbers', function (): void {
