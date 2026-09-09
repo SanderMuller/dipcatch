@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9f41a2226ba43a72ecf65e030d06bc8d",
+    "content-hash": "368ab169aaa57e33ff5620c0ff74b0d0",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -7341,16 +7341,16 @@
         },
         {
             "name": "sandermuller/laravel-queue-insights",
-            "version": "0.33.0",
+            "version": "0.33.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/SanderMuller/laravel-queue-insights.git",
-                "reference": "e233693a1c1591eb5707f7dbb2aba0fc9a531995"
+                "reference": "5637fcc6401ef1ae7f64bf418bc2330f5aa30577"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SanderMuller/laravel-queue-insights/zipball/e233693a1c1591eb5707f7dbb2aba0fc9a531995",
-                "reference": "e233693a1c1591eb5707f7dbb2aba0fc9a531995",
+                "url": "https://api.github.com/repos/SanderMuller/laravel-queue-insights/zipball/5637fcc6401ef1ae7f64bf418bc2330f5aa30577",
+                "reference": "5637fcc6401ef1ae7f64bf418bc2330f5aa30577",
                 "shasum": ""
             },
             "require": {
@@ -7443,9 +7443,9 @@
             ],
             "support": {
                 "issues": "https://github.com/SanderMuller/laravel-queue-insights/issues",
-                "source": "https://github.com/SanderMuller/laravel-queue-insights/tree/0.33.0"
+                "source": "https://github.com/SanderMuller/laravel-queue-insights/tree/0.33.1"
             },
-            "time": "2026-09-09T11:22:03+00:00"
+            "time": "2026-09-09T12:43:14+00:00"
         },
         {
             "name": "sandermuller/stopwatch",
