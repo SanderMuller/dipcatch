@@ -34,7 +34,7 @@
 
             <div class="px-4 pb-4">
             <p class="text-xs text-gray-500 dark:text-gray-400">
-                Matched on name and pack size. Prices come from the daily dataset — the live price is fetched when you add the shop.
+                Matched on name and pack size. Prices come from the daily dataset. DipCatch fetches the live price when you add the shop.
             </p>
 
             <ul class="mt-3 divide-y divide-gray-100 dark:divide-white/5">

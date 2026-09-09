@@ -61,7 +61,7 @@ return [
     'pro' => [
         'max_products' => null,
         'max_shops_per_product' => null,
-        'recheck_interval_hours' => (int) env('PLAN_PRO_RECHECK_INTERVAL_HOURS', 2),
+        'recheck_interval_hours' => (int) env('PLAN_PRO_RECHECK_INTERVAL_HOURS', 6),
         'notifications_hourly_limit' => (int) env('PLAN_PRO_NOTIFICATIONS_HOURLY_LIMIT', 200),
         'unit_price_alerts' => true,
         'history_days' => null,

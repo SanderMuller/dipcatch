@@ -136,7 +136,7 @@ it('keeps the history stamp after a comp ends, because the stamp never retracts'
 
 test('a blocked account that is also comped reads as blocked everywhere', function (): void {
     // Four screens re-derived "comped" without the blocked precedence, so this
-    // account showed a Free badge and "Pro on us — nothing to pay" on the same
+    // account showed a Free badge and "Pro is on us" on the same
     // line of the billing page.
     $user = User::factory()->create([
         'billing_blocked_at' => CarbonImmutable::now(),
@@ -147,6 +147,6 @@ test('a blocked account that is also comped reads as blocked everywhere', functi
 
     $content = (string) $this->get('/app/billing')->assertOk()->getContent();
 
-    expect($content)->not->toContain('Pro on us')
+    expect($content)->not->toContain('Pro is on us')
         ->and($user->isComped())->toBeFalse();
 });

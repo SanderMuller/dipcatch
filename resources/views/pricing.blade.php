@@ -10,6 +10,16 @@
     $trialDays = \App\Billing\ProPrice::trialDays();
     $authed = auth()->check();
     $ctaHref = $authed ? url('/app/billing') : route('register');
+    // Pro has its own destination: `upgrade` decides between registration,
+    // checkout and the billing page, so the card links to one URL whoever
+    // is reading it.
+    $isPro = $authed && auth()->user()?->isPro() === true;
+    $proCtaHref = $isPro ? url('/app/billing') : route('upgrade');
+    $proCtaLabel = match (true) {
+        $isPro => __('Your plan'),
+        $authed => __('Upgrade to Pro'),
+        default => __('Start with Pro'),
+    };
     $onSale = \App\Billing\BillingGate::isOpen();
     // maxProducts() is nullable, where null means unlimited, so it cannot be
     // interpolated without a branch.
@@ -76,14 +86,14 @@
                             <li>{{ __('Unlimited products') }}</li>
                             <li>{{ __('Unlimited shops per product') }}</li>
                             <li>{{ __('Prices checked every :hours hours', ['hours' => $pro->recheckIntervalHours()]) }}</li>
-                            <li>{{ __('Unit price alerts — your target per kilo, litre or piece') }}</li>
+                            <li>{{ __('Unit price alerts, so you can set a target per kilo, litre or piece') }}</li>
                             <li>{{ __('A higher alert ceiling') }}</li>
                             <li>{{ __('Full price history, kept for as long as you subscribe') }}</li>
                         </ul>
 
                         @if ($onSale)
-                            <a href="{{ $ctaHref }}" class="mt-8 inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200">
-                                {{ $authed ? __('Upgrade to Pro') : __('Start with Pro') }}
+                            <a href="{{ $proCtaHref }}" class="mt-8 inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200">
+                                {{ $proCtaLabel }}
                             </a>
                         @else
                             <p class="mt-8 inline-flex items-center rounded-full bg-zinc-900/5 px-5 py-2.5 text-sm font-medium text-zinc-500 ring-1 ring-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:ring-zinc-800">

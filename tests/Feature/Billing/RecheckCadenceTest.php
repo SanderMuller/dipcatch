@@ -27,12 +27,12 @@ function proUser(): User
     return $user;
 }
 
-it('rechecks a pro shop after two hours while the free shop waits for six', function (): void {
+it('rechecks a pro shop after six hours while the free shop waits for a day', function (): void {
     Queue::fake();
 
-    $threeHoursAgo = CarbonImmutable::now()->subHours(3);
-    $proShop = shopFor(proUser(), $threeHoursAgo);
-    $freeShop = shopFor(User::factory()->create(), $threeHoursAgo);
+    $sevenHoursAgo = CarbonImmutable::now()->subHours(7);
+    $proShop = shopFor(proUser(), $sevenHoursAgo);
+    $freeShop = shopFor(User::factory()->create(), $sevenHoursAgo);
 
     $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
 
@@ -43,7 +43,7 @@ it('rechecks a pro shop after two hours while the free shop waits for six', func
 it('still rechecks a free shop once its own interval has passed', function (): void {
     Queue::fake();
 
-    $shop = shopFor(User::factory()->create(), CarbonImmutable::now()->subHours(7));
+    $shop = shopFor(User::factory()->create(), CarbonImmutable::now()->subHours(25));
 
     $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
 
@@ -58,8 +58,8 @@ it('does not let a pro backlog starve free accounts', function (): void {
     config()->set('dipcatch.scheduler.batch_size', 1);
 
     $pro = proUser();
-    shopFor($pro, CarbonImmutable::now()->subHours(3));
-    shopFor($pro, CarbonImmutable::now()->subHours(4));
+    shopFor($pro, CarbonImmutable::now()->subHours(7));
+    shopFor($pro, CarbonImmutable::now()->subHours(8));
     $freeShop = shopFor(User::factory()->create(), CarbonImmutable::now()->subDays(2));
 
     $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
@@ -72,7 +72,7 @@ it('gives the pro cadence to an account-level trial, as plan() does', function (
     Queue::fake();
 
     $user = User::factory()->create(['trial_ends_at' => CarbonImmutable::now()->addDays(7)]);
-    $shop = shopFor($user, CarbonImmutable::now()->subHours(3));
+    $shop = shopFor($user, CarbonImmutable::now()->subHours(7));
 
     expect($user->isPro())->toBeTrue();
 
@@ -86,7 +86,7 @@ it('drops a blocked account back to the free cadence', function (): void {
 
     $user = proUser();
     $user->forceFill(['billing_blocked_at' => now()])->save();
-    $shop = shopFor($user, CarbonImmutable::now()->subHours(3));
+    $shop = shopFor($user, CarbonImmutable::now()->subHours(7));
 
     $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
 

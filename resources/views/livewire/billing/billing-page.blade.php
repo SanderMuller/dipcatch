@@ -26,11 +26,11 @@
             <flux:badge :color="$isPro ? 'green' : 'zinc'">{{ $isPro ? 'Pro' : 'Free' }}</flux:badge>
 
             @if ($isComped)
-                <flux:text class="text-zinc-500">Pro on us — nothing to pay</flux:text>
+                <flux:text class="text-zinc-500">Pro is on us, so there is nothing to pay</flux:text>
             @elseif ($isOnTrial)
                 <flux:text class="text-zinc-500">Trial ends {{ $periodEndsAt }}</flux:text>
             @elseif ($isCancelling)
-                <flux:text class="text-zinc-500">Cancelled — Pro until {{ $periodEndsAt }}</flux:text>
+                <flux:text class="text-zinc-500">Cancelled. Pro runs until {{ $periodEndsAt }}</flux:text>
             @elseif ($isPro)
                 <flux:text class="text-zinc-500">{{ $priceLabel }} per month</flux:text>
             @endif

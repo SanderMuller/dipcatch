@@ -42,10 +42,10 @@
                     <section>
                         <h2>{{ __('What we store') }}</h2>
                         <ul class="mt-2">
-                            <li><strong>{{ __('Account') }}</strong> — {{ __('your name, email address, a hashed password, your timezone and default currency, and your notification preferences. Optional: two-factor secrets and browser-push subscriptions you enable yourself.') }}</li>
-                            <li><strong>{{ __('Tracked products') }}</strong> — {{ __('the product links you paste, the titles, images and prices we read from those pages, the price history, and any private notes you add.') }}</li>
-                            <li><strong>{{ __('Alerts') }}</strong> — {{ __('which price drops we told you about, and when.') }}</li>
-                            <li><strong>{{ __('Technical') }}</strong> — {{ __('a session cookie to keep you signed in, and short-lived rate-limit counters keyed on your IP address to protect the shops we read prices from and this service.') }}</li>
+                            <li><strong>{{ __('Account') }}:</strong> {{ __('your name, email address, a hashed password, your timezone and default currency, and your notification preferences. Optional: two-factor secrets and browser-push subscriptions you enable yourself.') }}</li>
+                            <li><strong>{{ __('Tracked products') }}:</strong> {{ __('the product links you paste, the titles, images and prices we read from those pages, the price history, and any private notes you add.') }}</li>
+                            <li><strong>{{ __('Alerts') }}:</strong> {{ __('which price drops we told you about, and when.') }}</li>
+                            <li><strong>{{ __('Technical') }}:</strong> {{ __('a session cookie to keep you signed in, and short-lived rate-limit counters keyed on your IP address to protect the shops we read prices from and this service.') }}</li>
                         </ul>
                     </section>
 
@@ -57,13 +57,13 @@
                     <section>
                         <h2>{{ __('Who else sees it') }}</h2>
                         <ul class="mt-2">
-                            <li><strong>Laravel Cloud</strong> — {{ __('hosts the application and database.') }}</li>
-                            <li><strong>Resend</strong> — {{ __('delivers our email (verification, password reset, the daily digest).') }}</li>
-                            <li><strong>{{ __('Your browser’s push service') }}</strong> — {{ __('only if you turn on browser push; it receives the alert payloads.') }}</li>
-                            <li><strong>Google</strong> — {{ __('shop logos on this site are loaded from Google’s favicon service by your browser, which sees the shop domain and your IP address. No account data is sent.') }}</li>
-                            <li><strong>{{ __('The shops') }}</strong> — {{ __('we fetch product pages from the shops you track. Those requests come from our servers, not from you, and carry nothing about you.') }}</li>
+                            <li><strong>Laravel Cloud:</strong> {{ __('hosts the application and database.') }}</li>
+                            <li><strong>Resend:</strong> {{ __('delivers our email (verification, password reset, the daily digest).') }}</li>
+                            <li><strong>{{ __('Your browser’s push service') }}:</strong> {{ __('only if you turn on browser push; it receives the alert payloads.') }}</li>
+                            <li><strong>Google:</strong> {{ __('shop logos on this site are loaded from Google’s favicon service by your browser, which sees the shop domain and your IP address. No account data is sent.') }}</li>
+                            <li><strong>{{ __('The shops') }}:</strong> {{ __('we fetch product pages from the shops you track. Those requests come from our servers, not from you, and carry nothing about you.') }}</li>
                         </ul>
-                        <p class="mt-2">{{ __('If you share a product page, anyone with that link can see the product, its prices and the shops — nothing about your account.') }}</p>
+                        <p class="mt-2">{{ __('If you share a product page, anyone with that link can see the product, its prices and the shops. It says nothing about your account.') }}</p>
                         <p class="mt-2">{{ __('Product images on a shared page are loaded straight from the shop’s own servers by the viewer’s browser, so that shop sees the viewer’s IP address. We do not copy or store the images.') }}</p>
                     </section>
 

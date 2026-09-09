@@ -6,6 +6,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LlmsTxtController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\PushSubscriptionController;
+use App\Http\Controllers\ShopPageController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\UseCasePageController;
 use App\Http\Middleware\MarketingLocale;
@@ -17,6 +18,7 @@ use App\Livewire\Products\CreateProductManual;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\Settings\NotificationPreferences;
+use App\Support\ShopPages;
 use App\Support\UseCases;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -54,6 +56,17 @@ Route::view('pricing', 'pricing')->middleware(MarketingLocale::class)->name('pri
 // One landing page per repeat-purchase category. The slug is constrained to
 // the configured set so an unknown one 404s in the router, and the page never
 // renders empty.
+// One page per supported shop, plus the hub. Both carry the same locale
+// middleware as the other marketing pages, so `?lang=nl` works everywhere.
+Route::get('shops', [ShopPageController::class, 'index'])
+    ->middleware(MarketingLocale::class)
+    ->name('shops');
+
+Route::get('shops/{slug}', [ShopPageController::class, 'show'])
+    ->where('slug', ShopPages::slugPattern())
+    ->middleware(MarketingLocale::class)
+    ->name('shop');
+
 Route::get('price-alerts/{slug}', UseCasePageController::class)
     ->where('slug', UseCases::slugPattern())
     ->middleware(MarketingLocale::class)
@@ -93,6 +106,11 @@ Route::get('p/{slug}', PublicProductController::class)
     ->where('slug', '[A-Za-z0-9]{32}')
     ->middleware(ThrottleRequestsWithRedis::using('public-product'))
     ->name('product.public');
+
+// Public on purpose: the marketing pages point Pro here, and the controller
+// decides between registration, checkout and the billing page. Guarding it
+// with `auth` would only redirect a stranger to login and lose the intent.
+Route::get('upgrade', [BillingController::class, 'upgrade'])->name('upgrade');
 
 Route::middleware(['auth', EnsureEmailIsVerified::class])->group(function (): void {
 

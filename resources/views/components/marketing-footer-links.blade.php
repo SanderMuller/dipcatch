@@ -2,6 +2,7 @@
 
 @php
     $useCases = \App\Support\UseCases::all();
+    $shops = \App\Support\ShopPages::all();
 @endphp
 
 {{-- Replaces three drifted per-page footers, so a new landing page is linked
@@ -16,7 +17,16 @@
         </nav>
     @endif
 
-    <div @class(['flex flex-col items-center justify-between gap-3 text-sm text-zinc-500 sm:flex-row dark:text-zinc-400', 'mt-6' => $useCases !== []])>
+    @if ($shops !== [])
+        <nav @class(['flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400', 'mt-4' => $useCases !== []]) aria-label="{{ __('Price alerts by shop') }}">
+            <a href="{{ route('shops', $langQuery) }}" class="font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100">{{ __('Supported shops') }}</a>
+            @foreach ($shops as $shop)
+                <a href="{{ route('shop', [...$langQuery, 'slug' => $shop->slug]) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ $shop->name }}</a>
+            @endforeach
+        </nav>
+    @endif
+
+    <div @class(['flex flex-col items-center justify-between gap-3 text-sm text-zinc-500 sm:flex-row dark:text-zinc-400', 'mt-6' => $useCases !== [] || $shops !== []])>
         <p>&copy; {{ date('Y') }} {{ config('app.name') }}</p>
         <nav class="flex items-center gap-5" aria-label="{{ __('Footer') }}">
             @if ($home)

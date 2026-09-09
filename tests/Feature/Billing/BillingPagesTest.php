@@ -221,7 +221,7 @@ test('a comped account is not told it is being billed', function (): void {
 
     $content = (string) $this->get('/app/billing')->assertOk()->getContent();
 
-    expect($content)->toContain('Pro on us')
+    expect($content)->toContain('Pro is on us')
         ->and($content)->not->toContain('per month');
 });
 

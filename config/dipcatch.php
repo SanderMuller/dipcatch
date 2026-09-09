@@ -26,6 +26,22 @@ return [
         'password' => env('ADMIN_PASSWORD'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Demo accounts
+    |--------------------------------------------------------------------------
+    |
+    | Read by FreeAccountSeeder, which never runs in production. The address
+    | is an environment value rather than a literal so a developer can seed an
+    | account they can receive mail for.
+    |
+    */
+
+    'demo' => [
+        'free_email' => env('DEMO_FREE_EMAIL', 'free@dipcatch.test'),
+        'password' => env('DEMO_PASSWORD', 'password'),
+    ],
+
     'scheduler' => [
         'batch_size' => (int) env('DIPCATCH_SCHEDULER_BATCH_SIZE', 200),
         'jitter_seconds' => (int) env('DIPCATCH_SCHEDULER_JITTER_SECONDS', 300),
@@ -56,7 +72,7 @@ return [
     ],
 
     'recheck' => [
-        'interval_hours' => (int) env('DIPCATCH_RECHECK_INTERVAL_HOURS', 6),
+        'interval_hours' => (int) env('DIPCATCH_RECHECK_INTERVAL_HOURS', 24),
         // Spread each batch of rechecks over this window. Capped at the SQS
         // `DelaySeconds` ceiling of 900s (15 min) by App\Support\RecheckJitter,
         // so a larger value here has no effect.

@@ -75,7 +75,7 @@
                         This product is at its shop limit
                     </p>
                     <p class="mt-1 text-gray-500 dark:text-gray-400">
-                        Your plan compares up to {{ $shopLimit }} {{ Str::plural('shop', $shopLimit ?? 0) }} per product, and this one has {{ $shopCount }}. All of them keep being checked — only adding another is blocked.
+                        Your plan compares up to {{ $shopLimit }} {{ Str::plural('shop', $shopLimit ?? 0) }} per product, and this one has {{ $shopCount }}. All of them keep being checked. Only adding another one is blocked.
                     </p>
                 </div>
             </div>

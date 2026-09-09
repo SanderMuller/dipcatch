@@ -65,6 +65,8 @@ test('lang/nl.json carries no key the marketing views no longer use', function (
         resource_path('views/components/marketing-header.blade.php'),
         resource_path('views/components/marketing-footer-links.blade.php'),
         resource_path('views/use-case.blade.php'),
+        resource_path('views/shop.blade.php'),
+        resource_path('views/shops.blade.php'),
         resource_path('views/components/marketing-header/language.blade.php'),
         // Auth views are not locale-switchable yet (no MarketingLocale
         // middleware on the Fortify routes), but their strings go through
@@ -92,6 +94,9 @@ test('lang/nl.json carries no key the marketing views no longer use', function (
         // Same reason: the use-case pages' copy is written out per slug in PHP
         // so each page reads as its own text rather than a filled template.
         app_path('Support/UseCases.php'),
+        // Same again for the per-shop pages: their copy is assembled in PHP
+        // from what each adapter can actually read.
+        app_path('Support/ShopPages.php'),
     ];
 
     $sources = array_map(static fn (string $file): string => (string) file_get_contents($file), $files);
