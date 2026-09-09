@@ -44,6 +44,21 @@ composer setup    # install deps, copy env, key:generate, migrate, build assets
 composer dev      # octane (FrankenPHP, --watch) + queue + pail + vite (concurrent)
 ```
 
+### Tests
+
+The suite runs on Postgres only — the engine production runs — and in parallel:
+
+```bash
+createdb dipcatch_test   # once; psql -c 'CREATE DATABASE dipcatch_test'
+composer test            # pest --parallel
+composer test-serial     # same suite, one process, for debugging
+```
+
+`phpunit.xml.dist` points at `127.0.0.1:5432` as `postgres`/`postgres`; override with the usual
+`DB_*` variables in the environment when your local server differs. Each parallel worker gets its
+own database and its own Redis prefix. Do not start a serial run the moment a parallel one ends —
+the worker databases are still being torn down.
+
 The dev server runs Laravel Octane on FrankenPHP — the same runtime as production — with `--watch` so code changes reload the workers (FrankenPHP watches natively; no Node watcher needed). The FrankenPHP binary downloads on first `php artisan octane:start` and is gitignored.
 
 ## Deployment (Laravel Cloud)

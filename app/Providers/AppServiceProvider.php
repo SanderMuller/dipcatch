@@ -16,6 +16,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\ParallelTesting;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -62,9 +63,37 @@ final class AppServiceProvider extends ServiceProvider
         $this->registerHealthChecks();
         $this->configureBilling();
 
+        $this->isolateParallelTestProcesses();
+
         Gate::define('viewQueueInsights', static fn (): bool => app()->isLocal());
 
         Gate::define('retryFailedJobs', static fn (): bool => app()->isLocal());
+    }
+
+    /**
+     * Give each parallel test worker its own Redis keyspace.
+     *
+     * The database is already per worker (Laravel appends the token), but
+     * Redis is one shared server, and the throttle middleware drives it
+     * directly. Two workers hitting the same limiter key make one of them
+     * fail with 429 for a reason that has nothing to do with its own test.
+     *
+     * Applied per test case, not per process: a worker builds a fresh
+     * application for each test, which reloads config from the files and
+     * from an environment repository that is already fixed. Both a
+     * `setUpProcess` `config()` call and an environment write are gone by
+     * the time the test runs — `tests/Feature/ParallelIsolationTest.php`
+     * asserts the prefix that actually reaches a booted worker.
+     */
+    protected function isolateParallelTestProcesses(): void
+    {
+        if (! $this->app->runningUnitTests()) {
+            return;
+        }
+
+        ParallelTesting::setUpTestCase(static function (int $token): void {
+            config(['database.redis.options.prefix' => "dipcatch-test-{$token}-"]);
+        });
     }
 
     protected function configureBilling(): void

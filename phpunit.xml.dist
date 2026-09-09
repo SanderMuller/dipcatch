@@ -23,9 +23,19 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+        <!-- Postgres is the production engine, and the only one the suite
+             runs on: a char(3) overflow and a strict-grouping error are
+             invisible on SQLite and fatal in production. Each variable still
+             yields to one already set in the environment. -->
+        <env name="DB_CONNECTION" value="pgsql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="5432"/>
+        <env name="DB_DATABASE" value="dipcatch_test"/>
+        <env name="DB_USERNAME" value="postgres"/>
+        <env name="DB_PASSWORD" value="postgres"/>
         <env name="DB_URL" value=""/>
+        <env name="HEALTH_DB_CONNECTION" value="pgsql"/>
+        <env name="WEBPUSH_DB_CONNECTION" value="pgsql"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

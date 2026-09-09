@@ -117,7 +117,8 @@
             "Composer\\Config::disableProcessTimeout",
             "@test"
         ],
-        "test": "vendor/bin/pest",
+        "test": "vendor/bin/pest --parallel",
+        "test-serial": "vendor/bin/pest",
         "fix-cs": "vendor/bin/pint --parallel",
         "format": "vendor/bin/pint",
         "phpstan": "vendor/bin/phpstan analyse --memory-limit=2G",
