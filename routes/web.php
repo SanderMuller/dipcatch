@@ -10,6 +10,7 @@ use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\UseCasePageController;
 use App\Http\Middleware\MarketingLocale;
 use App\Livewire\Products\ProductList;
+use App\Livewire\Products\ProductShow;
 use App\Support\UseCases;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -128,7 +129,7 @@ Route::prefix('next')
         Route::livewire('products', ProductList::class)->name('products.index');
         Route::view('products/create', 'next.placeholder')->name('products.create');
         Route::view('products/create-manual', 'next.placeholder')->name('products.create-manual');
-        Route::view('products/{product}', 'next.placeholder')->name('products.show');
+        Route::livewire('products/{product}', ProductShow::class)->name('products.show');
         Route::view('products/{product}/edit', 'next.placeholder')->name('products.edit');
         Route::view('billing', 'next.placeholder')->name('billing');
         Route::view('notifications', 'next.placeholder')->name('notifications');
