@@ -104,3 +104,20 @@ select:focus[data-flux-control] {
     border-color: --alpha(var(--color-amber-900) / 50%);
     color: var(--color-amber-200);
 }
+
+/*
+| The primary palette the Filament-era views still name
+|--------------------------------------------------------------------------
+|
+| Six views that moved to the Flux app with the cutover style their buttons
+| with `bg-primary-600` and friends. Filament defined that palette; this
+| build did not, so those classes compiled to nothing and left white text on
+| a white card — an "Add a shop" button nobody could see.
+|
+| Amber, so they match the accents the rest of the app uses.
+*/
+@theme {
+    --color-primary-400: var(--color-amber-400);
+    --color-primary-500: var(--color-amber-500);
+    --color-primary-600: var(--color-amber-600);
+}
