@@ -6,6 +6,7 @@ use App\Billing\BillingGate;
 use App\Billing\CheckoutSessions;
 use App\Billing\Plan;
 use App\Billing\ProPrice;
+use App\Billing\StripeTax;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
@@ -118,6 +119,7 @@ class BillingController extends Controller
         $checkout = $subscription->checkout([
             'success_url' => url('/app/billing?checkout=done'),
             'cancel_url' => url('/app/billing?checkout=cancelled'),
+            ...StripeTax::checkoutOptions(),
         ]);
 
         $user->forceFill([

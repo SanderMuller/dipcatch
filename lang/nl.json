@@ -241,5 +241,6 @@
     "Every shop DipCatch has a reader for, and what it can see at each one: the price, the pack size, and the offer window where the shop states it.": "Elke winkel waarvoor DipCatch een lezer heeft, en wat het per winkel kan zien: de prijs, de verpakkingsgrootte en de aanbiedingsperiode waar de winkel die noemt.",
     "Many other webshops publish their product data in a form DipCatch can read as well. These are the ones with a reader written for them, so they are the ones that keep working when a page changes.": "Veel andere webshops publiceren hun productgegevens in een vorm die DipCatch ook kan lezen. Dit zijn de winkels met een eigen lezer, en dus de winkels die blijven werken als een pagina verandert.",
     "Price alerts by shop": "Prijsalarm per winkel",
-    "How to track a product from :shop": "Zo volg je een product van :shop"
+    "How to track a product from :shop": "Zo volg je een product van :shop",
+    "VAT included.": "Inclusief btw."
 }

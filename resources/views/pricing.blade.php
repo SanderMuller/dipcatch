@@ -74,6 +74,7 @@
                     <section class="rounded-2xl bg-white p-6 ring-2 ring-zinc-900 dark:bg-zinc-900 dark:ring-white">
                         <h2 class="text-lg font-semibold">{{ __('Pro') }}</h2>
                         <p class="mt-1 text-3xl font-semibold tracking-tight">{{ $price }}<span class="text-base font-normal text-zinc-500 dark:text-zinc-400"> / {{ __('month') }}</span></p>
+                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ __('VAT included.') }}</p>
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                             @if ($onSale)
                                 {{ $trialDays > 0 ? __(':days days free, cancel any time.', ['days' => $trialDays]) : __('Cancel any time.') }}
