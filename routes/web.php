@@ -9,6 +9,7 @@ use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\UseCasePageController;
 use App\Http\Middleware\MarketingLocale;
+use App\Livewire\Products\ProductList;
 use App\Support\UseCases;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -87,7 +88,6 @@ Route::get('p/{slug}', PublicProductController::class)
     ->name('product.public');
 
 Route::middleware(['auth', EnsureEmailIsVerified::class])->group(function (): void {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
 
     Route::post('push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
     Route::delete('push/subscribe', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
@@ -104,5 +104,35 @@ Route::middleware(ThrottleRequestsWithRedis::using('invitation'))->group(functio
     Route::get('invite/{token}', [InvitationController::class, 'show'])->name('invitation.show');
     Route::post('invite/{token}', [InvitationController::class, 'redeem'])->name('invitation.redeem');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Flux user-facing app  (specs/flux-user-app-migration.md)
+|--------------------------------------------------------------------------
+|
+| Built behind `/next` until the cutover, which repoints this group at `/app`
+| and deletes the Filament app panel. Every route the migration will need is
+| registered here in one place: several phases become ready at the same time
+| and would otherwise edit this file concurrently.
+|
+| Placeholders below are replaced by their real pages phase by phase. The
+| middleware matches the Filament panel's authMiddleware exactly, so the
+| access rules do not change at cutover.
+|
+*/
+Route::prefix('next')
+    ->name('app.')
+    ->middleware(['auth', EnsureEmailIsVerified::class])
+    ->group(function (): void {
+        Route::view('/', 'next.placeholder')->name('dashboard');
+        Route::livewire('products', ProductList::class)->name('products.index');
+        Route::view('products/create', 'next.placeholder')->name('products.create');
+        Route::view('products/create-manual', 'next.placeholder')->name('products.create-manual');
+        Route::view('products/{product}', 'next.placeholder')->name('products.show');
+        Route::view('products/{product}/edit', 'next.placeholder')->name('products.edit');
+        Route::view('billing', 'next.placeholder')->name('billing');
+        Route::view('notifications', 'next.placeholder')->name('notifications');
+        Route::view('connections', 'next.placeholder')->name('connections');
+    });
 
 require __DIR__ . '/settings.php';

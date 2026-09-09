@@ -6,38 +6,55 @@
     <body class="min-h-screen bg-white dark:bg-zinc-800">
         <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:sidebar.header>
-                <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
+                <x-app-logo :sidebar="true" :href="route('app.dashboard')" wire:navigate />
+                {{-- Bell slot, desktop. Phase 2 fills it by creating the partial;
+                     no edit to this file is needed then. --}}
+                @includeWhen(view()->exists('partials.notification-bell'), 'partials.notification-bell')
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
+            {{--
+                Every navigation entry is declared here, in one place, including
+                pages that do not exist yet. Later phases add their own page
+                files and must not edit this layout: three of them become ready
+                at the same time and would otherwise collide in this one file.
+            --}}
             <flux:sidebar.nav>
-                <flux:sidebar.group :heading="__('Platform')" class="grid">
-                    <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
+                <flux:sidebar.group class="grid">
+                    <flux:sidebar.item icon="home" :href="route('app.dashboard')" :current="request()->routeIs('app.dashboard')" wire:navigate>
                         {{ __('Dashboard') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item icon="shopping-bag" :href="route('app.products.index')" :current="request()->routeIs('app.products.*')" wire:navigate>
+                        {{ __('Products') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item icon="credit-card" :href="route('app.billing')" :current="request()->routeIs('app.billing')" wire:navigate>
+                        {{ __('Plan & billing') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item icon="bell" :href="route('app.notifications')" :current="request()->routeIs('app.notifications')" wire:navigate>
+                        {{ __('Notifications') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item icon="puzzle-piece" :href="route('app.connections')" :current="request()->routeIs('app.connections')" wire:navigate>
+                        {{ __('Connections') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
             <flux:spacer />
 
-            <flux:sidebar.nav>
-                <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                    {{ __('Repository') }}
-                </flux:sidebar.item>
-
-                <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
-                    {{ __('Documentation') }}
-                </flux:sidebar.item>
-            </flux:sidebar.nav>
-
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>
 
-        <!-- Mobile User Menu -->
         <flux:header class="lg:hidden">
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
 
             <flux:spacer />
+
+            {{-- Bell slot, mobile. --}}
+            @includeWhen(view()->exists('partials.notification-bell'), 'partials.notification-bell')
 
             <flux:dropdown position="top" align="end">
                 <flux:profile
@@ -68,6 +85,13 @@
                         <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
                             {{ __('Settings') }}
                         </flux:menu.item>
+
+                        {{-- Only an admin can open /admin at all (User::canAccessPanel), so this is a shortcut for people who already hold the key, never the thing that grants it. --}}
+                        @if (auth()->user()->is_admin)
+                            <flux:menu.item href="/admin" icon="wrench-screwdriver">
+                                {{ __('Admin panel') }}
+                            </flux:menu.item>
+                        @endif
                     </flux:menu.radio.group>
 
                     <flux:menu.separator />
@@ -95,6 +119,14 @@
                 <flux:toast />
             </flux:toast.group>
         @endpersist
+
+        {{--
+            Timezone auto-detection runs on every authenticated page, not only
+            settings. It fired panel-wide under Filament; a user who never opens
+            settings would otherwise keep a wrong digest hour. The view
+            short-circuits when timezone_detected_at is already set.
+        --}}
+        @include('filament.app.timezone-autodetect')
 
         @fluxScripts
     </body>

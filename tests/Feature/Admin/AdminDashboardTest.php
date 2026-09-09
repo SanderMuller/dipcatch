@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Widgets\StatsOverviewWidget\Stat;
 
 use function Pest\Livewire\livewire;
 
@@ -104,13 +105,19 @@ it('separates the 24-hour alert count from the 7-day one', function (): void {
 
     // Asserting the labels alone would pass with the date filters removed,
     // so assert the two counts, and pick ages that tell the windows apart.
-    livewire(OperationsOverviewWidget::class)
-        ->assertSee('Drops alerted (24h)')
-        ->assertSee('2 in the last 7 days')
-        // The value sits in its own wrapper, so this pins the 24h count to 1
-        // rather than matching a stray digit elsewhere on the dashboard.
-        ->assertSeeHtml('fi-wi-stats-overview-stat-value">
-            1');
+    // Read the stat itself rather than matching rendered HTML: an earlier
+    // version of this test asserted on markup indentation and broke when the
+    // template's whitespace shifted, which proved nothing either way.
+    $widget = new OperationsOverviewWidget();
+    $stats = (new ReflectionMethod(OperationsOverviewWidget::class, 'getStats'))->invoke($widget);
+
+    $alerts = collect($stats)->first(
+        fn (Stat $stat): bool => $stat->getLabel() === 'Drops alerted (24h)',
+    );
+
+    expect($alerts)->not->toBeNull()
+        ->and((string) $alerts->getValue())->toBe('1')
+        ->and((string) $alerts->getDescription())->toBe('2 in the last 7 days');
 });
 
 it('leaves a paused product out of the operational numbers', function (): void {

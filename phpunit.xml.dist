@@ -44,5 +44,17 @@
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="DIPCATCH_FETCHER_ALLOW_UNRESOLVED" value="true"/>
         <env name="DIPCATCH_FETCHER_ALLOW_PRIVATE_IPS" value="true"/>
+        <!--
+            Billing is shut for the suite regardless of the developer's .env.
+            Configuring real Stripe test keys locally otherwise flips
+            BillingGate open and fails every test that asserts the shop is
+            shut — the suite must not depend on a machine's configuration.
+            A test that needs the gate open opens it itself (configureStripe()).
+        -->
+        <env name="STRIPE_KEY" value=""/>
+        <env name="STRIPE_SECRET" value=""/>
+        <env name="STRIPE_WEBHOOK_SECRET" value=""/>
+        <env name="STRIPE_PRICE_PRO_MONTHLY" value=""/>
+        <env name="BILLING_ENABLED" value="false"/>
     </php>
 </phpunit>

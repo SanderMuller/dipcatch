@@ -22,6 +22,12 @@
             <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
                 {{ __('Settings') }}
             </flux:menu.item>
+            {{-- A shortcut for people who already hold the key: User::canAccessPanel does the gating. --}}
+            @if (auth()->user()->is_admin)
+                <flux:menu.item href="/admin" icon="wrench-screwdriver">
+                    {{ __('Admin panel') }}
+                </flux:menu.item>
+            @endif
             <form method="POST" action="{{ route('logout') }}" class="w-full">
                 @csrf
                 <flux:menu.item
