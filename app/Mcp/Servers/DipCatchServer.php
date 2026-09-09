@@ -18,7 +18,7 @@ use Laravel\Mcp\Server\Attributes\Version;
 use Laravel\Mcp\Server\Tool;
 
 #[Name('DipCatch')]
-#[Version('1.0.0')]
+#[Version('1.1.0')]
 #[Instructions(<<<'TEXT'
 DipCatch tracks the price of things this user buys more than once, across Dutch
 supermarkets and webshops, and tells them when one drops.
