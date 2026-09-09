@@ -41,9 +41,13 @@ class RecheckTool extends Tool
 
         $shopId = is_string($validated['shop_id'] ?? null) ? $validated['shop_id'] : null;
 
-        $shops = $product->shops()
-            ->when($shopId !== null, fn ($query) => $query->whereKey($shopId))
-            ->get();
+        $shopsQuery = $product->shops();
+
+        if ($shopId !== null) {
+            $shopsQuery->whereKey($shopId);
+        }
+
+        $shops = $shopsQuery->get();
 
         if ($shops->isEmpty()) {
             return Response::error($shopId === null

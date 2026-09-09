@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Database\Factories\ProductCheapestHistoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
@@ -10,6 +11,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * One segment of a product's cheapest-offer history.
+ *
+ * @property int $id
+ * @property string $product_id
+ * @property string|null $cheapest_shop_id
+ * @property string|null $cheapest_price
+ * @property CarbonImmutable $started_at
+ * @property CarbonImmutable|null $ended_at
+ * @property int|null $triggering_price_check_id
+ * @property-read Product $product
+ */
 #[WithoutTimestamps]
 class ProductCheapestHistory extends Model
 {
