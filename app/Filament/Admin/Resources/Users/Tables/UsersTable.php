@@ -2,11 +2,15 @@
 
 namespace App\Filament\Admin\Resources\Users\Tables;
 
+use App\Actions\Users\DeleteUser;
 use App\Billing\Plan;
 use App\Billing\ProUsers;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
@@ -16,7 +20,9 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class UsersTable
 {
@@ -111,6 +117,32 @@ class UsersTable
                     ->modalDescription('The account drops to Free immediately. History already kept stays kept.')
                     ->visible(fn (User $record): bool => self::actorIsAdmin() && $record->isComped())
                     ->action(self::endComp(...)),
+
+                DeleteAction::make()
+                    ->modalDescription('The account, its products, its price history and its notifications go. A live subscription is cancelled in Stripe first. Payment and dispute records stay, without the account.')
+                    // Deleting yourself ends your own session halfway through
+                    // the request, so the action is not offered on your row.
+                    ->visible(fn (User $record): bool => self::actorIsAdmin() && ! $record->is(auth()->user()))
+                    // False picks Filament's failure notification. Without the
+                    // catch a Stripe error escapes into Livewire instead.
+                    ->using(function (User $record): bool {
+                        try {
+                            app(DeleteUser::class)($record);
+                        } catch (Throwable $exception) {
+                            report($exception);
+
+                            return false;
+                        }
+
+                        return true;
+                    }),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
+                        ->visible(self::actorIsAdmin(...))
+                        ->using(self::deleteMany(...)),
+                ]),
             ])
             ->defaultSort('created_at', 'desc');
     }
@@ -155,6 +187,33 @@ class UsersTable
         ])->save();
 
         self::log('granted', $record, $reason);
+    }
+
+    /**
+     * @param  Collection<int, User>  $records
+     */
+    private static function deleteMany(DeleteBulkAction $action, Collection $records): void
+    {
+        foreach ($records as $record) {
+            // Same reason as the single action: an admin does not delete the
+            // account they are signed in with. Reported as a failure so the
+            // count Filament shows matches what was actually deleted.
+            if ($record->is(auth()->user())) {
+                $action->reportBulkProcessingFailure();
+
+                continue;
+            }
+
+            try {
+                app(DeleteUser::class)($record);
+            } catch (Throwable $exception) {
+                // One account that Stripe refuses to cancel must not stop the
+                // rest of the selection.
+                $action->reportBulkProcessingFailure();
+
+                report($exception);
+            }
+        }
     }
 
     public static function endComp(User $record): void
