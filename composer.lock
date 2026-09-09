@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "368ab169aaa57e33ff5620c0ff74b0d0",
+    "content-hash": "e557bc7855e8f5ef74da149ed628eaee",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -3150,16 +3150,16 @@
         },
         {
             "name": "laravel/mcp",
-            "version": "v0.9.4",
+            "version": "v0.9.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/mcp.git",
-                "reference": "7ca5b923630118696602d14348cd0466a5e853ec"
+                "reference": "923d8d8cd9ed46766d1a8b5269f8b4afc4c91c53"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/mcp/zipball/7ca5b923630118696602d14348cd0466a5e853ec",
-                "reference": "7ca5b923630118696602d14348cd0466a5e853ec",
+                "url": "https://api.github.com/repos/laravel/mcp/zipball/923d8d8cd9ed46766d1a8b5269f8b4afc4c91c53",
+                "reference": "923d8d8cd9ed46766d1a8b5269f8b4afc4c91c53",
                 "shasum": ""
             },
             "require": {
@@ -3220,7 +3220,7 @@
                 "issues": "https://github.com/laravel/mcp/issues",
                 "source": "https://github.com/laravel/mcp"
             },
-            "time": "2026-08-13T15:01:07+00:00"
+            "time": "2026-09-09T12:56:57+00:00"
         },
         {
             "name": "laravel/octane",
@@ -7341,16 +7341,16 @@
         },
         {
             "name": "sandermuller/laravel-queue-insights",
-            "version": "0.33.1",
+            "version": "0.34.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/SanderMuller/laravel-queue-insights.git",
-                "reference": "5637fcc6401ef1ae7f64bf418bc2330f5aa30577"
+                "reference": "9b9e38078e06193f4fcf38196784f4db1eaa4a83"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SanderMuller/laravel-queue-insights/zipball/5637fcc6401ef1ae7f64bf418bc2330f5aa30577",
-                "reference": "5637fcc6401ef1ae7f64bf418bc2330f5aa30577",
+                "url": "https://api.github.com/repos/SanderMuller/laravel-queue-insights/zipball/9b9e38078e06193f4fcf38196784f4db1eaa4a83",
+                "reference": "9b9e38078e06193f4fcf38196784f4db1eaa4a83",
                 "shasum": ""
             },
             "require": {
@@ -7443,9 +7443,9 @@
             ],
             "support": {
                 "issues": "https://github.com/SanderMuller/laravel-queue-insights/issues",
-                "source": "https://github.com/SanderMuller/laravel-queue-insights/tree/0.33.1"
+                "source": "https://github.com/SanderMuller/laravel-queue-insights/tree/0.34.0"
             },
-            "time": "2026-09-09T12:43:14+00:00"
+            "time": "2026-09-09T16:46:14+00:00"
         },
         {
             "name": "sandermuller/stopwatch",
@@ -14421,16 +14421,16 @@
         },
         {
             "name": "laravel/pint",
-            "version": "v1.31.1",
+            "version": "v1.32.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/pint.git",
-                "reference": "b136cebaf0b3f7d288bdafad5088858d082580aa"
+                "reference": "dea4e95f0f1722b8fec9eaabc8fdd676d71e8841"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/pint/zipball/b136cebaf0b3f7d288bdafad5088858d082580aa",
-                "reference": "b136cebaf0b3f7d288bdafad5088858d082580aa",
+                "url": "https://api.github.com/repos/laravel/pint/zipball/dea4e95f0f1722b8fec9eaabc8fdd676d71e8841",
+                "reference": "dea4e95f0f1722b8fec9eaabc8fdd676d71e8841",
                 "shasum": ""
             },
             "require": {
@@ -14487,7 +14487,7 @@
                 "issues": "https://github.com/laravel/pint/issues",
                 "source": "https://github.com/laravel/pint"
             },
-            "time": "2026-09-08T17:10:00+00:00"
+            "time": "2026-09-09T16:26:47+00:00"
         },
         {
             "name": "laravel/tinker",

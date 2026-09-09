@@ -125,7 +125,7 @@ return [
          | see inside `data.command`. Apps with sensitive jobs MUST bind a
          | custom PayloadSanitizer. See SECURITY.md.
          */
-        'payloads' => env('QUEUE_INSIGHTS_CAPTURE_PAYLOADS', 'full'),
+        'payloads' => env('QUEUE_INSIGHTS_CAPTURE_PAYLOADS', CaptureMode::Metadata->value),
         'redact_keys' => ['password', 'token', 'secret', 'api_?key', 'authorization'],
         'max_field_bytes' => 2048,
         'max_payload_bytes' => 16384,
@@ -147,9 +147,9 @@ return [
          | running into Redis memory pressure should tighten these
          | explicitly rather than expect a silent default change.
          */
-        'completed_stream_max' => 10000,
-        'per_class_stream_max' => 1000,
-        'per_connection_stream_max' => 5000,
+        'completed_stream_max' => 1500,
+        'per_class_stream_max' => 200,
+        'per_connection_stream_max' => 1000,
 
         /*
          | Per-class duration sample list cap. Drives slow_p95 detector
@@ -159,7 +159,7 @@ return [
          | p95 fidelity. Lower the cap (e.g. 200) to trim per-class Redis
          | memory by ~60 % at a small loss in percentile stability.
          */
-        'duration_samples_cap' => 500,
+        'duration_samples_cap' => 175,
     ],
 
     'schedule' => [
@@ -389,7 +389,7 @@ return [
      */
     'pending' => [
         'enabled' => env('QUEUE_INSIGHTS_PENDING_ENABLED', true),
-        'max_per_queue' => 10000,
+        'max_per_queue' => 700,
         'ttl_seconds' => 86400,
         // Tracked-vs-snapshot count drift threshold beyond which the
         // dashboard surfaces a "tracking gap" badge so operators know to
@@ -433,7 +433,7 @@ return [
          | classes don't carry secrets as properties.
          */
         'capture' => [
-            'payloads' => env('QUEUE_INSIGHTS_PENDING_CAPTURE_PAYLOADS', CaptureMode::Full->value),
+            'payloads' => env('QUEUE_INSIGHTS_PENDING_CAPTURE_PAYLOADS', CaptureMode::Metadata->value),
             'max_payload_bytes' => 4096,
             'include_command_body' => env('QUEUE_INSIGHTS_PENDING_INCLUDE_COMMAND_BODY', true),
         ],
@@ -493,7 +493,7 @@ return [
      */
     'batches' => [
         'enabled' => env('QUEUE_INSIGHTS_BATCHES_ENABLED', true),
-        'max_uuids_per_batch' => 5000,
+        'max_uuids_per_batch' => 700,
         'max_per_query' => 100,
         'ttl_seconds' => 604800,
     ],
@@ -531,19 +531,19 @@ return [
          |              byte-cap.
          */
         'capture' => [
-            'output' => env('QUEUE_INSIGHTS_SCHEDULER_CAPTURE', 'full'),
-            'max_output_bytes' => 8192,
+            'output' => env('QUEUE_INSIGHTS_SCHEDULER_CAPTURE', CaptureMode::Metadata->value),
+            'max_output_bytes' => 2048,
         ],
 
         'retention' => [
             'run_ttl_seconds' => 604800,
-            'runs_index_max' => 10000,
+            'runs_index_max' => 1000,
             'aggregate_ttl_hours' => 192,
             // Cap the per-run jobs zset (`qi:sched:run-jobs:{runId}`) so
             // a fan-out scheduled task that dispatches a very large
             // number of jobs can't grow the index unbounded. Oldest by
             // score evicted first.
-            'run_jobs_max' => 5000,
+            'run_jobs_max' => 750,
         ],
 
         /*
