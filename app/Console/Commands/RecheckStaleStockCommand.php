@@ -10,7 +10,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 
-#[Signature('dipcatch:recheck-stock {--before= : Only rows last checked before this time, e.g. "2026-09-09 12:00"} {--limit=500} {--dry-run}')]
+#[Signature('dipcatch:recheck-stock {--before= : Only rows last checked before this time. Quote a value with a space: --before="2026-09-09 15:00". Relative values work too: --before="-2 hours"} {--limit=500} {--dry-run}')]
 #[Description('Recheck shops whose stored stock predates a fix, so a corrected reading does not wait for the schedule.')]
 class RecheckStaleStockCommand extends Command
 {
@@ -20,6 +20,7 @@ class RecheckStaleStockCommand extends Command
 
         if (! is_string($before) || $before === '') {
             $this->error('Give --before, so the run is scoped to rows written before a known fix.');
+            $this->line('Quote a value with a space in it: --before="2026-09-09 15:00"');
 
             return self::FAILURE;
         }
