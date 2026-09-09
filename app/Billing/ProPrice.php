@@ -30,7 +30,7 @@ final class ProPrice
     {
         $amount = config('plans.stripe.pro_amount');
 
-        return is_numeric($amount) ? (string) $amount : '4.99';
+        return is_numeric($amount) ? (string) $amount : '2.99';
     }
 
     public static function label(): string

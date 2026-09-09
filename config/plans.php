@@ -80,7 +80,7 @@ return [
 
     'stripe' => [
         'pro_price_id' => env('STRIPE_PRICE_PRO_MONTHLY'),
-        'pro_amount' => env('PLAN_PRO_DISPLAY_AMOUNT', '4.99'),
+        'pro_amount' => env('PLAN_PRO_DISPLAY_AMOUNT', '2.99'),
         'pro_currency' => env('PLAN_PRO_DISPLAY_CURRENCY', 'EUR'),
         'trial_days' => (int) env('PLAN_PRO_TRIAL_DAYS', 14),
     ],

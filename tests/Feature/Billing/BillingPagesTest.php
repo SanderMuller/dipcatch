@@ -147,6 +147,10 @@ it('keeps a failed payment out of MRR and reports trial conversion', function ()
     $this->actingAs($admin);
     Filament::setCurrentPanel('admin');
 
+    // Pinned rather than left to the configured default: this asserts the
+    // arithmetic, and a price change must not read as a failing test.
+    config()->set('plans.stripe.pro_amount', '4.99');
+
     livewire(RevenueOverviewWidget::class)
         // Three subscriptions are past their trial and not cancelled, but
         // the past-due one pays nothing: 3 x EUR 4.99, not 4.
