@@ -142,33 +142,102 @@ final readonly class ProbeShopUrl
         $snapshot = $extraction->snapshot;
         assert($snapshot !== null);
 
-        // Every currency column is char(3). A page quoting "Euro" states no
-        // code that can be stored, so it is refused here rather than at the
-        // insert, where Postgres would reject the whole write.
+        $checked = $this->withStorableCurrency($snapshot, $product);
+
+        if ($checked instanceof ProbeOutcome) {
+            return $checked;
+        }
+
+        $snapshot = $checked;
+
+        // The link must point at what the price refers to. A caller that
+        // pastes a product page and pins a variant would otherwise store the
+        // page, and the shopper who clicks it lands on the default pack at a
+        // different price than the one they were quoted.
+        $target = self::variantTarget($normalizedUrl, $variantKey);
+        $duplicate = $target === $normalizedUrl ? null : $this->existingShopFor($product, $target);
+
+        if ($duplicate instanceof ProbeOutcome) {
+            return $duplicate;
+        }
+
+        return ProbeOutcome::success(
+            snapshot: $snapshot,
+            normalizedUrl: $target,
+            host: $fetch->host,
+            adapterKey: $extraction->adapterKey ?? 'generic',
+        );
+    }
+
+    /**
+     * The snapshot with a storable currency code, or the outcome that says
+     * why it has none.
+     *
+     * Every currency column is `char(3)`. A page quoting `"Euro"` states no
+     * code that can be stored, so it is refused here rather than at the
+     * insert, where Postgres rejects the whole write. A page quoting
+     * `" EUR "` states a code, padded — carried on unnormalized it reads as
+     * a different currency from the product's own.
+     */
+    private function withStorableCurrency(ShopSnapshot $snapshot, ?Product $product): ShopSnapshot|ProbeOutcome
+    {
         $currency = Iso4217::normalize($snapshot->currency);
 
         if ($currency === null) {
             return ProbeOutcome::extractionFailed('currency_not_a_code');
         }
 
-        // Carry the normalized code onward: a page publishing `" EUR "`
-        // otherwise reads as a different currency from the product's `EUR`,
-        // and reaches the char(3) columns padded.
         $snapshot = $snapshot->with(currency: $currency);
 
-        if ($product instanceof Product && strcasecmp($snapshot->currency, $product->currency) !== 0) {
+        if ($product instanceof Product && strcasecmp($currency, $product->currency) !== 0) {
             return ProbeOutcome::failed(ProbeFailure::CurrencyMismatch, [
                 'expected' => $product->currency,
-                'actual' => $snapshot->currency,
+                'actual' => $currency,
             ]);
         }
 
-        return ProbeOutcome::success(
-            snapshot: $snapshot,
-            normalizedUrl: $normalizedUrl,
-            host: $fetch->host,
-            adapterKey: $extraction->adapterKey ?? 'generic',
-        );
+        return $snapshot;
+    }
+
+    /**
+     * A duplicate outcome when this product already tracks the resolved
+     * target. Duplicates are decided on that target, not on the pasted
+     * string: two people pasting the same page and choosing different
+     * variants added two different things.
+     */
+    private function existingShopFor(?Product $product, string $target): ?ProbeOutcome
+    {
+        if (! $product instanceof Product) {
+            return null;
+        }
+
+        $existing = $product->shops()->where('url_hash', UrlNormalizer::hash($target))->first();
+
+        return $existing instanceof Shop ? ProbeOutcome::duplicate($existing) : null;
+    }
+
+    /**
+     * The address that names the chosen variant, when the key is one. A key
+     * that is a sku rather than a URL leaves the pasted address alone.
+     */
+    private static function variantTarget(string $normalizedUrl, ?string $variantKey): string
+    {
+        if ($variantKey === null || ! str_starts_with($variantKey, 'http')) {
+            return $normalizedUrl;
+        }
+
+        try {
+            $target = UrlNormalizer::normalize($variantKey);
+        } catch (InvalidArgumentException) {
+            return $normalizedUrl;
+        }
+
+        // Only within the shop we just read: a key naming another host is
+        // not a variant of this page.
+        $sameHost = UrlNormalizer::normalizeHost((string) parse_url($target, PHP_URL_HOST))
+            === UrlNormalizer::normalizeHost((string) parse_url($normalizedUrl, PHP_URL_HOST));
+
+        return $sameHost ? $target : $normalizedUrl;
     }
 
     /**
