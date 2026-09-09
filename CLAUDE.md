@@ -177,6 +177,31 @@ $table->string('description')->after('name');
 $table->string('description');
 ```
 
+### Guard Each Statement On an Engine Without Transactional DDL
+
+A migration runner records a migration only after its whole `up()` returns, and it wraps the run in a transaction only for engines it treats as supporting transactional DDL. Laravel does that for PostgreSQL and SQL Server, and not for MySQL, MariaDB or SQLite. Without that transaction, a run that dies halfway leaves the applied statements in place with nothing recorded, and the retry fails on the first statement it already applied, blocking every later migration. Check which side your engine and runner fall on before assuming a failed migration rolled back.
+
+Make each statement in a multi-statement migration skippable when it is already applied, using the runner's own column and index checks.
+
+```php
+// ❌ WRONG — a retry after a half-applied run dies on "Duplicate column name"
+Schema::table('orders', function (Blueprint $table) {
+    $table->string('reference');
+    $table->index('reference');
+});
+
+// ✅ CORRECT — each statement checks for itself first
+if (! Schema::hasColumn('orders', 'reference')) {
+    Schema::table('orders', fn (Blueprint $table) => $table->string('reference'));
+}
+
+if (! Schema::hasIndex('orders', 'orders_reference_index')) {
+    Schema::table('orders', fn (Blueprint $table) => $table->index('reference'));
+}
+```
+
+Keep slow work out of the migration on a large table: build an index, backfill a column, or add a foreign key as a separate job or an out-of-band task, not inside the deploy step.
+
 ---
 
 ## Fixing PHPStan Errors
@@ -199,6 +224,10 @@ Write a test when the PHPStan error indicates a fault that would surface at runt
 - A return-type mismatch that would break callers
 - Accessing a property or method that does not exist
 - Any type error that would manifest as a runtime exception
+
+### Annotate Rather Than Suppress
+
+Some errors are PHPStan reading a signature that says less than the code does — a return type a parameter decides, a bool helper that proves a type. The `backend-quality` skill carries the two annotations that state the missing fact, and the rules for when each one lies.
 
 ### When to Skip the Test
 
@@ -223,6 +252,29 @@ When signing is enabled, every commit must be signed. If the signing backend or 
 - **Do not** retry with `--no-gpg-sign`, unset `commit.gpgsign`, or otherwise produce an unsigned commit to "get past" the problem.
 
 A missing signature is a blocker to resolve (unlock the agent, re-authenticate 1Password, plug in the key), not a step to skip. Let the user fix the signing setup, then commit signed.
+
+---
+
+## Task Scope and Edits
+
+For session, branch, and PR scope, see the `single-issue-scope` guideline when the project enables it.
+
+### The Task Sets the Scope
+
+- Do not fix a pre-existing bug, a performance problem, or unrelated behaviour you find on the way, unless the requested behaviour cannot work without it. The same holds for refactors, cleanup, and documentation nobody asked for. A defect your own change introduces is not pre-existing: fix it.
+- A sibling rule that requires an update on a line you already change still applies. The rule removes extras, not obligations.
+- Report the rest as a follow-up in your summary. Propose an issue when the project tracks work that way, and let the user decide whether to file it. Report it; do not fix it.
+- Implement every behaviour the task does ask for, completely. This rule cuts extras, never the requested scope.
+
+### One Reading of an Ambiguous Ask
+
+Implement the reading that the wording and the surrounding code support most directly. State that assumption in your summary. Do not build for both readings.
+
+Materially different work is the test. When two readings would produce the same change, pick one and carry on. When they would not, or when a wrong guess is unsafe or makes the work useless, ask before building — through the `clarify` skill where the whole ask is fuzzy, otherwise with a direct question.
+
+### Edit in Place
+
+Change only the lines that must change. Rewrite a whole file only when the file is short, or when most of it changes. A rewrite churns lines the task never touched and can drop content by accident.
 
 ---
 
@@ -255,6 +307,12 @@ Use the project's own commands — check its `composer.json` / `package.json` sc
 ### Delegating the checks
 
 Where the project has dedicated quality-check skills synced, delegate to them — `backend-quality` for backend files, `frontend-quality` for frontend files, both when a change spans both. Otherwise, run the project's own equivalent commands directly.
+
+### A Commit Is a Claim Too
+
+Commit a change once its own checks pass against the tree as it stands, not while the approach is still being tried. A commit reads as a decision. The next defect then gets patched on top of the approach instead of the approach being dropped, and each extra commit raises the cost of the revert that was the right answer.
+
+Deferring is not "never commit". Uncommitted work is unprotected, and a commit is still the safe way to set work aside or to hand it over. A measurement loop inverts the rule on purpose — it commits before it measures, so a rejected experiment reverts in one step. Where a skill states that it commits first, that skill wins for its own flow.
 
 ### Never Use Without Evidence
 

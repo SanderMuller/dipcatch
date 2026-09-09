@@ -164,6 +164,11 @@ return [
 
     'schedule' => [
         'enabled' => true,
+        // Matches the app's own five-minute recheck cadence. The `live:*`
+        // TTL is derived from this expression, so it must stay the single
+        // source of truth — a hand-scheduled snapshot would leave the TTL
+        // on the per-minute default and read as "snapshotter dead".
+        'cron' => env('QUEUE_INSIGHTS_SCHEDULE_CRON', '*/5 * * * *'),
     ],
 
     /*
@@ -559,7 +564,11 @@ return [
          */
         'sweeper' => [
             'enabled' => true,
-            'sweep_seconds' => 60,
+            // In step with `schedule.cron`. The reconciler walks every
+            // expected fire between sweeps, so a slower cadence delays
+            // missed/hung detection but never under-detects.
+            'cron' => env('QUEUE_INSIGHTS_SCHEDULER_SWEEP_CRON', '*/5 * * * *'),
+            'sweep_seconds' => 300,
             'drift_seconds' => 90,
         ],
 
