@@ -34,6 +34,13 @@ final class JsonLdSearchState
     public bool $tied = false;
 
     /**
+     * True once some entity or offer answered to the caller's `variant_key`.
+     * A key that matches nothing must be reported, never quietly replaced by
+     * a URL match on the page itself.
+     */
+    public bool $keyMatched = false;
+
+    /**
      * Every entity that reached the top precision. More than one means the
      * page does not say which of them the request asked for, so they are
      * what the chooser offers.

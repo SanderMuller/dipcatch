@@ -9,6 +9,7 @@ use App\Mcp\Tools\CreateProductTool;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Services\ShopFetcher\HostFetchMemory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -158,4 +159,171 @@ test('an add_shop draft cannot be confirmed onto a different product', function 
         ->assertOk();
 
     expect($probed->shops()->count())->toBe(1);
+});
+
+test('a damaged draft token is not reported as expired', function (): void {
+    $me = User::factory()->create();
+
+    $token = DraftToken::issue(
+        $me,
+        ['title' => 'Coffee', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
+        'https://shop.example.com/p/1',
+        'jsonld',
+        variantKey: null,
+    );
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => substr($token, 0, -4) . 'zzzz', 'confirm' => true])
+        ->assertHasErrors()
+        ->assertSee('could not be read');
+
+    expect($me->products()->count())->toBe(0);
+});
+
+test('an expired draft says so', function (): void {
+    $me = User::factory()->create();
+
+    $token = DraftToken::issue(
+        $me,
+        ['title' => 'Coffee', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
+        'https://shop.example.com/p/1',
+        'jsonld',
+        variantKey: null,
+    );
+
+    $this->travel(16)->minutes();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $token, 'confirm' => true])
+        ->assertHasErrors()
+        ->assertSee('has expired');
+
+    expect($me->products()->count())->toBe(0);
+});
+
+test('a draft prepared for another product is refused as the wrong product', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id]);
+    $other = Product::factory()->create(['user_id' => $me->id]);
+
+    $token = DraftToken::issue(
+        $me,
+        ['title' => 'Coffee', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
+        'https://shop.example.com/p/1',
+        'jsonld',
+        variantKey: null,
+        productId: (string) $other->id,
+    );
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'draft' => $token, 'confirm' => true])
+        ->assertHasErrors()
+        ->assertSee('different product');
+
+    expect($product->shops()->count())->toBe(0);
+});
+
+test('a draft issued to another account is refused as theirs', function (): void {
+    $me = User::factory()->create();
+    $them = User::factory()->create();
+
+    $token = DraftToken::issue(
+        $them,
+        ['title' => 'Coffee', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true],
+        'https://shop.example.com/p/1',
+        'jsonld',
+        variantKey: null,
+    );
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $token, 'confirm' => true])
+        ->assertHasErrors()
+        ->assertSee('another account');
+
+    expect($me->products()->count())->toBe(0);
+});
+
+test('a shop that keeps refusing is not described as worth retrying', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/*' => Http::response('nope', 403),
+    ]);
+
+    $me = User::factory()->create();
+
+    foreach (range(1, HostFetchMemory::PERSISTENT_AFTER) as $i) {
+        RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+
+        DipCatchServer::actingAs($me)
+            ->tool(CreateProductTool::class, ['url' => "https://shop.example.com/p/{$i}"])
+            ->assertHasErrors();
+    }
+
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/again'])
+        ->assertHasErrors()
+        ->assertSee('Retrying will not help');
+});
+
+test('a first refusal still reads as a single block', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response('nope', 403),
+    ]);
+
+    $me = User::factory()->create();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
+        ->assertHasErrors()
+        ->assertSee('That shop blocked the request.');
+});
+
+test('an unreadable stock state is stored as unknown, not as available', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd((string) json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'Product',
+            'name' => 'Sanimed Skin Sensitive Kat',
+            'offers' => [
+                '@type' => 'Offer',
+                'price' => '19.95',
+                'priceCurrency' => 'EUR',
+                'availability' => 'https://schema.org/LimitedAvailability',
+            ],
+        ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $me = User::factory()->create();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
+        ->assertOk()
+        ->assertSee('unknown')
+        ->assertSee('LimitedAvailability');
+});
+
+test('a page whose words say it is unavailable is stored as out of stock', function (): void {
+    $body = withJsonLd((string) json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Kat',
+        'offers' => ['@type' => 'Offer', 'price' => '19.95', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR)) . '<p>Tijdelijk niet leverbaar</p>';
+
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response($body, 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $me = User::factory()->create();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
+        ->assertOk()
+        ->assertSee('out_of_stock')
+        ->assertSee('tijdelijk niet leverbaar');
 });

@@ -24,6 +24,7 @@ final readonly class ProductPresenter
             'shop_count' => $product->shops()->count(),
             'threshold_pct' => self::decimal($product->drop_threshold_pct),
             'threshold_abs' => self::decimal($product->drop_threshold_abs),
+            'unit_price_target' => self::decimal($product->unit_price_target),
         ];
     }
 
@@ -44,6 +45,7 @@ final readonly class ProductPresenter
                 'url' => $shop->url,
                 'price' => self::decimal($shop->current_price),
                 'in_stock' => $shop->current_in_stock,
+                'stock' => self::stock($shop->current_in_stock),
                 'pack_quantity' => $shop->pack_quantity === null ? null : (float) $shop->pack_quantity,
                 'pack_unit' => $shop->pack_unit,
                 'is_cheapest' => $shop->getKey() === $product->cheapest_shop_id,
@@ -52,6 +54,19 @@ final readonly class ProductPresenter
         }
 
         return $rows;
+    }
+
+    /**
+     * `in_stock` is nullable, and a reader that treats null as false would
+     * be as wrong as one that treats it as true. This says which it is.
+     */
+    private static function stock(?bool $inStock): string
+    {
+        return match ($inStock) {
+            true => 'in_stock',
+            false => 'out_of_stock',
+            null => 'unknown',
+        };
     }
 
     /**

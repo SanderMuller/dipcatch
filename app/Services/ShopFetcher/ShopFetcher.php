@@ -67,6 +67,7 @@ final readonly class ShopFetcher
     public function __construct(
         private RobotsTxtPolicy $robots,
         private UrlSafetyGuard $safety,
+        private HostFetchMemory $memory,
     ) {}
 
     public function fetch(string $url): FetchResult
@@ -96,9 +97,20 @@ final readonly class ShopFetcher
 
         $this->throttle($host);
 
-        $response = $this->sendRequest($url);
+        // Remember how this host answers: a caller told "try again shortly"
+        // for the tenth deterministic refusal in a row is being sent back to
+        // do the same thing again.
+        try {
+            $response = $this->sendRequest($url);
 
-        $this->classify($response);
+            $this->classify($response);
+        } catch (Blocked|TemporaryFailure $e) {
+            $this->memory->recordFailure($host, $e);
+
+            throw $e;
+        }
+
+        $this->memory->forget($host);
 
         $html = $this->prepareBody($response);
 

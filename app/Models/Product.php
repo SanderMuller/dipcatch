@@ -9,6 +9,7 @@ use App\Support\ImageUrl;
 use App\Support\Numeric;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProductFactory;
+use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -150,7 +151,9 @@ class Product extends Model
     {
         $candidates = $this->shops
             ->filter(fn (Shop $shop): bool => $shop->active
-                && $shop->current_in_stock
+                // Unknown stock still competes: the price is real, and
+                // dropping it would hide a shop rather than describe it.
+                && $shop->current_in_stock !== false
                 && $shop->health !== ShopHealth::Dead
                 && $shop->currency === $this->currency
                 && $shop->unitPrice() !== null);
@@ -196,7 +199,9 @@ class Product extends Model
             /** @var Shop|null $cheapest */
             $cheapest = $locked->shops()
                 ->where('active', true)
-                ->where('current_in_stock', true)
+                ->where(fn (EloquentBuilder $stock): EloquentBuilder => $stock
+                    ->where('current_in_stock', true)
+                    ->orWhereNull('current_in_stock'))
                 ->where('health', '!=', ShopHealth::Dead->value)
                 ->where('currency', $locked->currency)
                 ->whereNotNull('current_price')

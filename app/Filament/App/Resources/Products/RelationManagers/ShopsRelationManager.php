@@ -132,6 +132,7 @@ class ShopsRelationManager extends RelationManager
                 IconColumn::make('current_in_stock')
                     ->visibleFrom('md')
                     ->label('In stock')
+                    ->placeholder('Unknown')
                     ->boolean(),
 
                 TextColumn::make('health')

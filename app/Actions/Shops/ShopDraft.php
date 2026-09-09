@@ -22,7 +22,8 @@ final readonly class ShopDraft
         public string $adapterKey,
         public string $price,
         public string $currency,
-        public bool $inStock,
+        /** True in stock, false out of stock, null when the page did not say. */
+        public ?bool $inStock,
         public ?string $priceSelector = null,
         public ?string $titleSelector = null,
         public ?string $imageSelector = null,
@@ -54,9 +55,19 @@ final readonly class ShopDraft
             'price' => $snapshot->price,
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
+            'stock_signal' => $snapshot->stockSignal,
             'pack_size' => $snapshot->packSize,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
         ];
+    }
+
+    /**
+     * A preview snapshot states stock as true, false, or null for unknown —
+     * a missing key is unknown too, never "available".
+     */
+    private static function stock(mixed $value): ?bool
+    {
+        return is_bool($value) ? $value : null;
     }
 
     /**
@@ -79,7 +90,7 @@ final readonly class ShopDraft
             adapterKey: $adapterKey,
             price: self::string($snapshot, 'price') ?? '',
             currency: self::string($snapshot, 'currency') ?? '',
-            inStock: (bool) ($snapshot['in_stock'] ?? true),
+            inStock: self::stock($snapshot['in_stock'] ?? null),
             priceSelector: $priceSelector,
             titleSelector: $titleSelector,
             imageSelector: $imageSelector,

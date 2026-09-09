@@ -179,3 +179,86 @@ test('a persisted generic key does not outrank a later-added host adapter', func
         ->and($result->adapterKey)->toBe('dirk')
         ->and($result->snapshot?->packSize)->toBe('150 g');
 });
+
+function unknownStockAdapter(): ShopAdapter
+{
+    return fakeAdapter('jsonld', ExtractionResult::success(new ShopSnapshot(
+        title: 'demo',
+        imageUrl: null,
+        price: '19.95',
+        currency: 'EUR',
+        inStock: null,
+    )));
+}
+
+test('the page\'s own words decide when no adapter could read a stock signal', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $result = $resolver->resolve('https://x.test', '<p>Tijdelijk niet leverbaar</p><span>19,95</span>');
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->inStock)->toBeFalse()
+        ->and($result->snapshot?->stockSignal)->toBe('text: tijdelijk niet leverbaar')
+        ->and($result->adapterKey)->toBe('jsonld');
+});
+
+test('a page saying nothing about stock stays unknown', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $result = $resolver->resolve('https://x.test', '<p>Op voorraad, morgen in huis</p>');
+
+    expect($result->snapshot?->inStock)->toBeNull();
+});
+
+test('a shop that states it is in stock is not overruled by page text', function (): void {
+    $resolver = new AdapterResolver([fakeAdapter('jsonld', ExtractionResult::success(new ShopSnapshot(
+        title: 'demo',
+        imageUrl: null,
+        price: '19.95',
+        currency: 'EUR',
+        inStock: true,
+        stockSignal: 'https://schema.org/InStock',
+    )))]);
+
+    $result = $resolver->resolve('https://x.test', '<aside>Andere klanten: uitverkocht</aside>');
+
+    expect($result->snapshot?->inStock)->toBeTrue()
+        ->and($result->snapshot?->stockSignal)->toBe('https://schema.org/InStock');
+});
+
+test('a phrase inside a script tag is not the page speaking', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $result = $resolver->resolve('https://x.test', '<script>var msg = "uitverkocht";</script><p>19,95</p>');
+
+    expect($result->snapshot?->inStock)->toBeNull();
+});
+
+test('sales copy and page furniture do not turn a product into a sold-out one', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $pages = [
+        '<p>Bijna uitverkocht!</p>',
+        '<label>Toon ook niet leverbare artikelen</label>',
+        '<p>Nog 2 stuks, uitverkochte maten worden bijgevuld</p>',
+    ];
+
+    foreach ($pages as $page) {
+        expect($resolver->resolve('https://x.test', $page)->snapshot?->inStock)->toBeNull();
+    }
+});
+
+test('text about anything but the product leaves stock unknown', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $pages = [
+        '<div>Chat momenteel niet beschikbaar</div>',
+        '<aside><h3>Anderen kochten ook</h3><span>uitverkocht</span></aside>',
+        '<p>Bijna uitverkocht!</p>',
+        '<p>Bijna niet op voorraad</p>',
+    ];
+
+    foreach ($pages as $page) {
+        expect($resolver->resolve('https://x.test', $page)->snapshot?->inStock)->toBeNull();
+    }
+});

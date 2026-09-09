@@ -43,13 +43,15 @@ final readonly class MicrodataAdapter implements ShopAdapter
         $title = $scope->read('name', $crawler) ?? 'Unknown';
         $image = $scope->read('image', $crawler);
         $availability = $scope->read('availability', $crawler);
+        [$inStock, $stockSignal] = StockAvailability::read($availability);
 
         return ExtractionResult::success(new ShopSnapshot(
             title: $title,
             imageUrl: $image,
             price: $price,
             currency: strtoupper($currency),
-            inStock: self::availabilityInStock($availability),
+            inStock: $inStock,
+            stockSignal: $stockSignal,
             gtin: $scope->gtin(),
             gtinAuthoritative: true,
             raw: ['source' => 'microdata'],
@@ -75,20 +77,5 @@ final readonly class MicrodataAdapter implements ShopAdapter
         $text = trim($node->text(''));
 
         return $text === '' ? null : $text;
-    }
-
-    private static function availabilityInStock(?string $availability): bool
-    {
-        if (! is_string($availability)) {
-            return true;
-        }
-
-        $availability = strtolower($availability);
-
-        if (str_contains($availability, 'outofstock') || str_contains($availability, 'soldout') || str_contains($availability, 'discontinued')) {
-            return false;
-        }
-
-        return true;
     }
 }

@@ -78,8 +78,10 @@
                     </div>
                     <div class="text-lg font-semibold mt-1 tabular-nums">
                         {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
-                        @if (! $snapshot['in_stock'])
+                        @if (($snapshot['in_stock'] ?? null) === false)
                             <span class="ml-2 inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Out of stock</span>
+                        @elseif (($snapshot['in_stock'] ?? null) === null)
+                            <span class="ml-2 inline-flex items-center rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">Stock unknown</span>
                         @endif
                     </div>
                     @if ($previewUnitPrice !== null)
@@ -173,7 +175,11 @@
                         This shop's robots.txt forbids automated access.
                         @break
                     @case('blocked')
-                        This shop is blocking automated checks (Cloudflare/Akamai). We can't track it right now.
+                        @if ($errorContext['persistent'] ?? false)
+                            This shop has blocked our last {{ $errorContext['failures'] ?? 0 }} requests. Trying again won't help.
+                        @else
+                            This shop is blocking automated checks (Cloudflare/Akamai). We can't track it right now.
+                        @endif
                         @break
                     @case('host_rate_limited')
                         This shop returned a rate-limit response (HTTP 429). Try again in {{ $errorContext['retry_after_seconds'] ?? '~60' }} seconds.
@@ -182,10 +188,14 @@
                         We're spacing out checks to this shop to be polite. Try again in {{ $errorContext['retry_after_seconds'] ?? '~60' }} seconds.
                         @break
                     @case('probe_rate_limited')
-                        You've probed too many URLs in the last minute. Slow down a bit.
+                        You've probed too many URLs in the last minute. Try again in {{ $errorContext['retry_after_seconds'] ?? '~60' }} seconds.
                         @break
                     @case('temporary_failure')
-                        The shop is having a server problem (HTTP {{ $errorContext['status'] ?? '5xx' }}). Try again later.
+                        @if ($errorContext['persistent'] ?? false)
+                            This shop hasn't answered our last {{ $errorContext['failures'] ?? 0 }} requests. Trying again now won't help.
+                        @else
+                            The shop is having a server problem (HTTP {{ $errorContext['status'] ?? '5xx' }}). Try again later.
+                        @endif
                         @break
                     @case('http_error')
                         The shop returned HTTP {{ $errorContext['status'] ?? 'error' }}. Check the URL and try again.

@@ -62,7 +62,8 @@ final readonly class UserSelectorAdapter implements HostSpecificAdapter, ShopAda
             imageUrl: self::extractImage($crawler, $imageSelector),
             price: $price,
             currency: strtoupper($currency),
-            inStock: true,
+            // Nothing on the page states availability at this level.
+            inStock: null,
             raw: ['source' => 'user-selector', 'price_selector' => $priceSelector],
         ));
     }

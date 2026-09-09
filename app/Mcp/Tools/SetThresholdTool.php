@@ -14,7 +14,7 @@ use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
 
 #[Name('set_threshold')]
-#[Description('Sets how far a price must fall before this product alerts: a percentage, an absolute amount, or both. Omit a value to leave it as it is.')]
+#[Description('Sets when this product alerts: how far the price must fall (a percentage, an absolute amount, or both), and/or a unit price to reach. Omit a value to leave it as it is.')]
 class SetThresholdTool extends Tool
 {
     use InteractsWithOwner;
@@ -27,6 +27,7 @@ class SetThresholdTool extends Tool
             'product_id' => ['required', 'uuid'],
             'percent' => ['nullable', 'numeric', 'min:0.01', 'max:99.99'],
             'amount' => ['nullable', 'numeric', 'min:0.01'],
+            'unit_price_target' => ['nullable', 'numeric', 'min:0.01'],
         ]);
 
         $product = $this->ownedProduct($request, $this->str($validated, 'product_id'));
@@ -37,9 +38,10 @@ class SetThresholdTool extends Tool
 
         $percent = $validated['percent'] ?? null;
         $amount = $validated['amount'] ?? null;
+        $unitPriceTarget = $validated['unit_price_target'] ?? null;
 
-        if ($percent === null && $amount === null) {
-            return Response::error('Give a percent, an amount, or both.');
+        if ($percent === null && $amount === null && $unitPriceTarget === null) {
+            return Response::error('Give a percent, an amount, a unit_price_target, or several of them.');
         }
 
         if (is_numeric($percent)) {
@@ -50,9 +52,22 @@ class SetThresholdTool extends Tool
             $product->drop_threshold_abs = round((float) $amount, 2);
         }
 
+        if (is_numeric($unitPriceTarget)) {
+            $product->unit_price_target = round((float) $unitPriceTarget, 2);
+        }
+
         $product->save();
 
-        return Response::structured($this->presenter->summary($product));
+        $summary = $this->presenter->summary($product);
+
+        // A stored target on a free account is kept and starts working on
+        // upgrade, so say that rather than let the caller promise an alert
+        // that will not arrive.
+        if ($unitPriceTarget !== null && $this->user($request)->entitlements()->allowsUnitPriceAlerts() !== true) {
+            $summary['note'] = 'The unit price target is stored, but unit-price alerts are a Pro feature. This account is not alerted on it until it upgrades.';
+        }
+
+        return Response::structured($summary);
     }
 
     /**
@@ -64,6 +79,7 @@ class SetThresholdTool extends Tool
             'product_id' => $schema->string()->format('uuid')->description('From list_products.')->required(),
             'percent' => $schema->number()->description('Alert when the price falls this many percent, e.g. 10.'),
             'amount' => $schema->number()->description('Alert when the price falls by at least this much money.'),
+            'unit_price_target' => $schema->number()->description('Alert when the best value reaches this price per kg, litre or piece. This is a price to reach, not a fall, so it does not move with the current price.'),
         ];
     }
 }

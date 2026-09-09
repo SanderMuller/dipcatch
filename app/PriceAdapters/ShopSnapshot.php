@@ -17,7 +17,11 @@ final readonly class ShopSnapshot
         public ?string $imageUrl,
         public string $price,        // e.g. "289.00"
         public string $currency,     // ISO 4217 uppercase, e.g. "EUR"
-        public bool $inStock,
+        /**
+         * True in stock, false out of stock, null when the page did not say
+         * — never a guess. See {@see StockAvailability} and {@see StockText}.
+         */
+        public ?bool $inStock,
         public array $raw = [],
         /** Raw pack-size text from the source, e.g. "200 g". */
         public ?string $packSize = null,
@@ -55,6 +59,8 @@ final readonly class ShopSnapshot
          * promotion that ended stops being shown.
          */
         public bool $promotionWindowAuthoritative = false,
+        /** What the verdict was read from, e.g. `https://schema.org/InStock`. */
+        public ?string $stockSignal = null,
     ) {}
 
     /**
@@ -69,13 +75,16 @@ final readonly class ShopSnapshot
         ?bool $packSizeAuthoritative = null,
         ?PromotionWindow $promotionWindow = null,
         ?bool $promotionWindowAuthoritative = null,
+        ?bool $inStock = null,
+        ?string $stockSignal = null,
+        ?string $currency = null,
     ): self {
         return new self(
             title: $this->title,
             imageUrl: $this->imageUrl,
             price: $this->price,
-            currency: $this->currency,
-            inStock: $this->inStock,
+            currency: $currency ?? $this->currency,
+            inStock: $inStock ?? $this->inStock,
             raw: $this->raw,
             packSize: $packSize ?? $this->packSize,
             packSizeAuthoritative: $packSizeAuthoritative ?? $this->packSizeAuthoritative,
@@ -85,6 +94,7 @@ final readonly class ShopSnapshot
             conditionalOfferAuthoritative: $this->conditionalOfferAuthoritative,
             promotionWindow: $promotionWindow ?? $this->promotionWindow,
             promotionWindowAuthoritative: $promotionWindowAuthoritative ?? $this->promotionWindowAuthoritative,
+            stockSignal: $stockSignal ?? $this->stockSignal,
         );
     }
 }

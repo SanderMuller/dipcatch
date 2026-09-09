@@ -6,6 +6,7 @@ use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
+use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\ShopFetcher\ShopFetcher;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -225,4 +226,51 @@ test('a redirect target its own robots.txt allows is followed', function (): voi
 
     expect($result->host)->toBe('other.test')
         ->and($result->html)->toContain('ok');
+});
+
+test('a host that keeps blocking is remembered as persistent', function (): void {
+    Http::fake([
+        'https://blocked.com/robots.txt' => Http::response('', 404),
+        'https://blocked.com/p/*' => Http::response('nope', 403),
+    ]);
+
+    $memory = app(HostFetchMemory::class);
+
+    foreach (range(1, HostFetchMemory::PERSISTENT_AFTER) as $i) {
+        RateLimiter::clear('dipcatch:fetcher:host:blocked.com');
+
+        try {
+            app(ShopFetcher::class)->fetch("https://blocked.com/p/{$i}");
+        } catch (Blocked) {
+            // Counted below.
+        }
+    }
+
+    expect($memory->count('blocked.com', HostFetchMemory::KIND_BLOCKED))->toBe(HostFetchMemory::PERSISTENT_AFTER)
+        ->and($memory->isPersistent('blocked.com', HostFetchMemory::KIND_BLOCKED))->toBeTrue()
+        ->and($memory->isPersistent('blocked.com', HostFetchMemory::KIND_SILENT))->toBeFalse();
+});
+
+test('a host that answers again is no longer described as failing', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response('boom', 503),
+        'https://example.com/p/2' => Http::response('<html>ok</html>', 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $memory = app(HostFetchMemory::class);
+
+    try {
+        app(ShopFetcher::class)->fetch('https://example.com/p/1');
+    } catch (TemporaryFailure) {
+        // Counted below.
+    }
+
+    expect($memory->count('example.com', HostFetchMemory::KIND_SILENT))->toBe(1);
+
+    RateLimiter::clear('dipcatch:fetcher:host:example.com');
+
+    app(ShopFetcher::class)->fetch('https://example.com/p/2');
+
+    expect($memory->count('example.com', HostFetchMemory::KIND_SILENT))->toBe(0);
 });

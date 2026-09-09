@@ -137,6 +137,28 @@ test('per-user rate limit kicks in after 6 probes in a minute', function (): voi
     expect($blocked->errorCode)->toBe(ProbeFailure::ProbeRateLimited);
 });
 
+test('the per-user rate limit reports how long to wait', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/*' => Http::response(jsonLdPage(), 200),
+    ]);
+
+    $product = Product::factory()->create();
+    $user = User::factory()->create();
+
+    foreach (range(1, ProbeShopUrl::PER_USER_LIMIT_PER_MIN) as $i) {
+        app(ProbeShopUrl::class)($product, "https://example.com/p/{$i}", $user);
+    }
+
+    $blocked = app(ProbeShopUrl::class)($product, 'https://example.com/p/over', $user);
+
+    $retryAfter = $blocked->context['retry_after_seconds'] ?? null;
+
+    expect($blocked->errorCode)->toBe(ProbeFailure::ProbeRateLimited)
+        ->and($retryAfter)->toBeInt()
+        ->and($retryAfter)->toBeGreaterThan(0);
+});
+
 test('multi-variant ProductGroup with no URL match returns AMBIGUOUS with variants', function (): void {
     $json = json_encode([
         '@context' => 'https://schema.org',
@@ -357,4 +379,20 @@ test('a shop URL that redirects onto an unservable host is refused, not parsed',
     expect($outcome->errorCode)->toBe(ProbeFailure::ShopNotServable)
         ->and($outcome->context['reason'] ?? null)->toBe('plus_spa')
         ->and($outcome->shouldOfferManualSelector())->toBeFalse();
+});
+
+test('a page quoting a currency that is not a code is refused, not stored', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response(withJsonLd((string) json_encode([
+            '@type' => 'Product',
+            'name' => 'Demo',
+            'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'Euro'],
+        ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $outcome = app(ProbeShopUrl::class)(null, 'https://example.com/p/1', User::factory()->create());
+
+    expect($outcome->isSuccess())->toBeFalse()
+        ->and($outcome->extractionReason)->toBe('currency_not_a_code');
 });

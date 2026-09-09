@@ -3,6 +3,7 @@
 namespace App\Mcp\Support;
 
 use App\Actions\Shops\ProbeOutcome;
+use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ProbeFailure;
 use App\PriceAdapters\VariantCandidate;
 use Laravel\Mcp\Response;
@@ -30,13 +31,23 @@ final readonly class ProbeReporter
                 $outcome->variants,
             );
 
+            $unmatched = $outcome->unmatchedVariantKey;
+
+            $opening = $unmatched === null
+                ? 'That page sells more than one variant.'
+                : 'No variant on that page matches variant_key "' . $unmatched . '".';
+
             return Response::error(
-                'That page sells more than one variant. Ask which, then call again with variant_key set to one of: '
+                $opening . ' Ask which, then call again with variant_key set to one of: '
                 . implode(', ', $variants),
             );
         }
 
-        return Response::error($this->failure($outcome->errorCode));
+        if ($outcome->extractionReason === 'variant_key_no_match') {
+            return Response::error('That page lists no variant matching the variant_key that was sent. Call again without variant_key to see what the page offers.');
+        }
+
+        return Response::error($this->failure($outcome->errorCode, $outcome->context ?? []));
     }
 
     /**
@@ -52,24 +63,75 @@ final readonly class ProbeReporter
             'price' => $snapshot['price'] ?? null,
             'currency' => $snapshot['currency'] ?? null,
             'in_stock' => $snapshot['in_stock'] ?? null,
+            'stock' => match ($snapshot['in_stock'] ?? null) {
+                true => 'in_stock',
+                false => 'out_of_stock',
+                default => 'unknown',
+            },
+            // What the verdict was read from, so the caller can judge it
+            // instead of trusting a bare flag.
+            'stock_signal' => $snapshot['stock_signal'] ?? null,
             'pack_size' => $snapshot['pack_size'] ?? null,
             'shop' => $outcome->host,
             'url' => $outcome->normalizedUrl,
         ];
     }
 
-    private function failure(?ProbeFailure $code): string
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function failure(?ProbeFailure $code, array $context = []): string
     {
         return match ($code) {
             ProbeFailure::InvalidUrl => 'That does not look like a URL. Paste the address of a product page.',
-            ProbeFailure::ProbeRateLimited, ProbeFailure::LocalThrottle, ProbeFailure::HostRateLimited => 'Too many pages fetched just now. Wait a minute and try again.',
+            ProbeFailure::ProbeRateLimited => 'DipCatch reads at most ' . ProbeShopUrl::PER_USER_LIMIT_PER_MIN . ' pages a minute for one account. ' . self::waitSentence($context),
+            ProbeFailure::LocalThrottle, ProbeFailure::HostRateLimited => 'That shop asked DipCatch to slow down. ' . self::waitSentence($context),
             ProbeFailure::RobotsDisallowed => 'That shop asks crawlers not to read this page, and DipCatch honours that.',
-            ProbeFailure::Blocked => 'That shop blocked the request.',
+            ProbeFailure::Blocked => self::persistent($context)
+                ? 'That shop has blocked DipCatch on its last ' . self::failures($context) . ' requests. Retrying will not help — the shop refuses automated readers.'
+                : 'That shop blocked the request.',
             ProbeFailure::ExtractionFailed => 'The page loaded but no price could be read from it. Some shops load prices with JavaScript, which DipCatch cannot see.',
             ProbeFailure::CurrencyMismatch => 'That page prices in a different currency from the product.',
             ProbeFailure::NotInDataset => 'That shop is covered by a price dataset that does not list this product yet.',
-            ProbeFailure::TemporaryFailure, ProbeFailure::HttpError => 'The shop did not answer. Try again shortly.',
+            ProbeFailure::TemporaryFailure, ProbeFailure::HttpError => self::persistent($context)
+                ? 'That shop has not answered DipCatch on its last ' . self::failures($context) . ' requests. This is not a passing fault, so another attempt now will fail too.'
+                : 'The shop did not answer. Try again shortly.',
             default => 'That page could not be read. Try a different shop, or a direct product URL.',
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private static function persistent(array $context): bool
+    {
+        return ($context['persistent'] ?? false) === true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private static function failures(array $context): int
+    {
+        $failures = $context['failures'] ?? null;
+
+        return is_int($failures) ? $failures : 0;
+    }
+
+    /**
+     * How long to wait, when the failure carries a retry-after. Without one
+     * the caller still gets a bound rather than a guess.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private static function waitSentence(array $context): string
+    {
+        $seconds = $context['retry_after_seconds'] ?? null;
+
+        if (! is_int($seconds) || $seconds < 1) {
+            return 'Wait a minute and try again.';
+        }
+
+        return 'Try again in ' . $seconds . ' ' . ($seconds === 1 ? 'second' : 'seconds') . '.';
     }
 }

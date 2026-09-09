@@ -258,3 +258,47 @@ it('will not let one account spend a draft issued to another', function (): void
     expect($other->products()->count())->toBe(0)
         ->and($issuer->products()->count())->toBe(0);
 });
+
+it('sets the unit price target, and says when the account is not alerted on it', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 6.5])
+        ->assertOk()
+        ->assertSee('Pro feature');
+
+    expect((float) $product->fresh()?->unit_price_target)->toBe(6.5);
+});
+
+it('sets the unit price target without a caveat for a Pro account', function (): void {
+    $me = User::factory()->create();
+    subscribeUser($me);
+    $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 6.5])
+        ->assertOk()
+        ->assertDontSee('Pro feature');
+
+    expect((float) $product->fresh()?->unit_price_target)->toBe(6.5);
+});
+
+it('leaves the drop thresholds alone when only a unit price target is given', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create([
+        'user_id' => $me->id,
+        'drop_threshold_pct' => '10.00',
+        'drop_threshold_abs' => null,
+    ]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 4.25])
+        ->assertOk();
+
+    $fresh = $product->fresh();
+
+    expect((float) $fresh?->drop_threshold_pct)->toBe(10.0)
+        ->and($fresh?->drop_threshold_abs)->toBeNull()
+        ->and((float) $fresh?->unit_price_target)->toBe(4.25);
+});

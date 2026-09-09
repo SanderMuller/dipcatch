@@ -17,7 +17,9 @@ use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
+use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\ShopFetcher\ShopFetcher;
+use App\Support\Iso4217;
 use App\Support\UnservableShops;
 use App\Support\UrlNormalizer;
 use Illuminate\Support\Facades\RateLimiter;
@@ -33,13 +35,15 @@ use InvalidArgumentException;
  */
 final readonly class ProbeShopUrl
 {
-    private const int PER_USER_LIMIT_PER_MIN = 6;
+    /** Pages one account may probe per minute. Public so a caller-facing message can state it. */
+    public const int PER_USER_LIMIT_PER_MIN = 6;
 
     public function __construct(
         private ShopFetcher $fetcher,
         private AdapterResolver $resolver,
         private CheckjebonSource $checkjebon,
         private AhApiSource $ahApi,
+        private HostFetchMemory $memory,
     ) {}
 
     /**
@@ -81,8 +85,10 @@ final readonly class ProbeShopUrl
             return $local;
         }
 
-        if (! $this->withinPerUserLimit($actor)) {
-            return ProbeOutcome::failed(ProbeFailure::ProbeRateLimited);
+        $probeRetryAfter = $this->perUserRetryAfter($actor);
+
+        if ($probeRetryAfter !== null) {
+            return ProbeOutcome::failed(ProbeFailure::ProbeRateLimited, ['retry_after_seconds' => $probeRetryAfter]);
         }
 
         try {
@@ -94,7 +100,7 @@ final readonly class ProbeShopUrl
         } catch (RobotsDisallowed) {
             return ProbeOutcome::failed(ProbeFailure::RobotsDisallowed);
         } catch (Blocked) {
-            return ProbeOutcome::failed(ProbeFailure::Blocked);
+            return ProbeOutcome::failed(ProbeFailure::Blocked, $this->hostHistory($host, HostFetchMemory::KIND_BLOCKED));
         } catch (RateLimitedByHost $e) {
             return ProbeOutcome::failed(
                 $e->source === RateLimitedByHost::SOURCE_LOCAL
@@ -103,7 +109,10 @@ final readonly class ProbeShopUrl
                 ['retry_after_seconds' => $e->retryAfterSeconds],
             );
         } catch (TemporaryFailure $e) {
-            return ProbeOutcome::failed(ProbeFailure::TemporaryFailure, ['status' => $e->statusCode]);
+            return ProbeOutcome::failed(
+                ProbeFailure::TemporaryFailure,
+                ['status' => $e->statusCode] + $this->hostHistory($host, HostFetchMemory::KIND_SILENT),
+            );
         } catch (HttpError $e) {
             return ProbeOutcome::failed(ProbeFailure::HttpError, ['status' => $e->statusCode]);
         }
@@ -125,6 +134,7 @@ final readonly class ProbeShopUrl
                 variants: $extraction->variants,
                 normalizedUrl: $normalizedUrl,
                 host: $fetch->host,
+                unmatchedVariantKey: $extraction->unmatchedVariantKey,
             );
         }
 
@@ -134,6 +144,20 @@ final readonly class ProbeShopUrl
 
         $snapshot = $extraction->snapshot;
         assert($snapshot !== null);
+
+        // Every currency column is char(3). A page quoting "Euro" states no
+        // code that can be stored, so it is refused here rather than at the
+        // insert, where Postgres would reject the whole write.
+        $currency = Iso4217::normalize($snapshot->currency);
+
+        if ($currency === null) {
+            return ProbeOutcome::extractionFailed('currency_not_a_code');
+        }
+
+        // Carry the normalized code onward: a page publishing `" EUR "`
+        // otherwise reads as a different currency from the product's `EUR`,
+        // and reaches the char(3) columns padded.
+        $snapshot = $snapshot->with(currency: $currency);
 
         if ($product instanceof Product && strcasecmp($snapshot->currency, $product->currency) !== 0) {
             return ProbeOutcome::failed(ProbeFailure::CurrencyMismatch, [
@@ -209,14 +233,36 @@ final readonly class ProbeShopUrl
         );
     }
 
-    private function withinPerUserLimit(User $user): bool
+    /**
+     * Seconds until this user may probe again, or null while they are within
+     * budget. The host-throttle paths already report a retry-after; without
+     * one here a caller adding several shops in a row is told to wait with no
+     * idea how long, and guesses.
+     */
+    /**
+     * What this host has done lately, so the caller is told whether another
+     * attempt is worth making.
+     *
+     * @return array{failures: int, persistent: bool}
+     */
+    private function hostHistory(string $host, string $kind): array
+    {
+        return [
+            'failures' => $this->memory->count($host, $kind),
+            'persistent' => $this->memory->isPersistent($host, $kind),
+        ];
+    }
+
+    private function perUserRetryAfter(User $user): ?int
     {
         $key = "dipcatch:probe:user:{$user->id}";
+
         if (RateLimiter::tooManyAttempts($key, self::PER_USER_LIMIT_PER_MIN)) {
-            return false;
+            return max(1, RateLimiter::availableIn($key));
         }
+
         RateLimiter::hit($key);
 
-        return true;
+        return null;
     }
 }

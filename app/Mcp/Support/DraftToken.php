@@ -44,9 +44,6 @@ final readonly class DraftToken
         ], JSON_THROW_ON_ERROR));
     }
 
-    /**
-     * Null when the token is unreadable, the wrong shape, or expired.
-     */
     private static function ownerKey(User $owner): string
     {
         $key = $owner->getKey();
@@ -54,35 +51,43 @@ final readonly class DraftToken
         return is_scalar($key) ? (string) $key : '';
     }
 
-    public static function open(User $owner, string $token, ?string $productId = null): ?ShopDraft
+    /**
+     * The draft, or the reason it was refused. Each reason has its own
+     * recovery, so they never collapse into one message.
+     */
+    public static function open(User $owner, string $token, ?string $productId = null): ShopDraft|DraftFailure
     {
         try {
             $payload = json_decode(Crypt::decryptString($token), true, 512, JSON_THROW_ON_ERROR);
         } catch (DecryptException|JsonException) {
-            return null;
+            return DraftFailure::Malformed;
         }
 
         if (! is_array($payload)) {
-            return null;
+            return DraftFailure::Malformed;
         }
 
         $issuedAt = $payload['at'] ?? null;
 
-        if (! is_int($issuedAt) || $issuedAt + self::TTL_SECONDS < CarbonImmutable::now()->getTimestamp()) {
-            return null;
+        if (! is_int($issuedAt)) {
+            return DraftFailure::Malformed;
+        }
+
+        if ($issuedAt + self::TTL_SECONDS < CarbonImmutable::now()->getTimestamp()) {
+            return DraftFailure::Expired;
         }
 
         // Bound to its issuer: a draft is a record that one account approved
         // what it was shown, so another account cannot spend it.
         if (($payload['uid'] ?? null) !== self::ownerKey($owner)) {
-            return null;
+            return DraftFailure::WrongOwner;
         }
 
         // The probe checked this snapshot against one product's currency, so
         // confirming it onto a different product would write a shop that
         // product's own guard would have refused.
         if (($payload['pid'] ?? null) !== $productId) {
-            return null;
+            return DraftFailure::WrongProduct;
         }
 
         $snapshot = $payload['snapshot'] ?? null;
@@ -91,7 +96,7 @@ final readonly class DraftToken
         $variantKey = $payload['variantKey'] ?? null;
 
         if (! is_array($snapshot) || ! is_string($url) || ! is_string($adapterKey)) {
-            return null;
+            return DraftFailure::Malformed;
         }
 
         $clean = [];

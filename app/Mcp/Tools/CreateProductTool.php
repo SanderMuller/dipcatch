@@ -9,6 +9,7 @@ use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\ShopDraft;
 use App\Billing\PlanLimitReached;
 use App\Mcp\Concerns\InteractsWithOwner;
+use App\Mcp\Support\DraftFailure;
 use App\Mcp\Support\DraftToken;
 use App\Mcp\Support\ProbeReporter;
 use App\Mcp\Support\ProductPresenter;
@@ -50,8 +51,8 @@ class CreateProductTool extends Tool
         if (($validated['confirm'] ?? false) === true) {
             $draft = DraftToken::open($user, $this->str($validated, 'draft'));
 
-            if ($draft === null) {
-                return Response::error('That draft has expired. Call create_product again without confirm to re-read the page.');
+            if ($draft instanceof DraftFailure) {
+                return Response::error($draft->message('create_product'));
             }
 
             try {

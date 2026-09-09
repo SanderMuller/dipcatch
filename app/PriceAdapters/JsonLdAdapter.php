@@ -38,6 +38,17 @@ final readonly class JsonLdAdapter implements ShopAdapter
             return ExtractionResult::ambiguous($state->variants);
         }
 
+        // A key that matched nothing must never fall through to whatever the
+        // URL happens to name: the caller asked for one variant and would be
+        // handed the price of another without being told.
+        $variantKey = $context?->variantKey;
+
+        if ($variantKey !== null && ! $state->keyMatched) {
+            return $state->variants === []
+                ? ExtractionResult::failed('variant_key_no_match')
+                : ExtractionResult::ambiguous($state->variants, unmatchedVariantKey: $variantKey);
+        }
+
         if ($shop === null) {
             // No Product / ProductGroup / Offer entity at all → skip so the
             // weaker adapters (microdata, OG, generic) get a shot. Only fail
@@ -108,12 +119,12 @@ final readonly class JsonLdAdapter implements ShopAdapter
      */
     private function buildSnapshot(?array $product, array $shop): ExtractionResult
     {
-        $price = self::extractPrice($shop);
+        $price = JsonLdOfferPrice::price($shop);
         if ($price === null) {
             return ExtractionResult::failed('jsonld_no_price');
         }
 
-        $currency = self::extractCurrency($shop);
+        $currency = JsonLdOfferPrice::currency($shop);
         if ($currency === null) {
             return ExtractionResult::failed('jsonld_no_currency');
         }
@@ -125,13 +136,15 @@ final readonly class JsonLdAdapter implements ShopAdapter
             ?? JsonLdEntities::firstImageUrl($shop['image'] ?? null);
 
         $packSize = UnitPriceSize::from($shop, $price);
+        [$inStock, $stockSignal] = StockAvailability::read($shop['availability'] ?? null);
 
         return ExtractionResult::success(new ShopSnapshot(
             title: $title,
             imageUrl: $imageUrl,
             price: $price,
             currency: strtoupper($currency),
-            inStock: self::extractInStock($shop),
+            inStock: $inStock,
+            stockSignal: $stockSignal,
             raw: ['offer' => $shop],
             packSize: $packSize,
             // Only when the offer stated one: otherwise the title fallback
@@ -152,91 +165,5 @@ final readonly class JsonLdAdapter implements ShopAdapter
         $crawler->addHtmlContent('<html><body>' . $html . '</body></html>');
 
         return $crawler;
-    }
-
-    /**
-     * @param  array<string, mixed>  $shop
-     */
-    private static function extractPrice(array $shop): ?string
-    {
-        $types = JsonLdEntities::typesOf($shop);
-
-        if (in_array('AggregateOffer', $types, strict: true)) {
-            return PriceNormalizer::fromMixed($shop['lowPrice'] ?? null);
-        }
-
-        // Some shops emit non-spec key casing (dirk.nl writes `Price`).
-        $normalized = PriceNormalizer::fromMixed($shop['price'] ?? $shop['Price'] ?? null);
-        if ($normalized !== null) {
-            return $normalized;
-        }
-
-        // `priceSpecification` may be a single object or a list of
-        // (Unit)PriceSpecification entries — pick the first usable price.
-        $spec = self::firstPriceSpec($shop['priceSpecification'] ?? null);
-        if ($spec !== null) {
-            return PriceNormalizer::fromMixed($spec['price'] ?? null);
-        }
-
-        return null;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private static function firstPriceSpec(mixed $value): ?array
-    {
-        if (! is_array($value)) {
-            return null;
-        }
-
-        if (isset($value['@type']) || isset($value['price'])) {
-            /** @var array<string, mixed> $value */
-            return $value;
-        }
-
-        if (array_is_list($value)) {
-            foreach ($value as $entry) {
-                if (is_array($entry) && (isset($entry['@type']) || isset($entry['price']))) {
-                    /** @var array<string, mixed> $entry */
-                    return $entry;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $shop
-     */
-    private static function extractCurrency(array $shop): ?string
-    {
-        $currency = JsonLdEntities::nonEmptyString($shop['priceCurrency'] ?? null);
-        if ($currency !== null) {
-            return $currency;
-        }
-
-        $spec = self::firstPriceSpec($shop['priceSpecification'] ?? null);
-        if ($spec !== null) {
-            return JsonLdEntities::nonEmptyString($spec['priceCurrency'] ?? null);
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $shop
-     */
-    private static function extractInStock(array $shop): bool
-    {
-        $availability = $shop['availability'] ?? null;
-        if (! is_string($availability)) {
-            return true;
-        }
-
-        $availability = strtolower($availability);
-
-        return array_all(['/outofstock', '/discontinued', '/soldout', 'outofstock', 'discontinued', 'soldout'], fn (string $negative): bool => $availability !== $negative && ! str_ends_with($availability, $negative));
     }
 }

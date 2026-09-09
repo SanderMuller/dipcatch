@@ -53,9 +53,12 @@ final readonly class JsonLdMatch
     }
 
     /**
+     * Whether this entity — a Product, a variant, or a single Offer — is the
+     * one the caller pinned with `variant_key`.
+     *
      * @param  array<string, mixed>  $entity
      */
-    private static function keyMatches(array $entity, string $key): bool
+    public static function keyMatches(array $entity, string $key): bool
     {
         foreach (self::KEY_FIELDS as $field) {
             $value = $entity[$field] ?? null;

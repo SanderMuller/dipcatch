@@ -20,6 +20,7 @@ use App\Services\ShopFetcher\FetchResult;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Config as DipConfig;
 use App\Support\ImageUrl;
+use App\Support\Iso4217;
 use App\Support\PackSize;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -471,10 +472,15 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 $status = ScrapeStatus::CurrencyMismatch;
             }
 
+            // The column is char(3). A shop quoting " EUR " or "Euro" is a
+            // shop stating no code we can store, and the mismatch check
+            // above has already read the raw value.
+            $storedCurrency = Iso4217::normalize($reported);
+
             $check = PriceCheck::create([
                 'shop_id' => $locked->id,
                 'price' => $outcome['price'],
-                'currency' => $outcome['currency'],
+                'currency' => $storedCurrency,
                 'in_stock' => $outcome['in_stock'],
                 'status' => $status,
                 'error' => $outcome['error'],
@@ -486,10 +492,12 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             if ($status === ScrapeStatus::Ok) {
                 $updates += [
                     'current_price' => $outcome['price'],
-                    'current_in_stock' => (bool) ($outcome['in_stock'] ?? true),
+                    // Unknown stays unknown: coercing it to true is what
+                    // reported a sold-out product as available.
+                    'current_in_stock' => $outcome['in_stock'],
                     // An empty currency is no signal at all — keep the last known one
                     // rather than blanking the column.
-                    'currency' => $reported !== '' ? $reported : $locked->currency,
+                    'currency' => $storedCurrency ?? $locked->currency,
                     'last_success_at' => $now,
                     'last_error' => null,
                     'consecutive_failures' => 0,

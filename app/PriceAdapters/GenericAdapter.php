@@ -73,7 +73,8 @@ final readonly class GenericAdapter implements ShopAdapter
                 imageUrl: $image,
                 price: $price,
                 currency: $currency,
-                inStock: true,
+                // Nothing on the page states availability at this level.
+                inStock: null,
                 raw: ['source' => 'generic', 'matched_selector' => $selector],
             ));
         }

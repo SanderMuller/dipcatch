@@ -396,7 +396,30 @@ test('surrounding whitespace and lowercase in the reported currency do not trigg
 
     $shop->refresh();
     expect($shop->last_status)->toBe(ScrapeStatus::Ok)
-        ->and((string) $shop->current_price)->toBe('60.00');
+        ->and((string) $shop->current_price)->toBe('60.00')
+        // The column is char(3): the padded value must be normalised before
+        // it is stored, not written through as the shop sent it.
+        ->and(PriceCheck::query()->where('shop_id', $shop->id)->value('currency'))->toBe('EUR')
+        ->and($shop->currency)->toBe('EUR');
+});
+
+test('a currency that is not a three-letter code is stored as none, and flags a mismatch', function (): void {
+    Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '60.00', 'Euro'));
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.test/p/1',
+        'current_price' => '10.00',
+        'currency' => 'EUR',
+    ]);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+
+    expect($shop->last_status)->toBe(ScrapeStatus::CurrencyMismatch)
+        ->and(PriceCheck::query()->where('shop_id', $shop->id)->value('currency'))->toBeNull()
+        ->and($shop->currency)->toBe('EUR');
 });
 
 test('an empty currency is no signal and does not trigger a mismatch', function (): void {

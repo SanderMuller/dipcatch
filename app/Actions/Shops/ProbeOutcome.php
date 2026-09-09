@@ -41,6 +41,7 @@ final readonly class ProbeOutcome
         public ?array $context = null,
         public array $variants = [],
         public ?string $extractionReason = null,
+        public ?string $unmatchedVariantKey = null,
     ) {}
 
     public static function success(
@@ -112,13 +113,14 @@ final readonly class ProbeOutcome
     /**
      * @param  list<VariantCandidate>  $variants
      */
-    public static function ambiguous(array $variants, string $normalizedUrl, string $host): self
+    public static function ambiguous(array $variants, string $normalizedUrl, string $host, ?string $unmatchedVariantKey = null): self
     {
         return new self(
             state: self::STATE_AMBIGUOUS,
             normalizedUrl: $normalizedUrl,
             host: $host,
             variants: $variants,
+            unmatchedVariantKey: $unmatchedVariantKey,
         );
     }
 

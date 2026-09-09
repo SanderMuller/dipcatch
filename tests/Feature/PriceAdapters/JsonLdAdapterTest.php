@@ -677,3 +677,155 @@ test('two entities fitting the request equally well are put to the user', functi
     expect($result->isAmbiguous())->toBeTrue()
         ->and($result->variants)->toHaveCount(2);
 });
+
+/**
+ * The shape medpets.nl publishes (verified 2026-09-09): one Product, several
+ * Offers, each naming itself with a `sku` and a `?sku=` URL. No ProductGroup.
+ */
+function multiOfferProduct(): string
+{
+    return (string) json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://shop.test/sanimed',
+        'offers' => [
+            [
+                '@type' => 'Offer',
+                'sku' => 'MP2996',
+                'price' => 21.25,
+                'priceCurrency' => 'EUR',
+                'availability' => 'InStock',
+                'url' => 'https://shop.test/sanimed?sku=MP2996',
+            ],
+            [
+                '@type' => 'Offer',
+                'sku' => 'MP2997',
+                'price' => 41.65,
+                'priceCurrency' => 'EUR',
+                'availability' => 'InStock',
+                'url' => 'https://shop.test/sanimed?sku=MP2997',
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+}
+
+test('a Product with several offers asks which, instead of pricing the first', function (): void {
+    $result = new JsonLdAdapter()->extract('https://shop.test/sanimed', withJsonLd(multiOfferProduct()));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($result->snapshot)->toBeNull()
+        ->and(array_map(fn ($variant): string => $variant->key, $result->variants))->toBe(['MP2996', 'MP2997'])
+        ->and(array_map(fn ($variant): string => $variant->price, $result->variants))->toBe(['21.25', '41.65']);
+});
+
+test('a pinned variant_key prices that offer', function (): void {
+    $result = new JsonLdAdapter()->extract(
+        'https://shop.test/sanimed',
+        withJsonLd(multiOfferProduct()),
+        new AdapterContext(variantKey: 'MP2996'),
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('21.25');
+});
+
+test('a URL naming one offer prices that offer without asking', function (): void {
+    $result = new JsonLdAdapter()->extract('https://shop.test/sanimed?sku=MP2997', withJsonLd(multiOfferProduct()));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('41.65');
+});
+
+test('a variant_key matching nothing is reported, never silently ignored', function (): void {
+    $result = new JsonLdAdapter()->extract(
+        'https://shop.test/sanimed',
+        withJsonLd(multiOfferProduct()),
+        new AdapterContext(variantKey: 'SANIMED Skin Sensitive 12x100 gr. pouches'),
+    );
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($result->unmatchedVariantKey)->toBe('SANIMED Skin Sensitive 12x100 gr. pouches')
+        ->and($result->failureReason)->toBe('variant_key_no_match')
+        ->and($result->snapshot)->toBeNull();
+});
+
+test('a variant_key matching nothing on a single-variant page fails rather than pricing it', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'One size only',
+        'url' => 'https://shop.test/p/1',
+        'offers' => ['@type' => 'Offer', 'price' => '9.99', 'priceCurrency' => 'EUR', 'availability' => 'InStock'],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', withJsonLd($json), new AdapterContext(variantKey: 'nope'));
+
+    expect($result->isFailed())->toBeTrue()
+        ->and($result->failureReason)->toBe('variant_key_no_match');
+});
+
+test('one real offer beside a priceless stub still prices the product', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://shop.test/sanimed',
+        'offers' => [
+            ['@type' => 'Offer', 'sku' => 'MP2996', 'price' => 21.25, 'priceCurrency' => 'EUR', 'availability' => 'InStock'],
+            ['@type' => 'Offer', 'sku' => 'MP2997', 'availability' => 'OutOfStock'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/sanimed', withJsonLd($json));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('21.25');
+});
+
+test('the offer the URL names most precisely wins, whatever the order', function (): void {
+    $offers = [
+        ['@type' => 'Offer', 'sku' => 'L', 'price' => '10.00', 'priceCurrency' => 'EUR', 'url' => 'https://shop.test/p?size=L'],
+        ['@type' => 'Offer', 'sku' => 'LRED', 'price' => '20.00', 'priceCurrency' => 'EUR', 'url' => 'https://shop.test/p?size=L&color=red'],
+    ];
+
+    foreach ([$offers, array_reverse($offers)] as $ordered) {
+        $json = json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'Product',
+            'name' => 'Shirt',
+            'url' => 'https://shop.test/p',
+            'offers' => $ordered,
+        ], JSON_THROW_ON_ERROR);
+
+        $result = new JsonLdAdapter()->extract('https://shop.test/p?size=L&color=red', withJsonLd($json));
+
+        expect($result->snapshot?->price)->toBe('20.00');
+    }
+});
+
+test('offers pricing themselves through a priceSpecification still become choices', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Shirt',
+        'url' => 'https://shop.test/p',
+        'offers' => [
+            [
+                '@type' => 'Offer',
+                'sku' => 'S',
+                'priceSpecification' => ['@type' => 'UnitPriceSpecification', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Offer',
+                'sku' => 'L',
+                'priceSpecification' => ['@type' => 'UnitPriceSpecification', 'price' => '20.00', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p', withJsonLd($json));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and(array_map(fn ($variant): string => $variant->price, $result->variants))->toBe(['10.00', '20.00']);
+});

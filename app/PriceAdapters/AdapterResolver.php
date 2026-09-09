@@ -39,7 +39,7 @@ final readonly class AdapterResolver
         // Generic keys (jsonld etc.) never short-circuit — a host that
         // later gained a dedicated adapter must get it on the next check.
         if (! $persisted instanceof HostSpecificAdapter) {
-            return $this->runChain($url, $html, skipKey: null, context: $context);
+            return $this->readStock($this->runChain($url, $html, skipKey: null, context: $context), $html);
         }
 
         $result = $persisted->extract($url, $html, $context);
@@ -53,11 +53,11 @@ final readonly class AdapterResolver
         // present it as this product's price, which is how a wrong price
         // reaches a drop alert. Fail loudly instead.
         if (! $result->isSkip()) {
-            return $result->withAdapterKey($persisted->key());
+            return $this->readStock($result->withAdapterKey($persisted->key()), $html);
         }
 
         // The hint already ran and skipped — exclude it from the chain.
-        return $this->runChain($url, $html, $persistedKey, $context);
+        return $this->readStock($this->runChain($url, $html, $persistedKey, $context), $html);
     }
 
     private function runChain(string $url, string $html, ?string $skipKey, ?AdapterContext $context): ExtractionResult
@@ -75,6 +75,30 @@ final readonly class AdapterResolver
         }
 
         return ExtractionResult::failed('no_adapter_matched');
+    }
+
+    /**
+     * Last word on availability: when no adapter could read a structured
+     * signal, the page's own words decide. A shop that keeps its price and
+     * its cart button while printing "Tijdelijk niet leverbaar" was read as
+     * in stock before this (petmarkt.nl, verified 2026-09-09).
+     */
+    private function readStock(ExtractionResult $result, string $html): ExtractionResult
+    {
+        $snapshot = $result->snapshot;
+
+        if (! $result->isSuccess() || ! $snapshot instanceof ShopSnapshot || $snapshot->inStock !== null) {
+            return $result;
+        }
+
+        $phrase = StockText::unavailablePhrase($html);
+
+        if ($phrase === null) {
+            return $result;
+        }
+
+        return ExtractionResult::success($snapshot->with(inStock: false, stockSignal: 'text: ' . $phrase))
+            ->withAdapterKey((string) $result->adapterKey);
     }
 
     private function findByKey(string $key): ?ShopAdapter

@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * @property bool|null $current_in_stock True in stock, false out of stock, null when the shop's page did not say.
  * @property ShopHealth $health
  * @property string|null $pack_quantity
  * @property string|null $pack_unit

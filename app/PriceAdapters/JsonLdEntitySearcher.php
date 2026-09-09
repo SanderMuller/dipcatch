@@ -66,12 +66,20 @@ final readonly class JsonLdEntitySearcher
      */
     private static function weigh(array $entity, string $url, ?string $variantKey, JsonLdSearchState $state): void
     {
+        if (JsonLdOfferVariants::weigh($entity, $url, $variantKey, $state)) {
+            return;
+        }
+
         $matched = JsonLdMatch::attempt($entity, $url, $variantKey);
 
         if ($matched === null) {
             $state->product ??= $entity;
 
             return;
+        }
+
+        if ($variantKey !== null && JsonLdMatch::keyMatches($entity, $variantKey)) {
+            $state->keyMatched = true;
         }
 
         $precision = JsonLdMatch::precision($entity, $url, $variantKey);
@@ -109,6 +117,10 @@ final readonly class JsonLdEntitySearcher
             /** @var array<string, mixed> $variant */
             if (! in_array('Product', JsonLdEntities::typesOf($variant), strict: true)) {
                 continue;
+            }
+
+            if ($variantKey !== null && JsonLdMatch::keyMatches($variant, $variantKey)) {
+                $state->keyMatched = true;
             }
 
             $matched = JsonLdMatch::attempt($variant, $url, $variantKey);
