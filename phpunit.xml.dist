@@ -40,6 +40,13 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
+        <!-- The plan cadence is asserted on, so it is pinned here rather than
+             left to whichever .env the run happens to load. CI copies
+             .env.example and a developer has their own: the suite read 2 hours
+             on one and 6 on the other, and only CI noticed. -->
+        <env name="DIPCATCH_RECHECK_INTERVAL_HOURS" value="24"/>
+        <env name="PLAN_PRO_RECHECK_INTERVAL_HOURS" value="6"/>
+        <env name="PLAN_FREE_RECHECK_INTERVAL_HOURS" value=""/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="DIPCATCH_FETCHER_ALLOW_UNRESOLVED" value="true"/>
