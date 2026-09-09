@@ -3,6 +3,7 @@
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Support\RecheckJitter;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function (): void {
@@ -90,4 +91,42 @@ test('dispatch delay stays within configured jitter window', function (): void {
         $seconds = $delay->getTimestamp() - now()->getTimestamp();
         expect($seconds)->toBeGreaterThanOrEqual(0)->toBeLessThanOrEqual(5 * 60);
     }
+});
+
+test('dispatch delay never exceeds the SQS DelaySeconds ceiling', function (): void {
+    // SQS rejects `DelaySeconds` above 900 outright, so a wider configured
+    // window must be clamped rather than drawn from. 40 shops against a
+    // 60-minute window: uncapped, all 40 landing under 900s is a 1-in-2^40
+    // event, so this pins the clamp and not a lucky draw.
+    config()->set('dipcatch.recheck.interval_hours', 6);
+    config()->set('dipcatch.recheck.jitter_minutes', 60);
+    config()->set('dipcatch.scheduler.batch_size', 40);
+
+    $product = Product::factory()->create();
+    Shop::factory()->count(40)->for($product)->create(['last_checked_at' => now()->subDay()]);
+
+    $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
+
+    Queue::assertPushed(CheckShopPrice::class, 40);
+
+    /** @var iterable<CheckShopPrice> $jobs */
+    $jobs = Queue::pushed(CheckShopPrice::class);
+    foreach ($jobs as $job) {
+        $delay = $job->delay;
+        assert($delay instanceof DateTimeInterface);
+        $seconds = $delay->getTimestamp() - now()->getTimestamp();
+        expect($seconds)->toBeGreaterThanOrEqual(0)->toBeLessThanOrEqual(900);
+    }
+});
+
+test('the uniqueness window outlasts the widest delay a dispatch can carry', function (): void {
+    // `uniqueFor()` exists to hold the lock past the delayed job's start.
+    // Reading a different window than the dispatch does is the drift this
+    // pins: both must come from RecheckJitter.
+    config()->set('dipcatch.recheck.jitter_minutes', 60);
+
+    $shop = Shop::factory()->for(Product::factory())->create();
+
+    expect((new CheckShopPrice($shop))->uniqueFor())
+        ->toBeGreaterThan(RecheckJitter::maxSeconds());
 });

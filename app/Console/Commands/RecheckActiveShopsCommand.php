@@ -9,6 +9,7 @@ use App\Enums\ShopHealth;
 use App\Jobs\CheckShopPrice;
 use App\Models\Shop;
 use App\Support\Config as DipConfig;
+use App\Support\RecheckJitter;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -21,13 +22,16 @@ class RecheckActiveShopsCommand extends Command
 {
     public function handle(): int
     {
-        $jitterMinutes = DipConfig::int('dipcatch.recheck.jitter_minutes', 30);
+        // Clamp the range the draw comes from, never the drawn value: a
+        // `min($delay, 900)` would pile every over-ceiling draw onto exactly
+        // 900s, turning a spread into a spike.
+        $jitterSeconds = RecheckJitter::maxSeconds();
         $dispatched = 0;
 
         $this->dueQuery()
             ->limit(DipConfig::int('dipcatch.scheduler.batch_size', 200))
-            ->each(function (Shop $shop) use ($jitterMinutes, &$dispatched): void {
-                $delay = random_int(0, max(0, $jitterMinutes * 60));
+            ->each(function (Shop $shop) use ($jitterSeconds, &$dispatched): void {
+                $delay = random_int(0, $jitterSeconds);
                 dispatch(new CheckShopPrice($shop))
                     ->delay(now()->addSeconds($delay));
                 $dispatched++;

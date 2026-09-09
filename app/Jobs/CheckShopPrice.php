@@ -23,6 +23,7 @@ use App\Support\Config as DipConfig;
 use App\Support\ImageUrl;
 use App\Support\Iso4217;
 use App\Support\PackSize;
+use App\Support\RecheckJitter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -74,12 +75,14 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
     public function uniqueFor(): int
     {
-        // RecheckActiveShopsCommand dispatches with up to `jitter_minutes` of
+        // RecheckActiveShopsCommand dispatches with up to one jitter window of
         // delay; the scheduler ticks more frequently than that, so a short
         // 60s window would let the same offer be re-queued before the original
         // delayed job has started. Hold the uniqueness lock for the full
         // jitter window plus a buffer covering job timeout + queue scheduling.
-        return DipConfig::int('dipcatch.recheck.jitter_minutes', 30) * 60 + 600;
+        // Read the window through RecheckJitter so the lock cannot outlive or
+        // undercut the delay the command actually draws.
+        return RecheckJitter::maxSeconds() + 600;
     }
 
     public function handle(ShopFetcher $fetcher, AdapterResolver $resolver, CheckjebonSource $checkjebon, AhApiSource $ahApi): void

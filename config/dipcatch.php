@@ -57,6 +57,9 @@ return [
 
     'recheck' => [
         'interval_hours' => (int) env('DIPCATCH_RECHECK_INTERVAL_HOURS', 6),
+        // Spread each batch of rechecks over this window. Capped at the SQS
+        // `DelaySeconds` ceiling of 900s (15 min) by App\Support\RecheckJitter,
+        // so a larger value here has no effect.
         'jitter_minutes' => (int) env('DIPCATCH_RECHECK_JITTER_MINUTES', 30),
     ],
 
