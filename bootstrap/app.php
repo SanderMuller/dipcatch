@@ -4,6 +4,7 @@ use App\Console\Commands\DispatchDailyDigestsCommand;
 use App\Console\Commands\PruneOldChecksCommand;
 use App\Console\Commands\RecheckActiveShopsCommand;
 use App\Console\Commands\RefreshCheckjebonDatasetCommand;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
@@ -48,7 +49,10 @@ return Application::configure(basePath: dirname(__DIR__))
             ->everyMinute();
     })
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [
+        // `append()`, not `web()`: the security headers must land on API,
+        // webhook and MCP responses too, not only the web group.
+        $middleware->append([
+            SecurityHeaders::class,
             StrictTransportSecurity::class,
         ]);
 
