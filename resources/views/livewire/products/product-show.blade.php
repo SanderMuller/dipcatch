@@ -1,11 +1,9 @@
 <div>
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="flex items-start gap-4">
-            @if ($product->image_url)
-                <img src="{{ $product->image_url }}" alt="" class="size-16 rounded object-cover" />
-            @endif
-            <div>
-                <flux:heading size="xl">{{ $product->title }}</flux:heading>
+            <x-product-thumb :product="$product" size="size-16 sm:size-20" />
+            <div class="min-w-0">
+                <flux:heading size="xl" class="tracking-tight">{{ $product->title }}</flux:heading>
                 <flux:text class="mt-1 text-zinc-500">
                     {{ trans_choice(':count shop|:count shops', $shops->count(), ['count' => $shops->count()]) }}
                     · {{ $product->active ? __('Active') : __('Paused') }}
@@ -18,30 +16,29 @@
         </flux:button>
     </div>
 
-    <flux:card class="mt-6">
-        <flux:heading size="lg">{{ __('Price') }}</flux:heading>
-
-        <div class="mt-4 grid gap-4 sm:grid-cols-3">
-            <div>
-                <flux:text size="sm" class="text-zinc-500">{{ __('Cheapest now') }}</flux:text>
-                <flux:heading size="lg">
+    {{-- Three sibling numbers on one surface, divided rather than boxed. --}}
+    <flux:card class="mt-6 p-0!">
+        <dl class="grid divide-y divide-zinc-950/5 sm:grid-cols-3 sm:divide-x sm:divide-y-0 dark:divide-white/10">
+            <div class="p-5">
+                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Cheapest now') }}</dt>
+                <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
                     {{ \App\Support\MoneyFormatter::format($product->cheapest_price === null ? null : (string) $product->cheapest_price, $product->currency) }}
-                </flux:heading>
+                </dd>
                 @if ($product->cheapestShop)
-                    <flux:text size="sm" class="text-zinc-500">{{ $product->cheapestShop->host }}</flux:text>
+                    <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ $product->cheapestShop->host }}</dd>
                 @endif
             </div>
 
-            <div>
-                <flux:text size="sm" class="text-zinc-500">{{ __('Best value') }}</flux:text>
-                <flux:heading size="lg">
+            <div class="p-5">
+                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Best value') }}</dt>
+                <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
                     {{ \App\Livewire\Products\ProductList::unitPriceState($product->bestValueShop(), $product) }}
-                </flux:heading>
+                </dd>
             </div>
 
-            <div>
-                <flux:text size="sm" class="text-zinc-500">{{ __('Alerts below') }}</flux:text>
-                <flux:heading size="lg">
+            <div class="p-5">
+                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Alerts below') }}</dt>
+                <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
                     @if ($product->target_price !== null)
                         {{ \App\Support\MoneyFormatter::format((string) $product->target_price, $product->currency) }}
                     @elseif ($product->drop_threshold_pct !== null)
@@ -49,9 +46,9 @@
                     @else
                         {{ __('Any drop') }}
                     @endif
-                </flux:heading>
+                </dd>
             </div>
-        </div>
+        </dl>
     </flux:card>
 
     <flux:card class="mt-6">
@@ -106,19 +103,19 @@
 
         <div class="mt-4 overflow-x-auto">
             <table class="w-full text-start text-sm">
-                <thead class="border-b border-zinc-200 dark:border-zinc-700">
+                <thead class="border-b border-zinc-950/10 dark:border-white/10">
                     <tr>
-                        <th class="py-2 pe-3 text-start font-medium">{{ __('Shop') }}</th>
-                        <th class="py-2 pe-3 text-start font-medium">{{ __('Price') }}</th>
-                        <th class="hidden py-2 pe-3 text-start font-medium md:table-cell">{{ __('Unit price') }}</th>
-                        <th class="hidden py-2 pe-3 text-start font-medium md:table-cell">{{ __('In stock') }}</th>
-                        <th class="hidden py-2 pe-3 text-start font-medium md:table-cell">{{ __('Last checked') }}</th>
-                        <th class="py-2 text-end font-medium">{{ __('Actions') }}</th>
+                        <th class="py-2 pe-3 text-start font-medium whitespace-nowrap">{{ __('Shop') }}</th>
+                        <th class="py-2 pe-3 text-start font-medium whitespace-nowrap">{{ __('Price') }}</th>
+                        <th class="hidden py-2 pe-3 text-start font-medium whitespace-nowrap md:table-cell">{{ __('Unit price') }}</th>
+                        <th class="hidden py-2 pe-3 text-start font-medium whitespace-nowrap md:table-cell">{{ __('In stock') }}</th>
+                        <th class="hidden py-2 pe-3 text-start font-medium whitespace-nowrap md:table-cell">{{ __('Last checked') }}</th>
+                        <th class="py-2 text-end font-medium whitespace-nowrap">{{ __('Actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($shops as $shop)
-                        <tr class="border-b border-zinc-100 dark:border-zinc-800" wire:key="shop-{{ $shop->id }}">
+                        <tr class="border-b border-zinc-950/5 dark:border-white/5" wire:key="shop-{{ $shop->id }}">
                             <td class="py-3 pe-3">
                                 {!! \App\Support\Favicon::html($shop->host) !!}
                                 @if ($shop->notes)
@@ -127,7 +124,7 @@
                                     </flux:tooltip>
                                 @endif
                             </td>
-                            <td class="py-3 pe-3">
+                            <td class="py-3 pe-3 tabular-nums">
                                 {{ \App\Support\MoneyFormatter::format($shop->current_price === null ? null : (string) $shop->current_price, $shop->currency) }}
                                 {{-- A price that is only good until a date says so, or the
                                      number reads as permanent when it is not. --}}
@@ -144,7 +141,7 @@
                                     </flux:text>
                                 @endif
                             </td>
-                            <td class="hidden py-3 pe-3 md:table-cell">
+                            <td class="hidden py-3 pe-3 tabular-nums md:table-cell">
                                 {{ \App\Livewire\Products\ProductList::unitPriceState($shop, $product) }}
                             </td>
                             <td class="hidden py-3 pe-3 md:table-cell">

@@ -1,24 +1,29 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+{{-- No hardcoded `dark` class: @fluxAppearance decides the mode before
+     first paint from localStorage or the OS. Hardcoding it flashed a dark
+     page at everyone whose system is light. --}}
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white dark:bg-zinc-800">
-        <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
+    {{-- The same warm canvas as the marketing site, so the app a person
+         lands in after signing up looks like the page that sold it. --}}
+    <body class="min-h-dvh bg-amber-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50">
+        {{-- The same two blurred washes the marketing hero uses. They are what
+             gives that page its depth, and a flat tint could not reproduce it.
+             Fixed and behind everything, so scrolling and hit-testing are
+             untouched; light mode only, as on the marketing page. --}}
+        <div aria-hidden="true" class="pointer-events-none fixed -top-40 left-40 -z-10 size-[32rem] rounded-full bg-amber-200/40 blur-3xl dark:hidden"></div>
+        <div aria-hidden="true" class="pointer-events-none fixed right-0 -bottom-40 -z-10 size-[32rem] rounded-full bg-rose-200/40 blur-3xl dark:hidden"></div>
+        <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-900/5 bg-amber-50/80 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/80">
             <flux:sidebar.header>
                 <x-app-logo :sidebar="true" :href="route('app.dashboard')" wire:navigate />
-                {{-- Bell slot, desktop. Phase 2 fills it by creating the partial;
-                     no edit to this file is needed then. --}}
+                {{-- Bell slot, desktop. --}}
                 @includeWhen(view()->exists('partials.notification-bell'), 'partials.notification-bell')
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
-            {{--
-                Every navigation entry is declared here, in one place, including
-                pages that do not exist yet. Later phases add their own page
-                files and must not edit this layout: three of them become ready
-                at the same time and would otherwise collide in this one file.
-            --}}
+            {{-- Every navigation entry is declared here, in one place. --}}
             <flux:sidebar.nav>
                 <flux:sidebar.group class="grid">
                     <flux:sidebar.item icon="home" :href="route('app.dashboard')" :current="request()->routeIs('app.dashboard')" wire:navigate>
@@ -48,7 +53,7 @@
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>
 
-        <flux:header class="lg:hidden">
+        <flux:header class="border-b border-zinc-900/5 bg-amber-50/80 backdrop-blur-md lg:hidden dark:border-white/10 dark:bg-zinc-950/80">
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
 
             <flux:spacer />

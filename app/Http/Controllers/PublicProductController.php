@@ -82,18 +82,9 @@ final class PublicProductController extends Controller
         $now = CarbonImmutable::now();
         foreach ($segments as $segment) {
             $price = $segment->cheapest_price === null ? null : (string) $segment->cheapest_price;
-            $started = $segment->started_at;
             $ended = $segment->ended_at ?? $now;
-            // Larastan doesn't infer the datetime cast off the model's
-            // casts() method shape — narrow to CarbonInterface for PHPStan.
-            assert($started instanceof CarbonImmutable);
-            assert($ended instanceof CarbonImmutable);
-            /** @var string $startedIso — Larastan widens toIso8601String() to mixed; the @var pins it for the array shape below. */
-            $startedIso = $started->toIso8601String();
-            /** @var string $endedIso — same widening as above. */
-            $endedIso = $ended->toIso8601String();
-            $points[] = ['x' => $startedIso, 'y' => $price];
-            $points[] = ['x' => $endedIso, 'y' => $price];
+            $points[] = ['x' => $segment->started_at->toIso8601String(), 'y' => $price];
+            $points[] = ['x' => $ended->toIso8601String(), 'y' => $price];
         }
 
         return $points;

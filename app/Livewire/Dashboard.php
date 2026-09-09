@@ -21,13 +21,17 @@ class Dashboard extends Component
 {
     public function render(): View
     {
+        $activeDrops = $this->activeDrops();
+        $watching = $this->watching();
+
         return view('livewire.dashboard', [
             'trackedProducts' => $this->trackedProducts(),
-            'activeDropCount' => $this->activeDrops()->count(),
-            'activeDrops' => $this->activeDrops(),
+            'activeDropCount' => $activeDrops->count(),
+            'activeDrops' => $activeDrops,
+            'watching' => $watching,
             'lifetimeSavings' => $this->lifetimeSavings(),
             'canAddProduct' => app(PlanLimits::class)->canAddProduct($this->user()),
-            'hasAnyProduct' => Product::query()->where('user_id', $this->user()->id)->exists(),
+            'hasAnyProduct' => $watching->isNotEmpty(),
         ]);
     }
 
@@ -61,6 +65,23 @@ class Dashboard extends Component
             ->with(['cheapestShop', 'shops'])
             ->latest('last_notified_at')
             ->limit(10)
+            ->get();
+    }
+
+    /**
+     * The most recently tracked products, drops or not. Carries no `active`
+     * filter, so an empty result also answers "has this account any product
+     * at all" without a second query.
+     *
+     * @return EloquentCollection<int, Product>
+     */
+    private function watching(): EloquentCollection
+    {
+        return Product::query()
+            ->where('user_id', $this->user()->id)
+            ->with('cheapestShop')
+            ->latest('created_at')
+            ->limit(6)
             ->get();
     }
 

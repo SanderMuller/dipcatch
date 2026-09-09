@@ -34,6 +34,27 @@ it('drops the invitation once something is tracked', function (): void {
     livewire(Dashboard::class)->assertDontSee('Track your first product');
 });
 
+it('shows recently tracked products, paused ones included, and nobody elses', function (): void {
+    $user = User::factory()->create();
+    // Paused: the strip answers "what am I watching", which a paused product
+    // is still part of — the active filter belongs to the count above it.
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'My paused product', 'active' => false]);
+    Product::factory()->create(['title' => 'Someone elses product']);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertSee('Recently tracked')
+        ->assertSee('My paused product')
+        ->assertDontSee('Someone elses product');
+});
+
+it('hides the recently tracked strip until something is tracked', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    livewire(Dashboard::class)->assertDontSee('Recently tracked');
+});
+
 it('lists active drops and nobody elses', function (): void {
     $user = User::factory()->create();
     Product::factory()->create([
