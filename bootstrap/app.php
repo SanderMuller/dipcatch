@@ -40,7 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->onOneServer();
 
         $schedule->command(DispatchDailyDigestsCommand::class)
-            ->everyMinute()
+            ->everyFiveMinutes()
             ->withoutOverlapping()
             ->onOneServer();
     })

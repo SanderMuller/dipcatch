@@ -15,9 +15,9 @@ use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
  * Dispatches SendDailyDigest jobs for users whose local clock has reached the
  * configured send-hour and who haven't received today's digest yet.
  *
- * Runs every minute (see bootstrap/app.php schedule). The minute-granularity
- * is deliberate: at most a 60-second skew between "09:00 local" and the
- * actual dispatch.
+ * Runs every five minutes (see bootstrap/app.php schedule). The dispatch test
+ * is hour-granular, so the cadence only bounds the skew: at most five minutes
+ * between "09:00 local" and the actual dispatch.
  */
 #[Signature('dipcatch:dispatch-daily-digests')]
 #[Description('Dispatch SendDailyDigest jobs for users due for their daily price-drop email.')]
