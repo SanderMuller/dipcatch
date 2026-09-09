@@ -12,6 +12,8 @@ window.dipcatchChart = (canvas, payload, options) => {
     return new Chart(canvas, {
         type: 'line',
         data: payload,
-        options,
+        // The container sets the height; without this Chart.js keeps its own
+        // aspect ratio and grows past the fold on a wide screen.
+        options: { ...options, maintainAspectRatio: false, responsive: true },
     });
 };

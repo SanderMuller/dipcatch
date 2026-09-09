@@ -75,13 +75,16 @@
             </flux:select>
         </div>
 
+        {{-- Fixed height: Chart.js is responsive by default and would otherwise
+             grow to whatever the container allows, which ran the chart off the
+             fold. The Filament widget capped it at 260px for the same reason. --}}
         <div
-            class="mt-4"
+            class="mt-4 h-[260px]"
             wire:ignore
             x-data
             x-init="window.dipcatchChart($refs.canvas, @js($series), {{ $chartOptions }})"
         >
-            <canvas x-ref="canvas" height="260"></canvas>
+            <canvas x-ref="canvas"></canvas>
         </div>
     </flux:card>
 
