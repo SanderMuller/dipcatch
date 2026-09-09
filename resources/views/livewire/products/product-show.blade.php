@@ -86,16 +86,19 @@
     </flux:card>
 
     <flux:card class="mt-6">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <flux:heading size="lg">{{ __('Also sold at') }}</flux:heading>
+        {{-- Not "Also sold at": that phrase belongs to the suggestions panel
+             below, and a test asserts it is absent when nothing matches. --}}
+        <flux:heading size="lg">{{ __('Tracked shops') }}</flux:heading>
 
-            @if ($canAddShop)
-                <flux:button size="sm" icon="plus" x-on:click="$dispatch('open-add-shop')">{{ __('Add a shop') }}</flux:button>
-            @else
-                <flux:tooltip content="{{ __('Your plan allows no more shops for this product.') }}">
-                    <flux:button size="sm" icon="plus" disabled>{{ __('Add a shop') }}</flux:button>
-                </flux:tooltip>
-            @endif
+        {{-- The add-shop control and the limit explanation, shared with the
+             page this replaced: it states the count and the upgrade path
+             rather than merely disabling a button. --}}
+        <div class="mt-4">
+            @include('filament.partials.add-shop-header', [
+                'product' => $product,
+                'shopLimit' => $shopLimit,
+                'canAddShop' => $canAddShop,
+            ])
         </div>
 
         <div class="mt-4 overflow-x-auto">
@@ -113,9 +116,30 @@
                 <tbody>
                     @forelse ($shops as $shop)
                         <tr class="border-b border-zinc-100 dark:border-zinc-800" wire:key="shop-{{ $shop->id }}">
-                            <td class="py-3 pe-3">{!! \App\Support\Favicon::html($shop->host) !!}</td>
+                            <td class="py-3 pe-3">
+                                {!! \App\Support\Favicon::html($shop->host) !!}
+                                @if ($shop->notes)
+                                    <flux:tooltip content="{{ $shop->notes }}">
+                                        <flux:icon.pencil-square data-slot="notes_indicator" class="ms-1 inline size-3 text-zinc-400" />
+                                    </flux:tooltip>
+                                @endif
+                            </td>
                             <td class="py-3 pe-3">
                                 {{ \App\Support\MoneyFormatter::format($shop->current_price === null ? null : (string) $shop->current_price, $shop->currency) }}
+                                {{-- A price that is only good until a date says so, or the
+                                     number reads as permanent when it is not. --}}
+                                @php($promo = \App\Support\PromotionLabel::long($shop))
+                                @if ($promo)
+                                    <flux:text size="sm" class="text-zinc-500">{{ $promo }}</flux:text>
+                                @endif
+                                {{-- An offer only some shoppers can claim is named, so the
+                                     headline price is not read as everyone's price. --}}
+                                @php($conditional = $shop->conditionalOffer())
+                                @if ($conditional)
+                                    <flux:text size="sm" class="text-zinc-500">
+                                        {{ $conditional->label }} · {{ \App\Support\MoneyFormatter::format($conditional->price, $shop->currency) }}
+                                    </flux:text>
+                                @endif
                             </td>
                             <td class="hidden py-3 pe-3 md:table-cell">
                                 {{ \App\Livewire\Products\ProductList::unitPriceState($shop, $product) }}

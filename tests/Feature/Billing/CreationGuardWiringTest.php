@@ -1,12 +1,11 @@
 <?php declare(strict_types=1);
 
-use App\Filament\App\Resources\Products\Pages\CreateProductManual;
 use App\Livewire\Products\CreateProductFromUrl;
+use App\Livewire\Products\CreateProductManual;
 use App\Livewire\Shops\AddShop;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
-use Filament\Facades\Filament;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -68,16 +67,13 @@ it('refuses the product over the limit on the manual flow', function (): void {
     $user = User::factory()->create();
     Product::factory()->count(20)->create(['user_id' => $user->id]);
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
     Livewire::test(CreateProductManual::class)
-        ->fillForm([
-            'title' => 'One too many',
-            'currency' => 'EUR',
-            'drop_threshold_pct' => '10',
-            'drop_threshold_abs' => '0.50',
-        ])
-        ->call('create');
+        ->set('title', 'One too many')
+        ->set('currency', 'EUR')
+        ->set('drop_threshold_pct', '10')
+        ->set('drop_threshold_abs', '0.50')
+        ->call('save');
 
     expect(Product::query()->where('user_id', $user->id)->count())->toBe(20);
 });

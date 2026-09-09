@@ -12,6 +12,8 @@ use App\Http\Middleware\MarketingLocale;
 use App\Livewire\Billing\BillingPage;
 use App\Livewire\Connections\ConnectionsPage;
 use App\Livewire\Dashboard;
+use App\Livewire\Products\CreateProductFromUrl;
+use App\Livewire\Products\CreateProductManual;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\Settings\NotificationPreferences;
@@ -115,24 +117,19 @@ Route::middleware(ThrottleRequestsWithRedis::using('invitation'))->group(functio
 | Flux user-facing app  (specs/flux-user-app-migration.md)
 |--------------------------------------------------------------------------
 |
-| Built behind `/next` until the cutover, which repoints this group at `/app`
-| and deletes the Filament app panel. Every route the migration will need is
-| registered here in one place: several phases become ready at the same time
-| and would otherwise edit this file concurrently.
-|
-| Placeholders below are replaced by their real pages phase by phase. The
-| middleware matches the Filament panel's authMiddleware exactly, so the
-| access rules do not change at cutover.
+| The user-facing app. Every route is registered here in one place, and the
+| middleware matches the Filament panel's authMiddleware exactly, so the access
+| rules did not change when this replaced it.
 |
 */
-Route::prefix('next')
+Route::prefix('app')
     ->name('app.')
     ->middleware(['auth', EnsureEmailIsVerified::class])
     ->group(function (): void {
         Route::livewire('/', Dashboard::class)->name('dashboard');
         Route::livewire('products', ProductList::class)->name('products.index');
-        Route::view('products/create', 'next.placeholder')->name('products.create');
-        Route::view('products/create-manual', 'next.placeholder')->name('products.create-manual');
+        Route::livewire('products/create', CreateProductFromUrl::class)->name('products.create');
+        Route::livewire('products/create-manual', CreateProductManual::class)->name('products.create-manual');
         Route::livewire('products/{product}', ProductShow::class)->name('products.show');
         Route::view('products/{product}/edit', 'next.placeholder')->name('products.edit');
         Route::livewire('billing', BillingPage::class)->name('billing');

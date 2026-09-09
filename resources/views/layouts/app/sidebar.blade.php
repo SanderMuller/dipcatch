@@ -126,7 +126,7 @@
             settings would otherwise keep a wrong digest hour. The view
             short-circuits when timezone_detected_at is already set.
         --}}
-        @include('filament.app.timezone-autodetect')
+        @include('partials.timezone-autodetect')
 
         @fluxScripts
     </body>

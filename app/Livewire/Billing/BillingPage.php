@@ -40,6 +40,8 @@ class BillingPage extends Component
             'offersTrial' => $this->offersTrial(),
             'canUpgrade' => $this->canUpgrade(),
             'canManageBilling' => $this->canManageBilling(),
+            'isPastDue' => $this->user()->isPastDue(),
+            'isPro' => $this->user()->isPro(),
         ]);
     }
 

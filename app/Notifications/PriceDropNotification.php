@@ -2,7 +2,6 @@
 
 namespace App\Notifications;
 
-use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Drops\DropOutcome;
@@ -78,7 +77,7 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             ->title('Price drop: ' . $this->product->title)
             ->body($body)
             ->icon($this->product->image_url ?? '/favicon.svg')
-            ->data(['url' => ProductResource::getUrl('view', ['record' => $this->product])]);
+            ->data(['url' => route('app.products.show', $this->product)]);
     }
 
     /**
@@ -102,7 +101,7 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             'reference_kind' => $this->outcome->referenceKind,
             'drop_percent' => $this->outcome->dropPercent,
             'drop_absolute' => $this->outcome->dropAbsolute,
-            'view_url' => ProductResource::getUrl('view', ['record' => $this->product]),
+            'view_url' => route('app.products.show', $this->product),
         ];
     }
 }

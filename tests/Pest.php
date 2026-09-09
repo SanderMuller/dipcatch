@@ -1,8 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Billing\Plan;
-use App\Filament\App\Resources\Products\Pages\ViewProduct;
-use App\Filament\App\Resources\Products\RelationManagers\ShopsRelationManager;
+use App\Livewire\Products\ProductShow;
 use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
 use App\Models\Product;
@@ -324,12 +323,14 @@ function lidlPage(
  * Mount the per-product Shops relation manager scoped to a given product.
  * Centralises the (ownerRecord + pageClass) wiring so tests don't repeat it.
  */
+/**
+ * The shops list moved from a Filament relation manager onto the Flux product
+ * page; the helper keeps its name so the tests that drive it did not all have
+ * to change shape.
+ */
 function mountShopsRelationManager(Product $product): Testable
 {
-    return Pest\Livewire\livewire(ShopsRelationManager::class, [
-        'ownerRecord' => $product,
-        'pageClass' => ViewProduct::class,
-    ]);
+    return Pest\Livewire\livewire(ProductShow::class, ['product' => $product]);
 }
 
 /**

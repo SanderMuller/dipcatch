@@ -2,7 +2,6 @@
 
 namespace App\Notifications;
 
-use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -62,7 +61,7 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
             ->title('Target price: ' . $this->product->title)
             ->body($this->body())
             ->icon($this->product->image_url ?? '/favicon.svg')
-            ->data(['url' => ProductResource::getUrl('view', ['record' => $this->product])]);
+            ->data(['url' => route('app.products.show', $this->product)]);
     }
 
     /**
@@ -80,7 +79,7 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
                 ? null
                 : (string) $this->product->target_price,
             'host' => $this->snapshotHost,
-            'view_url' => ProductResource::getUrl('view', ['record' => $this->product]),
+            'view_url' => route('app.products.show', $this->product),
         ];
     }
 

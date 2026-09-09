@@ -1,11 +1,11 @@
 <?php declare(strict_types=1);
 
-use App\Filament\App\Resources\Products\Widgets\PriceHistoryChart;
+use App\Charts\PriceHistoryChartOptions;
+use App\Charts\PriceHistorySeries;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
-use Filament\Support\RawJs;
 
 /**
  * The dataset a chart plots under a given legend label.
@@ -14,7 +14,7 @@ use Filament\Support\RawJs;
  */
 function chartSeries(Product $product, string $label, string $range = '90'): array
 {
-    foreach (makeChartFor($product, $range)->computeData()['datasets'] as $dataset) {
+    foreach (makeChartFor($product, $range)->data()['datasets'] as $dataset) {
         if (($dataset['label'] ?? null) === $label) {
             return $dataset;
         }
@@ -23,19 +23,15 @@ function chartSeries(Product $product, string $label, string $range = '90'): arr
     return [];
 }
 
-function makeChartFor(Product $product, string $range = '90'): PriceHistoryChart
+function makeChartFor(Product $product, string $range = '90'): PriceHistorySeries
 {
-    $widget = new PriceHistoryChart();
-    $widget->record = $product;
-    $widget->filter = $range;
-
-    return $widget;
+    return new PriceHistorySeries($product, $range);
 }
 
 test('empty product returns empty labels', function (): void {
     $product = Product::factory()->create();
 
-    $data = makeChartFor($product)->computeData();
+    $data = makeChartFor($product)->data();
 
     expect($data['labels'])->toBe([]);
 });
@@ -57,7 +53,7 @@ test('renders cheapest segments as a stepped line', function (): void {
         'ended_at' => null,
     ]);
 
-    $data = makeChartFor($product)->computeData();
+    $data = makeChartFor($product)->data();
 
     /** @var list<array<string, mixed>> $datasets */
     $datasets = $data['datasets'];
@@ -86,7 +82,7 @@ test('respects the range filter', function (): void {
         'ended_at' => null,
     ]);
 
-    $thirtyDay = makeChartFor($product, '30')->computeData();
+    $thirtyDay = makeChartFor($product, '30')->data();
     /** @var list<array<string, mixed>> $datasets */
     $datasets = $thirtyDay['datasets'];
     $cheapest = collect($datasets)->first(static function (array $set): bool {
@@ -139,7 +135,7 @@ test('notification markers are scoped to the active range filter', function (): 
         'new_price' => '50.00',
     ]);
 
-    $thirtyDay = makeChartFor($product, '30')->computeData();
+    $thirtyDay = makeChartFor($product, '30')->data();
     /** @var list<array<string, mixed>> $datasets */
     $datasets = $thirtyDay['datasets'];
     $notified = collect($datasets)->firstWhere('label', 'Notified');
@@ -151,7 +147,7 @@ test('notification markers are scoped to the active range filter', function (): 
         ->and($notified['data'])->not->toContain(60.0);
 
     // Sanity: "All time" still includes both.
-    $allTime = makeChartFor($product, 'all')->computeData();
+    $allTime = makeChartFor($product, 'all')->data();
     /** @var list<array<string, mixed>> $datasetsAll */
     $datasetsAll = $allTime['datasets'];
     $notifiedAll = collect($datasetsAll)->firstWhere('label', 'Notified');
@@ -161,10 +157,7 @@ test('notification markers are scoped to the active range filter', function (): 
 });
 
 test('chart options carry the currency-aware tooltip formatter', function (): void {
-    $options = (new ReflectionMethod(PriceHistoryChart::class, 'getOptions'))->invoke(new PriceHistoryChart());
-
-    expect($options)->toBeInstanceOf(RawJs::class);
-    assert($options instanceof RawJs);
+    $options = PriceHistoryChartOptions::forProduct(Product::factory()->create());
 
     expect($options->toHtml())
         ->toContain('Intl.NumberFormat')
@@ -172,8 +165,7 @@ test('chart options carry the currency-aware tooltip formatter', function (): vo
 });
 
 test('the x axis renders dates, not full timestamps, and thins its ticks', function (): void {
-    $options = (new ReflectionMethod(PriceHistoryChart::class, 'getOptions'))->invoke(new PriceHistoryChart());
-    assert($options instanceof RawJs);
+    $options = PriceHistoryChartOptions::forProduct(Product::factory()->create());
 
     // The label keeps the full stamp for the tooltip; the axis shows the
     // date. A rotated stamp ate two thirds of the plot at phone width.
@@ -194,8 +186,7 @@ test('the per-unit axis is left out when no shop states a pack size', function (
         'ended_at' => null,
     ]);
 
-    $options = (new ReflectionMethod(PriceHistoryChart::class, 'getOptions'))->invoke(makeChartFor($product));
-    assert($options instanceof RawJs);
+    $options = PriceHistoryChartOptions::forProduct($product);
 
     expect($options->toHtml())->not->toContain('Per unit');
 });
@@ -210,8 +201,7 @@ test('the per-unit axis appears once a shop states a pack size', function (): vo
         'ended_at' => null,
     ]);
 
-    $options = (new ReflectionMethod(PriceHistoryChart::class, 'getOptions'))->invoke(makeChartFor($product));
-    assert($options instanceof RawJs);
+    $options = PriceHistoryChartOptions::forProduct($product);
 
     expect($options->toHtml())->toContain('Per unit');
 });
@@ -240,11 +230,10 @@ test('the per-unit axis stays declared when the range in view shows no unit data
     ]);
 
     $chart = makeChartFor($product, '30');
-    $options = (new ReflectionMethod(PriceHistoryChart::class, 'getOptions'))->invoke($chart);
-    assert($options instanceof RawJs);
+    $options = PriceHistoryChartOptions::forProduct($product);
 
     $unitSeries = array_filter(
-        $chart->computeData()['datasets'],
+        $chart->data()['datasets'],
         fn (array $dataset): bool => ($dataset['yAxisID'] ?? null) === 'unit',
     );
 

@@ -3,7 +3,7 @@
 use App\Filament\Admin\Resources\Disputes\Pages\ListDisputes;
 use App\Filament\Admin\Resources\Subscribers\Pages\ListSubscribers;
 use App\Filament\Admin\Widgets\RevenueOverviewWidget;
-use App\Filament\App\Pages\Billing;
+use App\Livewire\Billing\BillingPage;
 use App\Models\Product;
 use App\Models\StripeDispute;
 use App\Models\StripePayment;
@@ -21,9 +21,8 @@ it('shows a free account its usage and the upgrade route', function (): void {
     Product::factory()->count(3)->create(['user_id' => $user->id]);
 
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(Billing::class)
+    livewire(BillingPage::class)
         ->assertSee('Free')
         ->assertSee('3')
         ->assertSee('Start 14-day trial');
@@ -34,9 +33,8 @@ it('offers a pro account the stripe portal instead of checkout', function (): vo
     subscribeUser($user);
 
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(Billing::class)
+    livewire(BillingPage::class)
         ->assertSee('Manage subscription')
         ->assertDontSee('Upgrade to Pro');
 });
@@ -46,9 +44,8 @@ it('warns a past due account, keeps its Pro, and does not threaten its data', fu
     subscribeUser($user, 'past_due');
 
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(Billing::class)
+    livewire(BillingPage::class)
         ->assertSee('Your last payment did not go through')
         ->assertSee('Your tracked products keep working either way.')
         // The banner says "keep Pro", so the plan must still read Pro.
@@ -62,9 +59,8 @@ it('says why pro is off after a lost chargeback, and offers no way to buy again'
     subscribeUser($user);
 
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(Billing::class)
+    livewire(BillingPage::class)
         ->assertSee('Pro is paused after a chargeback')
         ->assertDontSee('Start 14-day trial')
         ->assertDontSee('Upgrade to Pro');
@@ -77,9 +73,8 @@ it('does not promise a trial to a former subscriber', function (): void {
     subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subDay());
 
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(Billing::class)
+    livewire(BillingPage::class)
         ->assertSee('Upgrade to Pro')
         ->assertDontSee('Start 14-day trial');
 });

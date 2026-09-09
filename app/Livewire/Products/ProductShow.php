@@ -7,11 +7,14 @@ use App\Billing\Entitlements;
 use App\Billing\HistoryWindow;
 use App\Billing\Plan;
 use App\Billing\PlanLimits;
+use App\Charts\PriceHistoryChartOptions;
 use App\Charts\PriceHistorySeries;
-use App\Filament\App\Resources\Products\Widgets\PriceHistoryChartOptions;
+use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Support\UrlNormalizer;
 use Illuminate\Contracts\View\View;
+use InvalidArgumentException;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -29,6 +32,8 @@ class ProductShow extends Component
     #[Url(as: 'range', except: '90')]
     public string $range = '90';
 
+    public ?string $shopMessage = null;
+
     public function mount(Product $product): void
     {
         // Ownership is checked here, not left to a scoped query: this component
@@ -44,6 +49,68 @@ class ProductShow extends Component
 
         $this->product->forceFill(['active' => ! $this->product->active])->save();
         $this->product->refresh();
+    }
+
+    /**
+     * Repair a shop's URL when the product moved. The re-check runs
+     * synchronously because the person is waiting on the new price, and a
+     * sync dispatch also bypasses ShouldBeUnique — a background recheck
+     * already holding the per-offer lock would otherwise swallow this run.
+     */
+    public function saveShopUrl(string $shopId, string $url): void
+    {
+        $shop = Shop::query()->findOrFail($shopId);
+
+        $this->authorize('update', $shop);
+
+        try {
+            $normalized = UrlNormalizer::normalize(trim($url));
+        } catch (InvalidArgumentException) {
+            $this->shopMessage = 'That URL is not valid';
+
+            return;
+        }
+
+        if (UrlNormalizer::hash($normalized) === $shop->url_hash) {
+            $this->shopMessage = 'That URL is already saved. Nothing to update.';
+
+            return;
+        }
+
+        $collision = Shop::query()
+            ->where('product_id', $shop->product_id)
+            ->where('url_hash', UrlNormalizer::hash($normalized))
+            ->whereKeyNot($shop->id)
+            ->exists();
+
+        if ($collision) {
+            $this->shopMessage = 'Another shop for this product already uses that URL';
+
+            return;
+        }
+
+        $shop->updateUrl($normalized);
+
+        dispatch_sync(new CheckShopPrice($shop->refresh()));
+
+        $this->shopMessage = 'Shop URL updated and price re-checked';
+        $this->product->refresh();
+    }
+
+    /**
+     * Private to the owner: shipping limits, coupons, payment quirks.
+     */
+    public function saveShopNotes(string $shopId, ?string $notes): void
+    {
+        $shop = Shop::query()->findOrFail($shopId);
+
+        $this->authorize('update', $shop);
+
+        $trimmed = is_string($notes) ? trim($notes) : '';
+
+        $shop->update(['notes' => $trimmed === '' ? null : $trimmed]);
+
+        $this->shopMessage = 'Notes saved';
     }
 
     public function removeShop(string $shopId): void
@@ -68,6 +135,7 @@ class ProductShow extends Component
             'historyNotice' => $this->historyNotice(),
             'shops' => $this->product->shops()->orderBy('current_price')->get(),
             'canAddShop' => app(PlanLimits::class)->canAddShop($this->product),
+            'shopLimit' => $this->product->user?->entitlements()->maxShopsPerProduct(),
         ]);
     }
 

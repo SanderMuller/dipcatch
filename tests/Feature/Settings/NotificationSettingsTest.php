@@ -1,16 +1,13 @@
 <?php declare(strict_types=1);
 
-use App\Filament\App\Pages\NotificationSettings;
+use App\Livewire\Settings\NotificationPreferences;
 use App\Models\User;
 use App\Notifications\TestNotification;
-use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
 
 use function Pest\Livewire\livewire;
 
-beforeEach(function (): void {
-    Filament::setCurrentPanel('app');
-});
+beforeEach(function (): void {});
 
 test('page hydrates with the user current preferences', function (): void {
     $user = User::factory()->create([
@@ -22,11 +19,11 @@ test('page hydrates with the user current preferences', function (): void {
 
     $this->actingAs($user);
 
-    livewire(NotificationSettings::class)
-        ->assertSet('data.notify_via_email', false)
-        ->assertSet('data.notify_via_filament', true)
-        ->assertSet('data.notify_via_push', false)
-        ->assertSet('data.default_currency', 'USD');
+    livewire(NotificationPreferences::class)
+        ->assertSet('notify_via_email', false)
+        ->assertSet('notify_via_filament', true)
+        ->assertSet('notify_via_push', false)
+        ->assertSet('default_currency', 'USD');
 });
 
 test('save persists toggles + currency', function (): void {
@@ -38,11 +35,11 @@ test('save persists toggles + currency', function (): void {
     ]);
     $this->actingAs($user);
 
-    livewire(NotificationSettings::class)
-        ->set('data.notify_via_email', false)
-        ->set('data.notify_via_filament', false)
-        ->set('data.notify_via_push', true)
-        ->set('data.default_currency', 'GBP')
+    livewire(NotificationPreferences::class)
+        ->set('notify_via_email', false)
+        ->set('notify_via_filament', false)
+        ->set('notify_via_push', true)
+        ->set('default_currency', 'GBP')
         ->call('save')
         ->assertHasNoErrors();
 
@@ -63,9 +60,9 @@ test('test action dispatches a TestNotification to the current user', function (
     ]);
     $this->actingAs($user);
 
-    livewire(NotificationSettings::class)
-        ->callAction('test')
-        ->assertHasNoActionErrors();
+    livewire(NotificationPreferences::class)
+        ->call('sendTest')
+        ->assertDispatched('test-sent');
 
     Notification::assertSentTo($user, TestNotification::class);
 });

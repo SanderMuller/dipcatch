@@ -159,5 +159,5 @@ it('states the shop limit instead of offering another', function (): void {
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product])
-        ->assertSee('Your plan allows no more shops for this product.');
+        ->assertSee('This product is at its shop limit');
 });

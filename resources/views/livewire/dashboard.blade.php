@@ -42,6 +42,7 @@
                     <tr>
                         <th class="py-2 pe-3 text-start font-medium">{{ __('Product') }}</th>
                         <th class="py-2 pe-3 text-start font-medium">{{ __('Now') }}</th>
+                        <th class="hidden py-2 pe-3 text-start font-medium md:table-cell">{{ __('Best value') }}</th>
                         <th class="hidden py-2 pe-3 text-start font-medium md:table-cell">{{ __('Notified at') }}</th>
                         <th class="hidden py-2 text-start font-medium md:table-cell">{{ __('Shop') }}</th>
                     </tr>
@@ -56,6 +57,13 @@
                                 {{ \App\Support\MoneyFormatter::format($product->cheapest_price === null ? null : (string) $product->cheapest_price, $product->currency) }}
                             </td>
                             <td class="hidden py-3 pe-3 md:table-cell">
+                                {{ \App\Livewire\Products\ProductList::unitPriceState($product->bestValueShop(), $product) }}
+                                @php($bestLabel = \App\Support\PromotionLabel::withHost($product->bestValueShop()))
+                                @if ($bestLabel)
+                                    <flux:text size="sm" class="text-zinc-500">{{ $bestLabel }}</flux:text>
+                                @endif
+                            </td>
+                            <td class="hidden py-3 pe-3 md:table-cell">
                                 {{ \App\Support\MoneyFormatter::format($product->last_notified_price === null ? null : (string) $product->last_notified_price, $product->currency) }}
                             </td>
                             <td class="hidden py-3 md:table-cell">
@@ -64,7 +72,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="py-10 text-center">
+                            <td colspan="5" class="py-10 text-center">
                                 <flux:text class="text-zinc-500">{{ __('No active drops right now.') }}</flux:text>
                                 <flux:text size="sm" class="text-zinc-400">{{ __("DipCatch is watching. We'll alert you when a price drops below your threshold.") }}</flux:text>
                             </td>

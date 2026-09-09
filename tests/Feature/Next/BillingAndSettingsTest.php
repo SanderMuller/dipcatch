@@ -39,7 +39,7 @@ it('does not offer checkout to a blocked account but still reaches the portal', 
     $this->actingAs($user);
 
     livewire(BillingPage::class)
-        ->assertSee('Pro is on hold')
+        ->assertSee('Pro is paused after a chargeback')
         ->assertSee('Manage subscription')
         ->assertDontSee('Start 14-day trial');
 });

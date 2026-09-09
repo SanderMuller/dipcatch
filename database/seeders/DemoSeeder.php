@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Billing\Plan;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
-use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Invitation;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
@@ -561,7 +560,7 @@ final class DemoSeeder extends Seeder
             ->value('id');
 
         $notificationId = (string) Str::uuid();
-        $viewUrl = ProductResource::getUrl('view', ['record' => $product->id], panel: 'app');
+        $viewUrl = route('app.products.show', $product->id);
 
         $event = PriceDropEvent::query()->create([
             'product_id' => $product->id,

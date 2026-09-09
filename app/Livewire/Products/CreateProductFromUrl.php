@@ -6,7 +6,6 @@ use App\Actions\Products\CreateProductWithShop;
 use App\Actions\Products\ProductDraft;
 use App\Actions\Shops\ProbeOutcome;
 use App\Billing\PlanLimitReached;
-use App\Filament\App\Resources\Products\ProductResource;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\PriceCheck;
 use App\Models\Product;
@@ -135,7 +134,7 @@ class CreateProductFromUrl extends Component
             ->body("Now tracking {$product->title} on {$this->host}.")
             ->send();
 
-        $this->redirect(ProductResource::getUrl('view', ['record' => $product], panel: 'app'));
+        $this->redirect(route('app.products.show', $product));
     }
 
     /**

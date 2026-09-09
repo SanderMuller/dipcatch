@@ -5,7 +5,7 @@
     $errorTextClass = 'mt-1 text-xs text-red-600';
     $primaryBtn = 'inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-60';
     $ghostBtn = 'inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10';
-    $manualCreateUrl = \App\Filament\App\Resources\Products\ProductResource::getUrl('create-manual', panel: 'app');
+    $manualCreateUrl = route('app.products.create-manual');
 @endphp
 
 <div class="space-y-4 max-w-2xl">
@@ -60,7 +60,7 @@
                 <div class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
                     This URL is already tracked on
                     <a
-                        href="{{ \App\Filament\App\Resources\Products\ProductResource::getUrl('view', ['record' => $existingTrackedProduct['id']], panel: 'app') }}"
+                        href="{{ route('app.products.show', $existingTrackedProduct['id']) }}"
                         class="font-semibold underline"
                     >{{ $existingTrackedProduct['title'] }}</a>.
                     You can still create a separate product for it.

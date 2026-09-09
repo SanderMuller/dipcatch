@@ -1,12 +1,12 @@
 <?php declare(strict_types=1);
 
-namespace App\Filament\App\Resources\Products\Widgets;
+namespace App\Charts;
 
 use App\Models\Product;
 use Filament\Support\RawJs;
 
 /**
- * The Chart.js options for {@see PriceHistoryChart}.
+ * The Chart.js options for {@see PriceHistorySeries}.
  *
  * Kept out of the widget so the axis rules can be read — and tested —
  * without the data building around them. A PHP array cannot carry a JS

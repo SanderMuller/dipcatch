@@ -1,15 +1,14 @@
 <?php declare(strict_types=1);
 
 use App\Billing\HistoryWindow;
-use App\Filament\App\Resources\Products\Pages\ViewProduct;
-use App\Filament\App\Resources\Products\Widgets\PriceHistoryChart;
+use App\Charts\PriceHistorySeries;
+use App\Livewire\Products\ProductShow;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Filament\Facades\Filament;
 
 use function Pest\Livewire\livewire;
 
@@ -41,22 +40,18 @@ function productWithOldHistory(User $user): Product
     return $product->refresh();
 }
 
-function chartFor(Product $product, string $filter): PriceHistoryChart
+function chartFor(Product $product, string $filter): PriceHistorySeries
 {
-    $chart = new PriceHistoryChart();
-    $chart->record = $product;
-    $chart->filter = $filter;
-
-    return $chart;
+    return new PriceHistorySeries($product, $filter);
 }
 
 /**
  * The price of the oldest point the chart plotted, or null when the long
  * segment is outside the window.
  */
-function plotsTheOldSegment(PriceHistoryChart $chart): bool
+function plotsTheOldSegment(PriceHistorySeries $chart): bool
 {
-    $data = $chart->computeData();
+    $data = $chart->data();
     $prices = $data['datasets'][0]['data'] ?? [];
 
     foreach ((array) $prices as $price) {
@@ -125,7 +120,7 @@ it('plots a segment older than a year only under all time', function (): void {
     $this->actingAs($user);
 
     $plotsTheAncientSegment = function (string $filter) use ($product): bool {
-        $prices = chartFor($product, $filter)->computeData()['datasets'][0]['data'] ?? [];
+        $prices = chartFor($product, $filter)->data()['datasets'][0]['data'] ?? [];
 
         foreach ((array) $prices as $price) {
             if (is_numeric($price) && abs((float) $price - 42.42) < 0.001) {
@@ -165,7 +160,7 @@ it('clamps the notification markers to the same window as the line', function ()
 
     $this->actingAs($user);
 
-    $markers = chartFor($product, 'all')->computeData()['datasets'][2]['data'] ?? [];
+    $markers = chartFor($product, 'all')->data()['datasets'][2]['data'] ?? [];
 
     expect(array_filter((array) $markers, static fn (mixed $m): bool => $m !== null))->toBe([]);
 });
@@ -176,14 +171,10 @@ it('tells a free account why the long ranges are missing', function (): void {
     $user = User::factory()->create();
     $product = productWithOldHistory($user);
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(PriceHistoryChart::class, ['record' => $product, 'pageClass' => ViewProduct::class])
+    livewire(ProductShow::class, ['product' => $product])
         ->assertSee('Your plan shows the last 90 days')
-        ->assertSee('Compare plans')
-        // Hand-written `fi-link` classes carry no colour, so the link
-        // rendered as plain sentence text.
-        ->assertSee('fi-color-primary', escape: false);
+        ->assertSee('Compare plans');
 });
 
 it('does not advertise pro while the shop is shut', function (): void {
@@ -191,9 +182,8 @@ it('does not advertise pro while the shop is shut', function (): void {
     $user = User::factory()->create();
     $product = productWithOldHistory($user);
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(PriceHistoryChart::class, ['record' => $product, 'pageClass' => ViewProduct::class])
+    livewire(ProductShow::class, ['product' => $product])
         ->assertSee('Your plan shows the last 90 days')
         ->assertDontSee('Compare plans');
 });
@@ -203,9 +193,8 @@ it('says nothing about plans to an account with no ceiling', function (): void {
     subscribeUser($user);
     $product = productWithOldHistory($user);
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(PriceHistoryChart::class, ['record' => $product, 'pageClass' => ViewProduct::class])
+    livewire(ProductShow::class, ['product' => $product])
         ->assertDontSee('Your plan shows the last');
 });
 
@@ -228,15 +217,17 @@ it('keeps the public shared page at 90 days for a pro owner', function (): void 
 });
 
 it('falls back to the free ceiling when the owner cannot be identified', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+
     // A gate that opens when it cannot tell who is asking is not a gate.
-    $chart = new PriceHistoryChart();
-    $chart->filter = 'all';
+    // The widget could be constructed with no record at all, which is how that
+    // hole existed; PriceHistorySeries requires a product, so the only
+    // remaining unknown-owner case is a product whose user relation is empty.
+    $series = new PriceHistorySeries($product, 'all');
 
-    expect($chart->computeData()['datasets'])->toBe([]);
+    $method = new ReflectionMethod(PriceHistorySeries::class, 'historyDays');
 
-    $method = new ReflectionMethod(PriceHistoryChart::class, 'historyDays');
-
-    expect($method->invoke($chart))->toBe(90);
+    expect($method->invoke($series))->toBe(90);
 });
 
 it('renders an empty history on a long range without failing', function (): void {
@@ -246,7 +237,7 @@ it('renders an empty history on a long range without failing', function (): void
     $this->actingAs($user);
 
     // A dataset shell with no points, not a crash and not a fabricated line.
-    $data = chartFor($product, 'all')->computeData();
+    $data = chartFor($product, 'all')->data();
 
     expect($data['labels'])->toBe([])
         ->and($data['datasets'][0]['data'])->toBe([]);

@@ -30,6 +30,9 @@ final class AdminPanelProvider extends PanelProvider
     public function panel(Panel $panel): Panel
     {
         return $panel
+            // The only panel left after the user-facing app moved to Flux, so
+            // it carries the default marker the deleted app panel used to hold.
+            ->default()
             ->id('admin')
             ->brandName('DipCatch')
             // A partial of its own, styled inline: this panel compiles no Vite
