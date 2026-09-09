@@ -9,9 +9,15 @@ use Carbon\CarbonImmutable;
 
 use function Pest\Livewire\livewire;
 
-function ownedProduct(User $user, array $attributes = []): Product
+function ownedProduct(User $user, ?string $title = null, ?string $cheapestPrice = null, bool $active = true): Product
 {
-    return Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', ...$attributes]);
+    return Product::factory()->create([
+        'user_id' => $user->id,
+        'currency' => 'EUR',
+        'title' => $title ?? 'Tracked product',
+        'cheapest_price' => $cheapestPrice,
+        'active' => $active,
+    ]);
 }
 
 it('refuses a product owned by someone else', function (): void {
@@ -23,7 +29,7 @@ it('refuses a product owned by someone else', function (): void {
 
 it('shows the product, its price and its shops', function (): void {
     $user = User::factory()->create();
-    $product = ownedProduct($user, ['title' => 'Coffee beans', 'cheapest_price' => '12.49']);
+    $product = ownedProduct($user, title: 'Coffee beans', cheapestPrice: '12.49');
     // `host` is derived from the URL, so setting it directly is ignored.
     Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '12.49']);
 
@@ -37,7 +43,7 @@ it('shows the product, its price and its shops', function (): void {
 
 it('pauses and resumes', function (): void {
     $user = User::factory()->create();
-    $product = ownedProduct($user, ['active' => true]);
+    $product = ownedProduct($user, active: true);
 
     $this->actingAs($user);
 
@@ -109,9 +115,11 @@ it('clamps a forged range to the plan ceiling', function (): void {
 
     // `range` reaches the component from the URL, so the menu is not the
     // enforcement point — the clamp is.
-    $component = livewire(ProductShow::class, ['product' => $product, 'range' => 'all']);
+    $component = livewire(ProductShow::class, ['product' => $product])->set('range', 'all');
 
-    expect(json_encode($component->viewData('series')))->not->toContain('99.99');
+    $series = $component->viewData('series');
+
+    expect(json_encode(is_array($series) ? $series : []))->not->toContain('99.99');
 });
 
 it('tells a free account why the long ranges are missing', function (): void {

@@ -9,8 +9,12 @@ use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\UseCasePageController;
 use App\Http\Middleware\MarketingLocale;
+use App\Livewire\Billing\BillingPage;
+use App\Livewire\Connections\ConnectionsPage;
+use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
+use App\Livewire\Settings\NotificationPreferences;
 use App\Support\UseCases;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -125,15 +129,15 @@ Route::prefix('next')
     ->name('app.')
     ->middleware(['auth', EnsureEmailIsVerified::class])
     ->group(function (): void {
-        Route::view('/', 'next.placeholder')->name('dashboard');
+        Route::livewire('/', Dashboard::class)->name('dashboard');
         Route::livewire('products', ProductList::class)->name('products.index');
         Route::view('products/create', 'next.placeholder')->name('products.create');
         Route::view('products/create-manual', 'next.placeholder')->name('products.create-manual');
         Route::livewire('products/{product}', ProductShow::class)->name('products.show');
         Route::view('products/{product}/edit', 'next.placeholder')->name('products.edit');
-        Route::view('billing', 'next.placeholder')->name('billing');
-        Route::view('notifications', 'next.placeholder')->name('notifications');
-        Route::view('connections', 'next.placeholder')->name('connections');
+        Route::livewire('billing', BillingPage::class)->name('billing');
+        Route::livewire('notifications', NotificationPreferences::class)->name('notifications');
+        Route::livewire('connections', ConnectionsPage::class)->name('connections');
     });
 
 require __DIR__ . '/settings.php';
