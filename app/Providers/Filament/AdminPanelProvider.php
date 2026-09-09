@@ -2,7 +2,10 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Widgets\OperationsOverviewWidget;
 use App\Filament\Admin\Widgets\RevenueOverviewWidget;
+use App\Filament\Admin\Widgets\ShopsNeedingAttentionWidget;
+use App\Filament\Admin\Widgets\SubscriptionOverviewWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -12,7 +15,6 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Contracts\View\View;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -29,7 +31,12 @@ final class AdminPanelProvider extends PanelProvider
     {
         return $panel
             ->id('admin')
-            ->brandLogo(fn (): View => view('filament.partials.brand'))
+            ->brandName('DipCatch')
+            // A partial of its own, styled inline: this panel compiles no Vite
+            // theme, so the app panel's `h-8 w-8` utilities do not exist in its
+            // CSS and the 512px logo rendered at full size over the sidebar.
+            ->brandLogo(fn (): View => view('filament.partials.brand-admin'))
+            ->brandLogoHeight('2rem')
             ->favicon(asset('favicon.png'))
             ->path('admin')
             ->authGuard('web')
@@ -44,8 +51,10 @@ final class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\\Filament\\Admin\\Widgets')
             ->widgets([
                 AccountWidget::class,
+                OperationsOverviewWidget::class,
+                SubscriptionOverviewWidget::class,
                 RevenueOverviewWidget::class,
-                FilamentInfoWidget::class,
+                ShopsNeedingAttentionWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

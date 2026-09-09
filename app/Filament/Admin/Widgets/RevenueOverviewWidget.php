@@ -5,13 +5,11 @@ namespace App\Filament\Admin\Widgets;
 use App\Billing\BillingGate;
 use App\Billing\Plan;
 use App\Billing\ProPrice;
-use App\Billing\ProUsers;
 use App\Models\StripePayment;
 use App\Support\MoneyFormatter;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Support\Facades\DB;
 use Laravel\Cashier\Subscription;
 
 /**
@@ -44,11 +42,6 @@ class RevenueOverviewWidget extends BaseWidget
                 ->icon('heroicon-o-banknotes')
                 ->color('success'),
 
-            Stat::make('Pro accounts', $this->proCount())
-                ->description($this->proDescription())
-                ->icon('heroicon-o-user-group')
-                ->color('primary'),
-
             Stat::make('This month', '+' . $new . ' / -' . $cancelled)
                 ->description($this->churnLabel($cancelled, $paying + $cancelled))
                 ->icon('heroicon-o-arrow-trending-up')
@@ -64,28 +57,6 @@ class RevenueOverviewWidget extends BaseWidget
                 ->icon('heroicon-o-sparkles')
                 ->color('info'),
         ];
-    }
-
-    private function proCount(): int
-    {
-        return DB::query()->fromSub(ProUsers::ids(), 'pro')->count();
-    }
-
-    /**
-     * Comps count towards this stat, because they really are entitled. Naming
-     * them keeps the number from reading as demand — every money figure below
-     * reads the subscription and payment tables directly and is unaffected.
-     */
-    private function proDescription(): string
-    {
-        $comped = DB::table('users')
-            ->whereNull('billing_blocked_at')
-            ->where('comped_until', '>', now())
-            ->count();
-
-        return $comped === 0
-            ? 'Entitled to Pro right now'
-            : 'Entitled to Pro right now, ' . $comped . ' of them comped';
     }
 
     /**

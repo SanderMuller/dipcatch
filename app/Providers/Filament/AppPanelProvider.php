@@ -7,6 +7,7 @@ use App\Filament\App\Widgets\ActiveDropsTableWidget;
 use App\Filament\App\Widgets\RecentNotificationsTableWidget;
 use App\Filament\App\Widgets\SavingsByMonthChartWidget;
 use App\Filament\App\Widgets\StatsOverviewWidget;
+use Filament\Actions\Action;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -46,6 +47,16 @@ final class AppPanelProvider extends PanelProvider
                 Dashboard::class,
             ])
             ->databaseNotifications()
+            ->userMenuItems([
+                // Only an admin can open /admin at all (User::canAccessPanel),
+                // so this is a shortcut for people who already have the door
+                // key — never the thing that grants it.
+                'admin' => Action::make('admin')
+                    ->label('Admin panel')
+                    ->url('/admin', shouldOpenInNewTab: false)
+                    ->icon('heroicon-o-wrench-screwdriver')
+                    ->visible(fn (): bool => auth()->user()?->is_admin === true),
+            ])
             ->discoverWidgets(in: app_path('Filament/App/Widgets'), for: 'App\\Filament\\App\\Widgets')
             ->widgets([
                 AccountWidget::class,

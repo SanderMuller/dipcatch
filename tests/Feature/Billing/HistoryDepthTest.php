@@ -210,6 +210,12 @@ it('says nothing about plans to an account with no ceiling', function (): void {
 });
 
 it('keeps the public shared page at 90 days for a pro owner', function (): void {
+    // The public route is throttled with a Redis limiter that outlives the
+    // test run, so a suite that reached it earlier leaves the bucket full and
+    // this case reads 429 instead of the page. PublicProductControllerTest
+    // clears the same limiter for the same reason.
+    clearRedisRateLimiter('public-product');
+
     $user = User::factory()->create();
     subscribeUser($user);
     $product = productWithOldHistory($user);
