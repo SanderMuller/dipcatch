@@ -71,9 +71,13 @@ return [
     | from your application. Of course, you are welcome to use any of the
     | various world currencies that are currently supported via Stripe.
     |
+    | Cashier ships `usd` here. This app sells one subscription, in euros, so
+    | the default is euros: an environment that never sets CASHIER_CURRENCY
+    | would otherwise raise a one-off charge or an invoice in dollars.
+    |
     */
 
-    'currency' => env('CASHIER_CURRENCY', 'usd'),
+    'currency' => env('CASHIER_CURRENCY', 'eur'),
 
     /*
     |--------------------------------------------------------------------------
@@ -86,7 +90,7 @@ return [
     |
     */
 
-    'currency_locale' => env('CASHIER_CURRENCY_LOCALE', 'en'),
+    'currency_locale' => env('CASHIER_CURRENCY_LOCALE', 'nl_NL'),
 
     /*
     |--------------------------------------------------------------------------
