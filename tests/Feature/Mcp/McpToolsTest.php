@@ -302,3 +302,16 @@ it('leaves the drop thresholds alone when only a unit price target is given', fu
         ->and($fresh?->drop_threshold_abs)->toBeNull()
         ->and((float) $fresh?->unit_price_target)->toBe(4.25);
 });
+
+it('says whether the cheapest shop can actually be bought', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['current_price' => '9.00', 'currency' => 'EUR', 'current_in_stock' => true]);
+    Shop::factory()->for($product)->create(['current_price' => '4.00', 'currency' => 'EUR', 'current_in_stock' => null]);
+
+    $product->recomputeCheapestShop();
+
+    DipCatchServer::actingAs($me)->tool(ListProductsTool::class)
+        ->assertOk()
+        ->assertSee('"cheapest_stock":"unknown"');
+});

@@ -327,3 +327,50 @@ test('a page whose words say it is unavailable is stored as out of stock', funct
         ->assertSee('out_of_stock')
         ->assertSee('tijdelijk niet leverbaar');
 });
+
+test('the variant chooser says what each key is and what it costs', function (): void {
+    $json = (string) json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://shop.example.com/p/1',
+        'offers' => [
+            ['@type' => 'Offer', 'sku' => 'MP32275', 'name' => '24 x 100 g', 'price' => '41.65', 'priceCurrency' => 'EUR'],
+            ['@type' => 'Offer', 'sku' => 'MP4838', 'name' => '12 x 100 g', 'price' => '21.25', 'priceCurrency' => 'EUR'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    DipCatchServer::actingAs(User::factory()->create())
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
+        ->assertHasErrors()
+        ->assertSee('MP4838')
+        ->assertSee('12 x 100 g')
+        ->assertSee('21.25');
+});
+
+test('a second refusal says how many there have been', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/*' => Http::response('nope', 403),
+    ]);
+
+    $me = User::factory()->create();
+
+    foreach (['1', '2'] as $i) {
+        RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+
+        $response = DipCatchServer::actingAs($me)
+            ->tool(CreateProductTool::class, ['url' => "https://shop.example.com/p/{$i}"]);
+
+        $response->assertHasErrors();
+
+        if ($i === '2') {
+            $response->assertSee('That is 2 in a row.');
+        }
+    }
+});
