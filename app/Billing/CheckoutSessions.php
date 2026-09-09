@@ -33,4 +33,14 @@ class CheckoutSessions
             is_string($session->url) ? $session->url : null,
         );
     }
+
+    /**
+     * Ends a session the customer never finished, so nobody can pay through
+     * it later. Unlike `find()` this throws: a delete that cannot reach
+     * Stripe must stop rather than leave a payable session behind.
+     */
+    public function expire(string $sessionId): void
+    {
+        Cashier::stripe()->checkout->sessions->expire($sessionId, []);
+    }
 }

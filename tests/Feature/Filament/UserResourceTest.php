@@ -1,6 +1,9 @@
 <?php declare(strict_types=1);
 
+use App\Billing\CheckoutSession;
+use App\Billing\CheckoutSessions;
 use App\Billing\Plan;
+use App\Billing\StripeCustomers;
 use App\Filament\Admin\Resources\Users\Pages\ListUsers;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Models\Product;
@@ -13,6 +16,14 @@ use Illuminate\Support\Str;
 use Laravel\Cashier\Subscription;
 
 use function Pest\Livewire\livewire;
+
+class RecordedStripeCalls
+{
+    /** @var list<string> */
+    public static array $calls = [];
+
+    public static bool $userExistedAtDelete = false;
+}
 
 beforeEach(function (): void {
     Filament::setCurrentPanel('admin');
@@ -285,4 +296,67 @@ test('deleting an account clears its credentials and leaves other accounts alone
         ->and(DB::table('oauth_access_tokens')->where('user_id', $bystander->id)->exists())->toBeTrue()
         ->and(DB::table('oauth_refresh_tokens')->where('id', 'refresh-' . $bystander->id)->exists())->toBeTrue()
         ->and(DB::table('sessions')->where('user_id', $bystander->id)->exists())->toBeTrue();
+});
+
+test('deleting an account expires its open checkout and removes the Stripe customer', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    $target = User::factory()->create([
+        'stripe_id' => 'cus_target',
+        'stripe_checkout_session_id' => 'cs_open',
+    ]);
+
+    app()->instance(CheckoutSessions::class, new class extends CheckoutSessions {
+        public function find(string $sessionId): CheckoutSession
+        {
+            return new CheckoutSession('open', url: 'https://checkout.stripe.test/cs_open');
+        }
+
+        public function expire(string $sessionId): void
+        {
+            RecordedStripeCalls::$calls[] = 'expire:' . $sessionId;
+        }
+    });
+
+    app()->instance(StripeCustomers::class, new class extends StripeCustomers {
+        public function delete(string $stripeId): void
+        {
+            RecordedStripeCalls::$calls[] = 'delete:' . $stripeId;
+            RecordedStripeCalls::$userExistedAtDelete = User::query()->where('stripe_id', $stripeId)->exists();
+        }
+    });
+
+    RecordedStripeCalls::$calls = [];
+    RecordedStripeCalls::$userExistedAtDelete = false;
+
+    livewire(ListUsers::class)
+        ->callAction(TestAction::make('delete')->table($target))
+        ->assertHasNoActionErrors();
+
+    // The session is expired before the customer goes, and both happen while
+    // the account still exists — Stripe first, database second.
+    expect(RecordedStripeCalls::$calls)->toBe(['expire:cs_open', 'delete:cus_target'])
+        ->and(RecordedStripeCalls::$userExistedAtDelete)->toBeTrue()
+        ->and(User::query()->find($target->id))->toBeNull();
+});
+
+test('a Stripe failure keeps the account instead of deleting it', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    $target = User::factory()->create(['stripe_id' => 'cus_target']);
+    $product = Product::factory()->create(['user_id' => $target->id]);
+
+    app()->instance(StripeCustomers::class, new class extends StripeCustomers {
+        public function delete(string $stripeId): void
+        {
+            throw new RuntimeException('Stripe is unreachable');
+        }
+    });
+
+    livewire(ListUsers::class)
+        ->callAction(TestAction::make('delete')->table($target))
+        ->assertNotified('Stripe refused the cancellation, so the account was kept. Try again in a moment.');
+
+    expect(User::query()->find($target->id))->not->toBeNull()
+        ->and(Product::query()->find($product->id))->not->toBeNull();
 });

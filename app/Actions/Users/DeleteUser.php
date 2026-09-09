@@ -2,6 +2,8 @@
 
 namespace App\Actions\Users;
 
+use App\Billing\CheckoutSessions;
+use App\Billing\StripeCustomers;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -16,19 +18,14 @@ use Illuminate\Support\Facades\Log;
  */
 final class DeleteUser
 {
-    /**
-     * Stripe statuses that already ended, so nothing is left to cancel.
-     */
-    private const array ENDED_STATUSES = ['canceled', 'incomplete_expired'];
+    public function __construct(
+        private readonly CheckoutSessions $sessions,
+        private readonly StripeCustomers $customers,
+    ) {}
 
-    public function __invoke(User $user): void
+    public function __invoke(User $user, User $actor): void
     {
-        // Stripe first, and on purpose. A failure here stops the delete: an
-        // account that is gone while Stripe keeps charging the card is worse
-        // than a delete that did not happen.
-        foreach ($user->subscriptions()->whereNotIn('stripe_status', self::ENDED_STATUSES)->get() as $subscription) {
-            $subscription->cancelNow();
-        }
+        $this->stopBilling($user);
 
         DB::transaction(function () use ($user): void {
             DB::table('subscription_items')
@@ -45,15 +42,44 @@ final class DeleteUser
             $user->delete();
         });
 
-        // The comp actions log who did what. A delete leaves no row behind to
-        // read afterwards, so the email is logged with the id.
-        $actor = auth()->user();
+        // The row is gone, so the remember token is too. Without this a
+        // later logout on the same instance cycles the token and saves the
+        // model, which re-inserts the account Laravel just deleted.
+        $user->setRememberToken('');
 
+        // A delete leaves no row behind to read afterwards, so the email is
+        // logged with the id.
         Log::info('User deleted', [
             'user_id' => $user->getKey(),
             'email' => $user->email,
-            'by' => $actor instanceof User ? $actor->getKey() : null,
+            'by' => $actor->getKey(),
         ]);
+    }
+
+    /**
+     * Everything Stripe could still charge this card for, and on purpose
+     * before the database work: an account that is gone while Stripe keeps
+     * billing is worse than a delete that did not happen.
+     *
+     * Deleting the customer cancels its subscriptions, including one whose
+     * webhook has not landed yet — so the local rows are never the source
+     * of truth here. The open Checkout session goes first, because a
+     * session that completes after the customer is gone is the same charge
+     * by another route.
+     */
+    private function stopBilling(User $user): void
+    {
+        if ($user->stripe_id === null) {
+            return;
+        }
+
+        $sessionId = $user->stripe_checkout_session_id;
+
+        if (is_string($sessionId) && $this->sessions->find($sessionId)?->isOpen() === true) {
+            $this->sessions->expire($sessionId);
+        }
+
+        $this->customers->delete($user->stripe_id);
     }
 
     /**

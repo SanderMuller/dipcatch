@@ -119,6 +119,7 @@ class UsersTable
                     ->action(self::endComp(...)),
 
                 DeleteAction::make()
+                    ->failureNotificationTitle('Stripe refused the cancellation, so the account was kept. Try again in a moment.')
                     ->modalDescription('The account, its products, its price history and its notifications go. A live subscription is cancelled in Stripe first. Payment and dispute records stay, without the account.')
                     // Deleting yourself ends your own session halfway through
                     // the request, so the action is not offered on your row.
@@ -127,7 +128,7 @@ class UsersTable
                     // catch a Stripe error escapes into Livewire instead.
                     ->using(function (User $record): bool {
                         try {
-                            app(DeleteUser::class)($record);
+                            self::delete($record);
                         } catch (Throwable $exception) {
                             report($exception);
 
@@ -205,7 +206,7 @@ class UsersTable
             }
 
             try {
-                app(DeleteUser::class)($record);
+                self::delete($record);
             } catch (Throwable $exception) {
                 // One account that Stripe refuses to cancel must not stop the
                 // rest of the selection.
@@ -256,6 +257,17 @@ class UsersTable
         return $record->comped_until->toDateString() === CarbonImmutable::parse(Plan::COMPED_FOREVER)->toDateString()
             ? 'Forever'
             : $record->comped_until->toDateString();
+    }
+
+    private static function delete(User $record): void
+    {
+        $actor = auth()->user();
+
+        // The panel gate and both actions already require a signed-in admin,
+        // so this cannot be reached without one.
+        abort_unless($actor instanceof User, 403);
+
+        app(DeleteUser::class)($record, $actor);
     }
 
     private static function actorIsAdmin(): bool
