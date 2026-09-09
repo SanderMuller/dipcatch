@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\ProbeBudget;
 use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ProbeFailure;
@@ -146,7 +147,7 @@ test('the per-user rate limit reports how long to wait', function (): void {
     $product = Product::factory()->create();
     $user = User::factory()->create();
 
-    foreach (range(1, ProbeShopUrl::PER_USER_LIMIT_PER_MIN) as $i) {
+    foreach (range(1, ProbeBudget::PER_MINUTE) as $i) {
         app(ProbeShopUrl::class)($product, "https://example.com/p/{$i}", $user);
     }
 

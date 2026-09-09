@@ -112,6 +112,15 @@ final class ProductInfolist
                     ->columnSpanFull()
                     ->state(fn (Product $r): string => self::thresholds($r)),
 
+                TextEntry::make('target_price')
+                    ->label('Target price')
+                    ->columnSpanFull()
+                    ->visible(fn (Product $r): bool => $r->target_price !== null)
+                    ->state(fn (Product $r): string => MoneyFormatter::format(
+                        (string) $r->target_price,
+                        $r->currency,
+                    )),
+
                 TextEntry::make('unit_price_target')
                     ->label('Unit price target')
                     ->columnSpanFull()

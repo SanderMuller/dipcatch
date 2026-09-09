@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Drops\DetectTargetPrice;
 use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
@@ -579,7 +580,10 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $product = $locked->product;
 
             if ($product !== null) {
-                app(DetectUnitPriceTarget::class)($product->refresh());
+                $product->refresh();
+
+                app(DetectUnitPriceTarget::class)($product);
+                app(DetectTargetPrice::class)($product);
             }
         });
     }
