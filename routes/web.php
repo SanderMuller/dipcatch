@@ -23,6 +23,7 @@ use App\Support\UseCases;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Config;
@@ -51,6 +52,14 @@ Route::prefix(Config::string('cashier.path', 'stripe'))->name('cashier.')->group
 
 Route::view('/', 'welcome')->middleware(MarketingLocale::class)->name('home');
 Route::view('privacy', 'privacy')->middleware(MarketingLocale::class)->name('privacy');
+Route::view('support', 'support')->middleware(MarketingLocale::class)->name('support');
+Route::view('terms-of-service', 'terms')->middleware(MarketingLocale::class)->name('terms');
+
+// `/privacy-policy` is the address given to Stripe and to anyone who guessed
+// the conventional path. One canonical page, so it redirects rather than
+// rendering a second copy. The locale query rides along.
+Route::get('privacy-policy', fn (): RedirectResponse => redirect()->route('privacy', request()->query(), 301))
+    ->name('privacy-policy');
 Route::view('pricing', 'pricing')->middleware(MarketingLocale::class)->name('pricing');
 
 // One landing page per repeat-purchase category. The slug is constrained to

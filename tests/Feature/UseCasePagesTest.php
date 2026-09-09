@@ -193,9 +193,9 @@ test('the sitemap lists every use-case page in both locales', function (): void 
             ->and($locs)->toContain($case->url('nl'));
     }
 
-    // Home, pricing, privacy and the shops hub, plus one per use case and one
-    // per shop, each in two locales.
-    expect($locs)->toHaveCount((4 + count(UseCases::all()) + count(ShopPages::all())) * 2);
+    // Home, pricing, privacy, terms, support and the shops hub, plus one per
+    // use case and one per shop, each in two locales.
+    expect($locs)->toHaveCount((6 + count(UseCases::all()) + count(ShopPages::all())) * 2);
 });
 
 test('a shop dropped from the supported hosts disappears from the page', function (): void {

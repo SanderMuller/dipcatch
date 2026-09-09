@@ -151,6 +151,66 @@ final class StructuredData
     }
 
     /**
+     * The support page: a ContactPage, so an assistant asked how to reach us
+     * has something to answer with.
+     *
+     * @return array<string, mixed>
+     */
+    public static function support(string $canonical, string $description): array
+    {
+        $page = [
+            '@type' => 'ContactPage',
+            '@id' => $canonical . '#page',
+            'url' => $canonical,
+            'name' => __('Support'),
+            'description' => $description,
+            'isPartOf' => ['@id' => self::id('#site')],
+        ];
+
+        $email = Config::get('site.contact_email');
+
+        if (is_string($email) && $email !== '') {
+            $page['mainEntity'] = [
+                '@type' => 'ContactPoint',
+                'contactType' => 'customer support',
+                'email' => $email,
+                'availableLanguage' => ['en', 'nl'],
+            ];
+        }
+
+        return [
+            '@context' => 'https://schema.org',
+            '@graph' => [$page, self::breadcrumb(__('Support'), $canonical)],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function terms(string $canonical, string $description): array
+    {
+        $page = [
+            '@type' => 'WebPage',
+            '@id' => $canonical . '#page',
+            'url' => $canonical,
+            'name' => __('Terms of service'),
+            'description' => $description,
+            'isPartOf' => ['@id' => self::id('#site')],
+        ];
+
+        $updated = Config::get('site.terms_updated_at');
+
+        if (is_string($updated) && $updated !== '') {
+            $page['dateModified'] = $updated;
+        }
+
+        return [
+            '@context' => 'https://schema.org',
+            '@graph' => [$page, self::breadcrumb(__('Terms of service'), $canonical)],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function privacy(string $canonical, string $description): array

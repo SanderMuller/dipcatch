@@ -34,6 +34,8 @@
             @endif
             <a href="{{ route('pricing', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Pricing') }}</a>
             <a href="{{ route('privacy', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Privacy') }}</a>
+            <a href="{{ route('terms', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Terms') }}</a>
+            <a href="{{ route('support', $langQuery) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Support') }}</a>
             @if (filled($contactEmail))
                 <a href="mailto:{{ $contactEmail }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Contact') }}</a>
             @endif

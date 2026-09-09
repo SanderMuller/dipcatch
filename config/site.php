@@ -24,6 +24,9 @@ return [
      */
     'privacy_updated_at' => '2026-09-02',
 
+    /** Shown on the terms page, and the date a change is measured from. */
+    'terms_updated_at' => '2026-09-09',
+
     /**
      * Shops with a dedicated adapter or data source, shown as logos on the
      * homepage and the first-run dashboard.

@@ -60,6 +60,8 @@ test('lang/nl.json carries no key the marketing views no longer use', function (
         resource_path('views/welcome.blade.php'),
         resource_path('views/privacy.blade.php'),
         resource_path('views/pricing.blade.php'),
+        resource_path('views/support.blade.php'),
+        resource_path('views/terms.blade.php'),
         resource_path('views/partials/head.blade.php'),
         resource_path('views/components/appearance-toggle.blade.php'),
         resource_path('views/components/marketing-header.blade.php'),
