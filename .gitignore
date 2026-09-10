@@ -43,6 +43,13 @@ _ide_helper_models.php
 .github/prompts/
 # <<< boost (managed) <<<
 
+# `project-boost:install` wraps `boost:install --mcp`, and Boost writes that MCP
+# config for every agent it detects. Only Claude Code and Copilot are used here,
+# so the rest are generated noise.
+.cursor/
+.junie/
+.amp/
+
 **/caddy
 frankenphp
 frankenphp-worker.php

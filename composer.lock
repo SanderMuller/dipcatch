@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e557bc7855e8f5ef74da149ed628eaee",
+    "content-hash": "f01004b1a03f578b2782ab5f421c07cd",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -127,16 +127,16 @@
         },
         {
             "name": "aws/aws-sdk-php",
-            "version": "3.394.10",
+            "version": "3.394.12",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aws/aws-sdk-php.git",
-                "reference": "3b7cbf17b8ba568f77546d1e5edd3f2071861c8f"
+                "reference": "23b24609e38ba51f872c01385f85a8bd12e917d7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/3b7cbf17b8ba568f77546d1e5edd3f2071861c8f",
-                "reference": "3b7cbf17b8ba568f77546d1e5edd3f2071861c8f",
+                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/23b24609e38ba51f872c01385f85a8bd12e917d7",
+                "reference": "23b24609e38ba51f872c01385f85a8bd12e917d7",
                 "shasum": ""
             },
             "require": {
@@ -218,9 +218,9 @@
             "support": {
                 "forum": "https://github.com/aws/aws-sdk-php/discussions",
                 "issues": "https://github.com/aws/aws-sdk-php/issues",
-                "source": "https://github.com/aws/aws-sdk-php/tree/3.394.10"
+                "source": "https://github.com/aws/aws-sdk-php/tree/3.394.12"
             },
-            "time": "2026-09-08T18:07:43+00:00"
+            "time": "2026-09-10T18:07:33+00:00"
         },
         {
             "name": "bacon/bacon-qr-code",
@@ -4604,6 +4604,79 @@
             "time": "2026-09-07T16:33:46+00:00"
         },
         {
+            "name": "livewire/flux-pro",
+            "version": "2.19.0",
+            "dist": {
+                "type": "zip",
+                "url": "https://composer.fluxui.dev/download/a2b0bccd-4fdc-4980-b614-09809cc5e325/flux-pro-2.19.0.zip",
+                "reference": "225534a61ea5c20a677df7b65b911fb83fba1dc1",
+                "shasum": "2f7f665c7f3b2d3f262eca2f9a8efbc44b4fd5ac"
+            },
+            "require": {
+                "illuminate/console": "^10.0|^11.0|^12.0|^13.0",
+                "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+                "illuminate/view": "^10.0|^11.0|^12.0|^13.0",
+                "laravel/prompts": "^0.1.24|^0.2|^0.3",
+                "livewire/flux": "2.19.0|dev-main",
+                "livewire/livewire": "^3.7.4|^4.0|dev-main",
+                "php": "^8.1",
+                "symfony/console": "^6.0|^7.0|^8.0"
+            },
+            "require-dev": {
+                "livewire/volt": "*",
+                "orchestra/testbench": "^10.8|^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "Flux": "FluxPro\\FluxPro"
+                    },
+                    "providers": [
+                        "FluxPro\\FluxProServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "FluxPro\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "App\\": "workbench/app/"
+                }
+            },
+            "scripts": {
+                "serve": [
+                    "Composer\\Config::disableProcessTimeout",
+                    "@php vendor/bin/testbench workbench:build --ansi",
+                    "@php vendor/bin/testbench serve --port 3000 --ansi"
+                ]
+            },
+            "license": [
+                "proprietary"
+            ],
+            "authors": [
+                {
+                    "name": "Caleb Porzio",
+                    "email": "calebporzio@gmail.com"
+                }
+            ],
+            "description": "The pro version of Flux, the official UI component library for Livewire.",
+            "keywords": [
+                "components",
+                "flux",
+                "laravel",
+                "livewire",
+                "ui"
+            ],
+            "time": "2026-09-07T16:47:37+00:00"
+        },
+        {
             "name": "livewire/livewire",
             "version": "v4.4.4",
             "source": {
@@ -8766,22 +8839,23 @@
         },
         {
             "name": "spomky-labs/cbor-php",
-            "version": "3.3.4",
+            "version": "3.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Spomky-Labs/cbor-php.git",
-                "reference": "1cac24eeae4be47122d505542a170623b2a35ea3"
+                "reference": "c1d8acbf4397a1d2c64ab881e6fb329ad7a4b3d7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Spomky-Labs/cbor-php/zipball/1cac24eeae4be47122d505542a170623b2a35ea3",
-                "reference": "1cac24eeae4be47122d505542a170623b2a35ea3",
+                "url": "https://api.github.com/repos/Spomky-Labs/cbor-php/zipball/c1d8acbf4397a1d2c64ab881e6fb329ad7a4b3d7",
+                "reference": "c1d8acbf4397a1d2c64ab881e6fb329ad7a4b3d7",
                 "shasum": ""
             },
             "require": {
                 "brick/math": "^0.9|^0.10|^0.11|^0.12|^0.13|^0.14|^0.15|^0.16|^0.17|^0.18|^0.19|^0.20",
                 "ext-mbstring": "*",
-                "php": ">=8.0"
+                "php": ">=8.0",
+                "symfony/polyfill-php81": "^1.32"
             },
             "require-dev": {
                 "ext-json": "*",
@@ -8790,8 +8864,8 @@
                 "symfony/var-dumper": "^6.4|^7.1|^8.0"
             },
             "suggest": {
-                "ext-bcmath": "GMP or BCMath extensions will drastically improve the library performance. BCMath extension needed to handle the Big Float and Decimal Fraction Tags",
-                "ext-gmp": "GMP or BCMath extensions will drastically improve the library performance"
+                "ext-bcmath": "Improves the library performance when ext-gmp is missing, and is required to handle the Big Float and Decimal Fraction Tags (4 and 5)",
+                "ext-gmp": "Strongly recommended when decoding untrusted input: without it, converting the byte string of a Big Number Tag (2 and 3) is quadratic in its length. Also improves the library performance overall"
             },
             "type": "library",
             "autoload": {
@@ -8821,7 +8895,7 @@
             ],
             "support": {
                 "issues": "https://github.com/Spomky-Labs/cbor-php/issues",
-                "source": "https://github.com/Spomky-Labs/cbor-php/tree/3.3.4"
+                "source": "https://github.com/Spomky-Labs/cbor-php/tree/3.4.0"
             },
             "funding": [
                 {
@@ -8833,7 +8907,7 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2026-08-31T18:59:25+00:00"
+            "time": "2026-09-10T09:03:06+00:00"
         },
         {
             "name": "spomky-labs/pki-framework",
@@ -8947,16 +9021,16 @@
         },
         {
             "name": "stripe/stripe-php",
-            "version": "v21.3.1",
+            "version": "v21.3.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/stripe/stripe-php.git",
-                "reference": "12986995cd5e229cc094d4b57de056f8e2e6e5a9"
+                "reference": "0d8b075e1a97d15c5324353a5277d0ea686ea525"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/stripe/stripe-php/zipball/12986995cd5e229cc094d4b57de056f8e2e6e5a9",
-                "reference": "12986995cd5e229cc094d4b57de056f8e2e6e5a9",
+                "url": "https://api.github.com/repos/stripe/stripe-php/zipball/0d8b075e1a97d15c5324353a5277d0ea686ea525",
+                "reference": "0d8b075e1a97d15c5324353a5277d0ea686ea525",
                 "shasum": ""
             },
             "require": {
@@ -9003,9 +9077,9 @@
             ],
             "support": {
                 "issues": "https://github.com/stripe/stripe-php/issues",
-                "source": "https://github.com/stripe/stripe-php/tree/v21.3.1"
+                "source": "https://github.com/stripe/stripe-php/tree/v21.3.2"
             },
-            "time": "2026-09-01T18:42:58+00:00"
+            "time": "2026-09-09T20:40:43+00:00"
         },
         {
             "name": "symfony/clock",
@@ -12579,16 +12653,16 @@
         },
         {
             "name": "web-auth/cose-lib",
-            "version": "4.7.1",
+            "version": "4.8.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/web-auth/cose-lib.git",
-                "reference": "e698b150049141f2f9ec03d2a4d681a2d020ab83"
+                "reference": "e2a851baa5acedc18f8bc40ad7167ae899032e9d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/web-auth/cose-lib/zipball/e698b150049141f2f9ec03d2a4d681a2d020ab83",
-                "reference": "e698b150049141f2f9ec03d2a4d681a2d020ab83",
+                "url": "https://api.github.com/repos/web-auth/cose-lib/zipball/e2a851baa5acedc18f8bc40ad7167ae899032e9d",
+                "reference": "e2a851baa5acedc18f8bc40ad7167ae899032e9d",
                 "shasum": ""
             },
             "require": {
@@ -12598,13 +12672,20 @@
                 "php": ">=8.1",
                 "spomky-labs/pki-framework": "^1.0"
             },
+            "conflict": {
+                "spomky-labs/cbor-php": "<3.4.0"
+            },
+            "replace": {
+                "symfony/polyfill-php81": "*"
+            },
             "require-dev": {
-                "spomky-labs/cbor-php": "^3.2.2"
+                "spomky-labs/cbor-php": "^3.4"
             },
             "suggest": {
-                "ext-bcmath": "For better performance, please install either GMP (recommended) or BCMath extension",
-                "ext-gmp": "For better performance, please install either GMP (recommended) or BCMath extension",
-                "spomky-labs/cbor-php": "For COSE Signature support"
+                "ext-bcmath": "Recommended: without GMP or BCMath, signing with RSASSA-PSS (PS256/PS384/PS512) blinds its private exponentiation in pure PHP",
+                "ext-gmp": "Recommended: without GMP or BCMath, signing with RSASSA-PSS (PS256/PS384/PS512) blinds its private exponentiation in pure PHP",
+                "ext-sodium": "Required by the EdDSA/Ed25519 signature algorithms (-8, -19, -260, -261) and to recompute an OKP public key from its private key",
+                "spomky-labs/cbor-php": "Required by the RFC 9052 header reader and cryptographic structures. 3.4.0 or later: it ships the six COSE message classes (CBOR\\Tag\\CoseSign1Tag and its siblings) that replace the deprecated Cose\\...Tag classes, and its decoder is what enforces the RFC 9052 label uniqueness and nesting bounds this library relies on"
             },
             "type": "library",
             "autoload": {
@@ -12634,7 +12715,7 @@
             ],
             "support": {
                 "issues": "https://github.com/web-auth/cose-lib/issues",
-                "source": "https://github.com/web-auth/cose-lib/tree/4.7.1"
+                "source": "https://github.com/web-auth/cose-lib/tree/4.8.0"
             },
             "funding": [
                 {
@@ -12646,7 +12727,7 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2026-08-30T13:53:57+00:00"
+            "time": "2026-09-10T20:36:28+00:00"
         },
         {
             "name": "web-auth/webauthn-lib",
@@ -13211,70 +13292,6 @@
             "time": "2026-03-04T14:03:08+00:00"
         },
         {
-            "name": "cebe/markdown",
-            "version": "1.2.1",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/cebe/markdown.git",
-                "reference": "9bac5e971dd391e2802dca5400bbeacbaea9eb86"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/cebe/markdown/zipball/9bac5e971dd391e2802dca5400bbeacbaea9eb86",
-                "reference": "9bac5e971dd391e2802dca5400bbeacbaea9eb86",
-                "shasum": ""
-            },
-            "require": {
-                "lib-pcre": "*",
-                "php": ">=5.4.0"
-            },
-            "require-dev": {
-                "cebe/indent": "*",
-                "facebook/xhprof": "*@dev",
-                "phpunit/phpunit": "4.1.*"
-            },
-            "bin": [
-                "bin/markdown"
-            ],
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "1.2.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "cebe\\markdown\\": ""
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Carsten Brandt",
-                    "email": "mail@cebe.cc",
-                    "homepage": "http://cebe.cc/",
-                    "role": "Creator"
-                }
-            ],
-            "description": "A super fast, highly extensible markdown parser for PHP",
-            "homepage": "https://github.com/cebe/markdown#readme",
-            "keywords": [
-                "extensible",
-                "fast",
-                "gfm",
-                "markdown",
-                "markdown-extra"
-            ],
-            "support": {
-                "issues": "https://github.com/cebe/markdown/issues",
-                "source": "https://github.com/cebe/markdown"
-            },
-            "time": "2018-03-26T11:24:36+00:00"
-        },
-        {
             "name": "dg/bypass-finals",
             "version": "v1.11.0",
             "source": {
@@ -13386,75 +13403,6 @@
                 "source": "https://github.com/driftingly/rector-laravel/tree/2.6.2"
             },
             "time": "2026-08-29T21:42:57+00:00"
-        },
-        {
-            "name": "ergebnis/agent-detector",
-            "version": "1.2.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/ergebnis/agent-detector.git",
-                "reference": "e211f17928c8b95a51e06040792d57f5462fb271"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/ergebnis/agent-detector/zipball/e211f17928c8b95a51e06040792d57f5462fb271",
-                "reference": "e211f17928c8b95a51e06040792d57f5462fb271",
-                "shasum": ""
-            },
-            "require": {
-                "php": "~7.4.0 || ~8.0.0 || ~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0 || ~8.6.0"
-            },
-            "require-dev": {
-                "ergebnis/composer-normalize": "^2.51.0",
-                "ergebnis/license": "^2.7.0",
-                "ergebnis/php-cs-fixer-config": "^6.60.2",
-                "ergebnis/phpstan-rules": "^2.13.1",
-                "ergebnis/phpunit-slow-test-detector": "^2.24.0",
-                "ergebnis/rector-rules": "^1.18.1",
-                "fakerphp/faker": "^1.24.1",
-                "infection/infection": "^0.26.6",
-                "phpstan/extension-installer": "^1.4.3",
-                "phpstan/phpstan": "^2.1.54",
-                "phpstan/phpstan-deprecation-rules": "^2.0.4",
-                "phpstan/phpstan-phpunit": "^2.0.16",
-                "phpstan/phpstan-strict-rules": "^2.0.10",
-                "phpunit/phpunit": "^9.6.34",
-                "rector/rector": "^2.4.2"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-main": "1.2-dev"
-                },
-                "composer-normalize": {
-                    "indent-size": 2,
-                    "indent-style": "space"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Ergebnis\\AgentDetector\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Andreas Möller",
-                    "email": "am@localheinz.com",
-                    "homepage": "https://localheinz.com"
-                }
-            ],
-            "description": "Provides a detector for detecting the presence of an agent.",
-            "homepage": "https://github.com/ergebnis/agent-detector",
-            "support": {
-                "issues": "https://github.com/ergebnis/agent-detector/issues",
-                "security": "https://github.com/ergebnis/agent-detector/blob/main/.github/SECURITY.md",
-                "source": "https://github.com/ergebnis/agent-detector"
-            },
-            "time": "2026-05-07T08:19:07+00:00"
         },
         {
             "name": "fakerphp/faker",
@@ -14105,16 +14053,16 @@
         },
         {
             "name": "larastan/larastan",
-            "version": "v3.11.0",
+            "version": "v3.12.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/larastan/larastan.git",
-                "reference": "9baa74074f17cc70feaef31616a06ea0faeebba5"
+                "reference": "ab26fdf90d84877061388109e1e251f67ca3ff7a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/larastan/larastan/zipball/9baa74074f17cc70feaef31616a06ea0faeebba5",
-                "reference": "9baa74074f17cc70feaef31616a06ea0faeebba5",
+                "url": "https://api.github.com/repos/larastan/larastan/zipball/ab26fdf90d84877061388109e1e251f67ca3ff7a",
+                "reference": "ab26fdf90d84877061388109e1e251f67ca3ff7a",
                 "shasum": ""
             },
             "require": {
@@ -14182,7 +14130,7 @@
             ],
             "support": {
                 "issues": "https://github.com/larastan/larastan/issues",
-                "source": "https://github.com/larastan/larastan/tree/v3.11.0"
+                "source": "https://github.com/larastan/larastan/tree/v3.12.0"
             },
             "funding": [
                 {
@@ -14190,7 +14138,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-09-01T16:35:48+00:00"
+            "time": "2026-09-10T09:06:54+00:00"
         },
         {
             "name": "laravel/agent-detector",
@@ -14253,6 +14201,72 @@
                 "source": "https://github.com/laravel/agent-detector"
             },
             "time": "2026-04-29T18:32:34+00:00"
+        },
+        {
+            "name": "laravel/boost",
+            "version": "v2.8.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/laravel/boost.git",
+                "reference": "820bc93b7826c456ca591cfecca463b4dc794a72"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/laravel/boost/zipball/820bc93b7826c456ca591cfecca463b4dc794a72",
+                "reference": "820bc93b7826c456ca591cfecca463b4dc794a72",
+                "shasum": ""
+            },
+            "require": {
+                "guzzlehttp/guzzle": "^7.9|^8.0",
+                "illuminate/console": "^11.45.3|^12.41.1|^13.0",
+                "illuminate/contracts": "^11.45.3|^12.41.1|^13.0",
+                "illuminate/routing": "^11.45.3|^12.41.1|^13.0",
+                "illuminate/support": "^11.45.3|^12.41.1|^13.0",
+                "laravel/mcp": "^0.7.1|^0.8.0|^0.9.0",
+                "laravel/prompts": "^0.3.10",
+                "laravel/roster": "^1.0.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.27.0",
+                "mockery/mockery": "^1.6.12",
+                "orchestra/testbench": "^9.15.0|^10.6|^11.0",
+                "pestphp/pest": "^2.36.0|^3.8.4|^4.1.5",
+                "phpstan/phpstan": "^2.1.27",
+                "rector/rector": "^2.1"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Laravel\\Boost\\BoostServiceProvider"
+                    ]
+                },
+                "branch-alias": {
+                    "dev-master": "1.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Laravel\\Boost\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Laravel Boost accelerates AI-assisted development by providing the essential context and structure that AI needs to generate high-quality, Laravel-specific code.",
+            "homepage": "https://github.com/laravel/boost",
+            "keywords": [
+                "ai",
+                "dev",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/laravel/boost/issues",
+                "source": "https://github.com/laravel/boost"
+            },
+            "time": "2026-09-10T15:25:39+00:00"
         },
         {
             "name": "laravel/pail",
@@ -14421,16 +14435,16 @@
         },
         {
             "name": "laravel/pint",
-            "version": "v1.32.0",
+            "version": "v1.32.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/pint.git",
-                "reference": "dea4e95f0f1722b8fec9eaabc8fdd676d71e8841"
+                "reference": "006bd7825eb01daf92959d060b89cd9514fe4253"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/pint/zipball/dea4e95f0f1722b8fec9eaabc8fdd676d71e8841",
-                "reference": "dea4e95f0f1722b8fec9eaabc8fdd676d71e8841",
+                "url": "https://api.github.com/repos/laravel/pint/zipball/006bd7825eb01daf92959d060b89cd9514fe4253",
+                "reference": "006bd7825eb01daf92959d060b89cd9514fe4253",
                 "shasum": ""
             },
             "require": {
@@ -14487,7 +14501,69 @@
                 "issues": "https://github.com/laravel/pint/issues",
                 "source": "https://github.com/laravel/pint"
             },
-            "time": "2026-09-09T16:26:47+00:00"
+            "time": "2026-09-10T10:47:55+00:00"
+        },
+        {
+            "name": "laravel/roster",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/laravel/roster.git",
+                "reference": "89e518bd88ae98ff50f6082f6b517c8d8e8245fa"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/laravel/roster/zipball/89e518bd88ae98ff50f6082f6b517c8d8e8245fa",
+                "reference": "89e518bd88ae98ff50f6082f6b517c8d8e8245fa",
+                "shasum": ""
+            },
+            "require": {
+                "composer/semver": "^3.0",
+                "illuminate/console": "^11.0|^12.0|^13.0",
+                "illuminate/contracts": "^11.0|^12.0|^13.0",
+                "illuminate/support": "^11.0|^12.0|^13.0",
+                "php": "^8.2",
+                "symfony/yaml": "^7.2|^8.0"
+            },
+            "require-dev": {
+                "laravel/pint": "^1.29",
+                "mockery/mockery": "^1.6",
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+                "pestphp/pest": "^3.0|^4.1",
+                "phpstan/phpstan": "^2.0",
+                "rector/rector": "^2.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Laravel\\Roster\\RosterServiceProvider"
+                    ]
+                },
+                "branch-alias": {
+                    "dev-master": "1.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Laravel\\Roster\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Detect packages & approaches in use within a Laravel project",
+            "homepage": "https://github.com/laravel/roster",
+            "keywords": [
+                "dev",
+                "laravel"
+            ],
+            "support": {
+                "issues": "https://github.com/laravel/roster/issues",
+                "source": "https://github.com/laravel/roster"
+            },
+            "time": "2026-07-18T17:53:15+00:00"
         },
         {
             "name": "laravel/tinker",
@@ -16130,50 +16206,6 @@
             "time": "2026-01-15T14:47:34+00:00"
         },
         {
-            "name": "phppkg/cli-markdown",
-            "version": "v2.0.3",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/phppkg/cli-markdown.git",
-                "reference": "df45939a047e67220bf0292b785300182d6d6f5f"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/phppkg/cli-markdown/zipball/df45939a047e67220bf0292b785300182d6d6f5f",
-                "reference": "df45939a047e67220bf0292b785300182d6d6f5f",
-                "shasum": ""
-            },
-            "require": {
-                "cebe/markdown": "^1.2",
-                "ext-mbstring": "*",
-                "php": ">8.0.0",
-                "toolkit/cli-utils": "~2.0"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "PhpPkg\\CliMarkdown\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "inhere",
-                    "email": "in.798@qq.com"
-                }
-            ],
-            "description": "Render colored markdown contents on console terminal",
-            "homepage": "https://github.com/phppkg/cli-markdown",
-            "support": {
-                "issues": "https://github.com/phppkg/cli-markdown/issues",
-                "source": "https://github.com/phppkg/cli-markdown/tree/v2.0.3"
-            },
-            "time": "2025-04-22T02:05:09+00:00"
-        },
-        {
             "name": "phpstan/extension-installer",
             "version": "1.4.3",
             "source": {
@@ -16497,16 +16529,16 @@
         },
         {
             "name": "phpunit/php-code-coverage",
-            "version": "14.3.2",
+            "version": "14.3.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/php-code-coverage.git",
-                "reference": "93d62632fb675b76c9b941fdcfcfa10ffb9dea75"
+                "reference": "f8640c238e930b914d0098a1edbad6652e61a64a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/php-code-coverage/zipball/93d62632fb675b76c9b941fdcfcfa10ffb9dea75",
-                "reference": "93d62632fb675b76c9b941fdcfcfa10ffb9dea75",
+                "url": "https://api.github.com/repos/sebastianbergmann/php-code-coverage/zipball/f8640c238e930b914d0098a1edbad6652e61a64a",
+                "reference": "f8640c238e930b914d0098a1edbad6652e61a64a",
                 "shasum": ""
             },
             "require": {
@@ -16525,7 +16557,7 @@
                 "theseer/tokenizer": "^2.0.1"
             },
             "require-dev": {
-                "phpunit/phpunit": "^13.3.2"
+                "phpunit/phpunit": "^13.3.3"
             },
             "suggest": {
                 "ext-pcov": "PHP extension that provides line coverage",
@@ -16563,7 +16595,7 @@
             "support": {
                 "issues": "https://github.com/sebastianbergmann/php-code-coverage/issues",
                 "security": "https://github.com/sebastianbergmann/php-code-coverage/security/policy",
-                "source": "https://github.com/sebastianbergmann/php-code-coverage/tree/14.3.2"
+                "source": "https://github.com/sebastianbergmann/php-code-coverage/tree/14.3.3"
             },
             "funding": [
                 {
@@ -16583,7 +16615,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-04T03:46:43+00:00"
+            "time": "2026-09-10T13:08:32+00:00"
         },
         {
             "name": "phpunit/php-file-iterator",
@@ -17108,16 +17140,16 @@
         },
         {
             "name": "sandermuller/boost-core",
-            "version": "1.9.1",
+            "version": "1.10.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/SanderMuller/boost-core.git",
-                "reference": "7c579c698fc8b266031d3408a304f76c2717bd14"
+                "reference": "32b80ee0f9eb3aa8c904a182661014b7b578d4b6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SanderMuller/boost-core/zipball/7c579c698fc8b266031d3408a304f76c2717bd14",
-                "reference": "7c579c698fc8b266031d3408a304f76c2717bd14",
+                "url": "https://api.github.com/repos/SanderMuller/boost-core/zipball/32b80ee0f9eb3aa8c904a182661014b7b578d4b6",
+                "reference": "32b80ee0f9eb3aa8c904a182661014b7b578d4b6",
                 "shasum": ""
             },
             "require": {
@@ -17161,7 +17193,7 @@
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-main": "1.9.x-dev"
+                    "dev-main": "1.10.x-dev"
                 }
             },
             "autoload": {
@@ -17197,22 +17229,22 @@
             ],
             "support": {
                 "issues": "https://github.com/SanderMuller/boost-core/issues",
-                "source": "https://github.com/SanderMuller/boost-core/tree/1.9.1"
+                "source": "https://github.com/SanderMuller/boost-core/tree/1.10.0"
             },
-            "time": "2026-09-08T16:23:05+00:00"
+            "time": "2026-09-10T09:55:05+00:00"
         },
         {
             "name": "sandermuller/boost-skills",
-            "version": "2.39.1",
+            "version": "2.41.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/SanderMuller/boost-skills.git",
-                "reference": "4394a57be98b216454125d0972ae71e48edf10b5"
+                "reference": "44810c4c140ba824833c0f4d5895e3fc47dee5dd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SanderMuller/boost-skills/zipball/4394a57be98b216454125d0972ae71e48edf10b5",
-                "reference": "4394a57be98b216454125d0972ae71e48edf10b5",
+                "url": "https://api.github.com/repos/SanderMuller/boost-skills/zipball/44810c4c140ba824833c0f4d5895e3fc47dee5dd",
+                "reference": "44810c4c140ba824833c0f4d5895e3fc47dee5dd",
                 "shasum": ""
             },
             "require": {
@@ -17223,7 +17255,7 @@
                 "laravel/pao": "^1.0",
                 "nunomaduro/collision": "^8.0",
                 "sandermuller/package-boost-php": "^1.0",
-                "stolt/skill-validator": "0.0.1"
+                "stolt/skill-validator": "0.0.5"
             },
             "type": "library",
             "notification-url": "https://packagist.org/downloads/",
@@ -17246,9 +17278,9 @@
             ],
             "support": {
                 "issues": "https://github.com/SanderMuller/boost-skills/issues",
-                "source": "https://github.com/SanderMuller/boost-skills/tree/2.39.1"
+                "source": "https://github.com/SanderMuller/boost-skills/tree/2.41.0"
             },
-            "time": "2026-09-08T16:22:16+00:00"
+            "time": "2026-09-10T10:36:31+00:00"
         },
         {
             "name": "sandermuller/laravel-fluent-validation-phpstan",
@@ -17403,61 +17435,68 @@
             "time": "2026-07-16T19:35:26+00:00"
         },
         {
-            "name": "sandermuller/package-boost-laravel",
-            "version": "1.1.0",
+            "name": "sandermuller/project-boost-laravel",
+            "version": "1.4.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/SanderMuller/package-boost-laravel.git",
-                "reference": "d47d17dc6cc26309ff5444b8382b8912e58f416d"
+                "url": "https://github.com/SanderMuller/project-boost-laravel.git",
+                "reference": "df60caa31ea07a520774c9ca9d37481711f05f06"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SanderMuller/package-boost-laravel/zipball/d47d17dc6cc26309ff5444b8382b8912e58f416d",
-                "reference": "d47d17dc6cc26309ff5444b8382b8912e58f416d",
+                "url": "https://api.github.com/repos/SanderMuller/project-boost-laravel/zipball/df60caa31ea07a520774c9ca9d37481711f05f06",
+                "reference": "df60caa31ea07a520774c9ca9d37481711f05f06",
                 "shasum": ""
             },
             "require": {
-                "php": "^8.3",
-                "sandermuller/boost-core": "^1.6",
-                "sandermuller/package-boost-php": "^1.0"
-            },
-            "require-dev": {
-                "composer/composer": "^2.7",
-                "driftingly/rector-laravel": "^2.3",
                 "illuminate/contracts": "^12.0||^13.0",
                 "illuminate/support": "^12.0||^13.0",
-                "larastan/larastan": "^3.9",
-                "laravel/boost": "^2.0||^3.0",
-                "laravel/pao": "^1.0",
-                "laravel/pint": "^1.29",
-                "mrpunyapal/rector-pest": "^0.2",
-                "nunomaduro/collision": "^8.0",
-                "orchestra/testbench": "^10.0||^11.0",
-                "pestphp/pest": "^4.0",
+                "laravel/boost": "^2.5",
+                "laravel/roster": "^1.0",
+                "php": "^8.3",
+                "sandermuller/boost-core": "^1.8.1"
+            },
+            "require-dev": {
+                "driftingly/rector-laravel": "^2.5",
+                "larastan/larastan": "^3.10",
+                "laravel/pao": "^1.1",
+                "laravel/pint": "^1.30",
+                "mrpunyapal/rector-pest": "^0.2.15",
+                "nunomaduro/collision": "^8.9",
+                "orchestra/testbench": "^11.2",
+                "pestphp/pest": "^4.7",
                 "pestphp/pest-plugin-arch": "^4.0",
-                "pestphp/pest-plugin-laravel": "^4.0",
+                "pestphp/pest-plugin-laravel": "^4.1",
                 "phpstan/extension-installer": "^1.4",
                 "phpstan/phpstan-deprecation-rules": "^2.0",
                 "phpstan/phpstan-phpunit": "^2.0",
                 "phpstan/phpstan-strict-rules": "^2.0",
-                "rector/rector": "^2.4",
+                "rector/rector": "^2.6",
                 "sandermuller/boost-skills": "^2.27",
-                "spaze/phpstan-disallowed-calls": "^4.10",
+                "sandermuller/package-boost-laravel": "^1.0",
+                "spaze/phpstan-disallowed-calls": "^4.14",
                 "symplify/phpstan-extensions": "^12.0",
-                "tomasvotruba/cognitive-complexity": "^1.1",
+                "tomasvotruba/cognitive-complexity": "^1.2",
                 "tomasvotruba/type-coverage": "^2.1"
             },
             "type": "library",
             "extra": {
                 "boost": {
-                    "emitters": [
-                        "SanderMuller\\PackageBoostLaravel\\Emitters\\McpJsonEmitter"
+                    "entry-point": {
+                        "sync": "php artisan project-boost:sync",
+                        "where": "php artisan project-boost:where",
+                        "install": "php artisan project-boost:install"
+                    }
+                },
+                "laravel": {
+                    "providers": [
+                        "SanderMuller\\ProjectBoostLaravel\\ProjectBoostLaravelServiceProvider"
                     ]
                 }
             },
             "autoload": {
                 "psr-4": {
-                    "SanderMuller\\PackageBoostLaravel\\": "src/"
+                    "SanderMuller\\ProjectBoostLaravel\\": "src/"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -17471,103 +17510,18 @@
                     "role": "Developer"
                 }
             ],
-            "description": "AI agent skills for Laravel package authors. Adds Laravel-flavored skills + .mcp.json emission on top of package-boost-php.",
-            "homepage": "https://github.com/sandermuller/package-boost-laravel",
+            "description": "Sync AI agent skills + guidelines for Laravel apps. Companion to laravel/boost: boost stays the MCP, this package owns the agent-file fanout (skills, guidelines, remote skills, tag filtering).",
+            "homepage": "https://github.com/sandermuller/project-boost-laravel",
             "keywords": [
-                "TestBench",
-                "ai",
-                "claude",
-                "developer-tools",
                 "laravel",
-                "package-boost",
-                "package-development",
+                "project-boost-laravel",
                 "sandermuller"
             ],
             "support": {
-                "issues": "https://github.com/SanderMuller/package-boost-laravel/issues",
-                "source": "https://github.com/SanderMuller/package-boost-laravel/tree/1.1.0"
+                "issues": "https://github.com/SanderMuller/project-boost-laravel/issues",
+                "source": "https://github.com/SanderMuller/project-boost-laravel/tree/1.4.0"
             },
-            "time": "2026-08-15T15:07:34+00:00"
-        },
-        {
-            "name": "sandermuller/package-boost-php",
-            "version": "1.0.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/SanderMuller/package-boost-php.git",
-                "reference": "848e99a63106c32bc0bced195ec2983a50ab8936"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/SanderMuller/package-boost-php/zipball/848e99a63106c32bc0bced195ec2983a50ab8936",
-                "reference": "848e99a63106c32bc0bced195ec2983a50ab8936",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^8.3",
-                "sandermuller/boost-core": "^1.0",
-                "stolt/lean-package-validator": "^5.7||^6.0",
-                "symfony/console": "^7.0||^8.0",
-                "symfony/process": "^7.0||^8.0"
-            },
-            "require-dev": {
-                "composer/composer": "^2.7",
-                "laravel/pao": "^1.0",
-                "laravel/pint": "^1.29",
-                "mrpunyapal/rector-pest": "^0.2.15",
-                "nunomaduro/collision": "^8.9",
-                "pestphp/pest": "^4.0",
-                "pestphp/pest-plugin-arch": "^4.0",
-                "phpstan/extension-installer": "^1.4",
-                "phpstan/phpstan": "^2.0",
-                "phpstan/phpstan-deprecation-rules": "^2.0",
-                "phpstan/phpstan-phpunit": "^2.0",
-                "phpstan/phpstan-strict-rules": "^2.0",
-                "rector/rector": "^2.4",
-                "rector/type-perfect": "^2.1",
-                "sandermuller/boost-skills": "^2.0",
-                "spaze/phpstan-disallowed-calls": "^4.12",
-                "symplify/phpstan-extensions": "^12.0",
-                "tomasvotruba/cognitive-complexity": "^1.1",
-                "tomasvotruba/type-coverage": "^2.1"
-            },
-            "bin": [
-                "bin/package-boost-php"
-            ],
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "SanderMuller\\PackageBoostPhp\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Sander Muller",
-                    "email": "github@scode.nl",
-                    "role": "Developer"
-                }
-            ],
-            "description": "AI agent skills for framework-agnostic Composer package authors. Pairs with sandermuller/boost-core for sync to nine AI agents.",
-            "homepage": "https://github.com/sandermuller/package-boost-php",
-            "keywords": [
-                "ai",
-                "claude",
-                "composer",
-                "cursor",
-                "developer-tools",
-                "package-boost",
-                "package-development",
-                "sandermuller"
-            ],
-            "support": {
-                "issues": "https://github.com/SanderMuller/package-boost-php/issues",
-                "source": "https://github.com/SanderMuller/package-boost-php/tree/1.0.0"
-            },
-            "time": "2026-06-05T06:40:33+00:00"
+            "time": "2026-08-29T21:47:05+00:00"
         },
         {
             "name": "sandermuller/richter",
@@ -18887,214 +18841,6 @@
             "time": "2024-10-20T05:08:20+00:00"
         },
         {
-            "name": "stolt/lean-package-validator",
-            "version": "v6.0.1",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/raphaelstolt/lean-package-validator.git",
-                "reference": "55a6985437e7259af7cb8bcf5e9b069deba5cbd0"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/raphaelstolt/lean-package-validator/zipball/55a6985437e7259af7cb8bcf5e9b069deba5cbd0",
-                "reference": "55a6985437e7259af7cb8bcf5e9b069deba5cbd0",
-                "shasum": ""
-            },
-            "require": {
-                "laravel/agent-detector": "^2.0",
-                "php": ">=8.2",
-                "sebastian/diff": "^9.0||^8.0||^7.0.0||^6.0.1||^5.0||^4.0.3",
-                "stolt/list-skills-command": "^1.0",
-                "symfony/console": "^8.0||^7.2.1||^v5.4.8",
-                "symfony/finder": "^8.0||^7.2.1||^v5.4.8"
-            },
-            "require-dev": {
-                "carthage-software/mago": "^1.18.0",
-                "dg/bypass-finals": "^1.9",
-                "friendsofphp/php-cs-fixer": "^3.95",
-                "laravel/pao": "^1.0",
-                "mockery/mockery": "^1.0",
-                "peckphp/peck": "^0.3",
-                "phlak/semver": "^4.1 || ^6.0",
-                "php-mock/php-mock": "^2.6",
-                "php-mock/php-mock-phpunit": "^2.7||^1.1",
-                "phpstan/phpstan": "^2.1",
-                "phpunit/phpunit": "^13.0||^12.0||^11.4.4||^10.5.25",
-                "shipmonk/composer-dependency-analyser": "^1.8",
-                "zenstruck/console-test": "^1.7"
-            },
-            "bin": [
-                "bin/lean-package-validator"
-            ],
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Stolt\\LeanPackage\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Raphael Stolt",
-                    "email": "raphael.stolt@gmail.com"
-                }
-            ],
-            "description": "Library and CLI for validating if a project or package has and will have lean releases.",
-            "keywords": [
-                "cli",
-                "dev",
-                "dist",
-                "gitattributes",
-                "lean",
-                "lpv",
-                "package",
-                "project",
-                "release",
-                "validation"
-            ],
-            "support": {
-                "issues": "https://github.com/raphaelstolt/lean-package-validator/issues",
-                "source": "https://github.com/raphaelstolt/lean-package-validator/tree/v6.0.1"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/raphaelstolt",
-                    "type": "github"
-                }
-            ],
-            "time": "2026-08-19T01:10:37+00:00"
-        },
-        {
-            "name": "stolt/list-skills-command",
-            "version": "v1.4.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/raphaelstolt/list-skills-command.git",
-                "reference": "807c8fa237594f2fd49f8e99d8719824f18a2069"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/raphaelstolt/list-skills-command/zipball/807c8fa237594f2fd49f8e99d8719824f18a2069",
-                "reference": "807c8fa237594f2fd49f8e99d8719824f18a2069",
-                "shasum": ""
-            },
-            "require": {
-                "ergebnis/agent-detector": "^1.0",
-                "php": ">=8.2",
-                "phppkg/cli-markdown": "^2.0",
-                "stolt/skill-validator": "^0.0.1",
-                "symfony/console": "^8.0||^7.3"
-            },
-            "require-dev": {
-                "dg/bypass-finals": "^1.9",
-                "friendsofphp/php-cs-fixer": "^3.70.1",
-                "peckphp/peck": "^0.1.2",
-                "phpstan/phpstan": "^2.1",
-                "phpunit/phpunit": "^11.4.4",
-                "stolt/lean-package-validator": "^4.4",
-                "zenstruck/console-test": "^1.7"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Stolt\\Console\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Raphael Stolt",
-                    "email": "raphael.stolt@gmail.com"
-                }
-            ],
-            "description": "A symfony/console command for listing and introspecting AI skills files of a project.",
-            "keywords": [
-                "SKILL.md",
-                "agent-skills",
-                "ai",
-                "boost",
-                "cli",
-                "console",
-                "introspect",
-                "list",
-                "php",
-                "skills",
-                "symfony"
-            ],
-            "support": {
-                "issues": "https://github.com/raphaelstolt/list-skills-command/issues",
-                "source": "https://github.com/raphaelstolt/list-skills-command/tree/v1.4.0"
-            },
-            "time": "2026-05-04T10:46:31+00:00"
-        },
-        {
-            "name": "stolt/skill-validator",
-            "version": "v0.0.1",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/raphaelstolt/skill-validator.git",
-                "reference": "24139a994f424a063beecb606ce03259102fae7e"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/raphaelstolt/skill-validator/zipball/24139a994f424a063beecb606ce03259102fae7e",
-                "reference": "24139a994f424a063beecb606ce03259102fae7e",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=8.2"
-            },
-            "require-dev": {
-                "dg/bypass-finals": "^1.9",
-                "friendsofphp/php-cs-fixer": "^3.70.1",
-                "peckphp/peck": "^0.1.2",
-                "phpstan/phpstan": "^2.1",
-                "phpunit/phpunit": "^11.4.4",
-                "stolt/lean-package-validator": "^4.4"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Stolt\\Ai\\Skill\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Raphael Stolt",
-                    "email": "raphael.stolt@gmail.com"
-                }
-            ],
-            "description": "A PHP library for parsing and validating SKILL.md files or content.",
-            "keywords": [
-                "SKILL.md",
-                "agent-skills",
-                "ai",
-                "content",
-                "file",
-                "parse",
-                "parsing",
-                "php",
-                "skills",
-                "validate",
-                "validating"
-            ],
-            "support": {
-                "issues": "https://github.com/raphaelstolt/skill-validator/issues",
-                "source": "https://github.com/raphaelstolt/skill-validator/tree/v0.0.1"
-            },
-            "time": "2026-05-04T00:50:45+00:00"
-        },
-        {
             "name": "symfony/yaml",
             "version": "v8.1.6",
             "source": {
@@ -19548,64 +19294,6 @@
                 }
             ],
             "time": "2026-08-29T08:21:40+00:00"
-        },
-        {
-            "name": "toolkit/cli-utils",
-            "version": "v2.0.5",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/php-toolkit/cli-utils.git",
-                "reference": "74a100794144e673b084bf9fe415c39b1e9d737e"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/php-toolkit/cli-utils/zipball/74a100794144e673b084bf9fe415c39b1e9d737e",
-                "reference": "74a100794144e673b084bf9fe415c39b1e9d737e",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">8.1.0"
-            },
-            "require-dev": {
-                "ext-posix": "*",
-                "ext-readline": "*"
-            },
-            "suggest": {
-                "inhere/console": "a lightweight php console application library.",
-                "toolkit/pflag": "Command line flag parse library of the php"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Toolkit\\Cli\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "inhere",
-                    "email": "in.798@qq.com",
-                    "homepage": "http://github.com/inhere"
-                }
-            ],
-            "description": "useful cli tool library of the php",
-            "homepage": "https://github.com/php-toolkit/cli-utils",
-            "keywords": [
-                "cli",
-                "cli-color",
-                "command-line",
-                "library",
-                "php",
-                "tool"
-            ],
-            "support": {
-                "issues": "https://github.com/php-toolkit/cli-utils/issues",
-                "source": "https://github.com/php-toolkit/cli-utils/tree/v2.0.5"
-            },
-            "time": "2025-04-19T14:11:08+00:00"
         }
     ],
     "aliases": [],
