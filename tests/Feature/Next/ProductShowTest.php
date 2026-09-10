@@ -117,9 +117,9 @@ it('clamps a forged range to the plan ceiling', function (): void {
     // enforcement point — the clamp is.
     $component = livewire(ProductShow::class, ['product' => $product])->set('range', 'all');
 
-    $series = $component->viewData('series');
+    $chart = $component->viewData('chart');
 
-    expect(json_encode(is_array($series) ? $series : []))->not->toContain('99.99');
+    expect(json_encode(is_array($chart) ? $chart : []))->not->toContain('99.99');
 });
 
 it('tells a free account why the long ranges are missing', function (): void {
@@ -148,7 +148,8 @@ it('renders a product with no shops and no history', function (): void {
 
     livewire(ProductShow::class, ['product' => ownedProduct($user)])
         ->assertOk()
-        ->assertSee('No shops yet.');
+        ->assertSee('No shops yet.')
+        ->assertSee('No price history yet.');
 });
 
 it('states the shop limit instead of offering another', function (): void {

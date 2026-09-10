@@ -210,16 +210,14 @@
                     <section id="faq" class="py-20">
                         <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Frequently asked questions') }}</h2>
                         <div class="mt-10 grid items-start gap-4 sm:grid-cols-2">
-                            @foreach ($faq as $item)
-                                <details class="group rounded-2xl bg-white/80 p-2 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:ring-zinc-800">
-                                    <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-base font-semibold select-none [&::-webkit-details-marker]:hidden">
-                                        <span>{{ $item['q'] }}</span>
-                                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="size-5 shrink-0 text-zinc-500 transition-transform group-open:rotate-180 dark:text-zinc-400">
-                                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
-                                        </svg>
-                                    </summary>
-                                    <p class="px-4 pb-3 text-sm text-pretty text-zinc-600 dark:text-zinc-400">{{ $item['a'] }}</p>
-                                </details>
+                            @foreach (array_chunk($faq, (int) ceil(count($faq) / 2)) as $column)
+                                <flux:accordion transition>
+                                    @foreach ($column as $item)
+                                        <flux:accordion.item :heading="$item['q']">
+                                            {{ $item['a'] }}
+                                        </flux:accordion.item>
+                                    @endforeach
+                                </flux:accordion>
                             @endforeach
                         </div>
                     </section>

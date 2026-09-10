@@ -7,7 +7,6 @@ use App\Billing\Entitlements;
 use App\Billing\HistoryWindow;
 use App\Billing\Plan;
 use App\Billing\PlanLimits;
-use App\Charts\PriceHistoryChartOptions;
 use App\Charts\PriceHistorySeries;
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
@@ -22,8 +21,8 @@ use Livewire\Component;
 /**
  * One product: its price, the shops it is tracked at, and the history chart.
  *
- * The chart's data and options come from the server so the plan window is
- * decided in one place — `$range` arrives from the client, and
+ * The chart's rows come from the server so the plan window is decided in
+ * one place — `$range` arrives from the client, and
  * `HistoryWindow::start()` clamps it whatever the menu offered.
  */
 class ProductShow extends Component
@@ -231,8 +230,7 @@ class ProductShow extends Component
     public function render(): View
     {
         return view('livewire.products.product-show', [
-            'series' => (new PriceHistorySeries($this->product, $this->range))->data(),
-            'chartOptions' => PriceHistoryChartOptions::forProduct($this->product)->toHtml(),
+            'chart' => new PriceHistorySeries($this->product, $this->range)->fluxChart(),
             'ranges' => HistoryWindow::filters($this->historyDays()),
             'historyNotice' => $this->historyNotice(),
             'shops' => $this->product->shops()->orderBy('current_price')->get(),

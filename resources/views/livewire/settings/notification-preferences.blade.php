@@ -1,5 +1,5 @@
 <div>
-    <flux:heading size="xl">{{ __('Notifications') }}</flux:heading>
+    <flux:heading size="xl" level="1">{{ __('Notifications') }}</flux:heading>
     <flux:text class="mt-1 text-zinc-500">{{ __('How and when DipCatch tells you a price dropped.') }}</flux:text>
 
     <form wire:submit="save" class="mt-6 space-y-6">
@@ -33,7 +33,7 @@
             <flux:heading size="lg">{{ __('Regional') }}</flux:heading>
 
             <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                <flux:select wire:model="timezone" :label="__('Timezone')">
+                <flux:select wire:model="timezone" variant="listbox" searchable :label="__('Timezone')" :placeholder="__('Search timezones…')">
                     @foreach ($timezones as $value => $label)
                         <flux:select.option value="{{ $value }}">{{ $label }}</flux:select.option>
                     @endforeach
@@ -46,13 +46,6 @@
         <div class="flex flex-wrap items-center gap-3">
             <flux:button type="submit" variant="primary">{{ __('Save preferences') }}</flux:button>
             <flux:button type="button" variant="ghost" wire:click="sendTest">{{ __('Send a test notification') }}</flux:button>
-
-            <flux:text x-data="{ shown: false }" x-on:saved.window="shown = true; setTimeout(() => shown = false, 3000)" x-show="shown" x-cloak class="text-green-600">
-                {{ __('Saved.') }}
-            </flux:text>
-            <flux:text x-data="{ shown: false }" x-on:test-sent.window="shown = true; setTimeout(() => shown = false, 3000)" x-show="shown" x-cloak class="text-green-600">
-                {{ __('Test notification sent.') }}
-            </flux:text>
         </div>
     </form>
 

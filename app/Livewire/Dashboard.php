@@ -37,7 +37,7 @@ class Dashboard extends Component
             'activeDrops' => $activeDrops,
             'watching' => $watching,
             'lifetimeSavings' => $this->lifetimeSavings(),
-            'savings' => $savings->hasData() ? $savings->data() : null,
+            'savings' => $savings->hasData() ? $savings->fluxChart() : null,
             'recentAlerts' => $this->recentAlerts(),
             'needsSecondShop' => $this->needsSecondShop($watching),
             'canAddProduct' => app(PlanLimits::class)->canAddProduct($this->user()),

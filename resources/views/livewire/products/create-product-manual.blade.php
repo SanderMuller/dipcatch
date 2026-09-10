@@ -1,5 +1,11 @@
 <div>
-    <flux:heading size="xl">{{ __('Create product manually') }}</flux:heading>
+    <flux:breadcrumbs class="mb-4">
+        <flux:breadcrumbs.item :href="route('app.products.index')" wire:navigate>{{ __('Products') }}</flux:breadcrumbs.item>
+        <flux:breadcrumbs.item :href="route('app.products.create')" wire:navigate>{{ __('Track a product') }}</flux:breadcrumbs.item>
+        <flux:breadcrumbs.item>{{ __('Manual') }}</flux:breadcrumbs.item>
+    </flux:breadcrumbs>
+
+    <flux:heading size="xl" level="1">{{ __('Create product manually') }}</flux:heading>
     <flux:text class="mt-1 text-zinc-500">{{ __('For a shop DipCatch cannot read automatically. Add the shops afterwards.') }}</flux:text>
 
     @if ($limitMessage)

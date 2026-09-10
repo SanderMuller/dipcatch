@@ -62,7 +62,7 @@ test('test action dispatches a TestNotification to the current user', function (
 
     livewire(NotificationPreferences::class)
         ->call('sendTest')
-        ->assertDispatched('test-sent');
+        ->assertDispatched('toast-show');
 
     Notification::assertSentTo($user, TestNotification::class);
 });

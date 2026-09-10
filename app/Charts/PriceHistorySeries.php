@@ -22,11 +22,11 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
  * a view concern: `$filter` reaches it from the client, so the menu an account
  * is shown is never the enforcement point — `HistoryWindow::start()` is.
  */
-final class PriceHistorySeries
+final readonly class PriceHistorySeries
 {
     public function __construct(
-        private readonly Product $product,
-        private readonly ?string $filter = null,
+        private Product $product,
+        private ?string $filter = null,
     ) {}
 
     /**
@@ -43,6 +43,17 @@ final class PriceHistorySeries
         return $user === null
             ? Entitlements::of(Plan::Free)->historyDays()
             : $user->entitlements()->historyDays();
+    }
+
+    /**
+     * Rows a Flux line chart can plot. Null prices stay as gaps; notified
+     * points are omitted when no alert fired on that stamp.
+     *
+     * @return array{rows: list<array<string, mixed>>, currency: string, unitLabel: ?string, hasNotified: bool}
+     */
+    public function fluxChart(): array
+    {
+        return PriceHistoryFluxChart::fromData($this->data(), strtoupper($this->product->currency));
     }
 
     /**

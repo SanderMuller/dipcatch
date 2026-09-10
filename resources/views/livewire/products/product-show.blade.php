@@ -1,12 +1,21 @@
 <div>
+    <flux:breadcrumbs class="mb-4">
+        <flux:breadcrumbs.item :href="route('app.dashboard')" wire:navigate>{{ __('Dashboard') }}</flux:breadcrumbs.item>
+        <flux:breadcrumbs.item :href="route('app.products.index')" wire:navigate>{{ __('Products') }}</flux:breadcrumbs.item>
+        <flux:breadcrumbs.item>{{ Str::limit($product->title, 40) }}</flux:breadcrumbs.item>
+    </flux:breadcrumbs>
+
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="flex items-start gap-4">
             <x-product-thumb :product="$product" size="size-16 sm:size-20" />
             <div class="min-w-0">
-                <flux:heading size="xl" class="tracking-tight">{{ $product->title }}</flux:heading>
+                <flux:heading size="xl" level="1" class="tracking-tight">{{ $product->title }}</flux:heading>
                 <flux:text class="mt-1 text-zinc-500">
                     {{ trans_choice(':count shop|:count shops', $shops->count(), ['count' => $shops->count()]) }}
-                    · {{ $product->active ? __('Active') : __('Paused') }}
+                    ·
+                    <flux:badge size="sm" :color="$product->active ? 'green' : 'zinc'">
+                        {{ $product->active ? __('Active') : __('Paused') }}
+                    </flux:badge>
                 </flux:text>
             </div>
         </div>
@@ -40,26 +49,13 @@
             @endif
 
             @if ($shareUrl)
-                {{-- Readonly and selected on focus: this is a value to copy,
-                     not a field to edit. --}}
-                <div class="space-y-2" x-data="{ copied: false }">
-                    <flux:input
-                        :label="__('Public link')"
-                        value="{{ $shareUrl }}"
-                        readonly
-                        x-ref="shareUrl"
-                        x-on:focus="$event.target.select()"
-                        class="font-mono"
-                    />
-                    <flux:button
-                        size="sm"
-                        icon="clipboard"
-                        x-on:click="navigator.clipboard.writeText($refs.shareUrl.value).then(() => { copied = true; setTimeout(() => copied = false, 2000) })"
-                    >
-                        <span x-show="! copied">{{ __('Copy link') }}</span>
-                        <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
-                    </flux:button>
-                </div>
+                <flux:input
+                    :label="__('Public link')"
+                    value="{{ $shareUrl }}"
+                    readonly
+                    copyable
+                    class="font-mono"
+                />
 
                 <div class="flex flex-wrap gap-2 border-t border-zinc-950/5 pt-4 dark:border-white/10">
                     <flux:button
@@ -132,10 +128,17 @@
         </dl>
     </flux:card>
 
-    <flux:card class="mt-6">
+    <flux:tab.group class="mt-6">
+        <flux:tabs>
+            <flux:tab name="history" icon="chart-bar">{{ __('History') }}</flux:tab>
+            <flux:tab name="shops" icon="building-storefront">{{ __('Shops') }}</flux:tab>
+        </flux:tabs>
+
+        <flux:tab.panel name="history">
+    <flux:card>
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <flux:heading size="lg">{{ __('Cheapest price history') }}</flux:heading>
+                <flux:heading size="lg" level="2">{{ __('Cheapest price history') }}</flux:heading>
                 @if ($historyNotice)
                     <flux:text size="sm" class="mt-1 text-zinc-500">
                         {{ $historyNotice['reason'] }}
@@ -146,30 +149,63 @@
                 @endif
             </div>
 
-            <flux:select wire:model.live="range" size="sm" class="max-w-44">
+            <flux:select wire:model.live="range" variant="listbox" size="sm" class="max-w-44">
                 @foreach ($ranges as $value => $label)
                     <flux:select.option value="{{ $value }}">{{ $label }}</flux:select.option>
                 @endforeach
             </flux:select>
         </div>
 
-        {{-- Fixed height: Chart.js is responsive by default and would otherwise
-             grow to whatever the container allows, which ran the chart off the
-             fold. The Filament widget capped it at 260px for the same reason. --}}
-        <div
-            class="mt-4 h-[260px]"
-            wire:ignore
-            x-data
-            x-init="window.dipcatchChart($refs.canvas, @js($series), {{ $chartOptions }})"
-        >
-            <canvas x-ref="canvas"></canvas>
-        </div>
+        @if ($chart['rows'] === [])
+            <flux:text class="mt-4 text-zinc-500">{{ __('No price history yet.') }}</flux:text>
+        @else
+            <flux:chart :value="$chart['rows']" class="mt-4 aspect-[3/1]">
+                <flux:chart.svg>
+                    <flux:chart.line field="price" class="text-amber-500 dark:text-amber-400" curve="none" />
+                    <flux:chart.area field="price" class="text-amber-200/50 dark:text-amber-400/20" curve="none" />
+                    @if ($chart['hasNotified'])
+                        <flux:chart.point field="notified" class="text-rose-600 dark:text-rose-400" r="6" />
+                    @endif
+                    <flux:chart.axis axis="x" field="date" :format="['month' => 'short', 'day' => 'numeric']">
+                        <flux:chart.axis.tick />
+                        <flux:chart.axis.line />
+                    </flux:chart.axis>
+                    <flux:chart.axis axis="y" :format="['style' => 'currency', 'currency' => $chart['currency']]">
+                        <flux:chart.axis.grid />
+                        <flux:chart.axis.tick />
+                    </flux:chart.axis>
+                    <flux:chart.cursor />
+                </flux:chart.svg>
+                <flux:chart.tooltip>
+                    <flux:chart.tooltip.heading field="date" :format="['month' => 'short', 'day' => 'numeric', 'hour' => 'numeric', 'minute' => '2-digit']" />
+                    <flux:chart.tooltip.value field="price" :label="__('Cheapest')" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
+                    @if ($chart['unitLabel'] !== null)
+                        <flux:chart.tooltip.value field="unit" :label="$chart['unitLabel']" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
+                    @endif
+                    @if ($chart['hasNotified'])
+                        <flux:chart.tooltip.value field="notified" :label="__('Notified')" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
+                    @endif
+                </flux:chart.tooltip>
+                @if ($chart['hasNotified'])
+                    <div class="flex flex-wrap justify-center gap-4 pt-4">
+                        <flux:chart.legend :label="__('Cheapest')">
+                            <flux:chart.legend.indicator class="bg-amber-500" />
+                        </flux:chart.legend>
+                        <flux:chart.legend :label="__('Notified')">
+                            <flux:chart.legend.indicator class="bg-rose-600" />
+                        </flux:chart.legend>
+                    </div>
+                @endif
+            </flux:chart>
+        @endif
     </flux:card>
+        </flux:tab.panel>
 
-    <flux:card class="mt-6">
+        <flux:tab.panel name="shops">
+    <flux:card>
         {{-- Not "Also sold at": that phrase belongs to the suggestions panel
              below, and a test asserts it is absent when nothing matches. --}}
-        <flux:heading size="lg">{{ __('Tracked shops') }}</flux:heading>
+        <flux:heading size="lg" level="2">{{ __('Tracked shops') }}</flux:heading>
 
         {{-- The add-shop control and the limit explanation, shared with the
              page this replaced: it states the count and the upgrade path
@@ -182,91 +218,90 @@
             ])
         </div>
 
-        <div class="mt-4 overflow-x-auto">
-            <table class="w-full text-start text-sm">
-                <thead class="border-b border-zinc-950/10 dark:border-white/10">
-                    <tr>
-                        <th class="py-2 pe-3 text-start font-medium whitespace-nowrap">{{ __('Shop') }}</th>
-                        <th class="py-2 pe-3 text-start font-medium whitespace-nowrap">{{ __('Price') }}</th>
-                        <th class="hidden py-2 pe-3 text-start font-medium whitespace-nowrap md:table-cell">{{ __('Unit price') }}</th>
-                        <th class="hidden py-2 pe-3 text-start font-medium whitespace-nowrap md:table-cell">{{ __('In stock') }}</th>
-                        <th class="hidden py-2 pe-3 text-start font-medium whitespace-nowrap md:table-cell">{{ __('Last checked') }}</th>
-                        <th class="py-2 text-end font-medium whitespace-nowrap">{{ __('Actions') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($shops as $shop)
-                        <tr class="border-b border-zinc-950/5 dark:border-white/5" wire:key="shop-{{ $shop->id }}">
-                            <td class="py-3 pe-3">
-                                {!! \App\Support\Favicon::html($shop->host) !!}
-                                @if ($shop->notes)
-                                    <flux:tooltip content="{{ $shop->notes }}">
-                                        <flux:icon.pencil-square data-slot="notes_indicator" class="ms-1 inline size-3 text-zinc-400" />
-                                    </flux:tooltip>
-                                @endif
-                            </td>
-                            <td class="py-3 pe-3 tabular-nums">
-                                {{ \App\Support\MoneyFormatter::format($shop->current_price === null ? null : (string) $shop->current_price, $shop->currency) }}
-                                {{-- A price that is only good until a date says so, or the
-                                     number reads as permanent when it is not. --}}
-                                @php($promo = \App\Support\PromotionLabel::long($shop))
-                                @if ($promo)
-                                    <flux:text size="sm" class="text-zinc-500">{{ $promo }}</flux:text>
-                                @endif
-                                {{-- An offer only some shoppers can claim is named, so the
-                                     headline price is not read as everyone's price. --}}
-                                @php($conditional = $shop->conditionalOffer())
-                                @if ($conditional)
-                                    <flux:text size="sm" class="text-zinc-500">
-                                        {{ $conditional->label }} · {{ \App\Support\MoneyFormatter::format($conditional->price, $shop->currency) }}
-                                    </flux:text>
-                                @endif
-                            </td>
-                            <td class="hidden py-3 pe-3 tabular-nums md:table-cell">
-                                {{ \App\Livewire\Products\ProductList::unitPriceState($shop, $product) }}
-                            </td>
-                            <td class="hidden py-3 pe-3 md:table-cell">
-                                {{ $shop->current_in_stock ? __('Yes') : __('No') }}
-                            </td>
-                            <td class="hidden py-3 pe-3 text-zinc-500 md:table-cell">
-                                {{ $shop->last_checked_at?->diffForHumans() ?? __('never') }}
-                            </td>
-                            <td class="py-3 text-end">
-                                <flux:button size="xs" variant="ghost" icon="arrow-top-right-on-square" :href="$shop->url" target="_blank" :aria-label="__('Open')" />
-
-                                <flux:button
-                                    size="xs"
-                                    variant="ghost"
-                                    icon="pencil-square"
-                                    wire:click="editShop('{{ $shop->id }}')"
-                                    :aria-label="__('Edit shop')"
-                                />
-
-                                <flux:button
-                                    size="xs"
-                                    variant="ghost"
-                                    icon="trash"
-                                    wire:click="removeShop('{{ $shop->id }}')"
-                                    wire:confirm="{{ __('Remove this shop?') }}"
-                                    :aria-label="__('Remove')"
-                                />
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="py-10 text-center">
-                                <flux:text class="text-zinc-500">{{ __('No shops yet. Add one to start tracking a price.') }}</flux:text>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+        <flux:table class="mt-4">
+            <flux:table.columns>
+                <flux:table.column>{{ __('Shop') }}</flux:table.column>
+                <flux:table.column>{{ __('Price') }}</flux:table.column>
+                <flux:table.column class="hidden md:table-cell">{{ __('Unit price') }}</flux:table.column>
+                <flux:table.column class="hidden md:table-cell">{{ __('In stock') }}</flux:table.column>
+                <flux:table.column class="hidden md:table-cell">{{ __('Last checked') }}</flux:table.column>
+                <flux:table.column align="end">{{ __('Actions') }}</flux:table.column>
+            </flux:table.columns>
+            <flux:table.rows>
+                @forelse ($shops as $shop)
+                    <flux:table.row :key="'shop-'.$shop->id">
+                        <flux:table.cell>
+                            {!! \App\Support\Favicon::html($shop->host) !!}
+                            @if ($shop->notes)
+                                <flux:tooltip content="{{ $shop->notes }}">
+                                    <flux:icon.pencil-square data-slot="notes_indicator" class="ms-1 inline size-3 text-zinc-400" />
+                                </flux:tooltip>
+                            @endif
+                        </flux:table.cell>
+                        <flux:table.cell class="tabular-nums">
+                            {{ \App\Support\MoneyFormatter::format($shop->current_price === null ? null : (string) $shop->current_price, $shop->currency) }}
+                            {{-- A price that is only good until a date says so, or the
+                                 number reads as permanent when it is not. --}}
+                            @php($promo = \App\Support\PromotionLabel::long($shop))
+                            @if ($promo)
+                                <flux:text size="sm" class="text-zinc-500">{{ $promo }}</flux:text>
+                            @endif
+                            {{-- An offer only some shoppers can claim is named, so the
+                                 headline price is not read as everyone's price. --}}
+                            @php($conditional = $shop->conditionalOffer())
+                            @if ($conditional)
+                                <flux:text size="sm" class="text-zinc-500">
+                                    {{ $conditional->label }} · {{ \App\Support\MoneyFormatter::format($conditional->price, $shop->currency) }}
+                                </flux:text>
+                            @endif
+                        </flux:table.cell>
+                        <flux:table.cell class="hidden tabular-nums md:table-cell">
+                            {{ \App\Livewire\Products\ProductList::unitPriceState($shop, $product) }}
+                        </flux:table.cell>
+                        <flux:table.cell class="hidden md:table-cell">
+                            @if ($shop->current_in_stock === true)
+                                <flux:badge size="sm" color="green">{{ __('In stock') }}</flux:badge>
+                            @elseif ($shop->current_in_stock === false)
+                                <flux:badge size="sm" color="amber">{{ __('Out of stock') }}</flux:badge>
+                            @else
+                                <flux:badge size="sm" color="zinc">{{ __('Stock unknown') }}</flux:badge>
+                            @endif
+                        </flux:table.cell>
+                        <flux:table.cell class="hidden text-zinc-500 md:table-cell">
+                            {{ $shop->last_checked_at?->diffForHumans() ?? __('never') }}
+                        </flux:table.cell>
+                        <flux:table.cell align="end">
+                            <flux:dropdown>
+                                <flux:button size="xs" variant="ghost" icon="ellipsis-horizontal" :aria-label="__('Actions')" />
+                                <flux:menu>
+                                    <flux:menu.item icon="arrow-top-right-on-square" :href="$shop->url" target="_blank">
+                                        {{ __('Open') }}
+                                    </flux:menu.item>
+                                    <flux:menu.item icon="pencil-square" wire:click="editShop('{{ $shop->id }}')">
+                                        {{ __('Edit shop') }}
+                                    </flux:menu.item>
+                                    <flux:menu.separator />
+                                    <flux:menu.item icon="trash" variant="danger" wire:click="removeShop('{{ $shop->id }}')" wire:confirm="{{ __('Remove this shop?') }}">
+                                        {{ __('Remove') }}
+                                    </flux:menu.item>
+                                </flux:menu>
+                            </flux:dropdown>
+                        </flux:table.cell>
+                    </flux:table.row>
+                @empty
+                    <flux:table.row>
+                        <flux:table.cell colspan="6" class="py-10 text-center">
+                            <flux:text class="text-zinc-500">{{ __('No shops yet. Add one to start tracking a price.') }}</flux:text>
+                        </flux:table.cell>
+                    </flux:table.row>
+                @endforelse
+            </flux:table.rows>
+        </flux:table>
 
         @if ($editingShopId)
             @php($editing = $shops->firstWhere('id', $editingShopId))
             @if ($editing)
-                <div class="mt-6 rounded-2xl bg-white/80 p-6 ring-1 ring-zinc-200 dark:bg-zinc-900/60 dark:ring-zinc-800">
+                <flux:card class="mt-6">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <flux:heading size="lg">{{ $editing->host }}</flux:heading>
@@ -296,8 +331,10 @@
                             <flux:button size="sm" wire:click="saveEditedNotes">{{ __('Save notes') }}</flux:button>
                         </div>
                     </div>
-                </div>
+                </flux:card>
             @endif
         @endif
     </flux:card>
+        </flux:tab.panel>
+    </flux:tab.group>
 </div>

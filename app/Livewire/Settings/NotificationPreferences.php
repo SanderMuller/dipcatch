@@ -5,6 +5,7 @@ namespace App\Livewire\Settings;
 use App\Models\User;
 use App\Notifications\TestNotification;
 use App\Support\IanaTimezones;
+use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -59,7 +60,7 @@ class NotificationPreferences extends Component
             'timezone_detected_at' => now(),
         ])->save();
 
-        $this->dispatch('saved');
+        Flux::toast(variant: 'success', text: __('Saved.'));
     }
 
     /**
@@ -69,7 +70,7 @@ class NotificationPreferences extends Component
     {
         $this->user()->notify(new TestNotification());
 
-        $this->dispatch('test-sent');
+        Flux::toast(variant: 'success', text: __('Test notification sent.'));
     }
 
     public function render(): View

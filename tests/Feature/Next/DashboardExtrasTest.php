@@ -80,6 +80,33 @@ it('counts only this accounts drops', function (): void {
     expect(new SavingsByMonthSeries($user)->hasData())->toBeFalse();
 });
 
+it('plots savings as one Flux field per currency', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    PriceDropEvent::factory()->create([
+        'user_id' => $user->id,
+        'product_id' => $product->id,
+        'currency' => 'EUR',
+        'drop_abs' => '3.75',
+        'fired_at' => CarbonImmutable::now()->startOfMonth()->addDays(2),
+    ]);
+    PriceDropEvent::factory()->create([
+        'user_id' => $user->id,
+        'product_id' => $product->id,
+        'currency' => 'USD',
+        'drop_abs' => '10.00',
+        'fired_at' => CarbonImmutable::now()->startOfMonth()->addDays(2),
+    ]);
+
+    $chart = new SavingsByMonthSeries($user)->fluxChart();
+    $last = $chart['rows'][11];
+
+    expect($chart['series'])->toHaveCount(2)
+        ->and($last['EUR'])->toBe(3.75)
+        ->and($last['USD'])->toBe(10.0);
+});
+
 it('shows the savings chart once a drop has fired', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id]);
@@ -93,7 +120,10 @@ it('shows the savings chart once a drop has fired', function (): void {
 
     $this->actingAs($user);
 
-    livewire(Dashboard::class)->assertSee('Savings by month');
+    livewire(Dashboard::class)
+        ->assertSee('Savings by month')
+        ->assertSeeHtml('<ui-chart')
+        ->assertDontSee('<canvas', false);
 });
 
 it('says nothing about savings on an account that has never had a drop', function (): void {
@@ -126,7 +156,8 @@ it('lists alerts that have already been read', function (): void {
         ->assertSee('Recent alerts')
         ->assertSee('Coffee beans 1 kg')
         ->assertSee('12.3%')
-        ->assertSee('€1.50');
+        ->assertSee('€1.50')
+        ->assertSeeHtml('data-flux-timeline');
 });
 
 it('keeps notifications that are not price alerts out of the history', function (): void {

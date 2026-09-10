@@ -20,6 +20,7 @@
                 <x-app-logo :sidebar="true" :href="route('app.dashboard')" wire:navigate />
                 {{-- Bell slot, desktop. --}}
                 @includeWhen(view()->exists('partials.notification-bell'), 'partials.notification-bell')
+                <livewire:app-command-palette />
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
@@ -60,6 +61,10 @@
 
             {{-- Bell slot, mobile. --}}
             @includeWhen(view()->exists('partials.notification-bell'), 'partials.notification-bell')
+
+            <flux:modal.trigger name="app-command">
+                <flux:button variant="ghost" icon="magnifying-glass" :aria-label="__('Search')" />
+            </flux:modal.trigger>
 
             <flux:dropdown position="top" align="end">
                 <flux:profile

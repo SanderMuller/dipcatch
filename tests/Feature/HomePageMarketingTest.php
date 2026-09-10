@@ -206,7 +206,7 @@ test('the FAQ JSON-LD matches the visible questions and has plain-text answers',
     expect($entities)->toBeArray();
     assert(is_array($entities));
 
-    preg_match_all('#<summary[^>]*>\s*<span>(.*?)</span>#s', (string) $content, $summaryMatches);
+    preg_match_all('#data-flux-accordion-heading[^>]*>\s*<span[^>]*>(.*?)</span>#s', (string) $content, $summaryMatches);
     $visibleQuestions = array_map(
         static fn (string $q): string => trim(html_entity_decode($q, ENT_QUOTES | ENT_HTML5)),
         $summaryMatches[1],

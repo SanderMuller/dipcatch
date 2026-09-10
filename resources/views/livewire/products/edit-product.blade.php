@@ -1,9 +1,15 @@
 <div>
+    <flux:breadcrumbs class="mb-4">
+        <flux:breadcrumbs.item :href="route('app.products.index')" wire:navigate>{{ __('Products') }}</flux:breadcrumbs.item>
+        <flux:breadcrumbs.item :href="route('app.products.show', $product)" wire:navigate>{{ Str::limit($product->title, 40) }}</flux:breadcrumbs.item>
+        <flux:breadcrumbs.item>{{ __('Edit') }}</flux:breadcrumbs.item>
+    </flux:breadcrumbs>
+
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="flex items-start gap-4">
             <x-product-thumb :product="$product" size="size-16" />
             <div class="min-w-0">
-                <flux:heading size="xl" class="tracking-tight">{{ __('Edit product') }}</flux:heading>
+                <flux:heading size="xl" level="1" class="tracking-tight">{{ __('Edit product') }}</flux:heading>
                 <flux:text class="mt-1 text-zinc-500">{{ $product->title }}</flux:text>
             </div>
         </div>
@@ -57,7 +63,7 @@
             <flux:text class="mt-1 text-zinc-500">{{ __('Leave a field empty to switch that kind of alert off.') }}</flux:text>
 
             <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                <flux:select wire:model="currency" :label="__('Currency')">
+                <flux:select wire:model="currency" variant="listbox" searchable :label="__('Currency')" :placeholder="__('Search currencies…')">
                     @foreach ($currencies as $code => $label)
                         <flux:select.option value="{{ $code }}">{{ $label }}</flux:select.option>
                     @endforeach

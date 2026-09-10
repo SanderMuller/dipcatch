@@ -19,6 +19,26 @@ final readonly class SavingsByMonthSeries
 {
     private const int MONTHS = 12;
 
+    /** @var list<string> */
+    private const array SERIES_COLORS = [
+        'text-blue-500 dark:text-blue-400',
+        'text-emerald-500 dark:text-emerald-400',
+        'text-amber-500 dark:text-amber-400',
+        'text-violet-500 dark:text-violet-400',
+        'text-rose-500 dark:text-rose-400',
+        'text-cyan-500 dark:text-cyan-400',
+    ];
+
+    /** @var list<string> */
+    private const array LEGEND_COLORS = [
+        'bg-blue-500',
+        'bg-emerald-500',
+        'bg-amber-500',
+        'bg-violet-500',
+        'bg-rose-500',
+        'bg-cyan-500',
+    ];
+
     public function __construct(private User $user) {}
 
     /**
@@ -28,6 +48,45 @@ final readonly class SavingsByMonthSeries
     public function hasData(): bool
     {
         return PriceDropEvent::query()->where('user_id', $this->user->id)->exists();
+    }
+
+    /**
+     * Rows a Flux bar chart can plot. One field per currency, never converted.
+     *
+     * @return array{rows: list<array<string, float|string>>, series: list<array{field: string, label: string, color: string, legend: string, currency: string}>}
+     */
+    public function fluxChart(): array
+    {
+        $data = $this->data();
+        $start = CarbonImmutable::now()->startOfMonth()->subMonths(self::MONTHS - 1);
+        $series = [];
+
+        foreach ($data['datasets'] as $index => $dataset) {
+            $currency = $dataset['currency'];
+
+            $series[] = [
+                'field' => $currency,
+                'label' => $dataset['label'],
+                'color' => self::SERIES_COLORS[$index % count(self::SERIES_COLORS)],
+                'legend' => self::LEGEND_COLORS[$index % count(self::LEGEND_COLORS)],
+                'currency' => $currency,
+            ];
+        }
+
+        $rows = [];
+
+        foreach (array_keys($data['labels']) as $index) {
+
+            $row = ['date' => $start->addMonths($index)->toDateString()];
+
+            foreach ($data['datasets'] as $dataset) {
+                $row[$dataset['currency']] = $dataset['data'][$index] ?? 0.0;
+            }
+
+            $rows[] = $row;
+        }
+
+        return ['rows' => $rows, 'series' => $series];
     }
 
     /**

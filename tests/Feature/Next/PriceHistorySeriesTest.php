@@ -1,11 +1,11 @@
 <?php declare(strict_types=1);
 
-use App\Charts\PriceHistoryChartOptions;
 use App\Charts\PriceHistorySeries;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
+use Carbon\CarbonImmutable;
 
 /**
  * The dataset a chart plots under a given legend label.
@@ -33,7 +33,7 @@ test('empty product returns empty labels', function (): void {
 
     $data = makeChartFor($product)->data();
 
-    expect($data['labels'])->toBe([]);
+    expect($data['labels'])->toBeEmpty();
 });
 
 test('renders cheapest segments as a stepped line', function (): void {
@@ -63,6 +63,27 @@ test('renders cheapest segments as a stepped line', function (): void {
     expect($cheapest['data'])->toContain(100.0)
         ->and($cheapest['data'])->toContain(85.0)
         ->and($cheapest['stepped'])->toBeTrue();
+
+    $flux = makeChartFor($product)->fluxChart();
+
+    expect($flux['rows'])->not->toBeEmpty()
+        ->and(collect($flux['rows'])->pluck('price')->all())->toContain(100.0, 85.0)
+        ->and($flux['currency'])->toBe('EUR');
+
+    $lastHundred = collect($flux['rows'])->last(fn (array $row): bool => ($row['price'] ?? null) === 100.0);
+    $firstDrop = collect($flux['rows'])->first(fn (array $row): bool => ($row['price'] ?? null) === 85.0);
+    $lastDate = is_array($lastHundred) ? ($lastHundred['date'] ?? null) : null;
+    $firstDate = is_array($firstDrop) ? ($firstDrop['date'] ?? null) : null;
+
+    expect($lastDate)->toBeString()
+        ->and($firstDate)->toBeString();
+
+    if (! is_string($lastDate) || ! is_string($firstDate)) {
+        return;
+    }
+
+    expect(CarbonImmutable::parse($lastDate)->diffInSeconds(CarbonImmutable::parse($firstDate), true))
+        ->toBeLessThanOrEqual(1);
 });
 
 test('respects the range filter', function (): void {
@@ -156,59 +177,7 @@ test('notification markers are scoped to the active range filter', function (): 
         ->and($notifiedAll['data'])->toContain(60.0);
 });
 
-test('chart options carry the currency-aware tooltip formatter', function (): void {
-    $options = PriceHistoryChartOptions::forProduct(Product::factory()->create());
-
-    expect($options->toHtml())
-        ->toContain('Intl.NumberFormat')
-        ->toContain('ctx.dataset.currency');
-});
-
-test('the x axis renders dates, not full timestamps, and thins its ticks', function (): void {
-    $options = PriceHistoryChartOptions::forProduct(Product::factory()->create());
-
-    // The label keeps the full stamp for the tooltip; the axis shows the
-    // date. A rotated stamp ate two thirds of the plot at phone width.
-    expect($options->toHtml())
-        ->toContain('getLabelForValue')
-        ->toContain('slice(0, 10)')
-        ->toContain('maxRotation: 0')
-        ->toContain('maxTicksLimit');
-});
-
-test('the per-unit axis is left out when no shop states a pack size', function (): void {
-    $product = Product::factory()->create(['currency' => 'EUR']);
-    $shop = Shop::factory()->for($product)->create(['pack_quantity' => null, 'pack_unit' => null]);
-    ProductCheapestHistory::factory()->for($product)->create([
-        'cheapest_shop_id' => $shop->id,
-        'cheapest_price' => '2.00',
-        'started_at' => now()->subDays(5),
-        'ended_at' => null,
-    ]);
-
-    $options = PriceHistoryChartOptions::forProduct($product);
-
-    expect($options->toHtml())->not->toContain('Per unit');
-});
-
-test('the per-unit axis appears once a shop states a pack size', function (): void {
-    $product = Product::factory()->create(['currency' => 'EUR']);
-    $shop = Shop::factory()->for($product)->create(['pack_quantity' => '200.00', 'pack_unit' => 'g']);
-    ProductCheapestHistory::factory()->for($product)->create([
-        'cheapest_shop_id' => $shop->id,
-        'cheapest_price' => '2.00',
-        'started_at' => now()->subDays(5),
-        'ended_at' => null,
-    ]);
-
-    $options = PriceHistoryChartOptions::forProduct($product);
-
-    expect($options->toHtml())->toContain('Per unit');
-});
-
-test('the per-unit axis stays declared when the range in view shows no unit data', function (): void {
-    // A range change updates the datasets but never re-sends the options, so
-    // the axis has to be decided for the product, not for the range.
+test('the per-unit series is omitted when the range in view shows no unit data', function (): void {
     $product = Product::factory()->create(['currency' => 'EUR']);
     $plain = Shop::factory()->for($product)->create([
         'url' => 'https://plain.test/p/1', 'pack_quantity' => null, 'pack_unit' => null,
@@ -229,16 +198,12 @@ test('the per-unit axis stays declared when the range in view shows no unit data
         'ended_at' => null,
     ]);
 
-    $chart = makeChartFor($product, '30');
-    $options = PriceHistoryChartOptions::forProduct($product);
-
     $unitSeries = array_filter(
-        $chart->data()['datasets'],
+        makeChartFor($product, '30')->data()['datasets'],
         fn (array $dataset): bool => ($dataset['yAxisID'] ?? null) === 'unit',
     );
 
-    expect($unitSeries)->toBe([])
-        ->and($options->toHtml())->toContain('Per unit');
+    expect($unitSeries)->toBeEmpty();
 });
 
 test('the cheapest price is plotted per unit as well, on its own axis', function (): void {
@@ -253,10 +218,12 @@ test('the cheapest price is plotted per unit as well, on its own axis', function
     ]);
 
     $unit = chartSeries($product, 'Cheapest per kg (€)');
+    $flux = makeChartFor($product)->fluxChart();
 
-    expect($unit)->not->toBe([])
+    expect($unit)->not->toBeEmpty()
         ->and($unit['data'])->toBe([10.95, 10.95])
-        ->and($unit['yAxisID'])->toBe('unit');
+        ->and($unit['yAxisID'])->toBe('unit')
+        ->and($flux['unitLabel'])->toBe('Cheapest per kg (€)');
 });
 
 test('a cheaper total that is worse value shows as two diverging lines', function (): void {
@@ -298,7 +265,7 @@ test('shops that state no pack size get no unit line', function (): void {
         'ended_at' => null,
     ]);
 
-    expect(chartSeries($product, 'Cheapest per kg (€)'))->toBe([]);
+    expect(chartSeries($product, 'Cheapest per kg (€)'))->toBeEmpty();
 });
 
 test('units that cannot share an axis leave gaps rather than wrong numbers', function (): void {
