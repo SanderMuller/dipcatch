@@ -3,12 +3,18 @@
 namespace App\Livewire;
 
 use App\Billing\PlanLimits;
+use App\Charts\SavingsByMonthSeries;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\User;
+use App\Notifications\PriceDropNotification;
+use App\Notifications\TargetPriceNotification;
+use App\Notifications\UnitPriceTargetNotification;
 use App\Support\MoneyFormatter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 /**
@@ -23,6 +29,7 @@ class Dashboard extends Component
     {
         $activeDrops = $this->activeDrops();
         $watching = $this->watching();
+        $savings = new SavingsByMonthSeries($this->user());
 
         return view('livewire.dashboard', [
             'trackedProducts' => $this->trackedProducts(),
@@ -30,6 +37,9 @@ class Dashboard extends Component
             'activeDrops' => $activeDrops,
             'watching' => $watching,
             'lifetimeSavings' => $this->lifetimeSavings(),
+            'savings' => $savings->hasData() ? $savings->data() : null,
+            'recentAlerts' => $this->recentAlerts(),
+            'needsSecondShop' => $this->needsSecondShop($watching),
             'canAddProduct' => app(PlanLimits::class)->canAddProduct($this->user()),
             'hasAnyProduct' => $watching->isNotEmpty(),
         ]);
@@ -83,6 +93,78 @@ class Dashboard extends Component
             ->latest('created_at')
             ->limit(6)
             ->get();
+    }
+
+    /**
+     * The last alerts this account was sent, whether or not they are still
+     * unread. The bell clears itself on open, so without this a drop that
+     * already happened is unreachable.
+     *
+     * @return Collection<int, array{title: string, url: ?string, percent: ?string, amount: ?string, sentAt: ?string}>
+     */
+    private function recentAlerts(): Collection
+    {
+        return DatabaseNotification::query()
+            ->where('notifiable_type', User::class)
+            ->where('notifiable_id', $this->user()->id)
+            // Price alerts only. A billing incident and a test notification
+            // also land in this table, and neither carries a product: listed
+            // here they would render as an empty row under "Recent alerts".
+            ->whereIn('type', [
+                PriceDropNotification::class,
+                TargetPriceNotification::class,
+                UnitPriceTargetNotification::class,
+            ])
+            ->latest()
+            ->limit(10)
+            ->get()
+            ->map(function (DatabaseNotification $notification): array {
+                /** @var array<string, mixed> $data */
+                $data = $notification->data;
+
+                $productId = is_string($data['product_id'] ?? null) ? $data['product_id'] : null;
+                $currency = is_string($data['currency'] ?? null) ? $data['currency'] : 'EUR';
+                $rawPercent = $data['drop_percent'] ?? null;
+                $amount = $data['drop_absolute'] ?? null;
+
+                $percent = self::percentage($rawPercent);
+
+                return [
+                    'title' => is_string($data['title'] ?? null) ? $data['title'] : '—',
+                    'url' => $productId === null ? null : route('app.products.show', $productId),
+                    'percent' => $percent,
+                    'amount' => is_numeric($amount) ? MoneyFormatter::format((string) $amount, $currency) : null,
+                    'sentAt' => $notification->created_at?->diffForHumans(),
+                ];
+            })
+            ->values();
+    }
+
+    /** One place decides how a drop percentage reads, and its type. */
+    private static function percentage(mixed $value): ?string
+    {
+        return is_numeric($value)
+            ? number_format((float) $value, 1, '.', '') . '%'
+            : null;
+    }
+
+    /**
+     * DipCatch only pays off once a product is tracked at more than one shop,
+     * so an account that has never done it gets one nudge. It disappears by
+     * itself.
+     *
+     * @param  EloquentCollection<int, Product>  $watching
+     */
+    private function needsSecondShop(EloquentCollection $watching): bool
+    {
+        if ($watching->isEmpty()) {
+            return false;
+        }
+
+        return ! Product::query()
+            ->where('user_id', $this->user()->id)
+            ->has('shops', '>=', 2)
+            ->exists();
     }
 
     /**

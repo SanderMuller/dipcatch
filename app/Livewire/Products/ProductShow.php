@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Support\UrlNormalizer;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -34,6 +35,15 @@ class ProductShow extends Component
 
     public ?string $shopMessage = null;
 
+    /** The shop whose panel is open, and the fields it is editing. */
+    public ?string $editingShopId = null;
+
+    public string $editingUrl = '';
+
+    public string $editingNotes = '';
+
+    public ?string $shareMessage = null;
+
     public function mount(Product $product): void
     {
         // Ownership is checked here, not left to a scoped query: this component
@@ -41,6 +51,98 @@ class ProductShow extends Component
         $this->authorize('view', $product);
 
         $this->product = $product;
+    }
+
+    /**
+     * Load one shop into the edit panel.
+     *
+     * The values ride on the component rather than being written into the
+     * markup: a URL or a note interpolated into an Alpine attribute breaks
+     * the page's JavaScript the moment it contains a quote.
+     */
+    public function editShop(string $shopId): void
+    {
+        $shop = $this->shop($shopId);
+
+        $this->authorize('update', $shop);
+
+        $this->editingShopId = $shop->id;
+        $this->editingUrl = $shop->url;
+        $this->editingNotes = $shop->notes ?? '';
+        $this->shopMessage = null;
+    }
+
+    public function saveEditedUrl(): void
+    {
+        if ($this->editingShopId !== null) {
+            $this->saveShopUrl($this->editingShopId, $this->editingUrl);
+        }
+    }
+
+    public function saveEditedNotes(): void
+    {
+        if ($this->editingShopId !== null) {
+            $this->saveShopNotes($this->editingShopId, $this->editingNotes);
+        }
+    }
+
+    /**
+     * Public sharing: create, replace or withdraw the link.
+     *
+     * Every write is an atomic conditional UPDATE against the slug this
+     * component last saw, not a read-then-write. Two tabs on the same product
+     * would otherwise overwrite each other, and the loser would hand out a URL
+     * that had already stopped working.
+     */
+    public function generateShareLink(): void
+    {
+        $this->authorize('update', $this->product);
+
+        $updated = Product::query()
+            ->whereKey($this->product->getKey())
+            ->whereNull('share_slug')
+            ->update(['share_slug' => Str::random(32)]);
+
+        $this->product->refresh();
+
+        $this->shareMessage = $updated === 0
+            ? 'This product was already shared in another tab.'
+            : 'Public link created.';
+    }
+
+    public function rotateShareLink(): void
+    {
+        $this->authorize('update', $this->product);
+
+        // Conditional on the slug we saw rather than merely on "still shared":
+        // a stop-then-share elsewhere has already issued a new URL, and
+        // rotating would silently revoke it.
+        $updated = Product::query()
+            ->whereKey($this->product->getKey())
+            ->where('share_slug', $this->product->share_slug)
+            ->update(['share_slug' => Str::random(32)]);
+
+        $this->product->refresh();
+
+        $this->shareMessage = $updated === 0
+            ? 'The link changed in another tab, so nothing was rotated.'
+            : 'Public link replaced. The old one stops working now.';
+    }
+
+    public function stopSharing(): void
+    {
+        $this->authorize('update', $this->product);
+
+        $updated = Product::query()
+            ->whereKey($this->product->getKey())
+            ->where('share_slug', $this->product->share_slug)
+            ->update(['share_slug' => null]);
+
+        $this->product->refresh();
+
+        $this->shareMessage = $updated === 0
+            ? 'The link changed in another tab, so nothing was withdrawn.'
+            : 'Public sharing stopped. The link now returns a 404.';
     }
 
     public function togglePaused(): void
@@ -59,7 +161,7 @@ class ProductShow extends Component
      */
     public function saveShopUrl(string $shopId, string $url): void
     {
-        $shop = Shop::query()->findOrFail($shopId);
+        $shop = $this->shop($shopId);
 
         $this->authorize('update', $shop);
 
@@ -102,7 +204,7 @@ class ProductShow extends Component
      */
     public function saveShopNotes(string $shopId, ?string $notes): void
     {
-        $shop = Shop::query()->findOrFail($shopId);
+        $shop = $this->shop($shopId);
 
         $this->authorize('update', $shop);
 
@@ -115,7 +217,7 @@ class ProductShow extends Component
 
     public function removeShop(string $shopId): void
     {
-        $shop = Shop::query()->findOrFail($shopId);
+        $shop = $this->shop($shopId);
 
         $this->authorize('delete', $shop);
 
@@ -134,9 +236,29 @@ class ProductShow extends Component
             'ranges' => HistoryWindow::filters($this->historyDays()),
             'historyNotice' => $this->historyNotice(),
             'shops' => $this->product->shops()->orderBy('current_price')->get(),
+            'shareUrl' => $this->product->publicShareUrl(),
             'canAddShop' => app(PlanLimits::class)->canAddShop($this->product),
             'shopLimit' => $this->product->user?->entitlements()->maxShopsPerProduct(),
         ]);
+    }
+
+    /**
+     * A shop of the product this page is showing.
+     *
+     * The policy runs first and answers for another account's shop, which is
+     * the established behaviour. The product check that follows catches the
+     * case the policy allows: one of this account's own shops, on a different
+     * product, which the page would otherwise edit or delete unseen.
+     */
+    private function shop(string $shopId): Shop
+    {
+        $shop = Shop::query()->findOrFail($shopId);
+
+        $this->authorize('view', $shop);
+
+        abort_unless($shop->product_id === $this->product->id, 404);
+
+        return $shop;
     }
 
     /**

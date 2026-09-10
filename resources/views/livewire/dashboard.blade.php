@@ -43,6 +43,18 @@
         </flux:callout>
     @endunless
 
+    @if ($needsSecondShop)
+        <flux:callout class="mt-6" icon="scale">
+            <flux:callout.heading>{{ __('Add a second shop to compare') }}</flux:callout.heading>
+            <flux:callout.text>
+                {{ __('One shop gives you a price history. A second one tells you which shop is cheaper, per kilo, litre or piece.') }}
+            </flux:callout.text>
+            <flux:button class="mt-3" :href="route('app.products.show', $watching->first())" variant="primary" wire:navigate>
+                {{ __('Open a product') }}
+            </flux:button>
+        </flux:callout>
+    @endif
+
     @if ($watching->isNotEmpty())
         <div class="mt-8">
             <div class="flex items-end justify-between gap-3">
@@ -139,4 +151,59 @@
             </table>
         </div>
     </div>
+
+    @if ($savings)
+        <div class="mt-8">
+            <flux:heading size="lg">{{ __('Savings by month') }}</flux:heading>
+            <flux:text class="mt-1 text-zinc-600 dark:text-zinc-400">
+                {{ __('Summed across every alert that fired, over the last twelve months. One bar per currency, never converted.') }}
+            </flux:text>
+
+            {{-- Fixed height, like the price chart: Chart.js is responsive and
+                 would otherwise grow to the container's aspect ratio. --}}
+            <flux:card class="mt-4">
+                <div class="h-[260px]" wire:ignore x-data x-init="window.dipcatchSavingsChart($refs.savings, @js($savings))">
+                    <canvas x-ref="savings"></canvas>
+                </div>
+            </flux:card>
+        </div>
+    @endif
+
+    @if ($recentAlerts->isNotEmpty())
+        <div class="mt-8">
+            <flux:heading size="lg">{{ __('Recent alerts') }}</flux:heading>
+            <flux:text class="mt-1 text-zinc-600 dark:text-zinc-400">
+                {{ __('What DipCatch has told you, most recent first. The bell clears itself; this does not.') }}
+            </flux:text>
+
+            <div class="mt-4 overflow-x-auto">
+                <table class="w-full text-start text-sm">
+                    <thead class="border-b border-zinc-950/10 dark:border-white/10">
+                        <tr>
+                            <th class="py-2 pe-3 text-start font-medium whitespace-nowrap">{{ __('Product') }}</th>
+                            <th class="hidden py-2 pe-3 text-start font-medium whitespace-nowrap md:table-cell">{{ __('Drop') }}</th>
+                            <th class="py-2 pe-3 text-start font-medium whitespace-nowrap">{{ __('Saved') }}</th>
+                            <th class="hidden py-2 text-start font-medium whitespace-nowrap md:table-cell">{{ __('Sent') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($recentAlerts as $alert)
+                            <tr class="border-b border-zinc-950/5 dark:border-white/5" wire:key="alert-{{ $loop->index }}">
+                                <td class="py-3 pe-3">
+                                    @if ($alert['url'])
+                                        <a href="{{ $alert['url'] }}" wire:navigate class="font-medium">{{ Str::limit($alert['title'], 60) }}</a>
+                                    @else
+                                        {{ Str::limit($alert['title'], 60) }}
+                                    @endif
+                                </td>
+                                <td class="hidden py-3 pe-3 tabular-nums md:table-cell">{{ $alert['percent'] ?? '—' }}</td>
+                                <td class="py-3 pe-3 tabular-nums">{{ $alert['amount'] ?? '—' }}</td>
+                                <td class="hidden py-3 text-zinc-500 md:table-cell">{{ $alert['sentAt'] ?? '—' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
 </div>

@@ -33,6 +33,10 @@ class ProductList extends Component
     #[Url(as: 'q', except: '')]
     public string $search = '';
 
+    /** all, active or paused. Anything else reads as all. */
+    #[Url(except: 'all')]
+    public string $status = 'all';
+
     #[Url(except: 'created_at')]
     public string $sort = 'created_at';
 
@@ -41,6 +45,11 @@ class ProductList extends Component
 
     /** Only these are sortable; anything else arriving from the URL is ignored. */
     private const array SORTABLE = ['title', 'cheapest_price', 'created_at', 'shops_count'];
+
+    public function updatedStatus(): void
+    {
+        $this->resetPage();
+    }
 
     public function updatedSearch(): void
     {
@@ -95,6 +104,10 @@ class ProductList extends Component
                 'LOWER(title) LIKE ?',
                 ['%' . mb_strtolower($this->search) . '%'],
             ))
+            ->when(
+                in_array($this->status, ['active', 'paused'], true),
+                fn (EloquentBuilder $query): EloquentBuilder => $query->where('active', $this->status === 'active'),
+            )
             ->withCount('shops')
             ->with(['cheapestShop', 'shops'])
             ->orderBy($sort, $direction)

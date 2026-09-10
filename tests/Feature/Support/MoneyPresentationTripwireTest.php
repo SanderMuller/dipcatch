@@ -62,6 +62,12 @@ function tripwireAllowlist(): array
                 'reason' => 'serialises threshold decimals into form state, not display',
             ],
         ],
+        'Dashboard.php' => [
+            [
+                'fragment' => 'number_format((float) $value, 1',
+                'reason' => 'percentage, not money',
+            ],
+        ],
         'price-drop-digest.blade.php' => [
             [
                 'fragment' => 'number_format((float) $event->drop_pct',

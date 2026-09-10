@@ -11,10 +11,91 @@
             </div>
         </div>
 
-        <flux:button size="sm" wire:click="togglePaused" :icon="$product->active ? 'pause' : 'play'">
-            {{ $product->active ? __('Pause tracking') : __('Resume tracking') }}
-        </flux:button>
+        <div class="flex items-center gap-2">
+            <flux:button size="sm" wire:click="togglePaused" :icon="$product->active ? 'pause' : 'play'">
+                {{ $product->active ? __('Pause tracking') : __('Resume tracking') }}
+            </flux:button>
+
+            <flux:modal.trigger name="sharing">
+                <flux:button size="sm" icon="share">{{ __('Sharing') }}</flux:button>
+            </flux:modal.trigger>
+
+            <flux:button size="sm" variant="primary" class="rounded-full!" icon="pencil-square" :href="route('app.products.edit', $product)" wire:navigate>
+                {{ __('Edit') }}
+            </flux:button>
+        </div>
     </div>
+
+    <flux:modal name="sharing" class="w-full max-w-lg">
+        <div class="space-y-6 text-start">
+            <div>
+                <flux:heading size="lg">{{ __('Public sharing') }}</flux:heading>
+                <flux:text class="mt-1 text-zinc-500">
+                    {{ __('Anyone with the link sees the product, its prices and the shops. Your notes, the add-shop form and everything about your account stay private.') }}
+                </flux:text>
+            </div>
+
+            @if ($shareMessage)
+                <flux:callout icon="information-circle">{{ $shareMessage }}</flux:callout>
+            @endif
+
+            @if ($shareUrl)
+                {{-- Readonly and selected on focus: this is a value to copy,
+                     not a field to edit. --}}
+                <div class="space-y-2" x-data="{ copied: false }">
+                    <flux:input
+                        :label="__('Public link')"
+                        value="{{ $shareUrl }}"
+                        readonly
+                        x-ref="shareUrl"
+                        x-on:focus="$event.target.select()"
+                        class="font-mono"
+                    />
+                    <flux:button
+                        size="sm"
+                        icon="clipboard"
+                        x-on:click="navigator.clipboard.writeText($refs.shareUrl.value).then(() => { copied = true; setTimeout(() => copied = false, 2000) })"
+                    >
+                        <span x-show="! copied">{{ __('Copy link') }}</span>
+                        <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                    </flux:button>
+                </div>
+
+                <div class="flex flex-wrap gap-2 border-t border-zinc-950/5 pt-4 dark:border-white/10">
+                    <flux:button
+                        size="sm"
+                        wire:click="rotateShareLink"
+                        wire:confirm="{{ __('Replace the link? The current one stops working immediately.') }}"
+                    >
+                        {{ __('Replace link') }}
+                    </flux:button>
+
+                    <flux:button
+                        size="sm"
+                        variant="danger"
+                        wire:click="stopSharing"
+                        wire:confirm="{{ __('Stop sharing? The link will return a 404.') }}"
+                    >
+                        {{ __('Stop sharing') }}
+                    </flux:button>
+                </div>
+
+                <flux:text size="sm" class="text-zinc-500">
+                    {{ __('A preview someone already has can stay visible for a while after you stop.') }}
+                </flux:text>
+            @else
+                <flux:text>{{ __('This product has no public link yet.') }}</flux:text>
+
+                <flux:button size="sm" variant="primary" class="rounded-full!" wire:click="generateShareLink">
+                    {{ __('Create a public link') }}
+                </flux:button>
+            @endif
+        </div>
+    </flux:modal>
+
+    @if ($shopMessage)
+        <flux:callout class="mt-6" icon="information-circle">{{ $shopMessage }}</flux:callout>
+    @endif
 
     {{-- Three sibling numbers on one surface, divided rather than boxed. --}}
     <flux:card class="mt-6 p-0!">
@@ -152,6 +233,15 @@
                             </td>
                             <td class="py-3 text-end">
                                 <flux:button size="xs" variant="ghost" icon="arrow-top-right-on-square" :href="$shop->url" target="_blank" :aria-label="__('Open')" />
+
+                                <flux:button
+                                    size="xs"
+                                    variant="ghost"
+                                    icon="pencil-square"
+                                    wire:click="editShop('{{ $shop->id }}')"
+                                    :aria-label="__('Edit shop')"
+                                />
+
                                 <flux:button
                                     size="xs"
                                     variant="ghost"
@@ -172,5 +262,42 @@
                 </tbody>
             </table>
         </div>
+
+        @if ($editingShopId)
+            @php($editing = $shops->firstWhere('id', $editingShopId))
+            @if ($editing)
+                <div class="mt-6 rounded-2xl bg-white/80 p-6 ring-1 ring-zinc-200 dark:bg-zinc-900/60 dark:ring-zinc-800">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <flux:heading size="lg">{{ $editing->host }}</flux:heading>
+                            <flux:text class="mt-1 text-zinc-500">
+                                {{ __('Repair the link when the shop moves the product, and keep your own notes about buying there.') }}
+                            </flux:text>
+                        </div>
+
+                        <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="$set('editingShopId', null)" :aria-label="__('Close')" />
+                    </div>
+
+                    <div class="mt-4 space-y-4">
+                        {{-- Saving the URL re-checks the price on the spot, so it is
+                             its own button rather than part of one save. --}}
+                        <div class="space-y-2">
+                            <flux:input wire:model="editingUrl" :label="__('Product URL')" type="url" />
+                            <flux:button size="sm" wire:click="saveEditedUrl">{{ __('Save URL and re-check') }}</flux:button>
+                        </div>
+
+                        <div class="space-y-2">
+                            <flux:textarea
+                                wire:model="editingNotes"
+                                :label="__('Notes')"
+                                :placeholder="__('Ships only to NL, coupon CODE10, free delivery over 30 euro…')"
+                                rows="3"
+                            />
+                            <flux:button size="sm" wire:click="saveEditedNotes">{{ __('Save notes') }}</flux:button>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        @endif
     </flux:card>
 </div>

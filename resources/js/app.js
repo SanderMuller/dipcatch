@@ -17,3 +17,42 @@ window.dipcatchChart = (canvas, payload, options) => {
         options: { ...options, maintainAspectRatio: false, responsive: true },
     });
 };
+
+// The savings chart. Its tooltip formats with the browser's own ICU, using the
+// `currency` each dataset carries: the amounts are never converted, so a euro
+// bar and a dollar bar must be labelled in their own currency.
+window.dipcatchSavingsChart = (canvas, payload) => {
+    if (! canvas) {
+        return null;
+    }
+
+    return new Chart(canvas, {
+        type: 'bar',
+        data: payload,
+        options: {
+            maintainAspectRatio: false,
+            responsive: true,
+            scales: { y: { beginAtZero: true } },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const value = ctx.parsed.y;
+
+                            if (value === null || value === undefined) {
+                                return ctx.dataset.label;
+                            }
+
+                            const money = new Intl.NumberFormat(undefined, {
+                                style: 'currency',
+                                currency: ctx.dataset.currency,
+                            }).format(value);
+
+                            return `${ctx.dataset.label}: ${money}`;
+                        },
+                    },
+                },
+            },
+        },
+    });
+};

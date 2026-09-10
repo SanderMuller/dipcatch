@@ -22,13 +22,21 @@
         @endif
     </div>
 
-    <flux:input
-        class="mt-6"
-        wire:model.live.debounce.300ms="search"
-        icon="magnifying-glass"
-        :placeholder="__('Search your products')"
-        clearable
-    />
+    <div class="mt-6 flex flex-wrap gap-3">
+        <flux:input
+            class="flex-1"
+            wire:model.live.debounce.300ms="search"
+            icon="magnifying-glass"
+            :placeholder="__('Search your products')"
+            clearable
+        />
+
+        <flux:select wire:model.live="status" class="max-w-44" :aria-label="__('Show')">
+            <flux:select.option value="all">{{ __('All products') }}</flux:select.option>
+            <flux:select.option value="active">{{ __('Active only') }}</flux:select.option>
+            <flux:select.option value="paused">{{ __('Paused only') }}</flux:select.option>
+        </flux:select>
+    </div>
 
     <div class="mt-6 overflow-x-auto">
         <table class="w-full text-start text-sm">

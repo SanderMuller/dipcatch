@@ -16,6 +16,7 @@ use App\Livewire\Connections\ConnectionsPage;
 use App\Livewire\Dashboard;
 use App\Livewire\Products\CreateProductFromUrl;
 use App\Livewire\Products\CreateProductManual;
+use App\Livewire\Products\EditProduct;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\Settings\NotificationPreferences;
@@ -168,7 +169,7 @@ Route::prefix('app')
         Route::livewire('products/create', CreateProductFromUrl::class)->name('products.create');
         Route::livewire('products/create-manual', CreateProductManual::class)->name('products.create-manual');
         Route::livewire('products/{product}', ProductShow::class)->name('products.show');
-        Route::view('products/{product}/edit', 'next.placeholder')->name('products.edit');
+        Route::livewire('products/{product}/edit', EditProduct::class)->name('products.edit');
         Route::livewire('billing', BillingPage::class)->name('billing');
         Route::livewire('notifications', NotificationPreferences::class)->name('notifications');
         Route::livewire('connections', ConnectionsPage::class)->name('connections');
