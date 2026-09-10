@@ -44,15 +44,13 @@
         </div>
     </flux:card>
 
-    <flux:card class="mt-6 p-0!">
-        <div class="flex flex-col gap-4 pt-5">
-            <div class="px-5">
-                <flux:heading size="lg">{{ __('Connected applications') }}</flux:heading>
-            </div>
+    <flux:card class="mt-6">
+        <div class="flex flex-col gap-4">
+            <flux:heading size="lg">{{ __('Connected applications') }}</flux:heading>
 
             <ul role="list" class="divide-y divide-zinc-950/5 dark:divide-white/10">
                 @forelse ($connections as $connection)
-                    <li class="flex items-center justify-between gap-3 px-5 py-3 last:pb-5" wire:key="token-{{ $connection['id'] }}">
+                    <li class="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0" wire:key="token-{{ $connection['id'] }}">
                         <div class="min-w-0">
                             <flux:text class="truncate font-medium">{{ $connection['name'] }}</flux:text>
                             <flux:text class="text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
@@ -72,7 +70,7 @@
                         </flux:button>
                     </li>
                 @empty
-                    <li class="px-5 pb-5">
+                    <li>
                         <flux:text class="py-6 text-center text-base text-zinc-500 sm:text-sm">{{ __('Nothing connected yet.') }}</flux:text>
                     </li>
                 @endforelse
