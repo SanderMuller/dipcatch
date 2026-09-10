@@ -24,8 +24,9 @@ for (const scheme of ['light', 'dark']) {
 
         const body = await page.locator('main').innerText();
 
-        check(`${tag} · explains the empty state`, /Nothing is connected/i.test(body), body.slice(0, 80));
+        check(`${tag} · explains the empty state`, /Nothing connected yet\./.test(body), body.slice(0, 80));
         check(`${tag} · shows the endpoint address`, body.includes('/mcp'), body.slice(0, 120));
+        check(`${tag} · offers Claude connect`, body.includes('Connect Claude'), body.slice(0, 120));
         check(`${tag} · no horizontal page scroll`, await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
         check(`${tag} · no JavaScript console errors`, errors.length === 0, errors.join(' | '));
 

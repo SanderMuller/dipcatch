@@ -11,10 +11,18 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('set_threshold')]
+#[Title('Set threshold')]
 #[Description('Sets when this product alerts: how far the price must fall (a percentage, an absolute amount, or both), a price to reach, and/or a unit price to reach. Omit a value to leave it as it is.')]
+#[IsReadOnly(false)]
+#[IsDestructive]
+#[IsOpenWorld(false)]
 class SetThresholdTool extends Tool
 {
     use InteractsWithOwner;

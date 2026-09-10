@@ -22,10 +22,18 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('create_product')]
+#[Title('Create product')]
 #[Description('Starts tracking a product from a shop URL. Call without `draft` first to see what the page says, show that to the user, then call again with the returned `draft` and confirm: true.')]
+#[IsReadOnly(false)]
+#[IsDestructive(false)]
+#[IsOpenWorld]
 class CreateProductTool extends Tool
 {
     use InteractsWithOwner;

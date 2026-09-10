@@ -62,6 +62,7 @@
                             <li><strong>{{ __('Your browser’s push service') }}:</strong> {{ __('only if you turn on browser push; it receives the alert payloads.') }}</li>
                             <li><strong>Google:</strong> {{ __('shop logos on this site are loaded from Google’s favicon service by your browser, which sees the shop domain and your IP address. No account data is sent.') }}</li>
                             <li><strong>{{ __('The shops') }}:</strong> {{ __('we fetch product pages from the shops you track. Those requests come from our servers, not from you, and carry nothing about you.') }}</li>
+                            <li><strong>{{ __('An assistant you connect') }}:</strong> {{ __('If you connect Claude, ChatGPT, or another assistant on Connections, DipCatch sends that assistant the product data and tool results it asks for, and the assistant can change the products you track. Disconnect it on Connections to stop new access. That does not delete chats or other copies the assistant’s provider already stored. DipCatch does not send your password to the assistant.') }}</li>
                         </ul>
                         <p class="mt-2">{{ __('If you share a product page, anyone with that link can see the product, its prices and the shops. It says nothing about your account.') }}</p>
                         <p class="mt-2">{{ __('Product images on a shared page are loaded straight from the shop’s own servers by the viewer’s browser, so that shop sees the viewer’s IP address. We do not copy or store the images.') }}</p>

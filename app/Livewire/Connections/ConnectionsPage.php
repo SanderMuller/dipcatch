@@ -52,6 +52,41 @@ class ConnectionsPage extends Component
         return url('/mcp');
     }
 
+    public function claudeInstallUrl(): string
+    {
+        return 'https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=DipCatch&connectorUrl=' . rawurlencode($this->endpoint());
+    }
+
+    public function chatgptPluginUrl(): ?string
+    {
+        $value = config('dipcatch.chatgpt_plugin_url');
+
+        if (! is_string($value) || $value === '' || filter_var($value, FILTER_VALIDATE_URL) === false) {
+            return null;
+        }
+
+        $parts = parse_url($value);
+
+        if (! is_array($parts)) {
+            return null;
+        }
+
+        $scheme = $parts['scheme'] ?? null;
+        $host = $parts['host'] ?? null;
+
+        if ($scheme !== 'https' || ! is_string($host) || $host === '') {
+            return null;
+        }
+
+        $host = strtolower($host);
+
+        if ($host !== 'chatgpt.com' && ! str_ends_with($host, '.chatgpt.com')) {
+            return null;
+        }
+
+        return $value;
+    }
+
     public function revoke(string $tokenId): void
     {
         $token = $this->tokens()->whereKey($tokenId)->first();
@@ -73,6 +108,8 @@ class ConnectionsPage extends Component
         return view('livewire.connections.connections-page', [
             'connections' => $this->connections(),
             'endpoint' => $this->endpoint(),
+            'claudeInstallUrl' => $this->claudeInstallUrl(),
+            'chatgptPluginUrl' => $this->chatgptPluginUrl(),
         ]);
     }
 

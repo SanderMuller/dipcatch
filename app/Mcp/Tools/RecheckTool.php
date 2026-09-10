@@ -13,10 +13,18 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('recheck')]
+#[Title('Recheck prices')]
 #[Description('Reads the shop pages of a tracked product again, right now, and returns what they say. Use it when the stored price or stock looks wrong. Rechecks otherwise run on a schedule, so a stored value can be hours old.')]
+#[IsReadOnly(false)]
+#[IsDestructive(false)]
+#[IsOpenWorld]
 class RecheckTool extends Tool
 {
     use InteractsWithOwner;

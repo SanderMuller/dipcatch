@@ -32,6 +32,8 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 
 - **[mcp-server.md](mcp-server.md)** — an MCP server so a user can drive their own account from an assistant: list and create products, attach shops, read prices and history. `laravel/mcp` with Passport OAuth, copied from the sibling `macrocrumb` app. No admin tools. Most of the work is extracting the add-product and add-shop logic out of two Livewire components so a tool and a web request run the same code.
 
+- **[chatgpt-plugin-directory.md](chatgpt-plugin-directory.md)** — list DipCatch in the ChatGPT Plugins Directory: MCP tool annotations, OpenAI domain-challenge endpoint, Connections Connect/Install buttons and copy, privacy text for connected assistants. Claude gets an install link; ChatGPT Free cannot paste `/mcp`.
+
 - **[superadmin-and-comped-accounts.md](superadmin-and-comped-accounts.md)** — a Users screen in the existing admin panel showing every account and its plan, plus comped Pro accounts via a `comped_until` column taught to both `Subscribes::plan()` and `ProUsers::ids()`.
 
 ## Decisions (locked)

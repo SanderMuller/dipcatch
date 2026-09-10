@@ -112,4 +112,8 @@ return [
         GenericAdapter::class,
     ],
 
+    'chatgpt_plugin_url' => env('DIPCATCH_CHATGPT_PLUGIN_URL'),
+
+    'openai_apps_challenge' => env('DIPCATCH_OPENAI_APPS_CHALLENGE_TOKEN'),
+
 ];

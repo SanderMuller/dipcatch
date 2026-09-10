@@ -4,6 +4,7 @@ use App\Http\Controllers\AutoDetectTimezoneController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LlmsTxtController;
+use App\Http\Controllers\OpenaiAppsChallengeController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ShopPageController;
@@ -102,6 +103,15 @@ Route::get('llms.txt', LlmsTxtController::class)
         PreventRequestForgery::class,
     ])
     ->name('llms');
+
+Route::get('.well-known/openai-apps-challenge', OpenaiAppsChallengeController::class)
+    ->withoutMiddleware([
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        PreventRequestForgery::class,
+    ])
+    ->name('openai-apps-challenge');
 
 // Advertised in the scraper's own user agent, so shop operators who look it
 // up land on a page that explains the crawler. English only, no locale

@@ -22,7 +22,7 @@ return [
      * page shows it and the sitemap emits it as <lastmod>, so both read one
      * value. Set to null to hide the line and drop the sitemap timestamp.
      */
-    'privacy_updated_at' => '2026-09-02',
+    'privacy_updated_at' => '2026-09-10',
 
     /** Shown on the terms page, and the date a change is measured from. */
     'terms_updated_at' => '2026-09-09',
