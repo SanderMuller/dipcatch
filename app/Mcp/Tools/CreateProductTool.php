@@ -33,7 +33,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[Description('Starts tracking a product from a shop URL. Call without `draft` first to see what the page says, show that to the user, then call again with the returned `draft` and confirm: true.')]
 #[IsReadOnly(false)]
 #[IsDestructive(false)]
-#[IsOpenWorld]
+#[IsOpenWorld(false)]
 class CreateProductTool extends Tool
 {
     use InteractsWithOwner;

@@ -1,0 +1,188 @@
+{
+  "$schema": "https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "DipCatch",
+    "subtitle": "Track prices and price drops",
+    "description": "DipCatch helps users track products across shops, compare current prices, review price history, and set alerts for price drops or target prices.",
+    "category": "SHOPPING"
+  },
+  "tools": {
+    "list_products": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Only retrieves products in the signed-in user's DipCatch account.",
+        "open_world_justification": "Does not change public internet state or any external system.",
+        "destructive_justification": "Does not delete, overwrite, revoke access, or perform an irreversible action."
+      }
+    },
+    "get_product": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Only retrieves one product and its tracked shops from the signed-in user's account.",
+        "open_world_justification": "Does not change public internet state or any external system.",
+        "destructive_justification": "Does not delete, overwrite, revoke access, or perform an irreversible action."
+      }
+    },
+    "create_product": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reads a shop page for preview and creates a private tracked product only after the user confirms the draft.",
+        "open_world_justification": "The tool reads shop pages but only creates data in the signed-in user's private DipCatch account.",
+        "destructive_justification": "Creates a new product and does not delete or irreversibly alter existing data."
+      }
+    },
+    "add_shop": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reads a shop page for preview and adds a private tracked shop only after the user confirms the draft.",
+        "open_world_justification": "The tool reads shop pages but only changes the signed-in user's private DipCatch account.",
+        "destructive_justification": "Adds a shop without deleting or irreversibly altering existing data."
+      }
+    },
+    "recheck": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Fetches tracked shop pages and refreshes private price and stock records in the signed-in user's account.",
+        "open_world_justification": "Only reads retailer pages and updates private DipCatch data without changing external systems.",
+        "destructive_justification": "Records new check results while retaining price history and does not delete user data."
+      }
+    },
+    "remove_shop": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Removes a tracked shop and recalculates the product's cheapest shop.",
+        "open_world_justification": "Only changes data in the signed-in user's private DipCatch account.",
+        "destructive_justification": "Deletes the selected tracked shop from the user's account."
+      }
+    },
+    "set_threshold": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Updates the selected product's private price-alert settings.",
+        "open_world_justification": "Only changes settings in the signed-in user's private DipCatch account.",
+        "destructive_justification": "Overwrites the selected stored alert values."
+      }
+    },
+    "price_history": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Only retrieves retained price-history segments for one product in the signed-in user's account.",
+        "open_world_justification": "Does not change public internet state or any external system.",
+        "destructive_justification": "Does not delete, overwrite, revoke access, or perform an irreversible action."
+      }
+    },
+    "delete_product": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Deletes a product and its tracked price data from the signed-in user's account.",
+        "open_world_justification": "Only changes data in the signed-in user's private DipCatch account.",
+        "destructive_justification": "Permanently deletes the selected product, its shops, and its price history."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "List tracked products and inspect one product's details and price history.",
+      "user_prompt": "Show my tracked products, then show the shop prices and price history for the coffee beans.",
+      "file_attachment_urls": null,
+      "tools_triggered": "list_products, get_product, price_history",
+      "expected_output": "Returns the user's matching products, current shop prices, cheapest option, and dated price-history segments.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Preview and confirm a new product from a retailer URL.",
+      "user_prompt": "Track this coffee product: https://example.com/coffee. Show the detected details first, and add it only after I confirm.",
+      "file_attachment_urls": null,
+      "tools_triggered": "create_product",
+      "expected_output": "Shows the detected product details and asks for confirmation before creating the private tracked product.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Preview and confirm a second retailer for an existing product.",
+      "user_prompt": "Add this retailer page to my coffee product. Show what it found before saving it: https://example.com/coffee-alt.",
+      "file_attachment_urls": null,
+      "tools_triggered": "add_shop",
+      "expected_output": "Shows the detected shop details and adds the shop only after confirmation.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Refresh a stale tracked price.",
+      "user_prompt": "The price for my coffee product looks old. Recheck every tracked shop now.",
+      "file_attachment_urls": null,
+      "tools_triggered": "recheck",
+      "expected_output": "Refreshes available shops and returns the updated price, stock, and any shops skipped by the page budget.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Change alerts and remove unneeded tracked data.",
+      "user_prompt": "Alert me when my coffee reaches 8 euros, remove the old retailer, and delete the discontinued product after I confirm it.",
+      "file_attachment_urls": null,
+      "tools_triggered": "set_threshold, remove_shop, delete_product",
+      "expected_output": "After confirmation, updates the requested alert, removes the named shop, and deletes the product.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Do not trigger for a general shopping recommendation.",
+      "user_prompt": "What are the best coffee beans to buy this month?",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked because the request does not concern the user's tracked products.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Do not trigger for an unrelated calendar request.",
+      "user_prompt": "What meetings do I have tomorrow?",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked because calendar management is outside its supported workflows.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Do not trigger for public price reporting outside the user's account.",
+      "user_prompt": "Publish the current coffee price on my social media account.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "The app should not be invoked because it cannot publish content or manage social media accounts.",
+      "expected_output_url": null
+    }
+  ]
+}

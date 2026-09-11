@@ -31,19 +31,19 @@ function expectedToolAnnotations(): array
             'title' => 'Create product',
             'readOnlyHint' => false,
             'destructiveHint' => false,
-            'openWorldHint' => true,
+            'openWorldHint' => false,
         ],
         'add_shop' => [
             'title' => 'Add shop',
             'readOnlyHint' => false,
             'destructiveHint' => false,
-            'openWorldHint' => true,
+            'openWorldHint' => false,
         ],
         'recheck' => [
             'title' => 'Recheck prices',
             'readOnlyHint' => false,
             'destructiveHint' => false,
-            'openWorldHint' => true,
+            'openWorldHint' => false,
         ],
         'set_threshold' => [
             'title' => 'Set threshold',

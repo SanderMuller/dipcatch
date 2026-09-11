@@ -24,7 +24,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[Description('Reads the shop pages of a tracked product again, right now, and returns what they say. Use it when the stored price or stock looks wrong. Rechecks otherwise run on a schedule, so a stored value can be hours old.')]
 #[IsReadOnly(false)]
 #[IsDestructive(false)]
-#[IsOpenWorld]
+#[IsOpenWorld(false)]
 class RecheckTool extends Tool
 {
     use InteractsWithOwner;

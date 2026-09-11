@@ -29,7 +29,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[Description('Tracks the same product at another shop, so DipCatch can compare them. Call without `draft` first to see what the page says, then again with the returned `draft` and confirm: true.')]
 #[IsReadOnly(false)]
 #[IsDestructive(false)]
-#[IsOpenWorld]
+#[IsOpenWorld(false)]
 class AddShopTool extends Tool
 {
     use InteractsWithOwner;
