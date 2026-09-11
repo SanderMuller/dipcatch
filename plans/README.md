@@ -19,7 +19,7 @@ vendor/bin/pest || true                       # 0 failures
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001 | Show the price line when the price has been stable | P1 | S | — | DONE |
-| 002 | Make a rate-limited recheck retry instead of dead-lettering | P1 | S | — | TODO |
+| 002 | Make a rate-limited recheck retry instead of dead-lettering | P1 | S | — | DONE |
 | 003 | Stop a recheck adopting a shop's new currency | P1 | M | 002 | DONE (`ead8499`) |
 | 004 | Stop `canonicalizeDecimal` misreading two price shapes | P1 | S | — | TODO |
 | 005 | Index, env documentation, and the SSRF escape hatch | P2 | S | — | TODO |
