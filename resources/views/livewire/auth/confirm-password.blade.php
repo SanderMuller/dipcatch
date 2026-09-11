@@ -10,6 +10,8 @@
         <form method="POST" action="{{ route('password.confirm.store') }}" class="flex flex-col gap-6">
             @csrf
 
+            <x-password-manager-username :email="auth()->user()->email" />
+
             <flux:input
                 name="password"
                 :label="__('Password')"

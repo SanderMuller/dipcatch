@@ -13,10 +13,11 @@
             @csrf
 
             <flux:input
+                name="email"
                 :label="__('Email')"
                 type="email"
                 :value="$invitation->email"
-                disabled
+                autocomplete="username"
                 readonly
             />
 

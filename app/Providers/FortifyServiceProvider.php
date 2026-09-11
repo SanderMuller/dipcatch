@@ -50,7 +50,19 @@ final class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::loginView(fn (): Factory|View => view('livewire.auth.login'));
         Fortify::verifyEmailView(fn (): Factory|View => view('livewire.auth.verify-email'));
-        Fortify::twoFactorChallengeView(fn (): Factory|View => view('livewire.auth.two-factor-challenge'));
+        Fortify::twoFactorChallengeView(function (Request $request): Factory|View {
+            $userId = $request->session()->get('login.id');
+            $email = '';
+
+            if (is_int($userId) || is_string($userId)) {
+                $challengedEmail = User::query()->whereKey($userId)->value('email');
+                $email = is_string($challengedEmail) ? $challengedEmail : '';
+            }
+
+            return view('livewire.auth.two-factor-challenge', [
+                'email' => $email,
+            ]);
+        });
         Fortify::confirmPasswordView(fn (): Factory|View => view('livewire.auth.confirm-password'));
         Fortify::registerView(fn (): Factory|View => view('livewire.auth.register'));
         Fortify::resetPasswordView(fn (): Factory|View => view('livewire.auth.reset-password'));

@@ -43,6 +43,10 @@
             <form method="POST" action="{{ route('two-factor.login.store') }}">
                 @csrf
 
+                @if (($email ?? '') !== '')
+                    <x-password-manager-username :email="$email" />
+                @endif
+
                 <div class="space-y-5 text-center">
                     <div x-show="!showRecoveryInput">
                         <div class="flex items-center justify-center my-5">
@@ -52,6 +56,7 @@
                                 name="code"
                                 label="OTP Code"
                                 label:sr-only
+                                autocomplete="one-time-code"
                                 class="mx-auto"
                              />
                         </div>
@@ -64,7 +69,7 @@
                                 name="recovery_code"
                                 x-ref="recovery_code"
                                 x-bind:required="showRecoveryInput"
-                                autocomplete="one-time-code"
+                                autocomplete="off"
                                 x-model="recovery_code"
                             />
                         </div>

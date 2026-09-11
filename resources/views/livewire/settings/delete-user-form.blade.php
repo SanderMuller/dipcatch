@@ -20,7 +20,15 @@
                 </flux:subheading>
             </div>
 
-            <flux:input wire:model="password" :label="__('Password')" type="password" viewable />
+            <x-password-manager-username :email="auth()->user()->email" />
+
+            <flux:input
+                wire:model="password"
+                :label="__('Password')"
+                type="password"
+                autocomplete="current-password"
+                viewable
+            />
 
             <div class="flex justify-end space-x-2 rtl:space-x-reverse">
                 <flux:modal.close>

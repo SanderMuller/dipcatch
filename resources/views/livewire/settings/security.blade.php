@@ -5,6 +5,8 @@
 
     <x-settings.layout :heading="__('Update password')" :subheading="__('Ensure your account is using a long, random password to stay secure')">
         <form method="POST" wire:submit="updatePassword" class="mt-6 space-y-6">
+            <x-password-manager-username :email="auth()->user()->email" />
+
             <flux:input
                 wire:model="current_password"
                 :label="__('Current password')"
@@ -116,6 +118,7 @@
                                     length="6"
                                     label="OTP Code"
                                     label:sr-only
+                                    autocomplete="one-time-code"
                                     class="mx-auto"
                                 />
                             </div>
@@ -203,12 +206,9 @@
                                             <flux:icon.loading variant="mini"/>
                                         </div>
                                     @else
-                                        <input
-                                            type="text"
-                                            readonly
-                                            value="{{ $manualSetupKey }}"
-                                            class="w-full p-3 bg-transparent outline-none text-stone-900 dark:text-stone-100"
-                                        />
+                                        <p id="totp-setup-key" class="w-full p-3 text-stone-900 dark:text-stone-100">
+                                            {{ $manualSetupKey }}
+                                        </p>
 
                                         <button
                                             @click="copy()"
