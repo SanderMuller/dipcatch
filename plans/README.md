@@ -22,7 +22,7 @@ vendor/bin/pest || true                       # 0 failures
 | 002 | Make a rate-limited recheck retry instead of dead-lettering | P1 | S | — | TODO |
 | 003 | Stop a recheck adopting a shop's new currency | P1 | M | 002 | DONE (`ead8499`) |
 | 004 | Stop `canonicalizeDecimal` misreading two price shapes | P1 | S | — | TODO |
-| 005 | Index, env documentation, and the SSRF escape hatch | P2 | S | — | TODO |
+| 005 | Index, env documentation, and the SSRF escape hatch | P2 | S | — | DONE |
 | 006 | Alert budget after the claim; reference out of the lock | P2 | S | — | TODO |
 | 007 | Clear the old price when an offer is repointed | P2 | S | — | TODO |
 | 008 | Only dispatch a digest when there is something to digest | P3 | M | — | TODO |
@@ -79,6 +79,40 @@ Recorded so an executor does not re-litigate them:
    arrive later the same day.
 
 ## Execution log
+
+- **005 — executed 2026-09-11.** Three deviations, all agreed with the maintainer
+  before the work started:
+  1. **Step 1 covers four indexes, not one.** The maintenance note claimed
+     `price_drop_events.product_id` was the only missing index. A `pg_constraint`
+     sweep found 12 foreign-key columns with no leading index, and three more of
+     them sit on the same nightly prune path: `price_drop_events.price_check_id`
+     and `product_cheapest_history.triggering_price_check_id` (Postgres enforces
+     the cascade and the set-null with a per-row lookup when the command deletes
+     from `price_checks` in bulk), and `price_drop_events.triggered_by_shop_id`
+     (filtered once per offer). The sweep now returns 8 rows. The remaining 8
+     only get scanned when a user or a shop is deleted, so they were left alone
+     rather than charged an ongoing write cost.
+  2. **Plain `CREATE INDEX`, not `CONCURRENTLY`.** Production is near empty, so
+     the SHARE lock lasts milliseconds and the migration keeps its transaction.
+     The reasoning is in the migration docblock for whoever revisits it at scale.
+  3. **Step 2 added the drift test the plan deliberately left out.** It guards
+     the five config files DipCatch authors, with no name allowlist. Package
+     config is out of scope by design: those files carry dozens of knobs for
+     drivers this app does not use. The app-specific names inside them
+     (`RESEND_API_KEY`, `VAPID_PEM_FILE`, `STRIPE_WEBHOOK_TOLERANCE`,
+     `FAILED_JOB_CHANNELS`) are documented but unguarded, which the test says.
+
+  **STOP condition 4 was assessed and does not apply.** It would have fired on
+  `PLAN_FREE_RECHECK_INTERVAL_HOURS` and `PLAN_FREE_NOTIFICATIONS_HOURLY_LIMIT`
+  having no default. `config/plans.php` documents that as deliberate: null falls
+  back to the `dipcatch` keys. Both are documented as empty with that comment.
+
+  The plan's motivating claim for step 2 was traced and holds — 14 health checks
+  are registered and none covers mail or web push, so a deploy missing
+  `RESEND_API_KEY` or `VAPID_PEM_FILE` does report healthy.
+
+  Not covered: a production test for `allowUnresolved()`. It needs a real DNS
+  miss and would be flaky. Only `allowPrivateIps()` has the production test.
 
 - **003 — APPROVED, merged to `main`.** Executed 2026-09-07 by a dispatched
   executor, reviewed against every done criterion. Two documented deviations,
