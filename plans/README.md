@@ -107,12 +107,19 @@ Recorded so an executor does not re-litigate them:
   having no default. `config/plans.php` documents that as deliberate: null falls
   back to the `dipcatch` keys. Both are documented as empty with that comment.
 
-  The plan's motivating claim for step 2 was traced and holds — 14 health checks
+  The plan's motivating claim for step 2 was traced and holds — 13 health checks
   are registered and none covers mail or web push, so a deploy missing
   `RESEND_API_KEY` or `VAPID_PEM_FILE` does report healthy.
 
-  Not covered: a production test for `allowUnresolved()`. It needs a real DNS
-  miss and would be flaky. Only `allowPrivateIps()` has the production test.
+  The security review that followed added a production test for
+  `allowUnresolved()`, which the first pass had skipped as too flaky. A host
+  under the RFC 2606 `.invalid` TLD never resolves, so the DNS miss is
+  deterministic. Both hatches are now pinned in both directions.
+
+  A `triggered_by_shop_id` index looked unjustified on review, because the
+  prune has no direct `WHERE` on that column — only an `EXISTS` through
+  `triggeredByShop`. `EXPLAIN` settles it: Postgres rewrites the correlation
+  into `Index Cond: (triggered_by_shop_id = ...)` and uses the index.
 
 - **003 — APPROVED, merged to `main`.** Executed 2026-09-07 by a dispatched
   executor, reviewed against every done criterion. Two documented deviations,

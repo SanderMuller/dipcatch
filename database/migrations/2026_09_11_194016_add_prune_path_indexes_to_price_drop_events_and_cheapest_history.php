@@ -6,23 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Postgres does not index the referencing side of a foreign key, so every
- * column below is a sequential scan today. All four sit on the nightly
- * `dipcatch:prune-old-checks` path:
+ * column below is a sequential scan today. All four are read once per product
+ * or once per offer by the nightly `dipcatch:prune-old-checks`, two of them
+ * through the cascade and set-null it triggers on `price_checks`.
  *
- *  - `price_drop_events.product_id` — the command filters on it once per
- *    product, and the chart's drop markers filter on it once per product view.
- *  - `price_drop_events.price_check_id` and
- *    `product_cheapest_history.triggering_price_check_id` — the command deletes
- *    from `price_checks` in bulk, and Postgres enforces the cascade and the
- *    set-null with a lookup on each referencing table per deleted row.
- *  - `price_drop_events.triggered_by_shop_id` — the command filters on it once
- *    per offer, through the `triggeredByShop` existence check.
- *
- * Plain `CREATE INDEX` rather than `CONCURRENTLY`: a plain build takes a SHARE
+ * Plain `CREATE INDEX` rather than `CONCURRENTLY`. A plain build takes a SHARE
  * lock for its duration, which is milliseconds on tables this size. Building
  * concurrently cannot run inside a transaction, so it would need
  * `$withinTransaction = false` and give up the rollback Postgres provides here.
  * Revisit that trade if these tables are ever indexed again at scale.
+ *
+ * The nearest sibling, `2026_09_02_180000_add_trgm_index_to_checkjebon_prices_name`,
+ * guards each statement with `IF NOT EXISTS`. It does not need to here: Postgres
+ * has transactional DDL, so a half-applied `up()` rolls back on its own.
  */
 return new class extends Migration {
     public function up(): void

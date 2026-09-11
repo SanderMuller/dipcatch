@@ -41,10 +41,6 @@ test('rejects unparseable URLs', function (): void {
 });
 
 test('the private-IP bypass is ignored when the app runs as production', function (): void {
-    // The flag exists for Herd's `.test` hosts and the suite's synthetic
-    // hostnames. In production it would turn every user-supplied shop URL into
-    // a request the server makes against its own network, so the environment
-    // overrules the flag rather than the other way round.
     config()->set('dipcatch.fetcher.allow_private_ips', true);
     $this->app->detectEnvironment(fn (): string => 'production');
 
