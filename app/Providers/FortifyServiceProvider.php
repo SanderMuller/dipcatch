@@ -84,6 +84,14 @@ final class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($throttleKey);
         });
 
+        RateLimiter::for('passkeys', function (Request $request) {
+            $credentialId = $request->string('credential.id')->toString();
+
+            return Limit::perMinute(10)->by(
+                (($credentialId !== '') ? $credentialId : $request->session()->getId()) . '|' . $request->ip(),
+            );
+        });
+
         RateLimiter::for('invitation', function (Request $request) {
             return Limit::perMinute(30)->by($request->ip() ?? 'unknown');
         });

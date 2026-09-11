@@ -46,7 +46,7 @@
     "DipCatch is a small price-tracking service run from the Netherlands. This page says what we store about you, why, and how to get rid of it. We keep it short on purpose; if something is unclear, ask.": "DipCatch is een kleine prijsvolgdienst vanuit Nederland. Op deze pagina staat wat we over je opslaan, waarom, en hoe je ervan af komt. We houden het bewust kort; als iets onduidelijk is, vraag het gerust.",
     "What we store": "Wat we opslaan",
     "Account": "Account",
-    "your name, email address, a hashed password, your timezone and default currency, and your notification preferences. Optional: two-factor secrets and browser-push subscriptions you enable yourself.": "je naam, e-mailadres, een gehasht wachtwoord, je tijdzone en standaardvaluta, en je meldingsvoorkeuren. Optioneel: tweefactorsleutels en browsermeldingen die je zelf aanzet.",
+    "your name, email address, a hashed password, your timezone and default currency, and your notification preferences. Optional: two-factor secrets, passkeys, and browser-push subscriptions you enable yourself.": "je naam, e-mailadres, een gehasht wachtwoord, je tijdzone en standaardvaluta, en je meldingsvoorkeuren. Optioneel: tweefactorsleutels, passkeys en browsermeldingen die je zelf aanzet.",
     "Tracked products": "Gevolgde producten",
     "the product links you paste, the titles, images and prices we read from those pages, the price history, and any private notes you add.": "de productlinks die je plakt, de titels, afbeeldingen en prijzen die we van die pagina’s lezen, de prijsgeschiedenis, en eigen notities die je toevoegt.",
     "Alerts": "Meldingen",

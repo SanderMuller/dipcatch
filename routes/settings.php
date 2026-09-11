@@ -4,6 +4,7 @@ use App\Livewire\Settings\Appearance;
 use App\Livewire\Settings\Profile;
 use App\Livewire\Settings\Security;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -19,11 +20,22 @@ Route::middleware(['auth', EnsureEmailIsVerified::class])->group(function (): vo
     Route::livewire('settings/security', Security::class)
         ->middleware(
             when(
-                Features::canManageTwoFactorAuthentication()
-                && Features::optionEnabled(Features::twoFactorAuthentication(), 'confirmPassword'),
+                (Features::canManageTwoFactorAuthentication()
+                    && Features::optionEnabled(Features::twoFactorAuthentication(), 'confirmPassword'))
+                || (Features::canManagePasskeys()
+                    && Features::optionEnabled(Features::passkeys(), 'confirmPassword')),
                 ['password.confirm'],
                 [],
             ),
         )
         ->name('security.edit');
 });
+
+if (Features::canManagePasskeys()) {
+    Route::get('.well-known/passkey-endpoints', function (): JsonResponse {
+        return response()->json([
+            'enroll' => route('security.edit'),
+            'manage' => route('security.edit'),
+        ]);
+    })->name('well-known.passkeys');
+}

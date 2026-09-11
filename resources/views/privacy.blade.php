@@ -42,7 +42,7 @@
                     <section>
                         <h2>{{ __('What we store') }}</h2>
                         <ul class="mt-2">
-                            <li><strong>{{ __('Account') }}:</strong> {{ __('your name, email address, a hashed password, your timezone and default currency, and your notification preferences. Optional: two-factor secrets and browser-push subscriptions you enable yourself.') }}</li>
+                            <li><strong>{{ __('Account') }}:</strong> {{ __('your name, email address, a hashed password, your timezone and default currency, and your notification preferences. Optional: two-factor secrets, passkeys, and browser-push subscriptions you enable yourself.') }}</li>
                             <li><strong>{{ __('Tracked products') }}:</strong> {{ __('the product links you paste, the titles, images and prices we read from those pages, the price history, and any private notes you add.') }}</li>
                             <li><strong>{{ __('Alerts') }}:</strong> {{ __('which price drops we told you about, and when.') }}</li>
                             <li><strong>{{ __('Technical') }}:</strong> {{ __('a session cookie to keep you signed in, and short-lived rate-limit counters keyed on your IP address to protect the shops we read prices from and this service.') }}</li>
