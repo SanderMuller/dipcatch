@@ -19,9 +19,9 @@ vendor/bin/pest || true                       # 0 failures
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001 | Show the price line when the price has been stable | P1 | S | — | DONE |
-| 002 | Make a rate-limited recheck retry instead of dead-lettering | P1 | S | — | TODO |
+| 002 | Make a rate-limited recheck retry instead of dead-lettering | P1 | S | — | DONE |
 | 003 | Stop a recheck adopting a shop's new currency | P1 | M | 002 | DONE (`ead8499`) |
-| 004 | Stop `canonicalizeDecimal` misreading two price shapes | P1 | S | — | TODO |
+| 004 | Stop `canonicalizeDecimal` misreading two price shapes | P1 | S | — | DONE |
 | 005 | Index, env documentation, and the SSRF escape hatch | P2 | S | — | DONE |
 | 006 | Alert budget after the claim; reference out of the lock | P2 | S | — | TODO |
 | 007 | Clear the old price when an offer is repointed | P2 | S | — | TODO |
@@ -89,7 +89,8 @@ Recorded so an executor does not re-litigate them:
      and `product_cheapest_history.triggering_price_check_id` (Postgres enforces
      the cascade and the set-null with a per-row lookup when the command deletes
      from `price_checks` in bulk), and `price_drop_events.triggered_by_shop_id`
-     (filtered once per offer). The sweep now returns 8 rows. The remaining 8
+     (read once per offer, see the `EXPLAIN` note below). The sweep now
+     returns 8 rows. The remaining 8
      only get scanned when a user or a shop is deleted, so they were left alone
      rather than charged an ongoing write cost.
   2. **Plain `CREATE INDEX`, not `CONCURRENTLY`.** Production is near empty, so
