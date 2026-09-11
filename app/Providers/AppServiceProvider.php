@@ -7,6 +7,7 @@ use App\Billing\StripeTax;
 use App\Health\BillingConfigurationCheck;
 use App\Health\CheckjebonFreshnessCheck;
 use App\Health\LastSuccessfulScrapeCheck;
+use App\Health\SessionDriverCheck;
 use App\Health\StripeWebhookSecretCheck;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ShopAdapter;
@@ -164,6 +165,7 @@ final class AppServiceProvider extends ServiceProvider
             CpuLoadCheck::new(),
             SecurityAdvisoriesCheck::new(),
             StripeWebhookSecretCheck::new(),
+            SessionDriverCheck::new(),
             BillingConfigurationCheck::new(),
             LastSuccessfulScrapeCheck::new()
                 ->warnAfterHours(48)
