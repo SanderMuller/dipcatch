@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Carbon\CarbonImmutable;
 use Database\Factories\ProductCheapestHistoryFactory;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Builder;
@@ -61,6 +62,31 @@ class ProductCheapestHistory extends Model
     protected function inOrder(Builder $query): void
     {
         $query->orderBy('started_at')->orderBy('id');
+    }
+
+    /**
+     * Segments that overlap the window, not merely those that started inside
+     * it. A price that has not changed for a year is one open segment that
+     * started before any window — matching on `started_at` alone would render
+     * an empty chart for the products that are working best.
+     *
+     * A null window means the account may read everything, so the scope
+     * no-ops and callers need no conditional of their own.
+     *
+     * @param  Builder<$this>  $query
+     */
+    #[Scope]
+    protected function overlapping(Builder $query, ?DateTimeInterface $windowStart): void
+    {
+        if ($windowStart === null) {
+            return;
+        }
+
+        $query->where(function (Builder $inner) use ($windowStart): void {
+            $inner->where('started_at', '>=', $windowStart)
+                ->orWhereNull('ended_at')
+                ->orWhere('ended_at', '>=', $windowStart);
+        });
     }
 
     /**

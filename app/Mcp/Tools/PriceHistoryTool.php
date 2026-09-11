@@ -6,7 +6,6 @@ use App\Mcp\Concerns\InteractsWithOwner;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -43,15 +42,7 @@ class PriceHistoryTool extends Tool
         $cutoff = $days === null ? null : CarbonImmutable::now()->subDays($days);
 
         $rows = $product->cheapestHistory()
-            // Overlap, not `started_at >= cutoff`: a price that has not moved
-            // since before the window is still the current price. Filtering on
-            // the start alone returns nothing while the chart shows a full
-            // line, which is the same product answering two different ways.
-            ->when($cutoff instanceof CarbonImmutable, fn (Builder $query): Builder => $query
-                ->where(fn (Builder $overlapping): Builder => $overlapping
-                    ->where('started_at', '>=', $cutoff)
-                    ->orWhereNull('ended_at')
-                    ->orWhere('ended_at', '>=', $cutoff)))
+            ->overlapping($cutoff)
             ->inOrder()
             ->get();
 
