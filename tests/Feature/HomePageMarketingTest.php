@@ -34,7 +34,7 @@ test('the header offers account creation to guests and the app to members', func
 });
 
 test('the contact link only renders when a contact address is configured', function (): void {
-    config()->set('site.contact_email', null);
+    config()->set('site.contact_email');
     $this->get(route('home'))->assertDontSee('mailto:', escape: false);
 
     config()->set('site.contact_email', 'hello@example.test');
@@ -76,8 +76,7 @@ test('the phone mock shows grocery examples from supported shops only', function
         ->assertSee('ah.nl')
         ->assertSee('dirk.nl')
         ->assertSee('jumbo.com')
-        ->assertDontSee('mediamarkt.nl')
-        ->assertDontSee('amazon.com');
+        ->assertDontSee('mediamarkt.nl');
 });
 
 test('the phone mock is an informative image with a label matching the cards', function (): void {
@@ -113,11 +112,7 @@ test('the homepage renders no decorative image element', function (): void {
 
     preg_match_all('#<img[^>]*>#', $content, $matches);
 
-    foreach ($matches[0] as $tag) {
-        // A missing alt converts the same way an empty one does, so require a
-        // non-empty alt rather than only rejecting the empty spelling.
-        expect($tag)->toMatch('#alt="[^"]+"#');
-    }
+    expect($matches[0])->each->toMatch('#alt="[^"]+"#');
 });
 
 test('the phone mock contributes no chrome to the page text', function (): void {
@@ -156,7 +151,7 @@ test('the shop list names every supported host without contradicting itself', fu
         expect($content)->toContain($shop['host']);
     }
 
-    // The overflow pill used to say "+4 more" directly under all twelve names,
+    // The overflow pill used to say "+4 more" directly under all the names,
     // which read as a contradiction once the page was flattened to Markdown.
     expect($content)->not->toContain(' more<')
         ->and($content)->toContain(__('and many other webshops'));
@@ -172,6 +167,8 @@ test('the FAQ section shows every question the page defines', function (): void 
     $response = $this->get(route('home'))->assertOk();
 
     $response->assertSee('Which shops work?')
+        ->assertSee('Etos, The Ordinary, Lookfantastic')
+        ->assertSee('Pets Place, Medpets, Welkoop')
         ->assertSee('How often are prices checked?')
         ->assertSee('Is it free?')
         ->assertSee('Do I need an extension or app?')
@@ -212,7 +209,7 @@ test('the FAQ JSON-LD matches the visible questions and has plain-text answers',
         $summaryMatches[1],
     );
 
-    expect($entities)->toHaveCount(count($visibleQuestions))
+    expect($entities)->toHaveSameSize($visibleQuestions)
         ->and($visibleQuestions)->not->toBeEmpty();
 
     foreach (array_values($entities) as $index => $question) {
@@ -238,7 +235,8 @@ test('the homepage speaks about repeat purchases, not only supermarkets', functi
         ->assertOk()
         ->assertSee('Price alerts for the things you buy anyway')
         ->assertSee('vacuum filters')
-        ->assertSee('cat food');
+        ->assertSee('cat food')
+        ->assertSee('skincare');
 });
 
 test('shop pills carry the brand name a person would search for', function (): void {

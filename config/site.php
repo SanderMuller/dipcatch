@@ -1,5 +1,23 @@
 <?php declare(strict_types=1);
 
+$amazonHosts = [
+    'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.nl', 'amazon.fr',
+    'amazon.es', 'amazon.it', 'amazon.ie', 'amazon.se', 'amazon.pl',
+    'amazon.ca', 'amazon.com.au', 'amazon.co.jp', 'amazon.in', 'amazon.com.mx',
+    'amazon.com.br', 'amazon.com.be', 'amazon.ae', 'amazon.sa', 'amazon.com.tr',
+    'amazon.sg',
+];
+
+$zooplusHosts = [
+    'zooplus.nl', 'zooplus.be', 'zooplus.de', 'zooplus.fr', 'zooplus.it',
+    'zooplus.es', 'zooplus.at', 'zooplus.ie', 'zooplus.pt', 'zooplus.fi',
+    'zooplus.lu', 'zooplus.com', 'zooplus.co.uk',
+];
+
+$bitibaHosts = [
+    'bitiba.nl', 'bitiba.be', 'bitiba.de', 'bitiba.fr', 'bitiba.it',
+];
+
 return [
 
     /*
@@ -30,10 +48,19 @@ return [
     /**
      * Shops with a dedicated adapter or data source, shown as logos on the
      * homepage and the first-run dashboard.
+     *
+     * Amazon hosts stay in sync with AmazonAdapter::hosts(); Zooplus and
+     * Bitiba hosts stay in sync with ZooplusAdapter::hosts().
      */
     'supported_hosts' => [
         'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl',
-        'dekamarkt.nl', 'poiesz.nl', 'vomar.nl', 'bol.com', 'amazon.nl', 'zooplus.nl',
+        'dekamarkt.nl', 'poiesz.nl', 'vomar.nl', 'bol.com',
+        ...$amazonHosts,
+        ...$zooplusHosts,
+        ...$bitibaHosts,
+        'dierapotheker.nl', 'petsplace.nl', 'medpets.nl', 'medpets.be', 'welkoop.nl',
+        'petsathome.com', 'etos.nl', 'theordinary.com',
+        'lookfantastic.com', 'cultbeauty.com', 'ulta.com', 'walmart.com',
     ],
 
     /**
@@ -53,8 +80,57 @@ return [
         'poiesz.nl' => 'Poiesz',
         'vomar.nl' => 'Vomar',
         'bol.com' => 'bol.com',
+        'amazon.com' => 'Amazon.com',
+        'amazon.co.uk' => 'Amazon.co.uk',
+        'amazon.de' => 'Amazon.de',
         'amazon.nl' => 'Amazon.nl',
+        'amazon.fr' => 'Amazon.fr',
+        'amazon.es' => 'Amazon.es',
+        'amazon.it' => 'Amazon.it',
+        'amazon.ie' => 'Amazon.ie',
+        'amazon.se' => 'Amazon.se',
+        'amazon.pl' => 'Amazon.pl',
+        'amazon.ca' => 'Amazon.ca',
+        'amazon.com.au' => 'Amazon.com.au',
+        'amazon.co.jp' => 'Amazon.co.jp',
+        'amazon.in' => 'Amazon.in',
+        'amazon.com.mx' => 'Amazon.com.mx',
+        'amazon.com.br' => 'Amazon.com.br',
+        'amazon.com.be' => 'Amazon.be',
+        'amazon.ae' => 'Amazon.ae',
+        'amazon.sa' => 'Amazon.sa',
+        'amazon.com.tr' => 'Amazon.com.tr',
+        'amazon.sg' => 'Amazon.sg',
         'zooplus.nl' => 'Zooplus',
+        'zooplus.be' => 'Zooplus.be',
+        'zooplus.de' => 'Zooplus.de',
+        'zooplus.fr' => 'Zooplus.fr',
+        'zooplus.it' => 'Zooplus.it',
+        'zooplus.es' => 'Zooplus.es',
+        'zooplus.at' => 'Zooplus.at',
+        'zooplus.ie' => 'Zooplus.ie',
+        'zooplus.pt' => 'Zooplus.pt',
+        'zooplus.fi' => 'Zooplus.fi',
+        'zooplus.lu' => 'Zooplus.lu',
+        'zooplus.com' => 'Zooplus.com',
+        'zooplus.co.uk' => 'Zooplus.co.uk',
+        'bitiba.nl' => 'Bitiba',
+        'bitiba.be' => 'Bitiba.be',
+        'bitiba.de' => 'Bitiba.de',
+        'bitiba.fr' => 'Bitiba.fr',
+        'bitiba.it' => 'Bitiba.it',
+        'dierapotheker.nl' => 'Dierapotheker',
+        'petsplace.nl' => 'Pets Place',
+        'medpets.nl' => 'Medpets',
+        'medpets.be' => 'Medpets.be',
+        'welkoop.nl' => 'Welkoop',
+        'petsathome.com' => 'Pets at Home',
+        'etos.nl' => 'Etos',
+        'theordinary.com' => 'The Ordinary',
+        'lookfantastic.com' => 'Lookfantastic',
+        'cultbeauty.com' => 'Cult Beauty',
+        'ulta.com' => 'Ulta',
+        'walmart.com' => 'Walmart',
     ],
 
     /**
@@ -74,10 +150,29 @@ return [
      * after adding one or the new page 404s while the footer advertises it.
      */
     'use_cases' => [
-        'groceries' => ['ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl', 'dekamarkt.nl', 'poiesz.nl', 'vomar.nl'],
-        'pet-food' => ['zooplus.nl', 'bol.com', 'amazon.nl'],
-        'coffee' => ['ah.nl', 'jumbo.com', 'bol.com', 'amazon.nl'],
-        'filters' => ['bol.com', 'amazon.nl'],
+        'groceries' => [
+            'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl', 'dekamarkt.nl', 'poiesz.nl', 'vomar.nl',
+            'amazon.com', 'amazon.co.uk',
+        ],
+        'pet-food' => [
+            ...$zooplusHosts,
+            ...$bitibaHosts,
+            'dierapotheker.nl', 'petsplace.nl', 'medpets.nl', 'medpets.be', 'welkoop.nl',
+            'petsathome.com',
+            'bol.com',
+            ...$amazonHosts,
+            'ah.nl', 'jumbo.com',
+        ],
+        'coffee' => ['ah.nl', 'jumbo.com', 'bol.com', ...$amazonHosts],
+        'filters' => ['bol.com', ...$amazonHosts],
+        'beauty' => [
+            'etos.nl', 'theordinary.com',
+            'lookfantastic.com', 'cultbeauty.com',
+            'ulta.com', 'walmart.com',
+            'bol.com',
+            ...$amazonHosts,
+            'ah.nl', 'jumbo.com',
+        ],
     ],
 
 ];

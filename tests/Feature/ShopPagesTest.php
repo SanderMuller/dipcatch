@@ -43,11 +43,41 @@ it('links each shop page to the categories that name it, and no others', functio
     // kinds of link apart.
     $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
 
-    expect($slugs)->toBe(['groceries', 'coffee']);
+    expect($slugs)->toBe(['groceries', 'pet-food', 'coffee', 'beauty']);
 
     $this->get(route('shop', ['slug' => 'ah-nl']))
         ->assertOk()
         ->assertSee('What people track at Albert Heijn', escape: false);
+});
+
+it('links Amazon UK and US shops to groceries as well as pet food, coffee and filters', function (string $slug): void {
+    $shop = ShopPages::find($slug);
+
+    $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
+
+    expect($slugs)->toBe(['groceries', 'pet-food', 'coffee', 'filters', 'beauty']);
+})->with(['amazon-com', 'amazon-co-uk']);
+
+it('links other Amazon country shops to pet food, coffee and filters', function (string $slug): void {
+    $shop = ShopPages::find($slug);
+
+    $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
+
+    expect($slugs)->toBe(['pet-food', 'coffee', 'filters', 'beauty']);
+})->with(['amazon-de', 'amazon-com-be']);
+
+it('links Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart to the beauty category only', function (string $slug): void {
+    $shop = ShopPages::find($slug);
+
+    $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
+
+    expect($slugs)->toBe(['beauty']);
+})->with(['etos-nl', 'theordinary-com', 'lookfantastic-com', 'cultbeauty-com', 'ulta-com', 'walmart-com']);
+
+it('states that Dierapotheker reads the article number', function (): void {
+    $this->get(route('shop', ['slug' => 'dierapotheker-nl']))
+        ->assertOk()
+        ->assertSee('article number', escape: false);
 });
 
 it('lists every shop on the hub, with a link to each', function (): void {

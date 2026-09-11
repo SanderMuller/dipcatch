@@ -8,7 +8,7 @@
     $canonical = $locale === 'nl' ? route('home', ['lang' => 'nl']) : route('home');
     $description = __('DipCatch tracks the price of anything you buy more than once, across Dutch supermarkets and webshops. It compares shops on unit price and tells you when one drops.');
     $h1 = __('Same product, every shop, one alert.');
-    $sub = __('DipCatch watches the coffee, cat food and vacuum filters you buy anyway at Albert Heijn, Jumbo, bol.com, Zooplus and more, compares them on price per kilo or per piece, and tells you when one drops.');
+    $sub = __('DipCatch watches the coffee, cat food, skincare and vacuum filters you buy anyway at Albert Heijn, Jumbo, bol.com, Zooplus and more, compares them on price per kilo or per piece, and tells you when one drops.');
     $authed = auth()->check();
     $primaryHref = $authed ? url('/app') : route('register');
     $headerLabel = $authed ? __('Open app') : __('Create account');
@@ -49,7 +49,7 @@
     ];
     $freeProducts = \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->maxProducts();
     $faq = [
-        ['q' => __('Which shops work?'), 'a' => __('DipCatch has built-in support for Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon.nl and Zooplus, including AH Bonus and Dirk promo prices. Many other webshops publish their product data in a form DipCatch can read. Shops that block bots or only load prices with JavaScript may not work. You see the result before you confirm.')],
+        ['q' => __('Which shops work?'), 'a' => __('DipCatch has built-in support for Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart, including AH Bonus and Dirk promo prices. Many other webshops publish their product data in a form DipCatch can read. Shops that block bots or only load prices with JavaScript may not work. You see the result before you confirm.')],
         ['q' => __('How often are prices checked?'), 'a' => __('A shop is checked the moment you add it or change its link. After that DipCatch re-checks it about every :hours hours, give or take half an hour.', ['hours' => config('dipcatch.recheck.interval_hours', 6)])],
         ['q' => __('Is it free?'), 'a' => $freeProducts === null
             ? __('Yes. The free plan has no product limit, you do not need a card, and there is no trial that runs out.')

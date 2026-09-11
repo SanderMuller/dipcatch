@@ -71,16 +71,83 @@ function graphTypes(array $nodes): array
 test('every configured use case has copy and shops', function (): void {
     $cases = UseCases::all();
 
-    expect($cases)->toHaveCount(count(Config::array('site.use_cases')));
+    expect($cases)->toHaveSameSize(Config::array('site.use_cases'));
 
     foreach ($cases as $case) {
-        expect($case->heading)->not->toBe('')
-            ->and($case->intro)->not->toBe('')
-            ->and($case->example)->not->toBe('')
-            ->and($case->description)->not->toBe('')
+        expect($case->heading)->not->toBeEmpty()
+            ->and($case->intro)->not->toBeEmpty()
+            ->and($case->example)->not->toBeEmpty()
+            ->and($case->description)->not->toBeEmpty()
             ->and($case->faq)->not->toBeEmpty()
             ->and($case->shops())->not->toBeEmpty();
     }
+});
+
+test('the groceries page lists Amazon in the UK and the US', function (): void {
+    $case = UseCases::find('groceries');
+
+    expect($case)->not->toBeNull();
+    assert($case !== null);
+
+    expect(array_column($case->shops(), 'host'))->toContain('amazon.com')
+        ->toContain('amazon.co.uk')
+        ->toContain('ah.nl');
+});
+
+test('the coffee and filters pages list Amazon in the UK and the US', function (): void {
+    $coffee = UseCases::find('coffee');
+    $filters = UseCases::find('filters');
+
+    expect($coffee)->not->toBeNull()
+        ->and($filters)->not->toBeNull();
+    assert($coffee !== null && $filters !== null);
+
+    expect(array_column($coffee->shops(), 'host'))->toContain('amazon.com')
+        ->toContain('amazon.co.uk')
+        ->and(array_column($filters->shops(), 'host'))->toContain('amazon.com')
+        ->toContain('amazon.co.uk');
+});
+
+test('the beauty page lists Etos, Lookfantastic, Ulta, Walmart and Amazon', function (): void {
+    $case = UseCases::find('beauty');
+
+    expect($case)->not->toBeNull();
+    assert($case !== null);
+
+    expect(array_column($case->shops(), 'host'))->toContain('etos.nl')
+        ->toContain('theordinary.com')
+        ->toContain('lookfantastic.com')
+        ->toContain('cultbeauty.com')
+        ->toContain('ulta.com')
+        ->toContain('walmart.com')
+        ->toContain('bol.com')
+        ->toContain('amazon.com')
+        ->toContain('amazon.co.uk')
+        ->toContain('ah.nl')
+        ->toContain('jumbo.com');
+});
+
+test('the pet-food page lists amazon.com and the other specialist shops', function (): void {
+    $case = UseCases::find('pet-food');
+
+    expect($case)->not->toBeNull();
+    assert($case !== null);
+
+    expect(array_column($case->shops(), 'host'))->toContain('amazon.com')
+        ->toContain('amazon.de')
+        ->toContain('zooplus.nl')
+        ->toContain('zooplus.be')
+        ->toContain('bitiba.nl')
+        ->toContain('dierapotheker.nl')
+        ->toContain('petsplace.nl')
+        ->toContain('medpets.nl')
+        ->toContain('welkoop.nl')
+        ->toContain('petsathome.com')
+        ->toContain('zooplus.co.uk')
+        ->toContain('bol.com')
+        ->toContain('amazon.nl')
+        ->toContain('ah.nl')
+        ->toContain('jumbo.com');
 });
 
 test('each use case reads as its own page, not a filled template', function (): void {
@@ -92,8 +159,8 @@ test('each use case reads as its own page, not a filled template', function (): 
         $intros[] = $case->intro;
     }
 
-    expect(array_unique($headings))->toHaveCount(count($headings))
-        ->and(array_unique($intros))->toHaveCount(count($intros));
+    expect(array_unique($headings))->toHaveSameSize($headings)
+        ->and(array_unique($intros))->toHaveSameSize($intros);
 });
 
 test('a use-case page renders its own heading, description and canonical', function (string $slug): void {
@@ -109,7 +176,7 @@ test('a use-case page renders its own heading, description and canonical', funct
         ->and($content)->toContain(e($case->intro))
         ->and($content)->toContain(e($case->example))
         ->and($content)->toContain('<link rel="canonical" href="' . $case->url() . '">');
-})->with(['groceries', 'pet-food', 'coffee', 'filters']);
+})->with(['groceries', 'pet-food', 'coffee', 'filters', 'beauty']);
 
 test('an unknown slug is a 404', function (): void {
     $this->get('/price-alerts/nonsense')->assertNotFound();
@@ -204,7 +271,7 @@ test('a shop dropped from the supported hosts disappears from the page', functio
 
     expect(array_column($case->shops(), 'host'))->toContain('zooplus.nl');
 
-    $hosts = array_values(array_filter(Config::array('site.supported_hosts'), 'is_string'));
+    $hosts = array_values(array_filter(Config::array('site.supported_hosts'), is_string(...)));
 
     Config::set('site.supported_hosts', array_values(array_diff($hosts, ['zooplus.nl'])));
 
@@ -226,7 +293,7 @@ test('a use case whose shops are all gone omits the block instead of showing an 
     $case = UseCases::find('filters');
     assert($case !== null);
 
-    expect($case->shops())->toBe([]);
+    expect($case->shops())->toBeEmpty();
 
     $this->get($case->url())->assertOk()->assertDontSee(__('Which shops this works with'));
 });

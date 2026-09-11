@@ -279,3 +279,87 @@ test('the Flemish and backorder phrasings a peer session reported are read too',
             ->and($result->snapshot?->stockSignal)->toBe('text: ' . $phrase);
     }
 });
+
+test('the production chain uses Welkoop current price, not JSON-LD list price', function (): void {
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => 'Royal Canin Kitten',
+        'offers' => ['@type' => 'Shop', 'price' => '31.50', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR);
+
+    $html = withJsonLd($json)
+        . '<h1>Royal Canin Kitten</h1>'
+        . '<p aria-label="Huidige prijs € 26,77">26,77</p>';
+
+    $result = app(AdapterResolver::class)->resolve(
+        'https://www.welkoop.nl/royal-canin-kitten-kattenvoer-2kg_1018191',
+        $html,
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->adapterKey)->toBe('welkoop')
+        ->and($result->snapshot?->price)->toBe('26.77');
+});
+
+test('the production chain drops Pets at Home subscription offers', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@graph' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Royal Canin Mini Dry Adult Dog Food',
+                'offers' => [
+                    [
+                        '@type' => 'Offer',
+                        'priceCurrency' => 'GBP',
+                        'sku' => '27223',
+                        'price' => 21.5,
+                        'description' => 'Easy Repeat subscription price',
+                    ],
+                    [
+                        '@type' => 'Offer',
+                        'priceCurrency' => 'GBP',
+                        'sku' => '27223',
+                        'price' => 23.89,
+                        'description' => 'Standard price',
+                    ],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = app(AdapterResolver::class)->resolve(
+        'https://www.petsathome.com/product/royal-canin-mini-dry-adult-dog-food/P687',
+        withJsonLd($json),
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->adapterKey)->toBe('petsathome')
+        ->and($result->snapshot?->price)->toBe('23.89');
+});
+
+test('the production chain reads the Walmart hero price, not a sibling itemprop', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'WebPage',
+        'name' => 'CeraVe Moisturizing Cream 16 oz',
+    ], JSON_THROW_ON_ERROR);
+
+    $html = <<<HTML
+<html><head>
+  <script type="application/ld+json">{$json}</script>
+</head><body>
+  <span itemProp="price">\$99.00</span>
+  <span data-seo-id="hero-price">\$15.97</span>
+</body></html>
+HTML;
+
+    $result = app(AdapterResolver::class)->resolve(
+        'https://www.walmart.com/ip/CeraVe-Moisturizing-Cream-16-oz/681955595',
+        $html,
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->adapterKey)->toBe('walmart')
+        ->and($result->snapshot?->price)->toBe('15.97');
+});

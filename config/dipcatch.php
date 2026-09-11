@@ -7,11 +7,20 @@ use App\PriceAdapters\Hosts\BolAdapter;
 use App\PriceAdapters\Hosts\DekaMarktAdapter;
 use App\PriceAdapters\Hosts\DierapothekerAdapter;
 use App\PriceAdapters\Hosts\DirkAdapter;
+use App\PriceAdapters\Hosts\EtosAdapter;
 use App\PriceAdapters\Hosts\JumboAdapter;
 use App\PriceAdapters\Hosts\LidlAdapter;
+use App\PriceAdapters\Hosts\LookfantasticAdapter;
+use App\PriceAdapters\Hosts\MedpetsAdapter;
+use App\PriceAdapters\Hosts\OrdinaryAdapter;
+use App\PriceAdapters\Hosts\PetsAtHomeAdapter;
+use App\PriceAdapters\Hosts\PetsPlaceAdapter;
 use App\PriceAdapters\Hosts\PoieszAdapter;
 use App\PriceAdapters\Hosts\SparAdapter;
+use App\PriceAdapters\Hosts\UltaAdapter;
 use App\PriceAdapters\Hosts\VomarAdapter;
+use App\PriceAdapters\Hosts\WalmartAdapter;
+use App\PriceAdapters\Hosts\WelkoopAdapter;
 use App\PriceAdapters\Hosts\ZooplusAdapter;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\MicrodataAdapter;
@@ -100,11 +109,20 @@ return [
         DekaMarktAdapter::class,
         DierapothekerAdapter::class,
         DirkAdapter::class,
+        EtosAdapter::class,
         JumboAdapter::class,
         LidlAdapter::class,
+        LookfantasticAdapter::class,
+        MedpetsAdapter::class,
+        OrdinaryAdapter::class,
+        PetsAtHomeAdapter::class,
+        PetsPlaceAdapter::class,
         PoieszAdapter::class,
         SparAdapter::class,
+        UltaAdapter::class,
         VomarAdapter::class,
+        WalmartAdapter::class,
+        WelkoopAdapter::class,
         ZooplusAdapter::class,
         JsonLdAdapter::class,
         MicrodataAdapter::class,

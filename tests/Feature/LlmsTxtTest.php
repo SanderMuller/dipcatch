@@ -12,7 +12,7 @@ test('an assistant fetching llms.txt gets plain text it can read', function (): 
 test('llms.txt sets no cookie, so it can be cached at the edge', function (): void {
     $response = $this->get('/llms.txt')->assertOk();
 
-    expect($response->headers->getCookies())->toBe([])
+    expect($response->headers->getCookies())->toBeEmpty()
         ->and($response->headers->get('Cache-Control'))->toContain('max-age=3600');
 });
 
@@ -27,7 +27,10 @@ test('llms.txt describes the product as more than groceries', function (): void 
     $content = (string) $this->get('/llms.txt')->assertOk()->getContent();
 
     expect($content)->toContain('pet food')
-        ->and($content)->toContain('filters');
+        ->and($content)->toContain('filters')
+        ->and($content)->toContain('skincare')
+        ->and($content)->toContain('Etos')
+        ->and($content)->toContain('Pets Place');
 });
 
 test('llms.txt links the pages worth reading, built from the routes themselves', function (): void {
@@ -48,7 +51,7 @@ test('the plan limits in llms.txt follow the config, not a typed-in number', fun
 });
 
 test('an unlimited free plan reads as unlimited rather than as nothing', function (): void {
-    config()->set('plans.free.max_products', null);
+    config()->set('plans.free.max_products');
 
     $this->get('/llms.txt')->assertOk()->assertSee('Free: unlimited products');
 });
@@ -63,7 +66,7 @@ test('llms.txt offers a contact address only when one is configured', function (
     config()->set('site.contact_email', 'hoi@dipcatch.eu');
     $this->get('/llms.txt')->assertOk()->assertSee('Contact: hoi@dipcatch.eu');
 
-    config()->set('site.contact_email', null);
+    config()->set('site.contact_email');
     $this->get('/llms.txt')->assertOk()->assertDontSee('Contact:');
 });
 

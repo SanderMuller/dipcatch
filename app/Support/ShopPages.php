@@ -27,7 +27,7 @@ final class ShopPages
     private const array PROMOTION_AWARE = ['ah.nl', 'aldi.nl', 'dekamarkt.nl', 'dirk.nl', 'lidl.nl'];
 
     /** Hosts whose adapter reads the article number, which catches a mismatched pack. */
-    private const array ARTICLE_NUMBER = ['poiesz.nl', 'vomar.nl'];
+    private const array ARTICLE_NUMBER = ['dierapotheker.nl', 'poiesz.nl', 'vomar.nl'];
 
     /**
      * Jumbo states multi-buy offers ("1+1 gratis") without lowering the shelf
@@ -120,11 +120,11 @@ final class ShopPages
 
         if ($host === self::MULTI_BUY) {
             $facts[] = __('Multi-buy offers such as "1+1 gratis" leave the shelf price alone at :shop, so that shelf price is what DipCatch stores and alerts on.', ['shop' => $name]);
-        } elseif (in_array($host, self::PROMOTION_AWARE, true)) {
+        } elseif (in_array($host, self::PROMOTION_AWARE, strict: true)) {
             $facts[] = __('An offer price at :shop is read with the date it ends, so a temporary price is never mistaken for the new normal.', ['shop' => $name]);
         }
 
-        if (in_array($host, self::ARTICLE_NUMBER, true)) {
+        if (in_array($host, self::ARTICLE_NUMBER, strict: true)) {
             $facts[] = __('DipCatch reads the article number at :shop and warns you when two shops turn out to be selling different packs.', ['shop' => $name]);
         }
 
@@ -140,7 +140,7 @@ final class ShopPages
     {
         $offerAnswer = match (true) {
             $host === self::MULTI_BUY => __('DipCatch stores the shelf price. :shop runs multi-buy offers that do not lower it, so a "1+1 gratis" week shows the same number as the week before.', ['shop' => $name]),
-            in_array($host, self::PROMOTION_AWARE, true) => __('Yes. The offer price is read along with the date it runs until, and the product page shows both, so you can see whether a price is a deal or the new level.', []),
+            in_array($host, self::PROMOTION_AWARE, strict: true) => __('Yes. The offer price is read along with the date it runs until, and the product page shows both, so you can see whether a price is a deal or the new level.', []),
             default => __('DipCatch reads the price :shop shows on the product page. When that price is an offer, that is the price you get alerted on.', ['shop' => $name]),
         };
 
@@ -181,7 +181,7 @@ final class ShopPages
         $slugs = [];
 
         foreach ($configured as $slug => $hosts) {
-            if (is_string($slug) && is_array($hosts) && in_array($host, $hosts, true)) {
+            if (is_string($slug) && is_array($hosts) && in_array($host, $hosts, strict: true)) {
                 $slugs[] = $slug;
             }
         }

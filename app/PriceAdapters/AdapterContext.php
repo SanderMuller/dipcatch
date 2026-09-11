@@ -26,4 +26,13 @@ final readonly class AdapterContext
 
         return is_string($price) && $price !== '';
     }
+
+    public function withVariantKey(string $variantKey): self
+    {
+        return new self(
+            selectors: $this->selectors,
+            fallbackCurrency: $this->fallbackCurrency,
+            variantKey: $variantKey,
+        );
+    }
 }
