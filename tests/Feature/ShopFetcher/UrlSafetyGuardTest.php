@@ -40,6 +40,27 @@ test('rejects unparseable URLs', function (): void {
         ->toThrow(InvalidArgumentException::class);
 });
 
+test('the private-IP bypass is ignored when the app runs as production', function (): void {
+    // The flag exists for Herd's `.test` hosts and the suite's synthetic
+    // hostnames. In production it would turn every user-supplied shop URL into
+    // a request the server makes against its own network, so the environment
+    // overrules the flag rather than the other way round.
+    config()->set('dipcatch.fetcher.allow_private_ips', true);
+    $this->app->detectEnvironment(fn (): string => 'production');
+
+    expect(fn () => new UrlSafetyGuard()->assertSafe('http://127.0.0.1/foo'))
+        ->toThrow(InvalidArgumentException::class);
+});
+
+test('the private-IP bypass still works outside production', function (): void {
+    // This is what keeps local development against Herd working. If it breaks,
+    // the production guard above has been applied too widely.
+    config()->set('dipcatch.fetcher.allow_private_ips', true);
+
+    expect(fn () => new UrlSafetyGuard()->assertSafe('http://127.0.0.1/foo'))
+        ->not->toThrow(InvalidArgumentException::class);
+});
+
 test('a fully qualified host loses its DNS root dot, so host checks still match', function (): void {
     expect(UrlNormalizer::normalizeHost('www.plus.nl.'))->toBe('plus.nl')
         ->and(UrlNormalizer::normalizeHost('WWW.Vomar.NL.'))->toBe('vomar.nl');

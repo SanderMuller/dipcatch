@@ -17,7 +17,8 @@ use InvalidArgumentException;
  *  - `DIPCATCH_FETCHER_ALLOW_PRIVATE_IPS=true` — private/loopback IPs pass
  *    the check (so Herd's `.test` hosts resolving to 127.0.0.1 work locally).
  *
- * Both default to false. Never enable in production.
+ * Both default to false, and both are ignored outright when the app runs as
+ * production — the environment decides, not the variable.
  */
 final class UrlSafetyGuard
 {
@@ -96,13 +97,31 @@ final class UrlSafetyGuard
         }
     }
 
+    /**
+     * A DNS miss failing open is the same class of hole as a private IP
+     * passing: both hand the fetcher a destination nothing has vetted.
+     */
     private static function allowUnresolved(): bool
     {
+        if (app()->isProduction()) {
+            return false;
+        }
+
         return (bool) config('dipcatch.fetcher.allow_unresolved', false);
     }
 
+    /**
+     * The bypass exists for Herd's `.test` hosts on 127.0.0.1 and for the
+     * suite's synthetic hostnames. In production it would turn every
+     * user-supplied shop URL into a request the server makes against its own
+     * network, so the environment overrules the flag however it is set.
+     */
     private static function allowPrivateIps(): bool
     {
+        if (app()->isProduction()) {
+            return false;
+        }
+
         return (bool) config('dipcatch.fetcher.allow_private_ips', false);
     }
 }
