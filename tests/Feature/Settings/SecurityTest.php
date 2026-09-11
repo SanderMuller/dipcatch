@@ -4,8 +4,11 @@ use App\Livewire\Settings\Security;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 use Laravel\Fortify\Features;
 use Livewire\Livewire;
+
+use function Pest\Laravel\mock;
 
 beforeEach(function (): void {
     $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
@@ -69,6 +72,44 @@ test('two factor authentication disabled when confirmation abandoned between req
         'two_factor_secret' => null,
         'two_factor_recovery_codes' => null,
     ]);
+});
+
+test('manual setup key contains the unencrypted two factor secret', function (): void {
+    $user = User::factory()->create();
+
+    mock(TwoFactorAuthenticationProvider::class)
+        ->shouldReceive('generateSecretKey')
+        ->once()
+        ->andReturn('CMN5TSOG355MJ55R')
+        ->shouldReceive('qrCodeUrl')
+        ->once()
+        ->with(config('app.name'), $user->email, 'CMN5TSOG355MJ55R')
+        ->andReturn('otpauth://totp/Dipcatch:test@example.com?secret=CMN5TSOG355MJ55R');
+
+    $this->actingAs($user);
+
+    Livewire::test(Security::class)
+        ->call('enable')
+        ->assertSet('manualSetupKey', 'CMN5TSOG355MJ55R');
+});
+
+test('invalid two factor secret type reports a setup error', function (): void {
+    $user = User::factory()->create();
+
+    $user->forceFill([
+        'two_factor_secret' => encrypt(['invalid-secret']),
+        'two_factor_confirmed_at' => now(),
+    ])->save();
+
+    mock(TwoFactorAuthenticationProvider::class)
+        ->shouldNotReceive('qrCodeUrl');
+
+    $this->actingAs($user);
+
+    Livewire::test(Security::class)
+        ->call('enable')
+        ->assertSet('manualSetupKey', '')
+        ->assertHasErrors('setupData');
 });
 
 test('password can be updated', function (): void {

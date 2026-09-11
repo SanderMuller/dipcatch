@@ -7,7 +7,6 @@ use App\Models\User;
 use Exception;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Actions\ConfirmTwoFactorAuthentication;
 use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
@@ -19,6 +18,7 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use UnexpectedValueException;
 
 #[Title('Security settings')]
 class Security extends Component
@@ -129,8 +129,14 @@ class Security extends Component
         assert($user instanceof User);
 
         try {
+            $manualSetupKey = Fortify::currentEncrypter()->decrypt((string) $user->two_factor_secret);
+
+            if (! is_string($manualSetupKey)) {
+                throw new UnexpectedValueException('The two-factor secret must be a string.');
+            }
+
             $this->qrCodeSvg = (string) $user->twoFactorQrCodeSvg();
-            $this->manualSetupKey = Crypt::decryptString((string) $user->two_factor_secret);
+            $this->manualSetupKey = $manualSetupKey;
         } catch (Exception) {
             $this->addError('setupData', 'Failed to fetch setup data.');
 
