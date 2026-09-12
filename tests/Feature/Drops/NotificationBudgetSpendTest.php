@@ -13,6 +13,7 @@ use App\Notifications\PriceDropNotification;
 use App\Notifications\UnitPriceTargetNotification;
 use App\Services\Drops\NotificationBudget;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -211,6 +212,50 @@ test('a target-price transaction that rolls back spends no slot', function (): v
 
     expect($product->refresh()->target_price_notified)->toBeNull()
         ->and(RateLimiter::attempts(NotificationBudget::key($user)))->toBe(0);
+
+    Notification::assertNothingSent();
+});
+
+test('a suppressed unit-price alert says so in the log', function (): void {
+    config()->set('plans.pro.notifications_hourly_limit', 1);
+
+    $product = budgetUnitPriceProduct();
+    $user = $product->user()->sole();
+
+    RateLimiter::hit(NotificationBudget::key($user), 3600);
+
+    Log::spy();
+
+    app(DetectUnitPriceTarget::class)($product);
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => $message === 'Notification suppressed by hourly rate limit'
+            && $context['alert'] === 'unit_price_target'
+            && $context['user_id'] === $user->id
+            && $context['product_id'] === $product->id);
+
+    Notification::assertNothingSent();
+});
+
+test('a suppressed target-price alert says so in the log', function (): void {
+    config()->set('plans.free.notifications_hourly_limit', 1);
+
+    $product = budgetTargetPriceProduct();
+    $user = $product->user()->sole();
+
+    RateLimiter::hit(NotificationBudget::key($user), 3600);
+
+    Log::spy();
+
+    app(DetectTargetPrice::class)($product);
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => $message === 'Notification suppressed by hourly rate limit'
+            && $context['alert'] === 'target_price'
+            && $context['user_id'] === $user->id
+            && $context['product_id'] === $product->id);
 
     Notification::assertNothingSent();
 });

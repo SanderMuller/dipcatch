@@ -9,6 +9,8 @@ use App\Services\Drops\NotificationBudget;
 use App\Support\Numeric;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Fires when the cheapest shop reaches the price the shopper asked about —
@@ -116,11 +118,36 @@ final readonly class DetectTargetPrice
         // ceiling, the limiter is cache-backed and does not roll back, and
         // `CheckShopPrice` runs this action inside a transaction.
         DB::afterCommit(function () use ($product, $shop, $price, $user): void {
-            if (! app(NotificationBudget::class)->allows($user)) {
-                return;
-            }
+            try {
+                if (! app(NotificationBudget::class)->allows($user)) {
+                    Log::warning('Notification suppressed by hourly rate limit', [
+                        'alert' => 'target_price',
+                        'user_id' => $user->id,
+                        'product_id' => $product->id,
+                    ]);
 
-            $user->notify(new TargetPriceNotification($product, $shop, $price));
+                    return;
+                }
+
+                $user->notify(new TargetPriceNotification($product, $shop, $price));
+            } catch (Throwable $e) {
+                // This alert is already lost. The claim is committed and the
+                // latch is armed, and `CheckShopPrice` sets
+                // `maxExceptions = 1`, so rethrowing fails the job on the
+                // first throw rather than retrying it — and a replayed check
+                // would find the latch already armed anyway. Rethrowing also
+                // skips every callback staged after this one, costing the
+                // other alerts on the same check. `report()` keeps the trace;
+                // the catch only stops the failure steering control flow.
+                report($e);
+
+                Log::error('Alert failed to send', [
+                    'alert' => 'target_price',
+                    'user_id' => $user->id,
+                    'product_id' => $product->id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
         });
     }
 }

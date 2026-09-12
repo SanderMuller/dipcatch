@@ -27,8 +27,13 @@ vendor/bin/pest || true                       # 0 failures
 | 007 | Clear the old price when an offer is repointed | P2 | S | — | TODO |
 | 008 | Only dispatch a digest when there is something to digest | P3 | M | — | TODO |
 | 009 | Make the nightly prune's cost independent of product count | P3 | M | 005 | TODO |
+| 010 | Let each alert fail on its own, and say when one is dropped | P2 | S | 006 | DONE |
+| 011 | Split the notification budget into asking and paying | P3 | S | 010 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
+
+Plans 010 and 011 were written on 2026-09-12 against commit `747f324`, after
+006 shipped. They are not part of the original `improve` sweep.
 
 ## Dependency notes
 
@@ -39,6 +44,11 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - **009 depends on 005** because 005 adds the index on
   `price_drop_events.product_id` that makes the prune's per-product lookups cheap.
   Batching before indexing measures the wrong thing.
+- **010 depends on 006** for the code it edits: 006 created the
+  `DB::afterCommit` closures that 010 makes fail independently.
+- **011 depends on 010 for evidence, not for code.** 010's suppression log is
+  what says whether anyone reaches the hourly cap. If nobody does, 011 is a
+  REJECT rather than a TODO, and its own STOP conditions say so.
 - 001, 004, 006, 007 and 008 are fully independent and can run in parallel.
 
 ## Why this order
@@ -79,6 +89,82 @@ Recorded so an executor does not re-litigate them:
    arrive later the same day.
 
 ## Execution log
+
+- **010 — executed 2026-09-12.** Six new tests, four in
+  `tests/Feature/Drops/AlertsSurviveTheJobTransactionTest.php` and two in
+  `tests/Feature/Drops/NotificationBudgetSpendTest.php`. All six were run
+  against `main` and fail there.
+
+  The cascade the plan describes was confirmed by the failing run's own stack
+  trace, not only by reading the framework: the throw inside the commit
+  callback escaped through `CheckShopPrice.php:505` (`persist()`'s transaction)
+  and out of `handle()` at `CheckShopPrice.php:171`. The premise held on all
+  three counts — the sibling alerts died, the job failed, the data stayed
+  committed.
+
+  **Three deviations, all from the review that followed the first pass.**
+
+  1. **The plan's stated reason for not rethrowing was wrong, and is fixed in
+     the code comments.** The plan said "the job retry finds no price change to
+     re-detect". There is no retry: `CheckShopPrice` sets `maxExceptions = 1`
+     and its own docblock says "a thrown exception and a timeout fail
+     immediately". The conclusion still holds by a shorter route — rethrowing
+     fails the job on the first throw and recovers nothing — but the reason the
+     comments give is now the accurate one.
+  2. **`Alert failed to send` logs at `error`, not `warning` as the plan's
+     snippet showed.** A suppressed alert is the cap working as designed and
+     stays at `warning`; a lost alert is not an expected state. The two are now
+     separable by level as well as by message. Note this is the first
+     `Log::error` in `app/` — there were 14 `warning` and 6 `info` before it.
+  3. **The cascade test originally proved two detectors, not three.** The
+     fixture set `target_price` but no `unit_price_target`, so
+     `DetectUnitPriceTarget` returned before staging a callback — and the
+     middle callback is precisely the one that proves the `foreach` resumes
+     rather than merely reaching its last entry. The fixture now subscribes the
+     user to Pro and gives the shop a pack size, so all three alerts fire.
+
+  Also added after review: a test that pins `report($e)` and the failure log
+  (neither was asserted anywhere), and `price_drop_event_id` on `DetectDrop`'s
+  failure line — it is the handle for finding the committed event row that has
+  no notification behind it.
+
+  Three notes:
+  1. **The plan's test-stub recipe needed the correction it anticipated.**
+     `NotificationBudget` is `final`, so the stub can neither subclass nor
+     double it. The container binding works because every call site resolves it
+     untyped — `app(NotificationBudget::class)->allows($user)` — so a plain
+     anonymous class with an `allows()` method serves. Plan 011 renames that
+     method and will break the stub.
+  2. **Use `Log::spy()`, not `Log::shouldReceive()`, to assert these lines.**
+     A strict facade mock installed before the job runs stops
+     `Exceptions::fake()` recording the reported exception, so an assertion on
+     `report()` fails for a reason that has nothing to do with the code. The
+     spy records and asserts afterwards.
+  3. **One scoped test run failed with schema errors and did not reproduce.**
+     `relation "users" does not exist`, then missing columns, which is a
+     migration running against the database mid-run. The same command passed
+     immediately afterwards and the full suite is clean. Recorded rather than
+     explained: the cause was not traced.
+
+  **STOP condition 4 resolved, and the reasoning is recorded because it was a
+  judgement call.** The condition asked whether catching `Throwable` hides a
+  failure the queue worker handles better. It partly does: `spatie/laravel-failed-job-monitor`
+  and `sandermuller/laravel-queue-insights` are both installed, so before this
+  change a failing alert produced a `failed_jobs` row and a monitor
+  notification, and now it produces `report($e)` plus a `Log::error` line. No
+  exception tracker (Sentry, Bugsnag, Flare, Nightwatch) is installed, so
+  `report()` currently lands in `storage/logs`. Against that: the old
+  behaviour recorded the job as failed *after* `PDO::commit()` had already
+  written the price check, the cheapest window and every latch, and it lost
+  three alerts instead of one. The change is a net improvement on alert
+  delivery and a regression on operator visibility. **Follow-up worth a plan:
+  give a lost alert a surface an operator is alerted on.** Nothing today
+  distinguishes one transient loss from a deterministic defect losing every
+  alert for every user.
+
+  One more input for plan 011, found during review: a send that throws has
+  *already* spent an hourly slot, because `allows()` calls `RateLimiter::hit()`
+  before returning true. So the user loses the alert and the slot.
 
 - **006 — executed 2026-09-12.** Both parts shipped. Ten new tests:
   `tests/Feature/Drops/NotificationBudgetSpendTest.php` (eight),
@@ -271,6 +357,26 @@ Not problems — options, recorded so they are not re-discovered:
   waitlist. Users cannot export their own price history.
 - **No signal on which adapter to build next.** `UnservableShops` names hosts that
   cannot work, but nothing records which unsupported hosts users actually paste.
+- **An outbox for durable alert delivery.** Raised after plan 006, deferred
+  deliberately. Since 006 the budget question and the send run in a
+  `DB::afterCommit` callback, so a `RateLimiter` or queue-driver failure loses
+  that alert for good: the data is committed, the latch is armed, and the job
+  retry finds no price change to re-detect. Plan 010 stops one such failure
+  taking the other two alerts with it and logs the loss, but it does not repair
+  it — it cannot, because the alert is already unrecoverable by the time the
+  callback runs.
+
+  The shape that does repair it: write an intent row inside the transaction that
+  already commits the latch, and let a separate queued job ask the budget and
+  send, so the retry belongs to the queue rather than to the price check. Most of
+  the machinery exists — all three notifications are already `ShouldQueue` — but
+  the dispatch itself currently happens in the callback, which is the part that
+  has to move.
+
+  **Trigger**: plan 010's `Alert failed to send` log line, not its suppression
+  line. Suppression is the cap working as designed and belongs to plan 011. Only
+  a non-zero count of real send failures justifies M effort here. Whoever picks
+  it up writes the plan then, against code that already has 010 in it.
 
 ## Not audited
 

@@ -15,6 +15,7 @@ use App\Services\Drops\ReferenceValue;
 use App\Support\Numeric;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 final readonly class DetectDrop
 {
@@ -172,13 +173,35 @@ final readonly class DetectDrop
             // send do not. Asking spends a slot of the hourly ceiling, and the
             // limiter is cache-backed — it does not roll back.
             DB::afterCommit(function () use ($locked, $outcome, $event, $user): void {
-                if ($this->withinHourlyLimit($user)) {
-                    $user->notify(new PriceDropNotification($locked, $outcome, $event->id));
-                } else {
-                    Log::warning('Notification suppressed by hourly rate limit', [
+                try {
+                    if ($this->withinHourlyLimit($user)) {
+                        $user->notify(new PriceDropNotification($locked, $outcome, $event->id));
+                    } else {
+                        Log::warning('Notification suppressed by hourly rate limit', [
+                            'alert' => 'price_drop',
+                            'user_id' => $user->id,
+                            'product_id' => $locked->id,
+                            'price_drop_event_id' => $event->id,
+                        ]);
+                    }
+                } catch (Throwable $e) {
+                    // This alert is already lost. The row is committed and the
+                    // latch is armed, and `CheckShopPrice` sets
+                    // `maxExceptions = 1`, so rethrowing fails the job on the
+                    // first throw rather than retrying it — and a replayed
+                    // check would find no price change to re-detect anyway.
+                    // Rethrowing also skips every callback staged after this
+                    // one, which is the unit-price and target-price alert for
+                    // the same check. `report()` keeps the trace; the catch
+                    // only stops the failure steering control flow.
+                    report($e);
+
+                    Log::error('Alert failed to send', [
+                        'alert' => 'price_drop',
                         'user_id' => $user->id,
                         'product_id' => $locked->id,
                         'price_drop_event_id' => $event->id,
+                        'exception' => $e->getMessage(),
                     ]);
                 }
             });
