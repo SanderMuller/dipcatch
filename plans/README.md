@@ -27,8 +27,13 @@ vendor/bin/pest || true                       # 0 failures
 | 007 | Clear the old price when an offer is repointed | P2 | S | — | TODO |
 | 008 | Only dispatch a digest when there is something to digest | P3 | M | — | TODO |
 | 009 | Make the nightly prune's cost independent of product count | P3 | M | 005 | TODO |
+| 010 | Let each alert fail on its own, and say when one is dropped | P2 | S | 006 | TODO |
+| 011 | Split the notification budget into asking and paying | P3 | S | 010 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
+
+Plans 010 and 011 were written on 2026-09-12 against commit `747f324`, after
+006 shipped. They are not part of the original `improve` sweep.
 
 ## Dependency notes
 
@@ -39,6 +44,11 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - **009 depends on 005** because 005 adds the index on
   `price_drop_events.product_id` that makes the prune's per-product lookups cheap.
   Batching before indexing measures the wrong thing.
+- **010 depends on 006** for the code it edits: 006 created the
+  `DB::afterCommit` closures that 010 makes fail independently.
+- **011 depends on 010 for evidence, not for code.** 010's suppression log is
+  what says whether anyone reaches the hourly cap. If nobody does, 011 is a
+  REJECT rather than a TODO, and its own STOP conditions say so.
 - 001, 004, 006, 007 and 008 are fully independent and can run in parallel.
 
 ## Why this order
@@ -271,6 +281,26 @@ Not problems — options, recorded so they are not re-discovered:
   waitlist. Users cannot export their own price history.
 - **No signal on which adapter to build next.** `UnservableShops` names hosts that
   cannot work, but nothing records which unsupported hosts users actually paste.
+- **An outbox for durable alert delivery.** Raised after plan 006, deferred
+  deliberately. Since 006 the budget question and the send run in a
+  `DB::afterCommit` callback, so a `RateLimiter` or queue-driver failure loses
+  that alert for good: the data is committed, the latch is armed, and the job
+  retry finds no price change to re-detect. Plan 010 stops one such failure
+  taking the other two alerts with it and logs the loss, but it does not repair
+  it — it cannot, because the alert is already unrecoverable by the time the
+  callback runs.
+
+  The shape that does repair it: write an intent row inside the transaction that
+  already commits the latch, and let a separate queued job ask the budget and
+  send, so the retry belongs to the queue rather than to the price check. Most of
+  the machinery exists — all three notifications are already `ShouldQueue` — but
+  the dispatch itself currently happens in the callback, which is the part that
+  has to move.
+
+  **Trigger**: plan 010's `Alert failed to send` log line, not its suppression
+  line. Suppression is the cap working as designed and belongs to plan 011. Only
+  a non-zero count of real send failures justifies M effort here. Whoever picks
+  it up writes the plan then, against code that already has 010 in it.
 
 ## Not audited
 
