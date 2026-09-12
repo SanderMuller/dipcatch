@@ -244,6 +244,23 @@ test('the command palette search is ignored by password managers', function (): 
     Assert::assertSame('off', $input->getAttribute('autocomplete'));
 });
 
+test('the passkey name field is ignored by password managers', function (): void {
+    $this->skipUnlessFortifyHas(Features::passkeys());
+
+    Features::passkeys([
+        'confirmPassword' => true,
+    ]);
+
+    $this->actingAs(User::factory()->create())
+        ->withSession(['auth.password_confirmed_at' => Carbon::now()->getTimestamp()]);
+
+    $input = formControl(Livewire::test(Security::class)->html(), 'passkey-name');
+
+    expect($input->hasAttribute('data-1p-ignore'))->toBeTrue()
+        ->and($input->getAttribute('autocomplete'))->toBe('off')
+        ->and($input->getAttribute('id'))->toBe('passkey-name');
+});
+
 function formControl(string $html, string $name): DOMElement
 {
     if ($html === '' || $name === '') {
