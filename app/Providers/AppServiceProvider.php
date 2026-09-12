@@ -18,6 +18,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\ParallelTesting;
 use Illuminate\Support\Facades\RateLimiter;
@@ -25,6 +26,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Cashier\Cashier;
 use Laravel\Passport\Passport;
+use SocialiteProviders\Apple\Provider as AppleProvider;
+use SocialiteProviders\Manager\SocialiteWasCalled;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
 use Spatie\Health\Checks\Checks\CacheCheck;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
@@ -65,6 +68,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->registerHealthChecks();
         $this->configureBilling();
+        $this->registerSocialiteProviders();
 
         $this->isolateParallelTestProcesses();
 
@@ -96,6 +100,18 @@ final class AppServiceProvider extends ServiceProvider
 
         ParallelTesting::setUpTestCase(static function (int $token): void {
             config()->set('database.redis.options.prefix', "dipcatch-test-{$token}-");
+        });
+    }
+
+    /**
+     * Apple is not one of Socialite's built-in drivers. The package ships it
+     * as an extension that registers itself on this event, which Socialite
+     * fires the first time a driver is resolved. Google needs nothing here.
+     */
+    protected function registerSocialiteProviders(): void
+    {
+        Event::listen(function (SocialiteWasCalled $event): void {
+            $event->extendSocialite('apple', AppleProvider::class);
         });
     }
 

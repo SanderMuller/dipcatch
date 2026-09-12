@@ -92,6 +92,14 @@ final class FortifyServiceProvider extends ServiceProvider
             );
         });
 
+        // Per IP. Both ends of the OAuth flow sit behind this: the redirect
+        // is cheap, but the callback verifies a token and can create an
+        // account, and neither has a username to key on. 20/min leaves room
+        // for a household behind one address and a few retries.
+        RateLimiter::for('social-login', function (Request $request) {
+            return Limit::perMinute(20)->by($request->ip() ?? 'unknown');
+        });
+
         RateLimiter::for('invitation', function (Request $request) {
             return Limit::perMinute(30)->by($request->ip() ?? 'unknown');
         });
