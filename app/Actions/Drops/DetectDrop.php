@@ -160,15 +160,20 @@ final readonly class DetectDrop
                 return;
             }
 
-            if ($this->withinHourlyLimit($user)) {
-                $user->notify(new PriceDropNotification($locked, $outcome, $event->id));
-            } else {
-                Log::warning('Notification suppressed by hourly rate limit', [
-                    'user_id' => $user->id,
-                    'product_id' => $locked->id,
-                    'price_drop_event_id' => $event->id,
-                ]);
-            }
+            // The event row belongs inside the transaction; the budget and the
+            // send do not. Asking spends a slot of the hourly ceiling, and the
+            // limiter is cache-backed — it does not roll back.
+            DB::afterCommit(function () use ($locked, $outcome, $event, $user): void {
+                if ($this->withinHourlyLimit($user)) {
+                    $user->notify(new PriceDropNotification($locked, $outcome, $event->id));
+                } else {
+                    Log::warning('Notification suppressed by hourly rate limit', [
+                        'user_id' => $user->id,
+                        'product_id' => $locked->id,
+                        'price_drop_event_id' => $event->id,
+                    ]);
+                }
+            });
         });
     }
 

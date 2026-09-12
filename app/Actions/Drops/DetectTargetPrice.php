@@ -89,7 +89,7 @@ final readonly class DetectTargetPrice
     {
         $user = $product->user;
 
-        if ($user === null || ! app(NotificationBudget::class)->allows($user)) {
+        if ($user === null) {
             return;
         }
 
@@ -112,7 +112,14 @@ final readonly class DetectTargetPrice
 
         $product->refresh();
 
+        // Asked here and nowhere earlier: asking spends a slot of the hourly
+        // ceiling, the limiter is cache-backed and does not roll back, and
+        // `CheckShopPrice` runs this action inside a transaction.
         DB::afterCommit(function () use ($product, $shop, $price, $user): void {
+            if (! app(NotificationBudget::class)->allows($user)) {
+                return;
+            }
+
             $user->notify(new TargetPriceNotification($product, $shop, $price));
         });
     }

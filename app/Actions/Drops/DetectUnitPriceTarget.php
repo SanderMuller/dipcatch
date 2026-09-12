@@ -97,10 +97,7 @@ final readonly class DetectUnitPriceTarget
     {
         $user = $product->user;
 
-        // The same hourly ceiling the drop alerts obey. Without this a Pro
-        // account with unlimited products could pass its own cap through
-        // this door.
-        if ($user === null || ! app(NotificationBudget::class)->allows($user)) {
+        if ($user === null) {
             return;
         }
 
@@ -123,7 +120,14 @@ final readonly class DetectUnitPriceTarget
 
         $product->refresh();
 
+        // Asked here and nowhere earlier: asking spends a slot of the hourly
+        // ceiling, the limiter is cache-backed and does not roll back, and
+        // `CheckShopPrice` runs this action inside a transaction.
         DB::afterCommit(function () use ($product, $shop, $unitPrice, $user): void {
+            if (! app(NotificationBudget::class)->allows($user)) {
+                return;
+            }
+
             $user->notify(new UnitPriceTargetNotification($product, $shop, $unitPrice));
         });
     }
