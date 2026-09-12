@@ -50,10 +50,12 @@ The throw surface is ordinary. `NotificationBudget::allows()` reads and writes
 the cache-backed rate limiter, and all three notifications are `ShouldQueue`,
 so `notify()` pushes to the queue driver. Both are network calls.
 
-The job retry cannot recover any of it. `$tries = 10`, but on the retry
-`recomputeCheapestShop()` sees no price change and returns before `DetectDrop`,
-and both target detectors see an armed latch and return. The data is correct
-and the alerts are gone.
+Nothing recovers any of it. `$tries = 10` bounds *releases*, not throws:
+`CheckShopPrice` also sets `maxExceptions = 1`, and its own docblock says "a
+thrown exception and a timeout fail immediately". So the first throw fails the
+job outright — there is no retry. Even if there were, a replayed check would
+find no price change for `recomputeCheapestShop()` to re-detect and an armed
+latch in both target detectors. The data is correct and the alerts are gone.
 
 **B. Two of the three detectors drop an alert silently.**
 `DetectDrop` writes a `Log::warning` when the budget suppresses a send.
@@ -182,9 +184,12 @@ error still reaches the tracker, it just stops steering control flow.
 
 Swallowing a `Throwable` otherwise is what that guidance warns about, so the
 reasoning goes in a comment beside the catch: the alert is **already** lost at
-this point — the data is committed, the latch is armed, and no retry re-detects
-it — so rethrowing buys no recovery and costs the other two alerts on the same
-check.
+this point — the data is committed, the latch is armed, and `maxExceptions = 1`
+means a rethrow fails the job on the first throw rather than retrying it — so
+rethrowing buys no recovery and costs the other two alerts on the same check.
+
+State that reason accurately. "The retry finds nothing to re-detect" is the
+wrong one: there is no retry after a throw.
 
 **Verify**: `vendor/bin/pest tests/Feature/Drops || true` → all pass.
 

@@ -224,15 +224,16 @@ test('a suppressed unit-price alert says so in the log', function (): void {
 
     RateLimiter::hit(NotificationBudget::key($user), 3600);
 
-    Log::shouldReceive('warning')
-        ->once()
-        ->with('Notification suppressed by hourly rate limit', Mockery::on(
-            fn (array $context): bool => $context['alert'] === 'unit_price_target'
-                && $context['user_id'] === $user->id
-                && $context['product_id'] === $product->id,
-        ));
+    Log::spy();
 
     app(DetectUnitPriceTarget::class)($product);
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => $message === 'Notification suppressed by hourly rate limit'
+            && $context['alert'] === 'unit_price_target'
+            && $context['user_id'] === $user->id
+            && $context['product_id'] === $product->id);
 
     Notification::assertNothingSent();
 });
@@ -245,15 +246,16 @@ test('a suppressed target-price alert says so in the log', function (): void {
 
     RateLimiter::hit(NotificationBudget::key($user), 3600);
 
-    Log::shouldReceive('warning')
-        ->once()
-        ->with('Notification suppressed by hourly rate limit', Mockery::on(
-            fn (array $context): bool => $context['alert'] === 'target_price'
-                && $context['user_id'] === $user->id
-                && $context['product_id'] === $product->id,
-        ));
+    Log::spy();
 
     app(DetectTargetPrice::class)($product);
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => $message === 'Notification suppressed by hourly rate limit'
+            && $context['alert'] === 'target_price'
+            && $context['user_id'] === $user->id
+            && $context['product_id'] === $product->id);
 
     Notification::assertNothingSent();
 });

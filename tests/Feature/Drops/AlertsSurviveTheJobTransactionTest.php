@@ -8,8 +8,11 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Notifications\TargetPriceNotification;
+use App\Notifications\UnitPriceTargetNotification;
 use App\Services\Drops\NotificationBudget;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -23,16 +26,26 @@ use Illuminate\Support\Facades\RateLimiter;
  */
 beforeEach(function (): void {
     Notification::fake();
+
+    // A positive ceiling, or `allows()` returns true without touching the
+    // limiter and the slot assertions below prove nothing.
     config()->set('plans.free.notifications_hourly_limit', 5);
+    config()->set('plans.pro.notifications_hourly_limit', 5);
 });
 
 /**
- * A product at 25.00 whose next check reads 17.05 — a drop against a stable
- * 25.00 window, and under the 18.00 pack-price target. One check, two alerts.
+ * A product at 25.00 whose next check reads 17.05. That is a drop against a
+ * stable 25.00 window, under the 18.00 pack-price target, and — at 370 g —
+ * under the 50.00/kg unit-price target. One check, all three alerts.
  *
- * @return array{0: Product, 1: Shop, 2: User}
+ * All three matter: `DetectDrop` stages its callback deepest and runs first,
+ * so a cascade test that omitted the unit-price alert would never prove that
+ * the `foreach` resumes after the throw, only that it reaches the last entry.
+ *
+ * Returns the shop the check runs against; its product and owner hang off
+ * it, so no test has to carry variables it does not assert on.
  */
-function jobTransactionProduct(): array
+function jobTransactionShop(): Shop
 {
     Http::fake([
         'https://shop.test/robots.txt' => Http::response('', 404),
@@ -50,9 +63,14 @@ function jobTransactionProduct(): array
 
     $user = User::factory()->create(['notify_via_filament' => true]);
 
+    // The unit-price target is a Pro feature, so without this the middle
+    // detector returns before it stages a callback.
+    subscribeUser($user);
+
     $product = Product::factory()->for($user)->create([
         'currency' => 'EUR',
         'target_price' => '18.00',
+        'unit_price_target' => '50.00',
         'drop_threshold_pct' => '10.00',
         'drop_threshold_abs' => '5.00',
     ]);
@@ -62,6 +80,8 @@ function jobTransactionProduct(): array
         'currency' => 'EUR',
         'current_price' => '25.00',
         'current_in_stock' => true,
+        'pack_quantity' => '370.00',
+        'pack_unit' => 'g',
     ]);
 
     $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '25.00'])->save();
@@ -73,7 +93,7 @@ function jobTransactionProduct(): array
         'ended_at' => null,
     ]);
 
-    return [$product, $shop, $user];
+    return $shop;
 }
 
 /**
@@ -104,8 +124,10 @@ function bindBudgetThatFailsOnce(): void
     });
 }
 
-test('a drop and a pack-price target both arrive through the job transaction', function (): void {
-    [$product, $shop, $user] = jobTransactionProduct();
+test('all three alerts arrive through the job transaction', function (): void {
+    $shop = jobTransactionShop();
+    $product = $shop->product;
+    $user = $product->user()->sole();
 
     dispatch_sync(new CheckShopPrice($shop));
 
@@ -114,43 +136,77 @@ test('a drop and a pack-price target both arrive through the job transaction', f
 
     Notification::assertSentTo($user, PriceDropNotification::class);
     Notification::assertSentTo($user, TargetPriceNotification::class);
+    Notification::assertSentTo($user, UnitPriceTargetNotification::class);
 
-    // Two alerts sent, two slots spent — never more.
-    expect(RateLimiter::attempts(NotificationBudget::key($user)))->toBe(2);
+    // Three alerts sent, three slots spent — never more.
+    expect(RateLimiter::attempts(NotificationBudget::key($user)))->toBe(3);
 });
 
-test('a failing drop alert does not take the pack-price alert with it', function (): void {
-    [$product, $shop, $user] = jobTransactionProduct();
+test('a failing drop alert does not take the other two with it', function (): void {
+    $shop = jobTransactionShop();
+    $user = $shop->product->user()->sole();
     bindBudgetThatFailsOnce();
 
     dispatch_sync(new CheckShopPrice($shop));
 
     // The drop alert is lost — that is the accepted cost of sending after the
-    // commit. The target alert has no business dying with it: its own claim
-    // committed and its own latch is armed.
+    // commit. The other two have no business dying with it: their claims
+    // committed and their latches are armed. The unit-price alert is the one
+    // that proves the loop resumes rather than merely reaching its last entry.
     Notification::assertNotSentTo($user, PriceDropNotification::class);
     Notification::assertSentTo($user, TargetPriceNotification::class);
+    Notification::assertSentTo($user, UnitPriceTargetNotification::class);
 });
 
 test('a failing alert does not fail the job', function (): void {
-    [$product, $shop, $user] = jobTransactionProduct();
+    $shop = jobTransactionShop();
     bindBudgetThatFailsOnce();
 
-    // `handle()` calls `persist()` outside every one of its try blocks, so an
-    // exception escaping a commit callback fails the whole check.
+    // `handle()` calls `persist()` outside every one of its try blocks and
+    // `CheckShopPrice` sets `maxExceptions = 1`, so before this change an
+    // exception escaping a commit callback failed the check outright.
     dispatch_sync(new CheckShopPrice($shop));
 })->throwsNoExceptions();
 
+test('a failing alert is reported and logged, not swallowed', function (): void {
+    Exceptions::fake();
+    Log::spy();
+
+    $shop = jobTransactionShop();
+    $product = $shop->product;
+    $user = $product->user()->sole();
+    bindBudgetThatFailsOnce();
+
+    dispatch_sync(new CheckShopPrice($shop));
+
+    Log::shouldHaveReceived('error')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => $message === 'Alert failed to send'
+            && $context['alert'] === 'price_drop'
+            && $context['user_id'] === $user->id
+            && $context['product_id'] === $product->id
+            && $context['price_drop_event_id'] !== null);
+
+    // `report()` is the only thing keeping this catch from being a silent
+    // failure. Without it the alert vanishes with no trace anywhere. Pinned on
+    // the message, so only the stub's own throw can satisfy it.
+    Exceptions::assertReported(
+        fn (RuntimeException $e): bool => $e->getMessage() === 'the rate limiter is unreachable',
+    );
+});
+
 test('a failing alert leaves the committed data alone', function (): void {
-    [$product, $shop, $user] = jobTransactionProduct();
+    $shop = jobTransactionShop();
+    $product = $shop->product;
     bindBudgetThatFailsOnce();
 
     dispatch_sync(new CheckShopPrice($shop));
 
     // The catch must not change the transaction semantics: the price, the
-    // event row and both latches are committed before any callback runs.
+    // event row and every latch are committed before any callback runs.
     expect((string) $product->refresh()->cheapest_price)->toBe('17.05')
         ->and(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(1)
         ->and((string) $product->last_notified_price)->toBe('17.05')
-        ->and((string) $product->target_price_notified)->toBe('17.05');
+        ->and((string) $product->target_price_notified)->toBe('17.05')
+        ->and((string) $product->unit_price_notified)->toBe('46.08');
 });

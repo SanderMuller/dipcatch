@@ -90,30 +90,81 @@ Recorded so an executor does not re-litigate them:
 
 ## Execution log
 
-- **010 — executed 2026-09-12.** No deviations. Five new tests, three in
+- **010 — executed 2026-09-12.** Six new tests, four in
   `tests/Feature/Drops/AlertsSurviveTheJobTransactionTest.php` and two in
-  `tests/Feature/Drops/NotificationBudgetSpendTest.php`. All five were run
-  against the unfixed code first and fail there.
+  `tests/Feature/Drops/NotificationBudgetSpendTest.php`. All six were run
+  against `main` and fail there.
 
   The cascade the plan describes was confirmed by the failing run's own stack
-  trace, not only by reading the framework: the throw at `DetectDrop.php:213`
-  inside the commit callback escaped through `CheckShopPrice.php:505`
-  (`persist()`'s transaction) and out of `handle()` at `CheckShopPrice.php:171`.
-  So the premise held on all three counts — the sibling alerts died, the job
-  failed, and the data stayed committed.
+  trace, not only by reading the framework: the throw inside the commit
+  callback escaped through `CheckShopPrice.php:505` (`persist()`'s transaction)
+  and out of `handle()` at `CheckShopPrice.php:171`. The premise held on all
+  three counts — the sibling alerts died, the job failed, the data stayed
+  committed.
 
-  Two notes:
-  1. **The plan's test-1 recipe needed one correction it already anticipated.**
+  **Three deviations, all from the review that followed the first pass.**
+
+  1. **The plan's stated reason for not rethrowing was wrong, and is fixed in
+     the code comments.** The plan said "the job retry finds no price change to
+     re-detect". There is no retry: `CheckShopPrice` sets `maxExceptions = 1`
+     and its own docblock says "a thrown exception and a timeout fail
+     immediately". The conclusion still holds by a shorter route — rethrowing
+     fails the job on the first throw and recovers nothing — but the reason the
+     comments give is now the accurate one.
+  2. **`Alert failed to send` logs at `error`, not `warning` as the plan's
+     snippet showed.** A suppressed alert is the cap working as designed and
+     stays at `warning`; a lost alert is not an expected state. The two are now
+     separable by level as well as by message. Note this is the first
+     `Log::error` in `app/` — there were 14 `warning` and 6 `info` before it.
+  3. **The cascade test originally proved two detectors, not three.** The
+     fixture set `target_price` but no `unit_price_target`, so
+     `DetectUnitPriceTarget` returned before staging a callback — and the
+     middle callback is precisely the one that proves the `foreach` resumes
+     rather than merely reaching its last entry. The fixture now subscribes the
+     user to Pro and gives the shop a pack size, so all three alerts fire.
+
+  Also added after review: a test that pins `report($e)` and the failure log
+  (neither was asserted anywhere), and `price_drop_event_id` on `DetectDrop`'s
+  failure line — it is the handle for finding the committed event row that has
+  no notification behind it.
+
+  Three notes:
+  1. **The plan's test-stub recipe needed the correction it anticipated.**
      `NotificationBudget` is `final`, so the stub can neither subclass nor
      double it. The container binding works because every call site resolves it
      untyped — `app(NotificationBudget::class)->allows($user)` — so a plain
      anonymous class with an `allows()` method serves. Plan 011 renames that
      method and will break the stub.
-  2. **One scoped test run failed with schema errors and did not reproduce.**
+  2. **Use `Log::spy()`, not `Log::shouldReceive()`, to assert these lines.**
+     A strict facade mock installed before the job runs stops
+     `Exceptions::fake()` recording the reported exception, so an assertion on
+     `report()` fails for a reason that has nothing to do with the code. The
+     spy records and asserts afterwards.
+  3. **One scoped test run failed with schema errors and did not reproduce.**
      `relation "users" does not exist`, then missing columns, which is a
      migration running against the database mid-run. The same command passed
      immediately afterwards and the full suite is clean. Recorded rather than
      explained: the cause was not traced.
+
+  **STOP condition 4 resolved, and the reasoning is recorded because it was a
+  judgement call.** The condition asked whether catching `Throwable` hides a
+  failure the queue worker handles better. It partly does: `spatie/laravel-failed-job-monitor`
+  and `sandermuller/laravel-queue-insights` are both installed, so before this
+  change a failing alert produced a `failed_jobs` row and a monitor
+  notification, and now it produces `report($e)` plus a `Log::error` line. No
+  exception tracker (Sentry, Bugsnag, Flare, Nightwatch) is installed, so
+  `report()` currently lands in `storage/logs`. Against that: the old
+  behaviour recorded the job as failed *after* `PDO::commit()` had already
+  written the price check, the cheapest window and every latch, and it lost
+  three alerts instead of one. The change is a net improvement on alert
+  delivery and a regression on operator visibility. **Follow-up worth a plan:
+  give a lost alert a surface an operator is alerted on.** Nothing today
+  distinguishes one transient loss from a deterministic defect losing every
+  alert for every user.
+
+  One more input for plan 011, found during review: a send that throws has
+  *already* spent an hourly slot, because `allows()` calls `RateLimiter::hit()`
+  before returning true. So the user loses the alert and the slot.
 
 - **006 — executed 2026-09-12.** Both parts shipped. Ten new tests:
   `tests/Feature/Drops/NotificationBudgetSpendTest.php` (eight),

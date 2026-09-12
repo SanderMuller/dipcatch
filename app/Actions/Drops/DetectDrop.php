@@ -185,19 +185,22 @@ final readonly class DetectDrop
                         ]);
                     }
                 } catch (Throwable $e) {
-                    // This alert is already lost. The row is committed, the
-                    // latch is armed, and the job retry finds no price change
-                    // to re-detect — so rethrowing recovers nothing. It would
-                    // also skip every callback staged after this one, which
-                    // is the unit-price and target-price alert for the same
-                    // check. `report()` keeps the trace; the catch only stops
-                    // the failure steering control flow.
+                    // This alert is already lost. The row is committed and the
+                    // latch is armed, and `CheckShopPrice` sets
+                    // `maxExceptions = 1`, so rethrowing fails the job on the
+                    // first throw rather than retrying it — and a replayed
+                    // check would find no price change to re-detect anyway.
+                    // Rethrowing also skips every callback staged after this
+                    // one, which is the unit-price and target-price alert for
+                    // the same check. `report()` keeps the trace; the catch
+                    // only stops the failure steering control flow.
                     report($e);
 
-                    Log::warning('Alert failed to send', [
+                    Log::error('Alert failed to send', [
                         'alert' => 'price_drop',
                         'user_id' => $user->id,
                         'product_id' => $locked->id,
+                        'price_drop_event_id' => $event->id,
                         'exception' => $e->getMessage(),
                     ]);
                 }

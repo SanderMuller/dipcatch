@@ -139,15 +139,17 @@ final readonly class DetectUnitPriceTarget
 
                 $user->notify(new UnitPriceTargetNotification($product, $shop, $unitPrice));
             } catch (Throwable $e) {
-                // This alert is already lost. The claim is committed, the
-                // latch is armed, and the job retry finds nothing to
-                // re-detect — so rethrowing recovers nothing. It would also
-                // skip every callback staged after this one, costing the
+                // This alert is already lost. The claim is committed and the
+                // latch is armed, and `CheckShopPrice` sets
+                // `maxExceptions = 1`, so rethrowing fails the job on the
+                // first throw rather than retrying it — and a replayed check
+                // would find the latch already armed anyway. Rethrowing also
+                // skips every callback staged after this one, costing the
                 // other alerts on the same check. `report()` keeps the trace;
                 // the catch only stops the failure steering control flow.
                 report($e);
 
-                Log::warning('Alert failed to send', [
+                Log::error('Alert failed to send', [
                     'alert' => 'unit_price_target',
                     'user_id' => $user->id,
                     'product_id' => $product->id,
