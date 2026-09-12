@@ -28,7 +28,8 @@
                 <h1 class="max-w-[24ch] text-4xl font-semibold tracking-tight text-balance sm:text-5xl">{{ __('Supported shops') }}</h1>
                 <p class="mt-5 max-w-[60ch] text-lg text-pretty text-zinc-600 dark:text-zinc-300">{{ $description }}</p>
                 <p class="mt-4 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">
-                    {{ __('Many other webshops publish their product data in a form DipCatch can read as well. These pages are the shops with a landing page of their own.') }}
+                    {{ __('Paste a product URL from almost any webshop. Most shops work as they are. These pages are shops where a reader was written because the page would otherwise give the wrong price.') }}
+                    <x-shop-request-link class="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300" />
                 </p>
 
                 <ul role="list" class="mt-10 grid gap-4 sm:grid-cols-2">

@@ -170,6 +170,7 @@ test('the FAQ section shows every question the page defines', function (): void 
     $response = $this->get(route('home'))->assertOk();
 
     $response->assertSee('Which shops work?')
+        ->assertSee('What if my shop is not listed?')
         ->assertSee('Etos, The Ordinary, Lookfantastic')
         ->assertSee('Pets Place, Medpets, Welkoop')
         ->assertSee('How often are prices checked?')
@@ -278,6 +279,17 @@ test('the free-plan answer quotes the limit the app actually enforces', function
     config()->set('plans.free.max_products', 7);
 
     $this->get(route('home'))->assertOk()->assertSee('your first 7 products');
+});
+
+test('the homepage says most shops work from a pasted link', function (): void {
+    config()->set('site.contact_email', 'hello@example.test');
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('Most shops work if you paste a product link')
+        ->assertSee('What if my shop is not listed?')
+        ->assertSee('Request a shop')
+        ->assertSee('mailto:hello@example.test?subject=', escape: false);
 });
 
 test('the FAQ answers how to catch a lower price at another shop', function (): void {

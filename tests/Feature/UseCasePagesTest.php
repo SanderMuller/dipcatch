@@ -288,7 +288,7 @@ test('a shop dropped from the supported hosts disappears from the page', functio
         ->and($content)->toContain("url('" . e(Favicon::url('bol.com', 32)) . "')");
 });
 
-test('a use case whose shops are all gone omits the block instead of showing an empty one', function (): void {
+test('a use case whose shops are all gone omits the chip list instead of showing an empty one', function (): void {
     Config::set('site.supported_hosts', ['ah.nl']);
 
     $case = UseCases::find('filters');
@@ -296,7 +296,20 @@ test('a use case whose shops are all gone omits the block instead of showing an 
 
     expect($case->shops())->toBeEmpty();
 
-    $this->get($case->url())->assertOk()->assertDontSee(__('Which shops this works with'));
+    $this->get($case->url())
+        ->assertOk()
+        ->assertDontSee(__('Shops with a reader of their own'))
+        ->assertSee('Paste a product URL from any other shop as well');
+});
+
+test('a use-case page offers a shop request mailto when a contact address is set', function (): void {
+    config()->set('site.contact_email', 'hello@example.test');
+
+    $this->get('/price-alerts/groceries')
+        ->assertOk()
+        ->assertSee('Shops with a reader of their own')
+        ->assertSee('Request a shop')
+        ->assertSee('mailto:hello@example.test?subject=', escape: false);
 });
 
 test('a use-case page marks no header link as the current page', function (): void {

@@ -206,3 +206,26 @@ test('create page renders the component and manual page still creates', function
 
     $this->get('/app/products/create-manual')->assertOk();
 });
+
+test('extraction failure offers a shop request mailto', function (): void {
+    config()->set('site.contact_email', 'hello@example.test');
+
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'No-Offer Product',
+    ], JSON_THROW_ON_ERROR);
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'error')
+        ->assertSet('errorCode', 'extraction_failed')
+        ->assertSee('Request a shop')
+        ->assertSee(rawurlencode('https://shop.example.com/p/1'), escape: false);
+});

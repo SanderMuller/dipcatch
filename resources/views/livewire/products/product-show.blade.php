@@ -51,7 +51,6 @@
             @if ($shareUrl)
                 <flux:input
                     :label="__('Public link')"
-                    id="share-url"
                     name="share-url"
                     value="{{ $shareUrl }}"
                     readonly

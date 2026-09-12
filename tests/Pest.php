@@ -104,6 +104,29 @@ function clearRedisRateLimiter(string $limiterName, string $key = '127.0.0.1'): 
 }
 
 /**
+ * Configure both social login providers with placeholder credentials.
+ *
+ * Set wholesale, not key by key: the local `.env` may carry its own values,
+ * and a call that only overwrote one key would inherit the rest. Lives here
+ * rather than in a test file because a function declared in one test file does
+ * not exist for a `--filter` run of another.
+ */
+function configureSocialProviders(): void
+{
+    config()->set('services.google', [
+        'client_id' => 'google-client-id',
+        'client_secret' => 'google-client-secret',
+        'redirect' => 'https://dipcatch.test/auth/google/callback',
+    ]);
+
+    config()->set('services.apple', [
+        'client_id' => 'apple-client-id',
+        'client_secret' => 'apple-client-secret',
+        'redirect' => 'https://dipcatch.test/auth/apple/callback',
+    ]);
+}
+
+/**
  * Wrap a JSON-LD payload in a minimal HTML document. The single source of
  * truth for the `<html><head><script type="application/ld+json">…</script>
  * </head></html>` shape used across adapter + Shops fixtures.

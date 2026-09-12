@@ -51,7 +51,10 @@
                             <li>{{ __('Some shops block automated requests, and some only put the price on the page with JavaScript afterwards. Neither can be read.') }}</li>
                             <li>{{ __('When a shop that used to work stops working, the check fails rather than storing a wrong price, and the shop is marked on the product page.') }}</li>
                         </ul>
-                        <p class="mt-2">{{ __('Send the link if you think a shop should work. Shops with a reader of their own are listed on the supported shops page.') }}</p>
+                        <p class="mt-2">
+                            {{ __('Send a product URL if a paste does not pick up the price. A reader of its own is written when the generic read is not enough. Shops with a reader of their own are listed on the supported shops page.') }}
+                            <x-shop-request-link class="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300" />
+                        </p>
                     </section>
 
                     <section>

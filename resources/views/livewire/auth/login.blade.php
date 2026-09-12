@@ -1,11 +1,26 @@
 <x-layouts::auth :title="__('Sign in to DipCatch')" robots="noindex">
     <div class="flex flex-col gap-6">
-        <x-auth-header :title="__('Log in to your account')" :description="__('Enter your email and password below to log in')" />
+        @php
+            // Named providers only when they are actually on the page. With a
+            // provider unconfigured the buttons disappear but this line would
+            // still promise it.
+            $providerNames = array_map(
+                fn (\App\Enums\SocialProvider $provider): string => $provider->label(),
+                \App\Enums\SocialProvider::configured(),
+            );
+        @endphp
+
+        <x-auth-header
+            :title="__('Log in to your account')"
+            :description="$providerNames === []
+                ? __('Enter your email and password below to log in')
+                : __('Continue with :providers, or use your email and password', ['providers' => implode(__(' or '), $providerNames)])"
+        />
 
         <!-- Session Status -->
         <x-auth-session-status class="text-center" :status="session('status')" />
 
-        <x-passkey-verify />
+        <x-social-login />
 
         <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-6">
             @csrf
@@ -52,6 +67,13 @@
                 </flux:button>
             </div>
         </form>
+
+        {{--
+            Below the form on purpose. Almost nobody arrives here with a
+            passkey, so it stays out of the way of the two routes that carry
+            the traffic, and the people who did set one up still find it.
+        --}}
+        <x-passkey-verify variant="link" />
 
         @if (Route::has('register'))
             <div class="space-x-1 text-sm text-center rtl:space-x-reverse text-zinc-600 dark:text-zinc-400">

@@ -40,7 +40,6 @@
                         <flux:input
                             readonly
                             copyable
-                            id="mcp-endpoint"
                             name="mcp-endpoint"
                             value="{{ $endpoint }}"
                             :aria-label="__('MCP endpoint')"
