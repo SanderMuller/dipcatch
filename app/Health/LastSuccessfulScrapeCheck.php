@@ -87,18 +87,17 @@ class LastSuccessfulScrapeCheck extends Check
             ->where(function (EloquentQueryBuilder $q) use ($hours): void {
                 $cutoff = now()->subHours($hours);
 
-                // An offer with no successful read at all is judged by its
-                // last attempt. `Shop::updateUrl()` leaves that state behind
-                // on every repoint, and counting it stale on the spot would
-                // report an offer as unread for hours it has not existed —
-                // at the fail threshold too, because a null matches both.
+                // An offer with no successful read at all is judged by the
+                // last thing that happened to it — its last attempt, or the
+                // edit that gave it this URL. `Shop::updateUrl()` clears both
+                // read timestamps on every repoint, and a bare null counts as
+                // stale against every threshold, so the check would report an
+                // offer as unread for hours it has not existed, at the fail
+                // level rather than the warn one.
                 $q->where('last_success_at', '<', $cutoff)
                     ->orWhere(function (EloquentQueryBuilder $never) use ($cutoff): void {
                         $never->whereNull('last_success_at')
-                            ->where(function (EloquentQueryBuilder $attempt) use ($cutoff): void {
-                                $attempt->whereNull('last_checked_at')
-                                    ->orWhere('last_checked_at', '<', $cutoff);
-                            });
+                            ->whereRaw('coalesce(last_checked_at, updated_at) < ?', [$cutoff]);
                     });
             });
     }

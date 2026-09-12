@@ -193,21 +193,33 @@ class ProductShow extends Component
 
         $shop->updateUrl($normalized);
 
-        dispatch_sync(new CheckShopPrice($shop->refresh()));
+        dispatch_sync(new CheckShopPrice($shop->refresh(), manual: true));
 
         // The check recomputes the cheapest offer itself, except when it gives
         // up early on a rate-limited host. The offer has no price from here on,
         // so without this the product would keep advertising the old one.
         $this->product->refresh()->recomputeCheapestShop();
 
-        // Still Pending means the check above gave up, and a release does
-        // nothing on a sync dispatch, so nothing re-runs before the scheduled
-        // recheck.
-        $this->shopMessage = $shop->refresh()->last_status === ScrapeStatus::Pending
-            ? 'Shop URL updated. The shop was too busy to read now, so the price follows with the next scheduled check.'
-            : 'Shop URL updated and price re-checked';
+        $this->shopMessage = $this->urlSaveMessageFor($shop->refresh());
 
         $this->product->refresh();
+    }
+
+    /**
+     * What the re-check above actually achieved. The callout is the only place
+     * the page reports it: the shops table shows a price, a stock badge and a
+     * check time, and none of those say why a price is missing.
+     */
+    private function urlSaveMessageFor(Shop $shop): string
+    {
+        return match ($shop->last_status) {
+            // Still Pending means the check gave up before it read anything,
+            // and a release does nothing on a sync dispatch, so nothing runs
+            // again before the scheduled recheck.
+            ScrapeStatus::Pending => 'Shop URL updated. The shop was too busy to read now, so the price follows with the next scheduled check.',
+            ScrapeStatus::Ok => 'Shop URL updated and price re-checked',
+            default => 'Shop URL updated, but no price could be read from the new page. Check that the link opens the product itself.',
+        };
     }
 
     /**

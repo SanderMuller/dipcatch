@@ -101,16 +101,28 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
     public int $timeout = 30;
 
-    public function __construct(public Shop $shop) {}
+    /**
+     * Lock-key scope per origin, indexed by `(int) $manual`. A scope rather
+     * than a flag in the key so the two never share a lock.
+     */
+    private const array LOCK_SCOPES = ['auto', 'manual'];
+
+    public function __construct(public Shop $shop, public bool $manual = false) {}
 
     public function uniqueId(): string
     {
         // Including url_hash keeps a recheck of a repointed offer out of the
         // long uniqueness window an automated recheck may still hold — the new
-        // URL is a new key. A sync run needs it too: it acquires no lock, but
-        // `CallQueuedHandler` force-releases this key when it finishes, so a
-        // shared key would let the URL edit unlock the offer's queued recheck.
-        return "check-shop:{$this->shop->id}:{$this->shop->url_hash}";
+        // URL is a new key.
+        //
+        // A person-initiated run is keyed apart from the automated one. It
+        // takes no lock, because a sync dispatch never acquires one, but
+        // `CallQueuedHandler` force-releases the key when the job finishes.
+        // On a shared key that unlocks the offer's queued recheck, and the
+        // next scheduler tick queues a second check for the same offer.
+        $scope = self::LOCK_SCOPES[(int) $this->manual];
+
+        return "check-shop:{$this->shop->id}:{$this->shop->url_hash}:{$scope}";
     }
 
     public function uniqueFor(): int

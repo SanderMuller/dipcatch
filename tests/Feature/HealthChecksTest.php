@@ -73,11 +73,11 @@ test('LastSuccessfulScrapeCheck does not flip on a recent successful offer', fun
 
 test('LastSuccessfulScrapeCheck gives an offer that has never been read the same grace as one that has', function (): void {
     $product = Product::factory()->create();
-    // What `Shop::updateUrl()` leaves behind: no successful read of this URL,
-    // and an attempt timestamp from minutes ago.
+    // What `Shop::updateUrl()` leaves behind: no read of this URL at all, on a
+    // row last written by the repoint itself.
     Shop::factory()->for($product)->create([
         'last_success_at' => null,
-        'last_checked_at' => now()->subMinutes(10),
+        'last_checked_at' => null,
     ]);
 
     $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();
@@ -99,11 +99,12 @@ test('LastSuccessfulScrapeCheck warns about an offer that has never been read on
         ->and($result->shortSummary)->toBe('1/1 stale');
 });
 
-test('LastSuccessfulScrapeCheck fails on an offer that was never read and never even tried', function (): void {
+test('LastSuccessfulScrapeCheck falls back to the last write for an offer that was never even tried', function (): void {
     $product = Product::factory()->create();
     Shop::factory()->for($product)->create([
         'last_success_at' => null,
         'last_checked_at' => null,
+        'updated_at' => now()->subHours(120),
     ]);
 
     $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();

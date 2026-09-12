@@ -224,3 +224,26 @@ it('reports the new price when the re-check does read the page', function (): vo
     expect((string) $shop->refresh()->current_price)->toBe('9.00')
         ->and($shop->last_success_at)->not->toBeNull();
 });
+
+it('says the new page could not be read when the re-check fails', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '5.00',
+    ]);
+
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/2' => Http::response('gone', 404),
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('saveShopUrl', $shop->id, 'https://shop.example.com/p/2')
+        ->assertSet('shopMessage', 'Shop URL updated, but no price could be read from the new page. Check that the link opens the product itself.');
+
+    expect($shop->refresh()->current_price)->toBeNull();
+});

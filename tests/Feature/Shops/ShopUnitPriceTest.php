@@ -61,6 +61,7 @@ test('updateUrl clears everything the previous product taught this offer', funct
         'promotion_ends_at' => now()->addDay(),
         'promotion_label' => 'Two for one',
         'last_success_at' => now()->subHour(),
+        'last_checked_at' => now()->subHour(),
     ]);
 
     expect($shop->updateUrl(UrlNormalizer::normalize('https://shop.example.com/p/2')))->toBeTrue();
@@ -75,7 +76,8 @@ test('updateUrl clears everything the previous product taught this offer', funct
         ->and($shop->promotion_starts_at)->toBeNull()
         ->and($shop->promotion_ends_at)->toBeNull()
         ->and($shop->promotion_label)->toBeNull()
-        ->and($shop->last_success_at)->toBeNull();
+        ->and($shop->last_success_at)->toBeNull()
+        ->and($shop->last_checked_at)->toBeNull();
 });
 
 test('a repointed offer loses cheapest instead of carrying the old price over', function (): void {

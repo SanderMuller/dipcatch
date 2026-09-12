@@ -654,3 +654,22 @@ test('an upstream Retry-After longer than the cap does not strand the job', func
 
     expect(DB::table('jobs')->where('attempts', '>=', 2)->count())->toBe(1);
 });
+
+test('a person-initiated recheck does not unlock the offers queued recheck', function (): void {
+    config()->set('queue.default', 'database');
+    Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '60.00'));
+
+    $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
+
+    // What the scheduler leaves behind: one queued job holding the unique lock.
+    dispatch(new CheckShopPrice($shop));
+    expect(DB::table('jobs')->count())->toBe(1);
+
+    dispatch_sync(new CheckShopPrice($shop, manual: true));
+
+    // The next scheduler tick. The lock the queued job holds must still stand,
+    // or the offer is checked twice.
+    dispatch(new CheckShopPrice($shop));
+
+    expect(DB::table('jobs')->count())->toBe(1);
+});
