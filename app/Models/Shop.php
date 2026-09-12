@@ -4,9 +4,13 @@ namespace App\Models;
 
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
+use App\PriceAdapters\ConditionalOffer;
+use App\PriceAdapters\PromotionWindow;
+use App\Support\Favicon;
 use App\Support\ImageUrl;
 use App\Support\PackSize;
 use App\Support\UrlNormalizer;
+use Carbon\CarbonInterface;
 use Database\Factories\ShopFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,9 +19,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * @property bool|null $current_in_stock True in stock, false out of stock, null when the shop's page did not say.
  * @property ShopHealth $health
  * @property string|null $pack_quantity
  * @property string|null $pack_unit
+ * @property string|null $gtin
+ * @property string|null $conditional_price
+ * @property string|null $conditional_label
+ * @property CarbonInterface|null $conditional_starts_at
+ * @property CarbonInterface|null $conditional_ends_at
+ * @property CarbonInterface|null $promotion_starts_at
+ * @property CarbonInterface|null $promotion_ends_at
+ * @property string|null $promotion_label
  */
 class Shop extends Model
 {
@@ -35,6 +48,11 @@ class Shop extends Model
             'initial_price' => 'decimal:2',
             'current_price' => 'decimal:2',
             'pack_quantity' => 'decimal:2',
+            'conditional_price' => 'decimal:2',
+            'conditional_starts_at' => 'datetime',
+            'conditional_ends_at' => 'datetime',
+            'promotion_starts_at' => 'datetime',
+            'promotion_ends_at' => 'datetime',
             'initial_checked_at' => 'datetime',
             'last_checked_at' => 'datetime',
             'last_success_at' => 'datetime',
@@ -97,6 +115,7 @@ class Shop extends Model
             // price the new offer wrongly until the next successful check.
             'pack_quantity' => null,
             'pack_unit' => null,
+            'gtin' => null,
         ])->save();
 
         return true;
@@ -109,8 +128,15 @@ class Shop extends Model
      */
     public function unitPrice(): ?string
     {
-        $price = $this->current_price;
+        return $this->unitPriceFor($this->current_price);
+    }
 
+    /**
+     * Any amount stated per unit at this shop's pack size — a past price as
+     * readily as the current one.
+     */
+    public function unitPriceFor(mixed $price): ?string
+    {
         if (! is_string($price) && ! is_numeric($price)) {
             return null;
         }
@@ -125,6 +151,61 @@ class Shop extends Model
     public function unitPriceLabel(): ?string
     {
         return $this->unitPrice() === null ? null : $this->packSize()?->label();
+    }
+
+    /** `/kg`, `/l` or `/stuk` for this shop's pack, whatever its price. */
+    public function packUnitLabel(): ?string
+    {
+        return $this->packSize()?->label();
+    }
+
+    /**
+     * The advertised offer only some shoppers can claim, while its window is
+     * open. An offer whose window has closed reads as none: it is no longer
+     * something the shopper can act on.
+     */
+    public function conditionalOffer(): ?ConditionalOffer
+    {
+        $price = $this->conditional_price;
+        $label = $this->conditional_label;
+
+        if ($price === null || ! is_string($label) || $label === '') {
+            return null;
+        }
+
+        $offer = new ConditionalOffer(
+            price: (string) $price,
+            label: $label,
+            startsAt: $this->conditional_starts_at?->toImmutable(),
+            endsAt: $this->conditional_ends_at?->toImmutable(),
+        );
+
+        return $offer->isLive() ? $offer : null;
+    }
+
+    /**
+     * How long the shop says this price runs. Unlike a conditional offer,
+     * an expired window is still returned: that a promotion has ended is
+     * exactly what makes the price on screen worth doubting.
+     */
+    public function promotionWindow(): ?PromotionWindow
+    {
+        $endsAt = $this->promotion_ends_at;
+
+        if ($endsAt === null) {
+            return null;
+        }
+
+        return PromotionWindow::make(
+            endsAt: $endsAt->toImmutable(),
+            startsAt: $this->promotion_starts_at?->toImmutable(),
+            label: $this->promotion_label,
+        );
+    }
+
+    public function faviconUrl(): string
+    {
+        return Favicon::url($this->host);
     }
 
     private function packSize(): ?PackSize

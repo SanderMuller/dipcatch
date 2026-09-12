@@ -93,7 +93,7 @@ final readonly class PackSize
             return null;
         }
 
-        if (preg_match('/' . self::NUMBER . '\s*(?:' . $massAlt . '|' . $volumeAlt . ')\b\s*\+\s*\d/iu', $text) === 1) {
+        if (preg_match('/' . self::NUMBER . '\s*(?:' . $massAlt . '|' . $volumeAlt . '|' . $pieceAlt . ')\b\s*\+\s*\d/iu', $text) === 1) {
             return null;
         }
 

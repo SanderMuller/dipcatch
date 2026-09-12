@@ -38,7 +38,7 @@ test('happy path: valid slug renders product summary + shop list', function (): 
 
     $response->assertOk()
         ->assertSee('Acme Headphones', escape: false)
-        ->assertSee('EUR 85.00', escape: false)
+        ->assertSee('€85.00', escape: false)
         ->assertSee('bol.com', escape: false);
 });
 
@@ -193,7 +193,7 @@ test('emits OG + Twitter meta tags with safeImageUrl-guarded image', function ()
     $response = $this->get('/p/' . str_repeat('a', 32));
 
     $response->assertSee('<meta property="og:title" content="Acme Headphones">', escape: false)
-        ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at EUR 85.00">', escape: false)
+        ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at €85.00">', escape: false)
         ->assertSee('<meta property="og:image" content="https://example.com/img.png">', escape: false)
         ->assertSee('<meta name="twitter:card" content="summary_large_image">', escape: false)
         ->assertSee('<meta name="twitter:image" content="https://example.com/img.png">', escape: false);
@@ -295,7 +295,7 @@ test('stale cheapest_price is suppressed when no shop is currently eligible', fu
 
     $response->assertOk()
         ->assertSee('No live price available right now', escape: false)
-        ->assertDontSee('EUR 85.00', escape: false)
+        ->assertDontSee('€85.00', escape: false)
         ->assertDontSee('gone.test', escape: false);
 });
 
@@ -312,7 +312,7 @@ test('shop with a pack size renders its unit price under the price', function ()
     $response = $this->get('/p/' . str_repeat('a', 32));
 
     $response->assertOk()
-        ->assertSee('EUR 8.45 /kg', escape: false);
+        ->assertSee('€8.45 /kg', escape: false);
 });
 
 test('shop without a pack size shows no unit price', function (): void {
@@ -341,4 +341,97 @@ test('throttle: the 121st request in a minute returns 429', function (): void {
         $this->get($slug)->assertOk();
     }
     $this->get($slug)->assertStatus(429);
+});
+
+test('chart payload includes a long-running segment that started before the window', function (): void {
+    // The cheapest price is stored as segments. A price that has not moved
+    // for over a year is one open segment that started before any window, so
+    // matching on started_at alone renders an empty chart for exactly the
+    // products that are working best.
+    $product = makeSharedProduct();
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '85.00',
+        'started_at' => now()->subDays(400),
+        'ended_at' => null,
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertOk()
+        ->assertSee('id="price-history-chart"', escape: false)
+        ->assertSee('"y":"85.00"', escape: false);
+});
+
+test('chart payload clips a segment that started before the window to the cutoff', function (): void {
+    // The heading above the canvas promises 90 days and the time axis has no
+    // floor, so an unclipped 400-day-old start stretches the plot to 400 days
+    // under a "last 90 days" heading.
+    $product = makeSharedProduct();
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '85.00',
+        'started_at' => now()->subDays(400),
+        'ended_at' => null,
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertOk()
+        ->assertSee('"y":"85.00"', escape: false)
+        ->assertDontSee(now()->subDays(400)->format('Y-m-d'), escape: false)
+        ->assertSee(now()->subDays(90)->format('Y-m-d'), escape: false);
+});
+
+test('chart payload includes a segment that started before the window and ended inside it', function (): void {
+    // The most common shape in production: a price that held for months and
+    // then moved last week. The earlier segment matches on neither its start
+    // nor an open end — only on `ended_at` falling inside the window.
+    $product = makeSharedProduct();
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '120.00',
+        'started_at' => now()->subDays(300),
+        'ended_at' => now()->subDays(20),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '85.00',
+        'started_at' => now()->subDays(20),
+        'ended_at' => null,
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertOk()
+        ->assertSee('"y":"120.00"', escape: false)
+        ->assertSee('"y":"85.00"', escape: false);
+});
+
+test('chart payload never carries another products segments', function (): void {
+    // The window predicate is a chain of ORs, so the product filter is the
+    // only thing keeping one account's prices off another's public page.
+    // Laravel groups a named scope's wheres for us; this pins the outcome
+    // rather than the mechanism.
+    $product = makeSharedProduct();
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '85.00',
+        'started_at' => now()->subDays(10),
+        'ended_at' => null,
+    ]);
+
+    $other = Product::factory()->for(User::factory())->create(['share_slug' => null]);
+    ProductCheapestHistory::factory()->for($other)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '777.77',
+        'started_at' => now()->subDays(400),
+        'ended_at' => null,
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    $response->assertOk()
+        ->assertSee('"y":"85.00"', escape: false)
+        ->assertDontSee('"y":"777.77"', escape: false);
 });

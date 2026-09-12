@@ -15,6 +15,10 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 
 ## Post-launch refactors + features
 
+- **[seo-and-ai-discoverability.md](seo-and-ai-discoverability.md)** — P1/P2 of the 2026-09-06 SEO audit: robots.txt opens `/register` and states an AI-crawler policy, sitemap and `llms.txt` routes, shared head partial with OG/Twitter, `Organization`/`WebSite`/`SoftwareApplication`/`Offer` JSON-LD, `dipcatch.eu` identity plus a `/bot` page, and copy repositioned to repeat purchases. Shipped 2026-09-06. Fixed a live bug where Laravel 13's `@context` Blade directive made the homepage JSON-LD unparseable.
+
+- **[landing-pages-and-marketing-polish.md](landing-pages-and-marketing-polish.md)** — use-case landing pages (`/price-alerts/{slug}`), branded 404/500 views, and marketing markup cleanup judged against the Markdown twin. Laravel Cloud's Markdown for Agents is already enabled at the edge, so no application code renders Markdown. Follows the spec above. Shipped 2026-09-06; the 503 was dropped because nothing invokes `errors::503`. Two ops tasks stay open in the Laravel Cloud dashboard.
+
 - **[unit-pricing.md](unit-pricing.md)** — normalized unit price (€/kg, €/l, €/stuk) per shop, parsed from source size data with title fallback; shown on shops table, previews, public page, products list.
 
 - ~~`multi-webshop-price-tracking.md`~~ — ✅ shipped (Product/Shop split, adapter chain, per-shop checks, ProductCheapestHistory timeline).
@@ -26,6 +30,12 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 - ~~`url-first-product-creation.md`~~ — ✅ shipped (paste-URL-first create flow: probe fills title/image, tier-default thresholds, one Confirm creates product + first shop; manual form kept at `/create-manual`).
 - ~~`public-product-sharing.md`~~ — ✅ shipped (per-product `share_slug` + public `/p/{slug}` route, Chart.js price-history + OG/Twitter meta, atomic conditional UPDATE on share/rotate/stop to refuse last-writer-wins between owner tabs, SRI-pinned CDN scripts).
 
+- **[mcp-server.md](mcp-server.md)** — an MCP server so a user can drive their own account from an assistant: list and create products, attach shops, read prices and history. `laravel/mcp` with Passport OAuth, copied from the sibling `macrocrumb` app. No admin tools. Most of the work is extracting the add-product and add-shop logic out of two Livewire components so a tool and a web request run the same code.
+
+- **[chatgpt-plugin-directory.md](chatgpt-plugin-directory.md)** — list DipCatch in the ChatGPT Plugins Directory: MCP tool annotations, OpenAI domain-challenge endpoint, Connections Connect/Install buttons and copy, privacy text for connected assistants. Claude gets an install link; ChatGPT Free cannot paste `/mcp`.
+
+- **[superadmin-and-comped-accounts.md](superadmin-and-comped-accounts.md)** — a Users screen in the existing admin panel showing every account and its plan, plus comped Pro accounts via a `comped_until` column taught to both `Subscribes::plan()` and `ProUsers::ids()`.
+
 ## Decisions (locked)
 
 - **Stack baseline:** PHP 8.5, Laravel 13, Filament v5.6+, Fortify v1, Livewire 4 + Flux 2, Pest 4, Larastan 3, Postgres, Laravel Cloud — all already installed; specs *configure* these, never reinstall.
@@ -35,7 +45,7 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 - **Failed-job alerts:** `spatie/laravel-failed-job-monitor` (already installed); no custom command.
 - **Health checks:** `shuvroroy/filament-spatie-laravel-health` panel + custom `LastSuccessfulScrapeCheck`.
 - **Validation:** `sandermuller/laravel-fluent-validation` idiom.
-- **Auth:** invite-only (admin creates users in Filament admin panel). Fortify owns login routes; both panels delegate to it.
+- **Auth:** open registration via Fortify; invitations remain for admin-created users. Fortify owns login routes; both panels delegate to it.
 - **Panel access:** `User::canAccessPanel(Panel $panel)` — AppPanel for any auth user, AdminPanel for `is_admin`.
 - **Currency:** detect per product (scraper-detected wins, user can override); per-user `default_currency` derived from locale.
 - **FX:** out of scope for v1. Lifetime savings widget groups per currency; tier defaults are currency-blind.

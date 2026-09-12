@@ -13,10 +13,6 @@ beforeEach(function (): void {
     clearRedisRateLimiter('invitation');
 });
 
-test('register route does not exist (invite-only)', function (): void {
-    $this->get('/register')->assertNotFound();
-});
-
 test('show invitation page renders for a fresh token', function (): void {
     $invitation = Invitation::factory()->create();
 
@@ -140,4 +136,14 @@ test('Filament invitation form rejects emails that already belong to a user', fu
         ->assertHasActionErrors(['email']);
 
     expect(Invitation::query()->where('email', 'already@dipcatch.test')->count())->toBe(0);
+});
+
+test('deleting a user who created invitations keeps the invitations and detaches the inviter', function (): void {
+    $admin = User::factory()->admin()->create();
+    $invitation = Invitation::factory()->create(['invited_by' => $admin->id]);
+
+    $admin->delete();
+
+    expect($invitation->fresh())->not->toBeNull()
+        ->and($invitation->fresh()?->invited_by)->toBeNull();
 });

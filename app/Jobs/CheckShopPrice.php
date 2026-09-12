@@ -2,12 +2,16 @@
 
 namespace App\Jobs;
 
+use App\Actions\Drops\DetectTargetPrice;
+use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Models\PriceCheck;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
+use App\PriceAdapters\ConditionalOffer;
+use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
@@ -17,7 +21,9 @@ use App\Services\ShopFetcher\FetchResult;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Config as DipConfig;
 use App\Support\ImageUrl;
+use App\Support\Iso4217;
 use App\Support\PackSize;
+use App\Support\RecheckJitter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -41,7 +47,9 @@ use Throwable;
  *     / parse_failed         : increment `consecutive_failures` only
  *   - robots_disallowed      : flip to health='dead', active=false
  *   - rate_limited           : release the job back to the queue (no counter
- *                              tick, no PriceCheck row) — see handle().
+ *                              tick, no PriceCheck row) until the release
+ *                              budget runs out, then recorded like any other
+ *                              failure — see handle().
  *
  * Health transitions (config-driven):
  *   - consecutive_failures >= failing_after        → health=failing
@@ -53,7 +61,43 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 1;
+    /**
+     * Releases the rate-limit branch makes before it gives up and records the
+     * throttling. Four waits of up to a minute outlast a drained bucket, which
+     * refills within one.
+     */
+    private const int MAX_RATE_LIMIT_ATTEMPTS = 5;
+
+    /**
+     * Longest a release waits. An upstream `Retry-After` is whatever the shop
+     * says, so without a ceiling one 429 asking for an hour would keep the job
+     * alive past uniqueFor() and let a duplicate be dispatched alongside it.
+     */
+    private const int MAX_RELEASE_DELAY_SECONDS = 60;
+
+    /**
+     * A backstop, not the rate-limit control — that is the release budget
+     * above, which gives up at 5. This only catches a job that dies without
+     * running its own error handling (SIGKILL, OOM, a deploy mid-run), which
+     * `$maxExceptions` cannot see because no exception is ever thrown.
+     *
+     * It must stay above MAX_RATE_LIMIT_ATTEMPTS, or it would fail the job
+     * before the release budget is spent — the original bug, in slower motion.
+     *
+     * A wall-clock `retryUntil()` cannot replace it: the worker stamps the
+     * deadline at dispatch, and RecheckActiveShopsCommand dispatches with up to
+     * RecheckJitter::maxSeconds() of jitter, so a high draw would burn the
+     * window before the first attempt and dead-letter the job unrun.
+     */
+    public int $tries = 10;
+
+    /**
+     * Everything that is not a release still runs once. The worker counts this
+     * only from its exception handler, and a `release()` returns normally, so
+     * a thrown exception and a timeout fail immediately while the rate-limit
+     * branch keeps retrying. That is the split this job needs.
+     */
+    public int $maxExceptions = 1;
 
     public int $timeout = 30;
 
@@ -69,12 +113,14 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
     public function uniqueFor(): int
     {
-        // RecheckActiveShopsCommand dispatches with up to `jitter_minutes` of
+        // RecheckActiveShopsCommand dispatches with up to one jitter window of
         // delay; the scheduler ticks more frequently than that, so a short
         // 60s window would let the same offer be re-queued before the original
         // delayed job has started. Hold the uniqueness lock for the full
         // jitter window plus a buffer covering job timeout + queue scheduling.
-        return DipConfig::int('dipcatch.recheck.jitter_minutes', 30) * 60 + 600;
+        // Read the window through RecheckJitter so the lock cannot outlive or
+        // undercut the delay the command actually draws.
+        return RecheckJitter::maxSeconds() + 600;
     }
 
     public function handle(ShopFetcher $fetcher, AdapterResolver $resolver, CheckjebonSource $checkjebon, AhApiSource $ahApi): void
@@ -104,13 +150,22 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $outcome = $this->fetchAndExtract($shop, $fetcher, $resolver);
         } catch (RateLimitedByHost $e) {
             // Per-host budget exhausted (probe path or another worker drained
-            // it). Release for retry instead of writing a `rate_limited` check
-            // and ticking the failure counter — the bucket refills shortly.
-            // Jitter avoids a thundering herd when many queued jobs for the
-            // same drained host all wake at the bucket's exact refill instant.
-            $this->release(max(1, $e->retryAfterSeconds) + random_int(0, 5));
+            // it). Wait for the bucket to refill rather than charging the
+            // offer for our own throttle. The jitter avoids a thundering herd
+            // when many jobs for one drained host wake at the same instant.
+            $delay = min(max(1, $e->retryAfterSeconds), self::MAX_RELEASE_DELAY_SECONDS) + random_int(0, 5);
 
-            return;
+            // attempts() counts this run, and is 0 outside a queue context —
+            // where release() is a no-op and there is nothing to bound.
+            if ($this->attempts() < self::MAX_RATE_LIMIT_ATTEMPTS) {
+                $this->release($delay);
+
+                return;
+            }
+
+            // The host stayed saturated across the whole budget. Record the
+            // throttling rather than losing the cycle silently.
+            $outcome = $this->failureOutcome($e);
         }
 
         $this->persist($shop, $outcome);
@@ -128,12 +183,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }
      */
     private function checkjebonOutcome(Shop $shop, CheckjebonSource $checkjebon): array
@@ -148,12 +209,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'currency' => null,
                 'in_stock' => null,
                 'image_url' => null,
+                'gtin' => null,
+                'gtin_authoritative' => false,
                 'raw' => null,
                 'error' => 'checkjebon:' . $result->missReason,
                 'adapter_key' => null,
                 'fetch_result' => null,
                 'pack_size' => null,
                 'pack_size_authoritative' => false,
+                'conditional_offer' => null,
+                'conditional_offer_authoritative' => false,
+                'promotion_window' => null,
+                'promotion_window_authoritative' => false,
             ];
         }
 
@@ -167,12 +234,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }
      */
     private function sourceOutcome(ShopSnapshot $snapshot, string $adapterKey): array
@@ -183,11 +256,17 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
             'image_url' => ImageUrl::safe($snapshot->imageUrl),
+            'gtin' => $snapshot->gtin,
+            'gtin_authoritative' => $snapshot->gtinAuthoritative,
             'raw' => null,
             'error' => null,
             'adapter_key' => $adapterKey,
             'fetch_result' => null,
             'pack_size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title),
+            'conditional_offer' => $snapshot->conditionalOffer,
+            'conditional_offer_authoritative' => $snapshot->conditionalOfferAuthoritative,
+            'promotion_window' => $snapshot->promotionWindow,
+            'promotion_window_authoritative' => $snapshot->promotionWindowAuthoritative,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
         ];
     }
@@ -202,12 +281,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }
      */
     private function fetchAndExtract(Shop $shop, ShopFetcher $fetcher, AdapterResolver $resolver): array
@@ -251,12 +336,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'currency' => null,
                 'in_stock' => null,
                 'image_url' => null,
+                'gtin' => null,
+                'gtin_authoritative' => false,
                 'raw' => null,
                 'error' => $extraction->failureReason,
                 'adapter_key' => $extraction->adapterKey,
                 'fetch_result' => $fetch,
                 'pack_size' => null,
                 'pack_size_authoritative' => false,
+                'conditional_offer' => null,
+                'conditional_offer_authoritative' => false,
+                'promotion_window' => null,
+                'promotion_window_authoritative' => false,
             ];
         }
 
@@ -269,6 +360,8 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
             'image_url' => ImageUrl::absolute($snapshot->imageUrl, $fetch->finalUrl),
+            'gtin' => $snapshot->gtin,
+            'gtin_authoritative' => $snapshot->gtinAuthoritative,
             'raw' => null,
             'error' => null,
             'adapter_key' => $extraction->adapterKey,
@@ -276,6 +369,10 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             // Scraped adapters carry no structured size — the title is the
             // only source, and it is never authoritative.
             'pack_size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title),
+            'conditional_offer' => $snapshot->conditionalOffer,
+            'conditional_offer_authoritative' => $snapshot->conditionalOfferAuthoritative,
+            'promotion_window' => $snapshot->promotionWindow,
+            'promotion_window_authoritative' => $snapshot->promotionWindowAuthoritative,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
         ];
     }
@@ -287,12 +384,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }
      */
     private function failureOutcome(FetchException $e): array
@@ -309,12 +412,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'currency' => null,
             'in_stock' => null,
             'image_url' => null,
+            'gtin' => null,
+            'gtin_authoritative' => false,
             'raw' => null,
             'error' => $e->getMessage(),
             'adapter_key' => null,
             'fetch_result' => null,
             'pack_size' => null,
             'pack_size_authoritative' => false,
+            'conditional_offer' => null,
+            'conditional_offer_authoritative' => false,
+            'promotion_window' => null,
+            'promotion_window_authoritative' => false,
         ];
     }
 
@@ -325,12 +434,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }
      */
     private function genericFailure(string $message): array
@@ -341,12 +456,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'currency' => null,
             'in_stock' => null,
             'image_url' => null,
+            'gtin' => null,
+            'gtin_authoritative' => false,
             'raw' => null,
             'error' => $message,
             'adapter_key' => null,
             'fetch_result' => null,
             'pack_size' => null,
             'pack_size_authoritative' => false,
+            'conditional_offer' => null,
+            'conditional_offer_authoritative' => false,
+            'promotion_window' => null,
+            'promotion_window_authoritative' => false,
         ];
     }
 
@@ -360,12 +481,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      *   currency: ?string,
      *   in_stock: ?bool,
      *   image_url: ?string,
+     *   gtin: ?string,
+     *   gtin_authoritative: bool,
      *   raw: ?string,
      *   error: ?string,
      *   adapter_key: ?string,
      *   fetch_result: ?FetchResult,
      *   pack_size: ?PackSize,
      *   pack_size_authoritative: bool,
+     *   conditional_offer: ?ConditionalOffer,
+     *   conditional_offer_authoritative: bool,
+     *   promotion_window: ?PromotionWindow,
+     *   promotion_window_authoritative: bool,
      * }  $outcome
      */
     private function persist(Shop $shop, array $outcome): void
@@ -383,10 +510,28 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
             $status = $outcome['status'];
 
+            $reported = strtoupper(trim((string) ($outcome['currency'] ?? '')));
+            $expected = strtoupper(trim($locked->currency));
+
+            // A shop that starts quoting another currency is not a cheaper shop. The
+            // add path already refuses this (ProbeShopUrl, ProbeFailure::CurrencyMismatch);
+            // without the same check here the offer competes numerically against the
+            // others and fires a drop alert for a price that does not exist.
+            // An empty currency is no signal at all, not a mismatch — some adapters
+            // legitimately return none.
+            if ($status === ScrapeStatus::Ok && $reported !== '' && $reported !== $expected) {
+                $status = ScrapeStatus::CurrencyMismatch;
+            }
+
+            // The column is char(3). A shop quoting " EUR " or "Euro" is a
+            // shop stating no code we can store, and the mismatch check
+            // above has already read the raw value.
+            $storedCurrency = Iso4217::normalize($reported);
+
             $check = PriceCheck::create([
                 'shop_id' => $locked->id,
                 'price' => $outcome['price'],
-                'currency' => $outcome['currency'],
+                'currency' => $storedCurrency,
                 'in_stock' => $outcome['in_stock'],
                 'status' => $status,
                 'error' => $outcome['error'],
@@ -398,8 +543,12 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             if ($status === ScrapeStatus::Ok) {
                 $updates += [
                     'current_price' => $outcome['price'],
-                    'current_in_stock' => (bool) ($outcome['in_stock'] ?? true),
-                    'currency' => $outcome['currency'] ?? $locked->currency,
+                    // Unknown stays unknown: coercing it to true is what
+                    // reported a sold-out product as available.
+                    'current_in_stock' => $outcome['in_stock'],
+                    // An empty currency is no signal at all — keep the last known one
+                    // rather than blanking the column.
+                    'currency' => $storedCurrency ?? $locked->currency,
                     'last_success_at' => $now,
                     'last_error' => null,
                     'consecutive_failures' => 0,
@@ -419,6 +568,15 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                     $updates['image_url'] = $outcome['image_url'];
                 }
 
+                // The GTIN follows the opposite rule: an adapter that reads
+                // GTIN fields and finds none is authoritative, and the stored
+                // value is cleared — a mismatch warning must not outlive the
+                // data it was raised on. A source with no GTIN concept (the
+                // AH API, the dataset) leaves the value alone.
+                if ($outcome['gtin'] !== null || $outcome['gtin_authoritative']) {
+                    $updates['gtin'] = $outcome['gtin'];
+                }
+
                 // An authoritative size is written verbatim — an empty or
                 // unparseable one clears the columns, because a stale unit
                 // price is worse than none. A title fallback only ever fills:
@@ -427,6 +585,31 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 if ($outcome['pack_size_authoritative'] || $packSize !== null) {
                     $updates['pack_quantity'] = $packSize?->quantity;
                     $updates['pack_unit'] = $packSize?->unit;
+                }
+
+                // Same rule as the GTIN: a source that reads conditional
+                // offers and finds none clears the stored one, so a campaign
+                // that ended stops being shown. A source with no such concept
+                // leaves it alone.
+                // Same clearing rule again: a source that reads promotion
+                // fields and finds none ends the promotion on screen.
+                $window = $outcome['promotion_window'];
+                if ($window !== null || $outcome['promotion_window_authoritative']) {
+                    // Stored in UTC, the app's timezone. Eloquent writes a
+                    // date by formatting it, which prints the wall clock of
+                    // whatever zone it carries — an Amsterdam 23:59:59 would
+                    // land in the column as 23:59:59 UTC, two hours late.
+                    $updates['promotion_starts_at'] = $window?->startsAt?->utc();
+                    $updates['promotion_ends_at'] = $window?->endsAt->utc();
+                    $updates['promotion_label'] = $window?->label;
+                }
+
+                $offer = $outcome['conditional_offer'];
+                if ($offer !== null || $outcome['conditional_offer_authoritative']) {
+                    $updates['conditional_price'] = $offer?->price;
+                    $updates['conditional_label'] = $offer?->label;
+                    $updates['conditional_starts_at'] = $offer?->startsAt?->utc();
+                    $updates['conditional_ends_at'] = $offer?->endsAt?->utc();
                 }
             } else {
                 $updates['last_error'] = $outcome['error'];
@@ -440,6 +623,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $locked->forceFill($updates)->save();
 
             $locked->product?->recomputeCheapestShop((int) $check->id);
+
+            // Separate from the drop engine on purpose: a rival shop cutting
+            // its price changes the best value without changing which shop is
+            // cheapest, so the cheapest-price trigger would never see it.
+            $product = $locked->product;
+
+            if ($product !== null) {
+                $product->refresh();
+
+                app(DetectUnitPriceTarget::class)($product);
+                app(DetectTargetPrice::class)($product);
+            }
         });
     }
 

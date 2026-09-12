@@ -1,11 +1,13 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\ProbeBudget;
 use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ProbeFailure;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Support\UrlNormalizer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -135,6 +137,28 @@ test('per-user rate limit kicks in after 6 probes in a minute', function (): voi
 
     $blocked = app(ProbeShopUrl::class)($product, 'https://example.com/p/7', $user);
     expect($blocked->errorCode)->toBe(ProbeFailure::ProbeRateLimited);
+});
+
+test('the per-user rate limit reports how long to wait', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/*' => Http::response(jsonLdPage(), 200),
+    ]);
+
+    $product = Product::factory()->create();
+    $user = User::factory()->create();
+
+    foreach (range(1, ProbeBudget::PER_MINUTE) as $i) {
+        app(ProbeShopUrl::class)($product, "https://example.com/p/{$i}", $user);
+    }
+
+    $blocked = app(ProbeShopUrl::class)($product, 'https://example.com/p/over', $user);
+
+    $retryAfter = $blocked->context['retry_after_seconds'] ?? null;
+
+    expect($blocked->errorCode)->toBe(ProbeFailure::ProbeRateLimited)
+        ->and($retryAfter)->toBeInt()
+        ->and($retryAfter)->toBeGreaterThan(0);
 });
 
 test('multi-variant ProductGroup with no URL match returns AMBIGUOUS with variants', function (): void {
@@ -284,4 +308,155 @@ test('null product with manual selectors falls back to EUR when no currency chos
 
     expect($outcome->isSuccess())->toBeTrue()
         ->and($outcome->snapshot?->currency)->toBe('EUR');
+});
+
+test('a shop that renders its price in the browser is refused without a fetch', function (): void {
+    Http::fake(); // any HTTP call would be an unexpected fetch
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $outcome = app(ProbeShopUrl::class)(
+        $product,
+        'https://www.plus.nl/product/fanta-orange-fles-1500-ml-991700',
+        $user,
+    );
+
+    expect($outcome->errorCode)->toBe(ProbeFailure::ShopNotServable)
+        ->and($outcome->context['reason'] ?? null)->toBe('plus_spa')
+        // No manual selector: there is no markup to select from.
+        ->and($outcome->shouldOfferManualSelector())->toBeFalse();
+
+    Http::assertNothingSent();
+});
+
+test('a trailing-dot plus.nl URL is refused like any other', function (): void {
+    Http::fake();
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $outcome = app(ProbeShopUrl::class)($product, 'https://www.plus.nl./product/fanta-orange-fles-1500-ml-991700', $user);
+
+    expect($outcome->errorCode)->toBe(ProbeFailure::ShopNotServable);
+
+    Http::assertNothingSent();
+});
+
+test('a shop that only answers on its www host is probed there, not on the apex', function (): void {
+    // vomar.nl answers 404 while www.vomar.nl serves the page.
+    Http::fake([
+        'https://www.shop-with-www.test/robots.txt' => Http::response('', 404),
+        'https://www.shop-with-www.test/p/1' => Http::response(withJsonLd(json_encode([
+            '@type' => 'Product',
+            'name' => 'Demo',
+            'offers' => ['@type' => 'Offer', 'price' => '9.99', 'priceCurrency' => 'EUR'],
+        ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']),
+        'https://shop-with-www.test/*' => Http::response('gone', 404),
+    ]);
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $outcome = app(ProbeShopUrl::class)($product, 'https://www.shop-with-www.test/p/1', $user);
+
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->snapshot?->price)->toBe('9.99')
+        // The stored host still drops the prefix, so host comparisons hold.
+        ->and($outcome->host)->toBe('shop-with-www.test');
+});
+
+test('a shop URL that redirects onto an unservable host is refused, not parsed', function (): void {
+    Http::fake([
+        'https://www.coop.nl/robots.txt' => Http::response('', 404),
+        'https://www.coop.nl/product/wp01234/melk' => Http::response('', 301, ['Location' => 'https://www.plus.nl']),
+        'https://www.plus.nl' => Http::response('<html>plus home page</html>', 200),
+    ]);
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $outcome = app(ProbeShopUrl::class)($product, 'https://www.coop.nl/product/wp01234/melk', $user);
+
+    expect($outcome->errorCode)->toBe(ProbeFailure::ShopNotServable)
+        ->and($outcome->context['reason'] ?? null)->toBe('plus_spa')
+        ->and($outcome->shouldOfferManualSelector())->toBeFalse();
+});
+
+test('a page quoting a currency that is not a code is refused, not stored', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response(withJsonLd((string) json_encode([
+            '@type' => 'Product',
+            'name' => 'Demo',
+            'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'Euro'],
+        ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $outcome = app(ProbeShopUrl::class)(null, 'https://example.com/p/1', User::factory()->create());
+
+    expect($outcome->isSuccess())->toBeFalse()
+        ->and($outcome->extractionReason)->toBe('currency_not_a_code');
+});
+
+test('choosing a variant stores the address that variant lives at', function (): void {
+    $json = (string) json_encode([
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://example.com/sanimed',
+        'offers' => [
+            ['@type' => 'Offer', 'sku' => 'MP32275', 'price' => '41.65', 'priceCurrency' => 'EUR', 'url' => 'https://example.com/sanimed?sku=MP32275'],
+            ['@type' => 'Offer', 'sku' => 'MP4838', 'price' => '21.25', 'priceCurrency' => 'EUR', 'url' => 'https://example.com/sanimed?sku=MP4838'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/sanimed*' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $outcome = app(ProbeShopUrl::class)(
+        null,
+        'https://example.com/sanimed',
+        User::factory()->create(),
+        variantKey: 'https://example.com/sanimed?sku=MP4838',
+    );
+
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->snapshot?->price)->toBe('21.25')
+        // The user clicks this. It must show the pack they were quoted.
+        ->and($outcome->normalizedUrl)->toBe('https://example.com/sanimed?sku=MP4838');
+});
+
+test('the same variant added twice is a duplicate, whichever address was pasted', function (): void {
+    $json = (string) json_encode([
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://example.com/sanimed',
+        'offers' => [
+            ['@type' => 'Offer', 'sku' => 'MP32275', 'price' => '41.65', 'priceCurrency' => 'EUR', 'url' => 'https://example.com/sanimed?sku=MP32275'],
+            ['@type' => 'Offer', 'sku' => 'MP4838', 'price' => '21.25', 'priceCurrency' => 'EUR', 'url' => 'https://example.com/sanimed?sku=MP4838'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/sanimed*' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://example.com/sanimed?sku=MP4838',
+        'url_hash' => UrlNormalizer::hash('https://example.com/sanimed?sku=MP4838'),
+        'currency' => 'EUR',
+    ]);
+
+    $outcome = app(ProbeShopUrl::class)(
+        $product,
+        'https://example.com/sanimed',
+        User::factory()->create(),
+        variantKey: 'https://example.com/sanimed?sku=MP4838',
+    );
+
+    expect($outcome->isDuplicate())->toBeTrue();
 });

@@ -109,7 +109,7 @@ final class JsonLdEntities
     public static function firstImageUrl(mixed $value): ?string
     {
         if (is_string($value) && $value !== '') {
-            return $value;
+            return html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
         if (! is_array($value)) {
@@ -132,32 +132,33 @@ final class JsonLdEntities
         return is_string($url) && $url !== '' ? $url : null;
     }
 
+    /**
+     * JSON-LD lives inside a `<script>`, so the HTML parser never decodes it:
+     * shops that HTML-escape their own data hand over a name like
+     * `Lay&#39;s chips naturel` (spar.nl, verified 2026-09-02), which would
+     * otherwise reach the product title verbatim.
+     */
     public static function nonEmptyString(mixed $value): ?string
     {
-        return is_string($value) && $value !== '' ? $value : null;
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return $decoded === '' ? null : $decoded;
     }
 
     /**
-     * Loose equality between the requested URL and an entity's `url` field —
-     * lowercased and stripped of query/fragment + trailing slash so e.g.
-     * `?activeVariant=…` doesn't defeat the match.
+     * Whether an entity's `url` names the page that was requested — see
+     * {@see EntityUrl} for the rule.
      *
      * @param  array<string, mixed>  $entity
      */
     public static function urlMatches(array $entity, string $url): bool
     {
         $entityUrl = self::nonEmptyString($entity['url'] ?? null);
-        if ($entityUrl === null) {
-            return false;
-        }
 
-        return self::canonicalizeUrl($entityUrl) === self::canonicalizeUrl($url);
-    }
-
-    private static function canonicalizeUrl(string $url): string
-    {
-        $stripped = strtok($url, '?#');
-
-        return rtrim(strtolower(is_string($stripped) ? $stripped : $url), '/');
+        return $entityUrl !== null && EntityUrl::matches($entityUrl, $url);
     }
 }

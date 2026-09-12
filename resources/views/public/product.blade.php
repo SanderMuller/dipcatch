@@ -1,4 +1,5 @@
 @php
+    use App\Support\Favicon;
     use App\Support\MoneyFormatter;
 
     $image = $product->safeImageUrl();
@@ -170,7 +171,8 @@
                                 class="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                             >
                                 <div class="min-w-0 flex-1">
-                                    <p class="truncate text-sm font-medium">
+                                    <p class="flex items-center gap-1.5 truncate text-sm font-medium">
+                                        <img src="{{ Favicon::url($shop->host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
                                         {{ $shop->host }}
                                         @if ($loop->first && $shops->count() > 1)
                                             <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 inset-ring inset-ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:inset-ring-emerald-500/20">Cheapest</span>

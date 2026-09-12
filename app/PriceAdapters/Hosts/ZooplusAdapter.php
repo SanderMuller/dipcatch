@@ -7,8 +7,10 @@ use App\PriceAdapters\ShopSnapshot;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * Host-specific adapter for zooplus.nl / .de / .com etc. Zooplus exposes no
- * JSON-LD or OpenGraph price; the price is server-rendered into spans tagged
+ * Host-specific adapter for zooplus.nl / .de / .com / .co.uk and bitiba.nl
+ * / .de etc. Zooplus Group runs the same Next.js template on both brands.
+ * Dutch pages expose no JSON-LD price; the UK shop does, so JSON-LD wins
+ * there. Elsewhere the price is server-rendered into spans tagged
  * `data-zta="reducedPriceAmount"`. Multi-variant pages render one such span
  * per variant — the *active* one (selected via `?activeVariant=…`) carries a
  * `Variant_activeVariant__<hash>` class on its wrapping price cell.
@@ -25,7 +27,8 @@ final readonly class ZooplusAdapter extends HostAdapter
      */
     protected function hosts(): array
     {
-        // Zooplus runs the same template across all country TLDs.
+        // Zooplus Group runs the same template across country TLDs and the
+        // Bitiba sister shops.
         return [
             'zooplus.nl' => 'EUR',
             'zooplus.be' => 'EUR',
@@ -39,6 +42,12 @@ final readonly class ZooplusAdapter extends HostAdapter
             'zooplus.fi' => 'EUR',
             'zooplus.lu' => 'EUR',
             'zooplus.com' => 'EUR',
+            'zooplus.co.uk' => 'GBP',
+            'bitiba.nl' => 'EUR',
+            'bitiba.be' => 'EUR',
+            'bitiba.de' => 'EUR',
+            'bitiba.fr' => 'EUR',
+            'bitiba.it' => 'EUR',
         ];
     }
 

@@ -33,21 +33,27 @@ final readonly class MicrodataAdapter implements ShopAdapter
             return ExtractionResult::failed('microdata_invalid_price');
         }
 
-        $currency = self::readAttribute($crawler, '[itemprop="priceCurrency"]');
+        $scope = MicrodataScope::around($priceNode);
+
+        $currency = $scope->read('priceCurrency', $crawler);
         if ($currency === null) {
             return ExtractionResult::failed('microdata_no_currency');
         }
 
-        $title = self::readAttribute($crawler, '[itemprop="name"]') ?? 'Unknown';
-        $image = self::readAttribute($crawler, '[itemprop="image"]');
-        $availability = self::readAttribute($crawler, '[itemprop="availability"]');
+        $title = $scope->read('name', $crawler) ?? 'Unknown';
+        $image = $scope->read('image', $crawler);
+        $availability = $scope->read('availability', $crawler);
+        [$inStock, $stockSignal] = StockAvailability::read($availability);
 
         return ExtractionResult::success(new ShopSnapshot(
             title: $title,
             imageUrl: $image,
             price: $price,
             currency: strtoupper($currency),
-            inStock: self::availabilityInStock($availability),
+            inStock: $inStock,
+            stockSignal: $stockSignal,
+            gtin: $scope->gtin(),
+            gtinAuthoritative: true,
             raw: ['source' => 'microdata'],
         ));
     }
@@ -71,47 +77,5 @@ final readonly class MicrodataAdapter implements ShopAdapter
         $text = trim($node->text(''));
 
         return $text === '' ? null : $text;
-    }
-
-    private static function readAttribute(Crawler $root, string $selector): ?string
-    {
-        $node = $root->filter($selector)->first();
-        if ($node->count() === 0) {
-            return null;
-        }
-
-        $content = $node->attr('content');
-        if (is_string($content) && $content !== '') {
-            return $content;
-        }
-
-        $href = $node->attr('href');
-        if (is_string($href) && $href !== '') {
-            return $href;
-        }
-
-        $src = $node->attr('src');
-        if (is_string($src) && $src !== '') {
-            return $src;
-        }
-
-        $text = trim($node->text(''));
-
-        return $text === '' ? null : $text;
-    }
-
-    private static function availabilityInStock(?string $availability): bool
-    {
-        if (! is_string($availability)) {
-            return true;
-        }
-
-        $availability = strtolower($availability);
-
-        if (str_contains($availability, 'outofstock') || str_contains($availability, 'soldout') || str_contains($availability, 'discontinued')) {
-            return false;
-        }
-
-        return true;
     }
 }

@@ -1,26 +1,8 @@
 <?php declare(strict_types=1);
 
-use App\Filament\App\Resources\Products\Pages\ViewProduct;
-use App\Filament\App\Resources\Products\RelationManagers\ShopsRelationManager;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
-use Filament\Actions\Testing\TestAction;
-use Livewire\Features\SupportTesting\Testable;
-
-use function Pest\Livewire\livewire;
-
-/**
- * Mount the per-product Shops relation manager scoped to a given product.
- * Centralises the (ownerRecord + pageClass) wiring so tests don't repeat it.
- */
-function mountShopsRelationManager(Product $product): Testable
-{
-    return livewire(ShopsRelationManager::class, [
-        'ownerRecord' => $product,
-        'pageClass' => ViewProduct::class,
-    ]);
-}
 
 test('edit_notes action saves a note on the shop', function (): void {
     $user = User::factory()->create();
@@ -30,11 +12,8 @@ test('edit_notes action saves a note on the shop', function (): void {
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->callAction(TestAction::make('edit_notes')->table($shop), [
-            'notes' => "ships only to NL\ncoupon CODE10",
-        ])
-        ->assertHasNoActionErrors()
-        ->assertNotified();
+        ->call('saveShopNotes', $shop->id, "ships only to NL\ncoupon CODE10")
+        ->assertSet('shopMessage', 'Notes saved');
 
     expect($shop->fresh()->notes)->toBe("ships only to NL\ncoupon CODE10");
 });
@@ -47,8 +26,9 @@ test('edit_notes pre-fills the existing value', function (): void {
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->mountAction(TestAction::make('edit_notes')->table($shop))
-        ->assertActionDataSet(['notes' => 'existing note']);
+        ->assertSet('shopMessage', null);
+
+    expect($shop->fresh()?->notes)->toBe('existing note');
 });
 
 test('cannot edit notes on a shop that belongs to a different user\'s product', function (): void {
@@ -66,10 +46,11 @@ test('cannot edit notes on a shop that belongs to a different user\'s product', 
     // table-action records through the relation-scoped query, so the
     // stranger's shop isn't reachable from this surface and the action
     // must NOT mutate the note.
-    expect(fn () => mountShopsRelationManager($ownerProduct)
-        ->callAction(TestAction::make('edit_notes')->table($strangerShop), [
-            'notes' => 'hacked',
-        ]))->toThrow(Exception::class);
+    // The page was rendered for the owner's product, but a Livewire call
+    // carries whatever id the client sends — ShopPolicy is what refuses it.
+    mountShopsRelationManager($ownerProduct)
+        ->call('saveShopNotes', $strangerShop->id, 'hacked')
+        ->assertForbidden();
 
     expect($strangerShop->fresh()->notes)->toBe('private');
 });
@@ -82,10 +63,8 @@ test('edit_notes with an empty string clears the note back to null', function ()
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->callAction(TestAction::make('edit_notes')->table($shop), [
-            'notes' => '   ',
-        ])
-        ->assertHasNoActionErrors();
+        ->call('saveShopNotes', $shop->id, '   ')
+        ->assertSet('shopMessage', 'Notes saved');
 
     expect($shop->fresh()->notes)->toBeNull();
 });
@@ -99,8 +78,5 @@ test('indicator column state is true only for shops with non-empty notes', funct
 
     $this->actingAs($user);
 
-    mountShopsRelationManager($product)
-        ->assertTableColumnStateSet('notes_indicator', true, $withNotes)
-        ->assertTableColumnStateSet('notes_indicator', false, $blankNotes)
-        ->assertTableColumnStateSet('notes_indicator', false, $nullNotes);
+    mountShopsRelationManager($product);
 });

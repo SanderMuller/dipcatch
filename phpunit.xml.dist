@@ -23,16 +23,45 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+        <!-- Postgres is the production engine, and the only one the suite
+             runs on: a char(3) overflow and a strict-grouping error are
+             invisible on SQLite and fatal in production. Each variable still
+             yields to one already set in the environment. -->
+        <env name="DB_CONNECTION" value="pgsql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="5432"/>
+        <env name="DB_DATABASE" value="dipcatch_test"/>
+        <env name="DB_USERNAME" value="postgres"/>
+        <env name="DB_PASSWORD" value="postgres"/>
         <env name="DB_URL" value=""/>
+        <env name="HEALTH_DB_CONNECTION" value="pgsql"/>
+        <env name="WEBPUSH_DB_CONNECTION" value="pgsql"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
+        <!-- The plan cadence is asserted on, so it is pinned here rather than
+             left to whichever .env the run happens to load. CI copies
+             .env.example and a developer has their own: the suite read 2 hours
+             on one and 6 on the other, and only CI noticed. -->
+        <env name="DIPCATCH_RECHECK_INTERVAL_HOURS" value="24"/>
+        <env name="PLAN_PRO_RECHECK_INTERVAL_HOURS" value="6"/>
+        <env name="PLAN_FREE_RECHECK_INTERVAL_HOURS" value=""/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="DIPCATCH_FETCHER_ALLOW_UNRESOLVED" value="true"/>
         <env name="DIPCATCH_FETCHER_ALLOW_PRIVATE_IPS" value="true"/>
+        <!--
+            Billing is shut for the suite regardless of the developer's .env.
+            Configuring real Stripe test keys locally otherwise flips
+            BillingGate open and fails every test that asserts the shop is
+            shut — the suite must not depend on a machine's configuration.
+            A test that needs the gate open opens it itself (configureStripe()).
+        -->
+        <env name="STRIPE_KEY" value=""/>
+        <env name="STRIPE_SECRET" value=""/>
+        <env name="STRIPE_WEBHOOK_SECRET" value=""/>
+        <env name="STRIPE_PRICE_PRO_MONTHLY" value=""/>
+        <env name="BILLING_ENABLED" value="false"/>
     </php>
 </phpunit>

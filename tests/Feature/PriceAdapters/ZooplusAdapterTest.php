@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\Hosts\ZooplusAdapter;
 
 beforeEach(function (): void {
@@ -40,7 +41,7 @@ HTML;
         ->and($result->snapshot?->title)->toBe('Single product');
 });
 
-test('matches all zooplus country TLDs', function (string $url): void {
+test('matches all zooplus country TLDs and Bitiba sister shops', function (string $url): void {
     $html = '<span data-zta="reducedPriceAmount">€ 9,99</span>';
     $result = $this->adapter->extract($url, $html);
 
@@ -50,4 +51,61 @@ test('matches all zooplus country TLDs', function (string $url): void {
     'de' => ['https://www.zooplus.de/shop/foo'],
     'be' => ['https://www.zooplus.be/shop/foo'],
     'com' => ['https://www.zooplus.com/shop/foo'],
+    'uk' => ['https://www.zooplus.co.uk/shop/foo'],
+    'bitiba-nl' => ['https://www.bitiba.nl/shop/foo'],
+    'bitiba-de' => ['https://www.bitiba.de/shop/foo'],
 ]);
+
+test('reads a sterling price on the UK shop', function (): void {
+    $html = '<span data-zta="reducedPriceAmount">£ 9.99</span>';
+    $result = $this->adapter->extract('https://www.zooplus.co.uk/shop/foo', $html);
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('9.99')
+        ->and($result->snapshot?->currency)->toBe('GBP');
+});
+
+test('an unanswered variant question is put to the user, not answered by the CSS fallback', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'FELIWAY Classic',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Startpakket',
+                'sku' => '169589.10',
+                'url' => 'https://www.zooplus.nl/shop/x/169589?activeVariant=169589.10',
+                'offers' => ['@type' => 'Offer', 'price' => '26.99', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Voordeelverpakking',
+                'sku' => '169589.19',
+                'url' => 'https://www.zooplus.nl/shop/x/169589?activeVariant=169589.19',
+                'offers' => ['@type' => 'Offer', 'price' => '59.99', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    // The markup also carries a price the CSS fallback would happily read.
+    $html = '<html><body><script type="application/ld+json">' . $json . '</script>'
+        . '<h1 data-zta="ProductTitle__Title">FELIWAY Classic</h1>'
+        . '<span data-zta="reducedPriceAmount">€ 26,99</span></body></html>';
+
+    $result = $this->adapter->extract('https://www.zooplus.nl/shop/x/169589', $html);
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($result->variants)->toHaveCount(2)
+        ->and($result->snapshot)->toBeNull();
+
+    // Answering it resolves to that variant, not to the fallback price.
+    $answered = $this->adapter->extract(
+        'https://www.zooplus.nl/shop/x/169589',
+        $html,
+        new AdapterContext(variantKey: '169589.19'),
+    );
+
+    expect($answered->isSuccess())->toBeTrue()
+        ->and($answered->snapshot?->price)->toBe('59.99');
+});

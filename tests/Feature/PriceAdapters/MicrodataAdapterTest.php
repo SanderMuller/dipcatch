@@ -65,3 +65,83 @@ HTML;
 
     expect($result->snapshot?->inStock)->toBeFalse();
 });
+
+test('every field comes from the scope around the price, not a neighbouring product', function (): void {
+    $html = <<<'HTML'
+<div itemscope itemtype="https://schema.org/Product">
+  <h1 itemprop="name">Other product</h1>
+  <img itemprop="image" src="https://shop.test/other.jpg" />
+  <meta itemprop="gtin13" content="0012345678905" />
+</div>
+<div itemscope itemtype="https://schema.org/Product">
+  <h1 itemprop="name">Tracked product</h1>
+  <img itemprop="image" src="https://shop.test/tracked.jpg" />
+  <meta itemprop="gtin13" content="8712243044506" />
+  <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+    <meta itemprop="price" content="12.50" />
+    <meta itemprop="priceCurrency" content="EUR" />
+    <link itemprop="availability" href="https://schema.org/InStock" />
+  </div>
+</div>
+HTML;
+
+    $result = $this->adapter->extract('https://x.test', $html);
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->title)->toBe('Tracked product')
+        ->and($result->snapshot?->imageUrl)->toBe('https://shop.test/tracked.jpg')
+        ->and($result->snapshot?->gtin)->toBe('8712243044506')
+        ->and($result->snapshot?->price)->toBe('12.50');
+});
+
+/**
+ * The shape petmarkt.nl serves (verified 2026-09-09): no JSON-LD, microdata
+ * stating LimitedAvailability, the cart button and price still rendered, and
+ * "Tijdelijk niet leverbaar" printed above the price.
+ */
+function limitedAvailabilityPage(string $notice = ''): string
+{
+    return <<<HTML
+<div itemscope itemtype="http://schema.org/Product">
+  <h1 itemprop="name">Sanimed Skin Sensitive Kat</h1>
+  <div>{$notice}</div>
+  <div itemprop="offers" itemscope itemtype="http://schema.org/Offer">
+    <meta itemprop="price" content="19.95" />
+    <meta itemprop="priceCurrency" content="EUR" />
+    <link itemprop="availability" href="http://schema.org/LimitedAvailability" />
+  </div>
+  <button>In winkelwagen</button>
+</div>
+HTML;
+}
+
+test('an availability value that states no verdict is unknown, never in stock', function (): void {
+    $result = $this->adapter->extract('https://x.test', limitedAvailabilityPage());
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->inStock)->toBeNull()
+        ->and($result->snapshot?->stockSignal)->toBe('http://schema.org/LimitedAvailability');
+});
+
+test('a page stating no availability at all is unknown', function (): void {
+    $html = <<<'HTML'
+<div itemscope itemtype="http://schema.org/Product">
+  <h1 itemprop="name">Widget</h1>
+  <div itemprop="offers" itemscope itemtype="http://schema.org/Offer">
+    <meta itemprop="price" content="45.99" />
+    <meta itemprop="priceCurrency" content="EUR" />
+  </div>
+</div>
+HTML;
+
+    $result = $this->adapter->extract('https://x.test', $html);
+
+    expect($result->snapshot?->inStock)->toBeNull()
+        ->and($result->snapshot?->stockSignal)->toBeNull();
+});
+
+test('an explicit out-of-stock value is read as such', function (): void {
+    $html = str_replace('LimitedAvailability', 'OutOfStock', limitedAvailabilityPage());
+
+    expect($this->adapter->extract('https://x.test', $html)->snapshot?->inStock)->toBeFalse();
+});

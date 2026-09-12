@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\PriceAdapters\AdapterContext;
+use App\PriceAdapters\EntityUrl;
 use App\PriceAdapters\JsonLdAdapter;
 
 test('skips when no application/ld+json script is present', function (): void {
@@ -348,4 +349,537 @@ test('accepts the non-spec capitalized Price key dirk.nl emits', function (): vo
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->price)->toBe('1.69')
         ->and($result->snapshot?->currency)->toBe('EUR');
+});
+
+test('an HTML-escaped name is decoded — JSON-LD is never decoded by the parser', function (): void {
+    $html = withJsonLd(json_encode([
+        '@type' => 'Product',
+        'name' => 'Lay&#39;s chips naturel',
+        'image' => 'https://shop.test/i.jpg?a=1&amp;b=2',
+        'offers' => ['@type' => 'Offer', 'price' => '2.45', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR));
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', $html);
+
+    expect($result->snapshot?->title)->toBe("Lay's chips naturel")
+        ->and($result->snapshot?->imageUrl)->toBe('https://shop.test/i.jpg?a=1&b=2');
+});
+
+test('variants that differ only in a query parameter are told apart by it', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'FELIWAY Classic',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Startpakket',
+                'gtin13' => '3411112169566',
+                'url' => 'https://shop.test/p/169589?activeVariant=169589.10',
+                'offers' => ['@type' => 'Offer', 'price' => '27.99', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Navulfles',
+                'gtin13' => '3411112169672',
+                'url' => 'https://shop.test/p/169589?activeVariant=169589.11',
+                'offers' => ['@type' => 'Offer', 'price' => '26.99', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Voordeelverpakking, 3 x 48 ml',
+                'gtin13' => '3411113099565',
+                'url' => 'https://shop.test/p/169589?activeVariant=169589.19',
+                'offers' => ['@type' => 'Offer', 'price' => '59.99', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/169589?activeVariant=169589.19', withJsonLd($json));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('59.99')
+        ->and($result->snapshot?->title)->toBe('Voordeelverpakking, 3 x 48 ml')
+        ->and($result->snapshot?->gtin)->toBe('3411113099565');
+});
+
+test('an extra parameter on the requested URL does not defeat the variant match', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'FELIWAY Classic',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Startpakket',
+                'url' => 'https://shop.test/p/169589?activeVariant=169589.10',
+                'offers' => ['@type' => 'Offer', 'price' => '27.99', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Voordeelverpakking',
+                'url' => 'https://shop.test/p/169589?activeVariant=169589.19',
+                'offers' => ['@type' => 'Offer', 'price' => '59.99', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/169589?activeVariant=169589.19&v=2', withJsonLd($json));
+
+    expect($result->snapshot?->price)->toBe('59.99');
+});
+
+test('a product URL without a query still matches a requested URL that carries one', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Single',
+        'url' => 'https://shop.test/p/1',
+        'offers' => ['@type' => 'Offer', 'price' => '9.95', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1?utm_source=mail', withJsonLd($json));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('9.95');
+});
+
+test('a relative entity url names this page', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Group',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'One',
+                'url' => '/p/169589?activeVariant=169589.10',
+                'offers' => ['@type' => 'Offer', 'price' => '27.99', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Three',
+                'url' => '/p/169589?activeVariant=169589.19',
+                'offers' => ['@type' => 'Offer', 'price' => '59.99', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/169589?activeVariant=169589.19', withJsonLd($json));
+
+    expect($result->snapshot?->price)->toBe('59.99');
+});
+
+test('an entity url on another host does not match a same-path request', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Elsewhere',
+        'url' => 'https://other.test/p/1',
+        'offers' => ['@type' => 'Offer', 'price' => '9.95', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR);
+
+    // The entity is still the page's only Product, so it stays the fallback —
+    // what must not happen is it counting as a URL match.
+    expect(EntityUrl::matches('https://other.test/p/1', 'https://shop.test/p/1'))->toBeFalse()
+        ->and(new JsonLdAdapter()->extract('https://shop.test/p/1', withJsonLd($json))->isSuccess())->toBeTrue();
+});
+
+test('a scheme difference does not defeat the match', function (): void {
+    expect(EntityUrl::matches('http://shop.test/p/1', 'https://shop.test/p/1'))->toBeTrue()
+        ->and(EntityUrl::matches('https://www.shop.test/p/1', 'https://shop.test/p/1'))->toBeTrue();
+});
+
+test('a queryless variant listed first does not beat the one the URL names', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Group',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Default',
+                'url' => 'https://shop.test/p/1',
+                'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Blue',
+                'url' => 'https://shop.test/p/1?activeVariant=blue',
+                'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1?activeVariant=blue', withJsonLd($json));
+
+    expect($result->snapshot?->price)->toBe('20.00')
+        ->and($result->snapshot?->title)->toBe('Blue');
+});
+
+test('a canonical Product does not silence a variant question it did not answer', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@graph' => [
+            [
+                '@type' => 'ProductGroup',
+                'name' => 'Group',
+                'hasVariant' => [
+                    [
+                        '@type' => 'Product',
+                        'name' => 'Small',
+                        'productID' => 'v-1',
+                        'url' => 'https://shop.test/p/1?activeVariant=small',
+                        'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+                    ],
+                    [
+                        '@type' => 'Product',
+                        'name' => 'Large',
+                        'productID' => 'v-2',
+                        'url' => 'https://shop.test/p/1?activeVariant=large',
+                        'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR'],
+                    ],
+                ],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Canonical',
+                'url' => 'https://shop.test/p/1',
+                'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', withJsonLd($json));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($result->variants)->toHaveCount(2);
+});
+
+test('a canonical Product listed before the group does not decide the price', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@graph' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Canonical',
+                'url' => 'https://shop.test/p/1',
+                'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'ProductGroup',
+                'name' => 'Group',
+                'hasVariant' => [
+                    [
+                        '@type' => 'Product',
+                        'name' => 'Small',
+                        'url' => 'https://shop.test/p/1?activeVariant=small',
+                        'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+                    ],
+                    [
+                        '@type' => 'Product',
+                        'name' => 'Large',
+                        'url' => 'https://shop.test/p/1?activeVariant=large',
+                        'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR'],
+                    ],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1?activeVariant=large', withJsonLd($json));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('20.00')
+        ->and($result->snapshot?->title)->toBe('Large');
+});
+
+test('a group whose variants all fit the request asks instead of picking one', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Group',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Small',
+                'productID' => 'v-1',
+                'url' => 'https://shop.test/p/1',
+                'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Large',
+                'productID' => 'v-2',
+                'url' => 'https://shop.test/p/1',
+                'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', withJsonLd($json));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($result->variants)->toHaveCount(2);
+});
+
+test('a tracking parameter on an entity url does not make it the variant', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@graph' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Canonical',
+                // States one parameter, but not the one that picks a variant.
+                'url' => 'https://shop.test/p/1?utm_source=mail',
+                'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Blue',
+                'url' => 'https://shop.test/p/1?activeVariant=blue',
+                'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1?utm_source=mail&activeVariant=blue', withJsonLd($json));
+
+    expect($result->snapshot?->price)->toBe('20.00')
+        ->and($result->snapshot?->title)->toBe('Blue');
+});
+
+test('two entities fitting the request equally well are put to the user', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Group',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Small',
+                'productID' => 'v-1',
+                'url' => 'https://shop.test/p/1?colour=blue',
+                'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Large',
+                'productID' => 'v-2',
+                'url' => 'https://shop.test/p/1?size=xl',
+                'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1?colour=blue&size=xl', withJsonLd($json));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($result->variants)->toHaveCount(2);
+});
+
+/**
+ * The shape medpets.nl publishes (verified 2026-09-09): one Product, several
+ * Offers, each naming itself with a `sku` and a `?sku=` URL. No ProductGroup.
+ */
+function multiOfferProduct(): string
+{
+    return (string) json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://shop.test/sanimed',
+        'offers' => [
+            [
+                '@type' => 'Offer',
+                'sku' => 'MP2996',
+                'price' => 21.25,
+                'priceCurrency' => 'EUR',
+                'availability' => 'InStock',
+                'url' => 'https://shop.test/sanimed?sku=MP2996',
+            ],
+            [
+                '@type' => 'Offer',
+                'sku' => 'MP2997',
+                'price' => 41.65,
+                'priceCurrency' => 'EUR',
+                'availability' => 'InStock',
+                'url' => 'https://shop.test/sanimed?sku=MP2997',
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+}
+
+test('a Product with several offers asks which, instead of pricing the first', function (): void {
+    $result = new JsonLdAdapter()->extract('https://shop.test/sanimed', withJsonLd(multiOfferProduct()));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($result->snapshot)->toBeNull()
+        ->and(array_map(fn ($variant): string => $variant->key, $result->variants))->toBe(['MP2996', 'MP2997'])
+        ->and(array_map(fn ($variant): string => $variant->price, $result->variants))->toBe(['21.25', '41.65']);
+});
+
+test('a pinned variant_key prices that offer', function (): void {
+    $result = new JsonLdAdapter()->extract(
+        'https://shop.test/sanimed',
+        withJsonLd(multiOfferProduct()),
+        new AdapterContext(variantKey: 'MP2996'),
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('21.25');
+});
+
+test('a URL naming one offer prices that offer without asking', function (): void {
+    $result = new JsonLdAdapter()->extract('https://shop.test/sanimed?sku=MP2997', withJsonLd(multiOfferProduct()));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('41.65');
+});
+
+test('a variant_key matching nothing is reported, never silently ignored', function (): void {
+    $result = new JsonLdAdapter()->extract(
+        'https://shop.test/sanimed',
+        withJsonLd(multiOfferProduct()),
+        new AdapterContext(variantKey: 'SANIMED Skin Sensitive 12x100 gr. pouches'),
+    );
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($result->unmatchedVariantKey)->toBe('SANIMED Skin Sensitive 12x100 gr. pouches')
+        ->and($result->failureReason)->toBe('variant_key_no_match')
+        ->and($result->snapshot)->toBeNull();
+});
+
+test('a variant_key matching nothing on a single-variant page fails rather than pricing it', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'One size only',
+        'url' => 'https://shop.test/p/1',
+        'offers' => ['@type' => 'Offer', 'price' => '9.99', 'priceCurrency' => 'EUR', 'availability' => 'InStock'],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', withJsonLd($json), new AdapterContext(variantKey: 'nope'));
+
+    expect($result->isFailed())->toBeTrue()
+        ->and($result->failureReason)->toBe('variant_key_no_match');
+});
+
+test('one real offer beside a priceless stub still prices the product', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://shop.test/sanimed',
+        'offers' => [
+            ['@type' => 'Offer', 'sku' => 'MP2996', 'price' => 21.25, 'priceCurrency' => 'EUR', 'availability' => 'InStock'],
+            ['@type' => 'Offer', 'sku' => 'MP2997', 'availability' => 'OutOfStock'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/sanimed', withJsonLd($json));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('21.25');
+});
+
+test('the offer the URL names most precisely wins, whatever the order', function (): void {
+    $offers = [
+        ['@type' => 'Offer', 'sku' => 'L', 'price' => '10.00', 'priceCurrency' => 'EUR', 'url' => 'https://shop.test/p?size=L'],
+        ['@type' => 'Offer', 'sku' => 'LRED', 'price' => '20.00', 'priceCurrency' => 'EUR', 'url' => 'https://shop.test/p?size=L&color=red'],
+    ];
+
+    foreach ([$offers, array_reverse($offers)] as $ordered) {
+        $json = json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'Product',
+            'name' => 'Shirt',
+            'url' => 'https://shop.test/p',
+            'offers' => $ordered,
+        ], JSON_THROW_ON_ERROR);
+
+        $result = new JsonLdAdapter()->extract('https://shop.test/p?size=L&color=red', withJsonLd($json));
+
+        expect($result->snapshot?->price)->toBe('20.00');
+    }
+});
+
+test('offers pricing themselves through a priceSpecification still become choices', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Shirt',
+        'url' => 'https://shop.test/p',
+        'offers' => [
+            [
+                '@type' => 'Offer',
+                'sku' => 'S',
+                'priceSpecification' => ['@type' => 'UnitPriceSpecification', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Offer',
+                'sku' => 'L',
+                'priceSpecification' => ['@type' => 'UnitPriceSpecification', 'price' => '20.00', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p', withJsonLd($json));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and(array_map(fn ($variant): string => $variant->price, $result->variants))->toBe(['10.00', '20.00']);
+});
+
+test('two offers that repeat the product name are still told apart', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat - Maaltijdzakje',
+        'url' => 'https://shop.test/sanimed',
+        'offers' => [
+            [
+                '@type' => 'Offer',
+                'sku' => 'MP32275',
+                'name' => 'Sanimed Skin Sensitive Cat - Maaltijdzakje',
+                'price' => '41.65',
+                'priceCurrency' => 'EUR',
+                'url' => 'https://shop.test/sanimed?sku=MP32275',
+            ],
+            [
+                '@type' => 'Offer',
+                'sku' => 'MP4838',
+                'name' => 'Sanimed Skin Sensitive Cat - Maaltijdzakje',
+                'price' => '21.25',
+                'priceCurrency' => 'EUR',
+                'url' => 'https://shop.test/sanimed?sku=MP4838',
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/sanimed', withJsonLd($json));
+
+    $titles = array_map(fn ($variant): string => $variant->title, $result->variants);
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($titles[0])->not->toBe($titles[1])
+        ->and($titles[0])->toContain('MP32275')
+        ->and($titles[1])->toContain('MP4838');
+});
+
+test('an offer stating its own size keeps that as the label', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://shop.test/sanimed',
+        'offers' => [
+            ['@type' => 'Offer', 'sku' => 'A', 'size' => '24 x 100 g', 'price' => '41.65', 'priceCurrency' => 'EUR'],
+            ['@type' => 'Offer', 'sku' => 'B', 'size' => '12 x 100 g', 'price' => '21.25', 'priceCurrency' => 'EUR'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/sanimed', withJsonLd($json));
+
+    expect(array_map(fn ($variant): string => $variant->title, $result->variants))
+        ->toBe(['Sanimed Skin Sensitive Cat — 24 x 100 g', 'Sanimed Skin Sensitive Cat — 12 x 100 g']);
 });

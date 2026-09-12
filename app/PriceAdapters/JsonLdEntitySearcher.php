@@ -3,69 +3,111 @@
 namespace App\PriceAdapters;
 
 /**
- * Visitor over the JSON-LD entity stream. Prefers an exact URL/variant-key
- * match over weaker product/offer fallbacks accumulated in
- * {@see JsonLdSearchState}. Also collects variant candidates so the caller
- * can surface an ambiguous-result chooser when multiple variants share the
- * requested URL.
+ * Visitor over the JSON-LD entity stream. It never stops at the first
+ * entity that fits: matches compete on precision in
+ * {@see JsonLdSearchState}, so a page listing its canonical URL before the
+ * variant the request names still prices the variant. Entities that fit
+ * nothing become chooser candidates.
  */
 final readonly class JsonLdEntitySearcher
 {
-    /** Schema.org variant identifiers we'll match against in order. */
-    private const array KEY_FIELDS = ['productID', 'sku', 'gtin13', 'gtin'];
-
     /**
-     * Inspect a single entity. Returns a [product, offer] tuple if this
-     * entity is a hard URL / variant-key match worth returning immediately,
-     * otherwise updates {@see JsonLdSearchState} with weaker candidates and
-     * variant candidates, and returns null.
+     * Inspect a single entity, recording what it offers in
+     * {@see JsonLdSearchState}. Nothing is returned early: the caller reads
+     * the winner off the state once every entity has had its turn.
      *
      * @param  array<string, mixed>  $entity
-     * @return array{0: array<string, mixed>, 1: array<string, mixed>}|null
      */
-    public function consider(array $entity, string $url, ?AdapterContext $context, JsonLdSearchState $state): ?array
+    public function consider(array $entity, string $url, ?AdapterContext $context, JsonLdSearchState $state): void
     {
         $types = JsonLdEntities::typesOf($entity);
         $variantKey = $context?->variantKey;
 
         if (in_array('Product', $types, strict: true)) {
-            $matched = self::tryMatch($entity, $url, $variantKey);
-            if ($matched !== null) {
-                return $matched;
-            }
-            $state->product ??= $entity;
+            self::weigh($entity, $url, $variantKey, $state);
         }
 
         if (in_array('ProductGroup', $types, strict: true)) {
             $state->productGroup ??= $entity;
-            $matched = self::scanVariants($entity, $url, $variantKey, $state);
-            if ($matched !== null) {
-                return $matched;
-            }
+            self::scanVariants($entity, $url, $variantKey, $state);
         }
 
         if ($state->shop === null && JsonLdEntities::isOfferType($types)) {
             $state->shop = $entity;
         }
-
-        return null;
     }
 
     /**
-     * Schema.org `hasVariant` traversal: prefer the variant whose `url` or
-     * `productID`/`sku` matches the requested URL / persisted variant_key.
-     * Variants that don't match are collected as candidates so the caller
-     * can surface a chooser when more than one exists.
+     * Close the scan. Entities that tied on precision are the question
+     * itself — the page states no way to tell them apart — so they become
+     * the choices the caller offers.
+     */
+    public function finish(JsonLdSearchState $state): void
+    {
+        if (! $state->tied) {
+            return;
+        }
+
+        foreach ($state->topMatches as $match) {
+            $candidate = self::candidateFor($match[0]);
+
+            if ($candidate !== null) {
+                $state->variants[] = $candidate;
+            }
+        }
+    }
+
+    /**
+     * Record where a single Product stands: an entity naming a variant
+     * competes on precision, one naming only the page is held as a
+     * fallback, and one naming neither is just the weakest candidate.
+     *
+     * @param  array<string, mixed>  $entity
+     */
+    private static function weigh(array $entity, string $url, ?string $variantKey, JsonLdSearchState $state): void
+    {
+        if (JsonLdOfferVariants::weigh($entity, $url, $variantKey, $state)) {
+            return;
+        }
+
+        $matched = JsonLdMatch::attempt($entity, $url, $variantKey);
+
+        if ($matched === null) {
+            $state->product ??= $entity;
+
+            return;
+        }
+
+        if ($variantKey !== null && JsonLdMatch::keyMatches($entity, $variantKey)) {
+            $state->keyMatched = true;
+        }
+
+        $precision = JsonLdMatch::precision($entity, $url, $variantKey);
+
+        if ($precision > 0) {
+            $state->offer($matched, $precision);
+
+            return;
+        }
+
+        $state->namesPageOnly ??= $matched;
+    }
+
+    /**
+     * Schema.org `hasVariant` traversal: every variant that fits the
+     * request competes on precision; the rest become chooser candidates.
      *
      * @param  array<string, mixed>  $productGroup
-     * @return array{0: array<string, mixed>, 1: array<string, mixed>}|null
      */
-    private static function scanVariants(array $productGroup, string $url, ?string $variantKey, JsonLdSearchState $state): ?array
+    private static function scanVariants(array $productGroup, string $url, ?string $variantKey, JsonLdSearchState $state): void
     {
         $variants = $productGroup['hasVariant'] ?? null;
+
         if (! is_array($variants)) {
-            return null;
+            return;
         }
+
+        $fitsPageOnly = [];
 
         foreach ($variants as $variant) {
             if (! is_array($variant)) {
@@ -77,61 +119,55 @@ final readonly class JsonLdEntitySearcher
                 continue;
             }
 
-            $matched = self::tryMatch($variant, $url, $variantKey);
+            if ($variantKey !== null && JsonLdMatch::keyMatches($variant, $variantKey)) {
+                $state->keyMatched = true;
+            }
+
+            $matched = JsonLdMatch::attempt($variant, $url, $variantKey);
+            $precision = $matched === null ? -1 : JsonLdMatch::precision($variant, $url, $variantKey);
+
+            if ($matched !== null && $precision > 0) {
+                $state->offer($matched, $precision);
+
+                continue;
+            }
+
             if ($matched !== null) {
-                return $matched;
+                $fitsPageOnly[] = $matched;
+
+                continue;
             }
 
-            $candidate = self::candidateFor($variant);
-            if ($candidate !== null) {
-                $state->variants[] = $candidate;
-            }
-
-            $state->product ??= $variant;
+            self::collect($variant, $state);
         }
 
-        return null;
+        // One variant fitting the request identifies it even when its URL
+        // names no variant of its own — a group listing a queryless entry
+        // is naming its default. Several fitting variants identify nothing,
+        // so they join the chooser instead.
+        if (count($fitsPageOnly) === 1) {
+            $state->offer($fitsPageOnly[0], 0);
+
+            return;
+        }
+
+        foreach ($fitsPageOnly as $match) {
+            self::collect($match[0], $state);
+        }
     }
 
     /**
-     * @param  array<string, mixed>  $entity
-     * @return array{0: array<string, mixed>, 1: array<string, mixed>}|null
+     * @param  array<string, mixed>  $variant
      */
-    private static function tryMatch(array $entity, string $url, ?string $variantKey): ?array
+    private static function collect(array $variant, JsonLdSearchState $state): void
     {
-        $matches = ($variantKey !== null && self::keyMatches($entity, $variantKey))
-            || JsonLdEntities::urlMatches($entity, $url);
+        $candidate = self::candidateFor($variant);
 
-        if (! $matches) {
-            return null;
+        if ($candidate !== null) {
+            $state->variants[] = $candidate;
         }
 
-        $shop = JsonLdEntities::pickOfferFromProduct($entity['offers'] ?? null);
-        if ($shop === null) {
-            return null;
-        }
-
-        return [$entity, $shop];
-    }
-
-    /**
-     * @param  array<string, mixed>  $entity
-     */
-    private static function keyMatches(array $entity, string $key): bool
-    {
-        foreach (self::KEY_FIELDS as $field) {
-            $value = $entity[$field] ?? null;
-            if (is_scalar($value) && (string) $value === $key) {
-                return true;
-            }
-        }
-
-        // Allow storing a full variant URL as the key.
-        if (JsonLdEntities::urlMatches($entity, $key)) {
-            return true;
-        }
-
-        return false;
+        $state->product ??= $variant;
     }
 
     /**
@@ -140,7 +176,7 @@ final readonly class JsonLdEntitySearcher
      *
      * @param  array<string, mixed>  $variant
      */
-    private static function candidateFor(array $variant): ?VariantCandidate
+    public static function candidateFor(array $variant): ?VariantCandidate
     {
         $offer = JsonLdEntities::pickOfferFromProduct($variant['offers'] ?? null);
         if (! is_array($offer)) {
@@ -167,7 +203,7 @@ final readonly class JsonLdEntitySearcher
      */
     private static function variantKeyFor(array $variant): string
     {
-        foreach (self::KEY_FIELDS as $field) {
+        foreach (JsonLdMatch::KEY_FIELDS as $field) {
             $value = $variant[$field] ?? null;
             if (is_scalar($value)) {
                 $str = (string) $value;

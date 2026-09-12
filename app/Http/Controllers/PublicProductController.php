@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Response;
@@ -37,7 +38,9 @@ final class PublicProductController extends Controller
         $shops = $product->shops()
             ->select(['id', 'product_id', 'host', 'current_price', 'current_in_stock', 'currency', 'last_checked_at', 'url', 'pack_quantity', 'pack_unit'])
             ->where('active', true)
-            ->where('current_in_stock', true)
+            ->where(fn (EloquentBuilder $stock): EloquentBuilder => $stock
+                ->where('current_in_stock', true)
+                ->orWhereNull('current_in_stock'))
             ->where('health', '!=', ShopHealth::Dead->value)
             ->whereNotNull('current_price')
             ->orderBy('current_price')
@@ -57,7 +60,8 @@ final class PublicProductController extends Controller
     /**
      * Build the [{x: ISO timestamp, y: decimal price string}, ...] payload
      * the Chart.js line chart consumes. Reads from ProductCheapestHistory
-     * for segments whose started_at falls in the last 90 days. Each segment
+     * for segments that overlap the last 90 days — a price that has not moved
+     * since before the window is still the current price. Each segment
      * contributes two points (started_at, ended_at) so the line steps when
      * the cheapest shop changes; the open segment's right edge is "now".
      *
@@ -71,26 +75,21 @@ final class PublicProductController extends Controller
         $segments = ProductCheapestHistory::query()
             ->select(['cheapest_price', 'started_at', 'ended_at'])
             ->where('product_id', $product->id)
-            ->where('started_at', '>=', $cutoff)
-            ->oldest('started_at')
+            ->overlapping($cutoff)
+            ->inOrder()
             ->get();
 
         $points = [];
         $now = CarbonImmutable::now();
         foreach ($segments as $segment) {
             $price = $segment->cheapest_price === null ? null : (string) $segment->cheapest_price;
-            $started = $segment->started_at;
             $ended = $segment->ended_at ?? $now;
-            // Larastan doesn't infer the datetime cast off the model's
-            // casts() method shape — narrow to CarbonInterface for PHPStan.
-            assert($started instanceof CarbonImmutable);
-            assert($ended instanceof CarbonImmutable);
-            /** @var string $startedIso — Larastan widens toIso8601String() to mixed; the @var pins it for the array shape below. */
-            $startedIso = $started->toIso8601String();
-            /** @var string $endedIso — same widening as above. */
-            $endedIso = $ended->toIso8601String();
-            $points[] = ['x' => $startedIso, 'y' => $price];
-            $points[] = ['x' => $endedIso, 'y' => $price];
+            // A segment may start long before the window it is drawn in, so
+            // clip its left edge to the cutoff. The heading above the canvas
+            // promises 90 days and the time axis has no floor of its own.
+            $started = $segment->started_at->max($cutoff);
+            $points[] = ['x' => $started->toIso8601String(), 'y' => $price];
+            $points[] = ['x' => $ended->toIso8601String(), 'y' => $price];
         }
 
         return $points;

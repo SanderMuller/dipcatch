@@ -1,9 +1,11 @@
-<x-layouts::auth :title="__('Log in')">
+<x-layouts::auth :title="__('Sign in to DipCatch')" robots="noindex">
     <div class="flex flex-col gap-6">
         <x-auth-header :title="__('Log in to your account')" :description="__('Enter your email and password below to log in')" />
 
         <!-- Session Status -->
         <x-auth-session-status class="text-center" :status="session('status')" />
+
+        <x-passkey-verify />
 
         <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-6">
             @csrf
@@ -16,7 +18,7 @@
                 type="email"
                 required
                 autofocus
-                autocomplete="email"
+                autocomplete="username"
                 placeholder="email@example.com"
             />
 

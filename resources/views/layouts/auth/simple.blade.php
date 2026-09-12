@@ -1,7 +1,12 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
     <head>
-        @include('partials.head')
+        @include('partials.head', [
+            'title' => $title ?? null,
+            'description' => $description ?? null,
+            'canonical' => $canonical ?? null,
+            'robots' => $robots ?? null,
+        ])
     </head>
     <body class="min-h-screen bg-white antialiased dark:bg-linear-to-b dark:from-neutral-950 dark:to-neutral-900">
         <div class="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">

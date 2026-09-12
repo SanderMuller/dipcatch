@@ -13,6 +13,20 @@ vendor/bin/pest --filter=testName
 
 ---
 
+## Public Repository — Everything You Push Is Published
+
+`SanderMuller/dipcatch` is a public GitHub repository. A later commit, a force-push or a rename does not unpublish what a push already published. Treat every commit, branch name and PR body as permanent and world-readable, and remember that `.gitignore` names files, not classes of file — it is not a safety net.
+
+- Never commit a secret — an API key, token, password, private key, signed URL, internal hostname or connection string. `.env.example` is the only `.env*` file that belongs in the repository, and it carries defaults and placeholders, never a working credential.
+- A secret that reached `origin` is leaked, not fixable in place. Stop, tell the user to rotate the credential, and remove it from the code after that.
+- Keep personal data out of the repository. Tests, factories, seeders, screenshots and documentation use fictional names and e-mail addresses. Strip session cookies, auth tokens and anything that identifies a person from a captured page fixture under `tests/Fixtures/` before you commit it. A real shop URL or public product page is fine.
+- A browser-harness run under `.github/eye-verify/` leaves more than screenshots. Never commit its storage state, trace, HAR or network dump — a storage state holds a live session cookie.
+- Commit messages, PR and issue text, code comments and TODOs are public too. Keep an internal host, a private URL and a real customer name out of them. The local `.test` host and a package this repository already depends on are fine.
+- Keep an agent working file out of the commit — a plan, a review brief, a scratch note. `/internal` is gitignored and holds them.
+- Give a workflow under `.github/workflows/` no more `permissions:` than its jobs need, and give a new ignore in `.github/zizmor.yml` a comment that states why.
+
+---
+
 ## Release Notes vs CHANGELOG
 
 `CHANGELOG.md` is **auto-populated by CI** on release. Do not hand-edit it.
@@ -20,6 +34,209 @@ vendor/bin/pest --filter=testName
 When you need to document a user-facing change for a release, write it to `RELEASE_NOTES_<version>.md` at the repo root (already gitignored via the `RELEASE_NOTES*.md` pattern). The CI release job picks it up and promotes it into `CHANGELOG.md` as part of the tag flow.
 
 If you find yourself editing `CHANGELOG.md` directly, stop — it will be overwritten.
+
+---
+
+## Shared Redis — Keep the Key Prefix
+
+Every project on this Laravel Cloud account shares one Redis instance. The key prefix is the only thing that separates them, so a lost prefix means one project reads and overwrites another project's cache, sessions and queues.
+
+- Keep `REDIS_PREFIX` and `CACHE_PREFIX` app-specific. Never set either to an empty value, and keep the `Str::slug(APP_NAME)` defaults in `config/database.php` and `config/cache.php`.
+- Every connection under `database.redis` inherits the top-level `options.prefix`. A per-connection `prefix` or `options` key overrides it — do not add one that clears the prefix.
+- Do not use a database index for isolation. Managed Redis may allow index 0 only, and an index is not a namespace.
+- A package or client that reaches Redis outside `Redis::connection()` never gets that prefix. Give it an app-scoped prefix in its own config — `queue-insights.key_prefix` is one such setting.
+
+---
+
+# Laravel Boost
+
+## Project Rules
+- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists (settled decisions, non-obvious traps, standing constraints). Framework and package guidelines that only apply to specific paths (testing, frontend, components) also live there, under `.ai/rules/boost` — this is not just recorded decisions, it is load-bearing guidance you have not seen inline. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
+
+
+## Artisan
+- Run Artisan commands directly via the command line (e.g., `php artisan route:list`). Use `php artisan list` to discover available commands and `php artisan [command] --help` to check parameters.
+- Inspect routes with `php artisan route:list`. Filter with: `--method=GET`, `--name=users`, `--path=api`, `--except-vendor`, `--only-vendor`.
+- Read configuration values using dot notation: `php artisan config:show app.name`, `php artisan config:show database.default`. Or read config files directly from the `config/` directory.
+
+## Tinker
+- Execute PHP in app context for debugging and testing code. Do not create models without user approval, prefer tests with factories instead. Prefer existing Artisan commands over custom tinker code.
+- Always use single quotes to prevent shell expansion: `php artisan tinker --execute 'Your::code();'`
+  - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
+
+---
+
+# Deployment
+
+- Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
+- Activate the `deploying-to-cloud` skill whenever deploying to Laravel Cloud, configuring Cloud environments or resources, using the Cloud CLI, or troubleshooting Cloud deployments.
+
+---
+
+# Test Enforcement
+
+- Add or update tests for behavior and logic changes when a test provides meaningful regression coverage.
+- Pure copy, styling, and layout-only changes do not require new or updated tests.
+- When test coverage applies, run the affected tests and ensure they pass.
+- Test the changed behavior and its important failure modes, but do not add tests beyond them.
+- Read the `testing-best-practices` skill before writing tests.
+
+---
+
+# Laravel Boost Guidelines
+
+The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to ensure the best experience when building Laravel applications.
+
+## Foundational Context
+This application is a Laravel application running on PHP 8.5. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
+
+Before relying on a package's API, confirm its installed version:
+- PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
+- JS packages: check `package.json` for the installed versions.
+
+
+
+## Conventions
+- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, and naming.
+- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
+- Check for existing components to reuse before writing a new one.
+
+## Verification Scripts
+- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
+
+## Application Structure & Architecture
+- Stick to existing directory structure; don't create new base folders without approval.
+- Do not change the application's dependencies without approval.
+
+## Frontend Bundling
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `yarn run build`, `yarn run dev`, or `composer run dev`. Ask them.
+
+## Documentation Files
+- You must only create documentation files if explicitly requested by the user.
+
+## Replies
+- Be concise in your explanations - focus on what's important rather than explaining obvious details.
+
+---
+
+# Laravel Herd
+
+- The application is served by Laravel Herd at `https?://[kebab-case-project-dir].test`. Use the `get-absolute-url` tool to generate valid URLs. Never run commands to serve the site. It is always available.
+- Use the `herd` CLI to manage services, PHP versions, and sites (e.g. `herd sites`, `herd services:start <service>`, `herd php:list`). Run `herd list` to discover all available commands.
+
+---
+
+# Do Things the Laravel Way
+
+- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
+- If you're creating a generic PHP class, use `php artisan make:class`.
+- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
+
+@scoped(['app/Models/**'])
+### Model Creation
+
+- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
+@endscoped
+
+@scoped(['app/Http/**', 'routes/**'])
+## APIs & Eloquent Resources
+
+- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
+@endscoped
+
+## URL Generation
+- When generating links to other pages, prefer named routes and the `route()` function.
+
+@scoped(['tests/**'])
+## Testing
+
+- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
+- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
+- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
+@endscoped
+
+## Vite Error
+- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `yarn run build` or ask the user to run `yarn run dev` or `composer run dev`.
+
+---
+
+@scoped(['app/Livewire/**', 'resources/views/**'])
+# Livewire
+
+- Livewire allows you to build dynamic, reactive interfaces in PHP without writing JavaScript.
+- You can use Alpine.js for client-side interactions instead of JavaScript frameworks.
+- Keep state server-side so the UI reflects it. Validate and authorize in actions as you would in HTTP requests.
+@endscoped
+
+---
+
+@scoped(['tests/**'])
+# Pest
+
+- This project uses Pest. Create tests with `php artisan make:test --pest {name}`.
+- Do not include the test suite directory in `{name}`. Use `SomeFeatureTest`, not `Feature/SomeFeatureTest`.
+- Read the `testing-best-practices` skill for guidance on coverage, naming, structure, dependency isolation, and review.
+- Do not delete tests or test files without approval. They are part of the application.
+
+## Running Tests
+
+- Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
+- Rerun a test after each change to it.
+- Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
+- After the feature tests pass, ask the user to run the complete suite with `php artisan test --compact`.
+@endscoped
+
+---
+
+## PHP 8.4
+
+Use these array functions instead of manual loops when not using Laravel collections:
+- `array_find(array $array, callable $callback): mixed` - first matching element
+- `array_find_key(array $array, callable $callback): int|string|null` - first matching key
+- `array_any(array $array, callable $callback): bool` - true if any element matches
+- `array_all(array $array, callable $callback): bool` - true if all elements match
+
+Chain directly on new instances without wrapping in parentheses:
+```php
+// Before: $response = (new JsonResponse(['data' => $data]))->setStatusCode(201);
+$response = new JsonResponse(['data' => $data])->setStatusCode(201);
+```
+
+---
+
+## PHP 8.5
+
+Use these array functions instead of manual loops when not using Laravel collections:
+
+- `array_first(array $array): mixed` - first value or `null` if empty
+- `array_last(array $array): mixed` - last value or `null` if empty
+
+Use the pipe operator (`|>`) to chain function calls left-to-right instead of nesting:
+
+```php
+// Before: $slug = strtolower(str_replace(' ', '-', trim($title)));
+$slug = $title |> trim(...) |> (fn($s) => str_replace(' ', '-', $s)) |> strtolower(...);
+```
+
+Use `clone($object, ['property' => $value])` to modify properties during cloning. Ideal for readonly classes.
+
+---
+
+# PHP
+
+- Always use curly braces for control structures, even for single-line bodies.
+- Use PHP 8 constructor property promotion: `public function __construct(public GitHub $github) { }`. Do not leave empty zero-parameter `__construct()` methods unless the constructor is private.
+- Use explicit return type declarations and type hints for all method parameters: `function isAccessible(User $user, ?string $path = null): bool`
+- Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
+- Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
+- Use array shape type definitions in PHPDoc blocks.
+
+---
+
+# Laravel Pint Code Formatter
+
+- If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
+- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
 
 ---
 
@@ -177,6 +394,31 @@ $table->string('description')->after('name');
 $table->string('description');
 ```
 
+### Guard Each Statement On an Engine Without Transactional DDL
+
+A migration runner records a migration only after its whole `up()` returns, and it wraps the run in a transaction only for engines it treats as supporting transactional DDL. Laravel does that for PostgreSQL and SQL Server, and not for MySQL, MariaDB or SQLite. Without that transaction, a run that dies halfway leaves the applied statements in place with nothing recorded, and the retry fails on the first statement it already applied, blocking every later migration. Check which side your engine and runner fall on before assuming a failed migration rolled back.
+
+Make each statement in a multi-statement migration skippable when it is already applied, using the runner's own column and index checks.
+
+```php
+// ❌ WRONG — a retry after a half-applied run dies on "Duplicate column name"
+Schema::table('orders', function (Blueprint $table) {
+    $table->string('reference');
+    $table->index('reference');
+});
+
+// ✅ CORRECT — each statement checks for itself first
+if (! Schema::hasColumn('orders', 'reference')) {
+    Schema::table('orders', fn (Blueprint $table) => $table->string('reference'));
+}
+
+if (! Schema::hasIndex('orders', 'orders_reference_index')) {
+    Schema::table('orders', fn (Blueprint $table) => $table->index('reference'));
+}
+```
+
+Keep slow work out of the migration on a large table: build an index, backfill a column, or add a foreign key as a separate job or an out-of-band task, not inside the deploy step.
+
 ---
 
 ## Fixing PHPStan Errors
@@ -199,6 +441,10 @@ Write a test when the PHPStan error indicates a fault that would surface at runt
 - A return-type mismatch that would break callers
 - Accessing a property or method that does not exist
 - Any type error that would manifest as a runtime exception
+
+### Annotate Rather Than Suppress
+
+Some errors are PHPStan reading a signature that says less than the code does — a return type a parameter decides, a bool helper that proves a type. The `backend-quality` skill carries the two annotations that state the missing fact, and the rules for when each one lies.
 
 ### When to Skip the Test
 
@@ -223,6 +469,29 @@ When signing is enabled, every commit must be signed. If the signing backend or 
 - **Do not** retry with `--no-gpg-sign`, unset `commit.gpgsign`, or otherwise produce an unsigned commit to "get past" the problem.
 
 A missing signature is a blocker to resolve (unlock the agent, re-authenticate 1Password, plug in the key), not a step to skip. Let the user fix the signing setup, then commit signed.
+
+---
+
+## Task Scope and Edits
+
+For session, branch, and PR scope, see the `single-issue-scope` guideline when the project enables it.
+
+### The Task Sets the Scope
+
+- Do not fix a pre-existing bug, a performance problem, or unrelated behaviour you find on the way, unless the requested behaviour cannot work without it. The same holds for refactors, cleanup, and documentation nobody asked for. A defect your own change introduces is not pre-existing: fix it.
+- A sibling rule that requires an update on a line you already change still applies. The rule removes extras, not obligations.
+- Report the rest as a follow-up in your summary. Propose an issue when the project tracks work that way, and let the user decide whether to file it. Report it; do not fix it.
+- Implement every behaviour the task does ask for, completely. This rule cuts extras, never the requested scope.
+
+### One Reading of an Ambiguous Ask
+
+Implement the reading that the wording and the surrounding code support most directly. State that assumption in your summary. Do not build for both readings.
+
+Materially different work is the test. When two readings would produce the same change, pick one and carry on. When they would not, or when a wrong guess is unsafe or makes the work useless, ask before building — through the `clarify` skill where the whole ask is fuzzy, otherwise with a direct question.
+
+### Edit in Place
+
+Change only the lines that must change. Rewrite a whole file only when the file is short, or when most of it changes. A rewrite churns lines the task never touched and can drop content by accident.
 
 ---
 
@@ -256,6 +525,12 @@ Use the project's own commands — check its `composer.json` / `package.json` sc
 
 Where the project has dedicated quality-check skills synced, delegate to them — `backend-quality` for backend files, `frontend-quality` for frontend files, both when a change spans both. Otherwise, run the project's own equivalent commands directly.
 
+### A Commit Is a Claim Too
+
+Commit a change once its own checks pass against the tree as it stands, not while the approach is still being tried. A commit reads as a decision. The next defect then gets patched on top of the approach instead of the approach being dropped, and each extra commit raises the cost of the revert that was the right answer.
+
+Deferring is not "never commit". Uncommitted work is unprotected, and a commit is still the safe way to set work aside or to hand it over. A measurement loop inverts the rule on purpose — it commits before it measures, so a rejected experiment reverts in one step. Where a skill states that it commits first, that skill wins for its own flow.
+
 ### Never Use Without Evidence
 
 - "should work now"
@@ -264,6 +539,14 @@ Where the project has dedicated quality-check skills synced, delegate to them �
 - "I'm confident this works"
 
 These phrases indicate missing verification. Run the command first, then report what actually happened.
+
+### Say What You Did Not Verify
+
+State the limits of your own check. A reader cannot tell a gap you did not mention from a check you ran, so an unmentioned gap counts as a claim you did not make good on.
+
+When you report a result, name what you ran and what you did not. "The unit suite passes; I did not run the browser tests" is a complete report. "Tests pass" is not, when you ran one suite of three. The same holds for a claim you carried over from an earlier step: if you did not re-run it against the tree as it stands now, say so.
+
+This is the outward half of the `NEEDS-CONFIRMATION` rule above. That rule stops you asserting an untraced cause. This one stops a traced, true statement from implying more than it covers.
 
 ---
 
@@ -287,7 +570,7 @@ This table decides which rule applies to a piece of text. Never apply both to th
 
 A surface the table does not list gets Simplified Technical English, unless an end user reads it. Then it gets the project's tone-of-voice rules. A project without documented tone-of-voice rules gets Simplified Technical English everywhere.
 
-This guideline governs **how a sentence is built**. It never overrides what a document is allowed to say: an issue-format doc still owns issue content, and a PR template still owns its sections.
+This guideline governs **how a sentence is built**, and how much you write. It never overrides what a document is allowed to say: an issue-format doc still owns issue content, and a PR template still owns its sections.
 
 ### Simplified Technical English
 
@@ -307,6 +590,20 @@ This guideline governs **how a sentence is built**. It never overrides what a do
 - No metaphors, no clichés, no jokes that carry meaning the plain sentence does not.
 
 The sentence limits, the tense list, the article rule, and the paragraph limit come from the ASD-STE100 writing rules. The everyday-words, Latin-abbreviation, no-shouting, and no-metaphor rules come from the GOV.UK content style guide.
+
+### Register and Volume
+
+Simplified Technical English decides how a sentence is built. This section decides how much you write and how you format it. A reply can pass every rule above and still read as machine output, because it is ten times the size of the question and formatted as a report.
+
+**Answer at the size of the question.** A one-line question gets a one-line answer. A yes/no question gets "yes" or "no", and a reason only if the reader cannot act without it. Do not pad a short answer to look thorough. A longer answer does not show more care, and the reader has to find the answer inside it. A sentence that names what you did not verify is content, not padding, and stays.
+
+**Do not format someone else's thread like a document.** In a PR comment, an issue comment, a chat reply, or a review reply, do not use bold section headings, tables, or fenced evidence blocks unless the reader asked for detail or the content cannot be read without them. A code block that quotes real output or a real diff is content and stays. The rest reads as machine output whatever the words are worth.
+
+**One answer per turn.** Do not answer a question and then add a closing observation about what the work taught you. Stop when the answer is complete.
+
+**Read the thread again as the last step before you post.** The thread can move while you draft. A reply to a question the other person already withdrew costs more than a slow reply.
+
+Apply these rules most strictly outside your own repository. A maintainer who does not know you can reject a contribution on this basis alone, and the change itself is then no longer read on merit.
 
 ---
 

@@ -35,6 +35,6 @@ test('admin can also access the app panel', function (): void {
     $this->get('/app')->assertOk();
 });
 
-test('public registration is disabled (route does not exist)', function (): void {
-    expect(Route::has('register'))->toBeFalse();
+test('public registration is enabled', function (): void {
+    expect(Route::has('register'))->toBeTrue();
 });

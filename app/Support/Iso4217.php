@@ -25,6 +25,25 @@ final class Iso4217
         return array_combine(self::CODES, self::CODES);
     }
 
+    /**
+     * A storable currency code, or null when the value is not one.
+     *
+     * The `currency` columns are `char(3)`. A shop publishing `" EUR "` or
+     * `"Euro"` used to reach the insert unchanged, which SQLite accepted and
+     * Postgres refused with "value too long for type character(3)" — the
+     * recheck then failed for that shop on every run.
+     */
+    public static function normalize(?string $code): ?string
+    {
+        if ($code === null) {
+            return null;
+        }
+
+        $normalized = strtoupper(trim($code));
+
+        return preg_match('/^[A-Z]{3}$/', $normalized) === 1 ? $normalized : null;
+    }
+
     public static function isValid(string $code): bool
     {
         return in_array(strtoupper($code), self::CODES, strict: true);

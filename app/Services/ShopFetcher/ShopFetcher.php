@@ -3,11 +3,14 @@
 namespace App\Services\ShopFetcher;
 
 use App\Services\ShopFetcher\Exceptions\Blocked;
+use App\Services\ShopFetcher\Exceptions\FetchException;
 use App\Services\ShopFetcher\Exceptions\HttpError;
+use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
 use App\Support\Config as DipConfig;
+use App\Support\UnservableShops;
 use App\Support\UrlNormalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
@@ -54,11 +57,17 @@ final readonly class ShopFetcher
         'akamai reference',
         'perimeterx',
         'px-captcha',
+        // Imperva/Incapsula serves a 200 with a tiny iframe shell. Without
+        // this marker the generic adapter can read a number out of the
+        // challenge page and store it as a price (hoogvliet.com, 2026-09-01).
+        'incapsula incident id',
+        '_incapsula_resource',
     ];
 
     public function __construct(
         private RobotsTxtPolicy $robots,
         private UrlSafetyGuard $safety,
+        private HostFetchMemory $memory,
     ) {}
 
     public function fetch(string $url): FetchResult
@@ -88,9 +97,20 @@ final readonly class ShopFetcher
 
         $this->throttle($host);
 
-        $response = $this->sendRequest($url);
+        // Remember how this host answers: a caller told "try again shortly"
+        // for the tenth deterministic refusal in a row is being sent back to
+        // do the same thing again.
+        try {
+            $response = $this->sendRequest($url);
 
-        $this->classify($response);
+            $this->classify($response);
+        } catch (Blocked|TemporaryFailure $e) {
+            $this->memory->recordFailure($host, $e);
+
+            throw $e;
+        }
+
+        $this->memory->forget($host);
 
         $html = $this->prepareBody($response);
 
@@ -104,6 +124,16 @@ final readonly class ShopFetcher
         $effectiveHost = parse_url($finalUrl, PHP_URL_HOST);
         if (is_string($effectiveHost) && $effectiveHost !== '') {
             $finalHost = UrlNormalizer::normalizeHost($effectiveHost);
+        }
+
+        // The host that served the body decides, not the one the user
+        // pasted: coop.nl redirects every path to the plus.nl home page,
+        // which would otherwise reach the adapter chain as if it were a
+        // product page (verified 2026-09-02).
+        $unservable = UnservableShops::reasonFor($finalHost);
+
+        if ($unservable !== null) {
+            throw new NotServable($finalHost, $unservable);
         }
 
         return new FetchResult(
@@ -163,17 +193,46 @@ final readonly class ShopFetcher
                         'max' => 5,
                         'strict' => true,
                         // Validate redirect targets against the SSRF guard so a
-                        // public URL can't bounce us to 127.0.0.1 or AWS metadata.
-                        'on_redirect' => static function (RequestInterface $request, ResponseInterface $response, UriInterface $uri) use ($safety): void {
+                        // public URL can't bounce us to 127.0.0.1 or AWS metadata,
+                        // and against the target's own robots.txt — the rules
+                        // checked before the request belong to the host that was
+                        // asked, not to the host the redirect points at.
+                        'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $uri) use ($safety): void {
                             $safety->assertSafe((string) $uri);
+                            $this->assertRobotsAllows((string) $uri);
                         },
                     ],
                 ])
                 ->get($url);
         } catch (ConnectionException) {
             throw new TemporaryFailure(599);
+        } catch (FetchException $e) {
+            // A redirect the callbacks refused: keep the reason, which the
+            // caller turns into its own outcome.
+            throw $e;
         } catch (Throwable) {
             throw new HttpError(0);
+        }
+    }
+
+    /**
+     * Guard one redirect hop against the target host's robots.txt, before
+     * that request goes out.
+     */
+    private function assertRobotsAllows(string $url): void
+    {
+        $parsed = parse_url($url);
+
+        if ($parsed === false || ! isset($parsed['host'])) {
+            return;
+        }
+
+        $host = UrlNormalizer::normalizeHost($parsed['host']);
+        $path = $parsed['path'] ?? '/';
+        $scheme = strtolower($parsed['scheme'] ?? 'https');
+
+        if (! $this->robots->isAllowed($host, $path, $scheme)) {
+            throw new RobotsDisallowed("robots.txt disallows {$host}{$path}");
         }
     }
 

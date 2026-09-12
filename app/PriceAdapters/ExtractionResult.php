@@ -31,6 +31,8 @@ final readonly class ExtractionResult
         public ?string $failureReason,
         public ?string $adapterKey = null,
         public array $variants = [],
+        /** The `variant_key` the caller sent when it matched nothing on the page. */
+        public ?string $unmatchedVariantKey = null,
     ) {}
 
     public static function skip(): self
@@ -51,14 +53,20 @@ final readonly class ExtractionResult
     /**
      * @param  list<VariantCandidate>  $variants
      */
-    public static function ambiguous(array $variants): self
+    public static function ambiguous(array $variants, ?string $unmatchedVariantKey = null): self
     {
-        return new self(self::STATE_AMBIGUOUS, snapshot: null, failureReason: 'multiple_variants', variants: $variants);
+        return new self(
+            self::STATE_AMBIGUOUS,
+            snapshot: null,
+            failureReason: $unmatchedVariantKey === null ? 'multiple_variants' : 'variant_key_no_match',
+            variants: $variants,
+            unmatchedVariantKey: $unmatchedVariantKey,
+        );
     }
 
     public function withAdapterKey(string $key): self
     {
-        return new self($this->state, $this->snapshot, $this->failureReason, $key, $this->variants);
+        return new self($this->state, $this->snapshot, $this->failureReason, $key, $this->variants, $this->unmatchedVariantKey);
     }
 
     public function isSkip(): bool

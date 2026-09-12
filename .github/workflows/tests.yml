@@ -14,11 +14,16 @@ on:
       - master
       - workos
 
+permissions:
+  contents: read
+
 jobs:
   ci:
+    name: tests (pgsql)
     runs-on: ubuntu-latest
     environment: Testing
     strategy:
+      fail-fast: false
       matrix:
         php-version: ['8.5']
 
@@ -35,6 +40,26 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dipcatch_test
+          # initdb does not need to survive a crash it will never have.
+          POSTGRES_INITDB_ARGS: --nosync
+        ports:
+          - 5432:5432
+        # The data directory lives in RAM: a CI database is thrown away at
+        # the end of the job, so paying for durable writes buys nothing.
+        # A service container cannot override the command, so this is how
+        # the fsync cost is removed.
+        options: >-
+          --mount type=tmpfs,destination=/var/lib/postgresql/data
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout code
@@ -46,7 +71,10 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
-          extensions: bcmath, redis, pdo_sqlite, sqlite3
+          # pdo_sqlite stays for CopyDatabaseCommandTest, which uses two
+          # throwaway SQLite files to stand in for a source and a target
+          # engine. Nothing else in the suite touches SQLite.
+          extensions: bcmath, redis, pdo_sqlite, sqlite3, pdo_pgsql, pgsql, intl
           tools: composer:v2
           coverage: xdebug
 
@@ -54,15 +82,33 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '22'
+          # The repository locks with yarn, so that is what the cache and
+          # the install must use — `npm i` ignored yarn.lock and resolved
+          # the tree again on every run.
+          cache: yarn
+          cache-dependency-path: yarn.lock
+
+      - name: Restore Built Assets
+        id: assets
+        uses: actions/cache@v6
+        with:
+          path: public/build
+          # composer.lock is part of the key because the CSS pulls Flux out
+          # of vendor/, so a Flux bump changes the build without any file in
+          # resources/ changing.
+          key: vite-${{ hashFiles('yarn.lock', 'package.json', 'vite.config.js', 'composer.lock', 'resources/**') }}
 
       - name: Install Node Dependencies
-        run: npm i
+        if: steps.assets.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
 
       - name: Add Flux Credentials Loaded From ENV
         run: composer config http-basic.composer.fluxui.dev "${{ secrets.FLUX_USERNAME }}" "${{ secrets.FLUX_LICENSE_KEY }}"
 
       - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        uses: ramsey/composer-install@v4
+        with:
+          composer-options: --prefer-dist --optimize-autoloader
 
       - name: Copy Environment File
         run: cp .env.example .env
@@ -73,8 +119,18 @@ jobs:
       - name: Generate Application Key
         run: php artisan key:generate
 
+      - name: Generate Passport Keys
+        # The MCP server authenticates with Passport, and its guard cannot
+        # parse a bearer token without these. They are gitignored, so CI
+        # makes its own each run.
+        run: php artisan passport:keys --force
+
       - name: Build Assets
-        run: npm run build
+        if: steps.assets.outputs.cache-hit != 'true'
+        run: yarn build
 
       - name: Run Tests
-        run: ./vendor/bin/pest
+        # Connection details come from phpunit.xml.dist, which points at the
+        # Postgres service above. Each worker gets its own database (Laravel
+        # appends the token) and its own Redis prefix (AppServiceProvider).
+        run: ./vendor/bin/pest --parallel

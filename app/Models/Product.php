@@ -7,7 +7,9 @@ use App\Enums\ShopHealth;
 use App\Services\Drops\Reference;
 use App\Support\ImageUrl;
 use App\Support\Numeric;
+use Carbon\CarbonImmutable;
 use Database\Factories\ProductFactory;
+use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +17,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * @property CarbonImmutable|null $history_kept_from
+ */
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
@@ -33,8 +38,15 @@ class Product extends Model
             'drop_threshold_pct' => 'decimal:2',
             'drop_threshold_abs' => 'decimal:2',
             'cheapest_price' => 'decimal:2',
+            'target_price' => 'decimal:2',
+            'target_price_notified' => 'decimal:2',
+            'target_price_notified_at' => 'datetime',
+            'unit_price_target' => 'decimal:2',
+            'unit_price_notified' => 'decimal:2',
+            'unit_price_notified_at' => 'datetime',
             'last_notified_price' => 'decimal:2',
             'last_notified_at' => 'datetime',
+            'history_kept_from' => 'datetime',
             'active' => 'boolean',
         ];
     }
@@ -91,6 +103,31 @@ class Product extends Model
             : null;
     }
 
+    /**
+     * Hosts reporting a GTIN that differs from another shop's, when the
+     * product's shops disagree. Two different identifiers mean the offers
+     * are different articles — a wrong-pack offer would otherwise sit in the
+     * comparison unnoticed. Pricing is deliberately left alone: a mismatch
+     * is reported, never silently excluded.
+     *
+     * @return list<string>
+     */
+    public function mismatchedGtinHosts(): array
+    {
+        $withGtin = $this->shops->filter(
+            static fn (Shop $shop): bool => is_string($shop->gtin) && $shop->gtin !== '',
+        );
+
+        if ($withGtin->pluck('gtin')->unique()->count() < 2) {
+            return [];
+        }
+
+        /** @var list<string> $hosts */
+        $hosts = $withGtin->pluck('host')->filter()->unique()->sort()->values()->all();
+
+        return $hosts;
+    }
+
     public function safeImageUrl(): ?string
     {
         return ImageUrl::safe($this->image_url);
@@ -104,6 +141,48 @@ class Product extends Model
      * Reference is computed BEFORE the lock so the 30-day window read does
      * not run inside the critical section.
      */
+    /**
+     * The shop with the lowest price per unit — the best value, which is not
+     * always the lowest price: a 370 g bag at EUR 1.99 beats a 200 g bag at
+     * EUR 1.69 by a third per kilo.
+     *
+     * Only shops that state a pack size can take part, and only those
+     * sharing one unit: EUR/kg and EUR/piece are not comparable numbers.
+     * When the sized shops disagree on the unit, the largest group wins.
+     */
+    public function bestValueShop(): ?Shop
+    {
+        $candidates = $this->shops
+            ->filter(fn (Shop $shop): bool => $shop->active
+                // Unknown stock still competes: the price is real, and
+                // dropping it would hide a shop rather than describe it.
+                && $shop->current_in_stock !== false
+                && $shop->health !== ShopHealth::Dead
+                && $shop->currency === $this->currency
+                && $shop->unitPrice() !== null);
+
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        // Group by unit AND currency: a EUR/kg figure and a (drifted) GBP/kg
+        // figure are not comparable numbers even though the unit matches.
+        $group = $candidates->countBy(fn (Shop $shop): string => (string) $shop->pack_unit . '|' . $shop->currency)
+            ->sortDesc()
+            ->keys()
+            ->first();
+
+        return $candidates
+            ->filter(fn (Shop $shop): bool => (string) $shop->pack_unit . '|' . $shop->currency === $group)
+            // Unit prices are two-decimal strings; compare them as numbers,
+            // with the oldest shop winning a tie so the answer is stable.
+            ->sortBy([
+                fn (Shop $a, Shop $b): int => (float) $a->unitPrice() <=> (float) $b->unitPrice(),
+                fn (Shop $a, Shop $b): int => $a->created_at <=> $b->created_at,
+            ])
+            ->first();
+    }
+
     public function recomputeCheapestShop(?int $triggeringPriceCheckId = null): void
     {
         $reference = app(Reference::class)->compute($this);
@@ -123,8 +202,11 @@ class Product extends Model
             /** @var Shop|null $cheapest */
             $cheapest = $locked->shops()
                 ->where('active', true)
-                ->where('current_in_stock', true)
+                ->where(fn (EloquentBuilder $stock): EloquentBuilder => $stock
+                    ->where('current_in_stock', true)
+                    ->orWhereNull('current_in_stock'))
                 ->where('health', '!=', ShopHealth::Dead->value)
+                ->where('currency', $locked->currency)
                 ->whereNotNull('current_price')
                 ->orderBy('current_price')
                 // Stable tie-break: among equal prices the offer added first

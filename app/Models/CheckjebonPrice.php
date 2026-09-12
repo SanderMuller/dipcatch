@@ -9,8 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * One row of the daily checkjebon.nl price dataset — an internal cache
  * table owned by RefreshCheckjebonDatasetCommand, read by CheckjebonSource.
- * `supermarket` is the dataset key ('ah' | 'dirk' | 'lidl'); `external_id`
- * is the AH `wi` id or the Dirk/boodschaapje numeric product id.
+ * `supermarket` is the dataset key ('ah', 'jumbo', 'plus', …); `external_id`
+ * is the AH `wi` id, the boodschaapje numeric id, or — for the match-only
+ * chains — the raw link. `link` is always the raw upstream link, appended to
+ * the chain's base URL to build a product URL.
  *
  * @property int $id
  * @property string $supermarket
@@ -18,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $name
  * @property numeric-string $price
  * @property string|null $size
+ * @property string|null $link
  * @property CarbonImmutable $refreshed_at
  */
 #[WithoutTimestamps]

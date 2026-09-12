@@ -1,0 +1,332 @@
+<?php declare(strict_types=1);
+
+use App\Support\Favicon;
+use App\Support\MarketingPages;
+use App\Support\ShopPages;
+use App\Support\UseCases;
+use Illuminate\Support\Facades\Config;
+
+/**
+ * The page's JSON-LD, narrowed once so every test below reads typed data.
+ *
+ * @return array{context: string, nodes: list<array<int|string, mixed>>}
+ */
+function useCaseGraph(string $url): array
+{
+    $content = (string) test()->get($url)->assertOk()->getContent();
+
+    preg_match('#<script type="application/ld\+json">(.*?)</script>#s', $content, $match);
+
+    if (! isset($match[1])) {
+        throw new RuntimeException('No JSON-LD script on ' . $url);
+    }
+
+    $decoded = json_decode($match[1], true, 512, JSON_THROW_ON_ERROR);
+
+    if (! is_array($decoded)) {
+        throw new RuntimeException('The JSON-LD on ' . $url . ' is not an object');
+    }
+
+    $context = $decoded['@context'] ?? null;
+    $graph = $decoded['@graph'] ?? null;
+
+    if (! is_string($context) || ! is_array($graph)) {
+        throw new RuntimeException('The JSON-LD on ' . $url . ' has no @context or @graph');
+    }
+
+    $nodes = [];
+
+    foreach ($graph as $node) {
+        if (! is_array($node)) {
+            throw new RuntimeException('The graph on ' . $url . ' holds a non-object node');
+        }
+
+        $nodes[] = $node;
+    }
+
+    return ['context' => $context, 'nodes' => $nodes];
+}
+
+/**
+ * The `@type` of every node in a graph.
+ *
+ * @param  list<array<int|string, mixed>>  $nodes
+ * @return list<string>
+ */
+function graphTypes(array $nodes): array
+{
+    $types = [];
+
+    foreach ($nodes as $node) {
+        $type = $node['@type'] ?? null;
+
+        if (is_string($type)) {
+            $types[] = $type;
+        }
+    }
+
+    return $types;
+}
+
+test('every configured use case has copy, and resolves any shops it names', function (): void {
+    $cases = UseCases::all();
+
+    expect($cases)->toHaveSameSize(Config::array('site.use_cases'));
+
+    foreach ($cases as $case) {
+        expect($case->heading)->not->toBeEmpty()
+            ->and($case->intro)->not->toBeEmpty()
+            ->and($case->example)->not->toBeEmpty()
+            ->and($case->description)->not->toBeEmpty()
+            ->and($case->faq)->not->toBeEmpty();
+
+        // A page that names hosts has to resolve them, or a typo drops the
+        // shop silently. A page about a way of working names none.
+        if ($case->hosts !== []) {
+            expect($case->shops())->not->toBeEmpty();
+        }
+    }
+});
+
+test('the groceries page lists Amazon in the UK and the US', function (): void {
+    $case = UseCases::find('groceries');
+
+    expect($case)->not->toBeNull();
+    assert($case !== null);
+
+    expect(array_column($case->shops(), 'host'))->toContain('amazon.com')
+        ->toContain('amazon.co.uk')
+        ->toContain('ah.nl');
+});
+
+test('the coffee and filters pages list Amazon in the UK and the US', function (): void {
+    $coffee = UseCases::find('coffee');
+    $filters = UseCases::find('filters');
+
+    expect($coffee)->not->toBeNull()
+        ->and($filters)->not->toBeNull();
+    assert($coffee !== null && $filters !== null);
+
+    expect(array_column($coffee->shops(), 'host'))->toContain('amazon.com')
+        ->toContain('amazon.co.uk')
+        ->and(array_column($filters->shops(), 'host'))->toContain('amazon.com')
+        ->toContain('amazon.co.uk');
+});
+
+test('the beauty page lists Etos, Lookfantastic, Ulta, Walmart and Amazon', function (): void {
+    $case = UseCases::find('beauty');
+
+    expect($case)->not->toBeNull();
+    assert($case !== null);
+
+    expect(array_column($case->shops(), 'host'))->toContain('etos.nl')
+        ->toContain('theordinary.com')
+        ->toContain('lookfantastic.com')
+        ->toContain('cultbeauty.com')
+        ->toContain('ulta.com')
+        ->toContain('walmart.com')
+        ->toContain('bol.com')
+        ->toContain('amazon.nl')
+        ->toContain('ah.nl')
+        ->toContain('jumbo.com');
+});
+
+test('the pet-food page lists the specialist shops', function (): void {
+    $case = UseCases::find('pet-food');
+
+    expect($case)->not->toBeNull();
+    assert($case !== null);
+
+    expect(array_column($case->shops(), 'host'))->toContain('zooplus.nl')
+        ->toContain('bitiba.nl')
+        ->toContain('dierapotheker.nl')
+        ->toContain('petsplace.nl')
+        ->toContain('medpets.nl')
+        ->toContain('welkoop.nl')
+        ->toContain('petsathome.com')
+        ->toContain('zooplus.co.uk')
+        ->toContain('bol.com')
+        ->toContain('amazon.nl')
+        ->toContain('ah.nl')
+        ->toContain('jumbo.com');
+});
+
+test('each use case reads as its own page, not a filled template', function (): void {
+    $headings = [];
+    $intros = [];
+
+    foreach (UseCases::all() as $case) {
+        $headings[] = $case->heading;
+        $intros[] = $case->intro;
+    }
+
+    expect(array_unique($headings))->toHaveSameSize($headings)
+        ->and(array_unique($intros))->toHaveSameSize($intros);
+});
+
+test('a use-case page renders its own heading, description and canonical', function (string $slug): void {
+    $case = UseCases::find($slug);
+
+    expect($case)->not->toBeNull();
+    assert($case !== null);
+
+    $content = (string) $this->get($case->url())->assertOk()->getContent();
+
+    expect($content)->toContain('<h1 class="max-w-[24ch]')
+        ->and($content)->toContain(e($case->heading))
+        ->and($content)->toContain(e($case->intro))
+        ->and($content)->toContain(e($case->example))
+        ->and($content)->toContain('<link rel="canonical" href="' . $case->url() . '">');
+})->with(['groceries', 'pet-food', 'coffee', 'filters', 'beauty', 'ask-your-assistant']);
+
+test('an unknown slug is a 404', function (): void {
+    $this->get('/price-alerts/nonsense')->assertNotFound();
+});
+
+test('the Dutch variant is canonical to itself and reciprocal with the English one', function (): void {
+    $case = UseCases::find('coffee');
+    assert($case !== null);
+
+    $content = (string) $this->get($case->url('nl'))->assertOk()->getContent();
+
+    expect($content)->toContain('<link rel="canonical" href="' . $case->url('nl') . '">')
+        ->and($content)->toContain('<link rel="alternate" hreflang="en" href="' . $case->url() . '">')
+        ->and($content)->toContain('<link rel="alternate" hreflang="nl" href="' . $case->url('nl') . '">')
+        ->and($content)->toContain('<html lang="nl"');
+});
+
+test('the graph carries the application, the FAQ and a breadcrumb', function (): void {
+    $case = UseCases::find('groceries');
+    assert($case !== null);
+
+    $graph = useCaseGraph($case->url());
+
+    expect($graph['context'])->toBe('https://schema.org')
+        ->and(graphTypes($graph['nodes']))->toContain('SoftwareApplication')
+        ->and(graphTypes($graph['nodes']))->toContain('FAQPage')
+        ->and(graphTypes($graph['nodes']))->toContain('BreadcrumbList');
+
+    $questions = [];
+
+    foreach ($graph['nodes'] as $node) {
+        if (($node['@type'] ?? null) !== 'FAQPage') {
+            continue;
+        }
+
+        $entities = $node['mainEntity'] ?? null;
+
+        if (! is_array($entities)) {
+            throw new RuntimeException('The FAQPage node carries no mainEntity list');
+        }
+
+        foreach ($entities as $entity) {
+            $name = is_array($entity) ? ($entity['name'] ?? null) : null;
+
+            if (! is_string($name)) {
+                throw new RuntimeException('A Question node carries no string name');
+            }
+
+            $questions[] = $name;
+        }
+    }
+
+    expect($questions)->toBe(array_map(static fn (array $item): string => $item['q'], $case->faq));
+});
+
+test('the application node is the same entity as on the homepage', function (): void {
+    $idOf = function (string $url): string {
+        foreach (useCaseGraph($url)['nodes'] as $node) {
+            if (($node['@type'] ?? null) === 'SoftwareApplication') {
+                $id = $node['@id'] ?? null;
+
+                if (! is_string($id)) {
+                    throw new RuntimeException('The application node carries no string @id on ' . $url);
+                }
+
+                return $id;
+            }
+        }
+
+        throw new RuntimeException('No application node on ' . $url);
+    };
+
+    expect($idOf('/price-alerts/groceries'))->toBe($idOf('/'));
+});
+
+test('the sitemap lists every use-case page in both locales', function (): void {
+    $locs = array_map(static fn (array $entry): string => $entry['loc'], MarketingPages::all());
+
+    foreach (UseCases::all() as $case) {
+        expect($locs)->toContain($case->url())
+            ->and($locs)->toContain($case->url('nl'));
+    }
+
+    // Home, pricing, privacy, terms, support and the shops hub, plus one per
+    // use case and one per shop, each in two locales.
+    expect($locs)->toHaveCount((6 + count(UseCases::all()) + count(ShopPages::all())) * 2);
+});
+
+test('a shop dropped from the supported hosts disappears from the page', function (): void {
+    $case = UseCases::find('pet-food');
+    assert($case !== null);
+
+    expect(array_column($case->shops(), 'host'))->toContain('zooplus.nl');
+
+    $hosts = array_values(array_filter(Config::array('site.supported_hosts'), is_string(...)));
+
+    Config::set('site.supported_hosts', array_values(array_diff($hosts, ['zooplus.nl'])));
+
+    expect(array_column($case->shops(), 'host'))->not->toContain('zooplus.nl');
+
+    // The prose still names Zooplus — that is written copy, not a live claim
+    // about what the app supports. What must go is the shop pill.
+    $content = (string) $this->get($case->url())->assertOk()->getContent();
+
+    // e(): the view emits the URL through {{ }}, so its `&` is already `&amp;`.
+    // Without this the needle never appears and the assertion cannot fail.
+    expect($content)->not->toContain("url('" . e(Favicon::url('zooplus.nl', 32)) . "')")
+        ->and($content)->toContain("url('" . e(Favicon::url('bol.com', 32)) . "')");
+});
+
+test('a use case whose shops are all gone omits the block instead of showing an empty one', function (): void {
+    Config::set('site.supported_hosts', ['ah.nl']);
+
+    $case = UseCases::find('filters');
+    assert($case !== null);
+
+    expect($case->shops())->toBeEmpty();
+
+    $this->get($case->url())->assertOk()->assertDontSee(__('Which shops this works with'));
+});
+
+test('a use-case page marks no header link as the current page', function (): void {
+    // The header links Pricing only (the use-case links live in the footer),
+    // so a use-case page must highlight nothing. Pricing itself highlights one
+    // link per nav, and the header renders two navs: desktop and mobile.
+    $useCase = (string) $this->get('/price-alerts/coffee')->assertOk()->getContent();
+    $pricing = (string) $this->get('/pricing')->assertOk()->getContent();
+
+    expect(substr_count($useCase, 'aria-current="page"'))->toBe(0)
+        ->and(substr_count($pricing, 'aria-current="page"'))->toBe(2);
+});
+
+test('the homepage and the footers link every use-case page', function (): void {
+    $home = (string) $this->get('/')->assertOk()->getContent();
+    $pricing = (string) $this->get('/pricing')->assertOk()->getContent();
+    $privacy = (string) $this->get('/privacy')->assertOk()->getContent();
+
+    foreach (UseCases::all() as $case) {
+        expect($home)->toContain('href="' . $case->url() . '"')
+            ->and($pricing)->toContain('href="' . $case->url() . '"')
+            ->and($privacy)->toContain('href="' . $case->url() . '"');
+    }
+});
+
+test('llms.txt lists every use-case page', function (): void {
+    $content = (string) $this->get('/llms.txt')->assertOk()->getContent();
+
+    foreach (UseCases::all() as $case) {
+        expect($content)->toContain($case->url())
+            ->and($content)->toContain($case->heading);
+    }
+});

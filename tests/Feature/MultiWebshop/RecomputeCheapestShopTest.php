@@ -67,13 +67,51 @@ test('writes a history segment when cheapest changes', function (): void {
     expect($product->cheapestHistory()->count())->toBe(2);
 
     /** @var ProductCheapestHistory $closed */
-    $closed = $product->cheapestHistory()->oldest('started_at')->first();
+    $closed = $product->cheapestHistory()->inOrder()->first();
     expect($closed->ended_at)->not->toBeNull();
 
     /** @var ProductCheapestHistory $open */
-    $open = $product->cheapestHistory()->latest('started_at')->first();
+    $open = $product->cheapestHistory()->newestFirst()->first();
     expect($open->ended_at)->toBeNull()
         ->and((string) $open->cheapest_price)->toBe('80.00');
+});
+
+test('two segments written in the same second still order deterministically', function (): void {
+    // `started_at` is whole seconds, so two segments written in one second tie.
+    // Ordering on it alone let the database pick, and the drivers disagreed.
+    // Time is frozen so a slow runner cannot straddle the boundary and make
+    // the tie itself intermittent.
+    $this->freezeTime();
+
+    $product = Product::factory()->create();
+    Shop::factory()->for($product)->create(['current_price' => '100.00']);
+    $product->recomputeCheapestShop();
+    Shop::factory()->for($product)->create(['current_price' => '80.00']);
+    $product->recomputeCheapestShop();
+
+    $segments = $product->cheapestHistory()->inOrder()->get();
+
+    expect($segments)->toHaveCount(2);
+
+    $startedAt = [];
+    $prices = [];
+
+    foreach ($segments as $segment) {
+        $startedAt[] = $segment->started_at?->toDateTimeString() ?? '';
+        $prices[] = (string) $segment->cheapest_price;
+    }
+
+    // The premise: both rows carry the same second, so ordering on
+    // `started_at` alone has no defined winner.
+    expect($startedAt[0])->not->toBe('')
+        ->and($startedAt[0])->toBe($startedAt[1]);
+
+    expect($prices)->toBe(['100.00', '80.00']);
+
+    $newest = $product->cheapestHistory()->newestFirst()->first();
+
+    expect($newest)->not->toBeNull()
+        ->and((string) $newest?->cheapest_price)->toBe('80.00');
 });
 
 test('does not write a new segment when nothing changed', function (): void {
@@ -85,6 +123,18 @@ test('does not write a new segment when nothing changed', function (): void {
     $product->recomputeCheapestShop();
 
     expect($product->cheapestHistory()->count())->toBe($first);
+});
+
+test('an offer in a different currency cannot win the comparison', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $eur = Shop::factory()->for($product)->create(['current_price' => '10.00', 'currency' => 'EUR']);
+    // Drifted row: numerically cheaper, but priced in a different currency.
+    Shop::factory()->for($product)->create(['current_price' => '9.00', 'currency' => 'GBP']);
+
+    $product->recomputeCheapestShop();
+
+    expect($product->cheapest_shop_id)->toBe($eur->id)
+        ->and((string) $product->cheapest_price)->toBe('10.00');
 });
 
 test('clears cheapest when all offers become ineligible', function (): void {
@@ -99,7 +149,7 @@ test('clears cheapest when all offers become ineligible', function (): void {
         ->and($product->cheapest_price)->toBeNull();
 
     /** @var ProductCheapestHistory $latest */
-    $latest = $product->cheapestHistory()->latest('started_at')->first();
+    $latest = $product->cheapestHistory()->newestFirst()->first();
     expect($latest->cheapest_price)->toBeNull()
         ->and($latest->ended_at)->toBeNull();
 });

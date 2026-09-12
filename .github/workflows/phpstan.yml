@@ -49,6 +49,16 @@ jobs:
       - name: Install composer dependencies
         uses: ramsey/composer-install@v4
 
+      # Larastan boots the application to analyse it. Session encryption is on
+      # unconditionally (config/session.php), so the boot needs an APP_KEY and
+      # fails with "No application encryption key has been specified" without
+      # one. The tests workflow does the same two steps for the same reason.
+      - name: Copy Environment File
+        run: cp .env.example .env
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+
       - name: Cache PHPStan results
         uses: actions/cache@v6
         with:

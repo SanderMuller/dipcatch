@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Health\CheckjebonFreshnessCheck;
+use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
 use App\Models\Product;
 use App\Models\Shop;
@@ -37,7 +38,7 @@ test('the freshness check is registered', function (): void {
     expect($registered)->toContain(CheckjebonFreshnessCheck::class);
 });
 
-test('idle when no active shop uses the dataset', function (): void {
+test('idle when nothing uses the dataset — no shop and no product', function (): void {
     $result = new CheckjebonFreshnessCheck()->run();
 
     expect($result->status->value)->toBe('ok')
@@ -78,4 +79,49 @@ test('fails past 96 hours', function (): void {
     $result = new CheckjebonFreshnessCheck()->run();
 
     expect($result->status->value)->toBe('failed');
+});
+
+test('a product alone keeps the check active — suggestions read the same rows', function (): void {
+    Product::factory()->create();
+
+    $result = new CheckjebonFreshnessCheck()->run();
+
+    expect($result->status->value)->toBe('failed')
+        ->and($result->shortSummary)->toBe('empty');
+});
+
+test('ages on the oldest chain, so one fresh chain cannot mask a stale one', function (): void {
+    freshnessShop();
+    freshnessRow(now()->subHours(1));
+
+    CheckjebonPrice::query()->create([
+        'supermarket' => 'jumbo',
+        'external_id' => 'jumbo-item-1',
+        'name' => 'Jumbo item',
+        'price' => '2.09',
+        'size' => null,
+        'refreshed_at' => now()->subHours(97),
+    ]);
+
+    $result = new CheckjebonFreshnessCheck()->run();
+
+    expect($result->status->value)->toBe('failed')
+        ->and($result->meta['oldest_chain'])->toBe('jumbo');
+});
+
+test('reports a known chain that has never produced a row', function (): void {
+    freshnessShop();
+    freshnessRow(now()->subHour());
+
+    CheckjebonChain::query()->create([
+        'chain' => 'plus',
+        'label' => 'PLUS',
+        'base_url' => 'https://www.plus.nl/product/',
+        'refreshed_at' => now(),
+    ]);
+
+    $result = new CheckjebonFreshnessCheck()->run();
+
+    expect($result->status->value)->toBe('failed')
+        ->and($result->meta['chains_without_rows'])->toBe(['plus']);
 });

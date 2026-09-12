@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\DropOutcome;
 use Illuminate\Support\Str;
+use Minishlink\WebPush\ContentEncoding;
 use NotificationChannels\WebPush\WebPushChannel;
 
 function pushOutcome(): DropOutcome
@@ -48,7 +49,7 @@ test('POST /push/subscribe creates a push_subscriptions row for the authed user'
     expect($sub->endpoint)->toBe('https://push.example.com/endpoint/abc')
         ->and($sub->public_key)->toBe('BJ_p256dh_public_key_base64url')
         ->and($sub->auth_token)->toBe('auth_secret_base64url')
-        ->and($sub->content_encoding)->toBe('aes128gcm');
+        ->and($sub->content_encoding)->toBe(ContentEncoding::aes128gcm);
 });
 
 test('subscribe is auth-required', function (): void {
@@ -150,7 +151,7 @@ test('toWebPush returns a WebPushMessage with title, body, icon and click url', 
 
     $payload = $message->toArray();
     expect($payload['title'])->toBe('Price drop: Acme Headphones')
-        ->and($payload['body'])->toBe('Acme Headphones is now EUR 85.00 at bol.com')
+        ->and($payload['body'])->toBe('Acme Headphones is now €85.00 at bol.com')
         ->and($payload['icon'])->toBe('https://example.com/img.png')
         ->and($payload['data'])->toMatchArray(['url' => $payload['data']['url']]);
 

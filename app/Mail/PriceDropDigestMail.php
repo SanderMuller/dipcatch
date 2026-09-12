@@ -67,6 +67,6 @@ class PriceDropDigestMail extends Mailable
 
     public function content(): Content
     {
-        return new Content(view: 'emails.price-drop-digest');
+        return new Content(markdown: 'emails.price-drop-digest');
     }
 }

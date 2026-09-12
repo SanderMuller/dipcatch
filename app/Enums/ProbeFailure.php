@@ -34,11 +34,20 @@ enum ProbeFailure: string
     case CurrencyMismatch = 'currency_mismatch';
 
     /**
-     * Checkjebon-served host (ah.nl / dirk.nl / boodschaapje.nl): the URL is
+     * Checkjebon-served host (ah.nl / boodschaapje.nl): the URL is
      * fine but the product has no row in the local daily dataset — or the
      * URL carries no recognizable product id, or the dataset was never
      * refreshed. The specific case travels in the outcome context `reason`.
      * No manual selector can help: there is no HTML to select from.
      */
     case NotInDataset = 'not_in_dataset';
+
+    /**
+     * A shop whose prices are never present in the page the server can
+     * fetch — an app shell that renders its price client-side from an
+     * endpoint the user's browser is authorized for and we are not. No
+     * fetch and no manual selector can help, so the probe says so instead
+     * of offering the selector flow. See {@see UnservableShops}.
+     */
+    case ShopNotServable = 'shop_not_servable';
 }

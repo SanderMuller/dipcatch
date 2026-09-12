@@ -119,6 +119,7 @@ return [
     'limiters' => [
         'login' => 'login',
         'two-factor' => 'two-factor',
+        'passkeys' => 'passkeys',
     ],
 
     /*
@@ -136,6 +137,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Passkeys
+    |--------------------------------------------------------------------------
+    |
+    | These settings configure Fortify's passkey (WebAuthn) support. Passkeys
+    | allow users to sign in without needing to remember credentials since
+    | they use public-key cryptography - making them immune to breaches.
+    |
+    */
+
+    'passkeys' => [
+        'relying_party_id' => parse_url(config()->string('app.url'), PHP_URL_HOST),
+        'allowed_origins' => [config()->string('app.url')],
+        'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET', config()->string('app.key')),
+        'timeout' => 60000,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Features
     |--------------------------------------------------------------------------
     |
@@ -146,14 +165,16 @@ return [
     */
 
     'features' => [
-        // Public registration is disabled — DipCatch is invite-only.
-        // Features::registration(),
+        Features::registration(),
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([
             'confirm' => true,
             'confirmPassword' => true,
             // 'window' => 0
+        ]),
+        Features::passkeys([
+            'confirmPassword' => true,
         ]),
     ],
 

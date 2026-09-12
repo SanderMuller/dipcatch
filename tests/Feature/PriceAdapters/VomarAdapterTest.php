@@ -1,0 +1,130 @@
+<?php declare(strict_types=1);
+
+use App\PriceAdapters\Hosts\VomarAdapter;
+
+beforeEach(function (): void {
+    $this->adapter = new VomarAdapter();
+});
+
+test('skips a host that is not vomar.nl', function (): void {
+    expect($this->adapter->extract('https://other.com/p/1', vomarPage())->isSkip())->toBeTrue();
+});
+
+test('reads price, title, pack size, EAN and image from the Nuxt 2 state', function (): void {
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', vomarPage());
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('2.39')
+        ->and($result->snapshot?->currency)->toBe('EUR')
+        ->and($result->snapshot?->title)->toBe('Aardappelgratin Kaas')
+        ->and($result->snapshot?->packSize)->toBe('500 gram')
+        ->and($result->snapshot?->packSizeAuthoritative)->toBeTrue()
+        ->and($result->snapshot?->gtin)->toBe('8718989087319')
+        ->and($result->snapshot?->imageUrl)
+        ->toBe('https://d3vricquk1sjgf.cloudfront.net/product-images/21070f17-ce64-430b-ae24-ef8572a67a37.png');
+});
+
+test('a minified name falls back to the page heading instead of the variable', function (): void {
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', vomarPage(description: null));
+
+    expect($result->snapshot?->title)->toBe('Ontbijtkoek');
+});
+
+test('a minified price fails rather than guessing', function (): void {
+    $html = str_replace('price:2.39', 'price:aB', vomarPage());
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_no_price');
+});
+
+test('a page without the product state fails with a Vomar-specific reason', function (): void {
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', '<html><body>x</body></html>');
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_no_product');
+});
+
+test('a malformed EAN is dropped instead of stored', function (): void {
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', vomarPage(ean: '8718989087310'));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->gtin)->toBeNull();
+});
+
+test('a second product object cannot leak its fields into this one', function (): void {
+    // The neighbour sits right after the tracked product's closing brace.
+    $html = str_replace(
+        '</script>',
+        ',{"other":{"articleNumber":999999,"description":"Other product","price":99.99}}</script>',
+        vomarPage(),
+    );
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->snapshot?->price)->toBe('2.39')
+        ->and($result->snapshot?->title)->toBe('Aardappelgratin Kaas');
+});
+
+test('a page describing a different article than the URL is refused', function (): void {
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', vomarPage(articleNumber: '888888'));
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_product_mismatch');
+});
+
+test('a URL that names no article is refused', function (): void {
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers', vomarPage());
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_no_product_id');
+});
+
+test('a hoisted article number proves nothing and is refused', function (): void {
+    $html = str_replace('articleNumber:119614', 'articleNumber:aQ', vomarPage());
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_product_mismatch');
+});
+
+test('a numeric literal this adapter cannot read fails instead of truncating', function (string $literal): void {
+    $html = str_replace('price:2.39', 'price:' . $literal, vomarPage());
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_no_price');
+})->with([
+    'exponent' => ['2.39e1'],
+    'bigint' => ['239n'],
+]);
+
+test('a nested object cannot donate its price to the product', function (): void {
+    // A promotion block sits inside productDetails, before the real price.
+    $html = str_replace(
+        'articleNumber:119614',
+        'promotion:{price:0.99,description:"Kortingsactie"},articleNumber:119614',
+        vomarPage(),
+    );
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->snapshot?->price)->toBe('2.39')
+        ->and($result->snapshot?->title)->toBe('Aardappelgratin Kaas');
+});
+
+test('a nested article number cannot satisfy the identity check', function (): void {
+    $html = str_replace(
+        'articleNumber:119614',
+        'related:{articleNumber:119614},articleNumber:888888',
+        vomarPage(),
+    );
+
+    $result = $this->adapter->extract('https://www.vomar.nl/producten/vers/x/x/119614', $html);
+
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('vomar_product_mismatch');
+});

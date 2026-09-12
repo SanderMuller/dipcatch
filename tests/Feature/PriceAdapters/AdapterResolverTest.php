@@ -3,6 +3,7 @@
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ExtractionResult;
+use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 
@@ -19,7 +20,9 @@ function snap(string $price = '10.00'): ShopSnapshot
 
 function fakeAdapter(string $key, ExtractionResult $result): ShopAdapter
 {
-    return new class ($key, $result) implements ShopAdapter {
+    // Implements the marker so persisted-key shortcut tests keep exercising
+    // the shortcut path (generic keys no longer short-circuit).
+    return new class ($key, $result) implements HostSpecificAdapter, ShopAdapter {
         public function __construct(public string $k, public ExtractionResult $r) {}
 
         public function key(): string
@@ -106,7 +109,9 @@ test('persisted key ambiguous propagates as ambiguous (no silent fallback)', fun
         ->and($result->adapterKey)->toBe('persisted');
 });
 
-test('persisted key failed → full chain runs (does not stop)', function (): void {
+test('a host-specific persisted key that fails stops the chain', function (): void {
+    // A weaker adapter would otherwise read some other number off the page
+    // and present it as this product's price.
     $resolver = new AdapterResolver([
         fakeAdapter('persisted', ExtractionResult::failed('hint_failed')),
         fakeAdapter('fallback', ExtractionResult::success(snap('77.00'))),
@@ -114,7 +119,9 @@ test('persisted key failed → full chain runs (does not stop)', function (): vo
 
     $result = $resolver->resolve('https://x.test', '<html></html>', 'persisted');
 
-    expect($result->snapshot?->price)->toBe('77.00');
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('hint_failed')
+        ->and($result->adapterKey)->toBe('persisted');
 });
 
 test('container wires resolver from dipcatch.adapters config in order', function (): void {
@@ -155,4 +162,204 @@ test('container resolves the production adapter chain shipped via config', funct
         ->and($result->snapshot?->price)->toBe('12.34')
         ->and($result->snapshot?->currency)->toBe('EUR')
         ->and($result->adapterKey)->toBe('og');
+});
+
+test('a persisted generic key does not outrank a later-added host adapter', function (): void {
+    // Shop keyed 'jsonld' before dirk.nl gained DirkAdapter: the chain must
+    // run and let the host adapter win (and re-key the shop).
+    $html = dirkPage();
+
+    $result = app(AdapterResolver::class)->resolve(
+        'https://www.dirk.nl/boodschappen/x/x/x/115212',
+        $html,
+        persistedKey: 'jsonld',
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->adapterKey)->toBe('dirk')
+        ->and($result->snapshot?->packSize)->toBe('150 g');
+});
+
+function unknownStockAdapter(): ShopAdapter
+{
+    return fakeAdapter('jsonld', ExtractionResult::success(new ShopSnapshot(
+        title: 'demo',
+        imageUrl: null,
+        price: '19.95',
+        currency: 'EUR',
+        inStock: null,
+    )));
+}
+
+test('the page\'s own words decide when no adapter could read a stock signal', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $result = $resolver->resolve('https://x.test', '<p>Tijdelijk niet leverbaar</p><span>19,95</span>');
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->inStock)->toBeFalse()
+        ->and($result->snapshot?->stockSignal)->toBe('text: tijdelijk niet leverbaar')
+        ->and($result->adapterKey)->toBe('jsonld');
+});
+
+test('a page saying nothing about stock stays unknown', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $result = $resolver->resolve('https://x.test', '<p>Op voorraad, morgen in huis</p>');
+
+    expect($result->snapshot?->inStock)->toBeNull();
+});
+
+test('a shop that states it is in stock is not overruled by page text', function (): void {
+    $resolver = new AdapterResolver([fakeAdapter('jsonld', ExtractionResult::success(new ShopSnapshot(
+        title: 'demo',
+        imageUrl: null,
+        price: '19.95',
+        currency: 'EUR',
+        inStock: true,
+        stockSignal: 'https://schema.org/InStock',
+    )))]);
+
+    $result = $resolver->resolve('https://x.test', '<aside>Andere klanten: uitverkocht</aside>');
+
+    expect($result->snapshot?->inStock)->toBeTrue()
+        ->and($result->snapshot?->stockSignal)->toBe('https://schema.org/InStock');
+});
+
+test('a phrase inside a script tag is not the page speaking', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $result = $resolver->resolve('https://x.test', '<script>var msg = "uitverkocht";</script><p>19,95</p>');
+
+    expect($result->snapshot?->inStock)->toBeNull();
+});
+
+test('sales copy and page furniture do not turn a product into a sold-out one', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $pages = [
+        '<p>Bijna uitverkocht!</p>',
+        '<label>Toon ook niet leverbare artikelen</label>',
+        '<p>Nog 2 stuks, uitverkochte maten worden bijgevuld</p>',
+    ];
+
+    foreach ($pages as $page) {
+        expect($resolver->resolve('https://x.test', $page)->snapshot?->inStock)->toBeNull();
+    }
+});
+
+test('text about anything but the product leaves stock unknown', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $pages = [
+        '<div>Chat momenteel niet beschikbaar</div>',
+        '<aside><h3>Anderen kochten ook</h3><span>uitverkocht</span></aside>',
+        '<p>Bijna uitverkocht!</p>',
+        '<p>Bijna niet op voorraad</p>',
+    ];
+
+    foreach ($pages as $page) {
+        expect($resolver->resolve('https://x.test', $page)->snapshot?->inStock)->toBeNull();
+    }
+});
+
+test('the Flemish and backorder phrasings a peer session reported are read too', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $phrases = [
+        'tijdelijk niet in voorraad',
+        'momenteel uitverkocht',
+        'niet meer op voorraad',
+    ];
+
+    foreach ($phrases as $phrase) {
+        $result = $resolver->resolve('https://x.test', "<p>{$phrase}</p>");
+
+        expect($result->snapshot?->inStock)->toBeFalse()
+            ->and($result->snapshot?->stockSignal)->toBe('text: ' . $phrase);
+    }
+});
+
+test('the production chain uses Welkoop current price, not JSON-LD list price', function (): void {
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => 'Royal Canin Kitten',
+        'offers' => ['@type' => 'Shop', 'price' => '31.50', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR);
+
+    $html = withJsonLd($json)
+        . '<h1>Royal Canin Kitten</h1>'
+        . '<p aria-label="Huidige prijs € 26,77">26,77</p>';
+
+    $result = app(AdapterResolver::class)->resolve(
+        'https://www.welkoop.nl/royal-canin-kitten-kattenvoer-2kg_1018191',
+        $html,
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->adapterKey)->toBe('welkoop')
+        ->and($result->snapshot?->price)->toBe('26.77');
+});
+
+test('the production chain drops Pets at Home subscription offers', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@graph' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Royal Canin Mini Dry Adult Dog Food',
+                'offers' => [
+                    [
+                        '@type' => 'Offer',
+                        'priceCurrency' => 'GBP',
+                        'sku' => '27223',
+                        'price' => 21.5,
+                        'description' => 'Easy Repeat subscription price',
+                    ],
+                    [
+                        '@type' => 'Offer',
+                        'priceCurrency' => 'GBP',
+                        'sku' => '27223',
+                        'price' => 23.89,
+                        'description' => 'Standard price',
+                    ],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = app(AdapterResolver::class)->resolve(
+        'https://www.petsathome.com/product/royal-canin-mini-dry-adult-dog-food/P687',
+        withJsonLd($json),
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->adapterKey)->toBe('petsathome')
+        ->and($result->snapshot?->price)->toBe('23.89');
+});
+
+test('the production chain reads the Walmart hero price, not a sibling itemprop', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'WebPage',
+        'name' => 'CeraVe Moisturizing Cream 16 oz',
+    ], JSON_THROW_ON_ERROR);
+
+    $html = <<<HTML
+<html><head>
+  <script type="application/ld+json">{$json}</script>
+</head><body>
+  <span itemProp="price">\$99.00</span>
+  <span data-seo-id="hero-price">\$15.97</span>
+</body></html>
+HTML;
+
+    $result = app(AdapterResolver::class)->resolve(
+        'https://www.walmart.com/ip/CeraVe-Moisturizing-Cream-16-oz/681955595',
+        $html,
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->adapterKey)->toBe('walmart')
+        ->and($result->snapshot?->price)->toBe('15.97');
 });

@@ -50,7 +50,19 @@ final class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::loginView(fn (): Factory|View => view('livewire.auth.login'));
         Fortify::verifyEmailView(fn (): Factory|View => view('livewire.auth.verify-email'));
-        Fortify::twoFactorChallengeView(fn (): Factory|View => view('livewire.auth.two-factor-challenge'));
+        Fortify::twoFactorChallengeView(function (Request $request): Factory|View {
+            $userId = $request->session()->get('login.id');
+            $email = '';
+
+            if (is_int($userId) || is_string($userId)) {
+                $challengedEmail = User::query()->whereKey($userId)->value('email');
+                $email = is_string($challengedEmail) ? $challengedEmail : '';
+            }
+
+            return view('livewire.auth.two-factor-challenge', [
+                'email' => $email,
+            ]);
+        });
         Fortify::confirmPasswordView(fn (): Factory|View => view('livewire.auth.confirm-password'));
         Fortify::registerView(fn (): Factory|View => view('livewire.auth.register'));
         Fortify::resetPasswordView(fn (): Factory|View => view('livewire.auth.reset-password'));
@@ -70,6 +82,14 @@ final class FortifyServiceProvider extends ServiceProvider
             $throttleKey = Str::transliterate(Str::lower($request->string(Fortify::username())->toString()) . '|' . $request->ip());
 
             return Limit::perMinute(5)->by($throttleKey);
+        });
+
+        RateLimiter::for('passkeys', function (Request $request) {
+            $credentialId = $request->string('credential.id')->toString();
+
+            return Limit::perMinute(10)->by(
+                (($credentialId !== '') ? $credentialId : $request->session()->getId()) . '|' . $request->ip(),
+            );
         });
 
         RateLimiter::for('invitation', function (Request $request) {

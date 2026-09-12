@@ -2,9 +2,11 @@
 
 use App\Services\ShopFetcher\Exceptions\Blocked;
 use App\Services\ShopFetcher\Exceptions\HttpError;
+use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
+use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\ShopFetcher\ShopFetcher;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -16,6 +18,7 @@ beforeEach(function (): void {
     RateLimiter::clear('dipcatch:fetcher:host:example.com');
     RateLimiter::clear('dipcatch:fetcher:host:blocked.com');
     RateLimiter::clear('dipcatch:fetcher:host:slow.com');
+    RateLimiter::clear('dipcatch:fetcher:host:shop.test');
 });
 
 test('robots.txt 404 → fail-open, fetches the page', function (): void {
@@ -146,4 +149,154 @@ test('response larger than body_cap_bytes throws HttpError(413)', function (): v
     } catch (HttpError $e) {
         expect($e->statusCode)->toBe(413);
     }
+});
+
+test('an Imperva challenge served as 200 is a block, not a page to parse', function (): void {
+    $challenge = '<html style="height:100%"><head><script src="/_Incapsula_Resource?SWJIYLWA=719d"></script></head>'
+        . '<body><iframe src="/_Incapsula_Resource?SWUDNSAI=31">Request unsuccessful. Incapsula incident ID: '
+        . '1487000310066016754-28872320744359880</iframe></body></html>';
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response($challenge, 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://shop.test/p/1'))
+        ->toThrow(Blocked::class);
+});
+
+test('a host that never serves its prices is refused after the fetch', function (): void {
+    Http::fake([
+        'https://www.plus.nl/robots.txt' => Http::response('', 404),
+        'https://www.plus.nl/product/fanta-1500-ml-991700' => Http::response('<html>app shell</html>', 200),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://www.plus.nl/product/fanta-1500-ml-991700'))
+        ->toThrow(NotServable::class);
+});
+
+test('the refusal reports as needs_js, the same dead end as a JS-rendered page', function (): void {
+    $exception = new NotServable('plus.nl', 'plus_spa');
+
+    expect($exception->code())->toBe('needs_js')
+        ->and($exception->reason)->toBe('plus_spa');
+});
+
+test('a redirect onto a host that never serves its prices is refused', function (): void {
+    RateLimiter::clear(ShopFetcher::throttleKey('coop.nl'));
+
+    Http::fake([
+        'https://www.coop.nl/robots.txt' => Http::response('', 404),
+        'https://www.coop.nl/product/wp01234/melk' => Http::response('', 301, ['Location' => 'https://www.plus.nl']),
+        'https://www.plus.nl' => Http::response('<html>plus</html>', 200),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://www.coop.nl/product/wp01234/melk'))
+        ->toThrow(NotServable::class);
+});
+
+test('a redirect target is checked against its own robots.txt', function (): void {
+    RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('', 301, ['Location' => 'https://other.test/p/1']),
+        'https://other.test/robots.txt' => Http::response("User-agent: *\nDisallow: /p/", 200),
+        'https://other.test/p/1' => Http::response('<html>should never be read</html>', 200),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://shop.test/p/1'))
+        ->toThrow(RobotsDisallowed::class);
+
+    // The refusal happens before the disallowed page is requested.
+    Http::assertNotSent(static fn ($request): bool => $request->url() === 'https://other.test/p/1');
+});
+
+test('a redirect target its own robots.txt allows is followed', function (): void {
+    RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('', 301, ['Location' => 'https://other.test/p/1']),
+        'https://other.test/robots.txt' => Http::response("User-agent: *\nDisallow: /admin/", 200),
+        'https://other.test/p/1' => Http::response('<html>ok</html>', 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $result = app(ShopFetcher::class)->fetch('https://shop.test/p/1');
+
+    expect($result->host)->toBe('other.test')
+        ->and($result->html)->toContain('ok');
+});
+
+test('a host that keeps blocking is remembered as persistent', function (): void {
+    Http::fake([
+        'https://blocked.com/robots.txt' => Http::response('', 404),
+        'https://blocked.com/p/*' => Http::response('nope', 403),
+    ]);
+
+    $memory = app(HostFetchMemory::class);
+
+    foreach (range(1, HostFetchMemory::PERSISTENT_AFTER) as $i) {
+        RateLimiter::clear('dipcatch:fetcher:host:blocked.com');
+
+        try {
+            app(ShopFetcher::class)->fetch("https://blocked.com/p/{$i}");
+        } catch (Blocked) {
+            // Counted below.
+        }
+    }
+
+    expect($memory->count('blocked.com', HostFetchMemory::KIND_BLOCKED))->toBe(HostFetchMemory::PERSISTENT_AFTER)
+        ->and($memory->isPersistent('blocked.com', HostFetchMemory::KIND_BLOCKED))->toBeTrue()
+        ->and($memory->isPersistent('blocked.com', HostFetchMemory::KIND_SILENT))->toBeFalse();
+});
+
+test('a host that answers again is no longer described as failing', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response('boom', 503),
+        'https://example.com/p/2' => Http::response('<html>ok</html>', 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $memory = app(HostFetchMemory::class);
+
+    try {
+        app(ShopFetcher::class)->fetch('https://example.com/p/1');
+    } catch (TemporaryFailure) {
+        // Counted below.
+    }
+
+    expect($memory->count('example.com', HostFetchMemory::KIND_SILENT))->toBe(1);
+
+    RateLimiter::clear('dipcatch:fetcher:host:example.com');
+
+    app(ShopFetcher::class)->fetch('https://example.com/p/2');
+
+    expect($memory->count('example.com', HostFetchMemory::KIND_SILENT))->toBe(0);
+});
+
+test('the failure count survives a cleared cache, because it does not live there', function (): void {
+    Http::fake([
+        'https://blocked.com/robots.txt' => Http::response('', 404),
+        'https://blocked.com/p/*' => Http::response('nope', 403),
+    ]);
+
+    $memory = app(HostFetchMemory::class);
+
+    foreach (range(1, HostFetchMemory::PERSISTENT_AFTER) as $i) {
+        RateLimiter::clear('dipcatch:fetcher:host:blocked.com');
+
+        // Whatever the environment's cache store is, or does between
+        // requests, must not decide whether a shop looks persistently
+        // blocked. In production it read zero every time.
+        Cache::flush();
+
+        try {
+            app(ShopFetcher::class)->fetch("https://blocked.com/p/{$i}");
+        } catch (Blocked) {
+            // Counted below.
+        }
+    }
+
+    expect($memory->isPersistent('blocked.com', HostFetchMemory::KIND_BLOCKED))->toBeTrue();
 });

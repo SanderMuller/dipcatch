@@ -1,4 +1,8 @@
-<x-layouts::auth :title="__('Register')">
+<x-layouts::auth
+    :title="__('Create a free DipCatch account')"
+    :description="__('Track your first :count products for free across Dutch supermarkets and webshops. No card, no extension.', ['count' => \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->maxProducts()])"
+    :canonical="route('register')"
+>
     <div class="flex flex-col gap-6">
         <x-auth-header :title="__('Create an account')" :description="__('Enter your details below to create your account')" />
 
@@ -26,7 +30,7 @@
                 :value="old('email')"
                 type="email"
                 required
-                autocomplete="email"
+                autocomplete="username"
                 placeholder="email@example.com"
             />
 

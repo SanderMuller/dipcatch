@@ -43,13 +43,15 @@ final readonly class OpenGraphAdapter implements ShopAdapter
         $image = self::meta($crawler, 'og:image');
         $availability = self::meta($crawler, 'og:availability')
             ?? self::meta($crawler, 'product:availability');
+        [$inStock, $stockSignal] = StockAvailability::read($availability);
 
         return ExtractionResult::success(new ShopSnapshot(
             title: $title,
             imageUrl: $image,
             price: $price,
             currency: strtoupper($currency),
-            inStock: self::availabilityInStock($availability),
+            inStock: $inStock,
+            stockSignal: $stockSignal,
             raw: ['source' => 'og'],
         ));
     }
@@ -75,20 +77,5 @@ final readonly class OpenGraphAdapter implements ShopAdapter
         $content = $node->attr('content');
 
         return is_string($content) && $content !== '' ? $content : null;
-    }
-
-    private static function availabilityInStock(?string $availability): bool
-    {
-        if (! is_string($availability)) {
-            return true;
-        }
-
-        $availability = strtolower($availability);
-
-        if (str_contains($availability, 'out of stock') || str_contains($availability, 'outofstock') || str_contains($availability, 'oos')) {
-            return false;
-        }
-
-        return true;
     }
 }

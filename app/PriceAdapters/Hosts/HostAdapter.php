@@ -4,6 +4,7 @@ namespace App\PriceAdapters\Hosts;
 
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
+use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
@@ -15,7 +16,7 @@ use App\Support\UrlNormalizer;
  * unknown host, delegate to JSON-LD on the happy path, fall back to CSS, and
  * surface a host-specific failure code when both fail.
  */
-abstract readonly class HostAdapter implements ShopAdapter
+abstract readonly class HostAdapter implements HostSpecificAdapter, ShopAdapter
 {
     /**
      * Normalized host (no `www.`) → ISO 4217 currency code.
@@ -44,9 +45,20 @@ abstract readonly class HostAdapter implements ShopAdapter
             return ExtractionResult::skip();
         }
 
-        $jsonLd = new JsonLdAdapter()->extract($url, $html);
+        // The context carries the variant the user already chose. Dropping
+        // it made that choice unreachable on every host adapter, so the
+        // page stayed ambiguous however often it was answered.
+        $jsonLd = new JsonLdAdapter()->extract($url, $html, $context);
 
         if ($jsonLd->isSuccess()) {
+            return $jsonLd;
+        }
+
+        // A page that lists several variants and states no way to tell
+        // which one was asked for is a question, not a failure. The CSS
+        // fallback would answer it by reading whichever price the markup
+        // happens to show first.
+        if ($jsonLd->isAmbiguous()) {
             return $jsonLd;
         }
 

@@ -13,7 +13,7 @@ use Symfony\Component\DomCrawler\Crawler;
  * generic chain returns `no_adapter_matched` and the user pastes a selector)
  * and the periodic re-check job (selectors persisted on the offer row).
  */
-final readonly class UserSelectorAdapter implements ShopAdapter
+final readonly class UserSelectorAdapter implements HostSpecificAdapter, ShopAdapter
 {
     public function key(): string
     {
@@ -62,7 +62,8 @@ final readonly class UserSelectorAdapter implements ShopAdapter
             imageUrl: self::extractImage($crawler, $imageSelector),
             price: $price,
             currency: strtoupper($currency),
-            inStock: true,
+            // Nothing on the page states availability at this level.
+            inStock: null,
             raw: ['source' => 'user-selector', 'price_selector' => $priceSelector],
         ));
     }

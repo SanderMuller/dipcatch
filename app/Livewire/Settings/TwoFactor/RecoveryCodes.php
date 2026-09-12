@@ -5,10 +5,11 @@ namespace App\Livewire\Settings\TwoFactor;
 use App\Models\User;
 use Exception;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Crypt;
 use Laravel\Fortify\Actions\GenerateNewRecoveryCodes;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use TypeError;
+use UnexpectedValueException;
 
 class RecoveryCodes extends Component
 {
@@ -46,9 +47,14 @@ class RecoveryCodes extends Component
 
         if ($user->hasEnabledTwoFactorAuthentication() && $user->two_factor_recovery_codes) {
             try {
-                $decoded = json_decode(Crypt::decryptString((string) $user->two_factor_recovery_codes), associative: true);
-                $this->recoveryCodes = is_array($decoded) ? $decoded : [];
-            } catch (Exception) {
+                $recoveryCodes = $user->recoveryCodes();
+
+                if (! is_array($recoveryCodes)) {
+                    throw new UnexpectedValueException('The recovery codes must be an array.');
+                }
+
+                $this->recoveryCodes = $recoveryCodes;
+            } catch (Exception|TypeError) {
                 $this->addError('recoveryCodes', 'Failed to load recovery codes');
 
                 $this->recoveryCodes = [];

@@ -3,22 +3,41 @@
     "name": "sandermuller/dipcatch",
     "type": "project",
     "description": "Track product prices across the web and get notified when a price drops more than your threshold.",
-    "keywords": ["price-tracking", "price-drop", "laravel", "filament", "livewire"],
+    "keywords": [
+        "price-tracking",
+        "price-drop",
+        "laravel",
+        "filament",
+        "livewire"
+    ],
     "license": "proprietary",
+    "repositories": [
+        {
+            "name": "flux-pro",
+            "type": "composer",
+            "url": "https://composer.fluxui.dev"
+        }
+    ],
     "require": {
         "php": "^8.5",
         "ext-bcmath": "*",
-        "aws/aws-sdk-php": "^3.394",
-        "filament/filament": "^5.7.6",
-        "laravel-notification-channels/webpush": "^10.5",
+        "ext-intl": "*",
+        "aws/aws-sdk-php": "^3.394.12",
+        "filament/filament": "^5.8.1",
+        "laravel-notification-channels/webpush": "^13.0.1",
+        "laravel/cashier": "^16.8",
         "laravel/fortify": "^1.39.0",
-        "laravel/framework": "^13.29",
-        "laravel/octane": "^2.19",
-        "livewire/flux": "^2.17.1",
-        "livewire/livewire": "^4.4.2",
+        "laravel/framework": "^13.31",
+        "laravel/mcp": "^0.8||^0.9.5",
+        "laravel/octane": "^2.19.1",
+        "laravel/passport": "^13.8",
+        "livewire/flux": "^2.19.0",
+        "livewire/flux-pro": "^2.19",
+        "livewire/livewire": "^4.4.4",
+        "resend/resend-php": "^1.13",
         "sandermuller/laravel-fluent-validation": "^1.33.0",
-        "sandermuller/laravel-queue-insights": "^0.32.0",
-        "sandermuller/stopwatch": "^0.13.1",
+        "sandermuller/laravel-queue-insights": "^0.34.0",
+        "sandermuller/stopwatch": "^0.14.0",
         "shuvroroy/filament-spatie-laravel-health": "^3.3.3",
         "spatie/cpu-load-health-check": "^1.0.5",
         "spatie/laravel-data": "^4.23.0",
@@ -31,43 +50,46 @@
         "zae/strict-transport-security": "^0.0.3"
     },
     "require-dev": {
-        "barryvdh/laravel-debugbar": "^4.4.2",
+        "barryvdh/laravel-debugbar": "^4.4.3",
         "calebdw/larastan-livewire": "^2.5.0",
         "dg/bypass-finals": "^1.11.0",
         "driftingly/rector-laravel": "^2.6.2",
         "fakerphp/faker": "^1.24.1",
-        "hihaho/phpstan-rules": "^3.15.2",
-        "hihaho/rector-rules": "^0.16.1",
-        "larastan/larastan": "^3.10.0",
-        "laravel/mcp": "^0.8||^0.9.4",
+        "hihaho/phpstan-rules": "^3.18.1",
+        "hihaho/rector-rules": "^0.22.0",
+        "larastan/larastan": "^3.12.0",
+        "laravel/boost": "^2.8.1",
         "laravel/pail": "^1.2.7",
-        "laravel/pao": "^1.1.4",
-        "laravel/pint": "^1.30.5",
+        "laravel/pao": "^1.1.5",
+        "laravel/pint": "^1.32.1",
         "laravel/tinker": "^3.0.2",
         "mockery/mockery": "^1.6.15",
         "nunomaduro/collision": "^8.9.5",
-        "pestphp/pest": "^5.0",
+        "pestphp/pest": "^5.1.4",
         "pestphp/pest-plugin-agent": "^5.0",
         "pestphp/pest-plugin-arch": "^5.0",
-        "pestphp/pest-plugin-laravel": "^5.0",
+        "pestphp/pest-plugin-laravel": "^5.0.1",
         "pestphp/pest-plugin-livewire": "^5.0",
-        "pestphp/pest-plugin-phpstan": "^5.0",
-        "pestphp/pest-plugin-rector": "^5.0",
+        "pestphp/pest-plugin-phpstan": "^5.2.1",
+        "pestphp/pest-plugin-rector": "^5.0.4",
         "phpstan/extension-installer": "^1.4.3",
         "phpstan/phpstan-deprecation-rules": "^2.0.5",
         "phpstan/phpstan-mockery": "^2.0",
         "phpstan/phpstan-phpunit": "^2.0.18",
         "phpstan/phpstan-strict-rules": "^2.0.12",
-        "rector/rector": "^2.2",
-        "sandermuller/boost-skills": "^2.35",
-        "sandermuller/laravel-fluent-validation-phpstan": "^0.2.0",
+        "rector/rector": "^2.6.6",
+        "sandermuller/boost-skills": "^2.41.0",
+        "sandermuller/laravel-fluent-validation-phpstan": "^0.3.0",
         "sandermuller/laravel-fluent-validation-rector": "^1.11.1",
-        "sandermuller/package-boost-laravel": "^1.1",
-        "sandermuller/richter": "^0.63.1",
+        "sandermuller/project-boost-laravel": "^1.4",
+        "sandermuller/richter": "^0.68.0",
         "spaze/phpstan-disallowed-calls": "^4.14.0",
         "symplify/phpstan-rules": "^14.13.1",
         "tomasvotruba/cognitive-complexity": "^1.2",
         "tomasvotruba/type-coverage": "^2.3.6"
+    },
+    "replace": {
+        "symfony/polyfill-intl-icu": "*"
     },
     "autoload": {
         "psr-4": {
@@ -104,7 +126,8 @@
             "Composer\\Config::disableProcessTimeout",
             "@test"
         ],
-        "test": "vendor/bin/pest",
+        "test": "vendor/bin/pest --parallel",
+        "test-serial": "vendor/bin/pest",
         "fix-cs": "vendor/bin/pint --parallel",
         "format": "vendor/bin/pint",
         "phpstan": "vendor/bin/phpstan analyse --memory-limit=2G",
@@ -112,7 +135,7 @@
         "phpstan-clear-cache": "vendor/bin/phpstan clear-result-cache",
         "rector": "vendor/bin/rector process",
         "test-coverage": "vendor/bin/pest --coverage",
-        "sync-ai": "vendor/bin/boost sync",
+        "sync-ai": "php artisan project-boost:sync",
         "qa": [
             "@rector",
             "@format",
@@ -124,11 +147,11 @@
             "@php artisan filament:upgrade"
         ],
         "post-install-cmd": [
-            "SanderMuller\\PackageBoostLaravel\\Scripts\\AutoSync::run"
+            "if [ \"$COMPOSER_DEV_MODE\" -eq 1 ] && [ -z \"$CI\" ]; then php artisan project-boost:sync --ansi; fi"
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
-            "SanderMuller\\PackageBoostLaravel\\Scripts\\AutoSync::run"
+            "if [ \"$COMPOSER_DEV_MODE\" -eq 1 ] && [ -z \"$CI\" ]; then php artisan project-boost:sync --ansi; fi"
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""

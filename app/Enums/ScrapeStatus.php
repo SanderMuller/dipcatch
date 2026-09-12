@@ -8,6 +8,7 @@ enum ScrapeStatus: string
     case EmptyMatch = 'empty_match';
     case HttpError = 'http_error';
     case ParseError = 'parse_error';
+    case CurrencyMismatch = 'currency_mismatch';
     case Throttled = 'throttled';
     case RobotsBlocked = 'robots_blocked';
     case NeedsJs = 'needs_js';
