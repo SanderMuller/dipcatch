@@ -30,8 +30,16 @@ final readonly class DetectDrop
      * has decreased. `$triggeringPriceCheckId` is the id of the freshly-inserted
      * price_check row that caused the drop — it becomes the event's anchor
      * (no `latest('checked_at')` lookup; that was racy under concurrent jobs).
+     *
+     * `$reference` is the value the caller already computed before it took the
+     * row lock. Passing it keeps the 30-day window read out of the critical
+     * section. Two cases still fall through to computing it here: a caller
+     * that holds no reference (a test, a manual trigger), and a product whose
+     * pre-lock compute returned null because it has no history segment yet.
+     * The second is a product's first-ever recompute, where the reference is
+     * the new price and nothing fires.
      */
-    public function __invoke(Product $product, ?int $triggeringPriceCheckId): void
+    public function __invoke(Product $product, ?int $triggeringPriceCheckId, ?ReferenceValue $reference = null): void
     {
         if ($product->cheapest_price === null) {
             return;
@@ -39,7 +47,7 @@ final readonly class DetectDrop
 
         $newPrice = (string) $product->cheapest_price;
 
-        $ref = $this->reference->compute($product);
+        $ref = $reference ?? $this->reference->compute($product);
 
         if ($ref === null) {
             return;
@@ -160,15 +168,20 @@ final readonly class DetectDrop
                 return;
             }
 
-            if ($this->withinHourlyLimit($user)) {
-                $user->notify(new PriceDropNotification($locked, $outcome, $event->id));
-            } else {
-                Log::warning('Notification suppressed by hourly rate limit', [
-                    'user_id' => $user->id,
-                    'product_id' => $locked->id,
-                    'price_drop_event_id' => $event->id,
-                ]);
-            }
+            // The event row belongs inside the transaction; the budget and the
+            // send do not. Asking spends a slot of the hourly ceiling, and the
+            // limiter is cache-backed — it does not roll back.
+            DB::afterCommit(function () use ($locked, $outcome, $event, $user): void {
+                if ($this->withinHourlyLimit($user)) {
+                    $user->notify(new PriceDropNotification($locked, $outcome, $event->id));
+                } else {
+                    Log::warning('Notification suppressed by hourly rate limit', [
+                        'user_id' => $user->id,
+                        'product_id' => $locked->id,
+                        'price_drop_event_id' => $event->id,
+                    ]);
+                }
+            });
         });
     }
 

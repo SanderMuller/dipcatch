@@ -185,6 +185,9 @@ class Product extends Model
 
     public function recomputeCheapestShop(?int $triggeringPriceCheckId = null): void
     {
+        // Computed before the lock and handed to both branches below: the
+        // 30-day window read is a segment query plus a price_checks count,
+        // and it has no business inside the critical section.
         $reference = app(Reference::class)->compute($this);
 
         DB::transaction(function () use ($triggeringPriceCheckId, $reference): void {
@@ -254,7 +257,7 @@ class Product extends Model
             $detector = app(DetectDrop::class);
 
             match ($direction) {
-                'down' => $detector($locked, $triggeringPriceCheckId),
+                'down' => $detector($locked, $triggeringPriceCheckId, $reference),
                 'up', 'null' => $detector->clearLatchIfRecovered($locked, $newPrice, $reference),
                 default => null,
             };

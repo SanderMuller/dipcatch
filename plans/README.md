@@ -23,7 +23,7 @@ vendor/bin/pest || true                       # 0 failures
 | 003 | Stop a recheck adopting a shop's new currency | P1 | M | 002 | DONE (`ead8499`) |
 | 004 | Stop `canonicalizeDecimal` misreading two price shapes | P1 | S | — | DONE |
 | 005 | Index, env documentation, and the SSRF escape hatch | P2 | S | — | DONE |
-| 006 | Alert budget after the claim; reference out of the lock | P2 | S | — | TODO |
+| 006 | Alert budget after the claim; reference out of the lock | P2 | S | — | DONE |
 | 007 | Clear the old price when an offer is repointed | P2 | S | — | TODO |
 | 008 | Only dispatch a digest when there is something to digest | P3 | M | — | TODO |
 | 009 | Make the nightly prune's cost independent of product count | P3 | M | 005 | TODO |
@@ -79,6 +79,83 @@ Recorded so an executor does not re-litigate them:
    arrive later the same day.
 
 ## Execution log
+
+- **006 — executed 2026-09-12.** Both parts shipped. Ten new tests:
+  `tests/Feature/Drops/NotificationBudgetSpendTest.php` (eight),
+  `tests/Feature/Drops/AlertsSurviveTheJobTransactionTest.php` (one) and
+  `tests/Feature/Drops/ReferenceComputedOnceTest.php` (one). Six of the ten
+  fail against `main` and were run there to prove it; the count was measured,
+  not reasoned. The other four are controls and pins: two positive controls
+  that spend a slot either way, one job-level test that passes on `main` too,
+  and one that records the reference value on the event row.
+
+  **Three deviations, all found by review after the first pass.**
+
+  1. **Step 1 was executed further than its literal text.** The plan said to
+     move the budget question below the claim in `DetectUnitPriceTarget`. That
+     is not enough. `CheckShopPrice::persist()` wraps the price_check insert,
+     the recompute and both target detectors in one transaction, so the
+     question still sat inside a transaction that can roll back — the exact
+     failure Step 2 moves out of `DetectDrop`. The question now lives inside
+     the `DB::afterCommit` callback.
+  2. **`DetectTargetPrice` was fixed too, though it is outside the in-scope
+     file list.** It was added in `6c19fe2`, after the plan was written at
+     `c9daac7`, and carried the identical ordering. Leaving it would not have
+     been neutral: `persist()` runs the detectors in the order drop,
+     unit-price, target-price, so deferring the first two and leaving the
+     third inline makes the third ask **first**. At the last free slot a
+     target-price alert that may never send would take the slot from a drop
+     alert whose event row is already written. That inversion is introduced by
+     this change, so fixing it belongs here. Total slot waste is still lower
+     than on `main` either way — what would have changed is which alert loses
+     at the cap.
+  3. **`app/Notifications/PriceDropNotification.php` gained a one-line comment
+     rewrite.** Its `afterCommit()` call was justified by a rollback inside
+     `DetectDrop` that this change makes impossible. Reworded as defence in
+     depth so the next reader does not delete the call for the wrong reason.
+
+  **The done criterion "no file outside the in-scope list" is not met.** Four
+  files sit outside it: `app/Actions/Drops/DetectTargetPrice.php` and
+  `app/Notifications/PriceDropNotification.php` for the reasons above, plus
+  `tests/Feature/Drops/AlertsSurviveTheJobTransactionTest.php` and this file.
+  Status is still DONE.
+
+  Four notes for whoever reads this next:
+  1. **A rate-limited alert is now dropped, not deferred.** The claim lands
+     before the budget denies, so the latch is armed and that alert is lost
+     rather than retried on the next check. This is what `DetectDrop` has
+     always done — it writes `last_notified_price` and the event row, then
+     logs the suppression — so the three alert types now agree. It is a real
+     behaviour change, not only a reordering, and a test pins it. The root
+     cause is that `NotificationBudget::allows()` conflates asking with
+     paying; splitting it into a peek and a take would let a detector find the
+     denial before arming the latch. The plan scoped that class out. **Worth a
+     follow-up plan.**
+  2. **A throw inside the commit callback now loses the alert.** A cache
+     outage in `RateLimiter`, or a channel error, exits `DB::commit()` with
+     the data already committed, so the job retry finds no price change and
+     sends nothing. Before, the same throw rolled the transaction back and the
+     retry re-detected the drop. The two target detectors already carried this
+     exposure; the drop path now shares it. Accepted cost of the placement.
+  3. **The `??` fallback in `DetectDrop::__invoke()` still recomputes on a
+     product's first-ever recompute.** `compareDirection(null, $price)` returns
+     `'down'` while the pre-lock compute returns null, because no history
+     segment exists yet. The outcome is unchanged (the in-lock compute returns
+     `INITIAL = $newPrice`, a 0% drop, which fires nothing), but a test that
+     counts window reads must seed history or it counts two. The parameter
+     stays optional per Step 3: making it required is not a pure refactor,
+     because `DropEvaluator::meetsAbsThreshold()` compares `>= 0`, so a
+     product with `drop_threshold_abs = 0` currently does fire on that path.
+  4. **Test 4 uses a query-log count, not the counting decorator the plan
+     asked for.** `Reference` is `final` and `DetectDrop`'s constructor takes
+     the concrete type, so it cannot be decorated in the container. The query
+     log also proves the ordering against the lock, which a decorator would
+     not. It matches the Postgres grammar (`from "price_checks"`,
+     `for update`); `phpunit.xml.dist` pins `DB_CONNECTION=pgsql`.
+
+  The plan's claim that `Product.php` carried a docblock about keeping the
+  window read out of the critical section did not hold — there was no comment
+  at the precompute. One was added.
 
 - **005 — executed 2026-09-11.** Three deviations, all agreed with the maintainer
   before the work started:
