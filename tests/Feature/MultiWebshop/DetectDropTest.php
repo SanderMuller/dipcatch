@@ -8,6 +8,7 @@ use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\Reference;
+use App\Support\UrlNormalizer;
 use Illuminate\Support\Facades\Notification;
 
 beforeEach(function (): void {
@@ -117,5 +118,41 @@ test('skips when cheapest_price is null', function (): void {
     app(DetectDrop::class)($product, null);
 
     expect(PriceDropEvent::query()->count())->toBe(0);
+    Notification::assertNothingSent();
+});
+
+test('no drop fires against the price the offer held before it was repointed', function (): void {
+    $product = Product::factory()->create();
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '100.00',
+    ]);
+    $product->forceFill([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '100.00',
+        'drop_threshold_pct' => '10.00',
+        'drop_threshold_abs' => '5.00',
+    ])->save();
+
+    foreach (range(1, 8) as $i) {
+        ProductCheapestHistory::factory()->for($product)->create([
+            'cheapest_shop_id' => $shop->id,
+            'cheapest_price' => '100.00',
+            'started_at' => now()->subDays(20 + $i),
+            'ended_at' => now()->subDays(19 + $i),
+        ]);
+    }
+
+    // The offer now points at a different product that happens to be cheaper.
+    // Against the old page's 100.00 that reads as a 30% drop; it is not one.
+    $shop->updateUrl(UrlNormalizer::normalize('https://shop.example.com/p/2'));
+
+    // What the first successful check of the new page leaves behind.
+    $shop->forceFill(['current_price' => '70.00', 'current_in_stock' => true])->save();
+    $check = PriceCheck::factory()->for($shop)->create(['price' => '70.00']);
+
+    $product->refresh()->recomputeCheapestShop((int) $check->id);
+
+    expect(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(0);
     Notification::assertNothingSent();
 });

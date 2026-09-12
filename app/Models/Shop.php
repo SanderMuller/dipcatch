@@ -32,6 +32,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $promotion_starts_at
  * @property CarbonInterface|null $promotion_ends_at
  * @property string|null $promotion_label
+ * @property CarbonInterface|null $repointed_at When this offer was last pointed at a different URL.
  */
 #[Unguarded]
 class Shop extends Model
@@ -56,6 +57,7 @@ class Shop extends Model
             'initial_checked_at' => 'datetime',
             'last_checked_at' => 'datetime',
             'last_success_at' => 'datetime',
+            'repointed_at' => 'datetime',
             'current_in_stock' => 'boolean',
             'active' => 'boolean',
             'health' => ShopHealth::class,
@@ -137,6 +139,10 @@ class Shop extends Model
             // queue, which is where an offer with no price belongs.
             'last_success_at' => null,
             'last_checked_at' => null,
+            // The line drawn through this offer's cheapest-history segments:
+            // everything before it priced whatever the old URL sold, so
+            // `Reference` stops reading it. See {@see ProductCheapestHistory}.
+            'repointed_at' => now(),
         ])->save();
 
         return true;

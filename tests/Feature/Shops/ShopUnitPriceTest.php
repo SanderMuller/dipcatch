@@ -77,7 +77,8 @@ test('updateUrl clears everything the previous product taught this offer', funct
         ->and($shop->promotion_ends_at)->toBeNull()
         ->and($shop->promotion_label)->toBeNull()
         ->and($shop->last_success_at)->toBeNull()
-        ->and($shop->last_checked_at)->toBeNull();
+        ->and($shop->last_checked_at)->toBeNull()
+        ->and($shop->repointed_at)->not->toBeNull();
 });
 
 test('a repointed offer loses cheapest instead of carrying the old price over', function (): void {
