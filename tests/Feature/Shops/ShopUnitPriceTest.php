@@ -48,7 +48,7 @@ test('updateUrl clears the pack columns so a stale size never prices a new produ
         ->and($shop->pack_unit)->toBeNull();
 });
 
-test('updateUrl clears the price, the stock flag and the campaign of the previous product', function (): void {
+test('updateUrl clears everything the previous product taught this offer', function (): void {
     $shop = Shop::factory()->create([
         'url' => 'https://shop.example.com/p/1',
         'current_price' => '10.00',

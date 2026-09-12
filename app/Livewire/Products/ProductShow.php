@@ -200,11 +200,9 @@ class ProductShow extends Component
         // so without this the product would keep advertising the old one.
         $this->product->refresh()->recomputeCheapestShop();
 
-        // A check that ran wrote its own status, whatever the outcome. Still
-        // Pending means the job released the host budget instead — and a
-        // release does nothing on a synchronous dispatch, so nothing re-runs
-        // before the scheduled recheck. Saying "re-checked" would be a lie the
-        // empty price cell then has to explain.
+        // Still Pending means the check above gave up, and a release does
+        // nothing on a sync dispatch, so nothing re-runs before the scheduled
+        // recheck.
         $this->shopMessage = $shop->refresh()->last_status === ScrapeStatus::Pending
             ? 'Shop URL updated. The shop was too busy to read now, so the price follows with the next scheduled check.'
             : 'Shop URL updated and price re-checked';

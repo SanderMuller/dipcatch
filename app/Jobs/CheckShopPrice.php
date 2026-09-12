@@ -107,9 +107,9 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     {
         // Including url_hash keeps a recheck of a repointed offer out of the
         // long uniqueness window an automated recheck may still hold — the new
-        // URL is a new key. No caller needs this today, because the only URL
-        // edit (ProductShow::saveShopUrl) dispatches synchronously and takes
-        // no unique lock; a queued one would.
+        // URL is a new key. A sync run needs it too: it acquires no lock, but
+        // `CallQueuedHandler` force-releases this key when it finishes, so a
+        // shared key would let the URL edit unlock the offer's queued recheck.
         return "check-shop:{$this->shop->id}:{$this->shop->url_hash}";
     }
 

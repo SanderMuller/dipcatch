@@ -71,6 +71,46 @@ test('LastSuccessfulScrapeCheck does not flip on a recent successful offer', fun
         ->and($result->shortSummary)->toBe('0/1 stale');
 });
 
+test('LastSuccessfulScrapeCheck gives an offer that has never been read the same grace as one that has', function (): void {
+    $product = Product::factory()->create();
+    // What `Shop::updateUrl()` leaves behind: no successful read of this URL,
+    // and an attempt timestamp from minutes ago.
+    Shop::factory()->for($product)->create([
+        'last_success_at' => null,
+        'last_checked_at' => now()->subMinutes(10),
+    ]);
+
+    $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();
+
+    expect($result->status->value)->toBe('ok')
+        ->and($result->shortSummary)->toBe('0/1 stale');
+});
+
+test('LastSuccessfulScrapeCheck warns about an offer that has never been read once its last attempt is old', function (): void {
+    $product = Product::factory()->create();
+    Shop::factory()->for($product)->create([
+        'last_success_at' => null,
+        'last_checked_at' => now()->subHours(60),
+    ]);
+
+    $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();
+
+    expect($result->status->value)->toBe('warning')
+        ->and($result->shortSummary)->toBe('1/1 stale');
+});
+
+test('LastSuccessfulScrapeCheck fails on an offer that was never read and never even tried', function (): void {
+    $product = Product::factory()->create();
+    Shop::factory()->for($product)->create([
+        'last_success_at' => null,
+        'last_checked_at' => null,
+    ]);
+
+    $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();
+
+    expect($result->status->value)->toBe('failed');
+});
+
 test('LastSuccessfulScrapeCheck treats dead offers as not relevant', function (): void {
     $product = Product::factory()->create();
     Shop::factory()->for($product)->dead()->create(['last_success_at' => now()->subHours(120)]);
