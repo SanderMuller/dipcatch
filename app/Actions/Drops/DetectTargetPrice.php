@@ -120,6 +120,12 @@ final readonly class DetectTargetPrice
         DB::afterCommit(function () use ($product, $shop, $price, $user): void {
             try {
                 if (! app(NotificationBudget::class)->allows($user)) {
+                    Log::warning('Notification suppressed by hourly rate limit', [
+                        'alert' => 'target_price',
+                        'user_id' => $user->id,
+                        'product_id' => $product->id,
+                    ]);
+
                     return;
                 }
 
@@ -134,6 +140,7 @@ final readonly class DetectTargetPrice
                 report($e);
 
                 Log::warning('Alert failed to send', [
+                    'alert' => 'target_price',
                     'user_id' => $user->id,
                     'product_id' => $product->id,
                     'exception' => $e->getMessage(),

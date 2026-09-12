@@ -27,7 +27,7 @@ vendor/bin/pest || true                       # 0 failures
 | 007 | Clear the old price when an offer is repointed | P2 | S | — | TODO |
 | 008 | Only dispatch a digest when there is something to digest | P3 | M | — | TODO |
 | 009 | Make the nightly prune's cost independent of product count | P3 | M | 005 | TODO |
-| 010 | Let each alert fail on its own, and say when one is dropped | P2 | S | 006 | TODO |
+| 010 | Let each alert fail on its own, and say when one is dropped | P2 | S | 006 | DONE |
 | 011 | Split the notification budget into asking and paying | P3 | S | 010 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
@@ -89,6 +89,31 @@ Recorded so an executor does not re-litigate them:
    arrive later the same day.
 
 ## Execution log
+
+- **010 — executed 2026-09-12.** No deviations. Five new tests, three in
+  `tests/Feature/Drops/AlertsSurviveTheJobTransactionTest.php` and two in
+  `tests/Feature/Drops/NotificationBudgetSpendTest.php`. All five were run
+  against the unfixed code first and fail there.
+
+  The cascade the plan describes was confirmed by the failing run's own stack
+  trace, not only by reading the framework: the throw at `DetectDrop.php:213`
+  inside the commit callback escaped through `CheckShopPrice.php:505`
+  (`persist()`'s transaction) and out of `handle()` at `CheckShopPrice.php:171`.
+  So the premise held on all three counts — the sibling alerts died, the job
+  failed, and the data stayed committed.
+
+  Two notes:
+  1. **The plan's test-1 recipe needed one correction it already anticipated.**
+     `NotificationBudget` is `final`, so the stub can neither subclass nor
+     double it. The container binding works because every call site resolves it
+     untyped — `app(NotificationBudget::class)->allows($user)` — so a plain
+     anonymous class with an `allows()` method serves. Plan 011 renames that
+     method and will break the stub.
+  2. **One scoped test run failed with schema errors and did not reproduce.**
+     `relation "users" does not exist`, then missing columns, which is a
+     migration running against the database mid-run. The same command passed
+     immediately afterwards and the full suite is clean. Recorded rather than
+     explained: the cause was not traced.
 
 - **006 — executed 2026-09-12.** Both parts shipped. Ten new tests:
   `tests/Feature/Drops/NotificationBudgetSpendTest.php` (eight),

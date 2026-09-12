@@ -178,6 +178,7 @@ final readonly class DetectDrop
                         $user->notify(new PriceDropNotification($locked, $outcome, $event->id));
                     } else {
                         Log::warning('Notification suppressed by hourly rate limit', [
+                            'alert' => 'price_drop',
                             'user_id' => $user->id,
                             'product_id' => $locked->id,
                             'price_drop_event_id' => $event->id,
@@ -194,6 +195,7 @@ final readonly class DetectDrop
                     report($e);
 
                     Log::warning('Alert failed to send', [
+                        'alert' => 'price_drop',
                         'user_id' => $user->id,
                         'product_id' => $locked->id,
                         'exception' => $e->getMessage(),
