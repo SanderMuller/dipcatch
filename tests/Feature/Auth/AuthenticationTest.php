@@ -6,7 +6,13 @@ use Laravel\Fortify\Features;
 test('login screen can be rendered', function (): void {
     $response = $this->get(route('login'));
 
-    $response->assertOk();
+    $response
+        ->assertOk()
+        ->assertSee('Sign in with a passkey')
+        ->assertSee('Or continue with email')
+        ->assertSee("options: '" . route('passkey.login-options') . "'", false)
+        ->assertSee("submit: '" . route('passkey.login') . "'", false)
+        ->assertDontSee(route('passkey.confirm-options'), false);
 });
 
 test('users can authenticate using the login screen', function (): void {
@@ -64,4 +70,17 @@ test('users can logout', function (): void {
     $response->assertRedirect(route('home'));
 
     $this->assertGuest();
+});
+
+test('login screen omits passkeys when the feature is disabled', function (): void {
+    config()->set('fortify.features', [
+        Features::registration(),
+        Features::resetPasswords(),
+        Features::emailVerification(),
+        Features::twoFactorAuthentication(),
+    ]);
+
+    $this->get(route('login'))
+        ->assertOk()
+        ->assertDontSee('Sign in with a passkey');
 });

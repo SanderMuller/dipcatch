@@ -8,7 +8,7 @@
      route, never user input. --}}
 # {!! config('app.name') !!}
 
-> {!! config('app.name') !!} is a price-alert service for the Netherlands, for the things you buy anyway: groceries, pet food, coffee, vacuum-cleaner filters, water filters, anything that runs out. You paste a product link from a supermarket or webshop, add the same product from other shops, and {!! config('app.name') !!} compares them on unit price (per kilo, litre or piece) and tells you when the cheapest one drops.
+> {!! config('app.name') !!} is a price-alert service for the Netherlands, for the things you buy anyway: groceries, pet food, coffee, skincare, vacuum-cleaner filters, water filters, anything that runs out. You paste a product link from a supermarket or webshop, add the same product from other shops, and {!! config('app.name') !!} compares them on unit price (per kilo, litre or piece) and tells you when the cheapest one drops.
 
 Site: {!! route('home') !!}
 @if (filled($contactEmail))
@@ -18,7 +18,7 @@ Languages: English (default), Dutch ({!! route('home', ['lang' => 'nl']) !!})
 
 ## What it does
 
-- Tracks one product across several shops: Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon.nl and Zooplus, plus most webshops that publish structured product data.
+- Tracks one product across several shops: Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart, plus most webshops that publish structured product data.
 - Reads AH Bonus and Dirk promo prices, not only the shelf price.
 - Compares pack sizes fairly by working out the price per kilo, litre or piece.
 - Re-checks each shop about every {!! $recheckIntervalHours !!} hours.

@@ -15,6 +15,7 @@
                 type="email"
                 required
                 autofocus
+                autocomplete="username"
                 placeholder="email@example.com"
             />
 

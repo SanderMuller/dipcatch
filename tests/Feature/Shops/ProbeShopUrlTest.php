@@ -1,11 +1,13 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\ProbeBudget;
 use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ProbeFailure;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Support\UrlNormalizer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -146,7 +148,7 @@ test('the per-user rate limit reports how long to wait', function (): void {
     $product = Product::factory()->create();
     $user = User::factory()->create();
 
-    foreach (range(1, ProbeShopUrl::PER_USER_LIMIT_PER_MIN) as $i) {
+    foreach (range(1, ProbeBudget::PER_MINUTE) as $i) {
         app(ProbeShopUrl::class)($product, "https://example.com/p/{$i}", $user);
     }
 
@@ -395,4 +397,66 @@ test('a page quoting a currency that is not a code is refused, not stored', func
 
     expect($outcome->isSuccess())->toBeFalse()
         ->and($outcome->extractionReason)->toBe('currency_not_a_code');
+});
+
+test('choosing a variant stores the address that variant lives at', function (): void {
+    $json = (string) json_encode([
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://example.com/sanimed',
+        'offers' => [
+            ['@type' => 'Offer', 'sku' => 'MP32275', 'price' => '41.65', 'priceCurrency' => 'EUR', 'url' => 'https://example.com/sanimed?sku=MP32275'],
+            ['@type' => 'Offer', 'sku' => 'MP4838', 'price' => '21.25', 'priceCurrency' => 'EUR', 'url' => 'https://example.com/sanimed?sku=MP4838'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/sanimed*' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $outcome = app(ProbeShopUrl::class)(
+        null,
+        'https://example.com/sanimed',
+        User::factory()->create(),
+        variantKey: 'https://example.com/sanimed?sku=MP4838',
+    );
+
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->snapshot?->price)->toBe('21.25')
+        // The user clicks this. It must show the pack they were quoted.
+        ->and($outcome->normalizedUrl)->toBe('https://example.com/sanimed?sku=MP4838');
+});
+
+test('the same variant added twice is a duplicate, whichever address was pasted', function (): void {
+    $json = (string) json_encode([
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://example.com/sanimed',
+        'offers' => [
+            ['@type' => 'Offer', 'sku' => 'MP32275', 'price' => '41.65', 'priceCurrency' => 'EUR', 'url' => 'https://example.com/sanimed?sku=MP32275'],
+            ['@type' => 'Offer', 'sku' => 'MP4838', 'price' => '21.25', 'priceCurrency' => 'EUR', 'url' => 'https://example.com/sanimed?sku=MP4838'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/sanimed*' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://example.com/sanimed?sku=MP4838',
+        'url_hash' => UrlNormalizer::hash('https://example.com/sanimed?sku=MP4838'),
+        'currency' => 'EUR',
+    ]);
+
+    $outcome = app(ProbeShopUrl::class)(
+        $product,
+        'https://example.com/sanimed',
+        User::factory()->create(),
+        variantKey: 'https://example.com/sanimed?sku=MP4838',
+    );
+
+    expect($outcome->isDuplicate())->toBeTrue();
 });

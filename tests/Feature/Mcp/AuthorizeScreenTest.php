@@ -83,3 +83,9 @@ test('the passport authorization routes the screen posts to exist', function ():
     expect(Route::has('passport.authorizations.approve'))->toBeTrue()
         ->and(Route::has('passport.authorizations.deny'))->toBeTrue();
 });
+
+test('uses a third-party-safe session cookie for MCP authorization', function (): void {
+    expect(config('session.partitioned'))->toBeTrue()
+        ->and(config('session.secure'))->toBeTrue()
+        ->and(config('session.same_site'))->toBe('none');
+});

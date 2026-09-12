@@ -14,7 +14,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Laravel\Passport\Http\Middleware\CheckToken;
 use Laravel\Passport\Http\Middleware\CheckTokenForAnyScope;
-use SanderMuller\QueueInsights\Console\QueueInsightsSnapshotCommand;
 use Zae\StrictTransportSecurity\Middleware\L5\StrictTransportSecurity;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -41,12 +40,9 @@ return Application::configure(basePath: dirname(__DIR__))
             ->onOneServer();
 
         $schedule->command(DispatchDailyDigestsCommand::class)
-            ->everyMinute()
+            ->everyFiveMinutes()
             ->withoutOverlapping()
             ->onOneServer();
-
-        $schedule->command(QueueInsightsSnapshotCommand::class)
-            ->everyMinute();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         // `append()`, not `web()`: the security headers must land on API,

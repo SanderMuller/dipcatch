@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Support\MarketingPages;
+use App\Support\ShopPages;
 use App\Support\UseCases;
 use Illuminate\Support\Facades\Config;
 
@@ -77,12 +78,15 @@ test('the sitemap lists both representations of every marketing page', function 
 
     preg_match_all('#<loc>(.*?)</loc>#', $content, $matches);
 
-    // Three fixed pages plus one per use-case page, each in two locales.
-    expect($matches[1])->toHaveCount((3 + count(UseCases::all())) * 2)
+    // Six fixed pages (home, pricing, privacy, terms, support, the shops hub)
+    // plus one per use-case page and one per shop, each in two locales.
+    expect($matches[1])->toHaveCount((6 + count(UseCases::all()) + count(ShopPages::all())) * 2)
         ->and($matches[1])->toContain(route('home'))
         ->and($matches[1])->toContain(route('home', ['lang' => 'nl']))
         ->and($matches[1])->toContain(route('pricing'))
-        ->and($matches[1])->toContain(route('privacy', ['lang' => 'nl']));
+        ->and($matches[1])->toContain(route('privacy', ['lang' => 'nl']))
+        ->and($matches[1])->toContain(route('shops'))
+        ->and($matches[1])->toContain(route('shop', ['slug' => 'ah-nl']));
 
     $base = Config::string('app.url');
 
@@ -129,7 +133,7 @@ test('the sitemap omits lastmod when no privacy date is configured', function ()
 test('only the marketing pages are offered to crawlers as sitemap entries', function (): void {
     $names = array_map(static fn (array $page): string => $page[0], MarketingPages::routes());
 
-    expect(array_values(array_unique($names)))->toBe(['home', 'pricing', 'privacy', 'use-case']);
+    expect(array_values(array_unique($names)))->toBe(['home', 'pricing', 'privacy', 'terms', 'support', 'use-case', 'shops', 'shop']);
 });
 
 test('the sitemap ignores a locale query and always lists both representations', function (): void {

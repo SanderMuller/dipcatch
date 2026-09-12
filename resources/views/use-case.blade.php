@@ -39,14 +39,31 @@
                     <p class="mt-4 max-w-[64ch] text-base text-pretty text-zinc-700 dark:text-zinc-300">{{ $useCase->example }}</p>
                 </section>
 
+                @if ($useCase->tips !== [])
+                    <section class="mt-16">
+                        <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Getting the most out of it') }}</h2>
+                        <ul role="list" class="mt-5 space-y-3">
+                            @foreach ($useCase->tips as $tip)
+                                <li class="flex items-start gap-3 text-base text-pretty text-zinc-700 dark:text-zinc-300">
+                                    <span aria-hidden="true" class="mt-2 size-1.5 shrink-0 rounded-full bg-amber-500"></span>
+                                    <span>{{ $tip }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </section>
+                @endif
+
                 @if ($shops !== [])
                     <section class="mt-16">
                         <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Which shops this works with') }}</h2>
-                        <ul class="mt-5 flex flex-wrap gap-2">
+                        <ul role="list" class="mt-5 flex flex-wrap gap-2">
                             @foreach ($shops as $shop)
-                                <li class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800">
-                                    <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
-                                    <span>{{ $shop['name'] }}</span>
+                                {{-- Linked: every one of these shops has a page of its own. --}}
+                                <li>
+                                    <a href="{{ route('shop', [...$langQuery, 'slug' => \App\Support\ShopPages::slug($shop['host'])]) }}" class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900">
+                                        <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
+                                        <span>{{ $shop['name'] }}</span>
+                                    </a>
                                 </li>
                             @endforeach
                         </ul>

@@ -12,9 +12,11 @@ use App\Mcp\Tools\PriceHistoryTool;
 use App\Mcp\Tools\RemoveShopTool;
 use App\Mcp\Tools\SetThresholdTool;
 use App\Models\Product;
+use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Support\Str;
+use Illuminate\Testing\Fluent\AssertableJson;
 
 it('lists only the products of the token owner', function (): void {
     $me = User::factory()->create();
@@ -301,4 +303,108 @@ it('leaves the drop thresholds alone when only a unit price target is given', fu
     expect((float) $fresh?->drop_threshold_pct)->toBe(10.0)
         ->and($fresh?->drop_threshold_abs)->toBeNull()
         ->and((float) $fresh?->unit_price_target)->toBe(4.25);
+});
+
+it('says whether the cheapest shop can actually be bought', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['current_price' => '9.00', 'currency' => 'EUR', 'current_in_stock' => true]);
+    Shop::factory()->for($product)->create(['current_price' => '4.00', 'currency' => 'EUR', 'current_in_stock' => null]);
+
+    $product->recomputeCheapestShop();
+
+    DipCatchServer::actingAs($me)->tool(ListProductsTool::class)
+        ->assertOk()
+        ->assertSee('"cheapest_stock":"unknown"');
+});
+
+it('returns a price segment that started before the plan window and is still open', function (): void {
+    // A free account reads 90 days. A price that has not moved for over a
+    // year is one open segment starting outside that window, so the shared
+    // scope must keep it. This tool already matched on overlap before the
+    // scope existed; the case guards the refactor, not a fix.
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '85.00',
+        'started_at' => now()->subDays(400),
+        'ended_at' => null,
+    ]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(PriceHistoryTool::class, ['product_id' => (string) $product->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('segments', 1)
+            ->where('segments.0.price', '85.00')
+            ->etc());
+});
+
+it('omits a segment that both started and ended before the plan window', function (): void {
+    // The overlap fix must not widen the window into "return everything".
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '999.99',
+        'started_at' => now()->subDays(400),
+        'ended_at' => now()->subDays(300),
+    ]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(PriceHistoryTool::class, ['product_id' => (string) $product->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('segments', 0)
+            ->etc());
+});
+
+it('returns a segment that started before the plan window and ended inside it', function (): void {
+    // Only `ended_at >= $windowStart` can match this shape. Without that
+    // clause the chart starts at the change instead of showing the level the
+    // price dropped from.
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '120.00',
+        'started_at' => now()->subDays(300),
+        'ended_at' => now()->subDays(20),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '85.00',
+        'started_at' => now()->subDays(20),
+        'ended_at' => null,
+    ]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(PriceHistoryTool::class, ['product_id' => (string) $product->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('segments', 2)
+            ->where('segments.0.price', '120.00')
+            ->where('segments.1.price', '85.00')
+            ->etc());
+});
+
+it('returns history older than the free window to a pro account', function (): void {
+    // Pro reads an unlimited window, which reaches the scope as a null
+    // cutoff. The scope no-ops there, so the guard that drops a closed
+    // segment on free must not drop it here.
+    $me = User::factory()->create();
+    subscribeUser($me, 'active');
+    $product = Product::factory()->create(['user_id' => $me->id]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '999.99',
+        'started_at' => now()->subDays(400),
+        'ended_at' => now()->subDays(300),
+    ]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(PriceHistoryTool::class, ['product_id' => (string) $product->id])
+        ->assertOk()
+        ->assertSee('999.99');
 });

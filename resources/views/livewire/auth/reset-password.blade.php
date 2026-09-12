@@ -17,7 +17,7 @@
                 :label="__('Email')"
                 type="email"
                 required
-                autocomplete="email"
+                autocomplete="username"
             />
 
             <!-- Password -->

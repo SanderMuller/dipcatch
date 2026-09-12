@@ -3,9 +3,11 @@
 namespace App\Providers;
 
 use App\Actions\Suggestions\SuggestShops;
+use App\Billing\StripeTax;
 use App\Health\BillingConfigurationCheck;
 use App\Health\CheckjebonFreshnessCheck;
 use App\Health\LastSuccessfulScrapeCheck;
+use App\Health\SessionDriverCheck;
 use App\Health\StripeWebhookSecretCheck;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ShopAdapter;
@@ -13,6 +15,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -104,6 +107,15 @@ final class AppServiceProvider extends ServiceProvider
         // drop the account.
         Cashier::keepPastDueSubscriptionsActive();
 
+        // Stripe Tax works out the VAT per customer location and adds the
+        // reverse charge for an EU business that gives a valid VAT number.
+        // Off until Stripe Tax is switched on in the dashboard with a
+        // registration behind it: with it on and Stripe Tax inactive, every
+        // checkout fails rather than merely charging no tax.
+        if (StripeTax::isEnabled()) {
+            Cashier::calculateTaxes();
+        }
+
         // Per token owner. The limiter sits behind `auth:api`, so an
         // unauthenticated request never reaches it and needs no IP fallback.
         RateLimiter::for('mcp', fn (Request $request): Limit => Limit::perMinute(60)
@@ -153,6 +165,7 @@ final class AppServiceProvider extends ServiceProvider
             CpuLoadCheck::new(),
             SecurityAdvisoriesCheck::new(),
             StripeWebhookSecretCheck::new(),
+            SessionDriverCheck::new(),
             BillingConfigurationCheck::new(),
             LastSuccessfulScrapeCheck::new()
                 ->warnAfterHours(48)

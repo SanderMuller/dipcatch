@@ -7,6 +7,13 @@
                 "mcp:start",
                 "richter"
             ]
+        },
+        "laravel-boost": {
+            "command": "php",
+            "args": [
+                "artisan",
+                "boost:mcp"
+            ]
         }
     }
 }

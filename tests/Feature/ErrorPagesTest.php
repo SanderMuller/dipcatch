@@ -30,7 +30,7 @@ test('the 404 shows the same links to a signed-in visitor as to a guest', functi
     $member = (string) $this->get('/this-route-does-not-exist')->getContent();
 
     expect($member)->toBe($guest)
-        ->and($member)->not->toContain(route('dashboard'));
+        ->and($member)->not->toContain(route('profile.edit'));
 });
 
 describe('the 500 page', function (): void {

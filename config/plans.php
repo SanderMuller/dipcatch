@@ -61,7 +61,7 @@ return [
     'pro' => [
         'max_products' => null,
         'max_shops_per_product' => null,
-        'recheck_interval_hours' => (int) env('PLAN_PRO_RECHECK_INTERVAL_HOURS', 2),
+        'recheck_interval_hours' => (int) env('PLAN_PRO_RECHECK_INTERVAL_HOURS', 6),
         'notifications_hourly_limit' => (int) env('PLAN_PRO_NOTIFICATIONS_HOURLY_LIMIT', 200),
         'unit_price_alerts' => true,
         'history_days' => null,
@@ -79,8 +79,20 @@ return [
     */
 
     'stripe' => [
+        /*
+        | Stripe Tax. Requires Stripe Tax to be active on the account, with a
+        | registration for at least one jurisdiction, and a tax behaviour set
+        | on the Price — a Price left `unspecified` fails the checkout rather
+        | than falling back to no tax.
+        |
+        | The DipCatch Pro price is `inclusive`: the customer pays the
+        | advertised amount and the VAT comes out of it, which is what EU
+        | consumer pricing rules expect.
+        */
+        'automatic_tax' => filter_var(env('STRIPE_AUTOMATIC_TAX', false), FILTER_VALIDATE_BOOLEAN),
+
         'pro_price_id' => env('STRIPE_PRICE_PRO_MONTHLY'),
-        'pro_amount' => env('PLAN_PRO_DISPLAY_AMOUNT', '4.99'),
+        'pro_amount' => env('PLAN_PRO_DISPLAY_AMOUNT', '2.99'),
         'pro_currency' => env('PLAN_PRO_DISPLAY_CURRENCY', 'EUR'),
         'trial_days' => (int) env('PLAN_PRO_TRIAL_DAYS', 14),
     ],

@@ -10,6 +10,7 @@ final readonly class UseCase
 {
     /**
      * @param  list<string>  $hosts
+     * @param  list<string>  $tips
      * @param  list<array{q: string, a: string}>  $faq
      */
     public function __construct(
@@ -19,6 +20,7 @@ final readonly class UseCase
         public string $intro,
         public string $example,
         public array $hosts,
+        public array $tips,
         public array $faq,
     ) {}
 

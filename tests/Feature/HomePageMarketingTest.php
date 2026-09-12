@@ -34,7 +34,7 @@ test('the header offers account creation to guests and the app to members', func
 });
 
 test('the contact link only renders when a contact address is configured', function (): void {
-    config()->set('site.contact_email', null);
+    config()->set('site.contact_email');
     $this->get(route('home'))->assertDontSee('mailto:', escape: false);
 
     config()->set('site.contact_email', 'hello@example.test');
@@ -76,8 +76,7 @@ test('the phone mock shows grocery examples from supported shops only', function
         ->assertSee('ah.nl')
         ->assertSee('dirk.nl')
         ->assertSee('jumbo.com')
-        ->assertDontSee('mediamarkt.nl')
-        ->assertDontSee('amazon.com');
+        ->assertDontSee('mediamarkt.nl');
 });
 
 test('the phone mock is an informative image with a label matching the cards', function (): void {
@@ -113,11 +112,7 @@ test('the homepage renders no decorative image element', function (): void {
 
     preg_match_all('#<img[^>]*>#', $content, $matches);
 
-    foreach ($matches[0] as $tag) {
-        // A missing alt converts the same way an empty one does, so require a
-        // non-empty alt rather than only rejecting the empty spelling.
-        expect($tag)->toMatch('#alt="[^"]+"#');
-    }
+    expect($matches[0])->each->toMatch('#alt="[^"]+"#');
 });
 
 test('the phone mock contributes no chrome to the page text', function (): void {
@@ -147,8 +142,8 @@ test('each tracked example still carries its icon', function (): void {
         ->and(substr_count($content, 'before:content-[var(--label)]'))->toBe(2);
 });
 
-test('the shop list names every supported host without contradicting itself', function (): void {
-    $hosts = SupportedShops::rows();
+test('the shop list names the homepage hosts without contradicting itself', function (): void {
+    $hosts = SupportedShops::homepage();
 
     $content = (string) $this->get(route('home'))->assertOk()->getContent();
 
@@ -156,10 +151,13 @@ test('the shop list names every supported host without contradicting itself', fu
         expect($content)->toContain($shop['host']);
     }
 
-    // The overflow pill used to say "+4 more" directly under all twelve names,
-    // which read as a contradiction once the page was flattened to Markdown.
-    expect($content)->not->toContain(' more<')
-        ->and($content)->toContain(__('and many other webshops'));
+    // Country TLDs of the same brand stay off this row; the shops hub lists them.
+    expect($content)->not->toContain('petsplace.nl')
+        ->and($content)->not->toContain('amazon.com')
+        ->and($content)->toContain('etos.nl')
+        ->and($content)->not->toContain(' more<')
+        ->and($content)->toContain(__('and many other webshops'))
+        ->and($content)->toMatch('/<a href="' . preg_quote(e(route('shops')), '/') . '"[^>]*>' . preg_quote(__('and many other webshops'), '/') . '<\/a>/');
 });
 
 test('the privacy page explains that shared product images load from the shop', function (): void {
@@ -172,6 +170,8 @@ test('the FAQ section shows every question the page defines', function (): void 
     $response = $this->get(route('home'))->assertOk();
 
     $response->assertSee('Which shops work?')
+        ->assertSee('Etos, The Ordinary, Lookfantastic')
+        ->assertSee('Pets Place, Medpets, Welkoop')
         ->assertSee('How often are prices checked?')
         ->assertSee('Is it free?')
         ->assertSee('Do I need an extension or app?')
@@ -206,13 +206,13 @@ test('the FAQ JSON-LD matches the visible questions and has plain-text answers',
     expect($entities)->toBeArray();
     assert(is_array($entities));
 
-    preg_match_all('#<summary[^>]*>\s*<span>(.*?)</span>#s', (string) $content, $summaryMatches);
+    preg_match_all('#data-flux-accordion-heading[^>]*>\s*<span[^>]*>(.*?)</span>#s', (string) $content, $summaryMatches);
     $visibleQuestions = array_map(
         static fn (string $q): string => trim(html_entity_decode($q, ENT_QUOTES | ENT_HTML5)),
         $summaryMatches[1],
     );
 
-    expect($entities)->toHaveCount(count($visibleQuestions))
+    expect($entities)->toHaveSameSize($visibleQuestions)
         ->and($visibleQuestions)->not->toBeEmpty();
 
     foreach (array_values($entities) as $index => $question) {
@@ -238,7 +238,8 @@ test('the homepage speaks about repeat purchases, not only supermarkets', functi
         ->assertOk()
         ->assertSee('Price alerts for the things you buy anyway')
         ->assertSee('vacuum filters')
-        ->assertSee('cat food');
+        ->assertSee('cat food')
+        ->assertSee('skincare');
 });
 
 test('shop pills carry the brand name a person would search for', function (): void {
@@ -255,6 +256,15 @@ test('a host nobody has named falls back to the host itself', function (): void 
     $rows = SupportedShops::rows();
 
     expect($rows[0]['name'])->toBe('unnamed-shop.example');
+});
+
+test('a homepage host that is not a supported shop is omitted from the row', function (): void {
+    config()->set('site.supported_hosts', ['ah.nl', 'petsplace.nl']);
+    config()->set('site.homepage_hosts', ['ah.nl', 'gone.example']);
+
+    $hosts = array_column(SupportedShops::homepage(), 'host');
+
+    expect($hosts)->toBe(['ah.nl']);
 });
 
 test('the how-it-works steps are headings so the page has an outline', function (): void {

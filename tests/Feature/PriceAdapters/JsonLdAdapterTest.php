@@ -829,3 +829,57 @@ test('offers pricing themselves through a priceSpecification still become choice
     expect($result->isAmbiguous())->toBeTrue()
         ->and(array_map(fn ($variant): string => $variant->price, $result->variants))->toBe(['10.00', '20.00']);
 });
+
+test('two offers that repeat the product name are still told apart', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat - Maaltijdzakje',
+        'url' => 'https://shop.test/sanimed',
+        'offers' => [
+            [
+                '@type' => 'Offer',
+                'sku' => 'MP32275',
+                'name' => 'Sanimed Skin Sensitive Cat - Maaltijdzakje',
+                'price' => '41.65',
+                'priceCurrency' => 'EUR',
+                'url' => 'https://shop.test/sanimed?sku=MP32275',
+            ],
+            [
+                '@type' => 'Offer',
+                'sku' => 'MP4838',
+                'name' => 'Sanimed Skin Sensitive Cat - Maaltijdzakje',
+                'price' => '21.25',
+                'priceCurrency' => 'EUR',
+                'url' => 'https://shop.test/sanimed?sku=MP4838',
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/sanimed', withJsonLd($json));
+
+    $titles = array_map(fn ($variant): string => $variant->title, $result->variants);
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($titles[0])->not->toBe($titles[1])
+        ->and($titles[0])->toContain('MP32275')
+        ->and($titles[1])->toContain('MP4838');
+});
+
+test('an offer stating its own size keeps that as the label', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Sanimed Skin Sensitive Cat',
+        'url' => 'https://shop.test/sanimed',
+        'offers' => [
+            ['@type' => 'Offer', 'sku' => 'A', 'size' => '24 x 100 g', 'price' => '41.65', 'priceCurrency' => 'EUR'],
+            ['@type' => 'Offer', 'sku' => 'B', 'size' => '12 x 100 g', 'price' => '21.25', 'priceCurrency' => 'EUR'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/sanimed', withJsonLd($json));
+
+    expect(array_map(fn ($variant): string => $variant->title, $result->variants))
+        ->toBe(['Sanimed Skin Sensitive Cat — 24 x 100 g', 'Sanimed Skin Sensitive Cat — 12 x 100 g']);
+});

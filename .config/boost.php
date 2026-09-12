@@ -70,9 +70,27 @@ return BoostConfig::configure()
 
     // Composer-package authoring skills — not relevant to this application.
     // Pulled in by the release-automation tag alongside the wanted pre-release skill.
+    //
+    // The laravel/boost entries are frameworks this app does not use. Its
+    // catalogue arrives through sandermuller/project-boost-laravel, which
+    // ships everything Boost detects, so the unused stacks are dropped here.
     ->withExcludedSkills([
+        'laravel/boost:inertia-react-development',
+        'laravel/boost:inertia-svelte-development',
+        'laravel/boost:inertia-vue-development',
+        'laravel/boost:wayfinder-development',
         'sandermuller/boost-skills:readme',
         'sandermuller/boost-skills:pre-release',
         'sandermuller/boost-skills:release-notes',
         'sandermuller/boost-skills:upgrading',
+    ])
+
+    ->withExcludedGuidelines([
+        'laravel/boost:inertia-laravel-core',
+        'laravel/boost:inertia-react-core',
+        'laravel/boost:inertia-svelte-core',
+        'laravel/boost:inertia-vue-core',
+        'laravel/boost:phpunit-core',
+        'laravel/boost:sail-core',
+        'laravel/boost:wayfinder-core',
     ]);

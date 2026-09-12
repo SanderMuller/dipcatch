@@ -24,7 +24,12 @@ final readonly class ProductPresenter
             'shop_count' => $product->shops()->count(),
             'threshold_pct' => self::decimal($product->drop_threshold_pct),
             'threshold_abs' => self::decimal($product->drop_threshold_abs),
+            'target_price' => self::decimal($product->target_price),
             'unit_price_target' => self::decimal($product->unit_price_target),
+            // Whether the headline price can actually be bought. Without it a
+            // caller has to cross-reference `is_cheapest` against each shop's
+            // stock before it can say "cheapest is X" honestly.
+            'cheapest_stock' => self::stock($product->cheapestShop?->current_in_stock),
         ];
     }
 

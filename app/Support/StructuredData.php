@@ -80,6 +80,137 @@ final class StructuredData
     }
 
     /**
+     * A shop landing page: the same application node, that shop's questions,
+     * and a trail through the shops hub rather than straight to the homepage,
+     * so the crawler sees the hierarchy the pages actually have.
+     *
+     * @return array<string, mixed>
+     */
+    public static function shop(ShopPage $shop, string $canonical): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@graph' => [
+                self::application($shop->description),
+                self::faqPage($shop->faq, $canonical),
+                self::shopBreadcrumb($shop, $canonical),
+            ],
+        ];
+    }
+
+    /**
+     * The hub: an ItemList of the shops, in the order the page renders them,
+     * so the list a reader sees is the list a crawler reads.
+     *
+     * @param  list<ShopPage>  $shops
+     * @return array<string, mixed>
+     */
+    public static function shopsHub(array $shops, string $canonical, string $description): array
+    {
+        $items = [];
+
+        foreach ($shops as $index => $shop) {
+            $items[] = [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $shop->name,
+                'url' => $shop->url(),
+            ];
+        }
+
+        return [
+            '@context' => 'https://schema.org',
+            '@graph' => [
+                self::application($description),
+                [
+                    '@type' => 'ItemList',
+                    '@id' => $canonical . '#shops',
+                    'name' => __('Supported shops'),
+                    'numberOfItems' => count($items),
+                    'itemListElement' => $items,
+                ],
+                self::breadcrumb(__('Supported shops'), $canonical),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function shopBreadcrumb(ShopPage $shop, string $canonical): array
+    {
+        return [
+            '@type' => 'BreadcrumbList',
+            '@id' => $canonical . '#breadcrumb',
+            'itemListElement' => [
+                ['@type' => 'ListItem', 'position' => 1, 'name' => Config::string('app.name', 'DipCatch'), 'item' => url('/')],
+                ['@type' => 'ListItem', 'position' => 2, 'name' => __('Supported shops'), 'item' => route('shops')],
+                ['@type' => 'ListItem', 'position' => 3, 'name' => $shop->heading, 'item' => $canonical],
+            ],
+        ];
+    }
+
+    /**
+     * The support page: a ContactPage, so an assistant asked how to reach us
+     * has something to answer with.
+     *
+     * @return array<string, mixed>
+     */
+    public static function support(string $canonical, string $description): array
+    {
+        $page = [
+            '@type' => 'ContactPage',
+            '@id' => $canonical . '#page',
+            'url' => $canonical,
+            'name' => __('Support'),
+            'description' => $description,
+            'isPartOf' => ['@id' => self::id('#site')],
+        ];
+
+        $email = Config::get('site.contact_email');
+
+        if (is_string($email) && $email !== '') {
+            $page['mainEntity'] = [
+                '@type' => 'ContactPoint',
+                'contactType' => 'customer support',
+                'email' => $email,
+                'availableLanguage' => ['en', 'nl'],
+            ];
+        }
+
+        return [
+            '@context' => 'https://schema.org',
+            '@graph' => [$page, self::breadcrumb(__('Support'), $canonical)],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function terms(string $canonical, string $description): array
+    {
+        $page = [
+            '@type' => 'WebPage',
+            '@id' => $canonical . '#page',
+            'url' => $canonical,
+            'name' => __('Terms of service'),
+            'description' => $description,
+            'isPartOf' => ['@id' => self::id('#site')],
+        ];
+
+        $updated = Config::get('site.terms_updated_at');
+
+        if (is_string($updated) && $updated !== '') {
+            $page['dateModified'] = $updated;
+        }
+
+        return [
+            '@context' => 'https://schema.org',
+            '@graph' => [$page, self::breadcrumb(__('Terms of service'), $canonical)],
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function privacy(string $canonical, string $description): array

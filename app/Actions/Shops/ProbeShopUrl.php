@@ -22,7 +22,6 @@ use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Iso4217;
 use App\Support\UnservableShops;
 use App\Support\UrlNormalizer;
-use Illuminate\Support\Facades\RateLimiter;
 use InvalidArgumentException;
 
 /**
@@ -35,15 +34,13 @@ use InvalidArgumentException;
  */
 final readonly class ProbeShopUrl
 {
-    /** Pages one account may probe per minute. Public so a caller-facing message can state it. */
-    public const int PER_USER_LIMIT_PER_MIN = 6;
-
     public function __construct(
         private ShopFetcher $fetcher,
         private AdapterResolver $resolver,
         private CheckjebonSource $checkjebon,
         private AhApiSource $ahApi,
         private HostFetchMemory $memory,
+        private ProbeBudget $budget,
     ) {}
 
     /**
@@ -85,7 +82,7 @@ final readonly class ProbeShopUrl
             return $local;
         }
 
-        $probeRetryAfter = $this->perUserRetryAfter($actor);
+        $probeRetryAfter = $this->budget->spend($actor);
 
         if ($probeRetryAfter !== null) {
             return ProbeOutcome::failed(ProbeFailure::ProbeRateLimited, ['retry_after_seconds' => $probeRetryAfter]);
@@ -145,33 +142,102 @@ final readonly class ProbeShopUrl
         $snapshot = $extraction->snapshot;
         assert($snapshot !== null);
 
-        // Every currency column is char(3). A page quoting "Euro" states no
-        // code that can be stored, so it is refused here rather than at the
-        // insert, where Postgres would reject the whole write.
+        $checked = $this->withStorableCurrency($snapshot, $product);
+
+        if ($checked instanceof ProbeOutcome) {
+            return $checked;
+        }
+
+        $snapshot = $checked;
+
+        // The link must point at what the price refers to. A caller that
+        // pastes a product page and pins a variant would otherwise store the
+        // page, and the shopper who clicks it lands on the default pack at a
+        // different price than the one they were quoted.
+        $target = self::variantTarget($normalizedUrl, $variantKey);
+        $duplicate = $target === $normalizedUrl ? null : $this->existingShopFor($product, $target);
+
+        if ($duplicate instanceof ProbeOutcome) {
+            return $duplicate;
+        }
+
+        return ProbeOutcome::success(
+            snapshot: $snapshot,
+            normalizedUrl: $target,
+            host: $fetch->host,
+            adapterKey: $extraction->adapterKey ?? 'generic',
+        );
+    }
+
+    /**
+     * The snapshot with a storable currency code, or the outcome that says
+     * why it has none.
+     *
+     * Every currency column is `char(3)`. A page quoting `"Euro"` states no
+     * code that can be stored, so it is refused here rather than at the
+     * insert, where Postgres rejects the whole write. A page quoting
+     * `" EUR "` states a code, padded — carried on unnormalized it reads as
+     * a different currency from the product's own.
+     */
+    private function withStorableCurrency(ShopSnapshot $snapshot, ?Product $product): ShopSnapshot|ProbeOutcome
+    {
         $currency = Iso4217::normalize($snapshot->currency);
 
         if ($currency === null) {
             return ProbeOutcome::extractionFailed('currency_not_a_code');
         }
 
-        // Carry the normalized code onward: a page publishing `" EUR "`
-        // otherwise reads as a different currency from the product's `EUR`,
-        // and reaches the char(3) columns padded.
         $snapshot = $snapshot->with(currency: $currency);
 
-        if ($product instanceof Product && strcasecmp($snapshot->currency, $product->currency) !== 0) {
+        if ($product instanceof Product && strcasecmp($currency, $product->currency) !== 0) {
             return ProbeOutcome::failed(ProbeFailure::CurrencyMismatch, [
                 'expected' => $product->currency,
-                'actual' => $snapshot->currency,
+                'actual' => $currency,
             ]);
         }
 
-        return ProbeOutcome::success(
-            snapshot: $snapshot,
-            normalizedUrl: $normalizedUrl,
-            host: $fetch->host,
-            adapterKey: $extraction->adapterKey ?? 'generic',
-        );
+        return $snapshot;
+    }
+
+    /**
+     * A duplicate outcome when this product already tracks the resolved
+     * target. Duplicates are decided on that target, not on the pasted
+     * string: two people pasting the same page and choosing different
+     * variants added two different things.
+     */
+    private function existingShopFor(?Product $product, string $target): ?ProbeOutcome
+    {
+        if (! $product instanceof Product) {
+            return null;
+        }
+
+        $existing = $product->shops()->where('url_hash', UrlNormalizer::hash($target))->first();
+
+        return $existing instanceof Shop ? ProbeOutcome::duplicate($existing) : null;
+    }
+
+    /**
+     * The address that names the chosen variant, when the key is one. A key
+     * that is a sku rather than a URL leaves the pasted address alone.
+     */
+    private static function variantTarget(string $normalizedUrl, ?string $variantKey): string
+    {
+        if ($variantKey === null || ! str_starts_with($variantKey, 'http')) {
+            return $normalizedUrl;
+        }
+
+        try {
+            $target = UrlNormalizer::normalize($variantKey);
+        } catch (InvalidArgumentException) {
+            return $normalizedUrl;
+        }
+
+        // Only within the shop we just read: a key naming another host is
+        // not a variant of this page.
+        $sameHost = UrlNormalizer::normalizeHost((string) parse_url($target, PHP_URL_HOST))
+            === UrlNormalizer::normalizeHost((string) parse_url($normalizedUrl, PHP_URL_HOST));
+
+        return $sameHost ? $target : $normalizedUrl;
     }
 
     /**
@@ -234,12 +300,6 @@ final readonly class ProbeShopUrl
     }
 
     /**
-     * Seconds until this user may probe again, or null while they are within
-     * budget. The host-throttle paths already report a retry-after; without
-     * one here a caller adding several shops in a row is told to wait with no
-     * idea how long, and guesses.
-     */
-    /**
      * What this host has done lately, so the caller is told whether another
      * attempt is worth making.
      *
@@ -251,18 +311,5 @@ final readonly class ProbeShopUrl
             'failures' => $this->memory->count($host, $kind),
             'persistent' => $this->memory->isPersistent($host, $kind),
         ];
-    }
-
-    private function perUserRetryAfter(User $user): ?int
-    {
-        $key = "dipcatch:probe:user:{$user->id}";
-
-        if (RateLimiter::tooManyAttempts($key, self::PER_USER_LIMIT_PER_MIN)) {
-            return max(1, RateLimiter::availableIn($key));
-        }
-
-        RateLimiter::hit($key);
-
-        return null;
     }
 }

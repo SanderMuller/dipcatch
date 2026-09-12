@@ -2,11 +2,15 @@
 
 namespace App\Filament\Admin\Resources\Users\Tables;
 
+use App\Actions\Users\DeleteUser;
 use App\Billing\Plan;
 use App\Billing\ProUsers;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
@@ -16,7 +20,9 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class UsersTable
 {
@@ -111,6 +117,33 @@ class UsersTable
                     ->modalDescription('The account drops to Free immediately. History already kept stays kept.')
                     ->visible(fn (User $record): bool => self::actorIsAdmin() && $record->isComped())
                     ->action(self::endComp(...)),
+
+                DeleteAction::make()
+                    ->failureNotificationTitle('Stripe refused the cancellation, so the account was kept. Try again in a moment.')
+                    ->modalDescription('The account, its products, its price history and its notifications go. A live subscription is cancelled in Stripe first. Payment and dispute records stay, without the account.')
+                    // Deleting yourself ends your own session halfway through
+                    // the request, so the action is not offered on your row.
+                    ->visible(fn (User $record): bool => self::actorIsAdmin() && ! $record->is(auth()->user()))
+                    // False picks Filament's failure notification. Without the
+                    // catch a Stripe error escapes into Livewire instead.
+                    ->using(function (User $record): bool {
+                        try {
+                            self::delete($record);
+                        } catch (Throwable $exception) {
+                            report($exception);
+
+                            return false;
+                        }
+
+                        return true;
+                    }),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
+                        ->visible(self::actorIsAdmin(...))
+                        ->using(self::deleteMany(...)),
+                ]),
             ])
             ->defaultSort('created_at', 'desc');
     }
@@ -157,6 +190,33 @@ class UsersTable
         self::log('granted', $record, $reason);
     }
 
+    /**
+     * @param  Collection<int, User>  $records
+     */
+    private static function deleteMany(DeleteBulkAction $action, Collection $records): void
+    {
+        foreach ($records as $record) {
+            // Same reason as the single action: an admin does not delete the
+            // account they are signed in with. Reported as a failure so the
+            // count Filament shows matches what was actually deleted.
+            if ($record->is(auth()->user())) {
+                $action->reportBulkProcessingFailure();
+
+                continue;
+            }
+
+            try {
+                self::delete($record);
+            } catch (Throwable $exception) {
+                // One account that Stripe refuses to cancel must not stop the
+                // rest of the selection.
+                $action->reportBulkProcessingFailure();
+
+                report($exception);
+            }
+        }
+    }
+
     public static function endComp(User $record): void
     {
         self::log('ended', $record, (string) $record->comped_reason);
@@ -197,6 +257,17 @@ class UsersTable
         return $record->comped_until->toDateString() === CarbonImmutable::parse(Plan::COMPED_FOREVER)->toDateString()
             ? 'Forever'
             : $record->comped_until->toDateString();
+    }
+
+    private static function delete(User $record): void
+    {
+        $actor = auth()->user();
+
+        // The panel gate and both actions already require a signed-in admin,
+        // so this cannot be reached without one.
+        abort_unless($actor instanceof User, 403);
+
+        app(DeleteUser::class)($record, $actor);
     }
 
     private static function actorIsAdmin(): bool

@@ -3,7 +3,6 @@
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
-use Filament\Actions\Testing\TestAction;
 
 test('the owner can remove a shop from the product', function (): void {
     $user = User::factory()->create();
@@ -16,9 +15,7 @@ test('the owner can remove a shop from the product', function (): void {
     // which silently hides the delete action (isReadOnly() override) —
     // and an absent ShopPolicy would deny it outright.
     mountShopsRelationManager($product)
-        ->assertActionVisible(TestAction::make('delete')->table($shop))
-        ->callAction(TestAction::make('delete')->table($shop))
-        ->assertHasNoActionErrors();
+        ->call('removeShop', $shop->id);
 
     expect(Shop::query()->whereKey($shop->id)->exists())->toBeFalse();
 });

@@ -7,11 +7,20 @@ use App\PriceAdapters\Hosts\BolAdapter;
 use App\PriceAdapters\Hosts\DekaMarktAdapter;
 use App\PriceAdapters\Hosts\DierapothekerAdapter;
 use App\PriceAdapters\Hosts\DirkAdapter;
+use App\PriceAdapters\Hosts\EtosAdapter;
 use App\PriceAdapters\Hosts\JumboAdapter;
 use App\PriceAdapters\Hosts\LidlAdapter;
+use App\PriceAdapters\Hosts\LookfantasticAdapter;
+use App\PriceAdapters\Hosts\MedpetsAdapter;
+use App\PriceAdapters\Hosts\OrdinaryAdapter;
+use App\PriceAdapters\Hosts\PetsAtHomeAdapter;
+use App\PriceAdapters\Hosts\PetsPlaceAdapter;
 use App\PriceAdapters\Hosts\PoieszAdapter;
 use App\PriceAdapters\Hosts\SparAdapter;
+use App\PriceAdapters\Hosts\UltaAdapter;
 use App\PriceAdapters\Hosts\VomarAdapter;
+use App\PriceAdapters\Hosts\WalmartAdapter;
+use App\PriceAdapters\Hosts\WelkoopAdapter;
 use App\PriceAdapters\Hosts\ZooplusAdapter;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\MicrodataAdapter;
@@ -24,6 +33,22 @@ return [
         'name' => env('ADMIN_NAME', 'Admin'),
         'email' => env('ADMIN_EMAIL'),
         'password' => env('ADMIN_PASSWORD'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Demo accounts
+    |--------------------------------------------------------------------------
+    |
+    | Read by FreeAccountSeeder, which never runs in production. The address
+    | is an environment value rather than a literal so a developer can seed an
+    | account they can receive mail for.
+    |
+    */
+
+    'demo' => [
+        'free_email' => env('DEMO_FREE_EMAIL', 'free@dipcatch.test'),
+        'password' => env('DEMO_PASSWORD', 'password'),
     ],
 
     'scheduler' => [
@@ -56,7 +81,10 @@ return [
     ],
 
     'recheck' => [
-        'interval_hours' => (int) env('DIPCATCH_RECHECK_INTERVAL_HOURS', 6),
+        'interval_hours' => (int) env('DIPCATCH_RECHECK_INTERVAL_HOURS', 24),
+        // Spread each batch of rechecks over this window. Capped at the SQS
+        // `DelaySeconds` ceiling of 900s (15 min) by App\Support\RecheckJitter,
+        // so a larger value here has no effect.
         'jitter_minutes' => (int) env('DIPCATCH_RECHECK_JITTER_MINUTES', 30),
     ],
 
@@ -81,16 +109,29 @@ return [
         DekaMarktAdapter::class,
         DierapothekerAdapter::class,
         DirkAdapter::class,
+        EtosAdapter::class,
         JumboAdapter::class,
         LidlAdapter::class,
+        LookfantasticAdapter::class,
+        MedpetsAdapter::class,
+        OrdinaryAdapter::class,
+        PetsAtHomeAdapter::class,
+        PetsPlaceAdapter::class,
         PoieszAdapter::class,
         SparAdapter::class,
+        UltaAdapter::class,
         VomarAdapter::class,
+        WalmartAdapter::class,
+        WelkoopAdapter::class,
         ZooplusAdapter::class,
         JsonLdAdapter::class,
         MicrodataAdapter::class,
         OpenGraphAdapter::class,
         GenericAdapter::class,
     ],
+
+    'chatgpt_plugin_url' => env('DIPCATCH_CHATGPT_PLUGIN_URL'),
+
+    'openai_apps_challenge' => env('DIPCATCH_OPENAI_APPS_CHALLENGE_TOKEN'),
 
 ];

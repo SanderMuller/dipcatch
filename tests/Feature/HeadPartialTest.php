@@ -84,7 +84,9 @@ test('auth pages other than register emit no half-built social card', function (
 test('the app shell emits no social card of its own', function (): void {
     $this->actingAs(User::factory()->create());
 
-    $content = (string) $this->get('/dashboard')->assertOk()->getContent();
+    // The Flux app shell. It lived at /dashboard until the starter placeholder
+    // was removed; the shell itself is what this asserts about.
+    $content = (string) $this->get(route('app.dashboard'))->assertOk()->getContent();
 
     expect($content)->not->toContain('property="og:');
 });

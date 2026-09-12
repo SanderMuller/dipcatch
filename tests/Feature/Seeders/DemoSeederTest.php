@@ -3,8 +3,8 @@
 use App\Enums\ShopHealth;
 use App\Filament\Admin\Widgets\OperationsOverviewWidget;
 use App\Filament\Admin\Widgets\ShopsNeedingAttentionWidget;
-use App\Filament\App\Widgets\ActiveDropsTableWidget;
-use App\Filament\App\Widgets\RecentNotificationsTableWidget;
+use App\Livewire\Dashboard;
+use App\Livewire\Notifications\Bell;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
@@ -149,10 +149,10 @@ it('renders the app dashboard with the seeded data', function (): void {
         ->assertOk()
         ->assertSee('Tracked products');
 
-    livewire(ActiveDropsTableWidget::class)
+    livewire(Dashboard::class)
         ->assertSee('Douwe Egberts Aroma Rood koffiebonen 1 kg');
 
-    livewire(RecentNotificationsTableWidget::class)
+    livewire(Bell::class)
         ->assertSee('Zeeuws Meisje Roomboter 250 g');
 });
 

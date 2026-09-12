@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Drops\DetectTargetPrice;
 use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
@@ -22,6 +23,7 @@ use App\Support\Config as DipConfig;
 use App\Support\ImageUrl;
 use App\Support\Iso4217;
 use App\Support\PackSize;
+use App\Support\RecheckJitter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -45,7 +47,9 @@ use Throwable;
  *     / parse_failed         : increment `consecutive_failures` only
  *   - robots_disallowed      : flip to health='dead', active=false
  *   - rate_limited           : release the job back to the queue (no counter
- *                              tick, no PriceCheck row) — see handle().
+ *                              tick, no PriceCheck row) until the release
+ *                              budget runs out, then recorded like any other
+ *                              failure — see handle().
  *
  * Health transitions (config-driven):
  *   - consecutive_failures >= failing_after        → health=failing
@@ -57,7 +61,43 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 1;
+    /**
+     * Releases the rate-limit branch makes before it gives up and records the
+     * throttling. Four waits of up to a minute outlast a drained bucket, which
+     * refills within one.
+     */
+    private const int MAX_RATE_LIMIT_ATTEMPTS = 5;
+
+    /**
+     * Longest a release waits. An upstream `Retry-After` is whatever the shop
+     * says, so without a ceiling one 429 asking for an hour would keep the job
+     * alive past uniqueFor() and let a duplicate be dispatched alongside it.
+     */
+    private const int MAX_RELEASE_DELAY_SECONDS = 60;
+
+    /**
+     * A backstop, not the rate-limit control — that is the release budget
+     * above, which gives up at 5. This only catches a job that dies without
+     * running its own error handling (SIGKILL, OOM, a deploy mid-run), which
+     * `$maxExceptions` cannot see because no exception is ever thrown.
+     *
+     * It must stay above MAX_RATE_LIMIT_ATTEMPTS, or it would fail the job
+     * before the release budget is spent — the original bug, in slower motion.
+     *
+     * A wall-clock `retryUntil()` cannot replace it: the worker stamps the
+     * deadline at dispatch, and RecheckActiveShopsCommand dispatches with up to
+     * RecheckJitter::maxSeconds() of jitter, so a high draw would burn the
+     * window before the first attempt and dead-letter the job unrun.
+     */
+    public int $tries = 10;
+
+    /**
+     * Everything that is not a release still runs once. The worker counts this
+     * only from its exception handler, and a `release()` returns normally, so
+     * a thrown exception and a timeout fail immediately while the rate-limit
+     * branch keeps retrying. That is the split this job needs.
+     */
+    public int $maxExceptions = 1;
 
     public int $timeout = 30;
 
@@ -73,12 +113,14 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
     public function uniqueFor(): int
     {
-        // RecheckActiveShopsCommand dispatches with up to `jitter_minutes` of
+        // RecheckActiveShopsCommand dispatches with up to one jitter window of
         // delay; the scheduler ticks more frequently than that, so a short
         // 60s window would let the same offer be re-queued before the original
         // delayed job has started. Hold the uniqueness lock for the full
         // jitter window plus a buffer covering job timeout + queue scheduling.
-        return DipConfig::int('dipcatch.recheck.jitter_minutes', 30) * 60 + 600;
+        // Read the window through RecheckJitter so the lock cannot outlive or
+        // undercut the delay the command actually draws.
+        return RecheckJitter::maxSeconds() + 600;
     }
 
     public function handle(ShopFetcher $fetcher, AdapterResolver $resolver, CheckjebonSource $checkjebon, AhApiSource $ahApi): void
@@ -108,13 +150,22 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $outcome = $this->fetchAndExtract($shop, $fetcher, $resolver);
         } catch (RateLimitedByHost $e) {
             // Per-host budget exhausted (probe path or another worker drained
-            // it). Release for retry instead of writing a `rate_limited` check
-            // and ticking the failure counter — the bucket refills shortly.
-            // Jitter avoids a thundering herd when many queued jobs for the
-            // same drained host all wake at the bucket's exact refill instant.
-            $this->release(max(1, $e->retryAfterSeconds) + random_int(0, 5));
+            // it). Wait for the bucket to refill rather than charging the
+            // offer for our own throttle. The jitter avoids a thundering herd
+            // when many jobs for one drained host wake at the same instant.
+            $delay = min(max(1, $e->retryAfterSeconds), self::MAX_RELEASE_DELAY_SECONDS) + random_int(0, 5);
 
-            return;
+            // attempts() counts this run, and is 0 outside a queue context —
+            // where release() is a no-op and there is nothing to bound.
+            if ($this->attempts() < self::MAX_RATE_LIMIT_ATTEMPTS) {
+                $this->release($delay);
+
+                return;
+            }
+
+            // The host stayed saturated across the whole budget. Record the
+            // throttling rather than losing the cycle silently.
+            $outcome = $this->failureOutcome($e);
         }
 
         $this->persist($shop, $outcome);
@@ -579,7 +630,10 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $product = $locked->product;
 
             if ($product !== null) {
-                app(DetectUnitPriceTarget::class)($product->refresh());
+                $product->refresh();
+
+                app(DetectUnitPriceTarget::class)($product);
+                app(DetectTargetPrice::class)($product);
             }
         });
     }

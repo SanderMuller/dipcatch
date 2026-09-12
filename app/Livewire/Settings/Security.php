@@ -7,19 +7,30 @@ use App\Models\User;
 use Exception;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Actions\ConfirmTwoFactorAuthentication;
 use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
 use Laravel\Fortify\Actions\EnableTwoFactorAuthentication;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+use Laravel\Passkeys\Actions\DeletePasskey;
+use Laravel\Passkeys\Passkey;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use UnexpectedValueException;
 
+/**
+ * @phpstan-type PasskeyListItem array{
+ *     id: int,
+ *     name: string,
+ *     authenticator: string|null,
+ *     created_at_diff: string,
+ *     last_used_at_diff: string|null
+ * }
+ */
 #[Title('Security settings')]
 class Security extends Component
 {
@@ -39,6 +50,23 @@ class Security extends Component
 
     #[Locked]
     public bool $requiresConfirmation;
+
+    #[Locked]
+    public bool $canManagePasskeys;
+
+    /**
+     * @var list<PasskeyListItem>
+     */
+    #[Locked]
+    public array $passkeys = [];
+
+    public bool $showDeleteModal = false;
+
+    #[Locked]
+    public ?int $deletingPasskeyId = null;
+
+    #[Locked]
+    public string $deletingPasskeyName = '';
 
     #[Locked]
     public string $qrCodeSvg = '';
@@ -71,6 +99,12 @@ class Security extends Component
             $this->twoFactorEnabled = $user->hasEnabledTwoFactorAuthentication();
             $this->requiresConfirmation = Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm');
         }
+
+        $this->canManagePasskeys = Features::canManagePasskeys();
+
+        if ($this->canManagePasskeys) {
+            $this->loadPasskeys();
+        }
     }
 
     /**
@@ -101,6 +135,64 @@ class Security extends Component
         Flux::toast(variant: 'success', text: __('Password updated.'));
     }
 
+    public function loadPasskeys(): void
+    {
+        $user = Auth::user();
+        assert($user instanceof User);
+
+        $this->passkeys = $user->passkeys()
+            ->select(['id', 'name', 'credential', 'created_at', 'last_used_at'])
+            ->latest()
+            ->get()
+            ->map(function (Passkey $passkey): array {
+                return [
+                    'id' => $passkey->id,
+                    'name' => $passkey->name,
+                    'authenticator' => $passkey->authenticator,
+                    'created_at_diff' => $passkey->created_at?->diffForHumans() ?? '',
+                    'last_used_at_diff' => $passkey->last_used_at?->diffForHumans(),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    public function confirmDelete(int $passkeyId): void
+    {
+        $user = Auth::user();
+        assert($user instanceof User);
+
+        $passkey = $user->passkeys()->findOrFail($passkeyId);
+
+        $this->deletingPasskeyId = $passkey->id;
+        $this->deletingPasskeyName = $passkey->name;
+        $this->showDeleteModal = true;
+    }
+
+    public function deletePasskey(DeletePasskey $deletePasskey): void
+    {
+        if ($this->deletingPasskeyId === null) {
+            return;
+        }
+
+        $user = Auth::user();
+        assert($user instanceof User);
+
+        $passkey = $user->passkeys()->findOrFail($this->deletingPasskeyId);
+
+        $deletePasskey($user, $passkey);
+
+        $this->closeDeleteModal();
+        $this->loadPasskeys();
+    }
+
+    public function closeDeleteModal(): void
+    {
+        $this->showDeleteModal = false;
+        $this->deletingPasskeyId = null;
+        $this->deletingPasskeyName = '';
+    }
+
     /**
      * Enable two-factor authentication for the user.
      */
@@ -129,8 +221,14 @@ class Security extends Component
         assert($user instanceof User);
 
         try {
+            $manualSetupKey = Fortify::currentEncrypter()->decrypt((string) $user->two_factor_secret);
+
+            if (! is_string($manualSetupKey)) {
+                throw new UnexpectedValueException('The two-factor secret must be a string.');
+            }
+
             $this->qrCodeSvg = (string) $user->twoFactorQrCodeSvg();
-            $this->manualSetupKey = Crypt::decryptString((string) $user->two_factor_secret);
+            $this->manualSetupKey = $manualSetupKey;
         } catch (Exception) {
             $this->addError('setupData', 'Failed to fetch setup data.');
 

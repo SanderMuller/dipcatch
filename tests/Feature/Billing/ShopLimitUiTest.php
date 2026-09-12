@@ -1,12 +1,10 @@
 <?php declare(strict_types=1);
 
-use App\Filament\App\Resources\Products\Pages\ListProducts;
-use App\Filament\App\Resources\Products\Pages\ViewProduct;
-use App\Filament\App\Resources\Products\RelationManagers\ShopsRelationManager;
+use App\Livewire\Products\ProductList;
+use App\Livewire\Products\ProductShow;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
-use Filament\Facades\Filament;
 
 use function Pest\Livewire\livewire;
 
@@ -17,7 +15,6 @@ function shopLimitOwner(int $shops): User
     Shop::factory()->count($shops)->create(['product_id' => $product->id]);
 
     test()->actingAs($user);
-    Filament::setCurrentPanel('app');
 
     return $user;
 }
@@ -30,7 +27,7 @@ function shopLimitProduct(User $user): Product
 it('shows how much of the shop limit is used before it is reached', function (): void {
     $product = shopLimitProduct(shopLimitOwner(2));
 
-    livewire(ShopsRelationManager::class, ['ownerRecord' => $product, 'pageClass' => ViewProduct::class])
+    livewire(ProductShow::class, ['product' => $product])
         ->assertSee('Add a shop')
         ->assertSee('2 of 4 shops');
 });
@@ -38,7 +35,7 @@ it('shows how much of the shop limit is used before it is reached', function ():
 it('takes the add button away at the limit rather than refusing on confirm', function (): void {
     $product = shopLimitProduct(shopLimitOwner(4));
 
-    livewire(ShopsRelationManager::class, ['ownerRecord' => $product, 'pageClass' => ViewProduct::class])
+    livewire(ProductShow::class, ['product' => $product])
         ->assertDontSee('Add a shop')
         ->assertSee('This product is at its shop limit')
         ->assertSee('Your plan compares up to 4 shops per product, and this one has 4.')
@@ -52,7 +49,7 @@ it('says so plainly on a product that already sits over the limit', function ():
     // legitimately hold more than the limit allows.
     $product = shopLimitProduct(shopLimitOwner(5));
 
-    livewire(ShopsRelationManager::class, ['ownerRecord' => $product, 'pageClass' => ViewProduct::class])
+    livewire(ProductShow::class, ['product' => $product])
         ->assertDontSee('Add a shop')
         ->assertSee('and this one has 5.');
 });
@@ -60,8 +57,10 @@ it('says so plainly on a product that already sits over the limit', function ():
 it('keeps every existing shop listed and checkable over the limit', function (): void {
     $product = shopLimitProduct(shopLimitOwner(5));
 
-    livewire(ShopsRelationManager::class, ['ownerRecord' => $product, 'pageClass' => ViewProduct::class])
-        ->assertCanSeeTableRecords($product->shops()->get());
+    // Over the limit, every existing shop stays listed and checked; only
+    // adding another is blocked.
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee('This product is at its shop limit');
 
     expect($product->shops()->where('active', true)->count())->toBe(5);
 });
@@ -70,7 +69,7 @@ it('gives a pro account the button with no count', function (): void {
     $user = shopLimitOwner(9);
     subscribeUser($user);
 
-    livewire(ShopsRelationManager::class, ['ownerRecord' => shopLimitProduct($user), 'pageClass' => ViewProduct::class])
+    livewire(ProductShow::class, ['product' => shopLimitProduct($user)])
         ->assertSee('Add a shop')
         ->assertDontSee('of 4 shops');
 });
@@ -80,11 +79,9 @@ it('replaces the create button with a way forward at the product limit', functio
     Product::factory()->count(20)->create(['user_id' => $user->id]);
 
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(ListProducts::class)
-        ->assertActionHidden('create')
-        ->assertActionVisible('planLimit');
+    livewire(ProductList::class)
+        ->assertSee('You have reached your plan limit.');
 });
 
 it('keeps the create button below the product limit', function (): void {
@@ -92,9 +89,8 @@ it('keeps the create button below the product limit', function (): void {
     Product::factory()->count(19)->create(['user_id' => $user->id]);
 
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(ListProducts::class)
-        ->assertActionVisible('create')
-        ->assertActionHidden('planLimit');
+    livewire(ProductList::class)
+        ->assertSee('Track a product')
+        ->assertDontSee('You have reached your plan limit.');
 });

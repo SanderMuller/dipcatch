@@ -19,9 +19,9 @@
     @php($mismatchedGtinHosts = $product->mismatchedGtinHosts())
 
     @if ($mismatchedGtinHosts !== [])
-        <p class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/20">
+        <flux:callout variant="warning" icon="exclamation-triangle">
             These shops report different article numbers (EAN): {{ implode(', ', $mismatchedGtinHosts) }}. They may be different pack sizes or products.
-        </p>
+        </flux:callout>
     @endif
 
     @if ($canAddShop)
@@ -34,56 +34,41 @@
             @toggle="addOpen = $el.open"
             @open-add-shop.window="$el.open = true; addOpen = true; $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'center' }))"
         >
-            <summary class="flex cursor-pointer list-none items-center justify-end gap-3 rounded-lg select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 [&::-webkit-details-marker]:hidden">
+            <summary class="flex cursor-pointer list-none items-center justify-end gap-3 rounded-lg select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-800 [&::-webkit-details-marker]:hidden">
                 {{-- Stays visible while the form is open: that is exactly
                      when someone wants to know how much room is left. --}}
                 @if ($shopLimit !== null)
-                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ $shopCount }} of {{ $shopLimit }} shops</span>
+                    <flux:text size="sm" class="text-zinc-500">{{ $shopCount }} of {{ $shopLimit }} shops</flux:text>
                 @endif
 
                 {{-- Primary while closed, secondary once open: the panel it
                      reveals has its own primary action, and a page should
                      only offer one. --}}
-                <span class="inline-flex items-center gap-1.5 rounded-lg py-2 pr-3 pl-2 text-sm font-semibold shadow-sm bg-primary-600 text-white hover:bg-primary-500 group-open:bg-white group-open:text-gray-700 group-open:ring-1 group-open:ring-gray-300 group-open:ring-inset group-open:hover:bg-gray-50 dark:group-open:bg-white/5 dark:group-open:text-gray-200 dark:group-open:ring-white/10 dark:group-open:hover:bg-white/10">
-                    <svg viewBox="0 0 20 20" fill="currentColor" class="size-5 group-open:hidden" aria-hidden="true">
-                        <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                    </svg>
-                    <svg viewBox="0 0 20 20" fill="currentColor" class="hidden size-5 group-open:block" aria-hidden="true">
-                        <path d="M5.22 5.22a.75.75 0 0 1 1.06 0L10 8.94l3.72-3.72a.75.75 0 1 1 1.06 1.06L11.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06L10 11.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06L8.94 10 5.22 6.28a.75.75 0 0 1 0-1.06Z" />
-                    </svg>
+                <span class="inline-flex items-center gap-1.5 rounded-full py-2 pe-3 ps-2 text-sm font-medium shadow-sm bg-zinc-800 text-white group-open:bg-zinc-100 group-open:text-zinc-800 group-open:ring-1 group-open:ring-zinc-300 group-open:shadow-none dark:bg-white dark:text-zinc-900 dark:group-open:bg-white/10 dark:group-open:text-zinc-200 dark:group-open:ring-white/10">
+                    <flux:icon.plus class="size-5 group-open:hidden" />
+                    <flux:icon.x-mark class="hidden size-5 group-open:block" />
                     <span class="group-open:hidden">Add a shop</span>
                     <span class="hidden group-open:inline">Cancel</span>
                 </span>
             </summary>
 
-            <div class="mt-4 w-full rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
+            <flux:card class="mt-4">
                 @livewire('shops.add-shop', ['product' => $product], key('add-shop-inline-' . $product->id))
-            </div>
+            </flux:card>
         </details>
     @else
         {{-- No Add button and no suggestions: every one of them would end at
              the same refusal on Confirm, after a live fetch of the page.
              Nothing already tracked is affected — the limit only stops the
              next one. --}}
-        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 rounded-lg bg-gray-50 p-4 ring-1 ring-gray-950/5 dark:bg-white/5 dark:ring-white/10">
-            <div class="flex items-start gap-3">
-                <svg viewBox="0 0 20 20" fill="currentColor" class="mt-0.5 size-5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V8H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 7V5.5a3 3 0 1 0-6 0V8h6Z" clip-rule="evenodd" />
-                </svg>
-                <div class="text-sm">
-                    <p class="font-medium text-gray-950 dark:text-white">
-                        This product is at its shop limit
-                    </p>
-                    <p class="mt-1 text-gray-500 dark:text-gray-400">
-                        Your plan compares up to {{ $shopLimit }} {{ Str::plural('shop', $shopLimit ?? 0) }} per product, and this one has {{ $shopCount }}. All of them keep being checked — only adding another is blocked.
-                    </p>
-                </div>
-            </div>
-
-            <a
-                href="{{ url('/app/billing') }}"
-                class="inline-flex shrink-0 items-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/10"
-            >Compare plans</a>
-        </div>
+        <flux:callout icon="lock-closed">
+            <flux:callout.heading>This product is at its shop limit</flux:callout.heading>
+            <flux:callout.text>
+                Your plan compares up to {{ $shopLimit }} {{ Str::plural('shop', $shopLimit ?? 0) }} per product, and this one has {{ $shopCount }}. All of them keep being checked. Only adding another one is blocked.
+            </flux:callout.text>
+            <flux:button class="mt-3" size="sm" :href="route('app.billing')" wire:navigate>
+                Compare plans
+            </flux:button>
+        </flux:callout>
     @endif
 </div>

@@ -2,7 +2,6 @@
 
 namespace App\Notifications;
 
-use App\Filament\App\Resources\Products\ProductResource;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -71,7 +70,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
             ->title('Unit price target: ' . $this->product->title)
             ->body($this->body())
             ->icon($this->product->image_url ?? '/favicon.svg')
-            ->data(['url' => ProductResource::getUrl('view', ['record' => $this->product])]);
+            ->data(['url' => route('app.products.show', $this->product)]);
     }
 
     /**
@@ -91,7 +90,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
                 : (string) $this->product->unit_price_target,
             'new_price' => $this->snapshotPrice,
             'host' => $this->snapshotHost,
-            'view_url' => ProductResource::getUrl('view', ['record' => $this->product]),
+            'view_url' => route('app.products.show', $this->product),
         ];
     }
 

@@ -25,7 +25,7 @@ Here's what changed since your last digest:
 | {{ $event->fired_at->setTimezone($user->timezone)->format('H:i') }} | {{ $event->triggeredByShop?->host ?? '—' }} | {{ \App\Support\MoneyFormatter::format($event->new_price, $event->currency) }} | {{ number_format((float) $event->drop_pct, 1, '.', '') }}% / {{ \App\Support\MoneyFormatter::format($event->drop_abs, $event->currency) }} |
 @endforeach
 
-<x-mail::button :url="\App\Filament\App\Resources\Products\ProductResource::getUrl('view', ['record' => $product])">
+<x-mail::button :url="route('app.products.show', $product)">
 View {{ $product->title }}
 </x-mail::button>
 

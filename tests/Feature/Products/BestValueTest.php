@@ -1,9 +1,9 @@
 <?php declare(strict_types=1);
 
 use App\Enums\ShopHealth;
-use App\Filament\App\Resources\Products\Pages\ListProducts;
-use App\Filament\App\Resources\Products\Pages\ViewProduct;
-use App\Filament\App\Widgets\ActiveDropsTableWidget;
+use App\Livewire\Dashboard;
+use App\Livewire\Products\ProductList;
+use App\Livewire\Products\ProductShow;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -91,7 +91,7 @@ test('a cheapest shop with no pack size shows no unit price beside it', function
 
     $this->actingAs($user);
 
-    livewire(ViewProduct::class, ['record' => $product->refresh()->getKey()])
+    livewire(ProductShow::class, ['product' => $product->refresh()])
         ->assertSeeText('€0.99')
         // The best value still stands on its own.
         ->assertSeeText('€5.38 /kg');
@@ -119,7 +119,7 @@ test('the product page shows the best value beside the cheapest price', function
 
     $this->actingAs($user);
 
-    livewire(ViewProduct::class, ['record' => $product->refresh()->getKey()])
+    livewire(ProductShow::class, ['product' => $product->refresh()])
         ->assertSeeText('Cheapest now')
         ->assertSeeText('€1.69')
         // Both stated per kilo, so the gap between them can be read off.
@@ -145,7 +145,7 @@ test('the products list shows the best value beside the cheapest price', functio
 
     $this->actingAs($user);
 
-    livewire(ListProducts::class)
+    livewire(ProductList::class)
         ->assertSeeText('€1.69')
         ->assertSeeText('€8.45 /kg')
         ->assertSeeText('€5.38 /kg')
@@ -172,7 +172,7 @@ test('the list reads every shop once, not once per product row', function (): vo
             $queries++;
         });
 
-        livewire(ListProducts::class)->assertSeeText('€5.38 /kg');
+        livewire(ProductList::class)->assertSeeText('€5.38 /kg');
 
         return $queries;
     };
@@ -200,7 +200,7 @@ test('the dashboard says how long the drop price lasts', function (): void {
 
     $this->actingAs($user);
 
-    livewire(ActiveDropsTableWidget::class)
+    livewire(Dashboard::class)
         ->assertSeeText('€1.69')
         // The shop has its own column, so the price only needs the deadline.
         ->assertSeeText('until 6 Sep');
@@ -227,7 +227,7 @@ test('the dashboard names the best value on an active drop', function (): void {
 
     $this->actingAs($user);
 
-    livewire(ActiveDropsTableWidget::class)
+    livewire(Dashboard::class)
         ->assertSeeText('€1.69')
         ->assertSeeText('€5.38 /kg')
         ->assertSeeText('lidl.nl');
@@ -251,7 +251,7 @@ test('the list says how long a quoted price lasts', function (): void {
 
     $this->actingAs($user);
 
-    livewire(ListProducts::class)
+    livewire(ProductList::class)
         // The cheapest price is a bonus that runs out; the best value is not.
         ->assertSeeText('ah.nl · until 6 Sep')
         ->assertSeeText('lidl.nl')
@@ -270,7 +270,7 @@ test('a shop with no promotion is named without a deadline', function (): void {
 
     $this->actingAs($user);
 
-    livewire(ListProducts::class)
+    livewire(ProductList::class)
         ->assertSeeText('jumbo.com')
         ->assertDontSeeText('jumbo.com ·');
 });

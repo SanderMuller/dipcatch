@@ -237,9 +237,7 @@ final readonly class JsonLdOfferVariants
 
         return new VariantCandidate(
             key: $key,
-            title: JsonLdEntities::nonEmptyString($offer['name'] ?? null)
-                ?? JsonLdEntities::nonEmptyString($entity['name'] ?? null)
-                ?? 'Variant',
+            title: JsonLdOfferLabel::for($entity, $offer, $key),
             price: $price,
             currency: strtoupper($currency),
         );

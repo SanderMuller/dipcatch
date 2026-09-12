@@ -1,14 +1,11 @@
 <?php declare(strict_types=1);
 
-use App\Filament\App\Pages\NotificationSettings;
+use App\Livewire\Settings\NotificationPreferences;
 use App\Models\User;
-use Filament\Facades\Filament;
 
 use function Pest\Livewire\livewire;
 
-beforeEach(function (): void {
-    Filament::setCurrentPanel('app');
-});
+beforeEach(function (): void {});
 
 test('happy path: persists timezone and stamps timezone_detected_at', function (): void {
     $user = User::factory()->create([
@@ -74,7 +71,7 @@ test('auto-detect view emits the script when the authenticated user has no timez
     $user = User::factory()->create(['timezone_detected_at' => null]);
     $this->actingAs($user);
 
-    $rendered = view('filament.app.timezone-autodetect')->render();
+    $rendered = view('partials.timezone-autodetect')->render();
 
     expect($rendered)->toContain('Intl.DateTimeFormat')
         ->and($rendered)->toContain('profile/timezone/auto-detect');
@@ -84,13 +81,13 @@ test('auto-detect view emits nothing once timezone_detected_at is set', function
     $user = User::factory()->create(['timezone_detected_at' => now()]);
     $this->actingAs($user);
 
-    $rendered = view('filament.app.timezone-autodetect')->render();
+    $rendered = view('partials.timezone-autodetect')->render();
 
     expect(trim($rendered))->toBe('');
 });
 
 test('auto-detect view emits nothing for an unauthenticated request', function (): void {
-    $rendered = view('filament.app.timezone-autodetect')->render();
+    $rendered = view('partials.timezone-autodetect')->render();
 
     expect(trim($rendered))->toBe('');
 });
@@ -103,8 +100,8 @@ test('NotificationSettings::save() stamps timezone_detected_at so future auto-de
     $this->actingAs($user);
 
     // User explicitly saves their preferences (keeping the default tz, even).
-    livewire(NotificationSettings::class)
-        ->set('data.timezone', 'Europe/Amsterdam')
+    livewire(NotificationPreferences::class)
+        ->set('timezone', 'Europe/Amsterdam')
         ->call('save')
         ->assertHasNoErrors();
 

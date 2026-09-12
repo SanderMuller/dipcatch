@@ -33,10 +33,18 @@ final class MarketingPages
             ['home', []],
             ['pricing', []],
             ['privacy', []],
+            ['terms', []],
+            ['support', []],
         ];
 
         foreach (UseCases::slugs() as $slug) {
             $pages[] = ['use-case', ['slug' => $slug]];
+        }
+
+        $pages[] = ['shops', []];
+
+        foreach (ShopPages::slugs() as $slug) {
+            $pages[] = ['shop', ['slug' => $slug]];
         }
 
         return $pages;

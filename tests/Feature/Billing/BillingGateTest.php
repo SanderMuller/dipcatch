@@ -4,9 +4,8 @@ use App\Billing\BillingGate;
 use App\Filament\Admin\Resources\Disputes\DisputeResource;
 use App\Filament\Admin\Resources\Subscribers\SubscriberResource;
 use App\Filament\Admin\Widgets\RevenueOverviewWidget;
-use App\Filament\App\Pages\Billing;
+use App\Livewire\Billing\BillingPage;
 use App\Models\User;
-use Filament\Facades\Filament;
 
 use function Pest\Livewire\livewire;
 
@@ -56,9 +55,8 @@ it('names what is missing', function (): void {
 it('offers no upgrade on the billing page while the shop is shut', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(Billing::class)
+    livewire(BillingPage::class)
         ->assertSee('Pro is not on sale yet')
         ->assertDontSee('Upgrade to Pro')
         ->assertDontSee('Start 14-day trial')
@@ -71,9 +69,8 @@ it('offers the upgrade once the shop opens', function (): void {
 
     $user = User::factory()->create();
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(Billing::class)
+    livewire(BillingPage::class)
         ->assertSee('Start 14-day trial')
         ->assertDontSee('Pro is not on sale yet');
 });
@@ -110,9 +107,8 @@ it('lets an account Stripe already bills reach the portal while blocked', functi
     subscribeUser($user);
 
     $this->actingAs($user);
-    Filament::setCurrentPanel('app');
 
-    livewire(Billing::class)
+    livewire(BillingPage::class)
         ->assertSee('Manage subscription')
         ->assertDontSee('Upgrade to Pro');
 });

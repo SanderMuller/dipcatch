@@ -2,8 +2,8 @@
 
 namespace App\Mcp\Support;
 
+use App\Actions\Shops\ProbeBudget;
 use App\Actions\Shops\ProbeOutcome;
-use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ProbeFailure;
 use App\PriceAdapters\VariantCandidate;
 use Laravel\Mcp\Response;
@@ -26,11 +26,6 @@ final readonly class ProbeReporter
         }
 
         if ($outcome->isAmbiguous()) {
-            $variants = array_map(
-                static fn (VariantCandidate $variant): string => $variant->key,
-                $outcome->variants,
-            );
-
             $unmatched = $outcome->unmatchedVariantKey;
 
             $opening = $unmatched === null
@@ -38,8 +33,10 @@ final readonly class ProbeReporter
                 : 'No variant on that page matches variant_key "' . $unmatched . '".';
 
             return Response::error(
-                $opening . ' Ask which, then call again with variant_key set to one of: '
-                . implode(', ', $variants),
+                $opening . ' Ask which, then call again with variant_key set to one of:'
+                . PHP_EOL . implode(PHP_EOL, array_map(self::variantLine(...), $outcome->variants))
+                . PHP_EOL . 'A key that is itself a URL can be sent as `url` instead, which also '
+                . 'stores the address the user clicks.',
             );
         }
 
@@ -84,20 +81,42 @@ final readonly class ProbeReporter
     {
         return match ($code) {
             ProbeFailure::InvalidUrl => 'That does not look like a URL. Paste the address of a product page.',
-            ProbeFailure::ProbeRateLimited => 'DipCatch reads at most ' . ProbeShopUrl::PER_USER_LIMIT_PER_MIN . ' pages a minute for one account. ' . self::waitSentence($context),
+            ProbeFailure::ProbeRateLimited => 'DipCatch reads at most ' . ProbeBudget::PER_MINUTE . ' pages a minute for one account. ' . self::waitSentence($context),
             ProbeFailure::LocalThrottle, ProbeFailure::HostRateLimited => 'That shop asked DipCatch to slow down. ' . self::waitSentence($context),
             ProbeFailure::RobotsDisallowed => 'That shop asks crawlers not to read this page, and DipCatch honours that.',
             ProbeFailure::Blocked => self::persistent($context)
                 ? 'That shop has blocked DipCatch on its last ' . self::failures($context) . ' requests. Retrying will not help — the shop refuses automated readers.'
-                : 'That shop blocked the request.',
+                : 'That shop blocked the request.' . self::streak($context),
             ProbeFailure::ExtractionFailed => 'The page loaded but no price could be read from it. Some shops load prices with JavaScript, which DipCatch cannot see.',
             ProbeFailure::CurrencyMismatch => 'That page prices in a different currency from the product.',
             ProbeFailure::NotInDataset => 'That shop is covered by a price dataset that does not list this product yet.',
             ProbeFailure::TemporaryFailure, ProbeFailure::HttpError => self::persistent($context)
                 ? 'That shop has not answered DipCatch on its last ' . self::failures($context) . ' requests. This is not a passing fault, so another attempt now will fail too.'
-                : 'The shop did not answer. Try again shortly.',
+                : 'The shop did not answer. Try again shortly.' . self::streak($context),
             default => 'That page could not be read. Try a different shop, or a direct product URL.',
         };
+    }
+
+    /**
+     * How many times in a row this host has failed this way, when it is more
+     * than once.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private static function streak(array $context): string
+    {
+        $failures = self::failures($context);
+
+        return $failures > 1 ? ' That is ' . $failures . ' in a row.' : '';
+    }
+
+    /**
+     * One choice, with what it is and what it costs. The key alone told a
+     * caller nothing, so it spent a probe on each option to find out.
+     */
+    private static function variantLine(VariantCandidate $variant): string
+    {
+        return '- ' . $variant->key . ' — ' . $variant->title . ' — ' . $variant->price . ' ' . $variant->currency;
     }
 
     /**

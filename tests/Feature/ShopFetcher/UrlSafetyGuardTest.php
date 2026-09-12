@@ -40,6 +40,44 @@ test('rejects unparseable URLs', function (): void {
         ->toThrow(InvalidArgumentException::class);
 });
 
+test('the private-IP bypass is ignored when the app runs as production', function (): void {
+    config()->set('dipcatch.fetcher.allow_private_ips', true);
+    $this->app->detectEnvironment(fn (): string => 'production');
+
+    // Pin the message: assertSafe() throws the same class for an unparseable
+    // URL and for a host that will not resolve, so the class alone would let
+    // this pass for the wrong reason.
+    expect(fn () => new UrlSafetyGuard()->assertSafe('http://127.0.0.1/foo'))
+        ->toThrow(InvalidArgumentException::class, 'URL resolves to a non-public address (127.0.0.1)');
+});
+
+test('the private-IP bypass still works outside production', function (): void {
+    // This is what keeps local development against Herd working. If it breaks,
+    // the production guard above has been applied too widely.
+    config()->set('dipcatch.fetcher.allow_private_ips', true);
+
+    expect(fn () => new UrlSafetyGuard()->assertSafe('http://127.0.0.1/foo'))
+        ->not->toThrow(InvalidArgumentException::class);
+});
+
+test('the unresolved-host bypass is ignored when the app runs as production', function (): void {
+    // The second escape hatch. A DNS miss failing open hands the fetcher a
+    // destination nothing has vetted, so production refuses it too.
+    // `.invalid` is reserved by RFC 2606 and never resolves.
+    config()->set('dipcatch.fetcher.allow_unresolved', true);
+    $this->app->detectEnvironment(fn (): string => 'production');
+
+    expect(fn () => new UrlSafetyGuard()->assertSafe('http://dipcatch-does-not-exist.invalid/p'))
+        ->toThrow(InvalidArgumentException::class, 'Cannot resolve host: dipcatch-does-not-exist.invalid');
+});
+
+test('the unresolved-host bypass still works outside production', function (): void {
+    config()->set('dipcatch.fetcher.allow_unresolved', true);
+
+    expect(fn () => new UrlSafetyGuard()->assertSafe('http://dipcatch-does-not-exist.invalid/p'))
+        ->not->toThrow(InvalidArgumentException::class);
+});
+
 test('a fully qualified host loses its DNS root dot, so host checks still match', function (): void {
     expect(UrlNormalizer::normalizeHost('www.plus.nl.'))->toBe('plus.nl')
         ->and(UrlNormalizer::normalizeHost('WWW.Vomar.NL.'))->toBe('vomar.nl');

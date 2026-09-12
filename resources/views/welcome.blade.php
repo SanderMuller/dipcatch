@@ -8,7 +8,7 @@
     $canonical = $locale === 'nl' ? route('home', ['lang' => 'nl']) : route('home');
     $description = __('DipCatch tracks the price of anything you buy more than once, across Dutch supermarkets and webshops. It compares shops on unit price and tells you when one drops.');
     $h1 = __('Same product, every shop, one alert.');
-    $sub = __('DipCatch watches the coffee, cat food and vacuum filters you buy anyway at Albert Heijn, Jumbo, bol.com, Zooplus and more, compares them on price per kilo or per piece, and tells you when one drops.');
+    $sub = __('DipCatch watches the coffee, cat food, skincare and vacuum filters you buy anyway at Albert Heijn, Jumbo, bol.com, Zooplus and more, compares them on price per kilo or per piece, and tells you when one drops.');
     $authed = auth()->check();
     $primaryHref = $authed ? url('/app') : route('register');
     $headerLabel = $authed ? __('Open app') : __('Create account');
@@ -19,7 +19,7 @@
         ['n' => '02', 'title' => __('Add it from other shops'), 'body' => __('Track the same item at other shops and DipCatch shows the cheapest one, with unit prices (€/kg, €/l) so different pack sizes compare fairly.')],
         ['n' => '03', 'title' => __('You get the dip'), 'body' => __('Prices are re-checked automatically. When one falls past your threshold you hear about it: a daily email digest, a note under the bell in the app, or a browser push if you turn that on.')],
     ];
-    $supportedShops = \App\Support\SupportedShops::rows();
+    $supportedShops = \App\Support\SupportedShops::homepage();
     $money = static fn (string $amount): string => \App\Support\MoneyFormatter::format($amount, 'EUR');
     $tracked = [
         [
@@ -49,12 +49,13 @@
     ];
     $freeProducts = \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->maxProducts();
     $faq = [
-        ['q' => __('Which shops work?'), 'a' => __('DipCatch has built-in support for Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon.nl and Zooplus, including AH Bonus and Dirk promo prices. Many other webshops publish their product data in a form DipCatch can read. Shops that block bots or only load prices with JavaScript may not work. You see the result before you confirm.')],
+        ['q' => __('Which shops work?'), 'a' => __('DipCatch has built-in support for Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart, including AH Bonus and Dirk promo prices. Many other webshops publish their product data in a form DipCatch can read. Shops that block bots or only load prices with JavaScript may not work. You see the result before you confirm.')],
         ['q' => __('How often are prices checked?'), 'a' => __('A shop is checked the moment you add it or change its link. After that DipCatch re-checks it about every :hours hours, give or take half an hour.', ['hours' => config('dipcatch.recheck.interval_hours', 6)])],
         ['q' => __('Is it free?'), 'a' => $freeProducts === null
             ? __('Yes. The free plan has no product limit, you do not need a card, and there is no trial that runs out.')
             : __('Yes, for your first :count products. You do not need a card, and there is no trial that runs out. Pro lifts the limit when you want more.', ['count' => $freeProducts])],
         ['q' => __('Do I need an extension or app?'), 'a' => __('No. You paste a link in your browser. Alerts arrive as a daily email digest, under the bell in the app, or as a browser push if you turn that on.')],
+        ['q' => __('Can I use DipCatch in ChatGPT or Claude?'), 'a' => __('Yes, through MCP. Open Connections in your account: the Claude button opens Claude with DipCatch filled in, any other app that speaks MCP can use the endpoint shown there, and that page says what each assistant needs today. You can then ask it to add a product, add a shop to it, set a threshold, or show you the price history. Adding takes two steps on purpose: the assistant first shows you the title and price it read from the page, and stores it only once you agree.')],
         ['q' => __('Can I compare different pack sizes?'), 'a' => __('Yes. When DipCatch can read the pack size, it shows a price per kilo, litre or piece next to that shop, so a 200 g and a 370 g bag compare fairly.')],
         ['q' => __('Can I share a comparison?'), 'a' => __('Yes. Every product has an optional public page with the current price per shop and, where there is history, a chart of the cheapest price over the last 90 days. Anyone with the link can view it. It shows nothing about your account.')],
         ['q' => __('How do I know when a product is cheaper somewhere else?'), 'a' => __('Paste the link from the shop you buy at now, then add the same product from the others. DipCatch tells you when the cheapest one drops past your threshold.')],
@@ -127,14 +128,20 @@
                                 <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Works with') }}</p>
                                 <ul class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($supportedShops as $shop)
-                                        <li @class(['items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800', 'inline-flex' => $loop->index < 8, 'hidden sm:inline-flex' => $loop->index >= 8])>
-                                            {{-- Background image, not an <img>: the edge Markdown twin emits an
-                                                 image reference even for an empty alt. --}}
-                                            <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
-                                            <span title="{{ $shop['name'] }}">{{ $shop['host'] }}</span>
+                                        <li @class(['items-center', 'inline-flex' => $loop->index < 8, 'hidden sm:inline-flex' => $loop->index >= 8])>
+                                            {{-- Linked, not decorative: each shop has a page of its own, and
+                                                 this row is where a reader looks for it. --}}
+                                            <a href="{{ route('shop', [...$langQuery, 'slug' => \App\Support\ShopPages::slug($shop['host'])]) }}" class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900">
+                                                {{-- Background image, not an <img>: the edge Markdown twin emits an
+                                                     image reference even for an empty alt. --}}
+                                                <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
+                                                <span title="{{ $shop['name'] }}">{{ $shop['host'] }}</span>
+                                            </a>
                                         </li>
                                     @endforeach
-                                    <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">{{ __('and many other webshops') }}</li>
+                                    <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+                                        <a href="{{ route('shops', $langQuery) }}" class="underline underline-offset-4 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('and many other webshops') }}</a>
+                                    </li>
                                 </ul>
 
                                 @php($useCases = \App\Support\UseCases::all())
@@ -206,16 +213,14 @@
                     <section id="faq" class="py-20">
                         <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Frequently asked questions') }}</h2>
                         <div class="mt-10 grid items-start gap-4 sm:grid-cols-2">
-                            @foreach ($faq as $item)
-                                <details class="group rounded-2xl bg-white/80 p-2 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:ring-zinc-800">
-                                    <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-base font-semibold select-none [&::-webkit-details-marker]:hidden">
-                                        <span>{{ $item['q'] }}</span>
-                                        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" class="size-5 shrink-0 text-zinc-500 transition-transform group-open:rotate-180 dark:text-zinc-400">
-                                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
-                                        </svg>
-                                    </summary>
-                                    <p class="px-4 pb-3 text-sm text-pretty text-zinc-600 dark:text-zinc-400">{{ $item['a'] }}</p>
-                                </details>
+                            @foreach (array_chunk($faq, (int) ceil(count($faq) / 2)) as $column)
+                                <flux:accordion transition>
+                                    @foreach ($column as $item)
+                                        <flux:accordion.item :heading="$item['q']">
+                                            {{ $item['a'] }}
+                                        </flux:accordion.item>
+                                    @endforeach
+                                </flux:accordion>
                             @endforeach
                         </div>
                     </section>

@@ -1,6 +1,9 @@
 <?php declare(strict_types=1);
 
+use App\Billing\CheckoutSession;
+use App\Billing\CheckoutSessions;
 use App\Billing\Plan;
+use App\Billing\StripeCustomers;
 use App\Filament\Admin\Resources\Users\Pages\ListUsers;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Models\Product;
@@ -9,8 +12,18 @@ use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Laravel\Cashier\Subscription;
 
 use function Pest\Livewire\livewire;
+
+class RecordedStripeCalls
+{
+    /** @var list<string> */
+    public static array $calls = [];
+
+    public static bool $userExistedAtDelete = false;
+}
 
 beforeEach(function (): void {
     Filament::setCurrentPanel('admin');
@@ -156,4 +169,194 @@ test('a non-admin cannot invoke the comp action even if they reach the page', fu
         ->assertActionHidden(TestAction::make('comp')->table($target));
 
     expect($target->fresh()?->comped_until)->toBeNull();
+});
+
+test('an admin can delete an account and its products go with it', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    $target = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $target->id]);
+
+    livewire(ListUsers::class)
+        ->callAction(TestAction::make('delete')->table($target))
+        ->assertHasNoActionErrors();
+
+    expect(User::query()->find($target->id))->toBeNull()
+        ->and(Product::query()->find($product->id))->toBeNull();
+});
+
+test('an admin cannot delete their own account', function (): void {
+    $admin = User::factory()->admin()->create();
+    $this->actingAs($admin);
+
+    livewire(ListUsers::class)
+        ->assertActionHidden(TestAction::make('delete')->table($admin));
+
+    expect(User::query()->find($admin->id))->not->toBeNull();
+});
+
+test('a non-admin cannot invoke the delete action even if they reach the page', function (): void {
+    $target = User::factory()->create();
+
+    $this->actingAs(User::factory()->create());
+
+    livewire(ListUsers::class)
+        ->assertActionHidden(TestAction::make('delete')->table($target));
+
+    expect(User::query()->find($target->id))->not->toBeNull();
+});
+
+test('deleting an account clears the rows no foreign key covers', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    $target = User::factory()->create();
+    DB::table('notifications')->insert([
+        'id' => (string) Str::uuid(),
+        'type' => 'App\\Notifications\\PriceDropNotification',
+        'notifiable_type' => $target->getMorphClass(),
+        'notifiable_id' => $target->id,
+        'data' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $subscription = Subscription::query()->create([
+        'user_id' => $target->id,
+        'type' => Plan::SUBSCRIPTION_TYPE,
+        'stripe_id' => 'sub_' . Str::random(12),
+        'stripe_status' => 'canceled',
+    ]);
+
+    livewire(ListUsers::class)
+        ->callAction(TestAction::make('delete')->table($target))
+        ->assertHasNoActionErrors();
+
+    expect(DB::table('subscriptions')->where('id', $subscription->id)->exists())->toBeFalse()
+        ->and(DB::table('notifications')->where('notifiable_id', $target->id)->exists())->toBeFalse();
+});
+
+test('a bulk delete removes the selected accounts and skips the signed in admin', function (): void {
+    $admin = User::factory()->admin()->create();
+    $this->actingAs($admin);
+
+    $first = User::factory()->create();
+    $second = User::factory()->create();
+
+    livewire(ListUsers::class)
+        ->selectTableRecords([$admin->id, $first->id, $second->id])
+        ->callAction(TestAction::make('delete')->table()->bulk())
+        ->assertHasNoActionErrors();
+
+    expect(User::query()->find($first->id))->toBeNull()
+        ->and(User::query()->find($second->id))->toBeNull()
+        ->and(User::query()->find($admin->id))->not->toBeNull();
+});
+
+test('deleting an account clears its credentials and leaves other accounts alone', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    $target = User::factory()->create();
+    $bystander = User::factory()->create();
+
+    foreach ([$target, $bystander] as $user) {
+        DB::table('oauth_access_tokens')->insert([
+            'id' => 'token-' . $user->id,
+            'user_id' => $user->id,
+            'client_id' => (string) Str::uuid(),
+            'scopes' => '[]',
+            'revoked' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'expires_at' => now()->addDay(),
+        ]);
+
+        DB::table('oauth_refresh_tokens')->insert([
+            'id' => 'refresh-' . $user->id,
+            'access_token_id' => 'token-' . $user->id,
+            'revoked' => false,
+            'expires_at' => now()->addDay(),
+        ]);
+
+        DB::table('sessions')->insert([
+            'id' => 'session-' . $user->id,
+            'user_id' => $user->id,
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'pest',
+            'payload' => '',
+            'last_activity' => now()->getTimestamp(),
+        ]);
+    }
+
+    livewire(ListUsers::class)
+        ->callAction(TestAction::make('delete')->table($target))
+        ->assertHasNoActionErrors();
+
+    expect(DB::table('oauth_access_tokens')->where('user_id', $target->id)->exists())->toBeFalse()
+        ->and(DB::table('oauth_refresh_tokens')->where('id', 'refresh-' . $target->id)->exists())->toBeFalse()
+        ->and(DB::table('sessions')->where('user_id', $target->id)->exists())->toBeFalse()
+        ->and(DB::table('oauth_access_tokens')->where('user_id', $bystander->id)->exists())->toBeTrue()
+        ->and(DB::table('oauth_refresh_tokens')->where('id', 'refresh-' . $bystander->id)->exists())->toBeTrue()
+        ->and(DB::table('sessions')->where('user_id', $bystander->id)->exists())->toBeTrue();
+});
+
+test('deleting an account expires its open checkout and removes the Stripe customer', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    $target = User::factory()->create([
+        'stripe_id' => 'cus_target',
+        'stripe_checkout_session_id' => 'cs_open',
+    ]);
+
+    app()->instance(CheckoutSessions::class, new class extends CheckoutSessions {
+        public function find(string $sessionId): CheckoutSession
+        {
+            return new CheckoutSession('open', url: 'https://checkout.stripe.test/cs_open');
+        }
+
+        public function expire(string $sessionId): void
+        {
+            RecordedStripeCalls::$calls[] = 'expire:' . $sessionId;
+        }
+    });
+
+    app()->instance(StripeCustomers::class, new class extends StripeCustomers {
+        public function delete(string $stripeId): void
+        {
+            RecordedStripeCalls::$calls[] = 'delete:' . $stripeId;
+            RecordedStripeCalls::$userExistedAtDelete = User::query()->where('stripe_id', $stripeId)->exists();
+        }
+    });
+
+    RecordedStripeCalls::$calls = [];
+    RecordedStripeCalls::$userExistedAtDelete = false;
+
+    livewire(ListUsers::class)
+        ->callAction(TestAction::make('delete')->table($target))
+        ->assertHasNoActionErrors();
+
+    // The session is expired before the customer goes, and both happen while
+    // the account still exists — Stripe first, database second.
+    expect(RecordedStripeCalls::$calls)->toBe(['expire:cs_open', 'delete:cus_target'])
+        ->and(RecordedStripeCalls::$userExistedAtDelete)->toBeTrue()
+        ->and(User::query()->find($target->id))->toBeNull();
+});
+
+test('a Stripe failure keeps the account instead of deleting it', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    $target = User::factory()->create(['stripe_id' => 'cus_target']);
+    $product = Product::factory()->create(['user_id' => $target->id]);
+
+    app()->instance(StripeCustomers::class, new class extends StripeCustomers {
+        public function delete(string $stripeId): void
+        {
+            throw new RuntimeException('Stripe is unreachable');
+        }
+    });
+
+    livewire(ListUsers::class)
+        ->callAction(TestAction::make('delete')->table($target))
+        ->assertNotified('Stripe refused the cancellation, so the account was kept. Try again in a moment.');
+
+    expect(User::query()->find($target->id))->not->toBeNull()
+        ->and(Product::query()->find($product->id))->not->toBeNull();
 });

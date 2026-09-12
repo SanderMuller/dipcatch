@@ -60,7 +60,8 @@ final class PublicProductController extends Controller
     /**
      * Build the [{x: ISO timestamp, y: decimal price string}, ...] payload
      * the Chart.js line chart consumes. Reads from ProductCheapestHistory
-     * for segments whose started_at falls in the last 90 days. Each segment
+     * for segments that overlap the last 90 days — a price that has not moved
+     * since before the window is still the current price. Each segment
      * contributes two points (started_at, ended_at) so the line steps when
      * the cheapest shop changes; the open segment's right edge is "now".
      *
@@ -74,7 +75,7 @@ final class PublicProductController extends Controller
         $segments = ProductCheapestHistory::query()
             ->select(['cheapest_price', 'started_at', 'ended_at'])
             ->where('product_id', $product->id)
-            ->where('started_at', '>=', $cutoff)
+            ->overlapping($cutoff)
             ->inOrder()
             ->get();
 
@@ -82,18 +83,13 @@ final class PublicProductController extends Controller
         $now = CarbonImmutable::now();
         foreach ($segments as $segment) {
             $price = $segment->cheapest_price === null ? null : (string) $segment->cheapest_price;
-            $started = $segment->started_at;
             $ended = $segment->ended_at ?? $now;
-            // Larastan doesn't infer the datetime cast off the model's
-            // casts() method shape — narrow to CarbonInterface for PHPStan.
-            assert($started instanceof CarbonImmutable);
-            assert($ended instanceof CarbonImmutable);
-            /** @var string $startedIso — Larastan widens toIso8601String() to mixed; the @var pins it for the array shape below. */
-            $startedIso = $started->toIso8601String();
-            /** @var string $endedIso — same widening as above. */
-            $endedIso = $ended->toIso8601String();
-            $points[] = ['x' => $startedIso, 'y' => $price];
-            $points[] = ['x' => $endedIso, 'y' => $price];
+            // A segment may start long before the window it is drawn in, so
+            // clip its left edge to the cutoff. The heading above the canvas
+            // promises 90 days and the time axis has no floor of its own.
+            $started = $segment->started_at->max($cutoff);
+            $points[] = ['x' => $started->toIso8601String(), 'y' => $price];
+            $points[] = ['x' => $ended->toIso8601String(), 'y' => $price];
         }
 
         return $points;

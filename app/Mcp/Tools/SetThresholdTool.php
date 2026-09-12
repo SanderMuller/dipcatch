@@ -11,10 +11,18 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('set_threshold')]
-#[Description('Sets when this product alerts: how far the price must fall (a percentage, an absolute amount, or both), and/or a unit price to reach. Omit a value to leave it as it is.')]
+#[Title('Set threshold')]
+#[Description('Sets when this product alerts: how far the price must fall (a percentage, an absolute amount, or both), a price to reach, and/or a unit price to reach. Omit a value to leave it as it is.')]
+#[IsReadOnly(false)]
+#[IsDestructive]
+#[IsOpenWorld(false)]
 class SetThresholdTool extends Tool
 {
     use InteractsWithOwner;
@@ -27,6 +35,7 @@ class SetThresholdTool extends Tool
             'product_id' => ['required', 'uuid'],
             'percent' => ['nullable', 'numeric', 'min:0.01', 'max:99.99'],
             'amount' => ['nullable', 'numeric', 'min:0.01'],
+            'target_price' => ['nullable', 'numeric', 'min:0.01'],
             'unit_price_target' => ['nullable', 'numeric', 'min:0.01'],
         ]);
 
@@ -38,10 +47,11 @@ class SetThresholdTool extends Tool
 
         $percent = $validated['percent'] ?? null;
         $amount = $validated['amount'] ?? null;
+        $targetPrice = $validated['target_price'] ?? null;
         $unitPriceTarget = $validated['unit_price_target'] ?? null;
 
-        if ($percent === null && $amount === null && $unitPriceTarget === null) {
-            return Response::error('Give a percent, an amount, a unit_price_target, or several of them.');
+        if ($percent === null && $amount === null && $targetPrice === null && $unitPriceTarget === null) {
+            return Response::error('Give a percent, an amount, a target_price, a unit_price_target, or several of them.');
         }
 
         if (is_numeric($percent)) {
@@ -50,6 +60,10 @@ class SetThresholdTool extends Tool
 
         if (is_numeric($amount)) {
             $product->drop_threshold_abs = round((float) $amount, 2);
+        }
+
+        if (is_numeric($targetPrice)) {
+            $product->target_price = round((float) $targetPrice, 2);
         }
 
         if (is_numeric($unitPriceTarget)) {
@@ -79,7 +93,8 @@ class SetThresholdTool extends Tool
             'product_id' => $schema->string()->format('uuid')->description('From list_products.')->required(),
             'percent' => $schema->number()->description('Alert when the price falls this many percent, e.g. 10.'),
             'amount' => $schema->number()->description('Alert when the price falls by at least this much money.'),
-            'unit_price_target' => $schema->number()->description('Alert when the best value reaches this price per kg, litre or piece. This is a price to reach, not a fall, so it does not move with the current price.'),
+            'target_price' => $schema->number()->description('Alert when the cheapest shop reaches this price. This is the price on the shelf, not a fall, so it does not move with the current price. Free accounts get this alert.'),
+            'unit_price_target' => $schema->number()->description('Alert when the best value reaches this price per kg, litre or piece. Pro accounts only — for a pack price on any plan, use target_price.'),
         ];
     }
 }

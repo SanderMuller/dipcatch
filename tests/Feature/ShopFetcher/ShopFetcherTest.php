@@ -274,3 +274,29 @@ test('a host that answers again is no longer described as failing', function ():
 
     expect($memory->count('example.com', HostFetchMemory::KIND_SILENT))->toBe(0);
 });
+
+test('the failure count survives a cleared cache, because it does not live there', function (): void {
+    Http::fake([
+        'https://blocked.com/robots.txt' => Http::response('', 404),
+        'https://blocked.com/p/*' => Http::response('nope', 403),
+    ]);
+
+    $memory = app(HostFetchMemory::class);
+
+    foreach (range(1, HostFetchMemory::PERSISTENT_AFTER) as $i) {
+        RateLimiter::clear('dipcatch:fetcher:host:blocked.com');
+
+        // Whatever the environment's cache store is, or does between
+        // requests, must not decide whether a shop looks persistently
+        // blocked. In production it read zero every time.
+        Cache::flush();
+
+        try {
+            app(ShopFetcher::class)->fetch("https://blocked.com/p/{$i}");
+        } catch (Blocked) {
+            // Counted below.
+        }
+    }
+
+    expect($memory->isPersistent('blocked.com', HostFetchMemory::KIND_BLOCKED))->toBeTrue();
+});

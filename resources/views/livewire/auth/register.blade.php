@@ -30,7 +30,7 @@
                 :value="old('email')"
                 type="email"
                 required
-                autocomplete="email"
+                autocomplete="username"
                 placeholder="email@example.com"
             />
 

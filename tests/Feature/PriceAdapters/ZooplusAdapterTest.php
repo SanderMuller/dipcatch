@@ -41,7 +41,7 @@ HTML;
         ->and($result->snapshot?->title)->toBe('Single product');
 });
 
-test('matches all zooplus country TLDs', function (string $url): void {
+test('matches all zooplus country TLDs and Bitiba sister shops', function (string $url): void {
     $html = '<span data-zta="reducedPriceAmount">€ 9,99</span>';
     $result = $this->adapter->extract($url, $html);
 
@@ -51,7 +51,19 @@ test('matches all zooplus country TLDs', function (string $url): void {
     'de' => ['https://www.zooplus.de/shop/foo'],
     'be' => ['https://www.zooplus.be/shop/foo'],
     'com' => ['https://www.zooplus.com/shop/foo'],
+    'uk' => ['https://www.zooplus.co.uk/shop/foo'],
+    'bitiba-nl' => ['https://www.bitiba.nl/shop/foo'],
+    'bitiba-de' => ['https://www.bitiba.de/shop/foo'],
 ]);
+
+test('reads a sterling price on the UK shop', function (): void {
+    $html = '<span data-zta="reducedPriceAmount">£ 9.99</span>';
+    $result = $this->adapter->extract('https://www.zooplus.co.uk/shop/foo', $html);
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('9.99')
+        ->and($result->snapshot?->currency)->toBe('GBP');
+});
 
 test('an unanswered variant question is put to the user, not answered by the CSS fallback', function (): void {
     $json = json_encode([

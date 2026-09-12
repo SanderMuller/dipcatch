@@ -18,11 +18,11 @@ vendor/bin/pest || true                       # 0 failures
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Show the price line when the price has been stable | P1 | S | — | TODO |
-| 002 | Make a rate-limited recheck retry instead of dead-lettering | P1 | S | — | TODO |
+| 001 | Show the price line when the price has been stable | P1 | S | — | DONE |
+| 002 | Make a rate-limited recheck retry instead of dead-lettering | P1 | S | — | DONE |
 | 003 | Stop a recheck adopting a shop's new currency | P1 | M | 002 | DONE (`ead8499`) |
-| 004 | Stop `canonicalizeDecimal` misreading two price shapes | P1 | S | — | TODO |
-| 005 | Index, env documentation, and the SSRF escape hatch | P2 | S | — | TODO |
+| 004 | Stop `canonicalizeDecimal` misreading two price shapes | P1 | S | — | DONE |
+| 005 | Index, env documentation, and the SSRF escape hatch | P2 | S | — | DONE |
 | 006 | Alert budget after the claim; reference out of the lock | P2 | S | — | TODO |
 | 007 | Clear the old price when an offer is repointed | P2 | S | — | TODO |
 | 008 | Only dispatch a digest when there is something to digest | P3 | M | — | TODO |
@@ -80,6 +80,48 @@ Recorded so an executor does not re-litigate them:
 
 ## Execution log
 
+- **005 — executed 2026-09-11.** Three deviations, all agreed with the maintainer
+  before the work started:
+  1. **Step 1 covers four indexes, not one.** The maintenance note claimed
+     `price_drop_events.product_id` was the only missing index. A `pg_constraint`
+     sweep found 12 foreign-key columns with no leading index, and three more of
+     them sit on the same nightly prune path: `price_drop_events.price_check_id`
+     and `product_cheapest_history.triggering_price_check_id` (Postgres enforces
+     the cascade and the set-null with a per-row lookup when the command deletes
+     from `price_checks` in bulk), and `price_drop_events.triggered_by_shop_id`
+     (read once per offer, see the `EXPLAIN` note below). The sweep now
+     returns 8 rows. The remaining 8
+     only get scanned when a user or a shop is deleted, so they were left alone
+     rather than charged an ongoing write cost.
+  2. **Plain `CREATE INDEX`, not `CONCURRENTLY`.** Production is near empty, so
+     the SHARE lock lasts milliseconds and the migration keeps its transaction.
+     The reasoning is in the migration docblock for whoever revisits it at scale.
+  3. **Step 2 added the drift test the plan deliberately left out.** It guards
+     the five config files DipCatch authors, with no name allowlist. Package
+     config is out of scope by design: those files carry dozens of knobs for
+     drivers this app does not use. The app-specific names inside them
+     (`RESEND_API_KEY`, `VAPID_PEM_FILE`, `STRIPE_WEBHOOK_TOLERANCE`,
+     `FAILED_JOB_CHANNELS`) are documented but unguarded, which the test says.
+
+  **STOP condition 4 was assessed and does not apply.** It would have fired on
+  `PLAN_FREE_RECHECK_INTERVAL_HOURS` and `PLAN_FREE_NOTIFICATIONS_HOURLY_LIMIT`
+  having no default. `config/plans.php` documents that as deliberate: null falls
+  back to the `dipcatch` keys. Both are documented as empty with that comment.
+
+  The plan's motivating claim for step 2 was traced and holds — 13 health checks
+  are registered and none covers mail or web push, so a deploy missing
+  `RESEND_API_KEY` or `VAPID_PEM_FILE` does report healthy.
+
+  The security review that followed added a production test for
+  `allowUnresolved()`, which the first pass had skipped as too flaky. A host
+  under the RFC 2606 `.invalid` TLD never resolves, so the DNS miss is
+  deterministic. Both hatches are now pinned in both directions.
+
+  A `triggered_by_shop_id` index looked unjustified on review, because the
+  prune has no direct `WHERE` on that column — only an `EXISTS` through
+  `triggeredByShop`. `EXPLAIN` settles it: Postgres rewrites the correlation
+  into `Index Cond: (triggered_by_shop_id = ...)` and uses the index.
+
 - **003 — APPROVED, merged to `main`.** Executed 2026-09-07 by a dispatched
   executor, reviewed against every done criterion. Two documented deviations,
   both accepted on merit:
@@ -117,6 +159,18 @@ Recorded so an executor does not re-litigate them:
   the initial URL *and* on every redirect target, robots.txt is re-checked per
   hop, and DNS results are range-checked. Plan 005 hardens the escape hatch; the
   mechanism itself needs nothing.
+- **A dot-is-decimal path for structured sources** — proposed after plan 004, on
+  the grounds that schema.org mandates `.` as the decimal point and discourages
+  grouping separators, so a JSON-LD, microdata or Open Graph `"1.099"` is
+  unambiguous by specification and need not be refused. Rejected: the codebase
+  already records that shops break that rule. `tests/Feature/PriceAdapters/JsonLdAdapterTest.php`
+  ("normalizes European decimal separator") asserts that a JSON-LD `"price"` of
+  `"1.299,99"` parses to `1299.99`, which is a shop writing display formatting
+  into a machine-readable field. Trusting the specification for structured
+  strings would restore the 1000× misread for exactly that class of shop.
+  The fixtures model the AH API and Aldi prices as PHP floats, which take the
+  numeric path instead; both read the value out of decoded JSON, so a string
+  price from either API would still reach the string path.
 - **Share-slug guessability** — `Str::random(32)`.
 - **N+1 in the product table** — `ProductsTable` eager-loads `cheapestShop` and
   `shops`.

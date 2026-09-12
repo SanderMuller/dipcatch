@@ -6,6 +6,7 @@ use App\Billing\BillingGate;
 use App\Billing\CheckoutSessions;
 use App\Billing\Plan;
 use App\Billing\ProPrice;
+use App\Billing\StripeTax;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +20,33 @@ use Throwable;
  */
 class BillingController extends Controller
 {
+    /**
+     * The one link the marketing pages point Pro at, for signed-in visitors
+     * and strangers alike.
+     *
+     * A stranger is sent to registration with the billing page recorded as
+     * the intended URL. Fortify's register, login and email-verification
+     * responses all redirect through `intended()`, so the intent survives
+     * the whole signup — without this the CTA landed them on the dashboard
+     * with nothing to say why they were there.
+     */
+    public function upgrade(): RedirectResponse
+    {
+        if (! auth()->check()) {
+            session()->put('url.intended', url('/app/billing'));
+
+            return redirect()->route('register');
+        }
+
+        // Anyone Stripe already bills goes to the page that manages it, not
+        // to a second checkout.
+        if ($this->user()->subscription(Plan::SUBSCRIPTION_TYPE)?->valid() === true) {
+            return redirect('/app/billing');
+        }
+
+        return redirect()->route('billing.checkout');
+    }
+
     public function checkout(): Checkout|RedirectResponse
     {
         if (! BillingGate::isOpen()) {
@@ -91,6 +119,7 @@ class BillingController extends Controller
         $checkout = $subscription->checkout([
             'success_url' => url('/app/billing?checkout=done'),
             'cancel_url' => url('/app/billing?checkout=cancelled'),
+            ...StripeTax::checkoutOptions(),
         ]);
 
         $user->forceFill([

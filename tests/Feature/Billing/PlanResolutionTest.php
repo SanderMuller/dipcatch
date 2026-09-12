@@ -92,7 +92,7 @@ it('reads the free limits from config', function (): void {
 
     expect($entitlements->maxProducts())->toBe(20)
         ->and($entitlements->maxShopsPerProduct())->toBe(4)
-        ->and($entitlements->recheckIntervalHours())->toBe(6)
+        ->and($entitlements->recheckIntervalHours())->toBe(24)
         ->and($entitlements->allowsUnitPriceAlerts())->toBeFalse();
 });
 
@@ -101,6 +101,6 @@ it('gives pro unlimited products and shops', function (): void {
 
     expect($entitlements->maxProducts())->toBeNull()
         ->and($entitlements->maxShopsPerProduct())->toBeNull()
-        ->and($entitlements->recheckIntervalHours())->toBe(2)
+        ->and($entitlements->recheckIntervalHours())->toBe(6)
         ->and($entitlements->allowsUnitPriceAlerts())->toBeTrue();
 });

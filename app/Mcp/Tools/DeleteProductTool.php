@@ -10,10 +10,18 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('delete_product')]
+#[Title('Delete product')]
 #[Description('Stops tracking a product and removes its shops and price history. Cannot be undone; confirm with the user first.')]
+#[IsReadOnly(false)]
+#[IsDestructive]
+#[IsOpenWorld(false)]
 class DeleteProductTool extends Tool
 {
     use InteractsWithOwner;
