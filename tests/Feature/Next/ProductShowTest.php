@@ -1,11 +1,14 @@
 <?php declare(strict_types=1);
 
 use App\Livewire\Products\ProductShow;
+use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 
 use function Pest\Livewire\livewire;
 
@@ -161,4 +164,38 @@ it('states the shop limit instead of offering another', function (): void {
 
     livewire(ProductShow::class, ['product' => $product])
         ->assertSee('This product is at its shop limit');
+});
+
+it('stops advertising the old price when the re-check is rate limited', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $rival = Shop::factory()->for($product)->create([
+        'url' => 'https://rival.example.com/p/1',
+        'current_price' => '12.00',
+    ]);
+    $repointed = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '5.00',
+    ]);
+
+    $product->recomputeCheapestShop();
+    expect($product->cheapest_shop_id)->toBe($repointed->id);
+
+    // A 429 makes the sync re-check give up before it writes a price, so the
+    // component's own recompute is the only one that runs.
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/2' => Http::response('slow down', 429, ['Retry-After' => '120']),
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('saveShopUrl', $repointed->id, 'https://shop.example.com/p/2');
+
+    expect($repointed->refresh()->current_price)->toBeNull()
+        ->and($product->refresh()->cheapest_shop_id)->toBe($rival->id)
+        ->and((string) $product->cheapest_price)->toBe('12.00')
+        ->and(PriceDropEvent::query()->count())->toBe(0);
 });

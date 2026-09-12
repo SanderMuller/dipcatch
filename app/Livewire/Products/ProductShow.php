@@ -194,6 +194,11 @@ class ProductShow extends Component
 
         dispatch_sync(new CheckShopPrice($shop->refresh()));
 
+        // The check recomputes the cheapest offer itself, except when it gives
+        // up early on a rate-limited host. The offer has no price from here on,
+        // so without this the product would keep advertising the old one.
+        $this->product->refresh()->recomputeCheapestShop();
+
         $this->shopMessage = 'Shop URL updated and price re-checked';
         $this->product->refresh();
     }

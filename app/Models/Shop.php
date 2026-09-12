@@ -116,6 +116,19 @@ class Shop extends Model
             'pack_quantity' => null,
             'pack_unit' => null,
             'gtin' => null,
+            // Until the next successful check this offer has no known price,
+            // and a leftover one keeps it eligible for
+            // `Product::recomputeCheapestShop()`. The stock flag is null, not
+            // false: the new page has not said either way yet.
+            'current_price' => null,
+            'current_in_stock' => null,
+            'conditional_price' => null,
+            'conditional_label' => null,
+            'conditional_starts_at' => null,
+            'conditional_ends_at' => null,
+            'promotion_starts_at' => null,
+            'promotion_ends_at' => null,
+            'promotion_label' => null,
         ])->save();
 
         return true;
