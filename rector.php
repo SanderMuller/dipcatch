@@ -18,9 +18,6 @@ use Rector\CodeQuality\Rector\Class_\CompleteDynamicPropertiesRector;
 use Rector\CodeQuality\Rector\ClassMethod\LocallyCalledStaticMethodToNonStaticRector;
 use Rector\CodeQuality\Rector\FuncCall\InlineIsAInstanceOfRector;
 use Rector\CodeQuality\Rector\Identical\FlipTypeControlToUseExclusiveTypeRector;
-use Rector\CodeQuality\Rector\If_\CombineIfRector;
-use Rector\CodeQuality\Rector\If_\ExplicitBoolCompareRector;
-use Rector\CodeQuality\Rector\If_\SimplifyIfElseToTernaryRector;
 use Rector\CodeQuality\Rector\If_\SimplifyIfReturnBoolRector;
 use Rector\CodingStyle\Rector\PostInc\PostIncDecToPreIncDecRector;
 use Rector\Config\RectorConfig;
@@ -28,15 +25,12 @@ use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
 use Rector\DeadCode\Rector\PropertyProperty\RemoveNullPropertyInitializationRector;
 use Rector\DeadCode\Rector\Stmt\RemoveUnreachableStatementRector;
 use Rector\DeadCode\Rector\StmtsAwareInterface\RemoveDeadInstanceOfAssertRector;
-use Rector\EarlyReturn\Rector\If_\ChangeOrIfContinueToMultiContinueRector;
-use Rector\EarlyReturn\Rector\Return_\ReturnBinaryOrToEarlyReturnRector;
 use Rector\Php70\Rector\StaticCall\StaticCallOnNonStaticToInstanceCallRector;
 use Rector\Php74\Rector\Closure\ClosureToArrowFunctionRector;
 use Rector\Php74\Rector\Property\RestoreDefaultNullToNullableTypePropertyRector;
 use Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector;
 use Rector\Php81\Rector\FuncCall\NullToStrictStringFuncCallArgRector;
 use Rector\Php81\Rector\MethodCall\SpatieEnumMethodCallToEnumConstRector;
-use Rector\Php82\Rector\Param\AddSensitiveParameterAttributeRector;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
 use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
 use Rector\PHPUnit\CodeQuality\Rector\Class_\PreferPHPUnitSelfCallRector;
@@ -258,7 +252,6 @@ return RectorConfig::configure()
         // static methods, not constants. The rule rewrites `Status::ok()` to
         // `Status::OK` and that constant does not exist: a fatal at runtime.
         SpatieEnumMethodCallToEnumConstRector::class,
-        StaticCallOnNonStaticToInstanceCallRector::class,
         // `toStartWith()` takes a `non-empty-string`, so it does not accept a
         // prefix that is read at runtime. The `str_starts_with()` form these
         // two files use also carries a failure message naming both values.
