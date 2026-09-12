@@ -84,9 +84,17 @@ class SocialLoginController extends Controller
             // challenge exactly as a password login does.
             $request->session()->put([
                 'login.id' => $user->getKey(),
-                // Same value as the direct path below, so the second factor
-                // does not quietly change how long the session lasts.
-                'login.remember' => true,
+                // Not remembered, unlike the path below. Fortify pulls this
+                // straight into `Auth::login($user, $remember)` after the
+                // challenge, and a recaller cookie then signs the user in
+                // without one. Remembering by default would hand a 400-day
+                // bypass to the people who deliberately turned a second factor
+                // on, and the challenge form has no checkbox to decline it.
+                //
+                // Written, not left unset: an abandoned password login with
+                // "Remember me" ticked leaves a stale `true` here, which this
+                // callback would otherwise inherit.
+                'login.remember' => false,
             ]);
 
             event(new TwoFactorAuthenticationChallenged($user));

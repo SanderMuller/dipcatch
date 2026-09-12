@@ -15,6 +15,7 @@ use Laravel\Socialite\Two\GoogleProvider;
 use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Mockery\MockInterface;
+use PragmaRX\Google2FA\Google2FA;
 use SocialiteProviders\Apple\Provider as AppleProvider;
 
 beforeEach(function (): void {
@@ -383,9 +384,23 @@ test('an empty subject claim is refused rather than linked to an empty provider 
     expect(User::query()->count())->toBe(0);
 });
 
+test('social login routes are throttled at 20 requests per minute per IP', function (): void {
+    // The callback creates accounts and is reachable without a session, so the
+    // limiter is the only ceiling on it. Driven through the redirect end, which
+    // shares the group's middleware and the same bucket, because the callback
+    // needs a mocked provider per call. Nothing else asserts it is attached.
+    $url = route('social.redirect', 'google');
+
+    for ($i = 0; $i < 20; $i++) {
+        $this->get($url)->assertRedirect();
+    }
+
+    $this->get($url)->assertStatus(429);
+});
+
 test('a configured provider sends the user to that provider', function (): void {
-    // The only test that drives the redirect end with real Socialite; every
-    // other one asserts a 404 or the guest bounce.
+    // The only test that asserts where the redirect end actually sends the
+    // user; the others check a 404, the guest bounce, or the throttle.
     $response = $this->get(route('social.redirect', 'google'));
 
     $location = (string) $response->headers->get('Location');
@@ -423,11 +438,48 @@ test('a user with two factor enabled still gets the challenge after a social log
     $this->get(route('social.callback', 'google'))
         ->assertRedirect(route('two-factor.login'))
         ->assertSessionHas('login.id', $user->id)
-        // Fortify reads this to decide the session length. Dropping it would
-        // silently shorten the session for exactly the users with 2FA on.
-        ->assertSessionHas('login.remember', true);
+        // Closure form, not `assertSessionHas(..., false)`: that compares with
+        // `assertEquals`, which passes for a missing key too, so it would stay
+        // green if the controller stopped writing the value at all. Writing it
+        // is the point — a stale `true` from an abandoned password login would
+        // otherwise be inherited here.
+        ->assertSessionHas('login.remember', fn (mixed $remember): bool => $remember === false);
 
     $this->assertGuest();
+});
+
+test('passing the two factor challenge after a social login leaves no recaller cookie', function (): void {
+    // The session flag the test above asserts is a means; this is the end it
+    // buys. A recaller cookie signs the user in on a later visit without any
+    // challenge, so a user who turned on a second factor must not get one.
+    // A real base32 secret, not the factory's placeholder: this test generates
+    // a live OTP and posts it, so the secret has to satisfy Google2FA.
+    $secret = app(Google2FA::class)->generateSecretKey();
+
+    $user = User::factory()->withTwoFactor()->create([
+        'email' => 'geen-recaller@example.test',
+        'two_factor_secret' => encrypt($secret),
+    ]);
+
+    SocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider' => SocialProvider::Google,
+        'provider_id' => 'google-sub-recaller',
+    ]);
+
+    fakeSocialiteDriver(fakeSocialiteUser('google-sub-recaller', 'geen-recaller@example.test', 'Geen Recaller', [
+        'email_verified' => true,
+    ]));
+
+    $this->get(route('social.callback', 'google'))->assertRedirect(route('two-factor.login'));
+
+    $code = app(Google2FA::class)->getCurrentOtp($secret);
+
+    $response = $this->post(route('two-factor.login.store'), ['code' => $code]);
+
+    $response->assertRedirect('/app')->assertCookieMissing(Auth::guard()->getRecallerName());
+
+    $this->assertAuthenticatedAs($user);
 });
 
 test('two factor that was started but never confirmed does not hold the user at the challenge', function (): void {
