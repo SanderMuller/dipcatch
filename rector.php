@@ -134,26 +134,6 @@ return RectorConfig::configure()
     ->withConfiguredRule(UpdateRulesReturnTypeDocblockRector::class, [
         SimplifyRuleWrappersRector::ALLOW_CHAIN_TAIL_ON_ALLOWLISTED => true,
     ])
-    ->withConfiguredRule(AddSensitiveParameterAttributeRector::class, [
-        'sensitive_parameters' => [
-            'appKey',
-            'confirm_password',
-            'confirmPassword',
-            'old_password',
-            'oldPassword',
-            'confirmed_password',
-            'confirmedPassword',
-            'current_password',
-            'currentPassword',
-            'newPassword',
-            'password',
-            'plainTextPassword',
-            'secret',
-            'token',
-            'two_factor_secret',
-        ],
-    ])
-
     ->withConfiguredRule(FirstPartyFlagArgumentToNamedRector::class, [
         FirstPartyFlagArgumentToNamedRector::FIRST_PARTY_NAMESPACES => ['App\\', 'Database\\Factories\\', 'Tests\\'],
         FirstPartyFlagArgumentToNamedRector::CASCADE_TRAILING_ARGS => true,
@@ -216,9 +196,6 @@ return RectorConfig::configure()
      * @see vendor/driftingly/rector-laravel/config/sets/laravel90.php:61
      */
     ->withSkip([
-        AddSensitiveParameterAttributeRector::class => [
-            __DIR__ . '/tests/*',
-        ],
         AddOverrideAttributeToOverriddenMethodsRector::class,
         AddOverrideAttributeToOverriddenPropertiesRector::class,
         // Larastan can't introspect models that declare their table via
@@ -229,14 +206,10 @@ return RectorConfig::configure()
         ApplyDefaultInsteadOfNullCoalesceRector::class,
         ArgumentAdderRector::class,
         CarbonToDateFacadeRector::class,
-        ChangeOrIfContinueToMultiContinueRector::class,
         ClosureToArrowFunctionRector::class,
-        CombineIfRector::class,
         CompleteDynamicPropertiesRector::class,
         DeclareStrictTypesRector::class, // Performed by Pint
-        ExplicitBoolCompareRector::class,
         EnvVariableToEnvHelperRector::class,
-        ExplicitBoolCompareRector::class,
         ArrayToFirstClassCallableRector::class => [
             __DIR__ . '/routes',
             __DIR__ . '/config',
@@ -267,14 +240,12 @@ return RectorConfig::configure()
         ],
         ReplaceServiceContainerCallArgRector::class,
         RestoreDefaultNullToNullableTypePropertyRector::class,
-        ReturnBinaryOrToEarlyReturnRector::class,
         RequestVariablesToRequestFacadeRector::class => [
             __DIR__ . '/tests/*',
         ],
         ServerVariableToRequestFacadeRector::class => [
             __DIR__ . '/tests/*',
         ],
-        SimplifyIfElseToTernaryRector::class,
         // `->not->toBe('')` also narrows the value to `non-empty-string` for
         // PHPStan. `->not->toBeEmpty()` does not, so a later `toStartWith()` on
         // the same value fails. Only these two files depend on that narrowing.
