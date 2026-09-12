@@ -90,12 +90,16 @@
     <template x-if="supported && showForm">
         <div class="space-y-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 p-4">
             <flux:input
-                label="{{ __('Passkey name') }}"
+                id="passkey-name"
+                name="passkey-name"
+                :label="__('Passkey name')"
                 x-model="name"
-                placeholder="{{ __('e.g., MacBook Pro, iPhone') }}"
+                :placeholder="__('e.g., MacBook Pro, iPhone')"
                 x-on:keydown.enter.prevent="register()"
                 x-ref="passkeyNameInput"
                 x-init="$nextTick(() => $refs.passkeyNameInput?.focus())"
+                autocomplete="off"
+                data-1p-ignore
             />
             <flux:text class="!mt-1">{{ __('Give this passkey a name to help you identify it later.') }}</flux:text>
 

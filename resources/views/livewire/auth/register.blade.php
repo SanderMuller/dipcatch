@@ -13,6 +13,7 @@
             @csrf
             <!-- Name -->
             <flux:input
+                id="name"
                 name="name"
                 :label="__('Name')"
                 :value="old('name')"
@@ -25,6 +26,7 @@
 
             <!-- Email Address -->
             <flux:input
+                id="email"
                 name="email"
                 :label="__('Email address')"
                 :value="old('email')"
@@ -36,6 +38,7 @@
 
             <!-- Password -->
             <flux:input
+                id="password"
                 name="password"
                 :label="__('Password')"
                 type="password"
@@ -47,6 +50,7 @@
 
             <!-- Confirm Password -->
             <flux:input
+                id="password_confirmation"
                 name="password_confirmation"
                 :label="__('Confirm password')"
                 type="password"

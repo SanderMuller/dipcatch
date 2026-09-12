@@ -21,6 +21,7 @@
             <x-password-manager-username :email="auth()->user()->email" />
 
             <flux:input
+                id="password"
                 name="password"
                 :label="__('Password')"
                 type="password"
