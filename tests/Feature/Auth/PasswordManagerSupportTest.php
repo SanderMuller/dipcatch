@@ -220,12 +220,14 @@ test('copyable secret fields are ignored by password managers', function (): voi
     $mcp = formControl(Livewire::test(ConnectionsPage::class)->html(), 'mcp-endpoint');
 
     expect($mcp->hasAttribute('data-1p-ignore'))->toBeTrue()
-        ->and($mcp->getAttribute('autocomplete'))->toBe('off');
+        ->and($mcp->getAttribute('autocomplete'))->toBe('off')
+        ->and($mcp->hasAttribute('id'))->toBeFalse();
 
     $share = formControl(Livewire::test(ProductShow::class, ['product' => $product])->html(), 'share-url');
 
     expect($share->hasAttribute('data-1p-ignore'))->toBeTrue()
-        ->and($share->getAttribute('autocomplete'))->toBe('off');
+        ->and($share->getAttribute('autocomplete'))->toBe('off')
+        ->and($share->hasAttribute('id'))->toBeFalse();
 });
 
 test('the command palette search is ignored by password managers', function (): void {
@@ -288,13 +290,21 @@ function expectOneTimeCodeOnAnInput(string $html): void
 
     $otpInputs = new Crawler($html)->filter('ui-otp[name="code"] input');
     Assert::assertCount(6, $otpInputs);
-    Assert::assertCount(1, $otpInputs->filter('[autocomplete="one-time-code"]'));
     Assert::assertCount(1, new Crawler($html)->filter('input[autocomplete="one-time-code"]'));
 
-    $ignored = $otpInputs->filter('[data-1p-ignore]');
-    Assert::assertCount(5, $ignored);
-    $ignored->each(static function (Crawler $node): void {
-        Assert::assertSame('off', $node->attr('autocomplete'));
+    $otpInputs->each(static function (Crawler $node, int $index): void {
+        $input = $node->getNode(0);
+        Assert::assertInstanceOf(DOMElement::class, $input);
+
+        if ($index === 0) {
+            Assert::assertSame('one-time-code', $input->getAttribute('autocomplete'));
+            Assert::assertFalse($input->hasAttribute('data-1p-ignore'));
+
+            return;
+        }
+
+        Assert::assertSame('off', $input->getAttribute('autocomplete'));
+        Assert::assertTrue($input->hasAttribute('data-1p-ignore'));
     });
 
     $label = fieldLabel($html, 'ui-otp[name="code"]');
