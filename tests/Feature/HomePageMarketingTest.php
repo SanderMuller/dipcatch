@@ -142,8 +142,8 @@ test('each tracked example still carries its icon', function (): void {
         ->and(substr_count($content, 'before:content-[var(--label)]'))->toBe(2);
 });
 
-test('the shop list names every supported host without contradicting itself', function (): void {
-    $hosts = SupportedShops::rows();
+test('the shop list names the homepage hosts without contradicting itself', function (): void {
+    $hosts = SupportedShops::homepage();
 
     $content = (string) $this->get(route('home'))->assertOk()->getContent();
 
@@ -151,10 +151,13 @@ test('the shop list names every supported host without contradicting itself', fu
         expect($content)->toContain($shop['host']);
     }
 
-    // The overflow pill used to say "+4 more" directly under all the names,
-    // which read as a contradiction once the page was flattened to Markdown.
-    expect($content)->not->toContain(' more<')
-        ->and($content)->toContain(__('and many other webshops'));
+    // Country TLDs of the same brand stay off this row; the shops hub lists them.
+    expect($content)->not->toContain('petsplace.nl')
+        ->and($content)->not->toContain('amazon.com')
+        ->and($content)->toContain('etos.nl')
+        ->and($content)->not->toContain(' more<')
+        ->and($content)->toContain(__('and many other webshops'))
+        ->and($content)->toMatch('/<a href="' . preg_quote(e(route('shops')), '/') . '"[^>]*>' . preg_quote(__('and many other webshops'), '/') . '<\/a>/');
 });
 
 test('the privacy page explains that shared product images load from the shop', function (): void {
@@ -253,6 +256,15 @@ test('a host nobody has named falls back to the host itself', function (): void 
     $rows = SupportedShops::rows();
 
     expect($rows[0]['name'])->toBe('unnamed-shop.example');
+});
+
+test('a homepage host that is not a supported shop is omitted from the row', function (): void {
+    config()->set('site.supported_hosts', ['ah.nl', 'petsplace.nl']);
+    config()->set('site.homepage_hosts', ['ah.nl', 'gone.example']);
+
+    $hosts = array_column(SupportedShops::homepage(), 'host');
+
+    expect($hosts)->toBe(['ah.nl']);
 });
 
 test('the how-it-works steps are headings so the page has an outline', function (): void {

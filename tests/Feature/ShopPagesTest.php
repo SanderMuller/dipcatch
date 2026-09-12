@@ -15,6 +15,10 @@ it('refuses a host that is not supported', function (): void {
     $this->get('/shops/not-a-shop')->assertNotFound();
 });
 
+it('does not keep a landing page for an adapter TLD that is not marketed', function (): void {
+    $this->get('/shops/amazon-de')->assertNotFound();
+});
+
 it('states the offer window only for the shops whose adapter reads one', function (): void {
     // Albert Heijn goes through the mobile API, which returns the Bonus
     // window; bol.com has no promotion parsing, so the page must not claim it.
@@ -50,21 +54,21 @@ it('links each shop page to the categories that name it, and no others', functio
         ->assertSee('What people track at Albert Heijn', escape: false);
 });
 
-it('links Amazon UK and US shops to groceries as well as pet food, coffee and filters', function (string $slug): void {
+it('links Amazon UK and US shops to groceries, coffee and filters', function (string $slug): void {
     $shop = ShopPages::find($slug);
+
+    $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
+
+    expect($slugs)->toBe(['groceries', 'coffee', 'filters']);
+})->with(['amazon-com', 'amazon-co-uk']);
+
+it('links Amazon.nl to groceries, pet food, coffee, filters and beauty', function (): void {
+    $shop = ShopPages::find('amazon-nl');
 
     $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
 
     expect($slugs)->toBe(['groceries', 'pet-food', 'coffee', 'filters', 'beauty']);
-})->with(['amazon-com', 'amazon-co-uk']);
-
-it('links other Amazon country shops to pet food, coffee and filters', function (string $slug): void {
-    $shop = ShopPages::find($slug);
-
-    $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
-
-    expect($slugs)->toBe(['pet-food', 'coffee', 'filters', 'beauty']);
-})->with(['amazon-de', 'amazon-com-be']);
+});
 
 it('links Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart to the beauty category only', function (string $slug): void {
     $shop = ShopPages::find($slug);
@@ -81,7 +85,8 @@ it('states that Dierapotheker reads the article number', function (): void {
 });
 
 it('lists every shop on the hub, with a link to each', function (): void {
-    $response = $this->get(route('shops'))->assertOk();
+    $response = $this->get(route('shops'))->assertOk()
+        ->assertSee('Shops with a dedicated page on DipCatch', escape: false);
 
     foreach (ShopPages::all() as $shop) {
         $response->assertSee(route('shop', ['slug' => $shop->slug]), escape: false);
@@ -104,10 +109,6 @@ it('renders the Dutch page in Dutch', function (): void {
         ->assertDontSee('Price alerts for Albert Heijn', escape: false);
 });
 
-it('reaches every shop page from the homepage', function (): void {
-    $response = $this->get('/')->assertOk();
-
-    foreach (ShopPages::all() as $shop) {
-        $response->assertSee(route('shop', ['slug' => $shop->slug]), escape: false);
-    }
+it('reaches the shops hub from the homepage', function (): void {
+    $this->get('/')->assertOk()->assertSee(route('shops'), escape: false);
 });

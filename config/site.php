@@ -1,23 +1,5 @@
 <?php declare(strict_types=1);
 
-$amazonHosts = [
-    'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.nl', 'amazon.fr',
-    'amazon.es', 'amazon.it', 'amazon.ie', 'amazon.se', 'amazon.pl',
-    'amazon.ca', 'amazon.com.au', 'amazon.co.jp', 'amazon.in', 'amazon.com.mx',
-    'amazon.com.br', 'amazon.com.be', 'amazon.ae', 'amazon.sa', 'amazon.com.tr',
-    'amazon.sg',
-];
-
-$zooplusHosts = [
-    'zooplus.nl', 'zooplus.be', 'zooplus.de', 'zooplus.fr', 'zooplus.it',
-    'zooplus.es', 'zooplus.at', 'zooplus.ie', 'zooplus.pt', 'zooplus.fi',
-    'zooplus.lu', 'zooplus.com', 'zooplus.co.uk',
-];
-
-$bitibaHosts = [
-    'bitiba.nl', 'bitiba.be', 'bitiba.de', 'bitiba.fr', 'bitiba.it',
-];
-
 return [
 
     /*
@@ -46,21 +28,28 @@ return [
     'terms_updated_at' => '2026-09-09',
 
     /**
-     * Shops with a dedicated adapter or data source, shown as logos on the
-     * homepage and the first-run dashboard.
-     *
-     * Amazon hosts stay in sync with AmazonAdapter::hosts(); Zooplus and
-     * Bitiba hosts stay in sync with ZooplusAdapter::hosts().
+     * Shops with a dedicated landing page. One host per brand, plus the
+     * Amazon and Zooplus country sites the use-case pages name. Adapter
+     * host maps stay on the adapters; a paste still extracts there.
      */
     'supported_hosts' => [
         'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl',
         'dekamarkt.nl', 'poiesz.nl', 'vomar.nl', 'bol.com',
-        ...$amazonHosts,
-        ...$zooplusHosts,
-        ...$bitibaHosts,
-        'dierapotheker.nl', 'petsplace.nl', 'medpets.nl', 'medpets.be', 'welkoop.nl',
+        'amazon.nl', 'amazon.com', 'amazon.co.uk',
+        'zooplus.nl', 'zooplus.co.uk', 'bitiba.nl',
+        'dierapotheker.nl', 'petsplace.nl', 'medpets.nl', 'welkoop.nl',
         'petsathome.com', 'etos.nl', 'theordinary.com',
         'lookfantastic.com', 'cultbeauty.com', 'ulta.com', 'walmart.com',
+    ],
+
+    /**
+     * Hosts on the homepage "Works with" row. Keep this short: one chip per
+     * brand a visitor should recognise at a glance. The shops hub lists the rest.
+     */
+    'homepage_hosts' => [
+        'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl',
+        'dekamarkt.nl', 'poiesz.nl', 'vomar.nl', 'bol.com', 'amazon.nl', 'zooplus.nl',
+        'etos.nl',
     ],
 
     /**
@@ -82,47 +71,13 @@ return [
         'bol.com' => 'bol.com',
         'amazon.com' => 'Amazon.com',
         'amazon.co.uk' => 'Amazon.co.uk',
-        'amazon.de' => 'Amazon.de',
         'amazon.nl' => 'Amazon.nl',
-        'amazon.fr' => 'Amazon.fr',
-        'amazon.es' => 'Amazon.es',
-        'amazon.it' => 'Amazon.it',
-        'amazon.ie' => 'Amazon.ie',
-        'amazon.se' => 'Amazon.se',
-        'amazon.pl' => 'Amazon.pl',
-        'amazon.ca' => 'Amazon.ca',
-        'amazon.com.au' => 'Amazon.com.au',
-        'amazon.co.jp' => 'Amazon.co.jp',
-        'amazon.in' => 'Amazon.in',
-        'amazon.com.mx' => 'Amazon.com.mx',
-        'amazon.com.br' => 'Amazon.com.br',
-        'amazon.com.be' => 'Amazon.be',
-        'amazon.ae' => 'Amazon.ae',
-        'amazon.sa' => 'Amazon.sa',
-        'amazon.com.tr' => 'Amazon.com.tr',
-        'amazon.sg' => 'Amazon.sg',
         'zooplus.nl' => 'Zooplus',
-        'zooplus.be' => 'Zooplus.be',
-        'zooplus.de' => 'Zooplus.de',
-        'zooplus.fr' => 'Zooplus.fr',
-        'zooplus.it' => 'Zooplus.it',
-        'zooplus.es' => 'Zooplus.es',
-        'zooplus.at' => 'Zooplus.at',
-        'zooplus.ie' => 'Zooplus.ie',
-        'zooplus.pt' => 'Zooplus.pt',
-        'zooplus.fi' => 'Zooplus.fi',
-        'zooplus.lu' => 'Zooplus.lu',
-        'zooplus.com' => 'Zooplus.com',
         'zooplus.co.uk' => 'Zooplus.co.uk',
         'bitiba.nl' => 'Bitiba',
-        'bitiba.be' => 'Bitiba.be',
-        'bitiba.de' => 'Bitiba.de',
-        'bitiba.fr' => 'Bitiba.fr',
-        'bitiba.it' => 'Bitiba.it',
         'dierapotheker.nl' => 'Dierapotheker',
         'petsplace.nl' => 'Pets Place',
         'medpets.nl' => 'Medpets',
-        'medpets.be' => 'Medpets.be',
         'welkoop.nl' => 'Welkoop',
         'petsathome.com' => 'Pets at Home',
         'etos.nl' => 'Etos',
@@ -152,25 +107,22 @@ return [
     'use_cases' => [
         'groceries' => [
             'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl', 'dekamarkt.nl', 'poiesz.nl', 'vomar.nl',
-            'amazon.com', 'amazon.co.uk',
+            'amazon.nl', 'amazon.com', 'amazon.co.uk',
         ],
         'pet-food' => [
-            ...$zooplusHosts,
-            ...$bitibaHosts,
-            'dierapotheker.nl', 'petsplace.nl', 'medpets.nl', 'medpets.be', 'welkoop.nl',
+            'zooplus.nl', 'zooplus.co.uk', 'bitiba.nl',
+            'dierapotheker.nl', 'petsplace.nl', 'medpets.nl', 'welkoop.nl',
             'petsathome.com',
-            'bol.com',
-            ...$amazonHosts,
+            'bol.com', 'amazon.nl',
             'ah.nl', 'jumbo.com',
         ],
-        'coffee' => ['ah.nl', 'jumbo.com', 'bol.com', ...$amazonHosts],
-        'filters' => ['bol.com', ...$amazonHosts],
+        'coffee' => ['ah.nl', 'jumbo.com', 'bol.com', 'amazon.nl', 'amazon.com', 'amazon.co.uk'],
+        'filters' => ['bol.com', 'amazon.nl', 'amazon.com', 'amazon.co.uk'],
         'beauty' => [
             'etos.nl', 'theordinary.com',
             'lookfantastic.com', 'cultbeauty.com',
             'ulta.com', 'walmart.com',
-            'bol.com',
-            ...$amazonHosts,
+            'bol.com', 'amazon.nl',
             'ah.nl', 'jumbo.com',
         ],
     ],

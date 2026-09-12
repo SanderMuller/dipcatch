@@ -121,22 +121,18 @@ test('the beauty page lists Etos, Lookfantastic, Ulta, Walmart and Amazon', func
         ->toContain('ulta.com')
         ->toContain('walmart.com')
         ->toContain('bol.com')
-        ->toContain('amazon.com')
-        ->toContain('amazon.co.uk')
+        ->toContain('amazon.nl')
         ->toContain('ah.nl')
         ->toContain('jumbo.com');
 });
 
-test('the pet-food page lists amazon.com and the other specialist shops', function (): void {
+test('the pet-food page lists the specialist shops', function (): void {
     $case = UseCases::find('pet-food');
 
     expect($case)->not->toBeNull();
     assert($case !== null);
 
-    expect(array_column($case->shops(), 'host'))->toContain('amazon.com')
-        ->toContain('amazon.de')
-        ->toContain('zooplus.nl')
-        ->toContain('zooplus.be')
+    expect(array_column($case->shops(), 'host'))->toContain('zooplus.nl')
         ->toContain('bitiba.nl')
         ->toContain('dierapotheker.nl')
         ->toContain('petsplace.nl')

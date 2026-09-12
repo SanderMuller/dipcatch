@@ -5,7 +5,7 @@
     $langQuery = $requestedLang === null ? [] : ['lang' => $requestedLang];
     $canonical = $locale === 'nl' ? route('shops', ['lang' => 'nl']) : route('shops');
     $contactEmail = config('site.contact_email');
-    $description = __('Every shop DipCatch has a reader for, and what it can see at each one: the price, the pack size, and the offer window where the shop states it.');
+    $description = __('Shops with a dedicated page on DipCatch, and what it can see at each one: the price, the pack size, and the offer window where the shop states it.');
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
@@ -28,7 +28,7 @@
                 <h1 class="max-w-[24ch] text-4xl font-semibold tracking-tight text-balance sm:text-5xl">{{ __('Supported shops') }}</h1>
                 <p class="mt-5 max-w-[60ch] text-lg text-pretty text-zinc-600 dark:text-zinc-300">{{ $description }}</p>
                 <p class="mt-4 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">
-                    {{ __('Many other webshops publish their product data in a form DipCatch can read as well. These are the ones with a reader written for them, so they are the ones that keep working when a page changes.') }}
+                    {{ __('Many other webshops publish their product data in a form DipCatch can read as well. These pages are the shops with a landing page of their own.') }}
                 </p>
 
                 <ul role="list" class="mt-10 grid gap-4 sm:grid-cols-2">

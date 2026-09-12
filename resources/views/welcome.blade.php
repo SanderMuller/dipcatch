@@ -19,7 +19,7 @@
         ['n' => '02', 'title' => __('Add it from other shops'), 'body' => __('Track the same item at other shops and DipCatch shows the cheapest one, with unit prices (€/kg, €/l) so different pack sizes compare fairly.')],
         ['n' => '03', 'title' => __('You get the dip'), 'body' => __('Prices are re-checked automatically. When one falls past your threshold you hear about it: a daily email digest, a note under the bell in the app, or a browser push if you turn that on.')],
     ];
-    $supportedShops = \App\Support\SupportedShops::rows();
+    $supportedShops = \App\Support\SupportedShops::homepage();
     $money = static fn (string $amount): string => \App\Support\MoneyFormatter::format($amount, 'EUR');
     $tracked = [
         [
@@ -138,7 +138,9 @@
                                             </a>
                                         </li>
                                     @endforeach
-                                    <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">{{ __('and many other webshops') }}</li>
+                                    <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+                                        <a href="{{ route('shops', $langQuery) }}" class="underline underline-offset-4 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('and many other webshops') }}</a>
+                                    </li>
                                 </ul>
 
                                 @php($useCases = \App\Support\UseCases::all())
