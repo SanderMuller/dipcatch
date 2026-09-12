@@ -89,7 +89,7 @@ class SocialLoginController extends Controller
                 'login.remember' => true,
             ]);
 
-            TwoFactorAuthenticationChallenged::dispatch($user);
+            event(new TwoFactorAuthenticationChallenged($user));
 
             return redirect()->route('two-factor.login');
         }

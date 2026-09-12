@@ -3,6 +3,7 @@
 use App\Enums\SocialProvider;
 use App\Models\SocialAccount;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Auth;
@@ -228,7 +229,7 @@ test('claiming an unverified local account revokes its passkeys, two factor and 
         'ip_address' => '127.0.0.1',
         'user_agent' => 'squatter',
         'payload' => 'x',
-        'last_activity' => time(),
+        'last_activity' => Carbon::now()->getTimestamp(),
     ]);
 
     fakeSocialiteDriver(fakeSocialiteUser('google-sub-15', 'kraker@example.test', 'Echte Eigenaar', [
@@ -369,7 +370,7 @@ test('a provider name longer than the column is truncated rather than failing th
 
     $this->get(route('social.callback', 'google'))->assertRedirect('/app');
 
-    expect(mb_strlen(User::query()->sole()->name))->toBe(255);
+    expect(User::query()->sole()->name)->toHaveLength(255);
 });
 
 test('an empty subject claim is refused rather than linked to an empty provider id', function (): void {

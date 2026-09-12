@@ -31,7 +31,7 @@ test('the mailto names the shop and carries the product URL', function (): void 
 test('a product URL supplies the shop host when none is passed', function (): void {
     config()->set('site.contact_email', 'hello@example.test');
 
-    $decoded = rawurldecode((string) ShopRequestMail::href(null, 'https://www.petsplace.nl/p/9'));
+    $decoded = rawurldecode((string) ShopRequestMail::href(productUrl: 'https://www.petsplace.nl/p/9'));
 
     expect($decoded)->toContain('Request www.petsplace.nl on DipCatch');
 });

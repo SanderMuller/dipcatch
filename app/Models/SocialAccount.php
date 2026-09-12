@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\SocialProvider;
 use Carbon\CarbonImmutable;
 use Database\Factories\SocialAccountFactory;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,12 +19,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $updated_at
  * @property User $user
  */
+#[Unguarded]
 class SocialAccount extends Model
 {
     /** @use HasFactory<SocialAccountFactory> */
     use HasFactory;
-
-    protected $guarded = [];
 
     /**
      * @return array<string, string>

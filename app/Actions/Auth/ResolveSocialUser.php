@@ -53,7 +53,7 @@ final class ResolveSocialUser
             }
 
             if ($user === null) {
-                $user = $this->createUser($provider, $socialiteUser, $email, $acceptLanguage);
+                $user = $this->createUser($socialiteUser, $email, $acceptLanguage);
                 $created = true;
             }
 
@@ -143,7 +143,7 @@ final class ResolveSocialUser
         // a way back in — and a stale two-factor secret would lock the rightful
         // owner out at a challenge they cannot answer.
         $user->forceFill([
-            'password' => Str::password(32),
+            'password' => Str::password(),
             'email_verified_at' => now(),
             'remember_token' => null,
             'two_factor_secret' => null,
@@ -159,7 +159,7 @@ final class ResolveSocialUser
         DB::table('sessions')->where('user_id', $user->getKey())->delete();
     }
 
-    private function createUser(SocialProvider $provider, SocialiteUser $socialiteUser, string $email, ?string $acceptLanguage): User
+    private function createUser(SocialiteUser $socialiteUser, string $email, ?string $acceptLanguage): User
     {
         $user = new User();
 
@@ -171,7 +171,7 @@ final class ResolveSocialUser
             // the user sets a real one through the reset flow if they ever
             // want to enable two-factor or a passkey, both of which confirm
             // the password first.
-            'password' => Str::password(32),
+            'password' => Str::password(),
             // The provider signed this address. A second verification mail
             // would only ask the user to prove what Google or Apple already
             // proved, and `MustVerifyEmail` would block the dashboard until
