@@ -170,13 +170,13 @@ final class UseCases
             ],
             'ask-your-assistant' => [
                 'heading' => __('Set up price tracking by asking ChatGPT or Claude'),
-                'description' => __('Connect DipCatch to your assistant and set a product up in one conversation: name what you buy, the shops you already check, and how far the price has to fall before you want to hear about it.'),
-                'intro' => __('Setting a product up by hand means finding the same item at three or four shops and pasting every link yourself. If you already have ChatGPT or Claude open, you can hand that over. Connect DipCatch once, then say what you want in a sentence and let the assistant do the looking up, the adding and the threshold.'),
-                'example' => __('You say: track this dry cat food, I already check zooplus.nl and bol.com, find me two more shops, and tell me when it drops 10 percent. The assistant looks up the product pages and hands each one to DipCatch, which fetches the page and reports the title, price and pack size it read. You check those four lines, say yes, and the threshold is set in the same reply.'),
+                'description' => __('Connect DipCatch to ChatGPT or Claude and set a product up by describing it. Say what you buy, where you buy it now, and how far the price has to fall before DipCatch should tell you.'),
+                'intro' => __('Adding a product by hand is four tabs and four copied links. If ChatGPT or Claude is already open, say it there instead. Connect DipCatch once and the assistant does the looking up and the adding for you.'),
+                'example' => __('You type one message: track Hill’s Science Plan Adult 1-6, I already buy it at zooplus.nl and bol.com, find me two more shops, and tell me when it drops 10 percent. The assistant looks up the four product pages. DipCatch reads each one back with the title, the price and the pack size it found, and saves nothing until you say yes.'),
                 'tips' => [
-                    __('Name the pack, not the category. "Dry cat food 7 kg" gives the assistant something to match; "cat food" leaves it guessing which of nine variants you meant.'),
-                    __('Read the lines DipCatch sends back before you agree. That is the moment a link pointing at a 2 kg bag instead of a 7 kg sack is cheap to fix.'),
-                    __('Ask in percentages when no target price comes to mind. Ten percent means the same thing on a €4 item and a €40 one, so you do not have to invent a number per product.'),
+                    __('Type as much of the pack as you know. Hill’s Science Plan Adult 1-6 7 kg points at one product. Cat food leaves the assistant to choose for you, and it will.'),
+                    __('Check the lines DipCatch reads back. A link to the 2 kg bag instead of the 7 kg sack looks fine in a chat window and costs you a wrong price for weeks.'),
+                    __('Ask for a percentage if you do not have a price in mind. Ten percent works the same on a €4 item and a €40 one, so you can give the same answer for everything you track.'),
                 ],
                 'faq' => [
                     ['q' => __('Which assistants can I use?'), 'a' => __('Any app that speaks MCP. The Connections page in your account opens Claude with DipCatch already filled in and shows the endpoint other clients need, and it says what each assistant requires today.')],
