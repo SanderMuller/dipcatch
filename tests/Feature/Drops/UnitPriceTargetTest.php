@@ -74,7 +74,7 @@ test('the same value does not notify twice', function (): void {
     app(DetectUnitPriceTarget::class)($product);
     app(DetectUnitPriceTarget::class)($product->refresh());
 
-    Notification::assertSentToTimes($product->user, UnitPriceTargetNotification::class, 1);
+    Notification::assertSentToTimes($product->user, UnitPriceTargetNotification::class);
 });
 
 test('a further drop is news again', function (): void {
@@ -164,7 +164,7 @@ test('a price check on any shop can fire the target, not only the cheapest', fun
         'pack_quantity' => '370.00', 'pack_unit' => 'g',
     ]);
 
-    CheckShopPrice::dispatchSync($value);
+    dispatch_sync(new CheckShopPrice($value));
 
     // The cheapest price never moved, so the drop engine saw nothing — but
     // the best value fell to €5.38/kg.

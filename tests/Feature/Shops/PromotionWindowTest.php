@@ -127,7 +127,7 @@ test('a failed check leaves a stored window alone', function (): void {
         'promotion_label' => 'VOOR 1.69',
     ]);
 
-    CheckShopPrice::dispatchSync($shop);
+    dispatch_sync(new CheckShopPrice($shop));
 
     expect($shop->refresh()->last_status)->not->toBe(ScrapeStatus::Ok)
         ->and($shop->promotion_label)->toBe('VOOR 1.69');
@@ -140,7 +140,7 @@ test('a failed check leaves a stored window alone', function (): void {
 function shopReporting(ShopSnapshot $snapshot): void
 {
     app()->forgetInstance(AdapterResolver::class);
-    app()->singleton('test.promotion.adapter', fn (): ShopAdapter => new class ($snapshot) implements ShopAdapter {
+    app()->singleton('test.promotion.adapter', fn (): ShopAdapter => new readonly class ($snapshot) implements ShopAdapter {
         public function __construct(private ShopSnapshot $snapshot) {}
 
         public function key(): string
@@ -196,7 +196,7 @@ test('a reported window is written to the shop', function (): void {
         authoritative: true,
     ));
 
-    CheckShopPrice::dispatchSync($shop);
+    dispatch_sync(new CheckShopPrice($shop));
 
     expect($shop->refresh()->promotion_label)->toBe('2 VOOR 3.00')
         ->and($shop->promotion_ends_at?->toDateString())->toBe('2026-09-20')
@@ -212,7 +212,7 @@ test('an Amsterdam day boundary survives the round trip to the database', functi
         authoritative: true,
     ));
 
-    CheckShopPrice::dispatchSync($shop);
+    dispatch_sync(new CheckShopPrice($shop));
 
     expect($shop->refresh()->promotionWindow()?->endsAt->setTimezone('Europe/Amsterdam')->toDateTimeString())
         ->toBe('2026-09-06 23:59:59');
@@ -222,7 +222,7 @@ test('an authoritative source reporting no window clears the stored one', functi
     $shop = shopWithStoredWindow();
     shopReporting(snapshotWith(null, authoritative: true));
 
-    CheckShopPrice::dispatchSync($shop);
+    dispatch_sync(new CheckShopPrice($shop));
 
     expect($shop->refresh()->promotion_ends_at)->toBeNull()
         ->and($shop->promotion_label)->toBeNull()
@@ -233,7 +233,7 @@ test('a source with no promotion concept leaves the stored window alone', functi
     $shop = shopWithStoredWindow();
     shopReporting(snapshotWith(null, authoritative: false));
 
-    CheckShopPrice::dispatchSync($shop);
+    dispatch_sync(new CheckShopPrice($shop));
 
     expect($shop->refresh()->promotion_label)->toBe('VOOR 1.69')
         ->and($shop->promotion_ends_at)->not->toBeNull();

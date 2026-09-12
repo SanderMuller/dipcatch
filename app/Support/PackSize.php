@@ -149,7 +149,7 @@ final readonly class PackSize
      */
     public static function of(float $quantity, string $unit): ?self
     {
-        if (! in_array($unit, ['g', 'ml', 'piece'], true)) {
+        if (! in_array($unit, ['g', 'ml', 'piece'], strict: true)) {
             return null;
         }
 

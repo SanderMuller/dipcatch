@@ -386,7 +386,7 @@ test('a shop URL that redirects onto an unservable host is refused, not parsed',
 test('a page quoting a currency that is not a code is refused, not stored', function (): void {
     Http::fake([
         'https://example.com/robots.txt' => Http::response('', 404),
-        'https://example.com/p/1' => Http::response(withJsonLd((string) json_encode([
+        'https://example.com/p/1' => Http::response(withJsonLd(json_encode([
             '@type' => 'Product',
             'name' => 'Demo',
             'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'Euro'],
@@ -400,7 +400,7 @@ test('a page quoting a currency that is not a code is refused, not stored', func
 });
 
 test('choosing a variant stores the address that variant lives at', function (): void {
-    $json = (string) json_encode([
+    $json = json_encode([
         '@type' => 'Product',
         'name' => 'Sanimed Skin Sensitive Cat',
         'url' => 'https://example.com/sanimed',
@@ -429,7 +429,7 @@ test('choosing a variant stores the address that variant lives at', function ():
 });
 
 test('the same variant added twice is a duplicate, whichever address was pasted', function (): void {
-    $json = (string) json_encode([
+    $json = json_encode([
         '@type' => 'Product',
         'name' => 'Sanimed Skin Sensitive Cat',
         'url' => 'https://example.com/sanimed',

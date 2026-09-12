@@ -9,7 +9,6 @@ use Illuminate\Routing\Route;
 use Illuminate\Support\Str;
 use Laravel\Passport\Http\Middleware\CheckToken;
 use Laravel\Passport\Passport;
-use Laravel\Passport\Token;
 
 /**
  * The endpoint tests only need the route's middleware stack, not a working
@@ -35,7 +34,7 @@ it('guards the endpoint with the mcp:use scope, not merely with authentication',
     // but checks it nowhere. Without the `scopes` middleware any Passport
     // token, issued for anything, would reach every tool.
     $route = collect(app('router')->getRoutes()->getRoutes())
-        ->first(fn ($route): bool => $route->uri() === 'mcp' && in_array('POST', $route->methods(), true));
+        ->first(fn ($route): bool => $route->uri() === 'mcp' && in_array('POST', $route->methods(), strict: true));
 
     expect($route)->not->toBeNull()
         ->and($route?->gatherMiddleware())->toContain('auth:api')
@@ -46,7 +45,7 @@ it('refuses a token that carries no mcp:use scope', function (): void {
     // The middleware-string assertion above proves the guard is attached.
     // This proves it actually rejects: `actingAs` on the server bypasses the
     // HTTP stack entirely, so without this nothing exercised Passport at all.
-    Passport::actingAs(User::factory()->create(), []);
+    Passport::actingAs(User::factory()->create());
 
     $this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list'])
         ->assertForbidden();
@@ -68,7 +67,7 @@ it('registers the scope middleware alias, since Laravel does not alias Passport 
 
 it('rate limits the endpoint per token owner', function (): void {
     $route = collect(app('router')->getRoutes()->getRoutes())
-        ->first(fn ($route): bool => $route->uri() === 'mcp' && in_array('POST', $route->methods(), true));
+        ->first(fn ($route): bool => $route->uri() === 'mcp' && in_array('POST', $route->methods(), strict: true));
 
     expect($route?->gatherMiddleware())->toContain('throttle:mcp');
 });
@@ -76,7 +75,7 @@ it('rate limits the endpoint per token owner', function (): void {
 it('exposes every tool under a readable name', function (): void {
     // The default is kebab-case of the class name with the Tool suffix left
     // on, so `list-products-tool`. Each tool sets #[Name] instead.
-    $defaults = (new ReflectionClass(DipCatchServer::class))->getDefaultProperties();
+    $defaults = new ReflectionClass(DipCatchServer::class)->getDefaultProperties();
     $declared = $defaults['tools'] ?? null;
 
     expect($declared)->toBeArray();

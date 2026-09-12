@@ -98,14 +98,14 @@ test('the organisation publishes a contact address when one is configured', func
 });
 
 test('the organisation keeps quiet when no contact address is set', function (): void {
-    config()->set('site.contact_email', null);
+    config()->set('site.contact_email');
 
     expect(nodeOfType('/', 'Organization'))->toBeArray()
         ->and(nodeOfType('/', 'Organization'))->not->toHaveKey('email');
 });
 
 test('the free plan is always on offer', function (): void {
-    config()->set('plans.stripe.pro_price_id', null);
+    config()->set('plans.stripe.pro_price_id');
 
     $offers = StructuredData::offers();
 
@@ -115,7 +115,7 @@ test('the free plan is always on offer', function (): void {
 });
 
 test('the paid plan stays off the graph until Stripe is configured', function (): void {
-    config()->set('plans.stripe.pro_price_id', null);
+    config()->set('plans.stripe.pro_price_id');
 
     expect(collect(StructuredData::offers())->pluck('name'))->not->toContain('Pro');
 });
@@ -181,7 +181,7 @@ test('the free offer describes the limits it actually enforces', function (): vo
 });
 
 test('an unlimited free plan is described as unlimited rather than as null', function (): void {
-    config()->set('plans.free.max_products', null);
+    config()->set('plans.free.max_products');
 
     expect(StructuredData::offers()[0]['description'])->toBe('Unlimited products.');
 });
@@ -193,7 +193,7 @@ test('the privacy page dates itself from the value the page shows its readers', 
 });
 
 test('the privacy page omits a date when none is configured', function (): void {
-    config()->set('site.privacy_updated_at', null);
+    config()->set('site.privacy_updated_at');
 
     expect(nodeOfType('/privacy', 'WebPage'))->toBeArray()
         ->and(nodeOfType('/privacy', 'WebPage'))->not->toHaveKey('dateModified');
@@ -238,7 +238,7 @@ test('the offer strings are translated on the Dutch page once billing is live', 
 });
 
 test('an unlimited free plan reads in Dutch on the Dutch page', function (): void {
-    config()->set('plans.free.max_products', null);
+    config()->set('plans.free.max_products');
     app()->setLocale('nl');
 
     expect(StructuredData::offers()[0]['description'])->toBe('Onbeperkt producten.');
@@ -246,7 +246,7 @@ test('an unlimited free plan reads in Dutch on the Dutch page', function (): voi
 
 test('an unlimited shop count reads in Dutch too', function (): void {
     config()->set('plans.free.max_products', 20);
-    config()->set('plans.free.max_shops_per_product', null);
+    config()->set('plans.free.max_shops_per_product');
     app()->setLocale('nl');
 
     expect(StructuredData::offers()[0]['description'])

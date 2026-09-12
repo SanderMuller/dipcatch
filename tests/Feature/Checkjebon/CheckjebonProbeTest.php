@@ -145,9 +145,8 @@ test('create-from-URL flow creates product + shop + check from a seeded dataset 
     $shop = Shop::query()->where('product_id', $product->id)->first();
     expect($shop->adapter_key)->toBe('checkjebon')
         ->and((string) $shop->current_price)->toBe('55.00')
-        ->and($shop->host)->toBe('ah.nl');
-
-    expect(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
+        ->and($shop->host)->toBe('ah.nl')
+        ->and(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
 });
 
 test('add-shop-mode probe on an EUR product succeeds from the dataset', function (): void {

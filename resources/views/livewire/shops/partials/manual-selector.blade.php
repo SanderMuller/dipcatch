@@ -2,6 +2,7 @@
     <flux:callout.heading>Auto-detect failed.</flux:callout.heading>
     <flux:callout.text>
         We couldn't find the price on that page. Paste the CSS selector for the price element below.
+        <x-shop-request-link :url="$url" class="font-medium" />
     </flux:callout.text>
 
     <form wire:submit.prevent="probeWithSelectors" class="mt-4 space-y-3">

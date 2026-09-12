@@ -16,11 +16,11 @@ use Illuminate\Support\Facades\Log;
  * own have no such key, so they are cleared here. Payment and dispute rows
  * keep their history and only lose the user reference.
  */
-final class DeleteUser
+final readonly class DeleteUser
 {
     public function __construct(
-        private readonly CheckoutSessions $sessions,
-        private readonly StripeCustomers $customers,
+        private CheckoutSessions $sessions,
+        private StripeCustomers $customers,
     ) {}
 
     public function __invoke(User $user, User $actor): void

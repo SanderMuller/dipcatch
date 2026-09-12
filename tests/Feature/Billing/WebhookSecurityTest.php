@@ -22,7 +22,7 @@ it('refuses every webhook when no secret is configured, rather than trusting it'
     // The failure mode this guards: Cashier only attaches its signature
     // middleware when a secret exists, so its own route would accept a
     // forged chargeback and block an account.
-    config()->set('cashier.webhook.secret', null);
+    config()->set('cashier.webhook.secret');
 
     $this->postJson('/stripe/webhook', ['type' => 'charge.dispute.closed'])
         ->assertForbidden();

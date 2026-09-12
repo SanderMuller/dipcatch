@@ -89,7 +89,7 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
             return null;
         }
 
-        [$from, $until] = array_values($windows)[0];
+        [$from, $until] = array_first($windows);
 
         return PromotionWindow::make(
             endsAt: CarbonImmutable::createFromTimestampUTC($until),

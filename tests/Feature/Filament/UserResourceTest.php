@@ -8,6 +8,7 @@ use App\Filament\Admin\Resources\Users\Pages\ListUsers;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Models\Product;
 use App\Models\User;
+use App\Notifications\PriceDropNotification;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -43,8 +44,8 @@ test('the users screen lists every account, not only subscribers', function (): 
 test('the users screen renders with no Stripe configured', function (): void {
     // SubscriberResource hides itself without Stripe. This one must not:
     // an owner has accounts to look at before they sell anything.
-    config()->set('cashier.key', null);
-    config()->set('cashier.secret', null);
+    config()->set('cashier.key');
+    config()->set('cashier.secret');
 
     $this->actingAs(User::factory()->admin()->create());
 
@@ -212,7 +213,7 @@ test('deleting an account clears the rows no foreign key covers', function (): v
     $target = User::factory()->create();
     DB::table('notifications')->insert([
         'id' => (string) Str::uuid(),
-        'type' => 'App\\Notifications\\PriceDropNotification',
+        'type' => PriceDropNotification::class,
         'notifiable_type' => $target->getMorphClass(),
         'notifiable_id' => $target->id,
         'data' => '{}',

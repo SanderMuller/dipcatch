@@ -9,7 +9,7 @@ use App\Models\User;
 use App\Support\MoneyFormatter;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -58,7 +58,7 @@ class ProductList extends Component
 
     public function sortBy(string $column): void
     {
-        if (! in_array($column, self::SORTABLE, true)) {
+        if (! in_array($column, self::SORTABLE, strict: true)) {
             return;
         }
 
@@ -93,25 +93,25 @@ class ProductList extends Component
      */
     private function products(): LengthAwarePaginator
     {
-        $sort = in_array($this->sort, self::SORTABLE, true) ? $this->sort : 'created_at';
+        $sort = in_array($this->sort, self::SORTABLE, strict: true) ? $this->sort : 'created_at';
         $direction = $this->direction === 'asc' ? 'asc' : 'desc';
 
         return Product::query()
             ->where('user_id', auth()->id())
             // LOWER() on both sides: Postgres LIKE is case-sensitive, so a
             // plain `like '%arabica%'` never matches "Arabica beans".
-            ->when($this->search !== '', fn (EloquentBuilder $query): EloquentBuilder => $query->whereRaw(
+            ->when($this->search !== '', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereRaw(
                 'LOWER(title) LIKE ?',
                 ['%' . mb_strtolower($this->search) . '%'],
             ))
             ->when(
-                in_array($this->status, ['active', 'paused'], true),
-                fn (EloquentBuilder $query): EloquentBuilder => $query->where('active', $this->status === 'active'),
+                in_array($this->status, ['active', 'paused'], strict: true),
+                fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', $this->status === 'active'),
             )
             ->withCount('shops')
             ->with(['cheapestShop', 'shops'])
             ->orderBy($sort, $direction)
-            ->paginate(15);
+            ->paginate();
     }
 
     private function canAddProduct(): bool

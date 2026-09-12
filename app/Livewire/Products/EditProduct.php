@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Support\Iso4217;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
+use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
 use SanderMuller\FluentValidation\FluentRule;
 use SanderMuller\FluentValidation\HasFluentValidation;
 
@@ -58,7 +59,7 @@ class EditProduct extends Component
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, FluentRuleContract>
      */
     public function rules(): array
     {
@@ -67,7 +68,9 @@ class EditProduct extends Component
             'imageUrl' => FluentRule::url('Image URL')->nullable()->max(2048),
             'currency' => FluentRule::string('Currency')->required()->in(Iso4217::CODES),
             // A threshold of zero would alert on a price that did not move.
-            'dropThresholdPct' => FluentRule::numeric('Drop threshold (%)')->nullable()->min(0.01)->max(99.99),
+            'dropThresholdPct' => FluentRule::numeric('Drop threshold (%)')
+                ->nullable()
+                ->between(0.01, 99.98999999999999),
             'dropThresholdAbs' => FluentRule::numeric('Drop threshold (absolute)')->nullable()->min(0.01),
             'targetPrice' => FluentRule::numeric('Target price')->nullable()->min(0.01),
             'unitPriceTarget' => FluentRule::numeric('Unit price target')->nullable()->min(0.01),

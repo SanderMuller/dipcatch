@@ -38,7 +38,7 @@ final class Gtin
             return null;
         }
 
-        if (! in_array(strlen($digits), self::LENGTHS, true)) {
+        if (! in_array(strlen($digits), self::LENGTHS, strict: true)) {
             return null;
         }
 

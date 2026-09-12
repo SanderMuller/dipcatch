@@ -127,6 +127,6 @@ test('the uniqueness window outlasts the widest delay a dispatch can carry', fun
 
     $shop = Shop::factory()->for(Product::factory())->create();
 
-    expect((new CheckShopPrice($shop))->uniqueFor())
+    expect(new CheckShopPrice($shop)->uniqueFor())
         ->toBeGreaterThan(RecheckJitter::maxSeconds());
 });

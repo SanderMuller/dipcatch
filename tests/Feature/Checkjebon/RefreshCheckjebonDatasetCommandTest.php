@@ -78,9 +78,8 @@ test('imports every chain with rows, using per-chain external ids', function ():
     expect($roomkaas)->not->toBeNull()
         ->and($roomkaas->name)->toBe('AH Kruiden roomkaas')
         ->and((string) $roomkaas->price)->toBe('1.25')
-        ->and($roomkaas->size)->toBe('125 g');
-
-    expect(CheckjebonPrice::query()->where('supermarket', 'lidl')->where('external_id', '8128671')->exists())->toBeTrue();
+        ->and($roomkaas->size)->toBe('125 g')
+        ->and(CheckjebonPrice::query()->where('supermarket', 'lidl')->where('external_id', '8128671')->exists())->toBeTrue();
 
     // Match-only chains keep the raw link as their id, slug or number alike.
     expect(CheckjebonPrice::query()->where('supermarket', 'jumbo')->value('external_id'))->toBe('jumbo-item-123456DSL')

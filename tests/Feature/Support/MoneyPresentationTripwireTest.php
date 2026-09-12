@@ -149,16 +149,7 @@ test('every tripwire allowlist entry still matches real source', function (): vo
 
     foreach (tripwireAllowlist() as $basename => $entries) {
         foreach ($entries as $entry) {
-            $used = false;
-
-            foreach ($matches as $match) {
-                if ($match['basename'] === $basename && str_contains($match['source'], $entry['fragment'])) {
-                    $used = true;
-
-                    break;
-                }
-            }
-
+            $used = array_any($matches, fn (array $match): bool => $match['basename'] === $basename && str_contains($match['source'], $entry['fragment']));
             if (! $used) {
                 $stale[] = $basename . ' / ' . $entry['fragment'];
             }

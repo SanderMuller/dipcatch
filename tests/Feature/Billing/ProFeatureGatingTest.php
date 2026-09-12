@@ -75,7 +75,7 @@ it('offers a trial only to an account that never had this subscription', functio
 });
 
 it('refuses checkout when no stripe price is configured', function (): void {
-    config()->set('plans.stripe.pro_price_id', null);
+    config()->set('plans.stripe.pro_price_id');
 
     $this->actingAs(User::factory()->create())
         ->get('/billing/checkout')

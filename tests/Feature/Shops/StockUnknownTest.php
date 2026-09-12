@@ -5,6 +5,7 @@ use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Services\ShopFetcher\ShopFetcher;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -18,9 +19,12 @@ beforeEach(function (): void {
     RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
 });
 
+/**
+ * @return array<string, PromiseInterface>
+ */
 function pageWithoutStock(string $price = '19.95'): array
 {
-    $json = (string) json_encode([
+    $json = json_encode([
         '@type' => 'Product',
         'name' => 'Sanimed Skin Sensitive Kat',
         'offers' => ['@type' => 'Offer', 'price' => $price, 'priceCurrency' => 'EUR'],
@@ -43,7 +47,7 @@ test('a check that could not read stock stores unknown, not available', function
         'adapter_key' => 'jsonld',
     ]);
 
-    CheckShopPrice::dispatchSync($shop);
+    dispatch_sync(new CheckShopPrice($shop));
 
     expect($shop->fresh()?->current_in_stock)->toBeNull()
         ->and(PriceCheck::query()->where('shop_id', $shop->id)->value('in_stock'))->toBeNull();
@@ -70,7 +74,7 @@ test('a shop the page says is sold out is not the cheapest', function (): void {
 });
 
 test('a recheck reads the page words too, not only the probe', function (): void {
-    $json = (string) json_encode([
+    $json = json_encode([
         '@type' => 'Product',
         'name' => 'Sanimed Skin Sensitive Kat',
         'offers' => ['@type' => 'Offer', 'price' => '19.95', 'priceCurrency' => 'EUR'],
@@ -93,7 +97,7 @@ test('a recheck reads the page words too, not only the probe', function (): void
         'adapter_key' => 'jsonld',
     ]);
 
-    CheckShopPrice::dispatchSync($shop);
+    dispatch_sync(new CheckShopPrice($shop));
 
     expect($shop->fresh()?->current_in_stock)->toBeFalse();
 });

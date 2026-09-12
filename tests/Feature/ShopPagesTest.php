@@ -85,8 +85,13 @@ it('states that Dierapotheker reads the article number', function (): void {
 });
 
 it('lists every shop on the hub, with a link to each', function (): void {
+    config()->set('site.contact_email', 'hello@example.test');
+
     $response = $this->get(route('shops'))->assertOk()
-        ->assertSee('Shops with a dedicated page on DipCatch', escape: false);
+        ->assertSee('Shops with a dedicated page on DipCatch', escape: false)
+        ->assertSee('Most shops work as they are', escape: false)
+        ->assertSee('Request a shop', escape: false)
+        ->assertSee('mailto:hello@example.test?subject=', escape: false);
 
     foreach (ShopPages::all() as $shop) {
         $response->assertSee(route('shop', ['slug' => $shop->slug]), escape: false);
@@ -107,6 +112,17 @@ it('renders the Dutch page in Dutch', function (): void {
         ->assertOk()
         ->assertSee('Prijsalarm voor Albert Heijn', escape: false)
         ->assertDontSee('Price alerts for Albert Heijn', escape: false);
+});
+
+it('says a shop page is not the only shop that works', function (): void {
+    config()->set('site.contact_email', 'hello@example.test');
+
+    $this->get(route('shop', ['slug' => 'ah-nl']))
+        ->assertOk()
+        ->assertSee('Does DipCatch only work at Albert Heijn?', escape: false)
+        ->assertSee('Request a shop', escape: false)
+        ->assertSee('mailto:hello@example.test?subject=', escape: false)
+        ->assertSee(rawurlencode('Request ah.nl on DipCatch'), escape: false);
 });
 
 it('reaches the shops hub from the homepage', function (): void {

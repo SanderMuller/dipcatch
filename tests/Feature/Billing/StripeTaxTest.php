@@ -8,7 +8,7 @@ it('stays off until it is switched on', function (): void {
     config()->set('plans.stripe.automatic_tax', false);
 
     expect(StripeTax::isEnabled())->toBeFalse()
-        ->and(StripeTax::checkoutOptions())->toBe([]);
+        ->and(StripeTax::checkoutOptions())->toBeEmpty();
 });
 
 it('tells Stripe to save the address it collects', function (): void {

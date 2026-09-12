@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,10 +18,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $dismissed_at
  */
 #[WithoutTimestamps]
+#[Unguarded]
 class ShopSuggestionDismissal extends Model
 {
-    protected $guarded = [];
-
     /**
      * @return BelongsTo<Product, $this>
      */

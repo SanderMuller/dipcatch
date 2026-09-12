@@ -1,12 +1,15 @@
 <?php declare(strict_types=1);
 
 use App\Enums\ScrapeStatus;
+use App\Enums\SocialProvider;
 use App\Models\Invitation;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\SocialAccount;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 
 test('user has dipcatch columns with sensible defaults', function (): void {
     $user = User::factory()->create();
@@ -89,4 +92,33 @@ test('ScrapeStatus enum has all seven cases with stable string values', function
         ->and(ScrapeStatus::Throttled->value)->toBe('throttled')
         ->and(ScrapeStatus::RobotsBlocked->value)->toBe('robots_blocked')
         ->and(ScrapeStatus::NeedsJs->value)->toBe('needs_js');
+});
+
+test('social_accounts refuses two users claiming the same provider account', function (): void {
+    // The index is the real race guard: `lockForUpdate` locks nothing on a row
+    // that does not exist yet on Postgres, so two concurrent first-time
+    // callbacks can both reach the insert.
+    SocialAccount::factory()->create([
+        'provider' => SocialProvider::Google,
+        'provider_id' => 'shared-google-sub',
+    ]);
+
+    expect(fn (): SocialAccount => SocialAccount::factory()->create([
+        'provider' => SocialProvider::Google,
+        'provider_id' => 'shared-google-sub',
+    ]))->toThrow(QueryException::class);
+});
+
+test('social_accounts refuses one user linking the same provider twice', function (): void {
+    $user = User::factory()->create();
+
+    SocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider' => SocialProvider::Google,
+    ]);
+
+    expect(fn (): SocialAccount => SocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider' => SocialProvider::Google,
+    ]))->toThrow(QueryException::class);
 });

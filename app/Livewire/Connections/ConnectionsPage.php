@@ -5,7 +5,7 @@ namespace App\Livewire\Connections;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Laravel\Passport\Token;
 use Livewire\Component;
 
@@ -114,9 +114,9 @@ class ConnectionsPage extends Component
     }
 
     /**
-     * @return Builder<Token>
+     * @return EloquentQueryBuilder<Token>
      */
-    private function tokens(): Builder
+    private function tokens(): EloquentQueryBuilder
     {
         return Token::query()
             ->with('client')

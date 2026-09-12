@@ -184,9 +184,8 @@ test('the middleware restores the locale when the request throws', function (): 
 
     expect(function () use ($middleware, $request, $throwing): void {
         $middleware->handle($request, $throwing);
-    })->toThrow(RuntimeException::class, 'boom');
-
-    expect($seen)->toBe(['nl'])
+    })->toThrow(RuntimeException::class, 'boom')
+        ->and($seen)->toBe(['nl'])
         ->and(App::getLocale())->toBe('en');
 });
 

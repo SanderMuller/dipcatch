@@ -29,6 +29,8 @@
             icon="magnifying-glass"
             :placeholder="__('Search your products')"
             clearable
+            autocomplete="off"
+            data-1p-ignore
         />
 
         <flux:radio.group variant="segmented" wire:model.live="status" :aria-label="__('Show')">

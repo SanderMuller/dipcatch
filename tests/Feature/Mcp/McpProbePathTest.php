@@ -135,8 +135,8 @@ test('an add_shop draft cannot be confirmed onto a different product', function 
         ShopDraft::flatten($outcome),
         (string) $outcome->normalizedUrl,
         (string) $outcome->adapterKey,
-        null,
-        (string) $probed->id,
+        variantKey: null,
+        productId: (string) $probed->id,
     );
 
     DipCatchServer::actingAs($me)
@@ -284,7 +284,7 @@ test('a first refusal still reads as a single block', function (): void {
 test('an unreadable stock state is stored as unknown, not as available', function (): void {
     Http::fake([
         'https://shop.example.com/robots.txt' => Http::response('', 404),
-        'https://shop.example.com/p/1' => Http::response(withJsonLd((string) json_encode([
+        'https://shop.example.com/p/1' => Http::response(withJsonLd(json_encode([
             '@context' => 'https://schema.org',
             '@type' => 'Product',
             'name' => 'Sanimed Skin Sensitive Kat',
@@ -307,7 +307,7 @@ test('an unreadable stock state is stored as unknown, not as available', functio
 });
 
 test('a page whose words say it is unavailable is stored as out of stock', function (): void {
-    $body = withJsonLd((string) json_encode([
+    $body = withJsonLd(json_encode([
         '@context' => 'https://schema.org',
         '@type' => 'Product',
         'name' => 'Sanimed Skin Sensitive Kat',
@@ -329,7 +329,7 @@ test('a page whose words say it is unavailable is stored as out of stock', funct
 });
 
 test('the variant chooser says what each key is and what it costs', function (): void {
-    $json = (string) json_encode([
+    $json = json_encode([
         '@context' => 'https://schema.org',
         '@type' => 'Product',
         'name' => 'Sanimed Skin Sensitive Cat',

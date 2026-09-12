@@ -21,6 +21,8 @@ test('the Dutch marketing pages render no untranslated string', function (): voi
         $this->get(route('home', ['lang' => 'nl']))->assertOk();
         $this->get(route('privacy', ['lang' => 'nl']))->assertOk();
         $this->get(route('pricing', ['lang' => 'nl']))->assertOk();
+        $this->get(route('shops', ['lang' => 'nl']))->assertOk();
+        $this->get(route('support', ['lang' => 'nl']))->assertOk();
 
         // Slugs from config, not UseCases::all(): building the objects here
         // evaluates their __() copy while the locale is still English, and the
@@ -34,6 +36,8 @@ test('the Dutch marketing pages render no untranslated string', function (): voi
         $this->get(route('home', ['lang' => 'nl']))->assertOk();
         $this->get(route('privacy', ['lang' => 'nl']))->assertOk();
         $this->get(route('pricing', ['lang' => 'nl']))->assertOk();
+        $this->get(route('shops', ['lang' => 'nl']))->assertOk();
+        $this->get(route('support', ['lang' => 'nl']))->assertOk();
 
         // Slugs from config, not UseCases::all(): building the objects here
         // evaluates their __() copy while the locale is still English, and the
@@ -70,6 +74,7 @@ test('lang/nl.json carries no key the marketing views no longer use', function (
         resource_path('views/shop.blade.php'),
         resource_path('views/shops.blade.php'),
         resource_path('views/components/marketing-header/language.blade.php'),
+        resource_path('views/components/shop-request-link.blade.php'),
         // Auth views are not locale-switchable yet (no MarketingLocale
         // middleware on the Fortify routes), but their strings go through
         // __() and carry Dutch entries, so list them here or every one of
@@ -99,6 +104,8 @@ test('lang/nl.json carries no key the marketing views no longer use', function (
         // Same again for the per-shop pages: their copy is assembled in PHP
         // from what each adapter can actually read.
         app_path('Support/ShopPages.php'),
+        // Mail subjects and bodies for "request a shop".
+        app_path('Support/ShopRequestMail.php'),
     ];
 
     $sources = array_map(static fn (string $file): string => (string) file_get_contents($file), $files);

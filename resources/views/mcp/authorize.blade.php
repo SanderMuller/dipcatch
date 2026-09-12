@@ -64,7 +64,7 @@
                         <input type="hidden" name="state" value="{{ $request->state }}">
                         <input type="hidden" name="client_id" value="{{ $client->getKey() }}">
                         <input type="hidden" name="auth_token" value="{{ $authToken }}">
-                        <button type="submit" class="inline-flex items-center rounded-full bg-white/80 px-5 py-2.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200 hover:text-zinc-900 dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800">{{ __('Cancel') }}</button>
+                        <button type="submit" class="inline-flex items-center rounded-full bg-white/80 px-5 py-2.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200 hover:text-zinc-900 dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:text-zinc-100">{{ __('Cancel') }}</button>
                     </form>
                 </div>
             </div>

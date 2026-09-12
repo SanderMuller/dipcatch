@@ -21,7 +21,7 @@ class StripePaymentFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
-            'stripe_id' => 'in_' . Str::random(16),
+            'stripe_id' => 'in_' . Str::random(),
             'kind' => StripePayment::KIND_PAYMENT,
             'amount' => 499,
             'currency' => 'EUR',
@@ -33,7 +33,7 @@ class StripePaymentFactory extends Factory
     {
         return $this->state(fn (): array => [
             'kind' => StripePayment::KIND_REFUND,
-            'stripe_id' => 'ch_' . Str::random(16),
+            'stripe_id' => 'ch_' . Str::random(),
             'amount' => -499,
         ]);
     }

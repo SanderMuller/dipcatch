@@ -11,7 +11,7 @@ test('page titles carry no stray whitespace', function (string $url): void {
 
     $title = $matches[1] ?? '';
 
-    expect($title)->not->toBe('')->and($title)->toBe(trim($title));
+    expect($title)->not->toBeEmpty()->and($title)->toBe(trim($title));
 })->with([
     'homepage' => '/',
     'pricing' => '/pricing',

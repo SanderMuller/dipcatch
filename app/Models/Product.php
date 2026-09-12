@@ -10,6 +10,7 @@ use App\Support\Numeric;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProductFactory;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,14 +21,13 @@ use Illuminate\Support\Facades\DB;
 /**
  * @property CarbonImmutable|null $history_kept_from
  */
+#[Unguarded]
 class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
     use HasFactory, HasUuids;
 
     private const int BC_SCALE = 4;
-
-    protected $guarded = [];
 
     /**
      * @return array<string, string>
@@ -167,13 +167,13 @@ class Product extends Model
 
         // Group by unit AND currency: a EUR/kg figure and a (drifted) GBP/kg
         // figure are not comparable numbers even though the unit matches.
-        $group = $candidates->countBy(fn (Shop $shop): string => (string) $shop->pack_unit . '|' . $shop->currency)
+        $group = $candidates->countBy(fn (Shop $shop): string => $shop->pack_unit . '|' . $shop->currency)
             ->sortDesc()
             ->keys()
             ->first();
 
         return $candidates
-            ->filter(fn (Shop $shop): bool => (string) $shop->pack_unit . '|' . $shop->currency === $group)
+            ->filter(fn (Shop $shop): bool => $shop->pack_unit . '|' . $shop->currency === $group)
             // Unit prices are two-decimal strings; compare them as numbers,
             // with the oldest shop winning a tie so the answer is stable.
             ->sortBy([

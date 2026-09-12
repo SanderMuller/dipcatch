@@ -14,7 +14,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 
 class SubscribersTable
 {
@@ -24,14 +24,14 @@ class SubscribersTable
             // One query for the page: the subscription rows and the money
             // sum come along, so no column reaches back to the database or
             // to Stripe while rendering.
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query
+            ->modifyQueryUsing(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query
                 ->with('subscriptions')
                 ->withSum([
                     // One currency only, matching the widget: cents of two
                     // currencies do not add up to a number that means anything.
-                    'stripePayments as revenue_sum' => fn (Builder $q): Builder => $q->where('currency', ProPrice::currency()),
+                    'stripePayments as revenue_sum' => fn (EloquentQueryBuilder $q): EloquentQueryBuilder => $q->where('currency', ProPrice::currency()),
                 ], 'amount')
-                ->withCount(['stripeDisputes as open_disputes_count' => fn (Builder $q): Builder => $q->whereNull('closed_at')]))
+                ->withCount(['stripeDisputes as open_disputes_count' => fn (EloquentQueryBuilder $q): EloquentQueryBuilder => $q->whereNull('closed_at')]))
             ->columns([
                 TextColumn::make('email')
                     ->searchable()
@@ -81,18 +81,18 @@ class SubscribersTable
                 TernaryFilter::make('pro')
                     ->label('Pro accounts')
                     ->queries(
-                        true: fn (Builder $query): Builder => $query->whereIn('users.id', ProUsers::ids()),
-                        false: fn (Builder $query): Builder => $query->whereNotIn('users.id', ProUsers::ids()),
-                        blank: fn (Builder $query): Builder => $query,
+                        true: fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('users.id', ProUsers::ids()),
+                        false: fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNotIn('users.id', ProUsers::ids()),
+                        blank: fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query,
                     ),
 
                 Filter::make('has_billing')
                     ->label('Has a Stripe customer')
-                    ->query(fn (Builder $query): Builder => $query->whereNotNull('stripe_id')),
+                    ->query(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNotNull('stripe_id')),
 
                 Filter::make('open_dispute')
                     ->label('Open chargeback')
-                    ->query(fn (Builder $query): Builder => $query->whereHas('stripeDisputes', fn (Builder $q): Builder => $q->whereNull('closed_at'))),
+                    ->query(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereHas('stripeDisputes', fn (EloquentQueryBuilder $q): EloquentQueryBuilder => $q->whereNull('closed_at'))),
             ])
             ->recordActions([
                 Action::make('stripe')

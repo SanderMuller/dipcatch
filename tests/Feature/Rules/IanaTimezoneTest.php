@@ -12,7 +12,7 @@ dataset('valid_timezones', [
 ]);
 
 test('valid IANA timezones pass', function (string $tz): void {
-    expect(runRule(new IanaTimezone(), 'timezone', $tz))->toBe([]);
+    expect(runRule(new IanaTimezone(), 'timezone', $tz))->toBeEmpty();
 })->with('valid_timezones');
 
 dataset('invalid_timezones', [
@@ -23,12 +23,12 @@ dataset('invalid_timezones', [
 ]);
 
 test('invalid timezones fail with a descriptive error', function (string $tz): void {
-    expect(runRule(new IanaTimezone(), 'timezone', $tz))->not->toBe([])
+    expect(runRule(new IanaTimezone(), 'timezone', $tz))->not->toBeEmpty()
         ->and(runRule(new IanaTimezone(), 'timezone', $tz)[0])->toContain('timezone');
 })->with('invalid_timezones');
 
 test('empty value is not a timezone failure (required validates separately)', function (): void {
-    expect(runRule(new IanaTimezone(), 'timezone', ''))->toBe([]);
+    expect(runRule(new IanaTimezone(), 'timezone', ''))->toBeEmpty();
 });
 
 test('User model round-trips timezone + last_digest_sent_at', function (): void {

@@ -36,7 +36,7 @@ function resolveChargesTo(?User $user): void
 function webhook(string $type, array $object, ?string $eventId = null): void
 {
     event(new WebhookReceived([
-        'id' => $eventId ?? 'evt_' . Str::random(16),
+        'id' => $eventId ?? 'evt_' . Str::random(),
         'type' => $type,
         'data' => ['object' => $object],
     ]));
@@ -78,7 +78,7 @@ it('records a refund as negative money and tells the owner once', function (): v
     expect(StripePayment::query()->where('kind', StripePayment::KIND_REFUND)->count())->toBe(1)
         ->and(StripePayment::query()->sum('amount'))->toBe(-499);
 
-    Notification::assertSentToTimes($admin, BillingIncidentNotification::class, 1);
+    Notification::assertSentToTimes($admin, BillingIncidentNotification::class);
 });
 
 it('keeps pro while a chargeback is open and alerts the owner', function (): void {
@@ -209,7 +209,7 @@ it('sends one alert when Stripe redelivers the same failed payment', function ()
     webhook('invoice.payment_failed', $payload, 'evt_failed');
     webhook('invoice.payment_failed', $payload, 'evt_failed');
 
-    Notification::assertSentToTimes($user, SubscriptionPaymentFailedNotification::class, 1);
+    Notification::assertSentToTimes($user, SubscriptionPaymentFailedNotification::class);
 });
 
 it('counts a second partial refund on the same charge', function (): void {

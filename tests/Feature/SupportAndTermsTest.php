@@ -33,13 +33,15 @@ it('shows the support email when one is configured', function (): void {
     $this->get('/support')
         ->assertOk()
         ->assertSee('mailto:help@example.test', escape: false)
-        ->assertSee('"email":"help@example.test"', escape: false);
+        ->assertSee('"email":"help@example.test"', escape: false)
+        ->assertSee('Request a shop', escape: false)
+        ->assertSee('Send a product URL if a paste does not pick up the price', escape: false);
 });
 
 it('says where to find the address when no email is configured', function (): void {
     // A support page that renders an empty mailto is worse than one that
     // tells the reader where to look.
-    config()->set('site.contact_email', null);
+    config()->set('site.contact_email');
 
     $this->get('/support')
         ->assertOk()

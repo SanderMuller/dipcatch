@@ -35,7 +35,7 @@ test('the page offers a contact address when one is configured', function (): vo
 });
 
 test('the page shows no contact section when no address is configured', function (): void {
-    config()->set('site.contact_email', null);
+    config()->set('site.contact_email');
 
     $this->get('/bot')->assertOk()->assertDontSee('mailto:');
 });

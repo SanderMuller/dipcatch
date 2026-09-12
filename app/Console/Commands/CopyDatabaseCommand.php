@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Support\DatabaseCopy\CopyPlan;
 use App\Support\DatabaseCopy\CopyPlanner;
 use App\Support\DatabaseCopy\TableCopier;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Console\Isolatable;
 use Illuminate\Database\Connection;
@@ -21,15 +22,14 @@ use Throwable;
  * migrations bookkeeping) are not copied — they rebuild themselves.
  */
 #[AsCommand(name: 'dipcatch:copy-database', description: 'Copy all application tables from one database connection to another (engine migration).')]
-final class CopyDatabaseCommand extends Command implements Isolatable
-{
-    protected $signature = 'dipcatch:copy-database
+#[Signature('dipcatch:copy-database
         {--from=mysql : Source connection name}
         {--to=pgsql_migration : Target connection name}
         {--chunk=500 : Rows per insert}
         {--truncate : Empty target tables first (reverse dependency order)}
-        {--dry-run : Resolve the table order and row counts without writing}';
-
+        {--dry-run : Resolve the table order and row counts without writing}')]
+final class CopyDatabaseCommand extends Command implements Isolatable
+{
     public function handle(): int
     {
         $fromName = $this->stringOption('from');

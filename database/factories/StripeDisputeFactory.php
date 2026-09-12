@@ -21,8 +21,8 @@ class StripeDisputeFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
-            'stripe_id' => 'dp_' . Str::random(16),
-            'stripe_charge_id' => 'ch_' . Str::random(16),
+            'stripe_id' => 'dp_' . Str::random(),
+            'stripe_charge_id' => 'ch_' . Str::random(),
             'amount' => 499,
             'currency' => 'EUR',
             'reason' => 'fraudulent',

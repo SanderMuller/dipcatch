@@ -41,13 +41,10 @@ final readonly class EntityUrl
 
         $requested = self::query($url);
 
-        foreach (self::query($entityUrl) as $key => $value) {
-            if (($requested[$key] ?? null) !== $value) {
-                return false;
-            }
-        }
-
-        return true;
+        return array_all(
+            self::query($entityUrl),
+            fn (string|array $value, int|string $key): bool => ($requested[$key] ?? null) === $value,
+        );
     }
 
     /**

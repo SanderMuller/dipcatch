@@ -28,7 +28,7 @@ test('a code with no intl symbol is separated by an ASCII space, never U+00A0', 
 });
 
 test('a null amount renders an em dash', function (): void {
-    expect(MoneyFormatter::format(null, 'EUR'))->toBe('—');
+    expect(MoneyFormatter::format(amount: null, currency: 'EUR'))->toBe('—');
 });
 
 test('a non-numeric amount renders an em dash instead of throwing', function (): void {

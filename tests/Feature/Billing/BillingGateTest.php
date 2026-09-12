@@ -11,7 +11,7 @@ use function Pest\Livewire\livewire;
 
 it('keeps the shop shut until every Stripe setting is present', function (string $missing): void {
     configureStripe();
-    config()->set($missing, null);
+    config()->set($missing);
 
     expect(BillingGate::isOpen())->toBeFalse();
 })->with([
@@ -25,7 +25,7 @@ it('opens the shop once Stripe is fully configured', function (): void {
     configureStripe();
 
     expect(BillingGate::isOpen())->toBeTrue()
-        ->and(BillingGate::missing())->toBe([]);
+        ->and(BillingGate::missing())->toBeEmpty();
 });
 
 it('stays shut when the switch says so, however complete Stripe is', function (): void {
@@ -35,14 +35,14 @@ it('stays shut when the switch says so, however complete Stripe is', function ()
     expect(BillingGate::isOpen())->toBeFalse()
         // Still worth telling the owner that Stripe itself is ready.
         ->and(BillingGate::isConfigured())->toBeTrue()
-        ->and(BillingGate::missing())->toBe([]);
+        ->and(BillingGate::missing())->toBeEmpty();
 });
 
 it('names what is missing', function (): void {
-    config()->set('cashier.key', null);
-    config()->set('cashier.secret', null);
-    config()->set('cashier.webhook.secret', null);
-    config()->set('plans.stripe.pro_price_id', null);
+    config()->set('cashier.key');
+    config()->set('cashier.secret');
+    config()->set('cashier.webhook.secret');
+    config()->set('plans.stripe.pro_price_id');
 
     expect(BillingGate::missing())->toBe([
         'STRIPE_KEY',
@@ -79,7 +79,7 @@ it('refuses checkout while the shop is shut', function (): void {
     // A price on its own is not enough to sell: a payment with no webhook
     // secret would never become a subscription.
     configureStripe();
-    config()->set('cashier.webhook.secret', null);
+    config()->set('cashier.webhook.secret');
 
     $user = User::factory()->create();
 
