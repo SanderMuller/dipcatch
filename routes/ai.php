@@ -10,10 +10,10 @@ use Laravel\Mcp\Facades\Mcp;
 
 // Register first so laravel/mcp skips its root well-known routes (hasGetRoute).
 // Nested `/.well-known/oauth-protected-resource/mcp` and DCR stay the package's.
-Route::get('/.well-known/oauth-protected-resource', [McpOauthDiscoveryController::class, 'protectedResource'])
+Route::get('.well-known/oauth-protected-resource', [McpOauthDiscoveryController::class, 'protectedResource'])
     ->name('mcp.oauth.protected-resource');
 
-Route::get('/.well-known/oauth-authorization-server', [McpOauthDiscoveryController::class, 'authorizationServer'])
+Route::get('.well-known/oauth-authorization-server', [McpOauthDiscoveryController::class, 'authorizationServer'])
     ->name('mcp.oauth.authorization-server');
 
 Mcp::oauthRoutes();

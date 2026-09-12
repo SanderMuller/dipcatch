@@ -19,8 +19,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -32,7 +32,7 @@ class UsersTable
             // The Plan column calls `plan()`, which reads the subscription
             // relation. Without the eager load that is a query per row, and
             // this table lists every account rather than only subscribers.
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query
+            ->modifyQueryUsing(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query
                 ->with('subscriptions')
                 ->withCount('products'))
             ->columns([
@@ -76,26 +76,26 @@ class UsersTable
                 TernaryFilter::make('pro')
                     ->label('Entitled to Pro')
                     ->queries(
-                        true: fn (Builder $query): Builder => $query->whereIn('users.id', ProUsers::ids()),
-                        false: fn (Builder $query): Builder => $query->whereNotIn('users.id', ProUsers::ids()),
-                        blank: fn (Builder $query): Builder => $query,
+                        true: fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('users.id', ProUsers::ids()),
+                        false: fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNotIn('users.id', ProUsers::ids()),
+                        blank: fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query,
                     ),
 
                 Filter::make('comped')
                     ->label('Comped')
                     // Blocked accounts are not entitled, so they are not comped
                     // either — the same precedence `User::isComped()` applies.
-                    ->query(fn (Builder $query): Builder => $query
+                    ->query(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query
                         ->whereNull('billing_blocked_at')
                         ->where('comped_until', '>', now())),
 
                 Filter::make('blocked')
                     ->label('Billing blocked')
-                    ->query(fn (Builder $query): Builder => $query->whereNotNull('billing_blocked_at')),
+                    ->query(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNotNull('billing_blocked_at')),
 
                 Filter::make('admin')
                     ->label('Admins')
-                    ->query(fn (Builder $query): Builder => $query->where('is_admin', true)),
+                    ->query(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('is_admin', true)),
             ])
             ->recordActions([
                 Action::make('comp')
@@ -191,9 +191,9 @@ class UsersTable
     }
 
     /**
-     * @param  Collection<int, User>  $records
+     * @param EloquentCollection<int, User> $records
      */
-    private static function deleteMany(DeleteBulkAction $action, Collection $records): void
+    private static function deleteMany(DeleteBulkAction $action, EloquentCollection $records): void
     {
         foreach ($records as $record) {
             // Same reason as the single action: an admin does not delete the

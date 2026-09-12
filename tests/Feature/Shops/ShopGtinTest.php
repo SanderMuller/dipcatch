@@ -11,6 +11,7 @@ use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Gtin;
 use App\Support\UrlNormalizer;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -41,6 +42,9 @@ function gtinJsonLdPage(?string $gtin, string $price = '50.00'): string
     return withJsonLd(json_encode($product, JSON_THROW_ON_ERROR));
 }
 
+/**
+ * @return array<string, PromiseInterface>
+ */
 function gtinFake(string $html): array
 {
     return [

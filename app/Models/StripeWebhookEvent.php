@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -17,10 +18,9 @@ use Throwable;
  * @property string $type
  * @property CarbonImmutable|null $handled_at
  */
+#[Unguarded]
 class StripeWebhookEvent extends Model
 {
-    protected $guarded = [];
-
     /**
      * Runs the side effects once for this event id, and only once, even if
      * two workers take the same redelivery at the same moment: the unique

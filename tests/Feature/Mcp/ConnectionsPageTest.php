@@ -93,7 +93,7 @@ test('the page offers a Claude install link with the encoded mcp url', function 
 });
 
 test('the ChatGPT install button stays hidden when no listing url is set', function (): void {
-    config()->set('dipcatch.chatgpt_plugin_url', null);
+    config()->set('dipcatch.chatgpt_plugin_url');
 
     $this->actingAs(User::factory()->create());
 

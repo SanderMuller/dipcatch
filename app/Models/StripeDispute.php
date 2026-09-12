@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Carbon\CarbonImmutable;
 use Database\Factories\StripeDisputeFactory;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $closed_at
  * @property-read User|null $user
  */
+#[Unguarded]
 class StripeDispute extends Model
 {
     /** @use HasFactory<StripeDisputeFactory> */
@@ -32,8 +34,6 @@ class StripeDispute extends Model
     public const string STATUS_LOST = 'lost';
 
     public const string STATUS_WON = 'won';
-
-    protected $guarded = [];
 
     public function isOpen(): bool
     {

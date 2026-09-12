@@ -59,7 +59,7 @@ class CheckjebonFreshnessCheck extends Check
         $oldest = CheckjebonPrice::query()
             ->selectRaw('supermarket, max(refreshed_at) as chain_refreshed_at')
             ->groupBy('supermarket')
-            ->orderBy('chain_refreshed_at')
+            ->oldest('chain_refreshed_at')
             ->first();
 
         if ($oldest === null) {

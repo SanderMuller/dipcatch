@@ -10,7 +10,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 
 /**
  * How the app is doing, independent of whether anything is on sale.
@@ -44,7 +44,7 @@ class OperationsOverviewWidget extends BaseWidget
     {
         $total = User::query()->count();
         $active = User::query()
-            ->whereHas('products', fn (EloquentBuilder $query): EloquentBuilder => $query->where('active', true))
+            ->whereHas('products', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', true))
             ->count();
 
         return Stat::make('Accounts', $total)
@@ -100,13 +100,13 @@ class OperationsOverviewWidget extends BaseWidget
      * rechecked, so counting them here would report work nobody is doing —
      * and let a paused, dead offer drag the health figure down.
      *
-     * @return EloquentBuilder<Shop>
+     * @return EloquentQueryBuilder<Shop>
      */
-    private function watchedShops(): EloquentBuilder
+    private function watchedShops(): EloquentQueryBuilder
     {
         return Shop::query()
             ->where('active', true)
-            ->whereHas('product', fn (EloquentBuilder $query): EloquentBuilder => $query->where('active', true));
+            ->whereHas('product', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', true));
     }
 
     private function alertsStat(): Stat

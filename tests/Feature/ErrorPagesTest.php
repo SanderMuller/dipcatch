@@ -63,7 +63,7 @@ describe('the 500 page', function (): void {
 
         $this->get('/__throws')->assertServerError()->assertSee('mailto:hello@example.test', escape: false);
 
-        config()->set('site.contact_email', null);
+        config()->set('site.contact_email');
 
         $this->get('/__throws')->assertServerError()->assertDontSee('mailto:', escape: false);
     });

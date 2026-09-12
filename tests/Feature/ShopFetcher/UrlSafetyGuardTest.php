@@ -22,11 +22,9 @@ test('rejects link-local AWS metadata IP', function (): void {
 
 test('rejects private RFC1918 IPv4', function (): void {
     expect(fn () => new UrlSafetyGuard()->assertSafe('http://10.0.0.5/p'))
-        ->toThrow(InvalidArgumentException::class);
-    expect(fn () => new UrlSafetyGuard()->assertSafe('http://192.168.1.1/p'))
-        ->toThrow(InvalidArgumentException::class);
-    expect(fn () => new UrlSafetyGuard()->assertSafe('http://172.16.0.1/p'))
-        ->toThrow(InvalidArgumentException::class);
+        ->toThrow(InvalidArgumentException::class)
+        ->and(fn () => new UrlSafetyGuard()->assertSafe('http://192.168.1.1/p'))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => new UrlSafetyGuard()->assertSafe('http://172.16.0.1/p'))->toThrow(InvalidArgumentException::class);
 });
 
 test('accepts a public host that resolves to a public IP', function (): void {

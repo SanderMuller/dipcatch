@@ -92,7 +92,7 @@ test('a conditional offer never becomes the tracked price', function (): void {
         'conditional_ends_at' => now()->addDays(4),
     ]);
 
-    CheckShopPrice::dispatchSync($shop);
+    dispatch_sync(new CheckShopPrice($shop));
     $shop->refresh();
 
     expect($shop->last_status)->toBe(ScrapeStatus::Ok)
@@ -112,7 +112,7 @@ test('a source that reads offers and finds none clears a stored one', function (
         'conditional_ends_at' => now()->addDays(4),
     ]);
 
-    CheckShopPrice::dispatchSync($shop);
+    dispatch_sync(new CheckShopPrice($shop));
 
     // The JSON-LD adapter states no conditional offer and is not
     // authoritative about them, so the stored one survives.

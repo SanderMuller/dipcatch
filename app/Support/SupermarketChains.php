@@ -50,12 +50,12 @@ final class SupermarketChains
 
     public static function isLinkable(string $chain): bool
     {
-        return ! in_array($chain, self::UNLINKABLE, true);
+        return ! in_array($chain, self::UNLINKABLE, strict: true);
     }
 
     public static function isTrackable(string $chain): bool
     {
-        return in_array($chain, self::TRACKABLE, true);
+        return in_array($chain, self::TRACKABLE, strict: true);
     }
 
     /**

@@ -82,7 +82,7 @@ it('creates a product and its first shop together', function (): void {
 
     $product = app(CreateProductWithShop::class)(
         $user,
-        new ProductDraft(title: 'Coffee', imageUrl: null, dropThresholdPct: '10.00', dropThresholdAbs: '0.50'),
+        new ProductDraft(title: 'Coffee', dropThresholdPct: '10.00', dropThresholdAbs: '0.50'),
         draft(),
     );
 
@@ -106,9 +106,8 @@ it('refuses to attach a shop past the plan limit, and writes nothing', function 
     $before = Shop::query()->count();
 
     expect(fn () => app(AttachShop::class)($product, draft('https://ah.nl/over-the-line')))
-        ->toThrow(PlanLimitReached::class);
-
-    expect(Shop::query()->count())->toBe($before);
+        ->toThrow(PlanLimitReached::class)
+        ->and(Shop::query()->count())->toBe($before);
 });
 
 it('rolls the whole create back when the product limit is reached', function (): void {
@@ -125,8 +124,7 @@ it('rolls the whole create back when the product limit is reached', function ():
         $user,
         new ProductDraft(title: 'One too many'),
         draft(),
-    ))->toThrow(PlanLimitReached::class);
-
-    expect($user->products()->count())->toBe($limit)
+    ))->toThrow(PlanLimitReached::class)
+        ->and($user->products()->count())->toBe($limit)
         ->and(Shop::query()->count())->toBe($shopsBefore);
 });

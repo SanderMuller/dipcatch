@@ -12,6 +12,7 @@ use App\Support\PackSize;
 use App\Support\UrlNormalizer;
 use Carbon\CarbonInterface;
 use Database\Factories\ShopFactory;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,12 +33,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $promotion_ends_at
  * @property string|null $promotion_label
  */
+#[Unguarded]
 class Shop extends Model
 {
     /** @use HasFactory<ShopFactory> */
     use HasFactory, HasUuids;
-
-    protected $guarded = [];
 
     /**
      * @return array<string, string>

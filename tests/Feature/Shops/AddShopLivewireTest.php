@@ -44,9 +44,8 @@ test('confirm persists offer + initial price_check + recomputes cheapest', funct
     expect($shop)->not->toBeNull()
         ->and($shop->url)->toBe('https://shop.example.com/p/1')
         ->and($shop->host)->toBe('shop.example.com')
-        ->and((string) $shop->current_price)->toBe('50.00');
-
-    expect(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
+        ->and((string) $shop->current_price)->toBe('50.00')
+        ->and(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
 
     $product->refresh();
     expect($product->cheapest_shop_id)->toBe($shop->id)

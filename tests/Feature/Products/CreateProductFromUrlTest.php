@@ -76,9 +76,8 @@ test('confirm creates product + shop + initial price check and recomputes cheape
     $shop = Shop::query()->where('product_id', $product->id)->first();
     expect($shop)->not->toBeNull()
         ->and($shop->url)->toBe('https://shop.example.com/p/1')
-        ->and((string) $shop->current_price)->toBe('50.00');
-
-    expect(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
+        ->and((string) $shop->current_price)->toBe('50.00')
+        ->and(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
 
     $product->refresh();
     expect($product->cheapest_shop_id)->toBe($shop->id)

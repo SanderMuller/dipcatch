@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Services\ShopFetcher\ShopFetcher;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -21,9 +22,12 @@ beforeEach(function (): void {
     RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
 });
 
+/**
+ * @return array<string, PromiseInterface>
+ */
 function soldOutPage(string $price = '19.95'): array
 {
-    $json = (string) json_encode([
+    $json = json_encode([
         '@type' => 'Product',
         'name' => 'Sanimed Skin Sensitive Kat',
         'offers' => ['@type' => 'Offer', 'price' => $price, 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/OutOfStock'],

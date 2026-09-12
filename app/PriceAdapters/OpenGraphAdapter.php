@@ -51,8 +51,8 @@ final readonly class OpenGraphAdapter implements ShopAdapter
             price: $price,
             currency: strtoupper($currency),
             inStock: $inStock,
-            stockSignal: $stockSignal,
             raw: ['source' => 'og'],
+            stockSignal: $stockSignal,
         ));
     }
 

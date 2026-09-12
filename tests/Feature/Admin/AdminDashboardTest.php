@@ -109,17 +109,8 @@ it('separates the 24-hour alert count from the 7-day one', function (): void {
     // version of this test asserted on markup indentation and broke when the
     // template's whitespace shifted, which proved nothing either way.
     $widget = new OperationsOverviewWidget();
-    $stats = (new ReflectionMethod(OperationsOverviewWidget::class, 'getStats'))->invoke($widget);
-
-    $alerts = null;
-
-    foreach ((is_array($stats) ? $stats : []) as $stat) {
-        if ($stat instanceof Stat && $stat->getLabel() === 'Drops alerted (24h)') {
-            $alerts = $stat;
-
-            break;
-        }
-    }
+    $stats = new ReflectionMethod(OperationsOverviewWidget::class, 'getStats')->invoke($widget);
+    $alerts = array_find(is_array($stats) ? $stats : [], fn ($stat): bool => $stat instanceof Stat && $stat->getLabel() === 'Drops alerted (24h)');
 
     expect($alerts)->toBeInstanceOf(Stat::class);
     assert($alerts instanceof Stat);

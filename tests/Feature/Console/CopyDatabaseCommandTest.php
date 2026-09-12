@@ -4,6 +4,7 @@ use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Spatie\Health\ResultStores\EloquentHealthResultStore;
@@ -50,6 +51,9 @@ afterEach(function (): void {
     @unlink($this->targetPath);
 });
 
+/**
+ * @return array<string, EloquentCollection<int, User>|User|EloquentCollection<int, Product>|Product|EloquentCollection<int, Shop>|Shop>
+ */
 function seedSource(): array
 {
     $default = config('database.default');
@@ -88,8 +92,8 @@ test('preserves booleans, decimals and nullable columns', function (): void {
 
     $copied = DB::connection('copy_target')->table('shops')->where('id', $shop->id)->first();
 
-    expect((bool) $copied->active)->toBeFalse()
-        ->and((bool) $copied->current_in_stock)->toBeTrue()
+    expect($copied->active)->toBeFalsy()
+        ->and($copied->current_in_stock)->toBeTruthy()
         ->and($copied->current_price)->toEqual(1.69)
         ->and($copied->last_error)->toBeNull();
 });

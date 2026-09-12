@@ -44,7 +44,7 @@ class HandleStripeWebhook
         $type = is_string($payload['type'] ?? null) ? $payload['type'] : '';
         $object = is_array($payload['data']['object'] ?? null) ? $payload['data']['object'] : [];
 
-        if (! in_array($type, self::HANDLED, true)) {
+        if (! in_array($type, self::HANDLED, strict: true)) {
             return;
         }
 
@@ -185,7 +185,7 @@ class HandleStripeWebhook
         if ($record->user_id === null) {
             // Nothing else will revisit this: Stripe promises no further
             // event after a close, and this event id is already claimed.
-            RelinkStripeDispute::dispatch($record->id);
+            dispatch(new RelinkStripeDispute($record->id));
         }
 
         $this->alertOwners(BillingIncidentNotification::disputeClosed($record));

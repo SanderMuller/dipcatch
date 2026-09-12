@@ -33,10 +33,10 @@ test('parses comma decimals', function (): void {
 });
 
 test('normalizes kg to grams', function (): void {
-    expect(PackSize::parse('1 kg')->quantity)->toBe(1000.0);
-    expect(PackSize::parse('1 kilo')->quantity)->toBe(1000.0);
-    expect(PackSize::parse('1 kilogram')->quantity)->toBe(1000.0);
-    expect(PackSize::parse('1 gr')->quantity)->toBe(1.0);
+    expect(PackSize::parse('1 kg')->quantity)->toBe(1000.0)
+        ->and(PackSize::parse('1 kilo')->quantity)->toBe(1000.0)
+        ->and(PackSize::parse('1 kilogram')->quantity)->toBe(1000.0)
+        ->and(PackSize::parse('1 gr')->quantity)->toBe(1.0);
 });
 
 test('normalizes dl to milliliters times 100', function (): void {
@@ -48,8 +48,8 @@ test('normalizes cl to milliliters times 10', function (): void {
 });
 
 test('normalizes liter aliases', function (): void {
-    expect(PackSize::parse('1 ltr')->quantity)->toBe(1000.0);
-    expect(PackSize::parse('1 liter')->quantity)->toBe(1000.0);
+    expect(PackSize::parse('1 ltr')->quantity)->toBe(1000.0)
+        ->and(PackSize::parse('1 liter')->quantity)->toBe(1000.0);
 });
 
 test('parses a piece size from the title', function (): void {

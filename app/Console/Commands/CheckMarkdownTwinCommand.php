@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Support\MarketingPages;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
@@ -15,12 +17,10 @@ use Illuminate\Support\Facades\Http;
  * CI and off the scheduler on purpose — a build should not fail on a network
  * blip or on a toggle in someone else's dashboard.
  */
-final class CheckMarkdownTwin extends Command
+#[Description('Check that the Markdown twin of every marketing page is clean')]
+#[Signature('seo:check-markdown {--url= : Origin to check, defaults to site.production_url}')]
+final class CheckMarkdownTwinCommand extends Command
 {
-    protected $signature = 'seo:check-markdown {--url= : Origin to check, defaults to site.production_url}';
-
-    protected $description = 'Check that the Markdown twin of every marketing page is clean';
-
     public function handle(): int
     {
         $origin = $this->targetOrigin();

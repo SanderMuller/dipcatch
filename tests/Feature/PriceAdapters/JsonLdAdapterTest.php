@@ -3,6 +3,7 @@
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\EntityUrl;
 use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\VariantCandidate;
 
 test('skips when no application/ld+json script is present', function (): void {
     $result = new JsonLdAdapter()->extract('https://x.test', '<html></html>');
@@ -684,7 +685,7 @@ test('two entities fitting the request equally well are put to the user', functi
  */
 function multiOfferProduct(): string
 {
-    return (string) json_encode([
+    return json_encode([
         '@context' => 'https://schema.org',
         '@type' => 'Product',
         'name' => 'Sanimed Skin Sensitive Cat',
@@ -715,8 +716,8 @@ test('a Product with several offers asks which, instead of pricing the first', f
 
     expect($result->isAmbiguous())->toBeTrue()
         ->and($result->snapshot)->toBeNull()
-        ->and(array_map(fn ($variant): string => $variant->key, $result->variants))->toBe(['MP2996', 'MP2997'])
-        ->and(array_map(fn ($variant): string => $variant->price, $result->variants))->toBe(['21.25', '41.65']);
+        ->and(array_map(fn (VariantCandidate $variant): string => $variant->key, $result->variants))->toBe(['MP2996', 'MP2997'])
+        ->and(array_map(fn (VariantCandidate $variant): string => $variant->price, $result->variants))->toBe(['21.25', '41.65']);
 });
 
 test('a pinned variant_key prices that offer', function (): void {
@@ -827,7 +828,7 @@ test('offers pricing themselves through a priceSpecification still become choice
     $result = new JsonLdAdapter()->extract('https://shop.test/p', withJsonLd($json));
 
     expect($result->isAmbiguous())->toBeTrue()
-        ->and(array_map(fn ($variant): string => $variant->price, $result->variants))->toBe(['10.00', '20.00']);
+        ->and(array_map(fn (VariantCandidate $variant): string => $variant->price, $result->variants))->toBe(['10.00', '20.00']);
 });
 
 test('two offers that repeat the product name are still told apart', function (): void {
@@ -858,7 +859,7 @@ test('two offers that repeat the product name are still told apart', function ()
 
     $result = new JsonLdAdapter()->extract('https://shop.test/sanimed', withJsonLd($json));
 
-    $titles = array_map(fn ($variant): string => $variant->title, $result->variants);
+    $titles = array_map(fn (VariantCandidate $variant): string => $variant->title, $result->variants);
 
     expect($result->isAmbiguous())->toBeTrue()
         ->and($titles[0])->not->toBe($titles[1])
@@ -880,6 +881,6 @@ test('an offer stating its own size keeps that as the label', function (): void 
 
     $result = new JsonLdAdapter()->extract('https://shop.test/sanimed', withJsonLd($json));
 
-    expect(array_map(fn ($variant): string => $variant->title, $result->variants))
+    expect(array_map(fn (VariantCandidate $variant): string => $variant->title, $result->variants))
         ->toBe(['Sanimed Skin Sensitive Cat — 24 x 100 g', 'Sanimed Skin Sensitive Cat — 12 x 100 g']);
 });

@@ -9,7 +9,7 @@ use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Str;
 
 class DisputesTable
@@ -17,7 +17,7 @@ class DisputesTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('user'))
+            ->modifyQueryUsing(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->with('user'))
             ->columns([
                 TextColumn::make('user.email')
                     ->label('Customer')
@@ -59,7 +59,7 @@ class DisputesTable
             ->filters([
                 Filter::make('open')
                     ->label('Open only')
-                    ->query(fn (Builder $query): Builder => $query->whereNull('closed_at'))
+                    ->query(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('closed_at'))
                     ->default(),
             ])
             ->recordActions([

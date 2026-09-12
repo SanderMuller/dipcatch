@@ -69,7 +69,7 @@ final readonly class CopyPlanner
     {
         $names = [];
         foreach ($this->fromSchema->getTableListing(schemaQualified: false) as $name) {
-            if (in_array($name, self::SKIP, true)) {
+            if (in_array($name, self::SKIP, strict: true)) {
                 continue;
             }
 
@@ -92,7 +92,7 @@ final readonly class CopyPlanner
         $edges = [];
         foreach ($this->toSchema->getForeignKeys($table) as $foreignKey) {
             $foreignTable = $foreignKey['foreign_table'];
-            if (! is_string($foreignTable) || $foreignTable === $table || ! in_array($foreignTable, $names, true)) {
+            if (! is_string($foreignTable) || $foreignTable === $table || ! in_array($foreignTable, $names, strict: true)) {
                 continue;
             }
 
@@ -134,7 +134,7 @@ final readonly class CopyPlanner
         foreach ([true, false] as $mutualOnly) {
             foreach ($remaining as $table) {
                 foreach ($edges[$table] as $foreignTable => $columns) {
-                    if (in_array($foreignTable, $order, true) || $columns === [] || array_diff($columns, $nullable[$table]) !== []) {
+                    if (in_array($foreignTable, $order, strict: true) || $columns === [] || array_diff($columns, $nullable[$table]) !== []) {
                         continue;
                     }
 

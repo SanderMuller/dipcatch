@@ -9,7 +9,8 @@ use Hihaho\RectorRules\Rector\Testing\TestFieldStringToConstantRector;
 use Hihaho\RectorRules\Set\HihahoSetList;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Routing\Middleware\ThrottleRequests;
-use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
+use Pest\Rector\Rules\SimplifyToLiteralBooleanRector;
+use Pest\Rector\Rules\UseToStartWithRector;
 use Pest\Rector\Set\PestSetList;
 use Rector\Arguments\Rector\ClassMethod\ArgumentAdderRector;
 use Rector\Caching\ValueObject\Storage\FileCacheStorage;
@@ -26,6 +27,7 @@ use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
 use Rector\DeadCode\Rector\PropertyProperty\RemoveNullPropertyInitializationRector;
 use Rector\DeadCode\Rector\Stmt\RemoveUnreachableStatementRector;
+use Rector\DeadCode\Rector\StmtsAwareInterface\RemoveDeadInstanceOfAssertRector;
 use Rector\EarlyReturn\Rector\If_\ChangeOrIfContinueToMultiContinueRector;
 use Rector\EarlyReturn\Rector\Return_\ReturnBinaryOrToEarlyReturnRector;
 use Rector\Php70\Rector\StaticCall\StaticCallOnNonStaticToInstanceCallRector;
@@ -33,6 +35,7 @@ use Rector\Php74\Rector\Closure\ClosureToArrowFunctionRector;
 use Rector\Php74\Rector\Property\RestoreDefaultNullToNullableTypePropertyRector;
 use Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector;
 use Rector\Php81\Rector\FuncCall\NullToStrictStringFuncCallArgRector;
+use Rector\Php81\Rector\MethodCall\SpatieEnumMethodCallToEnumConstRector;
 use Rector\Php82\Rector\Param\AddSensitiveParameterAttributeRector;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
 use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
@@ -162,8 +165,8 @@ return RectorConfig::configure()
         // signature (`ThrottleRequests::with(60, 1)` → `throttle:60,1`), so dropping a
         // default that equals its parameter default still changes the serialized string
         // and makes the rate limit implicit on a security-adjacent route. `with()` is
-        // declared on ThrottleRequests, so excluding the base covers the
-        // ThrottleRequestsWithRedis subclass this app actually calls.
+        // declared on ThrottleRequests, so excluding the base also covers the
+        // ThrottleRequestsWithRedis subclass.
         RemoveDefaultValuedArgumentRector::EXCLUDE_CALLS => [
             ThrottleRequests::class => ['with'],
         ],
@@ -176,10 +179,13 @@ return RectorConfig::configure()
     ])
     ->withConfiguredRule(MiddlewareStringToClassRector::class, [
         MiddlewareStringToClassRector::CONVERT_BARE_ALIASES => true,
-        // `throttle` resolves to ThrottleRequestsWithRedis in this app (Kernel.php), so
-        // the class is safe to supply explicitly — the rule cannot infer it from the call site.
-        MiddlewareStringToClassRector::INCLUDE_THROTTLE => true,
-        MiddlewareStringToClassRector::THROTTLE_CLASS => ThrottleRequestsWithRedis::class,
+        // `throttle` is left as an alias. This app has no `App\Http\Kernel` and
+        // registers no throttle override, so the alias resolves to
+        // `Illuminate\Routing\Middleware\ThrottleRequests`, not to the Redis
+        // subclass. Naming a class here freezes that choice at the call site and
+        // swaps the limiter on `routes/ai.php`, which guards an authenticated
+        // endpoint. The alias keeps following whatever the app registers.
+        MiddlewareStringToClassRector::INCLUDE_THROTTLE => false,
     ])
     /**
      * Consumes the manifest phpstan produces (see phpstan.neon namedArgumentManifest).
@@ -243,6 +249,10 @@ return RectorConfig::configure()
         PostIncDecToPreIncDecRector::class,
         PreferPHPUnitThisCallRector::class,
         RedirectRouteToToRouteHelperRector::class,
+        // `assert($x instanceof Foo)` after a container `make()` is what narrows
+        // `mixed` to the concrete type for PHPStan. Rector reads those asserts as
+        // dead and drops them, which turns the call site into a `return.type` error.
+        RemoveDeadInstanceOfAssertRector::class,
         RemoveNullPropertyInitializationRector::class => [
             __DIR__ . '/app/Http/Resources/*',
             __DIR__ . '/app/Http/Controllers/*',
@@ -265,8 +275,26 @@ return RectorConfig::configure()
             __DIR__ . '/tests/*',
         ],
         SimplifyIfElseToTernaryRector::class,
+        // `->not->toBe('')` also narrows the value to `non-empty-string` for
+        // PHPStan. `->not->toBeEmpty()` does not, so a later `toStartWith()` on
+        // the same value fails. Only these two files depend on that narrowing.
+        SimplifyToLiteralBooleanRector::class => [
+            __DIR__ . '/tests/Feature/CrawlPolicyTest.php',
+            __DIR__ . '/tests/Feature/StructuredDataTest.php',
+        ],
         SimplifyIfReturnBoolRector::class,
+        // `Spatie\Health\Enums\Status` extends `spatie/enum`, so its cases are
+        // static methods, not constants. The rule rewrites `Status::ok()` to
+        // `Status::OK` and that constant does not exist: a fatal at runtime.
+        SpatieEnumMethodCallToEnumConstRector::class,
         StaticCallOnNonStaticToInstanceCallRector::class,
+        // `toStartWith()` takes a `non-empty-string`, so it does not accept a
+        // prefix that is read at runtime. The `str_starts_with()` form these
+        // two files use also carries a failure message naming both values.
+        UseToStartWithRector::class => [
+            __DIR__ . '/tests/Feature/CrawlPolicyTest.php',
+            __DIR__ . '/tests/Feature/StructuredDataTest.php',
+        ],
         __DIR__ . '/bootstrap/cache',
         __DIR__ . '/.cache',
     ])

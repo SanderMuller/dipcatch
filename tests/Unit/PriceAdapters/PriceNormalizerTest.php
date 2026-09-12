@@ -36,7 +36,7 @@ test('drops a bare trailing comma', function (): void {
 // --- A three-digit dot tail is ambiguous, so it is refused ----------------
 
 test('refuses an ambiguous three-digit dot tail', function (): void {
-    expect(PriceNormalizer::canonicalizeDecimal('1.099'))->toBe('')
+    expect(PriceNormalizer::canonicalizeDecimal('1.099'))->toBeEmpty()
         ->and(PriceNormalizer::fromMixed('1.099'))->toBeNull();
 });
 

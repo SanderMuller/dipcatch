@@ -31,10 +31,8 @@ test('strips userinfo from authority', function (): void {
 
 test('strips default ports', function (): void {
     expect(UrlNormalizer::normalize('http://example.com:80/foo'))
-        ->toBe('http://example.com/foo');
-
-    expect(UrlNormalizer::normalize('https://example.com:443/foo'))
-        ->toBe('https://example.com/foo');
+        ->toBe('http://example.com/foo')
+        ->and(UrlNormalizer::normalize('https://example.com:443/foo'))->toBe('https://example.com/foo');
 });
 
 test('keeps non-default ports', function (): void {
@@ -103,8 +101,8 @@ test('different query orders produce identical hashes', function (): void {
     $a = UrlNormalizer::normalize('https://example.com/p?a=1&b=2');
     $b = UrlNormalizer::normalize('https://example.com/p?b=2&a=1');
 
-    expect($a)->toBe($b);
-    expect(UrlNormalizer::hash($a))->toBe(UrlNormalizer::hash($b));
+    expect($a)->toBe($b)
+        ->and(UrlNormalizer::hash($a))->toBe(UrlNormalizer::hash($b));
 });
 
 test('rejects non-http(s) schemes', function (): void {

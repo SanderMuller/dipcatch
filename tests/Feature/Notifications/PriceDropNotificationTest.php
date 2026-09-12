@@ -75,7 +75,7 @@ test('via() returns only real-time channels (database + push); never mail', func
     $notification = new PriceDropNotification($product, $outcome, 'fake-id');
 
     expect($notification->via($bellOnly))->toBe(['database'])
-        ->and($notification->via($silent))->toBe([])
+        ->and($notification->via($silent))->toBeEmpty()
         ->and($notification->via($bellOnly))->not->toContain('mail');
 });
 
@@ -91,6 +91,6 @@ test('via() includes web push only when user has subscriptions AND opted in', fu
     $notification = new PriceDropNotification($product, $outcome, 'fake-id');
 
     // No subscriptions yet → push channel not included.
-    expect($notification->via($optedInNoSubscriptions))->toBe([])
+    expect($notification->via($optedInNoSubscriptions))->toBeEmpty()
         ->and($notification->via($optedInNoSubscriptions))->not->toContain(WebPushChannel::class);
 });

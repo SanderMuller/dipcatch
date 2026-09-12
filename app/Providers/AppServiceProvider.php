@@ -95,7 +95,7 @@ final class AppServiceProvider extends ServiceProvider
         }
 
         ParallelTesting::setUpTestCase(static function (int $token): void {
-            config(['database.redis.options.prefix' => "dipcatch-test-{$token}-"]);
+            config()->set('database.redis.options.prefix', "dipcatch-test-{$token}-");
         });
     }
 

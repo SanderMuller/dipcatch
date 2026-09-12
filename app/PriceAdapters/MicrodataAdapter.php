@@ -51,10 +51,10 @@ final readonly class MicrodataAdapter implements ShopAdapter
             price: $price,
             currency: strtoupper($currency),
             inStock: $inStock,
-            stockSignal: $stockSignal,
+            raw: ['source' => 'microdata'],
             gtin: $scope->gtin(),
             gtinAuthoritative: true,
-            raw: ['source' => 'microdata'],
+            stockSignal: $stockSignal,
         ));
     }
 

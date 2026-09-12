@@ -92,7 +92,7 @@ test('a product alone keeps the check active — suggestions read the same rows'
 
 test('ages on the oldest chain, so one fresh chain cannot mask a stale one', function (): void {
     freshnessShop();
-    freshnessRow(now()->subHours(1));
+    freshnessRow(now()->subHours());
 
     CheckjebonPrice::query()->create([
         'supermarket' => 'jumbo',

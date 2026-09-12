@@ -20,6 +20,8 @@ use Pest\Expectation;
 use PHPUnit\Framework\Assert;
 use Tests\TestCase;
 
+use function Pest\Livewire\livewire;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -330,7 +332,7 @@ function lidlPage(
  */
 function mountShopsRelationManager(Product $product): Testable
 {
-    return Pest\Livewire\livewire(ProductShow::class, ['product' => $product]);
+    return livewire(ProductShow::class, ['product' => $product]);
 }
 
 /**
@@ -338,6 +340,7 @@ function mountShopsRelationManager(Product $product): Testable
  * built from.
  *
  * @var array<string, array{0: string, 1: string}>
+ * @return array<string, string[]>
  */
 function suggestionChains(): array
 {
@@ -684,5 +687,5 @@ function configureStripe(): void
     config()->set('cashier.secret', 'sk_test_1');
     config()->set('cashier.webhook.secret', 'whsec_1');
     config()->set('plans.stripe.pro_price_id', 'price_1');
-    config()->set('plans.enabled', null);
+    config()->set('plans.enabled');
 }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Carbon\CarbonImmutable;
 use Database\Factories\StripePaymentFactory;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $occurred_at
  * @property-read User|null $user
  */
+#[Unguarded]
 class StripePayment extends Model
 {
     /** @use HasFactory<StripePaymentFactory> */
@@ -30,8 +32,6 @@ class StripePayment extends Model
     public const string KIND_PAYMENT = 'payment';
 
     public const string KIND_REFUND = 'refund';
-
-    protected $guarded = [];
 
     /**
      * @return BelongsTo<User, $this>

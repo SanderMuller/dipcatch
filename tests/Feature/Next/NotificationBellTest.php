@@ -2,6 +2,7 @@
 
 use App\Livewire\Notifications\Bell;
 use App\Models\User;
+use App\Notifications\PriceDropNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -19,7 +20,7 @@ function storeNotification(User $user, array $data = [], ?string $readAt = null)
 
     DB::table('notifications')->insert([
         'id' => $id,
-        'type' => 'App\\Notifications\\PriceDropNotification',
+        'type' => PriceDropNotification::class,
         'notifiable_type' => $user->getMorphClass(),
         'notifiable_id' => $user->id,
         'data' => json_encode([
