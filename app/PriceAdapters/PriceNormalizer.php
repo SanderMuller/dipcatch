@@ -38,8 +38,10 @@ final class PriceNormalizer
      *  - "1,234.56" → "1234.56"
      *  - "1234.56"  → "1234.56"
      *  - "1234,56"  → "1234.56" (when tail = 1 or 2 digits)
-     *  - "1,234"    → "1234"    (when tail = 3 digits, treat as thousands)
+     *  - "1,234"    → "1234"    (a 3-digit tail after "1" is a thousands group)
+     *  - "0,899"    → "0.899"   (a 3-digit tail after "0" is a decimal)
      *  - "1,2345"   → "1,2345"  (no price shape, left for the caller to refuse)
+     *  - "0.899"    → "0.899"   (same rule, so this one is not ambiguous)
      *  - "1.099"    → ""        (ambiguous, so the caller reads it as a failure)
      */
     public static function canonicalizeDecimal(string $value): string
@@ -55,29 +57,45 @@ final class PriceNormalizer
                 $value = str_replace(',', '', $value);
             }
         } elseif ($hasComma) {
-            $tail = substr($value, strrpos($value, ',') + 1);
+            $position = (int) strrpos($value, ',');
+            $tail = substr($value, $position + 1);
 
-            // 1 or 2 digits is a decimal ("1,2" is €1.20, not €12), 3 is a
-            // thousands group, and a bare trailing comma is noise. Any other
-            // length is no price shape, so leave it for is_numeric() to refuse.
-            $value = match (strlen($tail)) {
-                0 => str_replace(',', '', $value),
-                1, 2 => str_replace(',', '.', $value),
-                3 => str_replace(',', '', $value),
+            // A tail of 1 to 3 digits is a decimal ("1,2" is €1.20, not €12)
+            // unless the head can carry a thousands group. A bare trailing
+            // comma is noise, and a longer tail is no price shape at all.
+            $value = match (true) {
+                $tail === '', self::isThousandsSeparator($value, $position) => str_replace(',', '', $value),
+                strlen($tail) <= 3 => str_replace(',', '.', $value),
                 default => $value,
             };
         } elseif ($hasDot) {
-            $tail = substr($value, strrpos($value, '.') + 1);
-
-            // A 3-digit dot tail is the European thousands form ("1.099" is
-            // €1099) or three decimals, and nothing here says which one the
-            // shop wrote. Unlike a comma, neither reading is the common one.
-            // Refusing costs a parse error; guessing costs a 1000x wrong price.
-            if (strlen($tail) === 3) {
+            // A thousands separator here cannot be told apart from three
+            // decimals: "1.099" is €1099 in one locale and €1.099 in another,
+            // and nothing says which one the shop wrote. Refusing costs a
+            // parse error; guessing costs a price that is 1000x wrong.
+            if (self::isThousandsSeparator($value, (int) strrpos($value, '.'))) {
                 return '';
             }
         }
 
         return $value;
+    }
+
+    /**
+     * Whether the separator at `$position` groups thousands, rather than
+     * marking the decimal point.
+     *
+     * A group is three characters long, and the number that carries one never
+     * starts with a zero. No locale writes "0,899" or ",899" for 899, so a
+     * zero-led or empty integer part rules the grouped reading out. The sign
+     * is not part of that test, or "-0,899" would disagree with "0,899".
+     */
+    private static function isThousandsSeparator(string $value, int $position): bool
+    {
+        $head = ltrim(substr($value, 0, $position), '-');
+
+        return strlen(substr($value, $position + 1)) === 3
+            && $head !== ''
+            && ! str_starts_with($head, '0');
     }
 }

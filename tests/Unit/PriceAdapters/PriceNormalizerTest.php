@@ -48,6 +48,23 @@ test('keeps a dot tail that is not three digits', function (string $input, strin
     'four decimals' => ['1.2345', '1.2345'],
 ]);
 
+// --- A 3-digit group needs an integer part that can carry one -------------
+
+test('reads a three-digit group as a decimal when the integer part cannot carry one', function (string $input, string $expected): void {
+    expect(PriceNormalizer::fromMixed($input))->toBe($expected);
+})->with([
+    'zero before a comma' => ['0,899', '0.899'],
+    'zero before a dot' => ['0.899', '0.899'],
+    'no integer part before a comma' => [',899', '.899'],
+    'no integer part before a dot' => ['.099', '.099'],
+    'signed zero before a comma' => ['-0,899', '-0.899'],
+    'signed zero before a dot' => ['-0.899', '-0.899'],
+]);
+
+test('reads a signed thousands group the same way as an unsigned one', function (): void {
+    expect(PriceNormalizer::fromMixed('-1,234'))->toBe('-1234');
+});
+
 // --- Numbers carry no locale, so the string rules never apply to them -----
 
 test('accepts a numeric value as given', function (int|float $input, string $expected): void {

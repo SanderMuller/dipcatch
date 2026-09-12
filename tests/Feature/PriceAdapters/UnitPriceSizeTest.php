@@ -42,6 +42,16 @@ test('reads a rate given per 100 grams', function (): void {
     expect(UnitPriceSize::from(offerWithUnitPrice(rate: 2.5, unitCode: 'GRM', per: 100.0), '5.00'))->toBe('200 g');
 });
 
+test('reads a sub-euro rate written as a string with three decimals', function (): void {
+    expect(UnitPriceSize::from(offerWithUnitPrice(rate: '0.500', unitCode: 'GRM', per: 100.0), '2.00'))->toBe('400 g');
+});
+
+test('refuses a string rate whose three decimals could be a thousands group', function (): void {
+    // "2.500" is €2.50 per 100 g or €2500, and a rate this parser guesses
+    // wrong makes the pack size wrong by the same factor.
+    expect(UnitPriceSize::from(offerWithUnitPrice(rate: '2.500', unitCode: 'GRM', per: 100.0), '2.00'))->toBeNull();
+});
+
 test('reads a rate given per piece', function (): void {
     expect(UnitPriceSize::from(offerWithUnitPrice(rate: 0.5, unitCode: 'H87'), '3.00'))->toBe('6 stuks');
 });
