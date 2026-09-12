@@ -66,6 +66,90 @@ it('writes a shop, its first price check, and the cheapest recompute', function 
         ->and($product->fresh()?->cheapest_shop_id)->toBe($shop->id);
 });
 
+it('recalculates and persists bundle price instead of trusting flattened price', function (): void {
+    $product = Product::factory()->create();
+    $draft = ShopDraft::fromSnapshot(
+        snapshot: [
+            'price' => '0.01',
+            'single_item_price' => '2.85',
+            'bundle_quantity' => 2,
+            'bundle_total_price' => '4.00',
+            'currency' => 'EUR',
+            'in_stock' => true,
+        ],
+        url: 'https://jumbo.com/producten/fanta',
+        adapterKey: 'jumbo',
+    );
+
+    $shop = app(AttachShop::class)($product, $draft);
+    $check = $shop->priceChecks()->first();
+    $history = $product->cheapestHistory()->first();
+
+    expect($draft->trackedPrice())->toBe('2.00')
+        ->and($shop->current_price)->toBe('2.00')
+        ->and($shop->single_item_price)->toBe('2.85')
+        ->and($shop->bundle_quantity)->toBe(2)
+        ->and($check?->price)->toBe('2.00')
+        ->and($check?->bundle_total_price)->toBe('4.00')
+        ->and($history?->bundle_quantity)->toBe(2);
+});
+
+it('stores a future bundle without applying it to the first price check', function (): void {
+    $product = Product::factory()->create();
+    $draft = ShopDraft::fromSnapshot(
+        snapshot: [
+            'price' => '2.85',
+            'single_item_price' => '2.85',
+            'bundle_quantity' => 2,
+            'bundle_total_price' => '4.00',
+            'promotion_starts_at' => now()->addDay()->toIso8601String(),
+            'promotion_ends_at' => now()->addDays(2)->toIso8601String(),
+            'currency' => 'EUR',
+            'in_stock' => true,
+        ],
+        url: 'https://jumbo.com/producten/fanta-future',
+        adapterKey: 'jumbo',
+    );
+
+    $shop = app(AttachShop::class)($product, $draft);
+    $check = $shop->priceChecks()->first();
+
+    expect($shop->current_price)->toBe('2.85')
+        ->and($shop->bundle_total_price)->toBe('4.00')
+        ->and($shop->liveBundleOffer())->toBeNull()
+        ->and($check?->bundle_quantity)->toBeNull()
+        ->and($check?->bundle_total_price)->toBeNull();
+});
+
+it('rejects flattened bundle terms that do not beat the single-item price', function (): void {
+    $draft = ShopDraft::fromSnapshot([
+        'price' => '0.01',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '6.00',
+        'currency' => 'EUR',
+        'in_stock' => true,
+    ], 'https://shop.test/product', 'test');
+
+    expect($draft->trackedPrice())->toBe('2.85')
+        ->and($draft->bundleOffer)->toBeNull();
+});
+
+it('rejects flattened bundle terms with an invalid promotion date', function (): void {
+    $draft = ShopDraft::fromSnapshot([
+        'price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'promotion_ends_at' => 'not-a-date',
+        'currency' => 'EUR',
+        'in_stock' => true,
+    ], 'https://shop.test/product', 'test');
+
+    expect($draft->trackedPrice())->toBe('2.85')
+        ->and($draft->bundleOffer)->toBeNull();
+});
+
 it('passes the triggering check id to the recompute, so drop detection sees it', function (): void {
     $product = Product::factory()->create();
 

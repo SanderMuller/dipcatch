@@ -42,6 +42,47 @@ test('happy path: valid slug renders product summary + shop list', function (): 
         ->assertSee('bol.com', escape: false);
 });
 
+test('bundle price always shows quantity total and single-item price', function (): void {
+    $product = makeSharedProduct(['cheapest_price' => '2.00']);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'currency' => 'EUR',
+    ]);
+
+    $this->get('/p/' . str_repeat('a', 32))
+        ->assertOk()
+        ->assertSeeInOrder(['€2.00', '2 for €4.00', 'Cheapest across'], escape: false)
+        ->assertSee('2 for €4.00', escape: false)
+        ->assertSee('Single item €2.85', escape: false)
+        ->assertSee('Tracked on DipCatch: cheapest at €2.00 · 2 for €4.00 · Single item €2.85', escape: false);
+});
+
+test('equal prices use the same stable shop order as the cheapest-price engine', function (): void {
+    $product = makeSharedProduct(['cheapest_price' => '2.00']);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://oldest.test/p/fanta',
+        'current_price' => '2.00',
+        'created_at' => now()->subMinute(),
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://newer.test/p/fanta',
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'created_at' => now(),
+    ]);
+
+    $this->get('/p/' . str_repeat('a', 32))
+        ->assertOk()
+        ->assertSeeInOrder(['oldest.test', 'newer.test'], escape: false)
+        ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at €2.00">', escape: false);
+});
+
 test('unknown slug returns 404', function (): void {
     $this->get('/p/' . str_repeat('z', 32))->assertNotFound();
 });

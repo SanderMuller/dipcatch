@@ -4,6 +4,8 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
+use App\Notifications\TargetPriceNotification;
+use App\Notifications\UnitPriceTargetNotification;
 use App\Services\Drops\DropOutcome;
 use Illuminate\Support\Str;
 use Minishlink\WebPush\ContentEncoding;
@@ -156,4 +158,48 @@ test('toWebPush returns a WebPushMessage with title, body, icon and click url', 
         ->and($payload['data'])->toMatchArray(['url' => $payload['data']['url']])
         ->and($payload['data']['url'])->toBeString()
         ->and($payload['data']['url'])->not->toBe('');
+});
+
+test('bundle price push states required quantity and total', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Fanta']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '2.00'])->save();
+
+    $notification = new PriceDropNotification($product, pushOutcome(), (string) Str::uuid());
+    $payload = $notification->toWebPush($user)->toArray();
+    $database = $notification->toDatabase($user);
+
+    expect($payload['body'])->toContain('2 for €4.00')
+        ->and($database['single_item_price'])->toBe('2.85')
+        ->and($database['bundle_quantity'])->toBe(2)
+        ->and($database['bundle_total_price'])->toBe('4.00');
+});
+
+test('target alerts state bundle quantity and exact total', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Fanta']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'pack_quantity' => '1.50',
+        'pack_unit' => 'l',
+    ]);
+
+    $target = new TargetPriceNotification($product, $shop, '2.00');
+    $unitTarget = new UnitPriceTargetNotification($product, $shop, '1.33');
+
+    expect($target->toWebPush($user)->toArray()['body'])->toContain('2 for €4.00')
+        ->and($unitTarget->toWebPush($user)->toArray()['body'])->toContain('2 for €4.00')
+        ->and($target->toDatabase($user)['single_item_price'])->toBe('2.85')
+        ->and($unitTarget->toDatabase($user)['bundle_quantity'])->toBe(2);
 });

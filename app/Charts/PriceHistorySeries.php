@@ -8,6 +8,7 @@ use App\Billing\Plan;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
+use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -49,7 +50,7 @@ final readonly class PriceHistorySeries
      * Rows a Flux line chart can plot. Null prices stay as gaps; notified
      * points are omitted when no alert fired on that stamp.
      *
-     * @return array{rows: list<array<string, mixed>>, currency: string, unitLabel: ?string, hasNotified: bool}
+     * @return array{rows: list<array<string, mixed>>, currency: string, unitLabel: ?string, hasNotified: bool, hasBundles: bool}
      */
     public function fluxChart(): array
     {
@@ -57,7 +58,7 @@ final readonly class PriceHistorySeries
     }
 
     /**
-     * @return array{datasets: list<array<string, mixed>>, labels: list<string>}
+     * @return array{datasets: list<array<string, mixed>>, labels: list<string>, bundleConditions: list<?string>}
      */
     public function data(): array
     {
@@ -70,6 +71,8 @@ final readonly class PriceHistorySeries
         $labels = [];
         /** @var list<float|null> $points */
         $points = [];
+        /** @var list<?string> $bundleConditions */
+        $bundleConditions = [];
         foreach ($segments as $segment) {
             $started = $segment->started_at;
             if (! $started instanceof CarbonInterface) {
@@ -79,6 +82,7 @@ final readonly class PriceHistorySeries
             $points[] = $segment->cheapest_price === null
                 ? null
                 : (float) $segment->cheapest_price;
+            $bundleConditions[] = BundlePriceLabel::forHistory($segment, $product->currency);
         }
 
         $current = $segments->last();
@@ -87,6 +91,7 @@ final readonly class PriceHistorySeries
             $points[] = $current->cheapest_price === null
                 ? null
                 : (float) $current->cheapest_price;
+            $bundleConditions[] = BundlePriceLabel::forHistory($current, $product->currency);
         }
 
         $unit = $this->unitSeries($segments, $current instanceof ProductCheapestHistory);
@@ -135,6 +140,7 @@ final readonly class PriceHistorySeries
         return [
             'datasets' => $datasets,
             'labels' => $labels,
+            'bundleConditions' => $bundleConditions,
         ];
     }
 

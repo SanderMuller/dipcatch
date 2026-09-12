@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
+use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\ConditionalOffer;
 use App\PriceAdapters\PromotionWindow;
 use App\Support\Favicon;
@@ -18,10 +19,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
 
 /**
  * @property bool|null $current_in_stock True in stock, false out of stock, null when the shop's page did not say.
  * @property ShopHealth $health
+ * @property ScrapeStatus $last_status
  * @property string|null $pack_quantity
  * @property string|null $pack_unit
  * @property string|null $gtin
@@ -32,6 +35,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $promotion_starts_at
  * @property CarbonInterface|null $promotion_ends_at
  * @property string|null $promotion_label
+ * @property string|null $single_item_price
+ * @property int|null $bundle_quantity
+ * @property string|null $bundle_total_price
  */
 #[Unguarded]
 class Shop extends Model
@@ -47,6 +53,9 @@ class Shop extends Model
         return [
             'initial_price' => 'decimal:2',
             'current_price' => 'decimal:2',
+            'single_item_price' => 'decimal:2',
+            'bundle_quantity' => 'integer',
+            'bundle_total_price' => 'decimal:2',
             'pack_quantity' => 'decimal:2',
             'conditional_price' => 'decimal:2',
             'conditional_starts_at' => 'datetime',
@@ -201,6 +210,41 @@ class Shop extends Model
             startsAt: $this->promotion_starts_at?->toImmutable(),
             label: $this->promotion_label,
         );
+    }
+
+    public function singleItemPrice(): ?string
+    {
+        $price = $this->single_item_price ?? $this->current_price;
+
+        return $price === null ? null : (string) $price;
+    }
+
+    public function bundleOffer(): ?BundleOffer
+    {
+        if ($this->bundle_quantity === null || $this->bundle_total_price === null) {
+            return null;
+        }
+
+        try {
+            $offer = new BundleOffer((int) $this->bundle_quantity, (string) $this->bundle_total_price);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        $singleItemPrice = $this->singleItemPrice();
+
+        return $singleItemPrice !== null && $offer->isCheaperThan($singleItemPrice) ? $offer : null;
+    }
+
+    public function liveBundleOffer(): ?BundleOffer
+    {
+        $offer = $this->bundleOffer();
+
+        if ($offer === null || $this->current_price === null) {
+            return null;
+        }
+
+        return bccomp((string) $this->current_price, $offer->effectiveUnitPrice(), 2) === 0 ? $offer : null;
     }
 
     public function faviconUrl(): string

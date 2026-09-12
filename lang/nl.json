@@ -277,8 +277,6 @@
     "An offer price at :shop is read with the date it ends, so a temporary price is never mistaken for the new normal.": "Een aanbiedingsprijs bij :shop wordt met de einddatum gelezen, zodat een tijdelijke prijs nooit voor de nieuwe prijs wordt aangezien.",
     "DipCatch reads the article number at :shop and warns you when two shops turn out to be selling different packs.": "DipCatch leest het artikelnummer bij :shop en waarschuwt je als twee winkels blijken verschillende verpakkingen te verkopen.",
     "Where the pack size is on the page, DipCatch compares per kilo, litre or piece, so a 200 g bag and a 370 g bag can be judged against each other.": "Waar de verpakkingsgrootte op de pagina staat, vergelijkt DipCatch per kilo, liter of stuk, zodat een zak van 200 g en een zak van 370 g eerlijk naast elkaar liggen.",
-    "Multi-buy offers such as \"1+1 gratis\" leave the shelf price alone at :shop, so that shelf price is what DipCatch stores and alerts on.": "Stapelaanbiedingen zoals \"1+1 gratis\" laten de schapprijs bij :shop ongemoeid, dus die schapprijs is wat DipCatch opslaat en waarop het meldt.",
-    "DipCatch stores the shelf price. :shop runs multi-buy offers that do not lower it, so a \"1+1 gratis\" week shows the same number as the week before.": "DipCatch slaat de schapprijs op. :shop draait stapelaanbiedingen die die prijs niet verlagen, dus een week met \"1+1 gratis\" laat hetzelfde bedrag zien als de week ervoor.",
     "Yes. The offer price is read along with the date it runs until, and the product page shows both, so you can see whether a price is a deal or the new level.": "Ja. De aanbiedingsprijs wordt met de einddatum gelezen en de productpagina laat allebei zien, zodat je ziet of een prijs een aanbieding is of het nieuwe niveau.",
     "DipCatch reads the price :shop shows on the product page. When that price is an offer, that is the price you get alerted on.": "DipCatch leest de prijs die :shop op de productpagina toont. Is dat een aanbiedingsprijs, dan is dat de prijs waarop je een melding krijgt.",
     "Can DipCatch track :shop?": "Kan DipCatch :shop volgen?",
@@ -353,5 +351,10 @@
     "Data and questions": "Gegevens en vragen",
     "What we store about you is on the privacy page, and how to reach us is on the support page.": "Wat we over je opslaan staat op de privacypagina, en hoe je ons bereikt op de supportpagina.",
     "Terms": "Voorwaarden",
-    "Track products you buy. Do not use DipCatch to build a copy of a shop’s catalogue or to resell its data.": "Volg producten die je koopt. Gebruik DipCatch niet om een kopie van het assortiment van een winkel te bouwen of om die gegevens door te verkopen."
+    "Track products you buy. Do not use DipCatch to build a copy of a shop’s catalogue or to resell its data.": "Volg producten die je koopt. Gebruik DipCatch niet om een kopie van het assortiment van een winkel te bouwen of om die gegevens door te verkopen.",
+    ":quantity for :total": ":quantity voor :total",
+    "Single item :price": "Los stuk :price",
+    "Bundle": "Bundel",
+    "A supported multi-buy offer at :shop is read with the date it ends. DipCatch converts it into an effective item price and always shows the required quantity.": "DipCatch leest een ondersteunde stapelaanbieding bij :shop met de einddatum. DipCatch rekent deze om naar een effectieve stukprijs en toont altijd het vereiste aantal.",
+    "Yes. DipCatch tracks supported multi-buy offers as an effective item price and shows how many items the offer requires.": "Ja. DipCatch volgt ondersteunde stapelaanbiedingen als effectieve stukprijs en toont hoeveel stuks de aanbieding vereist."
 }

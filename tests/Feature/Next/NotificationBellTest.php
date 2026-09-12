@@ -52,6 +52,22 @@ it('shows a notification that Filaments own bell would have hidden', function ()
         ->assertSee('jumbo.com');
 });
 
+it('discloses bundle terms in notification rows', function (): void {
+    $user = User::factory()->create();
+    storeNotification($user, [
+        'new_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(Bell::class)
+        ->assertSee('2 for €4.00')
+        ->assertSee('Single item €2.85');
+});
+
 it('counts only unread notifications', function (): void {
     $user = User::factory()->create();
     storeNotification($user);

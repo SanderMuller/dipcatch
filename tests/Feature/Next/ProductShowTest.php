@@ -41,6 +41,29 @@ it('shows the product, its price and its shops', function (): void {
         ->assertSee('jumbo.com');
 });
 
+it('discloses bundle terms in headline and shop row', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '2.00');
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'pack_quantity' => 1,
+        'pack_unit' => 'piece',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
+
+    $this->actingAs($user);
+
+    $component = livewire(ProductShow::class, ['product' => $product])
+        ->assertSee('2 for €4.00')
+        ->assertSee('Single item €2.85');
+
+    expect(substr_count($component->html(), '2 for €4.00'))->toBeGreaterThanOrEqual(3);
+});
+
 it('pauses and resumes', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user, active: true);

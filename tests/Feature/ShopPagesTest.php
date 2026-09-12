@@ -31,12 +31,12 @@ it('states the offer window only for the shops whose adapter reads one', functio
         ->assertDontSee('is read with the date it ends', escape: false);
 });
 
-it('warns that a Jumbo multi-buy leaves the shelf price alone', function (): void {
-    // Documented in JumboAdapter: "1+1 gratis" does not lower the price, so a
-    // page that promised otherwise would sell an alert that never fires.
+it('states that Jumbo multi-buy prices include the required quantity', function (): void {
     $this->get(route('shop', ['slug' => 'jumbo-com']))
         ->assertOk()
-        ->assertSee('leave the shelf price alone', escape: false);
+        ->assertSee('effective item price', escape: false)
+        ->assertSee('required quantity', escape: false)
+        ->assertDontSee('leave the shelf price alone', escape: false);
 });
 
 it('links each shop page to the categories that name it, and no others', function (): void {

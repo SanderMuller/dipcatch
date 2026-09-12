@@ -58,6 +58,9 @@ final readonly class ProbeReporter
         return [
             'title' => $snapshot['title'] ?? null,
             'price' => $snapshot['price'] ?? null,
+            'single_item_price' => $snapshot['single_item_price'] ?? null,
+            'bundle_quantity' => $snapshot['bundle_quantity'] ?? null,
+            'bundle_total_price' => $snapshot['bundle_total_price'] ?? null,
             'currency' => $snapshot['currency'] ?? null,
             'in_stock' => $snapshot['in_stock'] ?? null,
             'stock' => match ($snapshot['in_stock'] ?? null) {

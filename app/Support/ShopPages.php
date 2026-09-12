@@ -24,17 +24,13 @@ final class ShopPages
      * ah.nl through `AhApiSource` (Bonus, authoritative window); the rest
      * through their own adapter under `App\PriceAdapters\Hosts`.
      */
-    private const array PROMOTION_AWARE = ['ah.nl', 'aldi.nl', 'dekamarkt.nl', 'dirk.nl', 'lidl.nl'];
+    private const array PROMOTION_AWARE = ['ah.nl', 'aldi.nl', 'dekamarkt.nl', 'dirk.nl', 'jumbo.com', 'lidl.nl'];
+
+    /** Hosts whose adapters convert public multi-buy terms to an effective item price. */
+    private const array BUNDLE_AWARE = ['ah.nl', 'jumbo.com'];
 
     /** Hosts whose adapter reads the article number, which catches a mismatched pack. */
     private const array ARTICLE_NUMBER = ['dierapotheker.nl', 'poiesz.nl', 'vomar.nl'];
-
-    /**
-     * Jumbo states multi-buy offers ("1+1 gratis") without lowering the shelf
-     * price, so the shelf price is what DipCatch stores. Saying so on the page
-     * is better than letting someone find out from an alert that never fires.
-     */
-    private const string MULTI_BUY = 'jumbo.com';
 
     /**
      * @return list<ShopPage>
@@ -118,8 +114,8 @@ final class ShopPages
             __('Every tracked page is re-checked about every :hours hours without you opening anything, and four times as often on Pro.', ['hours' => is_numeric($hours) ? (int) $hours : 24]),
         ];
 
-        if ($host === self::MULTI_BUY) {
-            $facts[] = __('Multi-buy offers such as "1+1 gratis" leave the shelf price alone at :shop, so that shelf price is what DipCatch stores and alerts on.', ['shop' => $name]);
+        if (in_array($host, self::BUNDLE_AWARE, strict: true)) {
+            $facts[] = __('A supported multi-buy offer at :shop is read with the date it ends. DipCatch converts it into an effective item price and always shows the required quantity.', ['shop' => $name]);
         } elseif (in_array($host, self::PROMOTION_AWARE, strict: true)) {
             $facts[] = __('An offer price at :shop is read with the date it ends, so a temporary price is never mistaken for the new normal.', ['shop' => $name]);
         }
@@ -139,7 +135,7 @@ final class ShopPages
     private static function faq(string $host, string $name): array
     {
         $offerAnswer = match (true) {
-            $host === self::MULTI_BUY => __('DipCatch stores the shelf price. :shop runs multi-buy offers that do not lower it, so a "1+1 gratis" week shows the same number as the week before.', ['shop' => $name]),
+            in_array($host, self::BUNDLE_AWARE, strict: true) => __('Yes. DipCatch tracks supported multi-buy offers as an effective item price and shows how many items the offer requires.'),
             in_array($host, self::PROMOTION_AWARE, strict: true) => __('Yes. The offer price is read along with the date it runs until, and the product page shows both, so you can see whether a price is a deal or the new level.', []),
             default => __('DipCatch reads the price :shop shows on the product page. When that price is an offer, that is the price you get alerted on.', ['shop' => $name]),
         };

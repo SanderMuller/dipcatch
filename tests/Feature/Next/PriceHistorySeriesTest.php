@@ -268,6 +268,23 @@ test('shops that state no pack size get no unit line', function (): void {
     expect(chartSeries($product, 'Cheapest per kg (€)'))->toBeEmpty();
 });
 
+test('bundle history rows carry purchase condition into chart tooltip data', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'started_at' => now()->subDay(),
+        'ended_at' => null,
+    ]);
+
+    $chart = makeChartFor($product)->fluxChart();
+
+    expect($chart['hasBundles'])->toBeTrue()
+        ->and($chart['rows'][0]['bundle'])->toBe('2 for €4.00 · Single item €2.85');
+});
+
 test('units that cannot share an axis leave gaps rather than wrong numbers', function (): void {
     $product = Product::factory()->create(['currency' => 'EUR']);
     $perKilo = Shop::factory()->for($product)->create([

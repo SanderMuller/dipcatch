@@ -2,6 +2,7 @@
 
 use App\Jobs\SendDailyDigest;
 use App\Mail\PriceDropDigestMail;
+use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
@@ -194,6 +195,35 @@ test('the digest table renders money as symbol-first, not the ISO code', functio
         ->and($html)->toContain('€0.30')
         ->and($html)->not->toContain('EUR 1.69')
         ->and($html)->toContain('15.0%');
+});
+
+test('digest reads bundle terms from protected triggering check', function (): void {
+    $user = User::factory()->create(['timezone' => 'UTC']);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create();
+    $check = PriceCheck::factory()->for($shop)->create([
+        'price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+    $event = PriceDropEvent::factory()->for($user)->for($product)->create([
+        'price_check_id' => $check->id,
+        'triggered_by_shop_id' => $shop->id,
+        'currency' => 'EUR',
+        'new_price' => '2.00',
+    ]);
+
+    $html = (string) app(Markdown::class)->render('emails.price-drop-digest', [
+        'grouped' => collect([
+            $product->id => ['product' => $product, 'events' => collect([$event])],
+        ]),
+        'totalDrops' => 1,
+        'user' => $user,
+    ]);
+
+    expect($html)->toContain('2 for €4.00')
+        ->and($html)->toContain('Single item €2.85');
 });
 
 test('the digest mailable renders end to end without the mail fake', function (): void {

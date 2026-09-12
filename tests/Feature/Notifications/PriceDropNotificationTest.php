@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -93,4 +94,55 @@ test('via() includes web push only when user has subscriptions AND opted in', fu
     // No subscriptions yet → push channel not included.
     expect($notification->via($optedInNoSubscriptions))->toBeEmpty()
         ->and($notification->via($optedInNoSubscriptions))->not->toContain(WebPushChannel::class);
+});
+
+test('snapshots bundle terms from triggering check when cheapest shop changes', function (): void {
+    $user = User::factory()->create();
+    $product = buildProductAt85($user);
+    $triggerShop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+    ]);
+    $check = PriceCheck::factory()->for($triggerShop)->create([
+        'price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+
+    $notification = new PriceDropNotification($product, buildOutcome(), (string) Str::uuid(), $check);
+    $payload = $notification->toDatabase($user);
+
+    expect($payload['new_price'])->toBe('2.00')
+        ->and($payload['host'])->toBe('jumbo.com')
+        ->and($payload['single_item_price'])->toBe('2.85')
+        ->and($payload['bundle_quantity'])->toBe(2)
+        ->and($payload['bundle_total_price'])->toBe('4.00');
+});
+
+test('triggering scalar check cannot inherit bundle terms from a later cheapest shop', function (): void {
+    $user = User::factory()->create();
+    $product = buildProductAt85($user);
+    $triggerShop = Shop::factory()->for($product)->create([
+        'url' => 'https://dirk.nl/p/fanta',
+        'current_price' => '2.75',
+    ]);
+    $check = PriceCheck::factory()->for($triggerShop)->create(['price' => '2.75']);
+    $cheapest = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $cheapest->id, 'cheapest_price' => '2.00'])->save();
+
+    $payload = new PriceDropNotification($product, buildOutcome(), (string) Str::uuid(), $check)
+        ->toDatabase($user);
+
+    expect($payload['new_price'])->toBe('2.75')
+        ->and($payload['host'])->toBe('dirk.nl')
+        ->and($payload['single_item_price'])->toBeNull()
+        ->and($payload['bundle_quantity'])->toBeNull()
+        ->and($payload['bundle_total_price'])->toBeNull();
 });

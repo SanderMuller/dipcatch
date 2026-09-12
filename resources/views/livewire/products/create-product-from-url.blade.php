@@ -78,6 +78,9 @@
                             <flux:badge color="zinc" size="sm" class="ms-2">Stock unknown</flux:badge>
                         @endif
                     </div>
+                    @if ($bundleLabel = \App\Support\BundlePriceLabel::forSnapshot($snapshot))
+                        <flux:text size="sm" class="mt-1 text-zinc-500">{{ $bundleLabel }}</flux:text>
+                    @endif
                     @if ($previewUnitPrice !== null)
                         <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500">{{ $previewUnitPrice }}</flux:text>
                     @endif

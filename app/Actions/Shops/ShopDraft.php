@@ -2,9 +2,14 @@
 
 namespace App\Actions\Shops;
 
+use App\PriceAdapters\BundleOffer;
+use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\ImageUrl;
 use App\Support\PackSize;
+use Carbon\CarbonImmutable;
+use InvalidArgumentException;
+use Throwable;
 
 /**
  * Everything needed to write one shop row, resolved and flat.
@@ -32,7 +37,23 @@ final readonly class ShopDraft
         public ?string $variantKey = null,
         public ?PackSize $packSize = null,
         public ?string $title = null,
+        public ?string $singleItemPrice = null,
+        public ?BundleOffer $bundleOffer = null,
+        public ?PromotionWindow $promotionWindow = null,
     ) {}
+
+    public function trackedPrice(): string
+    {
+        $singleItemPrice = $this->singleItemPrice ?? $this->price;
+
+        if ($this->bundleOffer === null
+            || ! $this->bundleOffer->isCheaperThan($singleItemPrice)
+            || ($this->promotionWindow !== null && ! $this->promotionWindow->isRunning())) {
+            return $singleItemPrice;
+        }
+
+        return $this->bundleOffer->effectiveUnitPrice();
+    }
 
     /**
      * Flattens a successful probe into the preview shape both the Livewire
@@ -52,7 +73,13 @@ final readonly class ShopDraft
             'title' => $snapshot->title,
             'image_url' => ImageUrl::absolute($snapshot->imageUrl, $outcome->normalizedUrl ?? ''),
             'gtin' => $snapshot->gtin,
-            'price' => $snapshot->price,
+            'price' => $snapshot->trackedPrice(),
+            'single_item_price' => $snapshot->price,
+            'bundle_quantity' => $snapshot->bundleOffer?->quantity,
+            'bundle_total_price' => $snapshot->bundleOffer?->totalPrice,
+            'promotion_starts_at' => $snapshot->promotionWindow?->startsAt?->toIso8601String(),
+            'promotion_ends_at' => $snapshot->promotionWindow?->endsAt->toIso8601String(),
+            'promotion_label' => $snapshot->promotionWindow?->label,
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
             'stock_signal' => $snapshot->stockSignal,
@@ -85,6 +112,17 @@ final readonly class ShopDraft
         ?string $imageSelector = null,
         ?string $variantKey = null,
     ): self {
+        $singleItemPrice = self::string($snapshot, 'single_item_price') ?? self::string($snapshot, 'price') ?? '';
+        $bundleOffer = self::bundleOffer($snapshot);
+        $promotionWindow = self::promotionWindow($snapshot);
+        $hasPromotionDate = self::string($snapshot, 'promotion_starts_at') !== null
+            || self::string($snapshot, 'promotion_ends_at') !== null;
+
+        if ($bundleOffer !== null
+            && (! $bundleOffer->isCheaperThan($singleItemPrice) || ($hasPromotionDate && $promotionWindow === null))) {
+            $bundleOffer = null;
+        }
+
         return new self(
             url: $url,
             adapterKey: $adapterKey,
@@ -103,7 +141,53 @@ final readonly class ShopDraft
                 self::string($snapshot, 'title'),
             ),
             title: self::string($snapshot, 'title'),
+            singleItemPrice: $singleItemPrice,
+            bundleOffer: $bundleOffer,
+            promotionWindow: $promotionWindow,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    private static function bundleOffer(array $snapshot): ?BundleOffer
+    {
+        $quantity = $snapshot['bundle_quantity'] ?? null;
+        $total = self::string($snapshot, 'bundle_total_price');
+
+        if (! is_int($quantity) || $total === null) {
+            return null;
+        }
+
+        try {
+            return new BundleOffer($quantity, $total);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    private static function promotionWindow(array $snapshot): ?PromotionWindow
+    {
+        $endsAt = self::string($snapshot, 'promotion_ends_at');
+
+        if ($endsAt === null) {
+            return null;
+        }
+
+        try {
+            return PromotionWindow::make(
+                endsAt: CarbonImmutable::parse($endsAt),
+                startsAt: ($startsAt = self::string($snapshot, 'promotion_starts_at')) === null
+                    ? null
+                    : CarbonImmutable::parse($startsAt),
+                label: self::string($snapshot, 'promotion_label'),
+            );
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**

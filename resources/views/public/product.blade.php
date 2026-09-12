@@ -3,16 +3,15 @@
     use App\Support\MoneyFormatter;
 
     $image = $product->safeImageUrl();
-    // Suppress the denormalized `cheapest_price` when no eligible shop is
-    // currently visible. The denorm is recomputed asynchronously after each
-    // CheckShopPrice; between "all shops became ineligible" and the next
-    // recompute, the column carries a stale number. Rendering it next to
-    // "0 shops tracked" misleads — fall back to the no-price treatment.
-    $priceLine = ($product->cheapest_price !== null && $shops->isNotEmpty())
-        ? MoneyFormatter::format((string) $product->cheapest_price, $product->currency)
+    // Use the first visible shop so the headline and its bundle terms describe
+    // the same live row, even while the denormalized product price is stale.
+    $headlineShop = $shops->first();
+    $priceLine = $headlineShop?->current_price !== null
+        ? MoneyFormatter::format((string) $headlineShop->current_price, $product->currency)
         : null;
+    $headlineBundleLabel = \App\Support\BundlePriceLabel::forShop($headlineShop);
     $ogDescription = $priceLine !== null
-        ? "Tracked on DipCatch: cheapest at {$priceLine}"
+        ? "Tracked on DipCatch: cheapest at {$priceLine}" . ($headlineBundleLabel === null ? '' : " · {$headlineBundleLabel}")
         : 'Tracked on DipCatch.';
     $canonicalUrl = $product->publicShareUrl() ?? url('/');
     $hasChart = ! empty($chart);
@@ -94,6 +93,9 @@
 
                 @if ($priceLine !== null)
                     <p class="mt-3 text-3xl font-bold tabular-nums">{{ $priceLine }}</p>
+                    @if ($headlineBundleLabel !== null)
+                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $headlineBundleLabel }}</p>
+                    @endif
                     <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                         Cheapest across {{ $shops->count() }} {{ $shops->count() === 1 ? 'shop' : 'shops' }} tracked.
                     </p>
@@ -145,7 +147,16 @@
                                         x: { type: 'time', time: { unit: 'day' }, grid: { display: false } },
                                         y: { beginAtZero: false },
                                     },
-                                    plugins: { legend: { display: false } },
+                                    plugins: {
+                                        legend: { display: false },
+                                        tooltip: {
+                                            callbacks: {
+                                                afterLabel: function (context) {
+                                                    return context.raw.bundle || '';
+                                                },
+                                            },
+                                        },
+                                    },
                                 },
                             });
                         };
@@ -193,6 +204,9 @@
                                             <path d="M6 12l4-4-4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                         </svg>
                                     </div>
+                                    @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($shop))
+                                        <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $bundleLabel }}</p>
+                                    @endif
                                     @php
                                         $shopUnitPrice = $shop->unitPrice();
                                     @endphp

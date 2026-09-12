@@ -100,7 +100,7 @@ class Dashboard extends Component
      * unread. The bell clears itself on open, so without this a drop that
      * already happened is unreachable.
      *
-     * @return Collection<int, array{title: string, url: ?string, percent: ?string, amount: ?string, sentAt: ?string}>
+     * @return Collection<int, array{title: string, url: ?string, percent: ?string, amount: ?string, bundle: non-falsy-string|null, sentAt: ?string}>
      */
     private function recentAlerts(): Collection
     {
@@ -134,6 +134,9 @@ class Dashboard extends Component
                     'url' => $productId === null ? null : route('app.products.show', $productId),
                     'percent' => $percent,
                     'amount' => is_numeric($amount) ? MoneyFormatter::format((string) $amount, $currency) : null,
+                    'bundle' => is_int($data['bundle_quantity'] ?? null) && is_numeric($data['bundle_total_price'] ?? null)
+                        ? $data['bundle_quantity'] . ' for ' . MoneyFormatter::format((string) $data['bundle_total_price'], $currency)
+                        : null,
                     'sentAt' => $notification->created_at?->diffForHumans(),
                 ];
             })

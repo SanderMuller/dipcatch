@@ -104,6 +104,9 @@ test('lang/nl.json carries no key the marketing views no longer use', function (
         // Same again for the per-shop pages: their copy is assembled in PHP
         // from what each adapter can actually read.
         app_path('Support/ShopPages.php'),
+        // Bundle price copy also appears on signed-in product pages.
+        app_path('Support/BundlePriceLabel.php'),
+        resource_path('views/livewire/products/product-show.blade.php'),
         // Mail subjects and bodies for "request a shop".
         app_path('Support/ShopRequestMail.php'),
     ];

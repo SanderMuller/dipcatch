@@ -161,7 +161,7 @@ final readonly class DetectDrop
             }
 
             if ($this->withinHourlyLimit($user)) {
-                $user->notify(new PriceDropNotification($locked, $outcome, $event->id));
+                $user->notify(new PriceDropNotification($locked, $outcome, $event->id, $triggerCheck));
             } else {
                 Log::warning('Notification suppressed by hourly rate limit', [
                     'user_id' => $user->id,
