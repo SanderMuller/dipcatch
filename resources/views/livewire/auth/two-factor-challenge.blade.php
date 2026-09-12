@@ -50,26 +50,21 @@
                 <div class="space-y-5 text-center">
                     <div x-show="!showRecoveryInput">
                         <div class="flex items-center justify-center my-5">
-                            <flux:otp
-                                x-model="code"
-                                length="6"
-                                name="code"
-                                label="OTP Code"
-                                label:sr-only
-                                autocomplete="one-time-code"
-                                class="mx-auto"
-                             />
+                            <x-password-manager-otp x-model="code" class="mx-auto" />
                         </div>
                     </div>
 
                     <div x-show="showRecoveryInput">
                         <div class="my-5">
                             <flux:input
+                                id="recovery_code"
                                 type="text"
                                 name="recovery_code"
+                                :label="__('Recovery code')"
                                 x-ref="recovery_code"
                                 x-bind:required="showRecoveryInput"
                                 autocomplete="off"
+                                data-1p-ignore
                                 x-model="recovery_code"
                             />
                         </div>

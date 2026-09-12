@@ -12,6 +12,7 @@
 
             <!-- Email Address -->
             <flux:input
+                id="email"
                 name="email"
                 :label="__('Email address')"
                 :value="old('email')"
@@ -25,6 +26,7 @@
             <!-- Password -->
             <div class="relative">
                 <flux:input
+                    id="password"
                     name="password"
                     :label="__('Password')"
                     type="password"

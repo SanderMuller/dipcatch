@@ -2,15 +2,12 @@
     'email',
 ])
 
-{{-- Password managers skip type=hidden and display:none. Keep a clipped
-     readonly email in the layout so they can bind the nearby password. --}}
-<input
-    type="email"
+<flux:input
+    id="username"
     name="username"
-    value="{{ $email }}"
+    :label="__('Email')"
+    type="email"
+    :value="$email"
     autocomplete="username"
     readonly
-    tabindex="-1"
-    aria-hidden="true"
-    class="sr-only"
->
+/>

@@ -51,10 +51,14 @@
             @if ($shareUrl)
                 <flux:input
                     :label="__('Public link')"
+                    id="share-url"
+                    name="share-url"
                     value="{{ $shareUrl }}"
                     readonly
                     copyable
                     class="font-mono"
+                    autocomplete="off"
+                    data-1p-ignore
                 />
 
                 <div class="flex flex-wrap gap-2 border-t border-zinc-950/5 pt-4 dark:border-white/10">
