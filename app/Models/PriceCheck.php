@@ -4,18 +4,18 @@ namespace App\Models;
 
 use App\Enums\ScrapeStatus;
 use Database\Factories\PriceCheckFactory;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[WithoutTimestamps]
+#[Unguarded]
 class PriceCheck extends Model
 {
     /** @use HasFactory<PriceCheckFactory> */
     use HasFactory;
-
-    protected $guarded = [];
 
     /**
      * @return array<string, string>

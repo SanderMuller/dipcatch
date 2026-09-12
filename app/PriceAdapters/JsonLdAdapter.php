@@ -144,7 +144,6 @@ final readonly class JsonLdAdapter implements ShopAdapter
             price: $price,
             currency: strtoupper($currency),
             inStock: $inStock,
-            stockSignal: $stockSignal,
             raw: ['offer' => $shop],
             packSize: $packSize,
             // Only when the offer stated one: otherwise the title fallback
@@ -156,6 +155,7 @@ final readonly class JsonLdAdapter implements ShopAdapter
             // The offer supplied the price, so it speaks for the promotion
             // too: an offer that no longer states an end date has none.
             promotionWindowAuthoritative: true,
+            stockSignal: $stockSignal,
         ));
     }
 

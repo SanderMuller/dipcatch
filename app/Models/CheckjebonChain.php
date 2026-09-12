@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Model;
 
@@ -18,10 +19,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property CarbonImmutable $refreshed_at
  */
 #[WithoutTimestamps]
+#[Unguarded]
 class CheckjebonChain extends Model
 {
-    protected $guarded = [];
-
     public function productUrl(string $link): string
     {
         return $this->base_url . $link;

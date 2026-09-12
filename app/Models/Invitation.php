@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Carbon\CarbonImmutable;
 use Database\Factories\InvitationFactory;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,12 +19,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $expires_at
  * @property User|null $inviter
  */
+#[Unguarded]
 class Invitation extends Model
 {
     /** @use HasFactory<InvitationFactory> */
     use HasFactory, HasUuids;
-
-    protected $guarded = [];
 
     /**
      * @return array<string, string>

@@ -73,7 +73,6 @@ final readonly class DierapothekerAdapter implements HostSpecificAdapter, ShopAd
             inStock: ! is_string($availability) || self::isBuyable($availability),
             raw: ['source' => 'dierapotheker'],
             packSize: self::packSize($html),
-            packSizeAuthoritative: false,
             gtin: self::gtin($crawler),
             gtinAuthoritative: true,
         ));

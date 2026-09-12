@@ -1,7 +1,12 @@
 <?php declare(strict_types=1);
 
+use App\Livewire\AppCommandPalette;
+use App\Livewire\Connections\ConnectionsPage;
+use App\Livewire\Products\ProductList;
+use App\Livewire\Products\ProductShow;
 use App\Livewire\Settings\Security;
 use App\Models\Invitation;
+use App\Models\Product;
 use App\Models\User;
 use Carbon\Carbon;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
@@ -32,7 +37,10 @@ test('guest credential forms expose password-manager autocomplete tokens', funct
             Assert::fail('Expected a named form control.');
         }
 
-        expect(formControl($html, $name)->getAttribute('autocomplete'))->toBe($autocomplete);
+        $control = formControl($html, $name);
+
+        expect($control->getAttribute('autocomplete'))->toBe($autocomplete)
+            ->and($control->getAttribute('id'))->toBe($name);
     }
 })->with([
     'login' => ['login', [], ['email' => 'username', 'password' => 'current-password']],
@@ -62,10 +70,13 @@ test('the invitation form associates the invite email with the new password', fu
 
     expect($email->getAttribute('autocomplete'))->toBe('username')
         ->and($email->getAttribute('value'))->toBe('invitee@dipcatch.test')
+        ->and($email->getAttribute('id'))->toBe('email')
         ->and($email->hasAttribute('readonly'))->toBeTrue()
         ->and($email->hasAttribute('disabled'))->toBeFalse()
         ->and(formControl($html, 'password')->getAttribute('autocomplete'))->toBe('new-password')
-        ->and(formControl($html, 'password_confirmation')->getAttribute('autocomplete'))->toBe('new-password');
+        ->and(formControl($html, 'password')->getAttribute('id'))->toBe('password')
+        ->and(formControl($html, 'password_confirmation')->getAttribute('autocomplete'))->toBe('new-password')
+        ->and(formControl($html, 'password_confirmation')->getAttribute('id'))->toBe('password_confirmation');
 });
 
 test('the confirm-password form associates the signed-in email with the current password', function (): void {
@@ -79,7 +90,8 @@ test('the confirm-password form associates the signed-in email with the current 
         ->getContent();
 
     expectPasswordManagerUsername($html, 'member@dipcatch.test');
-    expect(formControl($html, 'password')->getAttribute('autocomplete'))->toBe('current-password');
+    expect(formControl($html, 'password')->getAttribute('autocomplete'))->toBe('current-password')
+        ->and(formControl($html, 'password')->getAttribute('id'))->toBe('password');
 });
 
 test('the security form associates the signed-in email with the password change', function (): void {
@@ -95,8 +107,11 @@ test('the security form associates the signed-in email with the password change'
 
     expectPasswordManagerUsername($html, 'member@dipcatch.test');
     expect(formControl($html, 'current_password')->getAttribute('autocomplete'))->toBe('current-password')
+        ->and(formControl($html, 'current_password')->getAttribute('id'))->toBe('current_password')
         ->and(formControl($html, 'password')->getAttribute('autocomplete'))->toBe('new-password')
-        ->and(formControl($html, 'password_confirmation')->getAttribute('autocomplete'))->toBe('new-password');
+        ->and(formControl($html, 'password')->getAttribute('id'))->toBe('password')
+        ->and(formControl($html, 'password_confirmation')->getAttribute('autocomplete'))->toBe('new-password')
+        ->and(formControl($html, 'password_confirmation')->getAttribute('id'))->toBe('password_confirmation');
 });
 
 test('the profile email field is not marked as a username next to the delete-account password', function (): void {
@@ -109,7 +124,8 @@ test('the profile email field is not marked as a username next to the delete-acc
         ->assertOk()
         ->getContent();
 
-    expect(formControl($html, 'email')->getAttribute('autocomplete'))->toBe('email');
+    expect(formControl($html, 'email')->getAttribute('autocomplete'))->toBe('email')
+        ->and(formControl($html, 'email')->getAttribute('id'))->toBe('email');
 });
 
 test('the delete-account form associates the signed-in email with the current password', function (): void {
@@ -122,7 +138,8 @@ test('the delete-account form associates the signed-in email with the current pa
     $html = Livewire::test('settings.delete-user-form')->html();
 
     expectPasswordManagerUsername($html, 'member@dipcatch.test');
-    expect(formControl($html, 'password')->getAttribute('autocomplete'))->toBe('current-password');
+    expect(formControl($html, 'password')->getAttribute('autocomplete'))->toBe('current-password')
+        ->and(formControl($html, 'password')->getAttribute('id'))->toBe('password');
 });
 
 test('the two-factor challenge marks the authenticator pin as a one-time code', function (): void {
@@ -145,8 +162,18 @@ test('the two-factor challenge marks the authenticator pin as a one-time code', 
     $html = (string) $this->get(route('two-factor.login'))->assertOk()->getContent();
 
     expectPasswordManagerUsername($html, 'member@dipcatch.test');
-    expect(formControl($html, 'code')->getAttribute('autocomplete'))->toBe('one-time-code')
-        ->and(formControl($html, 'recovery_code')->getAttribute('autocomplete'))->toBe('off');
+    expectOneTimeCodeOnAnInput($html);
+
+    $recovery = formControl($html, 'recovery_code');
+
+    expect($recovery->getAttribute('autocomplete'))->toBe('off')
+        ->and($recovery->getAttribute('id'))->toBe('recovery_code')
+        ->and($recovery->hasAttribute('data-1p-ignore'))->toBeTrue();
+
+    $label = fieldLabel($html, '#recovery_code');
+
+    Assert::assertStringContainsString('Recovery code', $label->text());
+    Assert::assertStringNotContainsString('sr-only', (string) $label->attr('class'));
 });
 
 test('two-factor setup does not offer the secret as a password', function (): void {
@@ -178,7 +205,68 @@ test('two-factor setup does not offer the secret as a password', function (): vo
 
     $verifying = $enabled->call('showVerificationIfNecessary');
 
-    expect(formControl($verifying->html(), 'code')->getAttribute('autocomplete'))->toBe('one-time-code');
+    expectOneTimeCodeOnAnInput($verifying->html());
+});
+
+test('copyable secret fields are ignored by password managers', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create([
+        'user_id' => $user->id,
+        'share_slug' => str_repeat('a', 32),
+    ]);
+
+    $this->actingAs($user);
+
+    $mcp = formControl(Livewire::test(ConnectionsPage::class)->html(), 'mcp-endpoint');
+
+    expect($mcp->hasAttribute('data-1p-ignore'))->toBeTrue()
+        ->and($mcp->getAttribute('autocomplete'))->toBe('off')
+        ->and($mcp->hasAttribute('id'))->toBeFalse();
+
+    $share = formControl(Livewire::test(ProductShow::class, ['product' => $product])->html(), 'share-url');
+
+    expect($share->hasAttribute('data-1p-ignore'))->toBeTrue()
+        ->and($share->getAttribute('autocomplete'))->toBe('off')
+        ->and($share->hasAttribute('id'))->toBeFalse();
+});
+
+test('the command palette search is ignored by password managers', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $input = ignoredSearchInput(
+        Livewire::test(AppCommandPalette::class)->html(),
+        'Search pages and recent products…',
+    );
+
+    expect($input->getAttribute('autocomplete'))->toBe('off');
+});
+
+test('the product list search is ignored by password managers', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $input = ignoredSearchInput(
+        Livewire::test(ProductList::class)->html(),
+        'Search your products',
+    );
+
+    expect($input->getAttribute('autocomplete'))->toBe('off');
+});
+
+test('the passkey name field is ignored by password managers', function (): void {
+    $this->skipUnlessFortifyHas(Features::passkeys());
+
+    Features::passkeys([
+        'confirmPassword' => true,
+    ]);
+
+    $this->actingAs(User::factory()->create())
+        ->withSession(['auth.password_confirmed_at' => Carbon::now()->getTimestamp()]);
+
+    $input = formControl(Livewire::test(Security::class)->html(), 'passkey-name');
+
+    expect($input->hasAttribute('data-1p-ignore'))->toBeTrue()
+        ->and($input->getAttribute('autocomplete'))->toBe('off')
+        ->and($input->getAttribute('id'))->toBe('passkey-name');
 });
 
 function formControl(string $html, string $name): DOMElement
@@ -193,6 +281,37 @@ function formControl(string $html, string $name): DOMElement
     return $node;
 }
 
+function expectOneTimeCodeOnAnInput(string $html): void
+{
+    $code = formControl($html, 'code');
+
+    Assert::assertSame('one-time-code', $code->getAttribute('autocomplete'));
+    Assert::assertSame('code', $code->getAttribute('id'));
+
+    $otpInputs = new Crawler($html)->filter('ui-otp[name="code"] input');
+    Assert::assertCount(6, $otpInputs);
+    Assert::assertCount(1, new Crawler($html)->filter('input[autocomplete="one-time-code"]'));
+
+    $otpInputs->each(static function (Crawler $node, int $index): void {
+        $input = $node->getNode(0);
+        Assert::assertInstanceOf(DOMElement::class, $input);
+
+        if ($index === 0) {
+            Assert::assertSame('one-time-code', $input->getAttribute('autocomplete'));
+            Assert::assertFalse($input->hasAttribute('data-1p-ignore'));
+
+            return;
+        }
+
+        Assert::assertSame('off', $input->getAttribute('autocomplete'));
+        Assert::assertTrue($input->hasAttribute('data-1p-ignore'));
+    });
+
+    $label = fieldLabel($html, 'ui-otp[name="code"]');
+    Assert::assertStringContainsString('Authentication code', $label->text());
+    Assert::assertStringNotContainsString('sr-only', (string) $label->attr('class'));
+}
+
 function expectPasswordManagerUsername(string $html, string $email): void
 {
     $username = formControl($html, 'username');
@@ -200,7 +319,42 @@ function expectPasswordManagerUsername(string $html, string $email): void
     Assert::assertSame('email', $username->getAttribute('type'));
     Assert::assertSame('username', $username->getAttribute('autocomplete'));
     Assert::assertSame($email, $username->getAttribute('value'));
+    Assert::assertSame('username', $username->getAttribute('id'));
     Assert::assertTrue($username->hasAttribute('readonly'));
     Assert::assertFalse($username->hasAttribute('disabled'));
-    Assert::assertStringContainsString('sr-only', $username->getAttribute('class'));
+    Assert::assertFalse($username->hasAttribute('aria-hidden'));
+    Assert::assertStringNotContainsString('sr-only', $username->getAttribute('class'));
+
+    $label = fieldLabel($html, '#username');
+    Assert::assertStringContainsString('Email', $label->text());
+    Assert::assertStringNotContainsString('sr-only', (string) $label->attr('class'));
+}
+
+function fieldLabel(string $html, string $controlSelector): Crawler
+{
+    $control = new Crawler($html)->filter($controlSelector);
+    Assert::assertCount(1, $control);
+
+    $label = $control
+        ->closest('ui-field, [data-flux-field]')
+        ?->filter('ui-label, label');
+
+    Assert::assertNotNull($label);
+    Assert::assertCount(1, $label);
+
+    return $label;
+}
+
+function ignoredSearchInput(string $html, string $placeholder): DOMElement
+{
+    $matches = new Crawler($html)
+        ->filter(sprintf('input[placeholder="%s"]', $placeholder));
+
+    Assert::assertCount(1, $matches);
+
+    $input = $matches->getNode(0);
+    Assert::assertInstanceOf(DOMElement::class, $input);
+    Assert::assertTrue($input->hasAttribute('data-1p-ignore'));
+
+    return $input;
 }

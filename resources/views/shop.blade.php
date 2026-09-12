@@ -77,7 +77,7 @@
                         <ul role="list" class="mt-5 flex flex-wrap gap-2">
                             @foreach ($related as $useCase)
                                 <li>
-                                    <a href="{{ route('use-case', [...$langQuery, 'slug' => $useCase->slug]) }}" class="inline-flex items-center rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800">{{ $useCase->heading }}</a>
+                                    <a href="{{ route('use-case', [...$langQuery, 'slug' => $useCase->slug]) }}" class="inline-flex items-center rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900">{{ $useCase->heading }}</a>
                                 </li>
                             @endforeach
                         </ul>
@@ -94,6 +94,10 @@
                             </div>
                         @endforeach
                     </div>
+                    <p class="mt-6 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">
+                        {{ __('Paste a product URL from any other shop as well. Most shops work. A reader of its own is written when a generic read is not enough.') }}
+                        <x-shop-request-link :host="$shop->host" class="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300" />
+                    </p>
                 </section>
 
                 <section class="mt-16">
@@ -101,7 +105,7 @@
                     <ul role="list" class="mt-5 flex flex-wrap gap-2">
                         @foreach ($others as $other)
                             <li>
-                                <a href="{{ route('shop', [...$langQuery, 'slug' => $other->slug]) }}" class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800">
+                                <a href="{{ route('shop', [...$langQuery, 'slug' => $other->slug]) }}" class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900">
                                     <span style="background-image: url('{{ $other->favicon() }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
                                     <span>{{ $other->name }}</span>
                                 </a>

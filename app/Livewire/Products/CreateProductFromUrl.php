@@ -7,17 +7,17 @@ use App\Actions\Products\ProductDraft;
 use App\Actions\Shops\ProbeOutcome;
 use App\Billing\PlanLimitReached;
 use App\Livewire\Concerns\DrivesShopProbe;
-use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Services\Drops\TierDefaults;
 use App\Support\UrlNormalizer;
 use Filament\Notifications\Notification;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\View\View;
 use Livewire\Component;
 use RuntimeException;
+use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
 use SanderMuller\FluentValidation\FluentRule;
 use SanderMuller\FluentValidation\HasFluentValidation;
 
@@ -52,14 +52,16 @@ class CreateProductFromUrl extends Component
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, FluentRuleContract>
      */
     public function rules(): array
     {
         return [
             'title' => FluentRule::string('Title')->required()->max(255),
             'imageUrl' => FluentRule::url('Image URL')->nullable()->max(2048),
-            'thresholdPct' => FluentRule::numeric('Drop threshold (%)')->required()->min(0.01)->max(99.99),
+            'thresholdPct' => FluentRule::numeric('Drop threshold (%)')
+                ->required()
+                ->between(0.01, 99.98999999999999),
             'thresholdAbs' => FluentRule::numeric('Drop threshold (absolute)')->required()->min(0.01),
         ];
     }
@@ -83,7 +85,7 @@ class CreateProductFromUrl extends Component
         if ($this->normalizedUrl !== null) {
             $existing = Shop::query()
                 ->where('url_hash', UrlNormalizer::hash($this->normalizedUrl))
-                ->whereHas('product', fn (Builder $query) => $query->where('user_id', auth()->id()))
+                ->whereHas('product', fn (EloquentQueryBuilder $query) => $query->where('user_id', auth()->id()))
                 ->with('product')
                 ->first();
 

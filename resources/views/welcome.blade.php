@@ -49,13 +49,14 @@
     ];
     $freeProducts = \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->maxProducts();
     $faq = [
-        ['q' => __('Which shops work?'), 'a' => __('DipCatch has built-in support for Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart, including AH Bonus and Dirk promo prices. Many other webshops publish their product data in a form DipCatch can read. Shops that block bots or only load prices with JavaScript may not work. You see the result before you confirm.')],
+        ['q' => __('Which shops work?'), 'a' => __('Paste a product URL. Most webshops work if the price is on the page. Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart have a reader of their own, including AH Bonus and Dirk promo prices. Shops that block bots or only load prices with JavaScript may not work. You see the result before you confirm.')],
+        ['q' => __('What if my shop is not listed?'), 'a' => __('Paste it anyway. The names on this site are shops with a reader of their own, not the only shops that work. If the price does not come through, send a product URL.')],
         ['q' => __('How often are prices checked?'), 'a' => __('A shop is checked the moment you add it or change its link. After that DipCatch re-checks it about every :hours hours, give or take half an hour.', ['hours' => config('dipcatch.recheck.interval_hours', 6)])],
         ['q' => __('Is it free?'), 'a' => $freeProducts === null
             ? __('Yes. The free plan has no product limit, you do not need a card, and there is no trial that runs out.')
             : __('Yes, for your first :count products. You do not need a card, and there is no trial that runs out. Pro lifts the limit when you want more.', ['count' => $freeProducts])],
         ['q' => __('Do I need an extension or app?'), 'a' => __('No. You paste a link in your browser. Alerts arrive as a daily email digest, under the bell in the app, or as a browser push if you turn that on.')],
-        ['q' => __('Can I use DipCatch in ChatGPT or Claude?'), 'a' => __('Yes, through MCP. Open Connections in your account: the Claude button opens Claude with DipCatch filled in, any other app that speaks MCP can use the endpoint shown there, and that page says what each assistant needs today. You can then ask it to add a product, add a shop to it, set a threshold, or show you the price history. Adding takes two steps on purpose: the assistant first shows you the title and price it read from the page, and stores it only once you agree.')],
+        ['q' => __('Can I use DipCatch in ChatGPT or Claude?'), 'a' => __('Yes. Ask it to start tracking something, add another shop to a product you already follow, change when you get alerted, or show you a price history. When it adds a shop or a new product it reads that page back to you first, title and price, so you can spot a link that points at the wrong pack. Connect DipCatch once on the Connections page in your account. That page tells you what Claude and ChatGPT each need today.')],
         ['q' => __('Can I compare different pack sizes?'), 'a' => __('Yes. When DipCatch can read the pack size, it shows a price per kilo, litre or piece next to that shop, so a 200 g and a 370 g bag compare fairly.')],
         ['q' => __('Can I share a comparison?'), 'a' => __('Yes. Every product has an optional public page with the current price per shop and, where there is history, a chart of the cheapest price over the last 90 days. Anyone with the link can view it. It shows nothing about your account.')],
         ['q' => __('How do I know when a product is cheaper somewhere else?'), 'a' => __('Paste the link from the shop you buy at now, then add the same product from the others. DipCatch tells you when the cheapest one drops past your threshold.')],
@@ -143,6 +144,10 @@
                                         <a href="{{ route('shops', $langQuery) }}" class="underline underline-offset-4 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('and many other webshops') }}</a>
                                     </li>
                                 </ul>
+                                <p class="mt-3 max-w-[48ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
+                                    {{ __('Most shops work if you paste a product link. The names above are shops with a reader of their own.') }}
+                                    <x-shop-request-link class="hover:text-zinc-700 dark:hover:text-zinc-300" />
+                                </p>
 
                                 @php($useCases = \App\Support\UseCases::all())
 

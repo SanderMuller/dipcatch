@@ -48,7 +48,7 @@ final readonly class ShopPage
         $related = [];
 
         foreach (UseCases::all() as $useCase) {
-            if (in_array($useCase->slug, $this->useCases, true)) {
+            if (in_array($useCase->slug, $this->useCases, strict: true)) {
                 $related[] = $useCase;
             }
         }

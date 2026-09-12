@@ -34,7 +34,7 @@ final readonly class TableCopier
             }
 
             $targetColumns[] = $column['name'];
-            if (in_array($column['type_name'], ['bool', 'boolean'], true)) {
+            if (in_array($column['type_name'], ['bool', 'boolean'], strict: true)) {
                 $booleanColumns[] = $column['name'];
             }
         }
@@ -124,13 +124,13 @@ final readonly class TableCopier
     {
         $values = [];
         foreach ($row as $column => $value) {
-            if (! is_string($column) || ! in_array($column, $targetColumns, true)) {
+            if (! is_string($column) || ! in_array($column, $targetColumns, strict: true)) {
                 continue;
             }
 
-            if (in_array($column, $deferredColumns, true)) {
+            if (in_array($column, $deferredColumns, strict: true)) {
                 $values[$column] = null;
-            } elseif (in_array($column, $booleanColumns, true) && $value !== null) {
+            } elseif (in_array($column, $booleanColumns, strict: true) && $value !== null) {
                 $values[$column] = (bool) $value;
             } else {
                 $values[$column] = $value;

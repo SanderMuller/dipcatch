@@ -126,8 +126,8 @@ test('via() includes the WebPush channel only when toggle is on AND user has at 
 
     $notification = new PriceDropNotification($product, $outcome, 'fake-id');
 
-    expect($notification->via($togglesOnNoSub))->toBe([])
-        ->and($notification->via($togglesOffWithSub))->toBe([])
+    expect($notification->via($togglesOnNoSub))->toBeEmpty()
+        ->and($notification->via($togglesOffWithSub))->toBeEmpty()
         ->and($notification->via($togglesOnWithSub))->toBe([WebPushChannel::class]);
 });
 
@@ -153,7 +153,7 @@ test('toWebPush returns a WebPushMessage with title, body, icon and click url', 
     expect($payload['title'])->toBe('Price drop: Acme Headphones')
         ->and($payload['body'])->toBe('Acme Headphones is now €85.00 at bol.com')
         ->and($payload['icon'])->toBe('https://example.com/img.png')
-        ->and($payload['data'])->toMatchArray(['url' => $payload['data']['url']]);
-
-    expect($payload['data']['url'])->toBeString()->and($payload['data']['url'])->not->toBe('');
+        ->and($payload['data'])->toMatchArray(['url' => $payload['data']['url']])
+        ->and($payload['data']['url'])->toBeString()
+        ->and($payload['data']['url'])->not->toBe('');
 });

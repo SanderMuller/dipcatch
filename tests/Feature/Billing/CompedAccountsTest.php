@@ -109,9 +109,8 @@ it('keeps everything but blocks new products when a comp ends', function (): voi
     $user = $user->fresh() ?? $user;
 
     expect($user->products()->count())->toBe($freeAllowance + 1)
-        ->and($limits->canAddProduct($user))->toBeFalse();
-
-    expect(fn () => $limits->guardProduct($user))->toThrow(PlanLimitReached::class);
+        ->and($limits->canAddProduct($user))->toBeFalse()
+        ->and(fn () => $limits->guardProduct($user))->toThrow(PlanLimitReached::class);
 });
 
 it('keeps the history stamp after a comp ends, because the stamp never retracts', function (): void {

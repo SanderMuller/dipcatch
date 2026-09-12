@@ -8,6 +8,7 @@
             <x-password-manager-username :email="auth()->user()->email" />
 
             <flux:input
+                id="current_password"
                 wire:model="current_password"
                 :label="__('Current password')"
                 type="password"
@@ -16,6 +17,7 @@
                 viewable
             />
             <flux:input
+                id="password"
                 wire:model="password"
                 :label="__('New password')"
                 type="password"
@@ -24,6 +26,7 @@
                 viewable
             />
             <flux:input
+                id="password_confirmation"
                 wire:model="password_confirmation"
                 :label="__('Confirm password')"
                 type="password"
@@ -112,15 +115,7 @@
                     @if ($showVerificationStep)
                         <div class="space-y-6">
                             <div class="flex flex-col items-center space-y-3 justify-center">
-                                <flux:otp
-                                    name="code"
-                                    wire:model="code"
-                                    length="6"
-                                    label="OTP Code"
-                                    label:sr-only
-                                    autocomplete="one-time-code"
-                                    class="mx-auto"
-                                />
+                                <x-password-manager-otp wire:model="code" class="mx-auto" />
                             </div>
 
                             <div class="flex items-center space-x-3">

@@ -12,7 +12,7 @@ dataset('valid_selectors', [
 ]);
 
 test('valid CSS selectors pass', function (string $selector): void {
-    expect(runRule(new ValidCssSelector(), 'selector', $selector))->toBe([]);
+    expect(runRule(new ValidCssSelector(), 'selector', $selector))->toBeEmpty();
 })->with('valid_selectors');
 
 dataset('invalid_selectors', [
@@ -22,11 +22,11 @@ dataset('invalid_selectors', [
 
 test('invalid CSS selectors fail with a descriptive error', function (string $selector): void {
     $errors = runRule(new ValidCssSelector(), 'selector', $selector);
-    expect($errors)->not->toBe([])
+    expect($errors)->not->toBeEmpty()
         ->and($errors[0])->toContain('selector');
 })->with('invalid_selectors');
 
 test('empty value is not a CSS-selector failure (required validates separately)', function (): void {
-    expect(runRule(new ValidCssSelector(), 'selector', ''))->toBe([])
-        ->and(runRule(new ValidCssSelector(), 'selector', '   '))->toBe([]);
+    expect(runRule(new ValidCssSelector(), 'selector', ''))->toBeEmpty()
+        ->and(runRule(new ValidCssSelector(), 'selector', '   '))->toBeEmpty();
 });

@@ -20,6 +20,8 @@ use Pest\Expectation;
 use PHPUnit\Framework\Assert;
 use Tests\TestCase;
 
+use function Pest\Livewire\livewire;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -99,6 +101,29 @@ function clearRedisRateLimiter(string $limiterName, string $key = '127.0.0.1'): 
         md5($limiterName . $key),
         $limiterName . ':' . $key,
     );
+}
+
+/**
+ * Configure both social login providers with placeholder credentials.
+ *
+ * Set wholesale, not key by key: the local `.env` may carry its own values,
+ * and a call that only overwrote one key would inherit the rest. Lives here
+ * rather than in a test file because a function declared in one test file does
+ * not exist for a `--filter` run of another.
+ */
+function configureSocialProviders(): void
+{
+    config()->set('services.google', [
+        'client_id' => 'google-client-id',
+        'client_secret' => 'google-client-secret',
+        'redirect' => 'https://dipcatch.test/auth/google/callback',
+    ]);
+
+    config()->set('services.apple', [
+        'client_id' => 'apple-client-id',
+        'client_secret' => 'apple-client-secret',
+        'redirect' => 'https://dipcatch.test/auth/apple/callback',
+    ]);
 }
 
 /**
@@ -330,7 +355,7 @@ function lidlPage(
  */
 function mountShopsRelationManager(Product $product): Testable
 {
-    return Pest\Livewire\livewire(ProductShow::class, ['product' => $product]);
+    return livewire(ProductShow::class, ['product' => $product]);
 }
 
 /**
@@ -338,6 +363,7 @@ function mountShopsRelationManager(Product $product): Testable
  * built from.
  *
  * @var array<string, array{0: string, 1: string}>
+ * @return array<string, string[]>
  */
 function suggestionChains(): array
 {
@@ -684,5 +710,5 @@ function configureStripe(): void
     config()->set('cashier.secret', 'sk_test_1');
     config()->set('cashier.webhook.secret', 'whsec_1');
     config()->set('plans.stripe.pro_price_id', 'price_1');
-    config()->set('plans.enabled', null);
+    config()->set('plans.enabled');
 }

@@ -23,8 +23,6 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
 {
     use Queueable;
 
-    public readonly string $snapshotUnitPrice;
-
     public readonly string $snapshotHost;
 
     public readonly ?string $snapshotPrice;
@@ -34,11 +32,8 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
     public function __construct(
         public Product $product,
         Shop $shop,
-        string $unitPrice,
+        public readonly string $snapshotUnitPrice,
     ) {
-        // Pinned at dispatch: a recheck landing before the queue renders
-        // must not swap the numbers under the message.
-        $this->snapshotUnitPrice = $unitPrice;
         $this->snapshotHost = $shop->host;
         $this->snapshotPrice = $shop->current_price === null ? null : (string) $shop->current_price;
         $this->snapshotUnitLabel = $shop->unitPriceLabel();

@@ -77,7 +77,7 @@ class SetThresholdTool extends Tool
         // A stored target on a free account is kept and starts working on
         // upgrade, so say that rather than let the caller promise an alert
         // that will not arrive.
-        if ($unitPriceTarget !== null && $this->user($request)->entitlements()->allowsUnitPriceAlerts() !== true) {
+        if ($unitPriceTarget !== null && ! $this->user($request)->entitlements()->allowsUnitPriceAlerts()) {
             $summary['note'] = 'The unit price target is stored, but unit-price alerts are a Pro feature. This account is not alerted on it until it upgrades.';
         }
 

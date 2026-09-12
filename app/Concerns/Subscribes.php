@@ -57,7 +57,7 @@ trait Subscribes
         // Stripe has given up collecting. `valid()` would still say yes
         // while `ends_at` is in the future, and `ProUsers` — which the
         // scheduler reads — would say no. Two answers for one account.
-        if (in_array($subscription->stripe_status, self::ENDED_STATUSES, true)) {
+        if (in_array($subscription->stripe_status, self::ENDED_STATUSES, strict: true)) {
             return Plan::Free;
         }
 

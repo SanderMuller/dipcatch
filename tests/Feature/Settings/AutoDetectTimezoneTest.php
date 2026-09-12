@@ -57,7 +57,7 @@ test('rejects a missing timezone with 422', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user)
-        ->postJson('/profile/timezone/auto-detect', [])
+        ->postJson('/profile/timezone/auto-detect')
         ->assertStatus(422)
         ->assertJsonValidationErrors(['timezone']);
 });
@@ -83,13 +83,13 @@ test('auto-detect view emits nothing once timezone_detected_at is set', function
 
     $rendered = view('partials.timezone-autodetect')->render();
 
-    expect(trim($rendered))->toBe('');
+    expect(trim($rendered))->toBeEmpty();
 });
 
 test('auto-detect view emits nothing for an unauthenticated request', function (): void {
     $rendered = view('partials.timezone-autodetect')->render();
 
-    expect(trim($rendered))->toBe('');
+    expect(trim($rendered))->toBeEmpty();
 });
 
 test('NotificationSettings::save() stamps timezone_detected_at so future auto-detects are no-ops', function (): void {

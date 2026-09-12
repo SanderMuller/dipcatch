@@ -37,7 +37,15 @@
                     <dt class="text-base font-medium text-balance sm:text-sm">{{ __('Other assistants') }}</dt>
                     <dd class="mt-1 text-pretty text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Other MCP clients can use this URL and then sign in with this account.') }}</dd>
                     <dd class="mt-auto min-w-0 pt-4">
-                        <flux:input readonly copyable name="mcp-endpoint" value="{{ $endpoint }}" :aria-label="__('MCP endpoint')" />
+                        <flux:input
+                            readonly
+                            copyable
+                            name="mcp-endpoint"
+                            value="{{ $endpoint }}"
+                            :aria-label="__('MCP endpoint')"
+                            autocomplete="off"
+                            data-1p-ignore
+                        />
                     </dd>
                 </div>
             </dl>

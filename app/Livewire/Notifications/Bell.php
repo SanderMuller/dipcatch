@@ -58,7 +58,7 @@ class Bell extends Component
      */
     private function items(): Collection
     {
-        $items = $this->notificationQuery()
+        return $this->notificationQuery()
             ->latest()
             ->limit(self::LIMIT)
             ->get()
@@ -68,8 +68,6 @@ class Bell extends Component
                 'at' => $notification->created_at,
                 ...$this->present($notification),
             ]);
-
-        return $items;
     }
 
     /**

@@ -5,7 +5,7 @@
 
     <flux:modal name="app-command" variant="bare" class="my-[12vh] max-h-screen w-full max-w-[30rem] overflow-y-hidden">
         <flux:command class="inline-flex max-h-[76vh] flex-col border-none shadow-lg">
-            <flux:command.input :placeholder="__('Search pages and recent products…')" closable />
+            <flux:command.input :placeholder="__('Search pages and recent products…')" closable autocomplete="off" data-1p-ignore />
             <flux:command.items>
                 <flux:command.item icon="home" :href="route('app.dashboard')" wire:navigate>
                     {{ __('Dashboard') }}

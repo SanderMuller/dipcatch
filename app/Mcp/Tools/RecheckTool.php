@@ -73,7 +73,7 @@ class RecheckTool extends Tool
                 break;
             }
 
-            CheckShopPrice::dispatchSync($shop);
+            dispatch_sync(new CheckShopPrice($shop));
             $rechecked++;
         }
 

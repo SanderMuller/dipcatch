@@ -23,6 +23,7 @@
             <x-password-manager-username :email="auth()->user()->email" />
 
             <flux:input
+                id="password"
                 wire:model="password"
                 :label="__('Password')"
                 type="password"

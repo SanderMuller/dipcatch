@@ -64,7 +64,7 @@ test('the same news is not sent twice, and a lower price is news again', functio
     app(DetectTargetPrice::class)($product);
     app(DetectTargetPrice::class)($product->refresh());
 
-    Notification::assertSentToTimes($product->user, TargetPriceNotification::class, 1);
+    Notification::assertSentToTimes($product->user, TargetPriceNotification::class);
 
     $product->shops()->first()?->update(['current_price' => '15.00']);
     $product->recomputeCheapestShop();

@@ -18,7 +18,7 @@ Languages: English (default), Dutch ({!! route('home', ['lang' => 'nl']) !!})
 
 ## What it does
 
-- Tracks one product across several shops: Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart, plus most webshops that publish structured product data.
+- Paste a product URL from almost any webshop. Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart have a reader of their own when a generic read is not enough or not reliable. Shops that block bots or only load the price with JavaScript will not work.
 - Reads AH Bonus and Dirk promo prices, not only the shelf price.
 - Compares pack sizes fairly by working out the price per kilo, litre or piece.
 - Re-checks each shop about every {!! $recheckIntervalHours !!} hours.

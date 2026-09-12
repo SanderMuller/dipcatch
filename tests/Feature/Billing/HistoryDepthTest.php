@@ -54,13 +54,7 @@ function plotsTheOldSegment(PriceHistorySeries $chart): bool
     $data = $chart->data();
     $prices = $data['datasets'][0]['data'] ?? [];
 
-    foreach ((array) $prices as $price) {
-        if (is_numeric($price) && abs((float) $price - 9.99) < 0.001) {
-            return true;
-        }
-    }
-
-    return false;
+    return array_any((array) $prices, fn ($price): bool => is_numeric($price) && abs((float) $price - 9.99) < 0.001);
 }
 
 it('offers a free account only the ranges it may read', function (): void {
@@ -122,13 +116,7 @@ it('plots a segment older than a year only under all time', function (): void {
     $plotsTheAncientSegment = function (string $filter) use ($product): bool {
         $prices = chartFor($product, $filter)->data()['datasets'][0]['data'] ?? [];
 
-        foreach ((array) $prices as $price) {
-            if (is_numeric($price) && abs((float) $price - 42.42) < 0.001) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any((array) $prices, fn ($price): bool => is_numeric($price) && abs((float) $price - 42.42) < 0.001);
     };
 
     expect($plotsTheAncientSegment('all'))->toBeTrue()
@@ -162,7 +150,7 @@ it('clamps the notification markers to the same window as the line', function ()
 
     $markers = chartFor($product, 'all')->data()['datasets'][2]['data'] ?? [];
 
-    expect(array_filter((array) $markers, static fn (mixed $m): bool => $m !== null))->toBe([]);
+    expect(array_filter((array) $markers, static fn (mixed $m): bool => $m !== null))->toBeEmpty();
 });
 
 it('tells a free account why the long ranges are missing', function (): void {
@@ -239,6 +227,6 @@ it('renders an empty history on a long range without failing', function (): void
     // A dataset shell with no points, not a crash and not a fabricated line.
     $data = chartFor($product, 'all')->data();
 
-    expect($data['labels'])->toBe([])
+    expect($data['labels'])->toBeEmpty()
         ->and($data['datasets'][0]['data'])->toBe([]);
 });

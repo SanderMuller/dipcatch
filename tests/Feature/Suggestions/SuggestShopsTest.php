@@ -105,7 +105,7 @@ test('tracking lidl.nl suppresses the boodschaapje row, and the reverse', functi
     $product = beemsterProduct();
     Shop::factory()->for($product)->create(['url' => $trackedUrl]);
 
-    expect(suggest($product))->toBe([]);
+    expect(suggest($product))->toBeEmpty();
 })->with([
     'https://www.lidl.nl/p/beemster-extra-belegen/p123',
     'https://boodschaapje.nl/product/8128671',
@@ -152,7 +152,7 @@ test('equal scores break on external id, so the list is stable', function (): vo
 test('an empty dataset suggests nothing', function (): void {
     seedChains();
 
-    expect(suggest(beemsterProduct()))->toBe([]);
+    expect(suggest(beemsterProduct()))->toBeEmpty();
 });
 
 test('a chain whose rows are older than 96 hours drops out while a fresh chain stays', function (): void {
@@ -170,7 +170,7 @@ test('a non-EUR product gets no suggestions — the dataset is EUR only', functi
     $product = beemsterProduct();
     $product->forceFill(['currency' => 'USD'])->save();
 
-    expect(suggest($product->refresh()))->toBe([]);
+    expect(suggest($product->refresh()))->toBeEmpty();
 });
 
 test('a product whose shops carry different pack sizes matches both sizes', function (): void {
@@ -257,5 +257,5 @@ test('a chain whose dataset links do not resolve is never suggested', function (
 
     // Every DekaMarkt id in the dataset answers "Het artikel is niet
     // gevonden" — a row nobody can open is worse than no row.
-    expect(suggest(beemsterProduct()))->toBe([]);
+    expect(suggest(beemsterProduct()))->toBeEmpty();
 });

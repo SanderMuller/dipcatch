@@ -44,9 +44,8 @@ test('confirm persists offer + initial price_check + recomputes cheapest', funct
     expect($shop)->not->toBeNull()
         ->and($shop->url)->toBe('https://shop.example.com/p/1')
         ->and($shop->host)->toBe('shop.example.com')
-        ->and((string) $shop->current_price)->toBe('50.00');
-
-    expect(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
+        ->and((string) $shop->current_price)->toBe('50.00')
+        ->and(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
 
     $product->refresh();
     expect($product->cheapest_shop_id)->toBe($shop->id)
@@ -81,6 +80,8 @@ test('duplicate URL surfaces duplicate error without fetch', function (): void {
 });
 
 test('robots-blocked URL is rejected without persisting', function (): void {
+    config()->set('site.contact_email', 'hello@example.test');
+
     Http::fake([
         'https://shop.example.com/robots.txt' => Http::response("User-agent: *\nDisallow: /", 200),
         'https://shop.example.com/p/1' => Http::response('<html>ok</html>', 200),
@@ -92,7 +93,8 @@ test('robots-blocked URL is rejected without persisting', function (): void {
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'error')
-        ->assertSet('errorCode', 'robots_disallowed');
+        ->assertSet('errorCode', 'robots_disallowed')
+        ->assertDontSee('Request a shop');
 
     expect(Shop::query()->count())->toBe(0);
 });
@@ -112,6 +114,8 @@ test('currency mismatch is surfaced inline', function (): void {
 });
 
 test('extraction failure flips into manual_selector state without persisting', function (): void {
+    config()->set('site.contact_email', 'hello@example.test');
+
     Http::fake([
         'https://shop.example.com/robots.txt' => Http::response('', 404),
         'https://shop.example.com/p/1' => Http::response('<html><body>no metadata</body></html>', 200),
@@ -123,12 +127,17 @@ test('extraction failure flips into manual_selector state without persisting', f
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'manual_selector')
-        ->assertSet('errorCode', 'no_adapter_matched');
+        ->assertSet('errorCode', 'no_adapter_matched')
+        ->assertSee('Request a shop')
+        ->assertSee('mailto:hello@example.test?subject=', escape: false)
+        ->assertSee(rawurlencode('https://shop.example.com/p/1'), escape: false);
 
     expect(Shop::query()->count())->toBe(0);
 });
 
 test('ExtractionFailed with non-manual reason stays in error state, not manual_selector', function (): void {
+    config()->set('site.contact_email', 'hello@example.test');
+
     // jsonld_no_offer is an extraction reason but NOT a manual-selector
     // trigger (those are 'no_adapter_matched' + 'user_selector_*'). Ensure
     // the bridge in AddShop::handleFailure() doesn't over-match — without
@@ -152,7 +161,10 @@ test('ExtractionFailed with non-manual reason stays in error state, not manual_s
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'error')
-        ->assertSet('errorCode', 'extraction_failed');
+        ->assertSet('errorCode', 'extraction_failed')
+        ->assertSee('DipCatch could not read a price from that page')
+        ->assertSee('Request a shop')
+        ->assertSee(rawurlencode('https://shop.example.com/p/1'), escape: false);
 
     expect(Shop::query()->count())->toBe(0);
 });

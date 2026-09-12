@@ -76,9 +76,8 @@ test('confirm creates product + shop + initial price check and recomputes cheape
     $shop = Shop::query()->where('product_id', $product->id)->first();
     expect($shop)->not->toBeNull()
         ->and($shop->url)->toBe('https://shop.example.com/p/1')
-        ->and((string) $shop->current_price)->toBe('50.00');
-
-    expect(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
+        ->and((string) $shop->current_price)->toBe('50.00')
+        ->and(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
 
     $product->refresh();
     expect($product->cheapest_shop_id)->toBe($shop->id)
@@ -206,4 +205,27 @@ test('create page renders the component and manual page still creates', function
         ->assertSeeLivewire(CreateProductFromUrl::class);
 
     $this->get('/app/products/create-manual')->assertOk();
+});
+
+test('extraction failure offers a shop request mailto', function (): void {
+    config()->set('site.contact_email', 'hello@example.test');
+
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'No-Offer Product',
+    ], JSON_THROW_ON_ERROR);
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'error')
+        ->assertSet('errorCode', 'extraction_failed')
+        ->assertSee('Request a shop')
+        ->assertSee(rawurlencode('https://shop.example.com/p/1'), escape: false);
 });

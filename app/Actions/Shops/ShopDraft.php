@@ -97,12 +97,12 @@ final readonly class ShopDraft
             imageUrl: self::string($snapshot, 'image_url'),
             gtin: self::string($snapshot, 'gtin'),
             variantKey: $variantKey,
-            title: self::string($snapshot, 'title'),
             packSize: PackSize::resolve(
                 self::string($snapshot, 'pack_size'),
                 (bool) ($snapshot['pack_size_authoritative'] ?? false),
                 self::string($snapshot, 'title'),
             ),
+            title: self::string($snapshot, 'title'),
         );
     }
 

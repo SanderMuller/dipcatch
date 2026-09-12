@@ -66,7 +66,7 @@ final class MoneyFormatter
     {
         $code = strtoupper(trim($currency));
 
-        return in_array($code, self::ZERO_DECIMAL, true)
+        return in_array($code, self::ZERO_DECIMAL, strict: true)
             ? self::format((string) $amount, $code)
             : self::format(sprintf('%.2F', $amount / 100), $code);
     }

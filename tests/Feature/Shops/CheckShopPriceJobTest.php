@@ -66,9 +66,8 @@ test('successful check writes price_check, updates offer, recomputes cheapest', 
         ->and($shop->consecutive_failures)->toBe(0)
         ->and($shop->last_status)->toBe(ScrapeStatus::Ok)
         ->and($shop->adapter_key)->toBe('jsonld')
-        ->and((string) $product->cheapest_price)->toBe('60.00');
-
-    expect(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
+        ->and((string) $product->cheapest_price)->toBe('60.00')
+        ->and(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(1);
 });
 
 test('parse failure increments main counter and writes failed price_check', function (): void {
@@ -339,7 +338,7 @@ test('a tracked shop whose host never serves its prices is recorded as needs_js'
         'url' => 'https://www.plus.nl/product/fanta-1500-ml-991700',
     ]);
 
-    CheckShopPrice::dispatchSync($shop);
+    dispatch_sync(new CheckShopPrice($shop));
 
     expect(PriceCheck::query()->where('shop_id', $shop->id)->latest('id')->first()?->status)
         ->toBe(ScrapeStatus::NeedsJs);
@@ -486,12 +485,12 @@ function drainHostBudget(string $host = 'shop.test'): void
 }
 
 test('a rate-limited job is released back onto the queue instead of failing', function (): void {
-    config(['queue.default' => 'database']);
+    config()->set('queue.default', 'database');
     drainHostBudget();
     Http::fake();
 
     $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1', 'consecutive_failures' => 0]);
-    CheckShopPrice::dispatch($shop);
+    dispatch(new CheckShopPrice($shop));
 
     // Two pops. The first leaves attempts at 1, which the old `$tries = 1`
     // still permitted; the failure only lands on the second. The release
@@ -508,12 +507,12 @@ test('a rate-limited job is released back onto the queue instead of failing', fu
 });
 
 test('a rate-limited cycle writes no check and leaves the failure counter alone', function (): void {
-    config(['queue.default' => 'database']);
+    config()->set('queue.default', 'database');
     drainHostBudget();
     Http::fake();
 
     $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1', 'consecutive_failures' => 0]);
-    CheckShopPrice::dispatch($shop);
+    dispatch(new CheckShopPrice($shop));
 
     workQueueOnce();
     $this->travel(70)->seconds();
@@ -525,14 +524,14 @@ test('a rate-limited cycle writes no check and leaves the failure counter alone'
 });
 
 test('a genuine failure still runs once and is not retried by the deadline', function (): void {
-    config(['queue.default' => 'database']);
+    config()->set('queue.default', 'database');
     Http::fake([
         'https://shop.test/robots.txt' => Http::response('', 404),
         'https://shop.test/p/1' => Http::response('boom', 500),
     ]);
 
     $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1', 'consecutive_failures' => 0]);
-    CheckShopPrice::dispatch($shop);
+    dispatch(new CheckShopPrice($shop));
 
     workQueueOnce();
     $this->travel(20)->seconds();
@@ -546,7 +545,7 @@ test('a genuine failure still runs once and is not retried by the deadline', fun
 });
 
 test('an exception thrown out of the job fails it once rather than looping', function (): void {
-    config(['queue.default' => 'database']);
+    config()->set('queue.default', 'database');
     // The ah.nl branch runs before any try in handle(), and AhApiSource only
     // catches ConnectionException — so this escapes the job. Without
     // maxExceptions the deadline would retry it for a quarter of an hour.
@@ -556,7 +555,7 @@ test('an exception thrown out of the job fails it once rather than looping', fun
     ]);
 
     $shop = Shop::factory()->create(['url' => 'https://ah.nl/producten/product/wi1/x']);
-    CheckShopPrice::dispatch($shop);
+    dispatch(new CheckShopPrice($shop));
 
     workQueueOnce();
     $this->travel(20)->seconds();
@@ -567,12 +566,12 @@ test('an exception thrown out of the job fails it once rather than looping', fun
 });
 
 test('a host saturated across the whole release budget records a rate-limited check', function (): void {
-    config(['queue.default' => 'database']);
+    config()->set('queue.default', 'database');
     drainHostBudget();
     Http::fake();
 
     $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1', 'consecutive_failures' => 0]);
-    CheckShopPrice::dispatch($shop);
+    dispatch(new CheckShopPrice($shop));
 
     // Five attempts: four release, the fifth gives up and records. Re-drain
     // each time, because the limiter decays inside the travelled window.
@@ -594,12 +593,12 @@ test('a host saturated across the whole release budget records a rate-limited ch
 });
 
 test('a released job completes normally once the host budget refills', function (): void {
-    config(['queue.default' => 'database']);
+    config()->set('queue.default', 'database');
     drainHostBudget();
     Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '60.00'));
 
     $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
-    CheckShopPrice::dispatch($shop);
+    dispatch(new CheckShopPrice($shop));
 
     workQueueOnce();
     expect(DB::table('jobs')->count())->toBe(1);
@@ -617,7 +616,7 @@ test('a released job completes normally once the host budget refills', function 
 });
 
 test('a job dispatched with the full recheck jitter still runs', function (): void {
-    config(['queue.default' => 'database']);
+    config()->set('queue.default', 'database');
     Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '60.00'));
 
     $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
@@ -626,7 +625,7 @@ test('a job dispatched with the full recheck jitter still runs', function (): vo
     // wall-clock deadline stamped at dispatch would already be spent by the
     // time the job became available, and the worker would dead-letter it
     // before handle() ran.
-    CheckShopPrice::dispatch($shop)->delay(now()->addSeconds(RecheckJitter::maxSeconds()));
+    dispatch(new CheckShopPrice($shop))->delay(now()->addSeconds(RecheckJitter::maxSeconds()));
 
     $this->travel(RecheckJitter::maxSeconds() + 10)->seconds();
     workQueueOnce();
@@ -637,14 +636,14 @@ test('a job dispatched with the full recheck jitter still runs', function (): vo
 });
 
 test('an upstream Retry-After longer than the cap does not strand the job', function (): void {
-    config(['queue.default' => 'database']);
+    config()->set('queue.default', 'database');
     Cache::put('dipcatch:robots:shop.test', [], 3600);
     Http::fake([
         'https://shop.test/p/1' => Http::response('slow down', 429, ['Retry-After' => '3600']),
     ]);
 
     $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
-    CheckShopPrice::dispatch($shop);
+    dispatch(new CheckShopPrice($shop));
 
     workQueueOnce();
 

@@ -123,7 +123,7 @@ test('the sitemap dates the privacy page from the same value the page shows', fu
 });
 
 test('the sitemap omits lastmod when no privacy date is configured', function (): void {
-    config()->set('site.privacy_updated_at', null);
+    config()->set('site.privacy_updated_at');
 
     $content = (string) $this->get('/sitemap.xml')->assertOk()->getContent();
 

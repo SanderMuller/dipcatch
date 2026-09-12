@@ -144,8 +144,8 @@ test('rerunning CheckShopPrice for the same shop with unchanged price does not w
         ->and(ProductCheapestHistory::query()
             ->where('product_id', $product->id)
             ->whereNull('ended_at')
-            ->count())->toBe(1);
-    expect(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(2);
+            ->count())->toBe(1)
+        ->and(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(2);
 });
 
 test('a failing recheck on the current cheapest does not corrupt the history segment', function (): void {

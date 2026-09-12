@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\SocialProvider;
 use App\Http\Controllers\AutoDetectTimezoneController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\InvitationController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ShopPageController;
 use App\Http\Controllers\SitemapController;
+use App\Http\Controllers\SocialLoginController;
 use App\Http\Controllers\UseCasePageController;
 use App\Http\Middleware\MarketingLocale;
 use App\Livewire\Billing\BillingPage;
@@ -143,6 +145,30 @@ Route::middleware(['auth', EnsureEmailIsVerified::class])->group(function (): vo
     Route::post('profile/timezone/auto-detect', AutoDetectTimezoneController::class)
         ->middleware(ThrottleRequestsWithRedis::using('auto-detect-timezone'))
         ->name('profile.timezone.auto-detect');
+});
+
+/*
+| Social login. `guest` keeps a signed-in user out of a flow that would only
+| swap their session, and the provider list is closed at the route so an
+| unknown driver is a 404 rather than a container error.
+*/
+Route::middleware(['guest', ThrottleRequestsWithRedis::using('social-login')])->group(function (): void {
+    Route::get('auth/{provider}/redirect', [SocialLoginController::class, 'redirect'])
+        ->whereIn('provider', SocialProvider::values())
+        ->name('social.redirect');
+
+    Route::get('auth/{provider}/callback', [SocialLoginController::class, 'callback'])
+        ->whereIn('provider', SocialProvider::values())
+        ->name('social.callback');
+
+    // Apple posts the callback cross-site (`response_mode=form_post`), so the
+    // body carries no CSRF token and never can. Only Apple is allowed on this
+    // route, and the provider's encrypted nonce cookie plus the signed
+    // identity token are what authenticate the callback instead.
+    Route::post('auth/{provider}/callback', [SocialLoginController::class, 'callback'])
+        ->whereIn('provider', [SocialProvider::Apple->value])
+        ->withoutMiddleware(PreventRequestForgery::class)
+        ->name('social.callback.post');
 });
 
 Route::middleware(ThrottleRequestsWithRedis::using('invitation'))->group(function (): void {

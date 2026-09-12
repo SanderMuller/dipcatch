@@ -149,7 +149,11 @@ return [
     'passkeys' => [
         'relying_party_id' => parse_url(config()->string('app.url'), PHP_URL_HOST),
         'allowed_origins' => [config()->string('app.url')],
-        'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET', config()->string('app.key')),
+        // Not `config()->string('app.key')`: the default is evaluated eagerly, and
+        // a strict read throws when APP_KEY is unset. Config is loaded before
+        // `key:generate` can run, so that aborts `composer install` (which fires
+        // `package:discover`) on a fresh clone and in CI.
+        'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET', config('app.key')),
         'timeout' => 60000,
     ],
 

@@ -83,7 +83,7 @@ it('advertises titles and hint values OpenAI scan tools can read', function (): 
 
     $expected = expectedToolAnnotations();
 
-    expect($tools)->toHaveCount(count($expected));
+    expect($tools)->toHaveSameSize($expected);
 
     foreach ($expected as $name => $hints) {
         expect($tools->get($name))->not->toBeNull()

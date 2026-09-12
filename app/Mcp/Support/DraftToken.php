@@ -32,7 +32,7 @@ final readonly class DraftToken
      */
     public static function issue(User $owner, array $snapshot, string $url, string $adapterKey, ?string $variantKey, ?string $productId = null): string
     {
-        return Crypt::encryptString((string) json_encode([
+        return Crypt::encryptString(json_encode([
             'v' => 1,
             'at' => CarbonImmutable::now()->getTimestamp(),
             'uid' => self::ownerKey($owner),

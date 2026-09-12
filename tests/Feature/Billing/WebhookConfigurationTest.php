@@ -17,7 +17,7 @@ it('subscribes the endpoint to every event the app acts on', function (): void {
 
 it('fails the health check when a configured Stripe accepts unsigned webhooks', function (): void {
     config()->set('cashier.secret', 'sk_test_123');
-    config()->set('cashier.webhook.secret', null);
+    config()->set('cashier.webhook.secret');
 
     expect(new StripeWebhookSecretCheck()->run()->status)->toBe(Status::failed());
 });
@@ -30,7 +30,7 @@ it('passes the health check once the webhook secret is set', function (): void {
 });
 
 it('stays quiet when Stripe is not configured at all', function (): void {
-    config()->set('cashier.secret', null);
+    config()->set('cashier.secret');
 
     expect(new StripeWebhookSecretCheck()->run()->status)->toBe(Status::ok());
 });

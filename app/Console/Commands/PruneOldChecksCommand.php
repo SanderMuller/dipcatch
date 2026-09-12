@@ -13,7 +13,7 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
@@ -84,9 +84,9 @@ class PruneOldChecksCommand extends Command
      *
      * @template TModel of Model
      *
-     * @param  Builder<TModel>  $query
+     * @param EloquentQueryBuilder<TModel> $query
      */
-    private function exceptKeptHistory(Builder $query, ?DateTimeInterface $keptFrom, string $column): void
+    private function exceptKeptHistory(EloquentQueryBuilder $query, ?DateTimeInterface $keptFrom, string $column): void
     {
         if ($keptFrom !== null) {
             $query->where($column, '<', $keptFrom);

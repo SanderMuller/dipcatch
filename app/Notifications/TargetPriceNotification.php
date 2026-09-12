@@ -20,18 +20,13 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public readonly string $snapshotPrice;
-
     public readonly string $snapshotHost;
 
     public function __construct(
         public Product $product,
         Shop $shop,
-        string $price,
+        public readonly string $snapshotPrice,
     ) {
-        // Pinned at dispatch: a recheck landing before the queue renders
-        // must not swap the numbers under the message.
-        $this->snapshotPrice = $price;
         $this->snapshotHost = $shop->host;
 
         $this->afterCommit();

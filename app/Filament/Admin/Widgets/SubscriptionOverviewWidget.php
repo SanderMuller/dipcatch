@@ -8,7 +8,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Laravel\Cashier\Subscription;
 
@@ -100,7 +100,7 @@ class SubscriptionOverviewWidget extends BaseWidget
         $granted = User::query()
             ->whereNull('billing_blocked_at')
             ->where('trial_ends_at', '>', CarbonImmutable::now())
-            ->whereDoesntHave('subscriptions', fn (EloquentBuilder $query): EloquentBuilder => $query->where('type', Plan::SUBSCRIPTION_TYPE))
+            ->whereDoesntHave('subscriptions', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('type', Plan::SUBSCRIPTION_TYPE))
             ->count();
 
         return $onSubscription + $granted;

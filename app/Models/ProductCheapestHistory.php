@@ -6,8 +6,9 @@ use Carbon\CarbonImmutable;
 use Database\Factories\ProductCheapestHistoryFactory;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read Product $product
  */
 #[WithoutTimestamps]
+#[Unguarded]
 class ProductCheapestHistory extends Model
 {
     /** @use HasFactory<ProductCheapestHistoryFactory> */
@@ -34,8 +36,6 @@ class ProductCheapestHistory extends Model
     // model properties via the migration schema. Don't switch back to #[Table]
     // unless we also update larastan to support attribute-table model discovery.
     protected $table = 'product_cheapest_history';
-
-    protected $guarded = [];
 
     /**
      * @return array<string, string>
@@ -56,12 +56,12 @@ class ProductCheapestHistory extends Model
      * the same second tie. Ordering on it alone leaves the winner to the
      * database — SQLite and Postgres disagree — so `id` breaks the tie.
      *
-     * @param  Builder<$this>  $query
+     * @param EloquentQueryBuilder<$this> $query
      */
     #[Scope]
-    protected function inOrder(Builder $query): void
+    protected function inOrder(EloquentQueryBuilder $query): void
     {
-        $query->orderBy('started_at')->orderBy('id');
+        $query->oldest('started_at')->orderBy('id');
     }
 
     /**
@@ -73,16 +73,16 @@ class ProductCheapestHistory extends Model
      * A null window means the account may read everything, so the scope
      * no-ops and callers need no conditional of their own.
      *
-     * @param  Builder<$this>  $query
+     * @param EloquentQueryBuilder<$this> $query
      */
     #[Scope]
-    protected function overlapping(Builder $query, ?DateTimeInterface $windowStart): void
+    protected function overlapping(EloquentQueryBuilder $query, ?DateTimeInterface $windowStart): void
     {
         if ($windowStart === null) {
             return;
         }
 
-        $query->where(function (Builder $inner) use ($windowStart): void {
+        $query->where(function (EloquentQueryBuilder $inner) use ($windowStart): void {
             $inner->where('started_at', '>=', $windowStart)
                 ->orWhereNull('ended_at')
                 ->orWhere('ended_at', '>=', $windowStart);
@@ -92,12 +92,12 @@ class ProductCheapestHistory extends Model
     /**
      * Segments newest first. See {@see inOrder} for why `id` is here.
      *
-     * @param  Builder<$this>  $query
+     * @param EloquentQueryBuilder<$this> $query
      */
     #[Scope]
-    protected function newestFirst(Builder $query): void
+    protected function newestFirst(EloquentQueryBuilder $query): void
     {
-        $query->orderByDesc('started_at')->orderByDesc('id');
+        $query->latest('started_at')->orderByDesc('id');
     }
 
     /**

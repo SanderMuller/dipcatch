@@ -158,7 +158,7 @@ final readonly class AhApiSource
             imageUrl: is_string($image) ? $image : null,
             price: $price,
             currency: 'EUR',
-            inStock: ! (is_string($orderable) && $orderable === 'UNAVAILABLE'),
+            inStock: ! is_string($orderable) || $orderable !== 'UNAVAILABLE',
             raw: [
                 'source' => 'ah-api',
                 'is_bonus' => (bool) data_get($card, 'isBonus'),

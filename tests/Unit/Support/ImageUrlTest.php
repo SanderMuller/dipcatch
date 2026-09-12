@@ -37,5 +37,5 @@ test('absolute keeps the port of the page url', function (): void {
 test('absolute rejects an unsafe scheme and an unusable base', function (): void {
     expect(ImageUrl::absolute('javascript:alert(1)', 'https://shop.test/p/1'))->toBeNull()
         ->and(ImageUrl::absolute('/a.jpg', ''))->toBeNull()
-        ->and(ImageUrl::absolute(null, 'https://shop.test/p/1'))->toBeNull();
+        ->and(ImageUrl::absolute(url: null, baseUrl: 'https://shop.test/p/1'))->toBeNull();
 });

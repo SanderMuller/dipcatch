@@ -50,7 +50,7 @@ class RecheckStaleStockCommand extends Command
         }
 
         $shops->each(function (Shop $shop): void {
-            CheckShopPrice::dispatch($shop);
+            dispatch(new CheckShopPrice($shop));
         });
 
         $this->info("Dispatched {$shops->count()} recheck(s).");

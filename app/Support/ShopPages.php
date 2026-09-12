@@ -114,7 +114,7 @@ final class ShopPages
         $hours = Config::get('dipcatch.recheck.interval_hours', 24);
 
         $facts = [
-            __('DipCatch has a reader written for :shop, so the price comes off the product page itself.', ['shop' => $name]),
+            __('DipCatch has a reader written for :shop, so the price comes off the product page itself even when a generic read would get it wrong.', ['shop' => $name]),
             __('Every tracked page is re-checked about every :hours hours without you opening anything, and four times as often on Pro.', ['hours' => is_numeric($hours) ? (int) $hours : 24]),
         ];
 
@@ -160,6 +160,10 @@ final class ShopPages
             [
                 'q' => __('Can I compare :shop against another shop?', ['shop' => $name]),
                 'a' => __('That is the point of it. Add the same product at a second shop and DipCatch shows which one is cheapest right now, comparing per kilo, litre or piece where it can read the pack size.'),
+            ],
+            [
+                'q' => __('Does DipCatch only work at :shop?', ['shop' => $name]),
+                'a' => __('No. Paste a product link from almost any webshop. The reader for :shop is for when a generic read is not enough.', ['shop' => $name]),
             ],
         ];
     }
