@@ -168,6 +168,25 @@ final class UseCases
                     ['q' => __('What if the filter is cheaper as a multipack?'), 'a' => __('Track both and let the unit price decide. A four-pack and a two-pack are the same product at different prices per cartridge, and DipCatch states both.')],
                 ],
             ],
+            'ask-your-assistant' => [
+                'heading' => __('Set up price tracking by asking ChatGPT or Claude'),
+                'description' => __('Connect DipCatch to your assistant and set a product up in one conversation: name what you buy, the shops you already check, and how far the price has to fall before you want to hear about it.'),
+                'intro' => __('Setting a product up by hand means finding the same item at three or four shops and pasting every link yourself. If you already have ChatGPT or Claude open, you can hand that over. Connect DipCatch once, then say what you want in a sentence and let the assistant do the looking up, the adding and the threshold.'),
+                'example' => __('You say: track this dry cat food, I already check zooplus.nl and bol.com, find me two more shops, and tell me when it drops 10 percent. The assistant looks up the product pages and hands each one to DipCatch, which fetches the page and reports the title, price and pack size it read. You check those four lines, say yes, and the threshold is set in the same reply.'),
+                'tips' => [
+                    __('Name the pack, not the category. "Dry cat food 7 kg" gives the assistant something to match; "cat food" leaves it guessing which of nine variants you meant.'),
+                    __('Read the lines DipCatch sends back before you agree. That is the moment a link pointing at a 2 kg bag instead of a 7 kg sack is cheap to fix.'),
+                    __('Ask in percentages when no target price comes to mind. Ten percent means the same thing on a €4 item and a €40 one, so you do not have to invent a number per product.'),
+                ],
+                'faq' => [
+                    ['q' => __('Which assistants can I use?'), 'a' => __('Any app that speaks MCP. The Connections page in your account opens Claude with DipCatch already filled in and shows the endpoint other clients need, and it says what each assistant requires today.')],
+                    ['q' => __('Can the assistant find the shops itself?'), 'a' => __('It finds the product pages with whatever browsing it has, then hands each link over. DipCatch does not search the web: it takes a link, fetches that page and reports what it read. For Dutch supermarkets the product page in DipCatch suggests other chains that look like the same pack as well.')],
+                    ['q' => __('What can I ask it to do?'), 'a' => __('List your products, look one up, start tracking a new one, add a shop to it, remove a shop, set a threshold, force a fresh check, read the price history, or stop tracking something. That is the whole set, and every one of them acts only on your own account.')],
+                    ['q' => __('Can it change things without asking me?'), 'a' => __('It can set a threshold, remove a shop and delete a product, so connect an assistant you trust and withdraw access on the same page when you are done. Adding is the exception that always takes two steps: DipCatch stores nothing on the first call, which is the one that reports what it read from the page.')],
+                    ['q' => __('Does a percentage replace the other alerts?'), 'a' => __('No. A percentage and an amount both apply, and whichever is reached first sends the alert. Set only a percentage and DipCatch keeps a sensible amount in reserve for the price range the product sits in.')],
+                    ['q' => __('How many shops can one product have?'), 'a' => __('Four on the free plan and as many as you like on Pro. Two shops you already check plus two the assistant finds is a normal starting point.')],
+                ],
+            ],
             'beauty' => [
                 'heading' => __('Price alerts for skincare and makeup'),
                 'description' => __('CeraVe, La Roche-Posay, Cetaphil, The Ordinary and the rest of the cabinet, at Etos, Lookfantastic, Cult Beauty, Ulta, Walmart, The Ordinary, bol.com, Amazon, Albert Heijn and Jumbo. DipCatch compares them on price per 100 ml or 100 g and tells you when a tub drops.'),

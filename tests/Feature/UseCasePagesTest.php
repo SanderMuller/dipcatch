@@ -68,7 +68,7 @@ function graphTypes(array $nodes): array
     return $types;
 }
 
-test('every configured use case has copy and shops', function (): void {
+test('every configured use case has copy, and resolves any shops it names', function (): void {
     $cases = UseCases::all();
 
     expect($cases)->toHaveSameSize(Config::array('site.use_cases'));
@@ -78,8 +78,13 @@ test('every configured use case has copy and shops', function (): void {
             ->and($case->intro)->not->toBeEmpty()
             ->and($case->example)->not->toBeEmpty()
             ->and($case->description)->not->toBeEmpty()
-            ->and($case->faq)->not->toBeEmpty()
-            ->and($case->shops())->not->toBeEmpty();
+            ->and($case->faq)->not->toBeEmpty();
+
+        // A page that names hosts has to resolve them, or a typo drops the
+        // shop silently. A page about a way of working names none.
+        if ($case->hosts !== []) {
+            expect($case->shops())->not->toBeEmpty();
+        }
     }
 });
 
@@ -172,7 +177,7 @@ test('a use-case page renders its own heading, description and canonical', funct
         ->and($content)->toContain(e($case->intro))
         ->and($content)->toContain(e($case->example))
         ->and($content)->toContain('<link rel="canonical" href="' . $case->url() . '">');
-})->with(['groceries', 'pet-food', 'coffee', 'filters', 'beauty']);
+})->with(['groceries', 'pet-food', 'coffee', 'filters', 'beauty', 'ask-your-assistant']);
 
 test('an unknown slug is a 404', function (): void {
     $this->get('/price-alerts/nonsense')->assertNotFound();
