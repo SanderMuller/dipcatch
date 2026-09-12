@@ -192,10 +192,35 @@ it('stops advertising the old price when the re-check is rate limited', function
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product])
-        ->call('saveShopUrl', $repointed->id, 'https://shop.example.com/p/2');
+        ->call('saveShopUrl', $repointed->id, 'https://shop.example.com/p/2')
+        ->assertSet('shopMessage', 'Shop URL updated. The shop was too busy to read now, so the price follows with the next scheduled check.');
 
     expect($repointed->refresh()->current_price)->toBeNull()
         ->and($product->refresh()->cheapest_shop_id)->toBe($rival->id)
         ->and((string) $product->cheapest_price)->toBe('12.00')
         ->and(PriceDropEvent::query()->count())->toBe(0);
+});
+
+it('reports the new price when the re-check does read the page', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '5.00',
+    ]);
+
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/2' => Http::response(jsonLdPage('9.00'), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('saveShopUrl', $shop->id, 'https://shop.example.com/p/2')
+        ->assertSet('shopMessage', 'Shop URL updated and price re-checked');
+
+    expect((string) $shop->refresh()->current_price)->toBe('9.00')
+        ->and($shop->last_success_at)->not->toBeNull();
 });

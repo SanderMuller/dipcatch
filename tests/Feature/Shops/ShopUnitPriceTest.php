@@ -60,6 +60,7 @@ test('updateUrl clears the price, the stock flag and the campaign of the previou
         'promotion_starts_at' => now()->subDay(),
         'promotion_ends_at' => now()->addDay(),
         'promotion_label' => 'Two for one',
+        'last_success_at' => now()->subHour(),
     ]);
 
     expect($shop->updateUrl(UrlNormalizer::normalize('https://shop.example.com/p/2')))->toBeTrue();
@@ -73,7 +74,8 @@ test('updateUrl clears the price, the stock flag and the campaign of the previou
         ->and($shop->conditional_ends_at)->toBeNull()
         ->and($shop->promotion_starts_at)->toBeNull()
         ->and($shop->promotion_ends_at)->toBeNull()
-        ->and($shop->promotion_label)->toBeNull();
+        ->and($shop->promotion_label)->toBeNull()
+        ->and($shop->last_success_at)->toBeNull();
 });
 
 test('a repointed offer loses cheapest instead of carrying the old price over', function (): void {

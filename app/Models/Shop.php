@@ -129,6 +129,12 @@ class Shop extends Model
             'promotion_starts_at' => null,
             'promotion_ends_at' => null,
             'promotion_label' => null,
+            // No URL this offer now points at has ever been read, so the
+            // health check must count it as unscraped from here. Keeping the
+            // old timestamp bought a repointed offer 48 quiet hours in
+            // `LastSuccessfulScrapeCheck`, and showed the admin a "Last read"
+            // that belonged to the previous page.
+            'last_success_at' => null,
         ])->save();
 
         return true;

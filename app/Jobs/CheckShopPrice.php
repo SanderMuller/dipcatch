@@ -105,9 +105,11 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
     public function uniqueId(): string
     {
-        // Including url_hash lets a manual URL change in the Filament edit_url
-        // action queue an immediate recheck even when an automated recheck is
-        // still holding the long uniqueness window — the new URL is a new key.
+        // Including url_hash keeps a recheck of a repointed offer out of the
+        // long uniqueness window an automated recheck may still hold — the new
+        // URL is a new key. No caller needs this today, because the only URL
+        // edit (ProductShow::saveShopUrl) dispatches synchronously and takes
+        // no unique lock; a queued one would.
         return "check-shop:{$this->shop->id}:{$this->shop->url_hash}";
     }
 

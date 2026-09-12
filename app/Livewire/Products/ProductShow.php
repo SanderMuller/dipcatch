@@ -8,6 +8,7 @@ use App\Billing\HistoryWindow;
 use App\Billing\Plan;
 use App\Billing\PlanLimits;
 use App\Charts\PriceHistorySeries;
+use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
@@ -199,7 +200,15 @@ class ProductShow extends Component
         // so without this the product would keep advertising the old one.
         $this->product->refresh()->recomputeCheapestShop();
 
-        $this->shopMessage = 'Shop URL updated and price re-checked';
+        // A check that ran wrote its own status, whatever the outcome. Still
+        // Pending means the job released the host budget instead — and a
+        // release does nothing on a synchronous dispatch, so nothing re-runs
+        // before the scheduled recheck. Saying "re-checked" would be a lie the
+        // empty price cell then has to explain.
+        $this->shopMessage = $shop->refresh()->last_status === ScrapeStatus::Pending
+            ? 'Shop URL updated. The shop was too busy to read now, so the price follows with the next scheduled check.'
+            : 'Shop URL updated and price re-checked';
+
         $this->product->refresh();
     }
 
