@@ -118,6 +118,10 @@ return [
         ],
         'coffee' => ['ah.nl', 'jumbo.com', 'bol.com', 'amazon.nl', 'amazon.com', 'amazon.co.uk'],
         'filters' => ['bol.com', 'amazon.nl', 'amazon.com', 'amazon.co.uk'],
+        // No hosts on purpose. The other entries are product categories, and
+        // their hosts drive the "What people track at X" list on each shop
+        // page. This one is a way of working, not a thing people track.
+        'ask-your-assistant' => [],
         'beauty' => [
             'etos.nl', 'theordinary.com',
             'lookfantastic.com', 'cultbeauty.com',
