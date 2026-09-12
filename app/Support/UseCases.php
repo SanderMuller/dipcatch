@@ -102,7 +102,7 @@ final class UseCases
                     __('Track the pack you buy, not the range. "Lay’s Naturel 200 g" is a price; "crisps" is not.'),
                 ],
                 'faq' => [
-                    ['q' => __('Which supermarkets does this work with?'), 'a' => __('Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz and Vomar have their own adapters, including AH Bonus and Dirk promo prices. Amazon.co.uk and Amazon.com do too. Other webshops often work too, and you see the result before you confirm.')],
+                    ['q' => __('Which supermarkets does this work with?'), 'a' => __('Paste a supermarket or webshop link. Most shops work. Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, Amazon.co.uk and Amazon.com have a reader of their own, including AH Bonus and Dirk promo prices. Other webshops often work too, and you see the result before you confirm.')],
                     ['q' => __('Does it compare different pack sizes?'), 'a' => __('Yes. DipCatch reads the pack size from the page and shows price per kilo or per litre, so a 400 g pack and a 1 kg pack line up honestly.')],
                     ['q' => __('How often are supermarket prices checked?'), 'a' => __('Once when you add the link, then once a day on the free plan and every six hours on Pro. Weekly bonus rounds start on a Monday, so a promotion is normally picked up that day.')],
                     ['q' => __('Will it tell me about a bonus I would have seen anyway?'), 'a' => __('Only if it beats your threshold. DipCatch is not a folder: it stays quiet until a price passes the line you set, which is what keeps a weekly mail worth opening.')],
@@ -121,7 +121,7 @@ final class UseCases
                     __('Check the article number warning on the product page: two shops can list the same food in different pack sizes.'),
                 ],
                 'faq' => [
-                    ['q' => __('Which pet shops work?'), 'a' => __('Zooplus and Bitiba country sites, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, bol.com, Amazon country sites, Albert Heijn and Jumbo have their own adapters. Many smaller pet shops publish their product data in a form DipCatch can read as well.')],
+                    ['q' => __('Which pet shops work?'), 'a' => __('Paste a pet-shop or supermarket link. Most shops work. Zooplus and Bitiba country sites, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, bol.com, Amazon country sites, Albert Heijn and Jumbo have a reader of their own. Many smaller pet shops work from the page data alone.')],
                     ['q' => __('Can it compare sack sizes?'), 'a' => __('That is the point of the page. DipCatch shows price per kilo next to the shelf price, so a bulk sack and a small bag can be judged against each other.')],
                     ['q' => __('Does it track litter and treats too?'), 'a' => __('Anything with a product page and a price. If you buy it more than once, it is worth tracking.')],
                     ['q' => __('Does it handle subscription or auto-delivery prices?'), 'a' => __('DipCatch reads the price on the product page. A subscription discount applied in the basket is not on that page, so treat the alert as the shelf price and subtract your own discount.')],
@@ -140,7 +140,7 @@ final class UseCases
                     __('Watch the end date on an offer price. A bonus week that closes tomorrow is not the price you will pay on Friday.'),
                 ],
                 'faq' => [
-                    ['q' => __('Which shops work for coffee?'), 'a' => __('Albert Heijn, Jumbo, bol.com and Amazon country sites, including Amazon.co.uk and Amazon.com, have their own adapters. Other webshops often work too, and you see the result before you confirm.')],
+                    ['q' => __('Which shops work for coffee?'), 'a' => __('Paste a product link. Most shops work. Albert Heijn, Jumbo, bol.com and Amazon country sites, including Amazon.co.uk and Amazon.com, have a reader of their own. Other webshops often work too, and you see the result before you confirm.')],
                     ['q' => __('Does it work for pads and beans as well as capsules?'), 'a' => __('Yes. Whatever the pack says, DipCatch reads the count or the weight and works out the unit price from it.')],
                     ['q' => __('Can I track the same coffee at more than one shop?'), 'a' => __('Yes, and that is where it earns its keep. Add the same product from several shops and the page shows you the cheapest one right now.')],
                     ['q' => __('Do supermarket bonus prices count?'), 'a' => __('They do. AH Bonus and Dirk promo prices are read as the current price, which is usually the price you actually want to know about.')],
@@ -160,7 +160,7 @@ final class UseCases
                     __('Set an absolute threshold rather than a percentage. You buy these so rarely that a percentage has nothing to measure against.'),
                 ],
                 'faq' => [
-                    ['q' => __('Which shops work for filters?'), 'a' => __('bol.com and Amazon country sites, including Amazon.co.uk and Amazon.com, have their own adapters. Manufacturer webshops often work too, as long as the price is in the page and not loaded afterwards with JavaScript.')],
+                    ['q' => __('Which shops work for filters?'), 'a' => __('Paste a product link. Most shops work. bol.com and Amazon country sites, including Amazon.co.uk and Amazon.com, have a reader of their own. Manufacturer webshops often work too, as long as the price is in the page and not loaded afterwards with JavaScript.')],
                     ['q' => __('Can I see what a filter used to cost?'), 'a' => __('Yes. Every product has an optional public page with a chart of the cheapest price over the last 90 days, which is the whole reason this use case exists.')],
                     ['q' => __('What if I only reorder once a year?'), 'a' => __('Then set a threshold and forget about it. DipCatch keeps checking and mails you when the price falls past it, however long that takes.')],
                     ['q' => __('Do manufacturer webshops work?'), 'a' => __('Often. A shop that publishes its product data in a readable form works; one that loads the price with JavaScript afterwards usually does not. You see which before you confirm.')],
@@ -198,7 +198,7 @@ final class UseCases
                     __('Add the drogist and the brand site for the same product. They rarely run offers in the same week.'),
                 ],
                 'faq' => [
-                    ['q' => __('Which beauty shops work?'), 'a' => __('Etos, Lookfantastic, Cult Beauty, Ulta, Walmart, The Ordinary, bol.com, Amazon country sites, Albert Heijn and Jumbo have their own adapters. Kruidvat, Boots, Superdrug, Target, Notino and many brand sites block the checker or hide the price behind JavaScript, so those are not listed. Other webshops often work too, and you see the result before you confirm.')],
+                    ['q' => __('Which beauty shops work?'), 'a' => __('Paste a product link. Most shops work. Etos, Lookfantastic, Cult Beauty, Ulta, Walmart, The Ordinary, bol.com, Amazon country sites, Albert Heijn and Jumbo have a reader of their own. Kruidvat, Boots, Superdrug, Target, Notino and many brand sites block the checker or hide the price behind JavaScript, so those are not listed. Other webshops often work too, and you see the result before you confirm.')],
                     ['q' => __('Does it compare different tub sizes?'), 'a' => __('Yes. DipCatch reads the pack size from the page and shows price per kilo, litre or piece, so a 340 g tub and a 454 g tub line up honestly.')],
                     ['q' => __('Does makeup count, or only skincare?'), 'a' => __('Anything with a product page and a price. A mascara you repurchase, a serum, a moisturiser and a cleanser are all worth tracking if you buy them more than once.')],
                     ['q' => __('Can I track The Ordinary on the brand site?'), 'a' => __('Yes. Paste the theordinary.com product link. DipCatch reads the price on that page, including the Dutch and other country paths.')],

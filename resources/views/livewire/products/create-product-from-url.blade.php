@@ -168,6 +168,10 @@
                     @case('http_error')
                         The shop returned HTTP {{ $errorContext['status'] ?? 'error' }}. Check the URL and try again.
                         @break
+                    @case('extraction_failed')
+                        DipCatch could not read a price from that page. Most shops work from the product URL itself.
+                        <x-shop-request-link :url="$url" class="font-medium" />
+                        @break
                     @case('not_in_dataset')
                         @php $njReason = $errorContext['reason'] ?? null; @endphp
                         @if ($njReason === 'unrecognized_url')

@@ -30,7 +30,9 @@ test('llms.txt describes the product as more than groceries', function (): void 
         ->and($content)->toContain('filters')
         ->and($content)->toContain('skincare')
         ->and($content)->toContain('Etos')
-        ->and($content)->toContain('Pets Place');
+        ->and($content)->toContain('Pets Place')
+        ->and($content)->toContain('Paste a product URL from almost any webshop')
+        ->and($content)->toContain('have a reader of their own');
 });
 
 test('llms.txt links the pages worth reading, built from the routes themselves', function (): void {

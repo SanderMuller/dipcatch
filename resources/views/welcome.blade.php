@@ -49,7 +49,8 @@
     ];
     $freeProducts = \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->maxProducts();
     $faq = [
-        ['q' => __('Which shops work?'), 'a' => __('DipCatch has built-in support for Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart, including AH Bonus and Dirk promo prices. Many other webshops publish their product data in a form DipCatch can read. Shops that block bots or only load prices with JavaScript may not work. You see the result before you confirm.')],
+        ['q' => __('Which shops work?'), 'a' => __('Paste a product URL. Most webshops work if the price is on the page. Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart have a reader of their own, including AH Bonus and Dirk promo prices. Shops that block bots or only load prices with JavaScript may not work. You see the result before you confirm.')],
+        ['q' => __('What if my shop is not listed?'), 'a' => __('Paste it anyway. The names on this site are shops with a reader of their own, not the only shops that work. If the price does not come through, send a product URL.')],
         ['q' => __('How often are prices checked?'), 'a' => __('A shop is checked the moment you add it or change its link. After that DipCatch re-checks it about every :hours hours, give or take half an hour.', ['hours' => config('dipcatch.recheck.interval_hours', 6)])],
         ['q' => __('Is it free?'), 'a' => $freeProducts === null
             ? __('Yes. The free plan has no product limit, you do not need a card, and there is no trial that runs out.')
@@ -143,6 +144,10 @@
                                         <a href="{{ route('shops', $langQuery) }}" class="underline underline-offset-4 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('and many other webshops') }}</a>
                                     </li>
                                 </ul>
+                                <p class="mt-3 max-w-[48ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
+                                    {{ __('Most shops work if you paste a product link. The names above are shops with a reader of their own.') }}
+                                    <x-shop-request-link class="hover:text-zinc-700 dark:hover:text-zinc-300" />
+                                </p>
 
                                 @php($useCases = \App\Support\UseCases::all())
 

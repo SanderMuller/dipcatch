@@ -94,6 +94,10 @@
                             </div>
                         @endforeach
                     </div>
+                    <p class="mt-6 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">
+                        {{ __('Paste a product URL from any other shop as well. Most shops work. A reader of its own is written when a generic read is not enough.') }}
+                        <x-shop-request-link :host="$shop->host" class="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300" />
+                    </p>
                 </section>
 
                 <section class="mt-16">

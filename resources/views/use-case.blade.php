@@ -53,9 +53,9 @@
                     </section>
                 @endif
 
-                @if ($shops !== [])
-                    <section class="mt-16">
-                        <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Which shops this works with') }}</h2>
+                <section class="mt-16">
+                    @if ($shops !== [])
+                        <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Shops with a reader of their own') }}</h2>
                         <ul role="list" class="mt-5 flex flex-wrap gap-2">
                             @foreach ($shops as $shop)
                                 {{-- Linked: every one of these shops has a page of its own. --}}
@@ -67,8 +67,12 @@
                                 </li>
                             @endforeach
                         </ul>
-                    </section>
-                @endif
+                    @endif
+                    <p @class(['max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400', 'mt-5' => $shops !== []])>
+                        {{ __('Paste a product URL from any other shop as well. Most shops work. A reader of its own is written when a generic read is not enough.') }}
+                        <x-shop-request-link class="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300" />
+                    </p>
+                </section>
 
                 <section class="mt-16">
                     <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Frequently asked questions') }}</h2>
