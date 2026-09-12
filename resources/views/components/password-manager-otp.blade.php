@@ -1,12 +1,7 @@
-@props([
-    'label' => null,
-])
-
 <flux:otp
     name="code"
     id="code"
-    length="6"
-    :label="$label ?? __('Authentication code')"
+    :label="__('Authentication code')"
     autocomplete="one-time-code"
     {{ $attributes }}
 >

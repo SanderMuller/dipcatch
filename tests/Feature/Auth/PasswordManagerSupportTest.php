@@ -2,6 +2,7 @@
 
 use App\Livewire\AppCommandPalette;
 use App\Livewire\Connections\ConnectionsPage;
+use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\Settings\Security;
 use App\Models\Invitation;
@@ -169,14 +170,10 @@ test('the two-factor challenge marks the authenticator pin as a one-time code', 
         ->and($recovery->getAttribute('id'))->toBe('recovery_code')
         ->and($recovery->hasAttribute('data-1p-ignore'))->toBeTrue();
 
-    $labelTexts = new Crawler($html)->filter('ui-label, label')->each(
-        static fn (Crawler $node): string => trim($node->text()),
-    );
+    $label = fieldLabel($html, '#recovery_code');
 
-    Assert::assertTrue(
-        array_any($labelTexts, fn (string $text): bool => str_contains($text, 'Recovery code')),
-        '1Password needs a visible labelled recovery-code field.',
-    );
+    Assert::assertStringContainsString('Recovery code', $label->text());
+    Assert::assertStringNotContainsString('sr-only', (string) $label->attr('class'));
 });
 
 test('two-factor setup does not offer the secret as a password', function (): void {
@@ -223,25 +220,34 @@ test('copyable secret fields are ignored by password managers', function (): voi
     $mcp = formControl(Livewire::test(ConnectionsPage::class)->html(), 'mcp-endpoint');
 
     expect($mcp->hasAttribute('data-1p-ignore'))->toBeTrue()
-        ->and($mcp->getAttribute('autocomplete'))->toBe('off')
-        ->and($mcp->getAttribute('id'))->toBe('mcp-endpoint');
+        ->and($mcp->getAttribute('autocomplete'))->toBe('off');
 
     $share = formControl(Livewire::test(ProductShow::class, ['product' => $product])->html(), 'share-url');
 
     expect($share->hasAttribute('data-1p-ignore'))->toBeTrue()
-        ->and($share->getAttribute('autocomplete'))->toBe('off')
-        ->and($share->getAttribute('id'))->toBe('share-url');
+        ->and($share->getAttribute('autocomplete'))->toBe('off');
 });
 
 test('the command palette search is ignored by password managers', function (): void {
     $this->actingAs(User::factory()->create());
 
-    $input = new Crawler(Livewire::test(AppCommandPalette::class)->html())
-        ->filter('input[data-1p-ignore]')
-        ->getNode(0);
+    $input = ignoredSearchInput(
+        Livewire::test(AppCommandPalette::class)->html(),
+        'Search pages and recent products…',
+    );
 
-    Assert::assertInstanceOf(DOMElement::class, $input);
-    Assert::assertSame('off', $input->getAttribute('autocomplete'));
+    expect($input->getAttribute('autocomplete'))->toBe('off');
+});
+
+test('the product list search is ignored by password managers', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $input = ignoredSearchInput(
+        Livewire::test(ProductList::class)->html(),
+        'Search your products',
+    );
+
+    expect($input->getAttribute('autocomplete'))->toBe('off');
 });
 
 test('the passkey name field is ignored by password managers', function (): void {
@@ -275,10 +281,25 @@ function formControl(string $html, string $name): DOMElement
 
 function expectOneTimeCodeOnAnInput(string $html): void
 {
-    expect(formControl($html, 'code')->getAttribute('autocomplete'))->toBe('one-time-code');
+    $code = formControl($html, 'code');
 
-    $input = new Crawler($html)->filter('input[autocomplete="one-time-code"]')->getNode(0);
-    Assert::assertInstanceOf(DOMElement::class, $input);
+    Assert::assertSame('one-time-code', $code->getAttribute('autocomplete'));
+    Assert::assertSame('code', $code->getAttribute('id'));
+
+    $otpInputs = new Crawler($html)->filter('ui-otp[name="code"] input');
+    Assert::assertCount(6, $otpInputs);
+    Assert::assertCount(1, $otpInputs->filter('[autocomplete="one-time-code"]'));
+    Assert::assertCount(1, new Crawler($html)->filter('input[autocomplete="one-time-code"]'));
+
+    $ignored = $otpInputs->filter('[data-1p-ignore]');
+    Assert::assertCount(5, $ignored);
+    $ignored->each(static function (Crawler $node): void {
+        Assert::assertSame('off', $node->attr('autocomplete'));
+    });
+
+    $label = fieldLabel($html, 'ui-otp[name="code"]');
+    Assert::assertStringContainsString('Authentication code', $label->text());
+    Assert::assertStringNotContainsString('sr-only', (string) $label->attr('class'));
 }
 
 function expectPasswordManagerUsername(string $html, string $email): void
@@ -294,12 +315,36 @@ function expectPasswordManagerUsername(string $html, string $email): void
     Assert::assertFalse($username->hasAttribute('aria-hidden'));
     Assert::assertStringNotContainsString('sr-only', $username->getAttribute('class'));
 
-    $labelTexts = new Crawler($html)->filter('ui-label, label')->each(
-        static fn (Crawler $node): string => trim($node->text()),
-    );
+    $label = fieldLabel($html, '#username');
+    Assert::assertStringContainsString('Email', $label->text());
+    Assert::assertStringNotContainsString('sr-only', (string) $label->attr('class'));
+}
 
-    Assert::assertTrue(
-        array_any($labelTexts, fn (string $text): bool => str_contains($text, 'Email')),
-        '1Password needs a visible labelled username field in the same form as the password.',
-    );
+function fieldLabel(string $html, string $controlSelector): Crawler
+{
+    $control = new Crawler($html)->filter($controlSelector);
+    Assert::assertCount(1, $control);
+
+    $label = $control
+        ->closest('ui-field, [data-flux-field]')
+        ?->filter('ui-label, label');
+
+    Assert::assertNotNull($label);
+    Assert::assertCount(1, $label);
+
+    return $label;
+}
+
+function ignoredSearchInput(string $html, string $placeholder): DOMElement
+{
+    $matches = new Crawler($html)
+        ->filter(sprintf('input[placeholder="%s"]', $placeholder));
+
+    Assert::assertCount(1, $matches);
+
+    $input = $matches->getNode(0);
+    Assert::assertInstanceOf(DOMElement::class, $input);
+    Assert::assertTrue($input->hasAttribute('data-1p-ignore'));
+
+    return $input;
 }
