@@ -159,6 +159,18 @@ Recorded so an executor does not re-litigate them:
   the initial URL *and* on every redirect target, robots.txt is re-checked per
   hop, and DNS results are range-checked. Plan 005 hardens the escape hatch; the
   mechanism itself needs nothing.
+- **A dot-is-decimal path for structured sources** — proposed after plan 004, on
+  the grounds that schema.org mandates `.` as the decimal point and discourages
+  grouping separators, so a JSON-LD, microdata or Open Graph `"1.099"` is
+  unambiguous by specification and need not be refused. Rejected: the codebase
+  already records that shops break that rule. `tests/Feature/PriceAdapters/JsonLdAdapterTest.php`
+  ("normalizes European decimal separator") asserts that a JSON-LD `"price"` of
+  `"1.299,99"` parses to `1299.99`, which is a shop writing display formatting
+  into a machine-readable field. Trusting the specification for structured
+  strings would restore the 1000× misread for exactly that class of shop.
+  The fixtures model the AH API and Aldi prices as PHP floats, which take the
+  numeric path instead; both read the value out of decoded JSON, so a string
+  price from either API would still reach the string path.
 - **Share-slug guessability** — `Str::random(32)`.
 - **N+1 in the product table** — `ProductsTable` eager-loads `cheapestShop` and
   `shops`.
