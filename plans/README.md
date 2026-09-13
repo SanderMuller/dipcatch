@@ -168,15 +168,24 @@ Recorded so an executor does not re-litigate them:
      DB_DATABASE="dipcatch_test_$(basename "$(git rev-parse --show-toplevel)" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g')" vendor/bin/pest --compact || true
      ```
 
-     Two properties make this safe, both verified here rather than assumed:
-     the `<env name="DB_DATABASE">` entry in `phpunit.xml.dist` carries no
-     `force` attribute, so a real environment variable wins over it; and
-     Laravel's migrate step creates the database when it is missing, so
-     nothing needs pre-creating. Use it only in a clone or worktree — the
-     primary checkout keeps the bare `dipcatch_test`.
+     The override works because the `<env name="DB_DATABASE">` entry in
+     `phpunit.xml.dist` carries no `force` attribute, so a real environment
+     variable wins over it. A **serial** run then creates its own database:
+     `migrate:fresh` passes `--force` to `migrate`, and
+     `MigrateCommand::createMissingMySqlOrPgsqlDatabase()` issues
+     `CREATE DATABASE` when it is missing. That is specific to this path — a
+     bare `php artisan migrate --no-interaction` against a missing database
+     does **not** create it.
 
-     Borrowed from `hihaho`, which documents the same problem and fix in
-     `.ai/docs/worktree-clone-isolation.md`.
+     A **parallel** run (`composer test`) needs the base database created once
+     per clone, because paratest connects to it in order to drop its
+     per-worker databases and fails before any migration runs. Use it only in
+     a clone or worktree — the primary checkout keeps the bare
+     `dipcatch_test`.
+
+     Full setup, browser host, Redis, and an orphan sweep for removed clones:
+     `.ai/docs/worktree-clone-isolation.md`, adapted from the equivalent doc
+     in `hihaho`.
 
   **STOP condition 4 resolved, and the reasoning is recorded because it was a
   judgement call.** The condition asked whether catching `Throwable` hides a
