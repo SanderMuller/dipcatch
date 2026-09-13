@@ -18,11 +18,19 @@ class ShopSuggestions extends Component
 {
     public string $productId;
 
-    public function mount(Product $product): void
+    /**
+     * Whether the list starts open. Closed by default so the panel does not
+     * push the tracked shops off the first screen; the add-shop form opens it
+     * after an add, when the remaining suggestions are the reason to look.
+     */
+    public bool $expanded = false;
+
+    public function mount(Product $product, bool $expanded = false): void
     {
         Gate::authorize('view', $product);
 
         $this->productId = (string) $product->id;
+        $this->expanded = $expanded;
     }
 
     public function accept(string $url): void

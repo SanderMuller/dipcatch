@@ -228,6 +228,41 @@ test('the add-shop disclosure lists suggestions while idle and hides them during
         ->assertDontSeeLivewire('suggestions.shop-suggestions');
 });
 
+test('the suggestions list comes back expanded once a shop is added', function (): void {
+    seedRow('spar', 'Beemster Extra belegen 48+ plakken', '150 g', '3.69', link: 'beemster-spar-1/');
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd(json_encode([
+            '@type' => 'Product',
+            'name' => 'Demo Item',
+            'offers' => [
+                '@type' => 'Shop',
+                'price' => '50.00',
+                'priceCurrency' => 'EUR',
+                'availability' => 'https://schema.org/InStock',
+            ],
+        ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $product = suggestionProduct();
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        // Closed on first open: nothing has happened that earns the space yet.
+        ->assertSeeHtml('x-data="{ open: false }"')
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'preview')
+        ->call('confirm')
+        ->assertSet('state', 'idle')
+        ->assertSet('expandSuggestions', true)
+        ->assertSeeHtml('x-data="{ open: true }"')
+        // The product page refreshes its shops on this event, so dropping it
+        // would leave that page stale with nothing else to catch it.
+        ->assertDispatched('shop-added');
+});
+
 test('accepting also asks the collapsed add-shop disclosure to open', function (): void {
     seedRow('spar', 'Beemster Extra belegen 48+ plakken', '150 g', '3.69', link: 'beemster-spar-1/');
 

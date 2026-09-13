@@ -13,7 +13,7 @@
             count keeps them discoverable while closed.
         --}}
         <flux:accordion>
-            <flux:accordion.item>
+            <flux:accordion.item :expanded="$expanded">
                 <flux:accordion.heading>
                     Also sold at
                     <flux:badge size="sm" class="ms-2">{{ count($suggestions) }}</flux:badge>

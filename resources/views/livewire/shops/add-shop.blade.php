@@ -6,7 +6,7 @@
         preview the user has to act on.
     --}}
     @if ($state === 'idle' || $state === 'error')
-        @livewire('suggestions.shop-suggestions', ['product' => $product], key('shop-suggestions-add-' . $product->id))
+        @livewire('suggestions.shop-suggestions', ['product' => $product, 'expanded' => $expandSuggestions], key('shop-suggestions-add-' . $product->id))
     @endif
 
     @if ($state === 'idle' || $state === 'error')
