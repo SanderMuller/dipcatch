@@ -25,7 +25,8 @@
     @endif
 
     @if ($canAddShop)
-        <div x-show="! addOpen" x-cloak>
+        <div class="grid grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_auto] [&>details[open]]:col-span-full">
+        <div class="min-w-0 pt-2" x-show="! addOpen" x-cloak>
             @livewire('suggestions.shop-suggestions', ['product' => $product], key('shop-suggestions-panel-' . $product->id))
         </div>
 
@@ -63,6 +64,7 @@
                 @livewire('shops.add-shop', ['product' => $product], key('add-shop-inline-' . $product->id))
             </flux:card>
         </details>
+        </div>
     @else
         {{-- No Add button and no suggestions: every one of them would end at
              the same refusal on Confirm, after a live fetch of the page.

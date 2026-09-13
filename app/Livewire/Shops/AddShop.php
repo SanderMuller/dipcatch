@@ -23,13 +23,8 @@ class AddShop extends Component
 
     public Product $product;
 
-    /**
-     * Set once a shop is added, and never cleared for the life of the form.
-     * Confirm remounts the suggestions list, which loses whether the user had
-     * it open; someone who just added one shop is the person most likely to
-     * add another, so it comes back expanded from then on.
-     */
-    public bool $expandSuggestions = false;
+    /** Keep suggestions visible whenever the add-shop form is open. */
+    public bool $expandSuggestions = true;
 
     public function mount(Product $product): void
     {
@@ -88,8 +83,6 @@ class AddShop extends Component
 
             return;
         }
-
-        $this->expandSuggestions = true;
 
         $this->dispatch('shop-added', offerId: $offerId);
         $this->resetProbeState();

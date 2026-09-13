@@ -222,13 +222,14 @@ test('the add-shop disclosure lists suggestions while idle and hides them during
 
     Livewire::test(AddShop::class, ['product' => $product])
         ->assertSeeLivewire('suggestions.shop-suggestions')
+        ->assertSeeHtml('x-data="{ open: true }"')
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
         ->assertDontSeeLivewire('suggestions.shop-suggestions');
 });
 
-test('the suggestions list comes back expanded once a shop is added', function (): void {
+test('the suggestions list stays expanded once a shop is added', function (): void {
     seedRow('spar', 'Beemster Extra belegen 48+ plakken', '150 g', '3.69', link: 'beemster-spar-1/');
     RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
     Http::fake([
@@ -249,14 +250,13 @@ test('the suggestions list comes back expanded once a shop is added', function (
     $this->actingAs($product->user()->sole());
 
     Livewire::test(AddShop::class, ['product' => $product])
-        // Closed on first open: nothing has happened that earns the space yet.
-        ->assertSeeHtml('x-data="{ open: false }"')
+        ->assertSet('expandSuggestions', true)
+        ->assertSeeHtml('x-data="{ open: true }"')
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
         ->call('confirm')
         ->assertSet('state', 'idle')
-        ->assertSet('expandSuggestions', true)
         ->assertSeeHtml('x-data="{ open: true }"')
         // The product page refreshes its shops on this event, so dropping it
         // would leave that page stale with nothing else to catch it.

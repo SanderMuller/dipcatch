@@ -12,7 +12,7 @@
             and the price history above them — off the first screen. The
             count keeps them discoverable while closed.
         --}}
-        <flux:accordion>
+        <flux:accordion variant="reverse">
             <flux:accordion.item :expanded="$expanded">
                 <flux:accordion.heading>
                     Also sold at
