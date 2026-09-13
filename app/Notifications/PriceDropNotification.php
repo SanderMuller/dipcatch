@@ -62,9 +62,10 @@ final class PriceDropNotification extends Notification implements ShouldQueue
         $this->snapshotBundleQuantity = $bundle?->quantity;
         $this->snapshotBundleTotalPrice = $bundle?->totalPrice;
 
-        // Defer queue dispatch until the surrounding DB transaction commits
-        // so a rollback inside DetectDrop cannot leave a queued job pointing
-        // at a non-existent PriceDropEvent.
+        // Defence in depth. `DetectDrop` already sends after its transaction
+        // commits, so this is here for any future caller that notifies inside
+        // one: a rollback must not leave a queued job pointing at a
+        // PriceDropEvent that does not exist.
         $this->afterCommit();
     }
 

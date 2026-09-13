@@ -23,12 +23,17 @@ vendor/bin/pest || true                       # 0 failures
 | 003 | Stop a recheck adopting a shop's new currency | P1 | M | 002 | DONE (`ead8499`) |
 | 004 | Stop `canonicalizeDecimal` misreading two price shapes | P1 | S | — | DONE |
 | 005 | Index, env documentation, and the SSRF escape hatch | P2 | S | — | DONE |
-| 006 | Alert budget after the claim; reference out of the lock | P2 | S | — | TODO |
+| 006 | Alert budget after the claim; reference out of the lock | P2 | S | — | DONE |
 | 007 | Clear the old price when an offer is repointed | P2 | S | — | DONE |
 | 008 | Only dispatch a digest when there is something to digest | P3 | M | — | TODO |
 | 009 | Make the nightly prune's cost independent of product count | P3 | M | 005 | TODO |
+| 010 | Let each alert fail on its own, and say when one is dropped | P2 | S | 006 | DONE |
+| 011 | Split the notification budget into asking and paying | P3 | S | 010 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
+
+Plans 010 and 011 were written on 2026-09-12 against commit `747f324`, after
+006 shipped. They are not part of the original `improve` sweep.
 
 ## Dependency notes
 
@@ -39,6 +44,11 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - **009 depends on 005** because 005 adds the index on
   `price_drop_events.product_id` that makes the prune's per-product lookups cheap.
   Batching before indexing measures the wrong thing.
+- **010 depends on 006** for the code it edits: 006 created the
+  `DB::afterCommit` closures that 010 makes fail independently.
+- **011 depends on 010 for evidence, not for code.** 010's suppression log is
+  what says whether anyone reaches the hourly cap. If nobody does, 011 is a
+  REJECT rather than a TODO, and its own STOP conditions say so.
 - 001, 004, 006, 007 and 008 are fully independent and can run in parallel.
 
 ## Why this order
@@ -79,6 +89,212 @@ Recorded so an executor does not re-litigate them:
    arrive later the same day.
 
 ## Execution log
+
+- **010 — executed 2026-09-12.** Six new tests, four in
+  `tests/Feature/Drops/AlertsSurviveTheJobTransactionTest.php` and two in
+  `tests/Feature/Drops/NotificationBudgetSpendTest.php`. All six were run
+  against `main` and fail there.
+
+  The cascade the plan describes was confirmed by the failing run's own stack
+  trace, not only by reading the framework: the throw inside the commit
+  callback escaped through `CheckShopPrice.php:505` (`persist()`'s transaction)
+  and out of `handle()` at `CheckShopPrice.php:171`. The premise held on all
+  three counts — the sibling alerts died, the job failed, the data stayed
+  committed.
+
+  **Three deviations, all from the review that followed the first pass.**
+
+  1. **The plan's stated reason for not rethrowing was wrong, and is fixed in
+     the code comments.** The plan said "the job retry finds no price change to
+     re-detect". There is no retry: `CheckShopPrice` sets `maxExceptions = 1`
+     and its own docblock says "a thrown exception and a timeout fail
+     immediately". The conclusion still holds by a shorter route — rethrowing
+     fails the job on the first throw and recovers nothing — but the reason the
+     comments give is now the accurate one.
+  2. **`Alert failed to send` logs at `error`, not `warning` as the plan's
+     snippet showed.** A suppressed alert is the cap working as designed and
+     stays at `warning`; a lost alert is not an expected state. The two are now
+     separable by level as well as by message. Note this is the first
+     `Log::error` in `app/` — there were 14 `warning` and 6 `info` before it.
+  3. **The cascade test originally proved two detectors, not three.** The
+     fixture set `target_price` but no `unit_price_target`, so
+     `DetectUnitPriceTarget` returned before staging a callback — and the
+     middle callback is precisely the one that proves the `foreach` resumes
+     rather than merely reaching its last entry. The fixture now subscribes the
+     user to Pro and gives the shop a pack size, so all three alerts fire.
+
+  Also added after review: a test that pins `report($e)` and the failure log
+  (neither was asserted anywhere), and `price_drop_event_id` on `DetectDrop`'s
+  failure line — it is the handle for finding the committed event row that has
+  no notification behind it.
+
+  Three notes:
+  1. **The plan's test-stub recipe needed the correction it anticipated.**
+     `NotificationBudget` is `final`, so the stub can neither subclass nor
+     double it. The container binding works because every call site resolves it
+     untyped — `app(NotificationBudget::class)->allows($user)` — so a plain
+     anonymous class with an `allows()` method serves. Plan 011 renames that
+     method and will break the stub.
+  2. **Use `Log::spy()`, not `Log::shouldReceive()`, to assert these lines.**
+     A strict facade mock installed before the job runs stops
+     `Exceptions::fake()` recording the reported exception, so an assertion on
+     `report()` fails for a reason that has nothing to do with the code. The
+     spy records and asserts afterwards.
+  3. **Schema errors during a test run mean another checkout is running the
+     suite.** Traced, after three occurrences. `phpunit.xml.dist` pins
+     `DB_DATABASE=dipcatch_test` with no per-checkout suffix, so every clone of
+     this repository on one machine shares a single test database. A suite run
+     in another checkout executes `migrate:fresh` against the database this one
+     is querying.
+
+     The signature is unmistakable once you know it: errors that walk the
+     schema as it is rebuilt — `relation "users" does not exist`, then
+     `column "timezone" does not exist`, then `column "timezone_detected_at"
+     does not exist` — and a different set of tests failing on every run. It is
+     not a defect in the code under test. Re-run in a quiet window.
+
+     Confirmed by elimination: `origin/main` alone ran clean (1705 tests), the
+     merged tree failed twice with disjoint failure sets, and the same merged
+     tree then ran clean (1721 tests) with nothing else active.
+
+     **The fix is a per-clone `DB_DATABASE`, and `--parallel` is not a
+     substitute.** Paratest appends `_test_N` per worker, which isolates
+     workers inside one run and does nothing across checkouts — two clones
+     both running `--parallel` collide on `dipcatch_test_test_1`. Override the
+     name instead, derived from the clone directory so it is reused rather
+     than multiplied:
+
+     ```bash
+     DB_DATABASE="dipcatch_test_$(basename "$(git rev-parse --show-toplevel)" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g')" vendor/bin/pest --compact || true
+     ```
+
+     The override works because the `<env name="DB_DATABASE">` entry in
+     `phpunit.xml.dist` carries no `force` attribute, so a real environment
+     variable wins over it. A **serial** run then creates its own database:
+     `migrate:fresh` passes `--force` to `migrate`, and
+     `MigrateCommand::createMissingMySqlOrPgsqlDatabase()` issues
+     `CREATE DATABASE` when it is missing. That is specific to this path — a
+     bare `php artisan migrate --no-interaction` against a missing database
+     does **not** create it.
+
+     A **parallel** run (`composer test`) needs the base database created once
+     per clone, because paratest connects to it in order to drop its
+     per-worker databases and fails before any migration runs. Use it only in
+     a clone or worktree — the primary checkout keeps the bare
+     `dipcatch_test`.
+
+     Full setup, browser host, Redis, and an orphan sweep for removed clones:
+     `.ai/docs/worktree-clone-isolation.md`, adapted from the equivalent doc
+     in `hihaho`.
+
+  **STOP condition 4 resolved, and the reasoning is recorded because it was a
+  judgement call.** The condition asked whether catching `Throwable` hides a
+  failure the queue worker handles better. It partly does: `spatie/laravel-failed-job-monitor`
+  and `sandermuller/laravel-queue-insights` are both installed, so before this
+  change a failing alert produced a `failed_jobs` row and a monitor
+  notification, and now it produces `report($e)` plus a `Log::error` line. No
+  exception tracker (Sentry, Bugsnag, Flare, Nightwatch) is installed, so
+  `report()` currently lands in `storage/logs`. Against that: the old
+  behaviour recorded the job as failed *after* `PDO::commit()` had already
+  written the price check, the cheapest window and every latch, and it lost
+  three alerts instead of one. The change is a net improvement on alert
+  delivery and a regression on operator visibility. **Follow-up worth a plan:
+  give a lost alert a surface an operator is alerted on.** Nothing today
+  distinguishes one transient loss from a deterministic defect losing every
+  alert for every user.
+
+  One more input for plan 011, found during review: a send that throws has
+  *already* spent an hourly slot, because `allows()` calls `RateLimiter::hit()`
+  before returning true. So the user loses the alert and the slot.
+
+  **The boundary of what this covers.** All three notifications are
+  `ShouldQueue`, so `$user->notify()` evaluates `via()` inline and then queues
+  one job per channel (`NotificationSender::queueNotification()`). In
+  production the catch therefore sees a *dispatch-time* failure — the budget
+  call, `via()`, the enqueue — and not a delivery failure: a channel
+  that fails later lands in `failed_jobs` with no `Alert failed to send` line
+  and the slot already spent. The tests see more than production does, because
+  `phpunit.xml.dist` sets `QUEUE_CONNECTION=sync` and the channels run inside
+  the callback. Closing that needs a `failed()` hook on the notifications,
+  which is outside plan 010 — and it is the same gap one layer down, so it
+  belongs with the deferred outbox option rather than with plan 011.
+
+- **006 — executed 2026-09-12.** Both parts shipped. Ten new tests:
+  `tests/Feature/Drops/NotificationBudgetSpendTest.php` (eight),
+  `tests/Feature/Drops/AlertsSurviveTheJobTransactionTest.php` (one) and
+  `tests/Feature/Drops/ReferenceComputedOnceTest.php` (one). Six of the ten
+  fail against `main` and were run there to prove it; the count was measured,
+  not reasoned. The other four are controls and pins: two positive controls
+  that spend a slot either way, one job-level test that passes on `main` too,
+  and one that records the reference value on the event row.
+
+  **Three deviations, all found by review after the first pass.**
+
+  1. **Step 1 was executed further than its literal text.** The plan said to
+     move the budget question below the claim in `DetectUnitPriceTarget`. That
+     is not enough. `CheckShopPrice::persist()` wraps the price_check insert,
+     the recompute and both target detectors in one transaction, so the
+     question still sat inside a transaction that can roll back — the exact
+     failure Step 2 moves out of `DetectDrop`. The question now lives inside
+     the `DB::afterCommit` callback.
+  2. **`DetectTargetPrice` was fixed too, though it is outside the in-scope
+     file list.** It was added in `6c19fe2`, after the plan was written at
+     `c9daac7`, and carried the identical ordering. Leaving it would not have
+     been neutral: `persist()` runs the detectors in the order drop,
+     unit-price, target-price, so deferring the first two and leaving the
+     third inline makes the third ask **first**. At the last free slot a
+     target-price alert that may never send would take the slot from a drop
+     alert whose event row is already written. That inversion is introduced by
+     this change, so fixing it belongs here. Total slot waste is still lower
+     than on `main` either way — what would have changed is which alert loses
+     at the cap.
+  3. **`app/Notifications/PriceDropNotification.php` gained a one-line comment
+     rewrite.** Its `afterCommit()` call was justified by a rollback inside
+     `DetectDrop` that this change makes impossible. Reworded as defence in
+     depth so the next reader does not delete the call for the wrong reason.
+
+  **The done criterion "no file outside the in-scope list" is not met.** Four
+  files sit outside it: `app/Actions/Drops/DetectTargetPrice.php` and
+  `app/Notifications/PriceDropNotification.php` for the reasons above, plus
+  `tests/Feature/Drops/AlertsSurviveTheJobTransactionTest.php` and this file.
+  Status is still DONE.
+
+  Four notes for whoever reads this next:
+  1. **A rate-limited alert is now dropped, not deferred.** The claim lands
+     before the budget denies, so the latch is armed and that alert is lost
+     rather than retried on the next check. This is what `DetectDrop` has
+     always done — it writes `last_notified_price` and the event row, then
+     logs the suppression — so the three alert types now agree. It is a real
+     behaviour change, not only a reordering, and a test pins it. The root
+     cause is that `NotificationBudget::allows()` conflates asking with
+     paying; splitting it into a peek and a take would let a detector find the
+     denial before arming the latch. The plan scoped that class out. **Worth a
+     follow-up plan.**
+  2. **A throw inside the commit callback now loses the alert.** A cache
+     outage in `RateLimiter`, or a channel error, exits `DB::commit()` with
+     the data already committed, so the job retry finds no price change and
+     sends nothing. Before, the same throw rolled the transaction back and the
+     retry re-detected the drop. The two target detectors already carried this
+     exposure; the drop path now shares it. Accepted cost of the placement.
+  3. **The `??` fallback in `DetectDrop::__invoke()` still recomputes on a
+     product's first-ever recompute.** `compareDirection(null, $price)` returns
+     `'down'` while the pre-lock compute returns null, because no history
+     segment exists yet. The outcome is unchanged (the in-lock compute returns
+     `INITIAL = $newPrice`, a 0% drop, which fires nothing), but a test that
+     counts window reads must seed history or it counts two. The parameter
+     stays optional per Step 3: making it required is not a pure refactor,
+     because `DropEvaluator::meetsAbsThreshold()` compares `>= 0`, so a
+     product with `drop_threshold_abs = 0` currently does fire on that path.
+  4. **Test 4 uses a query-log count, not the counting decorator the plan
+     asked for.** `Reference` is `final` and `DetectDrop`'s constructor takes
+     the concrete type, so it cannot be decorated in the container. The query
+     log also proves the ordering against the lock, which a decorator would
+     not. It matches the Postgres grammar (`from "price_checks"`,
+     `for update`); `phpunit.xml.dist` pins `DB_CONNECTION=pgsql`.
+
+  The plan's claim that `Product.php` carried a docblock about keeping the
+  window read out of the critical section did not hold — there was no comment
+  at the precompute. One was added.
 
 - **005 — executed 2026-09-11.** Three deviations, all agreed with the maintainer
   before the work started:
@@ -194,6 +410,26 @@ Not problems — options, recorded so they are not re-discovered:
   waitlist. Users cannot export their own price history.
 - **No signal on which adapter to build next.** `UnservableShops` names hosts that
   cannot work, but nothing records which unsupported hosts users actually paste.
+- **An outbox for durable alert delivery.** Raised after plan 006, deferred
+  deliberately. Since 006 the budget question and the send run in a
+  `DB::afterCommit` callback, so a `RateLimiter` or queue-driver failure loses
+  that alert for good: the data is committed, the latch is armed, and the job
+  retry finds no price change to re-detect. Plan 010 stops one such failure
+  taking the other two alerts with it and logs the loss, but it does not repair
+  it — it cannot, because the alert is already unrecoverable by the time the
+  callback runs.
+
+  The shape that does repair it: write an intent row inside the transaction that
+  already commits the latch, and let a separate queued job ask the budget and
+  send, so the retry belongs to the queue rather than to the price check. Most of
+  the machinery exists — all three notifications are already `ShouldQueue` — but
+  the dispatch itself currently happens in the callback, which is the part that
+  has to move.
+
+  **Trigger**: plan 010's `Alert failed to send` log line, not its suppression
+  line. Suppression is the cap working as designed and belongs to plan 011. Only
+  a non-zero count of real send failures justifies M effort here. Whoever picks
+  it up writes the plan then, against code that already has 010 in it.
 
 ## Not audited
 

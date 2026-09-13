@@ -61,6 +61,18 @@ test('accepting a suggestion hands the url to the add-shop component', function 
         ->assertDispatchedTo('shops.add-shop', 'suggest-shop', url: 'https://www.spar.nl/beemster-spar-1/');
 });
 
+test('the add and hide buttons render a callable wire:click, not an uncompiled directive', function (): void {
+    seedRow('spar', 'Beemster Extra belegen 48+ plakken', '150 g', '3.69', link: 'beemster-spar-1/');
+
+    $product = suggestionProduct();
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(ShopSuggestions::class, ['product' => $product])
+        ->assertDontSeeHtml('@js(')
+        ->assertSeeHtml('accept(\'https:\/\/www.spar.nl\/beemster-spar-1\/\')')
+        ->assertSeeHtml('dismiss(\'spar\', \'beemster-spar-1\/\')');
+});
+
 test('the add-shop component probes a suggested url and shows the preview', function (): void {
     RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
     Http::fake([

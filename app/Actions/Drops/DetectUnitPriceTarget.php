@@ -9,6 +9,8 @@ use App\Services\Drops\NotificationBudget;
 use App\Support\Numeric;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Fires when a product's best value reaches the price per unit the shopper
@@ -97,10 +99,7 @@ final readonly class DetectUnitPriceTarget
     {
         $user = $product->user;
 
-        // The same hourly ceiling the drop alerts obey. Without this a Pro
-        // account with unlimited products could pass its own cap through
-        // this door.
-        if ($user === null || ! app(NotificationBudget::class)->allows($user)) {
+        if ($user === null) {
             return;
         }
 
@@ -123,8 +122,40 @@ final readonly class DetectUnitPriceTarget
 
         $product->refresh();
 
+        // Asked here and nowhere earlier: asking spends a slot of the hourly
+        // ceiling, the limiter is cache-backed and does not roll back, and
+        // `CheckShopPrice` runs this action inside a transaction.
         DB::afterCommit(function () use ($product, $shop, $unitPrice, $user): void {
-            $user->notify(new UnitPriceTargetNotification($product, $shop, $unitPrice));
+            try {
+                if (! app(NotificationBudget::class)->allows($user)) {
+                    Log::warning('Notification suppressed by hourly rate limit', [
+                        'alert' => 'unit_price_target',
+                        'user_id' => $user->id,
+                        'product_id' => $product->id,
+                    ]);
+
+                    return;
+                }
+
+                $user->notify(new UnitPriceTargetNotification($product, $shop, $unitPrice));
+            } catch (Throwable $e) {
+                // This alert is already lost. The claim is committed and the
+                // latch is armed, and `CheckShopPrice` sets
+                // `maxExceptions = 1`, so rethrowing fails the job on the
+                // first throw rather than retrying it — and a replayed check
+                // would find the latch already armed anyway. Rethrowing also
+                // skips every callback staged after this one, costing the
+                // other alerts on the same check. `report()` keeps the trace;
+                // the catch only stops the failure steering control flow.
+                report($e);
+
+                Log::error('Alert failed to send', [
+                    'alert' => 'unit_price_target',
+                    'user_id' => $user->id,
+                    'product_id' => $product->id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
         });
     }
 }

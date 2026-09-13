@@ -59,10 +59,13 @@
                             </flux:button>
 
                             @if ($suggestion->trackable)
+                                {{-- Blade keeps a component attribute value as a literal
+                                     string, so `@js()` would never compile here. An echo
+                                     does run, and `e()` passes the Htmlable through. --}}
                                 <flux:button
                                     size="xs"
                                     variant="primary"
-                                    wire:click="accept(@js($suggestion->url))"
+                                    wire:click="accept({{ \Illuminate\Support\Js::from($suggestion->url) }})"
                                     wire:loading.attr="disabled"
                                 >
                                     Add
@@ -76,7 +79,7 @@
                             <flux:button
                                 size="xs"
                                 variant="ghost"
-                                wire:click="dismiss(@js($suggestion->chain), @js($suggestion->externalId))"
+                                wire:click="dismiss({{ \Illuminate\Support\Js::from($suggestion->chain) }}, {{ \Illuminate\Support\Js::from($suggestion->externalId) }})"
                             >
                                 Hide
                             </flux:button>
