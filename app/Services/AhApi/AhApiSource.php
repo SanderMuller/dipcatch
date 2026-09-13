@@ -4,10 +4,8 @@ namespace App\Services\AhApi;
 
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PriceNormalizer;
-use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\Checkjebon\CheckjebonResult;
-use App\Support\DutchDate;
 use App\Support\UrlNormalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
@@ -155,11 +153,9 @@ final readonly class AhApiSource
         // pack data (spec Section 4).
         $hasSalesUnitSize = array_key_exists('salesUnitSize', $card);
         $salesUnitSize = $hasSalesUnitSize && is_string($card['salesUnitSize']) ? $card['salesUnitSize'] : null;
-        $promotionWindow = self::promotionWindow($card);
+        $promotionWindow = AhPromotionWindow::fromCard($card);
         $hasPromotionDate = array_key_exists('bonusStartDate', $card) || array_key_exists('bonusEndDate', $card);
-        $invalidPromotionWindow = $bundleEligible
-            && $hasPromotionDate
-            && (self::hasInvalidPromotionDate($card) || $promotionWindow === null);
+        $invalidPromotionWindow = $bundleEligible && $hasPromotionDate && $promotionWindow === null;
         $bundleOffer = $bundleEligible && ! $invalidPromotionWindow && is_string($mechanism)
             ? BundleOffer::fromLabel($mechanism, $price)
             : null;
@@ -232,37 +228,6 @@ final readonly class AhApiSource
             'DISCOUNT_X_FOR_Y',
             'DISCOUNT_ONE_HALF_PRICE',
         ], strict: true) && is_int($count) && $count >= 2;
-    }
-
-    /**
-     * The bonus period, read only when the card says a bonus is running.
-     * `bonusMechanism` is Albert Heijn's own wording for the offer
-     * ("VOOR 1.69") and travels as the window's label.
-     *
-     * @param  array<mixed>  $card
-     */
-    private static function promotionWindow(array $card): ?PromotionWindow
-    {
-        if (data_get($card, 'isBonus') !== true) {
-            return null;
-        }
-
-        $mechanism = data_get($card, 'bonusMechanism');
-
-        return PromotionWindow::make(
-            endsAt: DutchDate::endOfDay(data_get($card, 'bonusEndDate')),
-            startsAt: DutchDate::startOfDay(data_get($card, 'bonusStartDate')),
-            label: is_string($mechanism) ? $mechanism : null,
-        );
-    }
-
-    /** @param array<mixed> $card */
-    private static function hasInvalidPromotionDate(array $card): bool
-    {
-        return (array_key_exists('bonusStartDate', $card)
-                && DutchDate::startOfDay($card['bonusStartDate']) === null)
-            || (array_key_exists('bonusEndDate', $card)
-                && DutchDate::endOfDay($card['bonusEndDate']) === null);
     }
 
     private static function productIdFromUrl(string $url): ?string

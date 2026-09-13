@@ -6,8 +6,10 @@ use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\PriceAdapters\PriceNormalizer;
 use App\Services\Drops\DropOutcome;
 use App\Support\MoneyFormatter;
+use App\Support\Numeric;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -141,7 +143,11 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             return false;
         }
 
-        if (bccomp((string) $check->price, (string) $product->cheapest_price, 2) !== 0) {
+        $checkPrice = PriceNormalizer::fromMixed($check->price);
+        $currentPrice = PriceNormalizer::fromMixed($product->cheapest_price);
+
+        if ($checkPrice === null || $currentPrice === null
+            || bccomp(Numeric::str($checkPrice), Numeric::str($currentPrice), 2) !== 0) {
             return false;
         }
 
