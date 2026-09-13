@@ -54,6 +54,35 @@ test('delegates to JsonLdAdapter on the happy path', function (): void {
         ->and($result->snapshot?->currency)->toBe('EUR');
 });
 
+test('reads an enabled primary add-to-cart button as in stock when JSON-LD omits availability', function (): void {
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => 'Fanta Cassis 1,5 L',
+        'offers' => [
+            '@type' => 'AggregateOffer',
+            'highPrice' => 2.85,
+            'lowPrice' => 2.85,
+            'offerCount' => 99,
+            'priceCurrency' => 'EUR',
+        ],
+    ], JSON_THROW_ON_ERROR);
+    $html = str_replace(
+        '<body></body>',
+        '<body><div class="product-panel-info">'
+            . jumboPriceComponent('Prijs: € 2,85', '2', '85')
+            . '<button aria-label="Toevoegen aan mandje Fanta Cassis 1,5 L">Toevoegen aan mandje</button>'
+            . '</div></body>',
+        withJsonLd($json),
+    );
+
+    $snapshot = $this->adapter
+        ->extract('https://www.jumbo.com/producten/fanta-cassis-1,5-l-428446FLS', $html)
+        ->snapshot;
+
+    expect($snapshot?->inStock)->toBeTrue()
+        ->and($snapshot?->stockSignal)->toBe('jumbo:add-to-cart');
+});
+
 test('falls back to the price component screenreader text when JSON-LD is missing', function (): void {
     $html = '<html><head>'
         . '<meta content="Milner 35+ Jong Kaas Stuk 450 g" property="og:title">'

@@ -43,6 +43,13 @@ final readonly class JumboAdapter extends HostAdapter
         $window = $promotion->count() > 0 ? self::promotionWindow($promotion, $label) : null;
         $hasDateText = $promotion->filter('[data-testid="product-communication"]')->count() > 0;
         $raw = $result->snapshot->raw;
+        $inStock = $result->snapshot->inStock;
+        $stockSignal = $result->snapshot->stockSignal;
+
+        if ($inStock === null && self::hasEnabledAddToCartButton($product)) {
+            $inStock = true;
+            $stockSignal = 'jumbo:add-to-cart';
+        }
 
         if ($hasDateText && $window === null) {
             $raw['bundle_diagnostic'] = 'invalid_promotion_window';
@@ -55,6 +62,8 @@ final readonly class JumboAdapter extends HostAdapter
         return ExtractionResult::success($result->snapshot->with(
             promotionWindow: $window,
             promotionWindowAuthoritative: true,
+            inStock: $inStock,
+            stockSignal: $stockSignal,
             bundleOffer: $offer,
             bundleOfferAuthoritative: true,
             raw: $raw,
@@ -187,5 +196,14 @@ final readonly class JumboAdapter extends HostAdapter
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private static function hasEnabledAddToCartButton(Crawler $product): bool
+    {
+        $button = $product->filter('button[aria-label^="Toevoegen aan mandje"]')->first();
+
+        return $button->count() > 0
+            && $button->attr('disabled') === null
+            && $button->attr('aria-disabled') !== 'true';
     }
 }
