@@ -24,6 +24,9 @@
                         {{ __('Normal price: :price each', ['price' => \App\Support\MoneyFormatter::format($singleItemPrice, $shop->currency)]) }}
                     </p>
                 @endif
+                @if (! $showSource && $deadline !== null)
+                    <p class="text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ $deadline }}</p>
+                @endif
             </div>
         @endif
 

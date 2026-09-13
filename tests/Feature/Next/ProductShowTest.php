@@ -7,6 +7,7 @@ use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
 use App\Support\Favicon;
+use App\Support\PromotionLabel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -70,6 +71,29 @@ it('discloses bundle terms in headline and shop row', function (): void {
         ->assertSee('2 voor 4,00');
 
     expect(substr_count($component->html(), '2 for €4.00'))->toBe(2);
+});
+
+it('warns about an ended bundle in the headline and shop row', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '2.00');
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'promotion_ends_at' => now()->subDay(),
+        'promotion_label' => '2 voor 4,00',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
+
+    $this->actingAs($user);
+
+    $component = livewire(ProductShow::class, ['product' => $product]);
+    $deadline = PromotionLabel::short($shop);
+
+    expect($deadline)->not->toBeNull()
+        ->and(substr_count($component->html(), (string) $deadline))->toBe(2);
 });
 
 it('pauses and resumes', function (): void {
