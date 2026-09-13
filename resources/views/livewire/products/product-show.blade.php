@@ -105,7 +105,9 @@
                     {{ \App\Support\MoneyFormatter::format($product->cheapest_price === null ? null : (string) $product->cheapest_price, $product->currency) }}
                 </dd>
                 @if ($product->cheapestShop)
-                    <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ $product->cheapestShop->host }}</dd>
+                    <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
+                        <x-shop-link :shop="$product->cheapestShop" />
+                    </dd>
                     @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
                         <dd class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $bundleLabel }}</dd>
                     @endif
@@ -119,7 +121,9 @@
                     {{ \App\Livewire\Products\ProductList::unitPriceState($bestValueShop, $product) }}
                 </dd>
                 @if ($bestValueShop)
-                    <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ $bestValueShop->host }}</dd>
+                    <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
+                        <x-shop-link :shop="$bestValueShop" />
+                    </dd>
                     @if ($bestValueBundleLabel = \App\Support\BundlePriceLabel::forShop($bestValueShop))
                         <dd class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $bestValueBundleLabel }}</dd>
                     @endif

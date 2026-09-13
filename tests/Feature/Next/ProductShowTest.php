@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
+use App\Support\Favicon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -76,6 +77,113 @@ it('pauses and resumes', function (): void {
     livewire(ProductShow::class, ['product' => $product])->call('togglePaused');
 
     expect($product->fresh()?->active)->toBeFalse();
+});
+
+/**
+ * The tile link `x-shop-link` renders for one shop, and what it wraps.
+ *
+ * @return list<string> the inner HTML of each matching anchor
+ */
+function tileLinksTo(string $html, string $url): array
+{
+    preg_match_all(
+        '/<a href="' . preg_quote($url, '/') . '" target="_blank" rel="noopener noreferrer"[^>]*>(.*?)<\/a>/',
+        (string) preg_replace('/\s+/', ' ', $html),
+        $matches,
+    );
+
+    return $matches[1];
+}
+
+it('shows a shop the add-shop form just added, without a page reload', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '12.49');
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '12.49']);
+
+    $this->actingAs($user);
+
+    $page = livewire(ProductShow::class, ['product' => $product])->assertDontSee('picnic.nl');
+
+    // What AddShop does on Confirm: write the shop, recompute, announce it.
+    Shop::factory()->for($product)->create(['url' => 'https://picnic.nl/p/9', 'current_price' => '9.99']);
+    $product->recomputeCheapestShop();
+
+    $page->dispatch('shop-added', offerId: '1')
+        ->assertSee('picnic.nl')
+        ->assertSee('€9.99');
+
+    // The table row alone satisfies both assertions above, so the summary
+    // tile is checked on its own: it reads `cheapest_shop_id`, which only a
+    // rehydrated product carries.
+    expect(tileLinksTo($page->html(), 'https://picnic.nl/p/9'))->toHaveCount(1);
+});
+
+it('keeps the add-shop disclosure out of the morph so it survives the refresh', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product])->html());
+
+    // A tripwire for the attribute, not the behaviour: the form staying open
+    // through the `shop-added` re-render is browser-only. Livewire's morph
+    // strips `open` from a <details> without this. Anchored to the element,
+    // because a Flux <dialog> on this page carries the same attribute.
+    expect($html)->toContain('<details class="group w-full" wire:ignore.self');
+});
+
+it('replaces the add-shop form with the limit callout when the added shop fills the plan', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->count(3)->for($product)->create();
+
+    $this->actingAs($user);
+
+    $page = livewire(ProductShow::class, ['product' => $product])->assertSee('Add a shop');
+
+    Shop::factory()->for($product)->create();
+
+    $page->dispatch('shop-added', offerId: '1')
+        ->assertDontSee('Add a shop')
+        ->assertSee('This product is at its shop limit');
+});
+
+it('links the cheapest and best-value shops out to the shop itself', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+
+    // Cheapest on the sticker, worst per gram — so the two tiles name
+    // different shops and one cannot satisfy both assertions.
+    $cheapest = Shop::factory()->for($product)->create([
+        'url' => 'https://picnic.nl/p/9',
+        'current_price' => '5.00',
+        'pack_quantity' => '100.00',
+        'pack_unit' => 'g',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/9',
+        'current_price' => '8.00',
+        'pack_quantity' => '400.00',
+        'pack_unit' => 'g',
+    ]);
+    $product->recomputeCheapestShop();
+
+    expect($product->fresh()?->cheapest_shop_id)->toBe($cheapest->id)
+        ->and($product->fresh()?->bestValueShop()?->host)->toBe('jumbo.com');
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product])->html());
+
+    // One link per tile. The table's Open menu item carries no `rel`, so it
+    // cannot stand in for either. Each link names its shop and shows its
+    // favicon, so a bare icon or a lost label fails here.
+    expect(tileLinksTo($html, 'https://picnic.nl/p/9'))->toHaveCount(1)
+        ->and(tileLinksTo($html, 'https://jumbo.com/p/9'))->toHaveCount(1)
+        ->and(tileLinksTo($html, 'https://picnic.nl/p/9')[0])
+        ->toContain('picnic.nl')
+        ->toContain(e(Favicon::url($cheapest->host)));
 });
 
 it('removes a shop and recomputes the cheapest offer', function (): void {

@@ -16,6 +16,7 @@ use App\Support\UrlNormalizer;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -144,6 +145,15 @@ class ProductShow extends Component
             ? 'The link changed in another tab, so nothing was withdrawn.'
             : 'Public sharing stopped. The link now returns a 404.';
     }
+
+    /**
+     * The add-shop form writes the shop and the recompute that follows it, so
+     * this page is stale until it renders again. The listener needs no body:
+     * `render()` re-reads the shops, and Livewire rehydrates `$product` from
+     * the row, which `AttachShop` has already updated.
+     */
+    #[On('shop-added')]
+    public function refreshShops(): void {}
 
     public function togglePaused(): void
     {

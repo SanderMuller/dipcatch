@@ -29,8 +29,15 @@
             @livewire('suggestions.shop-suggestions', ['product' => $product], key('shop-suggestions-panel-' . $product->id))
         </div>
 
+        {{-- wire:ignore.self keeps the `open` attribute. The page re-renders
+             on `shop-added`, and Livewire's morph strips any attribute the
+             server HTML does not carry — it special-cases <dialog> only, so
+             without this the form snaps shut the moment a shop is added.
+             `.self` skips this element alone, so the count in the summary and
+             the form inside it still update. --}}
         <details
             class="group w-full"
+            wire:ignore.self
             @toggle="addOpen = $el.open"
             @open-add-shop.window="$el.open = true; addOpen = true; $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'center' }))"
         >
