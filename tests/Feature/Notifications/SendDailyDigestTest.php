@@ -223,7 +223,7 @@ test('digest reads bundle terms from protected triggering check', function (): v
     ]);
 
     expect($html)->toContain('2 for €4.00')
-        ->and($html)->toContain('Single item €2.85');
+        ->and($html)->toContain('or €2.85 each');
 });
 
 test('digest eager loads every triggering price check', function (): void {

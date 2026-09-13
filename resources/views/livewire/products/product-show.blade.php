@@ -193,7 +193,7 @@
                     <flux:chart.tooltip.heading field="date" :format="['month' => 'short', 'day' => 'numeric', 'hour' => 'numeric', 'minute' => '2-digit']" />
                     <flux:chart.tooltip.value field="price" :label="__('Cheapest')" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
                     @if ($chart['hasBundles'])
-                        <flux:chart.tooltip.value field="bundle" :label="__('Bundle')" />
+                        <flux:chart.tooltip.value field="bundle" :label="__('Deal')" />
                     @endif
                     @if ($chart['unitLabel'] !== null)
                         <flux:chart.tooltip.value field="unit" :label="$chart['unitLabel']" :format="['style' => 'currency', 'currency' => $chart['currency']]" />

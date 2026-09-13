@@ -62,7 +62,7 @@ it('discloses bundle terms in headline and shop row', function (): void {
 
     $component = livewire(ProductShow::class, ['product' => $product])
         ->assertSee('2 for €4.00')
-        ->assertSee('Single item €2.85');
+        ->assertSee('or €2.85 each');
 
     expect(substr_count($component->html(), '2 for €4.00'))->toBeGreaterThanOrEqual(3);
 });

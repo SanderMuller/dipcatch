@@ -22,7 +22,7 @@ Here's what changed since your last digest:
 | When | Shop | New price | Drop |
 |------|------|-----------|------|
 @foreach ($events as $event)
-| {{ $event->fired_at->setTimezone($user->timezone)->format('H:i') }} | {{ $event->triggeredByShop?->host ?? '—' }} | {{ \App\Support\MoneyFormatter::format($event->new_price, $event->currency) }}@if ($event->priceCheck?->bundleOffer()) · {{ \App\Support\BundlePriceLabel::condition($event->priceCheck->bundleOffer(), $event->currency) }} · Single item {{ \App\Support\MoneyFormatter::format($event->priceCheck->singleItemPrice(), $event->currency) }}@endif | {{ number_format((float) $event->drop_pct, 1, '.', '') }}% / {{ \App\Support\MoneyFormatter::format($event->drop_abs, $event->currency) }} |
+| {{ $event->fired_at->setTimezone($user->timezone)->format('H:i') }} | {{ $event->triggeredByShop?->host ?? '—' }} | {{ \App\Support\MoneyFormatter::format($event->new_price, $event->currency) }}@if ($event->priceCheck?->bundleOffer()) · {{ \App\Support\BundlePriceLabel::condition($event->priceCheck->bundleOffer(), $event->currency) }} · {{ __('or :price each', ['price' => \App\Support\MoneyFormatter::format($event->priceCheck->singleItemPrice(), $event->currency)]) }}@endif | {{ number_format((float) $event->drop_pct, 1, '.', '') }}% / {{ \App\Support\MoneyFormatter::format($event->drop_abs, $event->currency) }} |
 @endforeach
 
 <x-mail::button :url="route('app.products.show', $product)">

@@ -353,8 +353,8 @@
     "Terms": "Voorwaarden",
     "Track products you buy. Do not use DipCatch to build a copy of a shop’s catalogue or to resell its data.": "Volg producten die je koopt. Gebruik DipCatch niet om een kopie van het assortiment van een winkel te bouwen of om die gegevens door te verkopen.",
     ":quantity for :total": ":quantity voor :total",
-    "Single item :price": "Los stuk :price",
-    "Bundle": "Bundel",
-    "A supported multi-buy offer at :shop is read with the date it ends. DipCatch converts it into an effective item price and always shows the required quantity.": "DipCatch leest een ondersteunde stapelaanbieding bij :shop met de einddatum. DipCatch rekent deze om naar een effectieve stukprijs en toont altijd het vereiste aantal.",
-    "Yes. DipCatch tracks supported multi-buy offers as an effective item price and shows how many items the offer requires.": "Ja. DipCatch volgt ondersteunde stapelaanbiedingen als effectieve stukprijs en toont hoeveel stuks de aanbieding vereist."
+    "or :price each": "of :price per stuk",
+    "Deal": "Aanbieding",
+    "At :shop, DipCatch reads multi-buy deals such as 2 for €4 and 1+1 free, including their end dates. You see the price per item and how many you need to buy.": "Bij :shop leest DipCatch ook stapelaanbiedingen, zoals 2 voor €4 en 1+1 gratis, met hun einddatum. Je ziet de prijs per stuk en hoeveel je moet kopen.",
+    "Yes. For deals such as 2 for €4 or 1+1 free, DipCatch shows the price per item and how many you need to buy.": "Ja. Bij aanbiedingen zoals 2 voor €4 of 1+1 gratis zie je de prijs per stuk en hoeveel je moet kopen."
 }

@@ -136,5 +136,5 @@ it('discloses bundle quantity beside the effective price', function (): void {
 
     livewire(ProductList::class)
         ->assertSee('2 for €4.00')
-        ->assertSee('Single item €2.85');
+        ->assertSee('or €2.85 each');
 });

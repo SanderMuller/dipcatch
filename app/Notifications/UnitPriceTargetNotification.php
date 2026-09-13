@@ -113,8 +113,10 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
 
         $bundle = $this->snapshotBundleQuantity === null || $this->snapshotBundleTotalPrice === null
             ? ''
-            : ' · ' . $this->snapshotBundleQuantity . ' for '
-                . MoneyFormatter::format($this->snapshotBundleTotalPrice, $this->product->currency);
+            : ' · ' . __(':quantity for :total', [
+                'quantity' => $this->snapshotBundleQuantity,
+                'total' => MoneyFormatter::format($this->snapshotBundleTotalPrice, $this->product->currency),
+            ]);
 
         return $this->product->title . ' is ' . $unit . $price . $bundle . ' at ' . $this->snapshotHost;
     }

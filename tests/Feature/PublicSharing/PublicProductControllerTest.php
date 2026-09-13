@@ -57,8 +57,8 @@ test('bundle price always shows quantity total and single-item price', function 
         ->assertOk()
         ->assertSeeInOrder(['€2.00', '2 for €4.00', 'Cheapest across'], escape: false)
         ->assertSee('2 for €4.00', escape: false)
-        ->assertSee('Single item €2.85', escape: false)
-        ->assertSee('Tracked on DipCatch: cheapest at €2.00 · 2 for €4.00 · Single item €2.85', escape: false);
+        ->assertSee('or €2.85 each', escape: false)
+        ->assertSee('Tracked on DipCatch: cheapest at €2.00 · 2 for €4.00 · or €2.85 each', escape: false);
 });
 
 test('equal prices use the same stable shop order as the cheapest-price engine', function (): void {

@@ -83,7 +83,7 @@ final readonly class BundlePriceLabel
         return implode(' · ', array_filter([
             $window === null ? null : PromotionLabel::forWindow($window),
             self::condition($offer, $currency),
-            __('Single item :price', ['price' => MoneyFormatter::format($singleItemPrice, $currency)]),
+            __('or :price each', ['price' => MoneyFormatter::format($singleItemPrice, $currency)]),
         ]));
     }
 

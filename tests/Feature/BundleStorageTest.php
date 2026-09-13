@@ -113,7 +113,7 @@ test('bundle labels retain source wording and deadline from preview snapshots', 
 
     expect($label)->toContain('2 VOOR 4.00 until')
         ->toContain('2 for €4.00')
-        ->toContain('Single item €2.85')
+        ->toContain('or €2.85 each')
         ->and(BundlePriceLabel::forSnapshot([
             'bundle_quantity' => 2,
             'bundle_total_price' => '4.00',

@@ -115,7 +115,7 @@ final class ShopPages
         ];
 
         if (in_array($host, self::BUNDLE_AWARE, strict: true)) {
-            $facts[] = __('A supported multi-buy offer at :shop is read with the date it ends. DipCatch converts it into an effective item price and always shows the required quantity.', ['shop' => $name]);
+            $facts[] = __('At :shop, DipCatch reads multi-buy deals such as 2 for €4 and 1+1 free, including their end dates. You see the price per item and how many you need to buy.', ['shop' => $name]);
         } elseif (in_array($host, self::PROMOTION_AWARE, strict: true)) {
             $facts[] = __('An offer price at :shop is read with the date it ends, so a temporary price is never mistaken for the new normal.', ['shop' => $name]);
         }
@@ -135,7 +135,7 @@ final class ShopPages
     private static function faq(string $host, string $name): array
     {
         $offerAnswer = match (true) {
-            in_array($host, self::BUNDLE_AWARE, strict: true) => __('Yes. DipCatch tracks supported multi-buy offers as an effective item price and shows how many items the offer requires.'),
+            in_array($host, self::BUNDLE_AWARE, strict: true) => __('Yes. For deals such as 2 for €4 or 1+1 free, DipCatch shows the price per item and how many you need to buy.'),
             in_array($host, self::PROMOTION_AWARE, strict: true) => __('Yes. The offer price is read along with the date it runs until, and the product page shows both, so you can see whether a price is a deal or the new level.', []),
             default => __('DipCatch reads the price :shop shows on the product page. When that price is an offer, that is the price you get alerted on.', ['shop' => $name]),
         };

@@ -37,8 +37,8 @@
                         </flux:text>
                         @if ($item['bundleQuantity'] !== null && $item['bundleTotalPrice'] !== null)
                             <flux:text size="sm" class="text-zinc-500">
-                                {{ $item['bundleQuantity'] }} for {{ \App\Support\MoneyFormatter::format($item['bundleTotalPrice'], $item['currency'] ?? 'EUR') }}
-                                @if ($item['singleItemPrice'] !== null) · Single item {{ \App\Support\MoneyFormatter::format($item['singleItemPrice'], $item['currency'] ?? 'EUR') }} @endif
+                                {{ __(':quantity for :total', ['quantity' => $item['bundleQuantity'], 'total' => \App\Support\MoneyFormatter::format($item['bundleTotalPrice'], $item['currency'] ?? 'EUR')]) }}
+                                @if ($item['singleItemPrice'] !== null) · {{ __('or :price each', ['price' => \App\Support\MoneyFormatter::format($item['singleItemPrice'], $item['currency'] ?? 'EUR')]) }} @endif
                             </flux:text>
                         @endif
                     @elseif ($item['body'] !== null)

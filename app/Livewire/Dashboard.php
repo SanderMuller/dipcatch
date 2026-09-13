@@ -128,15 +128,25 @@ class Dashboard extends Component
                 $amount = $data['drop_absolute'] ?? null;
 
                 $percent = self::percentage($rawPercent);
+                $bundle = null;
+
+                if (is_int($data['bundle_quantity'] ?? null) && is_numeric($data['bundle_total_price'] ?? null)) {
+                    $translatedBundle = __(':quantity for :total', [
+                        'quantity' => $data['bundle_quantity'],
+                        'total' => MoneyFormatter::format((string) $data['bundle_total_price'], $currency),
+                    ]);
+
+                    $bundle = is_string($translatedBundle) && $translatedBundle !== '' && $translatedBundle !== '0'
+                        ? $translatedBundle
+                        : null;
+                }
 
                 return [
                     'title' => is_string($data['title'] ?? null) ? $data['title'] : '—',
                     'url' => $productId === null ? null : route('app.products.show', $productId),
                     'percent' => $percent,
                     'amount' => is_numeric($amount) ? MoneyFormatter::format((string) $amount, $currency) : null,
-                    'bundle' => is_int($data['bundle_quantity'] ?? null) && is_numeric($data['bundle_total_price'] ?? null)
-                        ? $data['bundle_quantity'] . ' for ' . MoneyFormatter::format((string) $data['bundle_total_price'], $currency)
-                        : null,
+                    'bundle' => $bundle,
                     'sentAt' => $notification->created_at?->diffForHumans(),
                 ];
             })

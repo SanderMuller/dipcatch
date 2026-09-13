@@ -133,8 +133,10 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             return '';
         }
 
-        return ' · ' . $this->snapshotBundleQuantity . ' for '
-            . MoneyFormatter::format($this->snapshotBundleTotalPrice, $this->product->currency);
+        return ' · ' . __(':quantity for :total', [
+            'quantity' => $this->snapshotBundleQuantity,
+            'total' => MoneyFormatter::format($this->snapshotBundleTotalPrice, $this->product->currency),
+        ]);
     }
 
     private function checkRepresentsCurrentPricing(PriceCheck $check, Product $product, ?Shop $shop): bool

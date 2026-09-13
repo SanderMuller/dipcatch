@@ -286,7 +286,7 @@ test('bundle history rows carry purchase condition into chart tooltip data', fun
     $chart = makeChartFor($product)->fluxChart();
 
     expect($chart['hasBundles'])->toBeTrue()
-        ->and($chart['rows'][0]['bundle'])->toBe('2 for €4.00 · Single item €2.85');
+        ->and($chart['rows'][0]['bundle'])->toBe('2 for €4.00 · or €2.85 each');
 });
 
 test('units that cannot share an axis leave gaps rather than wrong numbers', function (): void {

@@ -116,7 +116,7 @@ it('discloses bundle terms beside dashboard effective prices', function (): void
 
     livewire(Dashboard::class)
         ->assertSee('2 for €4.00')
-        ->assertSee('Single item €2.85');
+        ->assertSee('or €2.85 each');
 });
 
 it('shows the mcp endpoint and an empty connection list', function (): void {

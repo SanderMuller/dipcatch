@@ -24,18 +24,18 @@ it('states the offer window only for the shops whose adapter reads one', functio
     // window; bol.com has no promotion parsing, so the page must not claim it.
     $this->get(route('shop', ['slug' => 'ah-nl']))
         ->assertOk()
-        ->assertSee('is read with the date it ends', escape: false);
+        ->assertSee('including their end dates', escape: false);
 
     $this->get(route('shop', ['slug' => 'bol-com']))
         ->assertOk()
-        ->assertDontSee('is read with the date it ends', escape: false);
+        ->assertDontSee('including their end dates', escape: false);
 });
 
-it('states that Jumbo multi-buy prices include the required quantity', function (): void {
+it('explains how Jumbo multi-buy prices work', function (): void {
     $this->get(route('shop', ['slug' => 'jumbo-com']))
         ->assertOk()
-        ->assertSee('effective item price', escape: false)
-        ->assertSee('required quantity', escape: false)
+        ->assertSee('2 for €4', escape: false)
+        ->assertSee('how many you need to buy', escape: false)
         ->assertDontSee('leave the shelf price alone', escape: false);
 });
 
