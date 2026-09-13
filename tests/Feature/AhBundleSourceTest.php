@@ -116,7 +116,7 @@ test('partial product card preserves bundle authority state', function (): void 
         ->and($snapshot?->promotionWindowAuthoritative)->toBeFalse();
 });
 
-test('invalid promotion dates cannot create an undated AH bundle', function (): void {
+test('invalid promotion dates cannot create an undated AH bundle', function (string $dateKey): void {
     $payload = jsonObject(File::get(base_path('tests/Fixtures/bundle-prices/ah-fixed-total.json')));
     $productCard = $payload['productCard'] ?? null;
 
@@ -124,7 +124,7 @@ test('invalid promotion dates cannot create an undated AH bundle', function (): 
         throw new UnexpectedValueException('AH fixture must contain a product card.');
     }
 
-    $productCard['bonusEndDate'] = 'not-a-date';
+    $productCard[$dateKey] = 'not-a-date';
     $payload['productCard'] = $productCard;
     fakeAhPayload($payload);
 
@@ -133,7 +133,7 @@ test('invalid promotion dates cannot create an undated AH bundle', function (): 
     expect($snapshot?->trackedPrice())->toBe('6.49')
         ->and($snapshot?->bundleOffer)->toBeNull()
         ->and($snapshot?->raw['bundle_diagnostic'] ?? null)->toBe('invalid_promotion_window');
-});
+})->with(['bonusStartDate', 'bonusEndDate']);
 
 function fakeAhBundleApi(string $fixture): void
 {

@@ -157,7 +157,9 @@ final readonly class AhApiSource
         $salesUnitSize = $hasSalesUnitSize && is_string($card['salesUnitSize']) ? $card['salesUnitSize'] : null;
         $promotionWindow = self::promotionWindow($card);
         $hasPromotionDate = array_key_exists('bonusStartDate', $card) || array_key_exists('bonusEndDate', $card);
-        $invalidPromotionWindow = $bundleEligible && $hasPromotionDate && $promotionWindow === null;
+        $invalidPromotionWindow = $bundleEligible
+            && $hasPromotionDate
+            && (self::hasInvalidPromotionDate($card) || $promotionWindow === null);
         $bundleOffer = $bundleEligible && ! $invalidPromotionWindow && is_string($mechanism)
             ? BundleOffer::fromLabel($mechanism, $price)
             : null;
@@ -252,6 +254,15 @@ final readonly class AhApiSource
             startsAt: DutchDate::startOfDay(data_get($card, 'bonusStartDate')),
             label: is_string($mechanism) ? $mechanism : null,
         );
+    }
+
+    /** @param array<mixed> $card */
+    private static function hasInvalidPromotionDate(array $card): bool
+    {
+        return (array_key_exists('bonusStartDate', $card)
+                && DutchDate::startOfDay($card['bonusStartDate']) === null)
+            || (array_key_exists('bonusEndDate', $card)
+                && DutchDate::endOfDay($card['bonusEndDate']) === null);
     }
 
     private static function productIdFromUrl(string $url): ?string

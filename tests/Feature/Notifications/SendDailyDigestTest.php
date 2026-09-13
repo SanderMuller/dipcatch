@@ -226,6 +226,28 @@ test('digest reads bundle terms from protected triggering check', function (): v
         ->and($html)->toContain('Single item €2.85');
 });
 
+test('digest eager loads every triggering price check', function (): void {
+    $user = User::factory()->create(['last_digest_sent_at' => null]);
+    $product = Product::factory()->for($user)->create();
+    $shop = Shop::factory()->for($product)->create();
+
+    PriceCheck::factory()->count(3)->for($shop)->create()->each(function (PriceCheck $check) use ($user, $product, $shop): void {
+        PriceDropEvent::factory()->for($user)->for($product)->create([
+            'price_check_id' => $check->id,
+            'triggered_by_shop_id' => $shop->id,
+            'fired_at' => now()->subHour(),
+        ]);
+    });
+
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail): bool {
+        return $mail->grouped
+            ->flatMap(fn (array $group): mixed => $group['events'])
+            ->every(fn (PriceDropEvent $event): bool => $event->relationLoaded('priceCheck'));
+    });
+});
+
 test('the digest mailable renders end to end without the mail fake', function (): void {
     Mail::swap(app('mail.manager'));
 
