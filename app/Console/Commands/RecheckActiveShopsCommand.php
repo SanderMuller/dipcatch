@@ -87,6 +87,7 @@ class RecheckActiveShopsCommand extends Command
                 $boundary->where(function (EloquentQueryBuilder $activation): void {
                     $activation->whereNotNull('promotion_starts_at')
                         ->where('promotion_starts_at', '<=', now())
+                        ->whereColumn('last_checked_at', '<', 'promotion_starts_at')
                         ->where(function (EloquentQueryBuilder $end): void {
                             $end->whereNull('promotion_ends_at')->orWhere('promotion_ends_at', '>=', now());
                         })

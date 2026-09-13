@@ -43,6 +43,7 @@ final class PublicProductController extends Controller
                 ->where('current_in_stock', true)
                 ->orWhereNull('current_in_stock'))
             ->where('health', '!=', ShopHealth::Dead->value)
+            ->where('currency', $product->currency)
             ->whereNotNull('current_price')
             ->orderBy('current_price')->oldest()
             ->orderBy('id')

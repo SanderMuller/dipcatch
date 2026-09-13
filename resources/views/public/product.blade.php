@@ -179,7 +179,7 @@
                                 href="{{ $shop->url }}"
                                 rel="noopener nofollow ugc"
                                 target="_blank"
-                                class="flex items-center justify-between gap-4 px-4 py-3 transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                                class="flex flex-col items-start gap-2 px-4 py-3 transition hover:bg-zinc-50 sm:flex-row sm:items-center sm:justify-between sm:gap-4 dark:hover:bg-zinc-800/50"
                             >
                                 <div class="min-w-0 flex-1">
                                     <p class="flex items-center gap-1.5 truncate text-sm font-medium">
@@ -195,8 +195,8 @@
                                         </p>
                                     @endif
                                 </div>
-                                <div class="text-right">
-                                    <div class="flex items-center gap-1 justify-end">
+                                <div class="w-full text-left sm:w-auto sm:text-right">
+                                    <div class="flex items-center justify-start gap-1 sm:justify-end">
                                         <p class="text-sm font-semibold tabular-nums">
                                             {{ MoneyFormatter::format((string) $shop->current_price, $shop->currency) }}
                                         </p>

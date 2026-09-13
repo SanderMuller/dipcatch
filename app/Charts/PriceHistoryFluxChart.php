@@ -120,7 +120,7 @@ final class PriceHistoryFluxChart
             return null;
         }
 
-        return CarbonImmutable::parse($iso)->subSecond()->toIso8601String();
+        return CarbonImmutable::parse($iso)->subSecond()->utc()->format('Y-m-d\TH:i:s\Z');
     }
 
     /**
@@ -179,7 +179,7 @@ final class PriceHistoryFluxChart
         $parsed = CarbonImmutable::createFromFormat('Y-m-d H:i:s', $stamp);
 
         return $parsed instanceof CarbonImmutable
-            ? $parsed->toIso8601String()
+            ? $parsed->utc()->format('Y-m-d\TH:i:s\Z')
             : $stamp;
     }
 }

@@ -68,6 +68,10 @@ test('renders cheapest segments as a stepped line', function (): void {
 
     expect($flux['rows'])->not->toBeEmpty()
         ->and(collect($flux['rows'])->pluck('price')->all())->toContain(100.0, 85.0)
+        ->and(collect($flux['rows'])->pluck('date')->every(
+            static fn (mixed $date): bool => is_string($date)
+                && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $date) === 1,
+        ))->toBeTrue()
         ->and($flux['currency'])->toBe('EUR');
 
     $lastHundred = collect($flux['rows'])->last(fn (array $row): bool => ($row['price'] ?? null) === 100.0);

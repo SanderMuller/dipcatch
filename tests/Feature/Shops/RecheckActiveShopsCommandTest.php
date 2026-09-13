@@ -136,7 +136,7 @@ test('bundle start and end boundaries bypass normal cadence once', function (): 
     config()->set('dipcatch.recheck.jitter_minutes', 0);
     $product = Product::factory()->create();
     $base = [
-        'last_checked_at' => now(),
+        'last_checked_at' => now()->subMinutes(2),
         'single_item_price' => '2.85',
         'bundle_quantity' => 2,
         'bundle_total_price' => '4.00',
@@ -168,4 +168,23 @@ test('bundle start and end boundaries bypass normal cadence once', function (): 
     Queue::assertPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($expiry));
     Queue::assertNotPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($alreadyActive));
     Queue::assertNotPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($alreadyExpired));
+});
+
+test('a failed activation check waits for normal cadence before retrying', function (): void {
+    config()->set('dipcatch.recheck.interval_hours', 24);
+    config()->set('dipcatch.recheck.jitter_minutes', 0);
+
+    $shop = Shop::factory()->for(Product::factory())->create([
+        'last_checked_at' => now(),
+        'current_price' => '2.85',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'promotion_starts_at' => now()->subMinute(),
+        'promotion_ends_at' => now()->addDay(),
+    ]);
+
+    $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
+
+    Queue::assertNotPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($shop));
 });

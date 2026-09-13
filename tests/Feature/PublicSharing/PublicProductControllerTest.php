@@ -83,6 +83,26 @@ test('equal prices use the same stable shop order as the cheapest-price engine',
         ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at €2.00">', escape: false);
 });
 
+test('headline and shop list ignore offers in another currency', function (): void {
+    $product = makeSharedProduct(['currency' => 'EUR', 'cheapest_price' => '2.00']);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://wrong-currency.test/p/fanta',
+        'current_price' => '1.00',
+        'currency' => 'GBP',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://euro.test/p/fanta',
+        'current_price' => '2.00',
+        'currency' => 'EUR',
+    ]);
+
+    $this->get('/p/' . str_repeat('a', 32))
+        ->assertOk()
+        ->assertSee('euro.test', escape: false)
+        ->assertDontSee('wrong-currency.test', escape: false)
+        ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at €2.00">', escape: false);
+});
+
 test('unknown slug returns 404', function (): void {
     $this->get('/p/' . str_repeat('z', 32))->assertNotFound();
 });

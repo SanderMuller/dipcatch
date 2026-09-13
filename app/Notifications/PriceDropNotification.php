@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\PriceCheck;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use App\Services\Drops\DropOutcome;
 use App\Support\MoneyFormatter;
@@ -46,16 +47,16 @@ final class PriceDropNotification extends Notification implements ShouldQueue
         public string $priceDropEventId,
         ?PriceCheck $triggeringCheck = null,
     ) {
-        $cheapest = $triggeringCheck !== null ? $triggeringCheck->shop : $product->cheapestShop;
-        $this->snapshotPrice = $triggeringCheck?->price === null
-            ? ($product->cheapest_price === null ? '0.00' : (string) $product->cheapest_price)
-            : (string) $triggeringCheck->price;
+        $cheapest = $product->cheapestShop;
+        $useTriggeringCheck = $triggeringCheck !== null
+            && $this->checkRepresentsCurrentPricing($triggeringCheck, $product, $cheapest);
+        $this->snapshotPrice = $product->cheapest_price === null ? '0.00' : (string) $product->cheapest_price;
         $this->snapshotHost = is_string($cheapest?->host) && $cheapest->host !== '' ? $cheapest->host : null;
         $this->snapshotOfferUrl = is_string($cheapest?->url) && $cheapest->url !== '' ? $cheapest->url : null;
-        $bundle = $triggeringCheck !== null ? $triggeringCheck->bundleOffer() : $cheapest?->liveBundleOffer();
+        $bundle = $useTriggeringCheck ? $triggeringCheck->bundleOffer() : $cheapest?->liveBundleOffer();
         $this->snapshotSingleItemPrice = $bundle === null
             ? null
-            : ($triggeringCheck?->singleItemPrice() ?? $cheapest?->singleItemPrice());
+            : ($useTriggeringCheck ? $triggeringCheck->singleItemPrice() : $cheapest?->singleItemPrice());
         $this->snapshotBundleQuantity = $bundle?->quantity;
         $this->snapshotBundleTotalPrice = $bundle?->totalPrice;
 
@@ -132,5 +133,23 @@ final class PriceDropNotification extends Notification implements ShouldQueue
 
         return ' · ' . $this->snapshotBundleQuantity . ' for '
             . MoneyFormatter::format($this->snapshotBundleTotalPrice, $this->product->currency);
+    }
+
+    private function checkRepresentsCurrentPricing(PriceCheck $check, Product $product, ?Shop $shop): bool
+    {
+        if ($shop === null || $check->shop_id !== $shop->id || $check->price === null || $product->cheapest_price === null) {
+            return false;
+        }
+
+        if (bccomp((string) $check->price, (string) $product->cheapest_price, 2) !== 0) {
+            return false;
+        }
+
+        $checkBundle = $check->bundleOffer();
+        $shopBundle = $shop->liveBundleOffer();
+
+        return $checkBundle?->quantity === $shopBundle?->quantity
+            && $checkBundle?->totalPrice === $shopBundle?->totalPrice
+            && $check->singleItemPrice() === $shop->singleItemPrice();
     }
 }

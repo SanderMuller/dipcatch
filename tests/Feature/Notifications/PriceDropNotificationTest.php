@@ -102,6 +102,9 @@ test('snapshots bundle terms from triggering check when cheapest shop changes', 
     $triggerShop = Shop::factory()->for($product)->create([
         'url' => 'https://jumbo.com/p/fanta',
         'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
     ]);
     $check = PriceCheck::factory()->for($triggerShop)->create([
         'price' => '2.00',
@@ -109,6 +112,10 @@ test('snapshots bundle terms from triggering check when cheapest shop changes', 
         'bundle_quantity' => 2,
         'bundle_total_price' => '4.00',
     ]);
+    $product->forceFill([
+        'cheapest_shop_id' => $triggerShop->id,
+        'cheapest_price' => '2.00',
+    ])->save();
 
     $notification = new PriceDropNotification($product, buildOutcome(), (string) Str::uuid(), $check);
     $payload = $notification->toDatabase($user);
@@ -135,13 +142,44 @@ test('triggering scalar check cannot inherit bundle terms from a later cheapest 
         'bundle_quantity' => 2,
         'bundle_total_price' => '4.00',
     ]);
-    $product->forceFill(['cheapest_shop_id' => $cheapest->id, 'cheapest_price' => '2.00'])->save();
+    $product->forceFill(['cheapest_shop_id' => $triggerShop->id, 'cheapest_price' => '2.75'])->save();
 
     $payload = new PriceDropNotification($product, buildOutcome(), (string) Str::uuid(), $check)
         ->toDatabase($user);
 
     expect($payload['new_price'])->toBe('2.75')
         ->and($payload['host'])->toBe('dirk.nl')
+        ->and($payload['single_item_price'])->toBeNull()
+        ->and($payload['bundle_quantity'])->toBeNull()
+        ->and($payload['bundle_total_price'])->toBeNull();
+});
+
+test('stale bundle check cannot override the current restored shelf price', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.85',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+    $staleCheck = PriceCheck::factory()->for($shop)->create([
+        'price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+    $product->forceFill([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '2.85',
+    ])->save();
+
+    $payload = new PriceDropNotification($product, buildOutcome(), (string) Str::uuid(), $staleCheck)
+        ->toDatabase($user);
+
+    expect($payload['new_price'])->toBe('2.85')
+        ->and($payload['host'])->toBe('jumbo.com')
         ->and($payload['single_item_price'])->toBeNull()
         ->and($payload['bundle_quantity'])->toBeNull()
         ->and($payload['bundle_total_price'])->toBeNull();
