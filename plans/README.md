@@ -155,9 +155,28 @@ Recorded so an executor does not re-litigate them:
 
      Confirmed by elimination: `origin/main` alone ran clean (1705 tests), the
      merged tree failed twice with disjoint failure sets, and the same merged
-     tree then ran clean (1721 tests) with nothing else active. **Worth a
-     follow-up**: give the test database a per-checkout name, or run the suite
-     with `--parallel`, which appends a token per process.
+     tree then ran clean (1721 tests) with nothing else active.
+
+     **The fix is a per-clone `DB_DATABASE`, and `--parallel` is not a
+     substitute.** Paratest appends `_test_N` per worker, which isolates
+     workers inside one run and does nothing across checkouts — two clones
+     both running `--parallel` collide on `dipcatch_test_test_1`. Override the
+     name instead, derived from the clone directory so it is reused rather
+     than multiplied:
+
+     ```bash
+     DB_DATABASE="dipcatch_test_$(basename "$(git rev-parse --show-toplevel)" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g')" vendor/bin/pest --compact || true
+     ```
+
+     Two properties make this safe, both verified here rather than assumed:
+     the `<env name="DB_DATABASE">` entry in `phpunit.xml.dist` carries no
+     `force` attribute, so a real environment variable wins over it; and
+     Laravel's migrate step creates the database when it is missing, so
+     nothing needs pre-creating. Use it only in a clone or worktree — the
+     primary checkout keeps the bare `dipcatch_test`.
+
+     Borrowed from `hihaho`, which documents the same problem and fix in
+     `.ai/docs/worktree-clone-isolation.md`.
 
   **STOP condition 4 resolved, and the reasoning is recorded because it was a
   judgement call.** The condition asked whether catching `Throwable` hides a
