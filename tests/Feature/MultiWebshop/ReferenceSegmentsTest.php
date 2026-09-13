@@ -7,6 +7,7 @@ use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Services\Drops\Reference;
 use App\Services\Drops\ReferenceValue;
+use App\Support\UrlNormalizer;
 
 function seedSegment(Product $product, Shop $shop, string $price, int $startsHoursAgo, ?int $endsHoursAgo): void
 {
@@ -139,4 +140,50 @@ test('failed checks do not count toward the median gate', function (): void {
     $ref = app(Reference::class)->compute($product);
 
     expect($ref->kind)->toBe(ReferenceValue::KIND_INITIAL);
+});
+
+test('a repointed offer leaves no reference behind for the product it used to price', function (): void {
+    $product = Product::factory()->create();
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://shop.example.com/p/1']);
+
+    seedSegment($product, $shop, '199.00', 24, null);
+    seedSuccessfulChecks($shop, 12);
+
+    $shop->updateUrl(UrlNormalizer::normalize('https://shop.example.com/p/2'));
+
+    // Nothing is left to compare a price on the new page against, so the
+    // first check on it cannot read as a drop from the old product's price.
+    expect(app(Reference::class)->compute($product->refresh()))->toBeNull();
+});
+
+test('repointing one offer leaves the other offers history standing', function (): void {
+    $product = Product::factory()->create();
+    $moved = Shop::factory()->for($product)->create(['url' => 'https://moved.example.com/p/1']);
+    $stayed = Shop::factory()->for($product)->create(['url' => 'https://stayed.example.com/p/1']);
+
+    seedSegment($product, $moved, '50.00', 48, 24);
+    seedSegment($product, $stayed, '80.00', 24, null);
+    seedSuccessfulChecks($stayed, 3);
+
+    $moved->updateUrl(UrlNormalizer::normalize('https://moved.example.com/p/2'));
+
+    $ref = app(Reference::class)->compute($product->refresh());
+
+    expect($ref)->toBeInstanceOf(ReferenceValue::class)
+        ->and($ref->value)->toBe('80.00');
+});
+
+test('what a repointed offer records after the move counts again', function (): void {
+    $product = Product::factory()->create();
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://shop.example.com/p/1']);
+
+    seedSegment($product, $shop, '199.00', 48, 24);
+    $shop->updateUrl(UrlNormalizer::normalize('https://shop.example.com/p/2'));
+    seedSegment($product, $shop, '30.00', 0, null);
+    seedSuccessfulChecks($shop, 3);
+
+    $ref = app(Reference::class)->compute($product->refresh());
+
+    expect($ref)->toBeInstanceOf(ReferenceValue::class)
+        ->and($ref->value)->toBe('30.00');
 });

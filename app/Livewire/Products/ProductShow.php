@@ -8,6 +8,7 @@ use App\Billing\HistoryWindow;
 use App\Billing\Plan;
 use App\Billing\PlanLimits;
 use App\Charts\PriceHistorySeries;
+use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
@@ -192,10 +193,33 @@ class ProductShow extends Component
 
         $shop->updateUrl($normalized);
 
-        dispatch_sync(new CheckShopPrice($shop->refresh()));
+        dispatch_sync(new CheckShopPrice($shop->refresh(), manual: true));
 
-        $this->shopMessage = 'Shop URL updated and price re-checked';
+        // The check recomputes the cheapest offer itself, except when it gives
+        // up early on a rate-limited host. The offer has no price from here on,
+        // so without this the product would keep advertising the old one.
+        $this->product->refresh()->recomputeCheapestShop();
+
+        $this->shopMessage = $this->urlSaveMessageFor($shop->refresh());
+
         $this->product->refresh();
+    }
+
+    /**
+     * What the re-check above actually achieved. The callout is the only place
+     * the page reports it: the shops table shows a price, a stock badge and a
+     * check time, and none of those say why a price is missing.
+     */
+    private function urlSaveMessageFor(Shop $shop): string
+    {
+        return match ($shop->last_status) {
+            // Still Pending means the check gave up before it read anything,
+            // and a release does nothing on a sync dispatch, so nothing runs
+            // again before the scheduled recheck.
+            ScrapeStatus::Pending => 'Shop URL updated. The shop was too busy to read now, so the price follows with the next scheduled check.',
+            ScrapeStatus::Ok => 'Shop URL updated and price re-checked',
+            default => 'Shop URL updated, but no price could be read from the new page. Check that the link opens the product itself.',
+        };
     }
 
     /**

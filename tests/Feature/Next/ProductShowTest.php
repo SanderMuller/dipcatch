@@ -1,11 +1,14 @@
 <?php declare(strict_types=1);
 
 use App\Livewire\Products\ProductShow;
+use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 
 use function Pest\Livewire\livewire;
 
@@ -184,4 +187,86 @@ it('states the shop limit instead of offering another', function (): void {
 
     livewire(ProductShow::class, ['product' => $product])
         ->assertSee('This product is at its shop limit');
+});
+
+it('stops advertising the old price when the re-check is rate limited', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $rival = Shop::factory()->for($product)->create([
+        'url' => 'https://rival.example.com/p/1',
+        'current_price' => '12.00',
+    ]);
+    $repointed = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '5.00',
+    ]);
+
+    $product->recomputeCheapestShop();
+    expect($product->cheapest_shop_id)->toBe($repointed->id);
+
+    // A 429 makes the sync re-check give up before it writes a price, so the
+    // component's own recompute is the only one that runs.
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/2' => Http::response('slow down', 429, ['Retry-After' => '120']),
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('saveShopUrl', $repointed->id, 'https://shop.example.com/p/2')
+        ->assertSet('shopMessage', 'Shop URL updated. The shop was too busy to read now, so the price follows with the next scheduled check.');
+
+    expect($repointed->refresh()->current_price)->toBeNull()
+        ->and($product->refresh()->cheapest_shop_id)->toBe($rival->id)
+        ->and((string) $product->cheapest_price)->toBe('12.00')
+        ->and(PriceDropEvent::query()->count())->toBe(0);
+});
+
+it('reports the new price when the re-check does read the page', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '5.00',
+    ]);
+
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/2' => Http::response(jsonLdPage('9.00'), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('saveShopUrl', $shop->id, 'https://shop.example.com/p/2')
+        ->assertSet('shopMessage', 'Shop URL updated and price re-checked');
+
+    expect((string) $shop->refresh()->current_price)->toBe('9.00')
+        ->and($shop->last_success_at)->not->toBeNull();
+});
+
+it('says the new page could not be read when the re-check fails', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '5.00',
+    ]);
+
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/2' => Http::response('gone', 404),
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('saveShopUrl', $shop->id, 'https://shop.example.com/p/2')
+        ->assertSet('shopMessage', 'Shop URL updated, but no price could be read from the new page. Check that the link opens the product itself.');
+
+    expect($shop->refresh()->current_price)->toBeNull();
 });

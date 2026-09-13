@@ -40,7 +40,7 @@ class LastSuccessfulScrapeCheck extends Check
         }
 
         // Count active offers (attached to active products) whose last
-        // successful fetch is missing or older than the warning threshold.
+        // successful fetch is older than the warning threshold.
         $staleOfferCount = $this->staleOfferQuery($this->warnAfterHours)->count();
         $totalActiveOfferCount = Shop::query()
             ->where('active', true)
@@ -85,8 +85,20 @@ class LastSuccessfulScrapeCheck extends Check
                 $q->where('active', true);
             })
             ->where(function (EloquentQueryBuilder $q) use ($hours): void {
-                $q->whereNull('last_success_at')
-                    ->orWhere('last_success_at', '<', now()->subHours($hours));
+                $cutoff = now()->subHours($hours);
+
+                // An offer with no successful read at all is judged by the
+                // last thing that happened to it — its last attempt, or the
+                // edit that gave it this URL. `Shop::updateUrl()` clears both
+                // read timestamps on every repoint, and a bare null counts as
+                // stale against every threshold, so the check would report an
+                // offer as unread for hours it has not existed, at the fail
+                // level rather than the warn one.
+                $q->where('last_success_at', '<', $cutoff)
+                    ->orWhere(function (EloquentQueryBuilder $never) use ($cutoff): void {
+                        $never->whereNull('last_success_at')
+                            ->whereRaw('coalesce(last_checked_at, updated_at) < ?', [$cutoff]);
+                    });
             });
     }
 }

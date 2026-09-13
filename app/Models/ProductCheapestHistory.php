@@ -122,6 +122,24 @@ class ProductCheapestHistory extends Model
     }
 
     /**
+     * Segments whose price still describes the page it was read from.
+     *
+     * Repointing an offer at a different URL can make it a different product,
+     * so the prices it held before that say nothing about what the new page
+     * costs. Drop detection reads this; the chart does not, because a segment
+     * that has been superseded still happened.
+     *
+     * @param EloquentQueryBuilder<$this> $query
+     */
+    #[Scope]
+    protected function recordedOnTheCurrentPage(EloquentQueryBuilder $query): void
+    {
+        $query->whereDoesntHave('cheapestShop', function (EloquentQueryBuilder $shop): void {
+            $shop->whereColumn('shops.repointed_at', '>', 'product_cheapest_history.started_at');
+        });
+    }
+
+    /**
      * Segments newest first. See {@see inOrder} for why `id` is here.
      *
      * @param EloquentQueryBuilder<$this> $query
