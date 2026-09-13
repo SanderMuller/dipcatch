@@ -22,6 +22,7 @@ use App\Livewire\Products\EditProduct;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\Settings\NotificationPreferences;
+use App\Livewire\Support\SupportPage;
 use App\Support\ShopPages;
 use App\Support\UseCases;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
@@ -199,6 +200,7 @@ Route::prefix('app')
         Route::livewire('billing', BillingPage::class)->name('billing');
         Route::livewire('notifications', NotificationPreferences::class)->name('notifications');
         Route::livewire('connections', ConnectionsPage::class)->name('connections');
+        Route::livewire('support', SupportPage::class)->name('support');
     });
 
 require __DIR__ . '/settings.php';

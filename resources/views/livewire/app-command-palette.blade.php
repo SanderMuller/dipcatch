@@ -25,6 +25,9 @@
                 <flux:command.item icon="puzzle-piece" :href="route('app.connections')" wire:navigate>
                     {{ __('Connections') }}
                 </flux:command.item>
+                <flux:command.item icon="lifebuoy" :href="route('app.support')" wire:navigate>
+                    {{ __('Support') }}
+                </flux:command.item>
                 <flux:command.item icon="cog-6-tooth" :href="route('profile.edit')" wire:navigate>
                     {{ __('Settings') }}
                 </flux:command.item>

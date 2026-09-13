@@ -46,6 +46,10 @@
                     <flux:sidebar.item icon="puzzle-piece" :href="route('app.connections')" :current="request()->routeIs('app.connections')" wire:navigate>
                         {{ __('Connections') }}
                     </flux:sidebar.item>
+
+                    <flux:sidebar.item icon="lifebuoy" :href="route('app.support')" :current="request()->routeIs('app.support')" wire:navigate>
+                        {{ __('Support') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
