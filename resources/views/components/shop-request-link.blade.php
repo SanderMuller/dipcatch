@@ -4,10 +4,16 @@
 ])
 
 @php
-    $href = \App\Support\ShopRequestMail::href(
-        is_string($host) ? $host : null,
-        is_string($url) ? $url : null,
-    );
+    $productUrl = is_string($url) ? $url : null;
+    $href = auth()->check()
+        ? route('app.support', array_filter([
+            'type' => \App\Enums\SupportRequestType::ShopRequest->value,
+            'shop_url' => $productUrl,
+        ]))
+        : \App\Support\ShopRequestMail::href(
+            is_string($host) ? $host : null,
+            $productUrl,
+        );
 @endphp
 
 @if ($href !== null)

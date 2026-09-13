@@ -235,6 +235,13 @@
                                             <flux:menu.item icon="pencil-square" wire:click="editShop('{{ $shop->id }}')">
                                                 {{ __('Edit shop') }}
                                             </flux:menu.item>
+                                            <flux:menu.item
+                                                icon="exclamation-triangle"
+                                                :href="route('app.support', ['type' => \App\Enums\SupportRequestType::ShopIssue->value, 'shop_url' => $shop->url])"
+                                                wire:navigate
+                                            >
+                                                {{ __('Report a problem') }}
+                                            </flux:menu.item>
                                             <flux:menu.separator />
                                             <flux:menu.item icon="trash" variant="danger" wire:click="removeShop('{{ $shop->id }}')" wire:confirm="{{ __('Remove this shop?') }}">
                                                 {{ __('Remove') }}

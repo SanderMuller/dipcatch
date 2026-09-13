@@ -4,6 +4,7 @@ use App\Enums\SupportRequestType;
 use App\Livewire\Support\SupportPage;
 use App\Mail\SupportRequestMail;
 use App\Models\User;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
@@ -21,6 +22,34 @@ test('verified users can open the support form', function (): void {
         ->assertOk()
         ->assertSee('How can we help?')
         ->assertSee('Report a shop problem');
+});
+
+test('shop support links prefill the request type and product URL', function (): void {
+    $user = User::factory()->create();
+    $shopUrl = 'https://shop.example.test/products/coffee';
+
+    Livewire::withQueryParams([
+        'type' => SupportRequestType::ShopIssue->value,
+        'shop_url' => $shopUrl,
+    ])
+        ->actingAs($user)
+        ->test(SupportPage::class)
+        ->assertSet('requestType', SupportRequestType::ShopIssue->value)
+        ->assertSet('shopUrl', $shopUrl);
+});
+
+test('shop request links use the support form for signed-in users', function (): void {
+    $user = User::factory()->create();
+    $shopUrl = 'https://shop.example.test/products/coffee';
+
+    $this->actingAs($user);
+
+    $html = Blade::render('<x-shop-request-link :url="$url" />', ['url' => $shopUrl]);
+
+    expect($html)->toContain(e(route('app.support', [
+        'type' => SupportRequestType::ShopRequest->value,
+        'shop_url' => $shopUrl,
+    ])));
 });
 
 test('shop requests and shop problems require a valid shop URL', function (SupportRequestType $requestType): void {

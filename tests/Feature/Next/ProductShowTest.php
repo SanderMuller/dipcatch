@@ -46,6 +46,21 @@ it('shows the product, its price and its shops', function (): void {
         ->assertSee('jumbo.com');
 });
 
+it('links each tracked shop to a prefilled problem report', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1']);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee('Report a problem')
+        ->assertSee(route('app.support', [
+            'type' => 'shop_issue',
+            'shop_url' => $shop->url,
+        ]));
+});
+
 it('discloses bundle terms in headline and shop row', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user, cheapestPrice: '2.00');

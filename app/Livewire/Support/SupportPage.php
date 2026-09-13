@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use RuntimeException;
 use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
@@ -23,8 +24,10 @@ class SupportPage extends Component
 {
     use HasFluentValidation;
 
+    #[Url(as: 'type', except: SupportRequestType::Feedback->value)]
     public string $requestType = SupportRequestType::Feedback->value;
 
+    #[Url(as: 'shop_url', except: '')]
     public string $shopUrl = '';
 
     public string $message = '';

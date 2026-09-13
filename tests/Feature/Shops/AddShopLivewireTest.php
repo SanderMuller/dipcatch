@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\SupportRequestType;
 use App\Livewire\Shops\AddShop;
 use App\Models\PriceCheck;
 use App\Models\Product;
@@ -129,8 +130,10 @@ test('extraction failure flips into manual_selector state without persisting', f
         ->assertSet('state', 'manual_selector')
         ->assertSet('errorCode', 'no_adapter_matched')
         ->assertSee('Request a shop')
-        ->assertSee('mailto:hello@example.test?subject=', escape: false)
-        ->assertSee(rawurlencode('https://shop.example.com/p/1'), escape: false);
+        ->assertSee(route('app.support', [
+            'type' => SupportRequestType::ShopRequest->value,
+            'shop_url' => 'https://shop.example.com/p/1',
+        ]));
 
     expect(Shop::query()->count())->toBe(0);
 });
