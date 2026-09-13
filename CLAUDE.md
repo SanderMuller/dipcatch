@@ -24,11 +24,11 @@ DB_DATABASE="dipcatch_test_$(basename "$(git rev-parse --show-toplevel)" | tr '[
 ```
 
 - A **serial** run creates its own database: `migrate:fresh` passes `--force` to `migrate`, which issues `CREATE DATABASE` when it is missing.
-- A **parallel** run (`composer test`) does not. Paratest connects to the base database to drop its per-worker ones, so create it once per clone first: `PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE "dipcatch_test_<slug>"'`.
+- A **parallel** run (`composer test`) does not. Laravel's parallel-testing support connects to the base database to recreate its per-worker ones, so create the base once per clone first: `psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE "dipcatch_test_<slug>"'`.
 - `--parallel` is **not** a substitute — it isolates workers inside one run, not across checkouts.
 - The name is derived from the clone, never the run, so it is reused rather than multiplied. In the primary checkout keep the bare `dipcatch_test`.
 
-Two other resources are shared and are **not** covered by this: the Herd site (a clone's `.env` still says `APP_URL=http://dipcatch.test`, so eye-verify drives the main checkout) and Redis (every clone slugs `APP_NAME` to the same `dipcatch` prefix). Browser setup, the `dipcatch` dev database, and teardown including an orphan sweep: **`.ai/docs/worktree-clone-isolation.md`**.
+Two other resources are shared and are **not** covered by this: the Herd site (a clone's `.env` still says `APP_URL=http://dipcatch.test`, so eye-verify drives the main checkout) and the `dipcatch` dev database, which carries the cache, sessions and queue as well as the app's data. Browser setup, what not to run against dev data, and teardown including an orphan sweep: **`.ai/docs/worktree-clone-isolation.md`**.
 
 ---
 

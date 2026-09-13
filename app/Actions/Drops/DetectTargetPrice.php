@@ -135,10 +135,13 @@ final readonly class DetectTargetPrice
                 // latch is armed, and `CheckShopPrice` sets
                 // `maxExceptions = 1`, so rethrowing fails the job on the
                 // first throw rather than retrying it — and a replayed check
-                // would find the latch already armed anyway. Rethrowing also
-                // skips every callback staged after this one, costing the
-                // other alerts on the same check. `report()` keeps the trace;
-                // the catch only stops the failure steering control flow.
+                // would find the latch already armed anyway. `report()` keeps
+                // the trace; the catch only stops the failure steering
+                // control flow.
+                //
+                // `persist()` stages this callback last, so unlike the other
+                // two detectors nothing here can cost a sibling alert. The
+                // catch stays anyway: the ordering is the caller's to change.
                 report($e);
 
                 Log::error('Alert failed to send', [
