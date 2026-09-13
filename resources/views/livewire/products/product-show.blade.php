@@ -97,8 +97,8 @@
     @endif
 
     {{-- Three sibling numbers on one surface, divided rather than boxed. --}}
-    <flux:card class="mt-6 p-0!">
-        <dl class="grid divide-y divide-zinc-950/5 sm:grid-cols-3 sm:divide-x sm:divide-y-0 dark:divide-white/10">
+    <flux:card class="mt-6 p-0! @container">
+        <dl class="grid divide-y divide-zinc-950/5 @3xl:grid-cols-3 @3xl:divide-x @3xl:divide-y-0 dark:divide-white/10">
             <div class="p-5">
                 <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Cheapest now') }}</dt>
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
@@ -108,9 +108,7 @@
                     <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
                         <x-shop-link :shop="$product->cheapestShop" />
                     </dd>
-                    @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
-                        <dd class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $bundleLabel }}</dd>
-                    @endif
+                    <dd><x-shop-deal :shop="$product->cheapestShop" :show-source="false" class="mt-3" /></dd>
                 @endif
             </div>
 
@@ -124,8 +122,8 @@
                     <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
                         <x-shop-link :shop="$bestValueShop" />
                     </dd>
-                    @if ($bestValueBundleLabel = \App\Support\BundlePriceLabel::forShop($bestValueShop))
-                        <dd class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $bestValueBundleLabel }}</dd>
+                    @if ($bestValueShop->id !== $product->cheapestShop?->id)
+                        <dd><x-shop-deal :shop="$bestValueShop" :show-source="false" class="mt-3" /></dd>
                     @endif
                 @endif
             </div>
@@ -259,16 +257,12 @@
                             @endif
                         </flux:table.cell>
                         <flux:table.cell class="tabular-nums">
-                            {{ \App\Support\MoneyFormatter::format($shop->current_price === null ? null : (string) $shop->current_price, $shop->currency) }}
-                            @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($shop))
-                                <flux:text size="sm" class="text-zinc-500">{{ $bundleLabel }}</flux:text>
-                            @endif
+                            <p class="text-base font-medium text-zinc-900 sm:text-sm dark:text-zinc-100">
+                                {{ \App\Support\MoneyFormatter::format($shop->current_price === null ? null : (string) $shop->current_price, $shop->currency) }}
+                            </p>
                             {{-- A price that is only good until a date says so, or the
                                  number reads as permanent when it is not. --}}
-                            @php($promo = $bundleLabel === null ? \App\Support\PromotionLabel::long($shop) : null)
-                            @if ($promo)
-                                <flux:text size="sm" class="text-zinc-500">{{ $promo }}</flux:text>
-                            @endif
+                            <x-shop-deal :shop="$shop" class="mt-2 min-w-56 max-w-xl" />
                             {{-- An offer only some shoppers can claim is named, so the
                                  headline price is not read as everyone's price. --}}
                             @php($conditional = $shop->conditionalOffer())

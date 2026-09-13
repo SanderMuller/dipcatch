@@ -355,6 +355,9 @@
     ":quantity for :total": ":quantity voor :total",
     "or :price each": "of :price per stuk",
     "Deal": "Aanbieding",
+    "Normal price: :price each": "Normale prijs: :price per stuk",
+    "Offer period": "Actieperiode",
+    "Shop page": "Winkelpagina",
     "At :shop, DipCatch reads multi-buy deals such as 2 for €4 and 1+1 free, including their end dates. You see the price per item and how many you need to buy.": "Bij :shop leest DipCatch ook stapelaanbiedingen, zoals 2 voor €4 en 1+1 gratis, met hun einddatum. Je ziet de prijs per stuk en hoeveel je moet kopen.",
     "Yes. For deals such as 2 for €4 or 1+1 free, DipCatch shows the price per item and how many you need to buy.": "Ja. Bij aanbiedingen zoals 2 voor €4 of 1+1 gratis zie je de prijs per stuk en hoeveel je moet kopen."
 }

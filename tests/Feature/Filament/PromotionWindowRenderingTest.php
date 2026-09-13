@@ -29,14 +29,18 @@ test('a running promotion says until when', function (): void {
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->assertSeeText('VOOR 1.69 until ' . now()->addDays(4)->setTimezone('Europe/Amsterdam')->format('j M'));
+        ->assertSeeText('Shop page:')
+        ->assertSeeText('VOOR 1.69')
+        ->assertSeeText('until ' . now()->addDays(4)->setTimezone('Europe/Amsterdam')->format('j M'));
 });
 
-test('a promotion with no label of its own is called Bonus', function (): void {
+test('a promotion with no label of its own shows its offer period', function (): void {
     [$user, $product] = seedShopWith(['promotion_ends_at' => now()->addDays(3)]);
     $this->actingAs($user);
 
-    mountShopsRelationManager($product)->assertSeeText('Bonus until');
+    mountShopsRelationManager($product)
+        ->assertSeeText('Offer period:')
+        ->assertSeeText('until');
 });
 
 test('a promotion that has not started says from when, never ended', function (): void {
@@ -47,8 +51,9 @@ test('a promotion that has not started says from when, never ended', function ()
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->assertSeeText('Bonus from ' . now()->addDays(3)->setTimezone('Europe/Amsterdam')->format('j M'))
-        ->assertDontSeeText('Bonus ended');
+        ->assertSeeText('Offer period:')
+        ->assertSeeText('from ' . now()->addDays(3)->setTimezone('Europe/Amsterdam')->format('j M'))
+        ->assertDontSeeText('ended');
 });
 
 test('a promotion that has passed says so, so the price reads as suspect', function (): void {
@@ -56,7 +61,8 @@ test('a promotion that has passed says so, so the price reads as suspect', funct
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->assertSeeText('Bonus ended ' . now()->subDays(2)->setTimezone('Europe/Amsterdam')->format('j M'));
+        ->assertSeeText('Offer period:')
+        ->assertSeeText('ended ' . now()->subDays(2)->setTimezone('Europe/Amsterdam')->format('j M'));
 });
 
 test('a date-only window renders its own day, not the day before', function (): void {
@@ -69,8 +75,9 @@ test('a date-only window renders its own day, not the day before', function (): 
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->assertSeeText('Bonus from 8 Sep')
-        ->assertDontSeeText('Bonus from 7 Sep');
+        ->assertSeeText('Offer period:')
+        ->assertSeeText('from 8 Sep')
+        ->assertDontSeeText('from 7 Sep');
 });
 
 test('a shop with no promotion shows none', function (): void {
@@ -78,8 +85,9 @@ test('a shop with no promotion shows none', function (): void {
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->assertDontSeeText('Bonus until')
-        ->assertDontSeeText('Bonus ended');
+        ->assertDontSeeText('Offer period:')
+        ->assertDontSeeText('until')
+        ->assertDontSeeText('ended');
 });
 
 test('a promotion window and a conditional offer are both shown', function (): void {
@@ -92,6 +100,7 @@ test('a promotion window and a conditional offer are both shown', function (): v
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->assertSeeText('Bonus until')
+        ->assertSeeText('Offer period:')
+        ->assertSeeText('until')
         ->assertSeeText('Bonus Box 15% korting');
 });

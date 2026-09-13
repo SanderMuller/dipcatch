@@ -107,6 +107,7 @@ test('lang/nl.json carries no key the marketing views no longer use', function (
         // Bundle price copy also appears on signed-in product pages.
         app_path('Support/BundlePriceLabel.php'),
         resource_path('views/livewire/products/product-show.blade.php'),
+        resource_path('views/components/shop-deal.blade.php'),
         // Mail subjects and bodies for "request a shop".
         app_path('Support/ShopRequestMail.php'),
     ];
