@@ -140,11 +140,24 @@ Recorded so an executor does not re-litigate them:
      `Exceptions::fake()` recording the reported exception, so an assertion on
      `report()` fails for a reason that has nothing to do with the code. The
      spy records and asserts afterwards.
-  3. **One scoped test run failed with schema errors and did not reproduce.**
-     `relation "users" does not exist`, then missing columns, which is a
-     migration running against the database mid-run. The same command passed
-     immediately afterwards and the full suite is clean. Recorded rather than
-     explained: the cause was not traced.
+  3. **Schema errors during a test run mean another checkout is running the
+     suite.** Traced, after three occurrences. `phpunit.xml.dist` pins
+     `DB_DATABASE=dipcatch_test` with no per-checkout suffix, so every clone of
+     this repository on one machine shares a single test database. A suite run
+     in another checkout executes `migrate:fresh` against the database this one
+     is querying.
+
+     The signature is unmistakable once you know it: errors that walk the
+     schema as it is rebuilt — `relation "users" does not exist`, then
+     `column "timezone" does not exist`, then `column "timezone_detected_at"
+     does not exist` — and a different set of tests failing on every run. It is
+     not a defect in the code under test. Re-run in a quiet window.
+
+     Confirmed by elimination: `origin/main` alone ran clean (1705 tests), the
+     merged tree failed twice with disjoint failure sets, and the same merged
+     tree then ran clean (1721 tests) with nothing else active. **Worth a
+     follow-up**: give the test database a per-checkout name, or run the suite
+     with `--parallel`, which appends a token per process.
 
   **STOP condition 4 resolved, and the reasoning is recorded because it was a
   judgement call.** The condition asked whether catching `Throwable` hides a
