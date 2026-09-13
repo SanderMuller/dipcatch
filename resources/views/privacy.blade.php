@@ -42,7 +42,7 @@
                     <section>
                         <h2>{{ __('What we store') }}</h2>
                         <ul class="mt-2">
-                            <li><strong>{{ __('Account') }}:</strong> {{ __('your name, email address, a hashed password, your timezone and default currency, and your notification preferences. Optional: two-factor secrets, passkeys, and browser-push subscriptions you enable yourself.') }}</li>
+                            <li><strong>{{ __('Account') }}:</strong> {{ __('your name, email address, a hashed password, your timezone and default currency, and your notification preferences. Optional: two-factor secrets, passkeys, browser-push subscriptions, and a link to your Google or Apple account — all of which you turn on yourself.') }}</li>
                             <li><strong>{{ __('Tracked products') }}:</strong> {{ __('the product links you paste, the titles, images and prices we read from those pages, the price history, and any private notes you add.') }}</li>
                             <li><strong>{{ __('Alerts') }}:</strong> {{ __('which price drops we told you about, and when.') }}</li>
                             <li><strong>{{ __('Technical') }}:</strong> {{ __('a session cookie to keep you signed in, and short-lived rate-limit counters keyed on your IP address to protect the shops we read prices from and this service.') }}</li>
@@ -60,7 +60,8 @@
                             <li><strong>Laravel Cloud:</strong> {{ __('hosts the application and database.') }}</li>
                             <li><strong>Resend:</strong> {{ __('delivers our email (verification, password reset, the daily digest).') }}</li>
                             <li><strong>{{ __('Your browser’s push service') }}:</strong> {{ __('only if you turn on browser push; it receives the alert payloads.') }}</li>
-                            <li><strong>Google:</strong> {{ __('shop logos on this site are loaded from Google’s favicon service by your browser, which sees the shop domain and your IP address. No account data is sent.') }}</li>
+                            <li><strong>Google:</strong> {{ __('shop logos on this site are loaded from Google’s favicon service by your browser, which sees the shop domain and your IP address. That request carries no account data. Separately, if you sign in with Google, Google sees that you signed in to DipCatch and sends us your Google profile. We keep your name, email address and Google account id from it.') }}</li>
+                            <li><strong>Apple:</strong> {{ __('if you sign in with Apple, Apple sees that you signed in to DipCatch and sends us your Apple account id and an email address — your own, or a relay address Apple forwards from if you asked Apple to hide yours. It sends your name the first time you sign in, and never again.') }}</li>
                             <li><strong>{{ __('The shops') }}:</strong> {{ __('we fetch product pages from the shops you track. Those requests come from our servers, not from you, and carry nothing about you.') }}</li>
                             <li><strong>{{ __('An assistant you connect') }}:</strong> {{ __('If you connect Claude, ChatGPT, or another assistant on Connections, DipCatch sends that assistant the product data and tool results it asks for, and the assistant can change the products you track. Disconnect it on Connections to stop new access. That does not delete chats or other copies the assistant’s provider already stored. DipCatch does not send your password to the assistant.') }}</li>
                         </ul>
