@@ -80,11 +80,11 @@ it('pauses and resumes', function (): void {
 });
 
 /**
- * The tile link `x-shop-link` renders for one shop, and what it wraps.
+ * The `x-shop-link` anchors pointing at one shop, and what each wraps.
  *
  * @return list<string> the inner HTML of each matching anchor
  */
-function tileLinksTo(string $html, string $url): array
+function shopLinksTo(string $html, string $url): array
 {
     preg_match_all(
         '/<a href="' . preg_quote($url, '/') . '" target="_blank" rel="noopener noreferrer"[^>]*>(.*?)<\/a>/',
@@ -93,6 +93,17 @@ function tileLinksTo(string $html, string $url): array
     );
 
     return $matches[1];
+}
+
+/**
+ * The summary tiles alone. The same shop is linked from the tiles and from
+ * the tracked-shops table, so a whole-page count cannot tell them apart.
+ */
+function summaryTiles(string $html): string
+{
+    preg_match('/<dl\b[^>]*>.*?<\/dl>/s', (string) preg_replace('/\s+/', ' ', $html), $matches);
+
+    return $matches[0] ?? '';
 }
 
 it('shows a shop the add-shop form just added, without a page reload', function (): void {
@@ -115,7 +126,7 @@ it('shows a shop the add-shop form just added, without a page reload', function 
     // The table row alone satisfies both assertions above, so the summary
     // tile is checked on its own: it reads `cheapest_shop_id`, which only a
     // rehydrated product carries.
-    expect(tileLinksTo($page->html(), 'https://picnic.nl/p/9'))->toHaveCount(1);
+    expect(shopLinksTo(summaryTiles($page->html()), 'https://picnic.nl/p/9'))->toHaveCount(1);
 });
 
 it('keeps the add-shop disclosure out of the morph so it survives the refresh', function (): void {
@@ -175,15 +186,39 @@ it('links the cheapest and best-value shops out to the shop itself', function ()
     $this->actingAs($user);
 
     $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product])->html());
+    $tiles = summaryTiles($html);
 
-    // One link per tile. The table's Open menu item carries no `rel`, so it
-    // cannot stand in for either. Each link names its shop and shows its
-    // favicon, so a bare icon or a lost label fails here.
-    expect(tileLinksTo($html, 'https://picnic.nl/p/9'))->toHaveCount(1)
-        ->and(tileLinksTo($html, 'https://jumbo.com/p/9'))->toHaveCount(1)
-        ->and(tileLinksTo($html, 'https://picnic.nl/p/9')[0])
+    // One link per tile. Each names its shop and shows its favicon, so a bare
+    // icon or a lost label fails here.
+    expect(shopLinksTo($tiles, 'https://picnic.nl/p/9'))->toHaveCount(1)
+        ->and(shopLinksTo($tiles, 'https://jumbo.com/p/9'))->toHaveCount(1)
+        ->and(shopLinksTo($tiles, 'https://picnic.nl/p/9')[0])
         ->toContain('picnic.nl')
         ->toContain(e(Favicon::url($cheapest->host)));
+});
+
+it('links every tracked shop row out to the shop itself', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://picnic.nl/p/9', 'current_price' => '5.00']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/9', 'current_price' => '8.00', 'notes' => 'Free delivery over €35']);
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product])->html());
+    // The table only: the tiles link the same shops, and the Open menu item
+    // carries no `rel`, so neither can stand in for a row.
+    $table = str_replace(summaryTiles($html), '', $html);
+
+    expect(shopLinksTo($table, 'https://picnic.nl/p/9'))->toHaveCount(1)
+        ->and(shopLinksTo($table, 'https://jumbo.com/p/9'))->toHaveCount(1)
+        ->and(shopLinksTo($table, 'https://jumbo.com/p/9')[0])
+        ->toContain('jumbo.com')
+        ->toContain(e(Favicon::url('jumbo.com')));
+
+    // The notes indicator sits beside the link, not inside it.
+    expect(shopLinksTo($table, 'https://jumbo.com/p/9')[0])->not->toContain('notes_indicator')
+        ->and($html)->toContain('notes_indicator');
 });
 
 it('removes a shop and recomputes the cheapest offer', function (): void {

@@ -251,7 +251,7 @@
                 @forelse ($shops as $shop)
                     <flux:table.row :key="'shop-'.$shop->id">
                         <flux:table.cell>
-                            {!! \App\Support\Favicon::html($shop->host) !!}
+                            <x-shop-link :shop="$shop" />
                             @if ($shop->notes)
                                 <flux:tooltip content="{{ $shop->notes }}">
                                     <flux:icon.pencil-square data-slot="notes_indicator" class="ms-1 inline size-3 text-zinc-400" />
