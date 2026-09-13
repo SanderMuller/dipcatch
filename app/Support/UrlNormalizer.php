@@ -17,7 +17,7 @@ final class UrlNormalizer
     /**
      * Normalize a URL so two URLs that point at the same resource produce the
      * same string: lowercase scheme + host, strip default ports, strip the
-     * trailing slash on non-root paths, drop `utm_*` query params, sort
+     * trailing slash on non-root paths except SPAR, drop `utm_*` query params, sort
      * remaining params alphabetically.
      *
      * The `www.` prefix is deliberately KEPT here: not every shop serves its
@@ -47,7 +47,7 @@ final class UrlNormalizer
         $port = $parts['port'] ?? null;
         $portSegment = self::normalizePort($scheme, $port);
 
-        $path = self::normalizePath($parts['path'] ?? '');
+        $path = self::normalizePath($parts['path'] ?? '', preserveTrailingSlash: self::normalizeHost($host) === 'spar.nl');
         $query = self::normalizeQuery($parts['query'] ?? '');
 
         return $scheme . '://' . $host . $portSegment . $path . ($query !== '' ? '?' . $query : '');
@@ -97,10 +97,19 @@ final class UrlNormalizer
      * Dedupe key for a normalized URL. `www.` is dropped here rather than in
      * {@see normalize()}, so `www.shop.test/p` and `shop.test/p` are one
      * shop while each keeps the host that actually serves it.
+     * SPAR keeps its trailing slash for fetching, but drops it here to retain
+     * compatibility with hashes stored before that slash was preserved.
      */
     public static function hash(string $normalizedUrl): string
     {
-        return hash('sha256', preg_replace('#^(https?://)www\.#', '$1', $normalizedUrl) ?? $normalizedUrl);
+        $comparisonUrl = preg_replace('#^(https?://)www\.#', '$1', $normalizedUrl) ?? $normalizedUrl;
+
+        if (parse_url($comparisonUrl, PHP_URL_HOST) === 'spar.nl' && parse_url($comparisonUrl, PHP_URL_PATH) !== '/') {
+            $parts = explode('?', $comparisonUrl, 2);
+            $comparisonUrl = rtrim($parts[0], '/') . (isset($parts[1]) ? '?' . $parts[1] : '');
+        }
+
+        return hash('sha256', $comparisonUrl);
     }
 
     private static function normalizePort(string $scheme, ?int $port): string
@@ -120,7 +129,7 @@ final class UrlNormalizer
         return ':' . $port;
     }
 
-    private static function normalizePath(string $path): string
+    private static function normalizePath(string $path, bool $preserveTrailingSlash = false): string
     {
         if ($path === '' || $path === '/') {
             return '/';
@@ -135,8 +144,8 @@ final class UrlNormalizer
         );
         $path = implode('/', $segments);
 
-        // Strip trailing slash on non-root paths.
-        if (str_ends_with($path, '/')) {
+        // SPAR product URLs return 404 when their trailing slash is removed.
+        if (! $preserveTrailingSlash && str_ends_with($path, '/')) {
             $path = rtrim($path, '/');
         }
 

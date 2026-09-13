@@ -2,6 +2,14 @@
 
 use App\Support\UrlNormalizer;
 
+test('keeps the required trailing slash on SPAR product URLs', function (): void {
+    $url = 'https://www.spar.nl/fanta-fanta-cassis-pet-1.5l-9256413/';
+
+    expect(UrlNormalizer::normalize($url))->toBe($url)
+        ->and(UrlNormalizer::hash(UrlNormalizer::normalize($url)))
+        ->toBe(UrlNormalizer::hash(rtrim($url, '/')));
+});
+
 test('lowercases scheme and host', function (): void {
     expect(UrlNormalizer::normalize('HTTPS://ExAmple.COM/foo'))
         ->toBe('https://example.com/foo');
