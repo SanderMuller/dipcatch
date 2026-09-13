@@ -139,7 +139,8 @@ final readonly class JumboAdapter extends HostAdapter
             return null;
         }
 
-        $text = mb_strtolower(trim($communication->text('')));
+        $heading = $communication->filter('[data-testid="jum-heading"], h6')->first();
+        $text = mb_strtolower(trim($heading->count() > 0 ? $heading->text('') : $communication->text('')));
 
         if (preg_match('/geldig van\s+\p{L}+\s+(\d{1,2})(?:\s+(\p{L}+))?\s+t\/m\s+\p{L}+\s+(\d{1,2})\s+(\p{L}+)/u', $text, $matches) !== 1) {
             return null;

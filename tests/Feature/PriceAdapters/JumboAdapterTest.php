@@ -117,6 +117,25 @@ test('extracts a fixed-total bundle from the primary product', function (): void
         ->and($result->snapshot?->promotionWindow?->label)->toBe('2 voor 4,00');
 });
 
+test('extracts a bundle when minified markup joins the promotion month to following text', function (): void {
+    CarbonImmutable::setTestNow('2026-09-13 12:00:00 Europe/Amsterdam');
+    $html = '<html><body><div class="product-panel-info">'
+        . jumboPriceComponent('Prijs: € 2,85', '2', '85')
+        . '<div data-testautomation="pdp-promotion">'
+        . '<span data-testid="promotion-tag">2 voor 4,00</span>'
+        . '<div data-testid="product-communication"><h6>Geldig van wo 9 t/m di 15 sep</h6><p>Bij boodschappen bestellen geldt de aanbieding.</p></div>'
+        . '</div></div></body></html>';
+
+    $snapshot = $this->adapter
+        ->extract('https://www.jumbo.com/producten/fanta-cassis-1,5-l-428446FLS', $html)
+        ->snapshot;
+
+    expect($snapshot?->trackedPrice())->toBe('2.00')
+        ->and($snapshot?->bundleOffer?->quantity)->toBe(2)
+        ->and($snapshot?->bundleOffer?->totalPrice)->toBe('4.00')
+        ->and($snapshot?->promotionWindow?->endsAt->toDateString())->toBe('2026-09-15');
+});
+
 test('extracts a free-item bundle from the primary product', function (): void {
     CarbonImmutable::setTestNow('2026-09-12 12:00:00 Europe/Amsterdam');
     $html = File::get(base_path('tests/Fixtures/bundle-prices/jumbo-free-item.html'));
