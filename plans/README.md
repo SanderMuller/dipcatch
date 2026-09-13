@@ -207,6 +207,18 @@ Recorded so an executor does not re-litigate them:
   *already* spent an hourly slot, because `allows()` calls `RateLimiter::hit()`
   before returning true. So the user loses the alert and the slot.
 
+  **The boundary of what this covers.** All three notifications are
+  `ShouldQueue`, so `$user->notify()` evaluates `via()` inline and then queues
+  one job per channel (`NotificationSender::queueNotification()`). In
+  production the catch therefore sees a *dispatch-time* failure — the budget
+  call, `via()`, the enqueue — and not a delivery failure: a channel
+  that fails later lands in `failed_jobs` with no `Alert failed to send` line
+  and the slot already spent. The tests see more than production does, because
+  `phpunit.xml.dist` sets `QUEUE_CONNECTION=sync` and the channels run inside
+  the callback. Closing that needs a `failed()` hook on the notifications,
+  which is outside plan 010 — and it is the same gap one layer down, so it
+  belongs with the deferred outbox option rather than with plan 011.
+
 - **006 — executed 2026-09-12.** Both parts shipped. Ten new tests:
   `tests/Feature/Drops/NotificationBudgetSpendTest.php` (eight),
   `tests/Feature/Drops/AlertsSurviveTheJobTransactionTest.php` (one) and
