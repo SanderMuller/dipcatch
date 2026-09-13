@@ -88,6 +88,9 @@
                                             · {{ $product->cheapestShop->host }}
                                         @endif
                                     </flux:text>
+                                    @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
+                                        <flux:text size="sm" class="truncate text-zinc-500">{{ $bundleLabel }}</flux:text>
+                                    @endif
                                 </div>
                             </a>
                         </li>
@@ -121,10 +124,15 @@
                             <flux:text class="font-medium text-emerald-600 dark:text-emerald-400">
                                 {{ \App\Support\MoneyFormatter::format($product->cheapest_price === null ? null : (string) $product->cheapest_price, $product->currency) }}
                             </flux:text>
+                            @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
+                                <flux:text size="sm" class="text-zinc-500">{{ $bundleLabel }}</flux:text>
+                            @endif
                         </flux:table.cell>
                         <flux:table.cell class="hidden tabular-nums md:table-cell">
-                            {{ \App\Livewire\Products\ProductList::unitPriceState($product->bestValueShop(), $product) }}
-                            @php($bestLabel = \App\Support\PromotionLabel::withHost($product->bestValueShop()))
+                            @php($bestValueShop = $product->bestValueShop())
+                            {{ \App\Livewire\Products\ProductList::unitPriceState($bestValueShop, $product) }}
+                            @php($bestBundleLabel = \App\Support\BundlePriceLabel::forShop($bestValueShop))
+                            @php($bestLabel = $bestBundleLabel === null ? \App\Support\PromotionLabel::withHost($bestValueShop) : $bestValueShop?->host . ' · ' . $bestBundleLabel)
                             @if ($bestLabel)
                                 <flux:text size="sm" class="text-zinc-500">{{ $bestLabel }}</flux:text>
                             @endif
@@ -227,6 +235,9 @@
                                 {{ $alert['percent'] ?? '—' }}
                                 @if ($alert['amount'])
                                     · {{ $alert['amount'] }}
+                                @endif
+                                @if ($alert['bundle'])
+                                    · {{ $alert['bundle'] }}
                                 @endif
                             </flux:text>
                         </flux:timeline.content>

@@ -24,7 +24,7 @@ vendor/bin/pest || true                       # 0 failures
 | 004 | Stop `canonicalizeDecimal` misreading two price shapes | P1 | S | — | DONE |
 | 005 | Index, env documentation, and the SSRF escape hatch | P2 | S | — | DONE |
 | 006 | Alert budget after the claim; reference out of the lock | P2 | S | — | DONE |
-| 007 | Clear the old price when an offer is repointed | P2 | S | — | TODO |
+| 007 | Clear the old price when an offer is repointed | P2 | S | — | DONE |
 | 008 | Only dispatch a digest when there is something to digest | P3 | M | — | TODO |
 | 009 | Make the nightly prune's cost independent of product count | P3 | M | 005 | TODO |
 | 010 | Let each alert fail on its own, and say when one is dropped | P2 | S | 006 | DONE |

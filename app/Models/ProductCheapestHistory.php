@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\PriceAdapters\BundleOffer;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProductCheapestHistoryFactory;
 use DateTimeInterface;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use InvalidArgumentException;
 
 /**
  * One segment of a product's cheapest-offer history.
@@ -23,6 +25,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable $started_at
  * @property CarbonImmutable|null $ended_at
  * @property int|null $triggering_price_check_id
+ * @property string|null $single_item_price
+ * @property int|null $bundle_quantity
+ * @property string|null $bundle_total_price
  * @property-read Product $product
  */
 #[WithoutTimestamps]
@@ -44,9 +49,36 @@ class ProductCheapestHistory extends Model
     {
         return [
             'cheapest_price' => 'decimal:2',
+            'single_item_price' => 'decimal:2',
+            'bundle_quantity' => 'integer',
+            'bundle_total_price' => 'decimal:2',
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
         ];
+    }
+
+    public function singleItemPrice(): ?string
+    {
+        $price = $this->single_item_price ?? $this->cheapest_price;
+
+        return $price === null ? null : (string) $price;
+    }
+
+    public function bundleOffer(): ?BundleOffer
+    {
+        if ($this->bundle_quantity === null || $this->bundle_total_price === null) {
+            return null;
+        }
+
+        try {
+            $offer = new BundleOffer((int) $this->bundle_quantity, (string) $this->bundle_total_price);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        $singleItemPrice = $this->singleItemPrice();
+
+        return $singleItemPrice !== null && $offer->isCheaperThan($singleItemPrice) ? $offer : null;
     }
 
     /**
@@ -86,6 +118,24 @@ class ProductCheapestHistory extends Model
             $inner->where('started_at', '>=', $windowStart)
                 ->orWhereNull('ended_at')
                 ->orWhere('ended_at', '>=', $windowStart);
+        });
+    }
+
+    /**
+     * Segments whose price still describes the page it was read from.
+     *
+     * Repointing an offer at a different URL can make it a different product,
+     * so the prices it held before that say nothing about what the new page
+     * costs. Drop detection reads this; the chart does not, because a segment
+     * that has been superseded still happened.
+     *
+     * @param EloquentQueryBuilder<$this> $query
+     */
+    #[Scope]
+    protected function recordedOnTheCurrentPage(EloquentQueryBuilder $query): void
+    {
+        $query->whereDoesntHave('cheapestShop', function (EloquentQueryBuilder $shop): void {
+            $shop->whereColumn('shops.repointed_at', '>', 'product_cheapest_history.started_at');
         });
     }
 

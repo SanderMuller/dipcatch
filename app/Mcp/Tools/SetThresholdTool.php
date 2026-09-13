@@ -93,7 +93,7 @@ class SetThresholdTool extends Tool
             'product_id' => $schema->string()->format('uuid')->description('From list_products.')->required(),
             'percent' => $schema->number()->description('Alert when the price falls this many percent, e.g. 10.'),
             'amount' => $schema->number()->description('Alert when the price falls by at least this much money.'),
-            'target_price' => $schema->number()->description('Alert when the cheapest shop reaches this price. This is the price on the shelf, not a fall, so it does not move with the current price. Free accounts get this alert.'),
+            'target_price' => $schema->number()->description('Alert when the cheapest shop reaches this effective item price. A bundle response also states the required quantity. Free accounts get this alert.'),
             'unit_price_target' => $schema->number()->description('Alert when the best value reaches this price per kg, litre or piece. Pro accounts only — for a pack price on any plan, use target_price.'),
         ];
     }

@@ -78,7 +78,10 @@
                         <flux:text class="font-medium">
                             {{ \App\Support\MoneyFormatter::format($product->cheapest_price === null ? null : (string) $product->cheapest_price, $product->currency) }}
                         </flux:text>
-                        @php($promo = \App\Support\PromotionLabel::withHost($product->cheapestShop))
+                        @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
+                            <flux:text size="sm" class="text-zinc-500">{{ $bundleLabel }}</flux:text>
+                        @endif
+                        @php($promo = $bundleLabel === null ? \App\Support\PromotionLabel::withHost($product->cheapestShop) : $product->cheapestShop?->host)
                         @if ($promo)
                             <flux:text size="sm" class="text-zinc-500">{{ $promo }}</flux:text>
                         @endif
@@ -87,8 +90,10 @@
                         {{ \App\Livewire\Products\ProductList::unitPriceState($product->cheapestShop, $product) }}
                     </flux:table.cell>
                     <flux:table.cell class="hidden tabular-nums md:table-cell">
-                        {{ \App\Livewire\Products\ProductList::unitPriceState($product->bestValueShop(), $product) }}
-                        @php($best = \App\Support\PromotionLabel::withHost($product->bestValueShop()))
+                        @php($bestValueShop = $product->bestValueShop())
+                        {{ \App\Livewire\Products\ProductList::unitPriceState($bestValueShop, $product) }}
+                        @php($bestBundle = \App\Support\BundlePriceLabel::forShop($bestValueShop))
+                        @php($best = $bestBundle === null ? \App\Support\PromotionLabel::withHost($bestValueShop) : $bestValueShop?->host . ' · ' . $bestBundle)
                         @if ($best)
                             <flux:text size="sm" class="text-zinc-500">{{ $best }}</flux:text>
                         @endif

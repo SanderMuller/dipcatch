@@ -1,0 +1,28 @@
+{
+    "productCard": {
+        "webshopId": 597752,
+        "title": "AH Verse maaltijd butter chicken",
+        "bonusStartDate": "2026-09-07",
+        "bonusEndDate": "2026-09-13",
+        "discountType": "AH",
+        "promotionType": "NATIONAL",
+        "segmentType": "AH",
+        "bonusMechanism": "2 VOOR 12.00",
+        "priceBeforeBonus": 6.49,
+        "isStapelBonus": false,
+        "bonusSegmentId": 812513,
+        "hqPromotionId": 196143,
+        "bonusSegmentDescription": "Alle AH Verse maaltijden",
+        "isBonus": true,
+        "isBonusPrice": false,
+        "isVirtualBundle": false,
+        "discountLabels": [
+            {
+                "code": "DISCOUNT_X_FOR_Y",
+                "defaultDescription": "2 voor 12.00",
+                "count": 2,
+                "price": 12.00
+            }
+        ]
+    }
+}

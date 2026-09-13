@@ -1,0 +1,27 @@
+{
+    "productCard": {
+        "webshopId": 62661,
+        "title": "AH Rucola slamelange",
+        "bonusStartDate": "2026-09-07",
+        "bonusEndDate": "2026-09-13",
+        "discountType": "AH",
+        "promotionType": "NATIONAL",
+        "segmentType": "AH",
+        "bonusMechanism": "2e Halve Prijs",
+        "priceBeforeBonus": 1.39,
+        "isStapelBonus": false,
+        "bonusSegmentId": 808400,
+        "hqPromotionId": 191811,
+        "bonusSegmentDescription": "Alle AH Slamelanges 75-130 gram",
+        "isBonus": true,
+        "isBonusPrice": false,
+        "isVirtualBundle": false,
+        "discountLabels": [
+            {
+                "code": "DISCOUNT_ONE_HALF_PRICE",
+                "defaultDescription": "2e halve prijs",
+                "count": 2
+            }
+        ]
+    }
+}

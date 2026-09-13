@@ -1,6 +1,8 @@
 <?php declare(strict_types=1);
 
 use App\PriceAdapters\Hosts\JumboAdapter;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\File;
 
 /**
  * Trimmed replica of jumbo.com's server-rendered price component
@@ -20,6 +22,10 @@ HTML;
 
 beforeEach(function (): void {
     $this->adapter = new JumboAdapter();
+});
+
+afterEach(function (): void {
+    CarbonImmutable::setTestNow();
 });
 
 test('skips when the URL host is not jumbo.com', function (): void {
@@ -95,4 +101,56 @@ test('failed when jumbo page has neither JSON-LD nor the price component', funct
 
     expect($result->isFailed())->toBeTrue()
         ->and($result->failureReason)->toBe('jumbo_extraction_failed');
+});
+
+test('extracts a fixed-total bundle from the primary product', function (): void {
+    CarbonImmutable::setTestNow('2026-09-12 12:00:00 Europe/Amsterdam');
+    $html = File::get(base_path('tests/Fixtures/bundle-prices/jumbo-fixed-total.html'));
+
+    $result = $this->adapter->extract('https://www.jumbo.com/producten/fanta-cassis-1,5-l-428446FLS', $html);
+
+    expect($result->snapshot?->price)->toBe('2.85')
+        ->and($result->snapshot?->trackedPrice())->toBe('2.00')
+        ->and($result->snapshot?->bundleOffer?->quantity)->toBe(2)
+        ->and($result->snapshot?->bundleOffer?->totalPrice)->toBe('4.00')
+        ->and($result->snapshot?->bundleOfferAuthoritative)->toBeTrue()
+        ->and($result->snapshot?->promotionWindow?->label)->toBe('2 voor 4,00');
+});
+
+test('extracts a free-item bundle from the primary product', function (): void {
+    CarbonImmutable::setTestNow('2026-09-12 12:00:00 Europe/Amsterdam');
+    $html = File::get(base_path('tests/Fixtures/bundle-prices/jumbo-free-item.html'));
+
+    $result = $this->adapter->extract('https://www.jumbo.com/producten/knorr-good-noodles-kip-70-g-752107PAK', $html);
+
+    expect($result->snapshot?->trackedPrice())->toBe('0.60')
+        ->and($result->snapshot?->bundleOffer?->totalPrice)->toBe('1.19');
+});
+
+test('authoritatively ignores related-product promotions', function (): void {
+    $html = File::get(base_path('tests/Fixtures/bundle-prices/jumbo-no-offer.html'));
+
+    $result = $this->adapter->extract('https://www.jumbo.com/producten/lays-control', $html);
+
+    expect($result->snapshot?->price)->toBe('1.99')
+        ->and($result->snapshot?->bundleOffer)->toBeNull()
+        ->and($result->snapshot?->bundleOfferAuthoritative)->toBeTrue();
+});
+
+test('rejects bundle dates that cannot form a promotion window and records a diagnostic', function (): void {
+    $html = '<html><body><div class="product-panel-info">'
+        . jumboPriceComponent('Prijs: € 2,85', '2', '85')
+        . '<div data-testautomation="pdp-promotion">'
+        . '<span data-testid="promotion-tag">2 voor 4,00</span>'
+        . '<span data-testid="product-communication">Geldig van ma 99 sep t/m zo 100 sep</span>'
+        . '</div></div></body></html>';
+
+    $snapshot = $this->adapter
+        ->extract('https://www.jumbo.com/producten/fanta-cassis-1,5-l-428446FLS', $html)
+        ->snapshot;
+
+    expect($snapshot?->trackedPrice())->toBe('2.85')
+        ->and($snapshot?->bundleOffer)->toBeNull()
+        ->and($snapshot?->bundleOfferAuthoritative)->toBeTrue()
+        ->and($snapshot?->raw['bundle_diagnostic'] ?? null)->toBe('invalid_promotion_window');
 });

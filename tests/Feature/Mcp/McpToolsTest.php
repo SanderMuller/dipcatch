@@ -65,6 +65,25 @@ it('reads one product with its shops', function (): void {
         ->assertSee((string) $shop->id);
 });
 
+it('returns bundle conditions beside tracked MCP prices', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id]);
+    $shop = Shop::factory()->for($product)->create([
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+    $product->recomputeCheapestShop();
+
+    DipCatchServer::actingAs($me)->tool(GetProductTool::class, ['product_id' => (string) $product->id])
+        ->assertOk()
+        ->assertSee('"cheapest_price":"2.00"')
+        ->assertSee('"cheapest_single_item_price":"2.85"')
+        ->assertSee('"cheapest_bundle_quantity":2')
+        ->assertSee('"cheapest_bundle_total_price":"4.00"');
+});
+
 it('sets a threshold and refuses an empty one', function (): void {
     $me = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $me->id]);

@@ -20,6 +20,9 @@ class PriceCheckFactory extends Factory
         return [
             'shop_id' => Shop::factory(),
             'price' => fake()->randomFloat(2, 5, 2000),
+            'single_item_price' => null,
+            'bundle_quantity' => null,
+            'bundle_total_price' => null,
             'currency' => 'EUR',
             'in_stock' => true,
             'raw' => '€ 49,99',

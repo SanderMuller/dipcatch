@@ -68,6 +68,10 @@ test('renders cheapest segments as a stepped line', function (): void {
 
     expect($flux['rows'])->not->toBeEmpty()
         ->and(collect($flux['rows'])->pluck('price')->all())->toContain(100.0, 85.0)
+        ->and(collect($flux['rows'])->pluck('date')->every(
+            static fn (mixed $date): bool => is_string($date)
+                && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $date) === 1,
+        ))->toBeTrue()
         ->and($flux['currency'])->toBe('EUR');
 
     $lastHundred = collect($flux['rows'])->last(fn (array $row): bool => ($row['price'] ?? null) === 100.0);
@@ -266,6 +270,23 @@ test('shops that state no pack size get no unit line', function (): void {
     ]);
 
     expect(chartSeries($product, 'Cheapest per kg (€)'))->toBeEmpty();
+});
+
+test('bundle history rows carry purchase condition into chart tooltip data', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'started_at' => now()->subDay(),
+        'ended_at' => null,
+    ]);
+
+    $chart = makeChartFor($product)->fluxChart();
+
+    expect($chart['hasBundles'])->toBeTrue()
+        ->and($chart['rows'][0]['bundle'])->toBe('2 for €4.00 · Single item €2.85');
 });
 
 test('units that cannot share an axis leave gaps rather than wrong numbers', function (): void {

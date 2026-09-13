@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
+use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\ConditionalOffer;
 use App\PriceAdapters\PromotionWindow;
 use App\Support\Favicon;
@@ -18,10 +19,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
 
 /**
  * @property bool|null $current_in_stock True in stock, false out of stock, null when the shop's page did not say.
  * @property ShopHealth $health
+ * @property ScrapeStatus $last_status
  * @property string|null $pack_quantity
  * @property string|null $pack_unit
  * @property string|null $gtin
@@ -32,6 +35,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $promotion_starts_at
  * @property CarbonInterface|null $promotion_ends_at
  * @property string|null $promotion_label
+ * @property string|null $single_item_price
+ * @property int|null $bundle_quantity
+ * @property string|null $bundle_total_price
+ * @property CarbonInterface|null $repointed_at When this offer was last pointed at a different URL.
  */
 #[Unguarded]
 class Shop extends Model
@@ -47,6 +54,9 @@ class Shop extends Model
         return [
             'initial_price' => 'decimal:2',
             'current_price' => 'decimal:2',
+            'single_item_price' => 'decimal:2',
+            'bundle_quantity' => 'integer',
+            'bundle_total_price' => 'decimal:2',
             'pack_quantity' => 'decimal:2',
             'conditional_price' => 'decimal:2',
             'conditional_starts_at' => 'datetime',
@@ -56,6 +66,7 @@ class Shop extends Model
             'initial_checked_at' => 'datetime',
             'last_checked_at' => 'datetime',
             'last_success_at' => 'datetime',
+            'repointed_at' => 'datetime',
             'current_in_stock' => 'boolean',
             'active' => 'boolean',
             'health' => ShopHealth::class,
@@ -116,6 +127,34 @@ class Shop extends Model
             'pack_quantity' => null,
             'pack_unit' => null,
             'gtin' => null,
+            // Until the next successful check this offer has no known price,
+            // and a leftover one keeps it eligible for
+            // `Product::recomputeCheapestShop()`. The stock flag is null, not
+            // false: the new page has not said either way yet.
+            'current_price' => null,
+            'single_item_price' => null,
+            'bundle_quantity' => null,
+            'bundle_total_price' => null,
+            'current_in_stock' => null,
+            'conditional_price' => null,
+            'conditional_label' => null,
+            'conditional_starts_at' => null,
+            'conditional_ends_at' => null,
+            'promotion_starts_at' => null,
+            'promotion_ends_at' => null,
+            'promotion_label' => null,
+            // Nothing has read the URL this offer now points at. Keeping the
+            // old timestamps showed a "Last read" and a "Last checked" that
+            // belonged to the previous page, and let the offer coast on the
+            // previous page's success in `LastSuccessfulScrapeCheck`. A null
+            // check time also puts the offer at the front of the recheck
+            // queue, which is where an offer with no price belongs.
+            'last_success_at' => null,
+            'last_checked_at' => null,
+            // The line drawn through this offer's cheapest-history segments:
+            // everything before it priced whatever the old URL sold, so
+            // `Reference` stops reading it. See {@see ProductCheapestHistory}.
+            'repointed_at' => now(),
         ])->save();
 
         return true;
@@ -201,6 +240,41 @@ class Shop extends Model
             startsAt: $this->promotion_starts_at?->toImmutable(),
             label: $this->promotion_label,
         );
+    }
+
+    public function singleItemPrice(): ?string
+    {
+        $price = $this->single_item_price ?? $this->current_price;
+
+        return $price === null ? null : (string) $price;
+    }
+
+    public function bundleOffer(): ?BundleOffer
+    {
+        if ($this->bundle_quantity === null || $this->bundle_total_price === null) {
+            return null;
+        }
+
+        try {
+            $offer = new BundleOffer((int) $this->bundle_quantity, (string) $this->bundle_total_price);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        $singleItemPrice = $this->singleItemPrice();
+
+        return $singleItemPrice !== null && $offer->isCheaperThan($singleItemPrice) ? $offer : null;
+    }
+
+    public function liveBundleOffer(): ?BundleOffer
+    {
+        $offer = $this->bundleOffer();
+
+        if ($offer === null || $this->current_price === null) {
+            return null;
+        }
+
+        return bccomp((string) $this->current_price, $offer->effectiveUnitPrice(), 2) === 0 ? $offer : null;
     }
 
     public function faviconUrl(): string

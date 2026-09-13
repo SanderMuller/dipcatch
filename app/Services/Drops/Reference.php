@@ -32,6 +32,11 @@ final class Reference
      * the "every price_check inside the window is a sample" semantics from
      * the pre-refactor design while letting segments carry the actual
      * weighted-median value.
+     *
+     * Segments an offer recorded before it was repointed are left out — see
+     * {@see ProductCheapestHistory::recordedOnTheCurrentPage()}. A product whose
+     * every sample is excluded has no reference at all, so no drop fires
+     * until the new pages have built one.
      */
     public function compute(Product $product): ?ReferenceValue
     {
@@ -41,6 +46,7 @@ final class Reference
         /** @var EloquentCollection<int, ProductCheapestHistory> $segments */
         $segments = $product->cheapestHistory()
             ->whereNotNull('cheapest_price')
+            ->recordedOnTheCurrentPage()
             ->where(function (EloquentBuilder $q) use ($windowStart): void {
                 $q->whereNull('ended_at')
                     ->orWhere('ended_at', '>=', $windowStart);
@@ -159,6 +165,7 @@ final class Reference
     {
         $first = $product->cheapestHistory()
             ->whereNotNull('cheapest_price')
+            ->recordedOnTheCurrentPage()
             ->inOrder()
             ->first();
 

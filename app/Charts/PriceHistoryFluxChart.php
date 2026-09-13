@@ -13,8 +13,8 @@ use Carbon\CarbonImmutable;
 final class PriceHistoryFluxChart
 {
     /**
-     * @param  array{datasets: list<array<string, mixed>>, labels: list<string>}  $data
-     * @return array{rows: list<array<string, mixed>>, currency: string, unitLabel: ?string, hasNotified: bool}
+     * @param  array{datasets: list<array<string, mixed>>, labels: list<string>, bundleConditions?: list<?string>}  $data
+     * @return array{rows: list<array<string, mixed>>, currency: string, unitLabel: ?string, hasNotified: bool, hasBundles: bool}
      */
     public static function fromData(array $data, string $currency): array
     {
@@ -24,6 +24,7 @@ final class PriceHistoryFluxChart
             self::valuesAt($data['datasets'], 0),
             $unit['values'],
             self::valuesForLabel($data['datasets'], 'Notified'),
+            $data['bundleConditions'] ?? [],
         ));
 
         return [
@@ -31,6 +32,7 @@ final class PriceHistoryFluxChart
             'currency' => $currency,
             'unitLabel' => $unit['label'],
             'hasNotified' => array_any($rows, fn (array $row): bool => isset($row['notified'])),
+            'hasBundles' => array_any($rows, fn (array $row): bool => isset($row['bundle'])),
         ];
     }
 
@@ -39,9 +41,10 @@ final class PriceHistoryFluxChart
      * @param  list<mixed>  $price
      * @param  list<mixed>|null  $unit
      * @param  list<mixed>|null  $notified
+     * @param  list<?string>  $bundleConditions
      * @return list<array<string, mixed>>
      */
-    private static function rows(array $labels, array $price, ?array $unit, ?array $notified): array
+    private static function rows(array $labels, array $price, ?array $unit, ?array $notified, array $bundleConditions): array
     {
         $rows = [];
 
@@ -57,6 +60,10 @@ final class PriceHistoryFluxChart
 
             if (is_numeric($notified[$index] ?? null)) {
                 $row['notified'] = (float) $notified[$index];
+            }
+
+            if (is_string($bundleConditions[$index] ?? null)) {
+                $row['bundle'] = $bundleConditions[$index];
             }
 
             $rows[] = $row;
@@ -113,7 +120,7 @@ final class PriceHistoryFluxChart
             return null;
         }
 
-        return CarbonImmutable::parse($iso)->subSecond()->toIso8601String();
+        return CarbonImmutable::parse($iso)->subSecond()->utc()->format('Y-m-d\TH:i:s\Z');
     }
 
     /**
@@ -172,7 +179,7 @@ final class PriceHistoryFluxChart
         $parsed = CarbonImmutable::createFromFormat('Y-m-d H:i:s', $stamp);
 
         return $parsed instanceof CarbonImmutable
-            ? $parsed->toIso8601String()
+            ? $parsed->utc()->format('Y-m-d\TH:i:s\Z')
             : $stamp;
     }
 }

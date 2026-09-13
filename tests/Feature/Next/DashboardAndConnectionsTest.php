@@ -4,6 +4,7 @@ use App\Livewire\Connections\ConnectionsPage;
 use App\Livewire\Dashboard;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 
 use function Pest\Livewire\livewire;
@@ -98,6 +99,24 @@ it('shows zero savings rather than nothing for a new account', function (): void
     $this->actingAs(User::factory()->create());
 
     livewire(Dashboard::class)->assertSee('€0.00');
+});
+
+it('discloses bundle terms beside dashboard effective prices', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'cheapest_price' => '2.00']);
+    $shop = Shop::factory()->for($product)->create([
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertSee('2 for €4.00')
+        ->assertSee('Single item €2.85');
 });
 
 it('shows the mcp endpoint and an empty connection list', function (): void {

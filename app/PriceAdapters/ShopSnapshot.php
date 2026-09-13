@@ -61,7 +61,22 @@ final readonly class ShopSnapshot
         public bool $promotionWindowAuthoritative = false,
         /** What the verdict was read from, e.g. `https://schema.org/InStock`. */
         public ?string $stockSignal = null,
+        /** A public multi-buy offer that changes the tracked unit price. */
+        public ?BundleOffer $bundleOffer = null,
+        /** True when the source exposed its product-bound bundle field. */
+        public bool $bundleOfferAuthoritative = false,
     ) {}
+
+    public function trackedPrice(): string
+    {
+        if ($this->bundleOffer === null || ($this->promotionWindow !== null && ! $this->promotionWindow->isRunning())) {
+            return $this->price;
+        }
+
+        $bundlePrice = $this->bundleOffer->effectiveUnitPrice();
+
+        return $this->bundleOffer->isCheaperThan($this->price) ? $bundlePrice : $this->price;
+    }
 
     /**
      * A copy with some fields replaced.
@@ -69,6 +84,8 @@ final readonly class ShopSnapshot
      * Host adapters that augment a JSON-LD snapshot used to rebuild it field
      * by field, which silently dropped every field added to this class
      * afterwards — two adapters had to be edited for each one.
+     *
+     * @param  array<string, mixed>|null  $raw
      */
     public function with(
         ?string $packSize = null,
@@ -78,6 +95,9 @@ final readonly class ShopSnapshot
         ?bool $inStock = null,
         ?string $stockSignal = null,
         ?string $currency = null,
+        ?BundleOffer $bundleOffer = null,
+        ?bool $bundleOfferAuthoritative = null,
+        ?array $raw = null,
     ): self {
         return new self(
             title: $this->title,
@@ -85,7 +105,7 @@ final readonly class ShopSnapshot
             price: $this->price,
             currency: $currency ?? $this->currency,
             inStock: $inStock ?? $this->inStock,
-            raw: $this->raw,
+            raw: $raw ?? $this->raw,
             packSize: $packSize ?? $this->packSize,
             packSizeAuthoritative: $packSizeAuthoritative ?? $this->packSizeAuthoritative,
             gtin: $this->gtin,
@@ -95,6 +115,8 @@ final readonly class ShopSnapshot
             promotionWindow: $promotionWindow ?? $this->promotionWindow,
             promotionWindowAuthoritative: $promotionWindowAuthoritative ?? $this->promotionWindowAuthoritative,
             stockSignal: $stockSignal ?? $this->stockSignal,
+            bundleOffer: $bundleOfferAuthoritative === null ? $this->bundleOffer : $bundleOffer,
+            bundleOfferAuthoritative: $bundleOfferAuthoritative ?? $this->bundleOfferAuthoritative,
         );
     }
 }

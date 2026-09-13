@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Shop;
+use App\PriceAdapters\PromotionWindow;
 use Carbon\CarbonImmutable;
 
 /**
@@ -28,7 +29,12 @@ final readonly class PromotionLabel
             return null;
         }
 
-        return ($window->label ?? 'Bonus') . ' ' . self::deadline($shop);
+        return self::forWindow($window);
+    }
+
+    public static function forWindow(PromotionWindow $window): string
+    {
+        return ($window->label ?? 'Bonus') . ' ' . self::deadline($window);
     }
 
     /**
@@ -48,17 +54,13 @@ final readonly class PromotionLabel
     /** The deadline alone: "until 6 Sep", "from 8 Sep", "ended 6 Sep". */
     public static function short(?Shop $shop): ?string
     {
-        return $shop?->promotionWindow() === null ? null : self::deadline($shop);
+        $window = $shop?->promotionWindow();
+
+        return $window === null ? null : self::deadline($window);
     }
 
-    private static function deadline(Shop $shop): string
+    private static function deadline(PromotionWindow $window): string
     {
-        $window = $shop->promotionWindow();
-
-        if ($window === null) {
-            return '';
-        }
-
         if ($window->hasNotStarted()) {
             return 'from ' . self::shortDate($window->startsAt);
         }

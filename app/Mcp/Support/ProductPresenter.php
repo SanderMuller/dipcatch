@@ -16,11 +16,17 @@ final readonly class ProductPresenter
      */
     public function summary(Product $product): array
     {
+        $cheapest = $product->cheapestShop;
+        $bundle = $cheapest?->liveBundleOffer();
+
         return [
             'product_id' => self::id($product->getKey()),
             'title' => $product->title,
             'currency' => $product->currency,
             'cheapest_price' => self::decimal($product->cheapest_price),
+            'cheapest_single_item_price' => $cheapest?->singleItemPrice(),
+            'cheapest_bundle_quantity' => $bundle?->quantity,
+            'cheapest_bundle_total_price' => $bundle?->totalPrice,
             'shop_count' => $product->shops()->count(),
             'threshold_pct' => self::decimal($product->drop_threshold_pct),
             'threshold_abs' => self::decimal($product->drop_threshold_abs),
@@ -49,6 +55,9 @@ final readonly class ProductPresenter
                 'host' => is_string($host) ? $host : null,
                 'url' => $shop->url,
                 'price' => self::decimal($shop->current_price),
+                'single_item_price' => $shop->singleItemPrice(),
+                'bundle_quantity' => $shop->liveBundleOffer()?->quantity,
+                'bundle_total_price' => $shop->liveBundleOffer()?->totalPrice,
                 'in_stock' => $shop->current_in_stock,
                 'stock' => self::stock($shop->current_in_stock),
                 'pack_quantity' => $shop->pack_quantity === null ? null : (float) $shop->pack_quantity,

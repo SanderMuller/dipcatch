@@ -61,6 +61,16 @@ DB_DATABASE="dipcatch_test_$(basename "$(git rev-parse --show-toplevel)" | tr '[
 `CREATE DATABASE "<name>"` when the database is missing. So a serial run creates its
 own database on first use. Append `--filter=…` or a path exactly as normal.
 
+**The whole suite serially needs more than the default 128M.** `composer test` is
+`--parallel`, and each forked worker runs only its share, so the ceiling is never
+reached that way. One process running all of it dies partway through with
+`Allowed memory size of 134217728 bytes exhausted`, inside whichever test happened to
+be running — it reads like a test failure and is not one. Raise the limit for the run:
+
+```bash
+DB_DATABASE="dipcatch_test_${slug}" php -d memory_limit=1G vendor/bin/pest --compact || true
+```
+
 ### Parallel runs — create the base database once
 
 `composer test` is `pest --parallel`. That path is **not** self-creating. Laravel's own

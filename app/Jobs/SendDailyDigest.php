@@ -66,7 +66,7 @@ class SendDailyDigest implements ShouldBeUnique, ShouldQueue
         $events = PriceDropEvent::query()
             ->where('user_id', $this->user->id)
             ->where('fired_at', '>', $since)
-            ->with(['product', 'triggeredByShop'])
+            ->with(['product', 'triggeredByShop', 'priceCheck'])
             ->oldest('fired_at')
             ->get();
 

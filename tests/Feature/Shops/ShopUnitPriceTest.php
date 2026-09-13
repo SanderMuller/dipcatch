@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Models\Product;
 use App\Models\Shop;
 use App\Support\UrlNormalizer;
 
@@ -45,4 +46,81 @@ test('updateUrl clears the pack columns so a stale size never prices a new produ
     $shop->refresh();
     expect($shop->pack_quantity)->toBeNull()
         ->and($shop->pack_unit)->toBeNull();
+});
+
+test('updateUrl clears everything the previous product taught this offer', function (): void {
+    $shop = Shop::factory()->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '10.00',
+        'single_item_price' => '10.00',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '16.00',
+        'current_in_stock' => true,
+        'conditional_price' => '8.00',
+        'conditional_label' => 'With the shop card',
+        'conditional_starts_at' => now()->subDay(),
+        'conditional_ends_at' => now()->addDay(),
+        'promotion_starts_at' => now()->subDay(),
+        'promotion_ends_at' => now()->addDay(),
+        'promotion_label' => 'Two for one',
+        'last_success_at' => now()->subHour(),
+        'last_checked_at' => now()->subHour(),
+    ]);
+
+    expect($shop->updateUrl(UrlNormalizer::normalize('https://shop.example.com/p/2')))->toBeTrue();
+
+    $shop->refresh();
+    expect($shop->current_price)->toBeNull()
+        ->and($shop->single_item_price)->toBeNull()
+        ->and($shop->bundle_quantity)->toBeNull()
+        ->and($shop->bundle_total_price)->toBeNull()
+        ->and($shop->current_in_stock)->toBeNull()
+        ->and($shop->conditional_price)->toBeNull()
+        ->and($shop->conditional_label)->toBeNull()
+        ->and($shop->conditional_starts_at)->toBeNull()
+        ->and($shop->conditional_ends_at)->toBeNull()
+        ->and($shop->promotion_starts_at)->toBeNull()
+        ->and($shop->promotion_ends_at)->toBeNull()
+        ->and($shop->promotion_label)->toBeNull()
+        ->and($shop->last_success_at)->toBeNull()
+        ->and($shop->last_checked_at)->toBeNull()
+        ->and($shop->repointed_at)->not->toBeNull();
+});
+
+test('a repointed offer loses cheapest instead of carrying the old price over', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $rival = Shop::factory()->for($product)->create([
+        'url' => 'https://rival.example.com/p/1',
+        'current_price' => '12.00',
+    ]);
+    $repointed = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '5.00',
+    ]);
+
+    $product->recomputeCheapestShop();
+    expect($product->cheapest_shop_id)->toBe($repointed->id);
+
+    $repointed->updateUrl(UrlNormalizer::normalize('https://shop.example.com/p/2'));
+
+    $product->recomputeCheapestShop();
+
+    expect($product->cheapest_shop_id)->toBe($rival->id)
+        ->and((string) $product->cheapest_price)->toBe('12.00');
+});
+
+test('a no-op url edit leaves the offer state intact', function (): void {
+    $shop = Shop::factory()->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '10.00',
+        'conditional_price' => '8.00',
+        'promotion_label' => 'Two for one',
+    ]);
+
+    expect($shop->updateUrl(UrlNormalizer::normalize('https://shop.example.com/p/1')))->toBeFalse();
+
+    $shop->refresh();
+    expect((string) $shop->current_price)->toBe('10.00')
+        ->and((string) $shop->conditional_price)->toBe('8.00')
+        ->and($shop->promotion_label)->toBe('Two for one');
 });

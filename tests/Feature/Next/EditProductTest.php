@@ -201,6 +201,12 @@ it('refuses to open a shop on somebody elses product', function (): void {
     livewire(ProductShow::class, ['product' => $mine])
         ->call('editShop', $stranger->id)
         ->assertForbidden();
+
+    livewire(ProductShow::class, ['product' => $mine])
+        ->call('saveShopUrl', $stranger->id, 'https://shop.example.com/p/9')
+        ->assertForbidden();
+
+    expect($stranger->fresh()?->url)->toBe($stranger->url);
 });
 
 it('refuses a shop of my own that belongs to another product', function (): void {
@@ -209,12 +215,20 @@ it('refuses a shop of my own that belongs to another product', function (): void
     $user = User::factory()->create();
     $shown = Product::factory()->create(['user_id' => $user->id]);
     $elsewhere = Product::factory()->create(['user_id' => $user->id]);
-    $shop = Shop::factory()->create(['product_id' => $elsewhere->id, 'notes' => 'untouched']);
+    $shop = Shop::factory()->create([
+        'product_id' => $elsewhere->id,
+        'notes' => 'untouched',
+        'current_price' => '10.00',
+    ]);
 
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $shown])
         ->call('editShop', $shop->id)
+        ->assertNotFound();
+
+    livewire(ProductShow::class, ['product' => $shown])
+        ->call('saveShopUrl', $shop->id, 'https://shop.example.com/p/9')
         ->assertNotFound();
 
     livewire(ProductShow::class, ['product' => $shown])
@@ -225,5 +239,8 @@ it('refuses a shop of my own that belongs to another product', function (): void
         ->call('removeShop', $shop->id)
         ->assertNotFound();
 
-    expect($shop->fresh()?->notes)->toBe('untouched');
+    $untouched = $shop->fresh();
+
+    expect($untouched?->notes)->toBe('untouched')
+        ->and((string) $untouched?->current_price)->toBe('10.00');
 });

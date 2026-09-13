@@ -2,11 +2,10 @@
 
 namespace App\Services\AhApi;
 
+use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PriceNormalizer;
-use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\Checkjebon\CheckjebonResult;
-use App\Support\DutchDate;
 use App\Support\UrlNormalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
@@ -135,9 +134,11 @@ final readonly class AhApiSource
     {
         $card = is_array($payload['productCard'] ?? null) ? $payload['productCard'] : $payload;
 
-        $price = PriceNormalizer::fromMixed(
-            data_get($card, 'currentPrice') ?? data_get($card, 'priceBeforeBonus'),
-        );
+        $currentPrice = PriceNormalizer::fromMixed(data_get($card, 'currentPrice'));
+        $priceBeforeBonus = PriceNormalizer::fromMixed(data_get($card, 'priceBeforeBonus'));
+        $mechanism = data_get($card, 'bonusMechanism');
+        $bundleEligible = self::hasSupportedBundleContract($card);
+        $price = $bundleEligible ? $priceBeforeBonus : ($currentPrice ?? $priceBeforeBonus);
 
         if ($price === null) {
             return null;
@@ -152,6 +153,22 @@ final readonly class AhApiSource
         // pack data (spec Section 4).
         $hasSalesUnitSize = array_key_exists('salesUnitSize', $card);
         $salesUnitSize = $hasSalesUnitSize && is_string($card['salesUnitSize']) ? $card['salesUnitSize'] : null;
+        $promotionWindow = AhPromotionWindow::fromCard($card);
+        $hasPromotionDate = array_key_exists('bonusStartDate', $card) || array_key_exists('bonusEndDate', $card);
+        $invalidPromotionWindow = $bundleEligible && $hasPromotionDate && $promotionWindow === null;
+        $bundleOffer = $bundleEligible && ! $invalidPromotionWindow && is_string($mechanism)
+            ? BundleOffer::fromLabel($mechanism, $price)
+            : null;
+
+        $raw = [
+            'source' => 'ah-api',
+            'is_bonus' => (bool) data_get($card, 'isBonus'),
+            'price_before_bonus' => data_get($card, 'priceBeforeBonus'),
+        ];
+
+        if ($invalidPromotionWindow) {
+            $raw['bundle_diagnostic'] = 'invalid_promotion_window';
+        }
 
         return new ShopSnapshot(
             title: is_string($title) && $title !== '' ? $title : 'AH product',
@@ -159,41 +176,58 @@ final readonly class AhApiSource
             price: $price,
             currency: 'EUR',
             inStock: ! is_string($orderable) || $orderable !== 'UNAVAILABLE',
-            raw: [
-                'source' => 'ah-api',
-                'is_bonus' => (bool) data_get($card, 'isBonus'),
-                'price_before_bonus' => data_get($card, 'priceBeforeBonus'),
-            ],
+            raw: $raw,
             packSize: $salesUnitSize,
             packSizeAuthoritative: $hasSalesUnitSize,
-            promotionWindow: self::promotionWindow($card),
+            promotionWindow: $promotionWindow,
             // Authority keys on `isBonus`, never on the date fields: a
             // product with no bonus answers `isBonus: false` and omits the
             // dates, and that is exactly when a finished bonus must clear.
             promotionWindowAuthoritative: array_key_exists('isBonus', $card),
+            bundleOffer: $bundleOffer,
+            bundleOfferAuthoritative: array_key_exists('isBonus', $card),
         );
     }
 
     /**
-     * The bonus period, read only when the card says a bonus is running.
-     * `bonusMechanism` is Albert Heijn's own wording for the offer
-     * ("VOOR 1.69") and travels as the window's label.
+     * Enable only product-card contracts captured in fixtures. Tiered AH
+     * offers stay disabled until a live payload proves their exact shape.
      *
      * @param  array<mixed>  $card
      */
-    private static function promotionWindow(array $card): ?PromotionWindow
+    private static function hasSupportedBundleContract(array $card): bool
     {
-        if (data_get($card, 'isBonus') !== true) {
-            return null;
+        if (data_get($card, 'isBonus') !== true || data_get($card, 'isVirtualBundle') !== false) {
+            return false;
         }
 
-        $mechanism = data_get($card, 'bonusMechanism');
+        if (data_get($card, 'discountType') !== 'AH'
+            || data_get($card, 'promotionType') !== 'NATIONAL'
+            || data_get($card, 'segmentType') !== 'AH') {
+            return false;
+        }
 
-        return PromotionWindow::make(
-            endsAt: DutchDate::endOfDay(data_get($card, 'bonusEndDate')),
-            startsAt: DutchDate::startOfDay(data_get($card, 'bonusStartDate')),
-            label: is_string($mechanism) ? $mechanism : null,
-        );
+        $labels = data_get($card, 'discountLabels');
+
+        if (! is_array($labels)) {
+            return false;
+        }
+
+        return array_any($labels, self::isSupportedDiscountLabel(...));
+    }
+
+    private static function isSupportedDiscountLabel(mixed $label): bool
+    {
+        if (! is_array($label)) {
+            return false;
+        }
+
+        $count = data_get($label, 'count');
+
+        return in_array(data_get($label, 'code'), [
+            'DISCOUNT_X_FOR_Y',
+            'DISCOUNT_ONE_HALF_PRICE',
+        ], strict: true) && is_int($count) && $count >= 2;
     }
 
     private static function productIdFromUrl(string $url): ?string

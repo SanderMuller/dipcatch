@@ -6,6 +6,7 @@ use App\Enums\ShopHealth;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Support\BundlePriceLabel;
 use App\Support\Favicon;
 use App\Support\MoneyFormatter;
 use Filament\Actions\BulkAction;
@@ -41,7 +42,7 @@ class ShopsTable
                     ->state(fn (Shop $r): string => MoneyFormatter::format(
                         $r->current_price === null ? null : (string) $r->current_price,
                         $r->currency,
-                    ))
+                    ) . (($bundle = BundlePriceLabel::forShop($r)) === null ? '' : ' · ' . $bundle))
                     ->sortable(),
                 TextColumn::make('health')
                     ->badge()

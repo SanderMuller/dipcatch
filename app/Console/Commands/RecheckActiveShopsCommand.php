@@ -66,10 +66,38 @@ class RecheckActiveShopsCommand extends Command
             ->where(function (EloquentQueryBuilder $q) use ($proCutoff, $freeCutoff): void {
                 $q->whereNull('last_checked_at')
                     ->orWhere(fn (EloquentQueryBuilder $due): EloquentQueryBuilder => $this->duePerPlan($due, Plan::Pro, $proCutoff))
-                    ->orWhere(fn (EloquentQueryBuilder $due): EloquentQueryBuilder => $this->duePerPlan($due, Plan::Free, $freeCutoff));
+                    ->orWhere(fn (EloquentQueryBuilder $due): EloquentQueryBuilder => $this->duePerPlan($due, Plan::Free, $freeCutoff))
+                    ->orWhere(fn (EloquentQueryBuilder $boundary): EloquentQueryBuilder => $this->dueBundleBoundary($boundary));
             })
             ->orderByRaw('last_checked_at IS NULL DESC')
             ->oldest('last_checked_at');
+    }
+
+    /**
+     * @param  EloquentQueryBuilder<Shop>  $query
+     * @return EloquentQueryBuilder<Shop>
+     */
+    private function dueBundleBoundary(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query
+            ->whereNotNull('single_item_price')
+            ->whereNotNull('bundle_quantity')
+            ->whereNotNull('bundle_total_price')
+            ->where(function (EloquentQueryBuilder $boundary): void {
+                $boundary->where(function (EloquentQueryBuilder $activation): void {
+                    $activation->whereNotNull('promotion_starts_at')
+                        ->where('promotion_starts_at', '<=', now())
+                        ->whereColumn('last_checked_at', '<', 'promotion_starts_at')
+                        ->where(function (EloquentQueryBuilder $end): void {
+                            $end->whereNull('promotion_ends_at')->orWhere('promotion_ends_at', '>=', now());
+                        })
+                        ->whereColumn('current_price', 'single_item_price');
+                })->orWhere(function (EloquentQueryBuilder $expiry): void {
+                    $expiry->whereNotNull('promotion_ends_at')
+                        ->where('promotion_ends_at', '<', now())
+                        ->whereColumn('current_price', '!=', 'single_item_price');
+                });
+            });
     }
 
     /**

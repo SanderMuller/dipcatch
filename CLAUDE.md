@@ -23,7 +23,7 @@ When you work in a **Polyscope clone or git worktree**, name the test database a
 DB_DATABASE="dipcatch_test_$(basename "$(git rev-parse --show-toplevel)" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g')" vendor/bin/pest --compact || true
 ```
 
-- A **serial** run creates its own database: `migrate:fresh` passes `--force` to `migrate`, which issues `CREATE DATABASE` when it is missing.
+- A **serial** run creates its own database: `migrate:fresh` passes `--force` to `migrate`, which issues `CREATE DATABASE` when it is missing. Running the *whole* suite serially needs `php -d memory_limit=1G` in front of `vendor/bin/pest` — the default 128M runs out partway through and reads like a test failure.
 - A **parallel** run (`composer test`) does not. Laravel's parallel-testing support connects to the base database to recreate its per-worker ones, so create the base once per clone first: `psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE "dipcatch_test_<slug>"'`.
 - `--parallel` is **not** a substitute — it isolates workers inside one run, not across checkouts.
 - The name is derived from the clone, never the run, so it is reused rather than multiplied. In the primary checkout keep the bare `dipcatch_test`.

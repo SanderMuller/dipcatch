@@ -54,6 +54,9 @@ class PriceHistoryTool extends Tool
 
             $segments[] = [
                 'price' => is_scalar($segment->cheapest_price) ? (string) $segment->cheapest_price : null,
+                'single_item_price' => $segment->singleItemPrice(),
+                'bundle_quantity' => $segment->bundleOffer()?->quantity,
+                'bundle_total_price' => $segment->bundleOffer()?->totalPrice,
                 'from' => $started instanceof CarbonInterface ? $started->toIso8601String() : null,
                 'until' => $ended instanceof CarbonInterface ? $ended->toIso8601String() : null,
             ];

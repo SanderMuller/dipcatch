@@ -35,6 +35,12 @@
                             {{ \App\Support\MoneyFormatter::format($item['price'], $item['currency'] ?? 'EUR') }}
                             @if ($item['host'] !== null) · {{ $item['host'] }} @endif
                         </flux:text>
+                        @if ($item['bundleQuantity'] !== null && $item['bundleTotalPrice'] !== null)
+                            <flux:text size="sm" class="text-zinc-500">
+                                {{ $item['bundleQuantity'] }} for {{ \App\Support\MoneyFormatter::format($item['bundleTotalPrice'], $item['currency'] ?? 'EUR') }}
+                                @if ($item['singleItemPrice'] !== null) · Single item {{ \App\Support\MoneyFormatter::format($item['singleItemPrice'], $item['currency'] ?? 'EUR') }} @endif
+                            </flux:text>
+                        @endif
                     @elseif ($item['body'] !== null)
                         <flux:text size="sm" class="text-zinc-500">{{ $item['body'] }}</flux:text>
                     @endif

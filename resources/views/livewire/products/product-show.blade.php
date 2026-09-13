@@ -106,14 +106,24 @@
                 </dd>
                 @if ($product->cheapestShop)
                     <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ $product->cheapestShop->host }}</dd>
+                    @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
+                        <dd class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $bundleLabel }}</dd>
+                    @endif
                 @endif
             </div>
 
             <div class="p-5">
                 <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Best value') }}</dt>
+                @php($bestValueShop = $product->bestValueShop())
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
-                    {{ \App\Livewire\Products\ProductList::unitPriceState($product->bestValueShop(), $product) }}
+                    {{ \App\Livewire\Products\ProductList::unitPriceState($bestValueShop, $product) }}
                 </dd>
+                @if ($bestValueShop)
+                    <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ $bestValueShop->host }}</dd>
+                    @if ($bestValueBundleLabel = \App\Support\BundlePriceLabel::forShop($bestValueShop))
+                        <dd class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $bestValueBundleLabel }}</dd>
+                    @endif
+                @endif
             </div>
 
             <div class="p-5">
@@ -182,6 +192,9 @@
                 <flux:chart.tooltip>
                     <flux:chart.tooltip.heading field="date" :format="['month' => 'short', 'day' => 'numeric', 'hour' => 'numeric', 'minute' => '2-digit']" />
                     <flux:chart.tooltip.value field="price" :label="__('Cheapest')" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
+                    @if ($chart['hasBundles'])
+                        <flux:chart.tooltip.value field="bundle" :label="__('Bundle')" />
+                    @endif
                     @if ($chart['unitLabel'] !== null)
                         <flux:chart.tooltip.value field="unit" :label="$chart['unitLabel']" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
                     @endif
@@ -243,9 +256,12 @@
                         </flux:table.cell>
                         <flux:table.cell class="tabular-nums">
                             {{ \App\Support\MoneyFormatter::format($shop->current_price === null ? null : (string) $shop->current_price, $shop->currency) }}
+                            @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($shop))
+                                <flux:text size="sm" class="text-zinc-500">{{ $bundleLabel }}</flux:text>
+                            @endif
                             {{-- A price that is only good until a date says so, or the
                                  number reads as permanent when it is not. --}}
-                            @php($promo = \App\Support\PromotionLabel::long($shop))
+                            @php($promo = $bundleLabel === null ? \App\Support\PromotionLabel::long($shop) : null)
                             @if ($promo)
                                 <flux:text size="sm" class="text-zinc-500">{{ $promo }}</flux:text>
                             @endif

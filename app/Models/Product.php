@@ -226,6 +226,14 @@ class Product extends Model
             $newPrice = $cheapest?->current_price === null
                 ? null
                 : (string) $cheapest->current_price;
+            $singleItemPrice = $cheapest?->singleItemPrice();
+            $bundleOffer = $cheapest?->liveBundleOffer();
+
+            $openSegment = ProductCheapestHistory::query()
+                ->where('product_id', $locked->id)
+                ->whereNull('ended_at')
+                ->latest('id')
+                ->first();
 
             $locked->forceFill([
                 'cheapest_shop_id' => $newOfferId,
@@ -233,7 +241,10 @@ class Product extends Model
             ])->save();
 
             $changed = $previousOfferId !== $newOfferId
-                || $previousPrice !== $newPrice;
+                || $previousPrice !== $newPrice
+                || $openSegment?->singleItemPrice() !== $singleItemPrice
+                || $openSegment?->bundleOffer()?->quantity !== $bundleOffer?->quantity
+                || $openSegment?->bundleOffer()?->totalPrice !== $bundleOffer?->totalPrice;
 
             if (! $changed) {
                 return;
@@ -248,6 +259,9 @@ class Product extends Model
                 'product_id' => $locked->id,
                 'cheapest_shop_id' => $newOfferId,
                 'cheapest_price' => $newPrice,
+                'single_item_price' => $singleItemPrice,
+                'bundle_quantity' => $bundleOffer?->quantity,
+                'bundle_total_price' => $bundleOffer?->totalPrice,
                 'started_at' => now(),
                 'ended_at' => null,
                 'triggering_price_check_id' => $triggeringPriceCheckId,

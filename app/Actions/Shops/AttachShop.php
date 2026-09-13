@@ -50,10 +50,17 @@ final readonly class AttachShop
     private function record(Product $product, ShopDraft $draft): Shop
     {
         $shop = $this->write($product, $draft);
+        $trackedPrice = $draft->trackedPrice();
+        $appliedBundle = $draft->bundleOffer?->effectiveUnitPrice() === $trackedPrice
+            ? $draft->bundleOffer
+            : null;
 
         $check = PriceCheck::create([
             'shop_id' => $shop->id,
-            'price' => $draft->price,
+            'price' => $trackedPrice,
+            'single_item_price' => $draft->singleItemPrice ?? $draft->price,
+            'bundle_quantity' => $appliedBundle?->quantity,
+            'bundle_total_price' => $appliedBundle?->totalPrice,
             'currency' => $draft->currency,
             'in_stock' => $draft->inStock,
             'status' => ScrapeStatus::Ok->value,
@@ -68,6 +75,8 @@ final readonly class AttachShop
 
     private function write(Product $product, ShopDraft $draft): Shop
     {
+        $trackedPrice = $draft->trackedPrice();
+
         return $product->shops()->create([
             'url' => $draft->url,
             'adapter_key' => $draft->adapterKey,
@@ -80,9 +89,15 @@ final readonly class AttachShop
             'pack_quantity' => $draft->packSize?->quantity,
             'pack_unit' => $draft->packSize?->unit,
             'currency' => $draft->currency,
-            'initial_price' => $draft->price,
+            'initial_price' => $trackedPrice,
             'initial_checked_at' => now(),
-            'current_price' => $draft->price,
+            'current_price' => $trackedPrice,
+            'single_item_price' => $draft->singleItemPrice ?? $draft->price,
+            'bundle_quantity' => $draft->bundleOffer?->quantity,
+            'bundle_total_price' => $draft->bundleOffer?->totalPrice,
+            'promotion_starts_at' => $draft->promotionWindow?->startsAt?->utc(),
+            'promotion_ends_at' => $draft->promotionWindow?->endsAt->utc(),
+            'promotion_label' => $draft->promotionWindow?->label,
             'current_in_stock' => $draft->inStock,
             'last_checked_at' => now(),
             'last_success_at' => now(),

@@ -4,12 +4,14 @@ namespace App\Jobs;
 
 use App\Actions\Drops\DetectTargetPrice;
 use App\Actions\Drops\DetectUnitPriceTarget;
+use App\Actions\Shops\ResolvedBundlePricing;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Models\PriceCheck;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
+use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\ConditionalOffer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
@@ -56,6 +58,29 @@ use Throwable;
  *   - consecutive_failures >= dead_after           → health=dead, active=false
  *   - consecutive_5xx_failures >= failing_5xx_after → health=failing
  *   - consecutive_5xx_failures >= dead_5xx_after    → health=dead, active=false
+ *
+ * @phpstan-type CheckOutcome array{
+ *   status: ScrapeStatus,
+ *   price: ?string,
+ *   single_item_price: ?string,
+ *   bundle_offer: ?BundleOffer,
+ *   bundle_offer_authoritative: bool,
+ *   currency: ?string,
+ *   in_stock: ?bool,
+ *   image_url: ?string,
+ *   gtin: ?string,
+ *   gtin_authoritative: bool,
+ *   raw: ?string,
+ *   error: ?string,
+ *   adapter_key: ?string,
+ *   fetch_result: ?FetchResult,
+ *   pack_size: ?PackSize,
+ *   pack_size_authoritative: bool,
+ *   conditional_offer: ?ConditionalOffer,
+ *   conditional_offer_authoritative: bool,
+ *   promotion_window: ?PromotionWindow,
+ *   promotion_window_authoritative: bool
+ * }
  */
 class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 {
@@ -101,14 +126,28 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
     public int $timeout = 30;
 
-    public function __construct(public Shop $shop) {}
+    /**
+     * Lock-key scope per origin, indexed by `(int) $manual`. A scope rather
+     * than a flag in the key so the two never share a lock.
+     */
+    private const array LOCK_SCOPES = ['auto', 'manual'];
+
+    public function __construct(public Shop $shop, public bool $manual = false) {}
 
     public function uniqueId(): string
     {
-        // Including url_hash lets a manual URL change in the Filament edit_url
-        // action queue an immediate recheck even when an automated recheck is
-        // still holding the long uniqueness window — the new URL is a new key.
-        return "check-shop:{$this->shop->id}:{$this->shop->url_hash}";
+        // Including url_hash keeps a recheck of a repointed offer out of the
+        // long uniqueness window an automated recheck may still hold — the new
+        // URL is a new key.
+        //
+        // A person-initiated run is keyed apart from the automated one. It
+        // takes no lock, because a sync dispatch never acquires one, but
+        // `CallQueuedHandler` force-releases the key when the job finishes.
+        // On a shared key that unlocks the offer's queued recheck, and the
+        // next scheduler tick queues a second check for the same offer.
+        $scope = self::LOCK_SCOPES[(int) $this->manual];
+
+        return "check-shop:{$this->shop->id}:{$this->shop->url_hash}:{$scope}";
     }
 
     public function uniqueFor(): int
@@ -177,25 +216,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      * miss maps to `EmptyMatch` so a delisted product walks the existing
      * failure counters into `failing` / `dead`.
      *
-     * @return array{
-     *   status: ScrapeStatus,
-     *   price: ?string,
-     *   currency: ?string,
-     *   in_stock: ?bool,
-     *   image_url: ?string,
-     *   gtin: ?string,
-     *   gtin_authoritative: bool,
-     *   raw: ?string,
-     *   error: ?string,
-     *   adapter_key: ?string,
-     *   fetch_result: ?FetchResult,
-     *   pack_size: ?PackSize,
-     *   pack_size_authoritative: bool,
-     *   conditional_offer: ?ConditionalOffer,
-     *   conditional_offer_authoritative: bool,
-     *   promotion_window: ?PromotionWindow,
-     *   promotion_window_authoritative: bool,
-     * }
+     * @return CheckOutcome
      */
     private function checkjebonOutcome(Shop $shop, CheckjebonSource $checkjebon): array
     {
@@ -206,6 +227,9 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             return [
                 'status' => ScrapeStatus::EmptyMatch,
                 'price' => null,
+                'single_item_price' => null,
+                'bundle_offer' => null,
+                'bundle_offer_authoritative' => false,
                 'currency' => null,
                 'in_stock' => null,
                 'image_url' => null,
@@ -228,31 +252,16 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * @return array{
-     *   status: ScrapeStatus,
-     *   price: ?string,
-     *   currency: ?string,
-     *   in_stock: ?bool,
-     *   image_url: ?string,
-     *   gtin: ?string,
-     *   gtin_authoritative: bool,
-     *   raw: ?string,
-     *   error: ?string,
-     *   adapter_key: ?string,
-     *   fetch_result: ?FetchResult,
-     *   pack_size: ?PackSize,
-     *   pack_size_authoritative: bool,
-     *   conditional_offer: ?ConditionalOffer,
-     *   conditional_offer_authoritative: bool,
-     *   promotion_window: ?PromotionWindow,
-     *   promotion_window_authoritative: bool,
-     * }
+     * @return CheckOutcome
      */
     private function sourceOutcome(ShopSnapshot $snapshot, string $adapterKey): array
     {
         return [
             'status' => ScrapeStatus::Ok,
             'price' => $snapshot->price,
+            'single_item_price' => $snapshot->price,
+            'bundle_offer' => $snapshot->bundleOffer,
+            'bundle_offer_authoritative' => $snapshot->bundleOfferAuthoritative,
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
             'image_url' => ImageUrl::safe($snapshot->imageUrl),
@@ -275,25 +284,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      * Network-side: fetch HTML + run adapter chain. Returns a classified
      * outcome with everything `persist()` needs.
      *
-     * @return array{
-     *   status: ScrapeStatus,
-     *   price: ?string,
-     *   currency: ?string,
-     *   in_stock: ?bool,
-     *   image_url: ?string,
-     *   gtin: ?string,
-     *   gtin_authoritative: bool,
-     *   raw: ?string,
-     *   error: ?string,
-     *   adapter_key: ?string,
-     *   fetch_result: ?FetchResult,
-     *   pack_size: ?PackSize,
-     *   pack_size_authoritative: bool,
-     *   conditional_offer: ?ConditionalOffer,
-     *   conditional_offer_authoritative: bool,
-     *   promotion_window: ?PromotionWindow,
-     *   promotion_window_authoritative: bool,
-     * }
+     * @return CheckOutcome
      */
     private function fetchAndExtract(Shop $shop, ShopFetcher $fetcher, AdapterResolver $resolver): array
     {
@@ -333,6 +324,9 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             return [
                 'status' => ScrapeStatus::ParseError,
                 'price' => null,
+                'single_item_price' => null,
+                'bundle_offer' => null,
+                'bundle_offer_authoritative' => false,
                 'currency' => null,
                 'in_stock' => null,
                 'image_url' => null,
@@ -357,6 +351,9 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         return [
             'status' => ScrapeStatus::Ok,
             'price' => $snapshot->price,
+            'single_item_price' => $snapshot->price,
+            'bundle_offer' => $snapshot->bundleOffer,
+            'bundle_offer_authoritative' => $snapshot->bundleOfferAuthoritative,
             'currency' => $snapshot->currency,
             'in_stock' => $snapshot->inStock,
             'image_url' => ImageUrl::absolute($snapshot->imageUrl, $fetch->finalUrl),
@@ -378,25 +375,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * @return array{
-     *   status: ScrapeStatus,
-     *   price: ?string,
-     *   currency: ?string,
-     *   in_stock: ?bool,
-     *   image_url: ?string,
-     *   gtin: ?string,
-     *   gtin_authoritative: bool,
-     *   raw: ?string,
-     *   error: ?string,
-     *   adapter_key: ?string,
-     *   fetch_result: ?FetchResult,
-     *   pack_size: ?PackSize,
-     *   pack_size_authoritative: bool,
-     *   conditional_offer: ?ConditionalOffer,
-     *   conditional_offer_authoritative: bool,
-     *   promotion_window: ?PromotionWindow,
-     *   promotion_window_authoritative: bool,
-     * }
+     * @return CheckOutcome
      */
     private function failureOutcome(FetchException $e): array
     {
@@ -409,6 +388,9 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         return [
             'status' => $status,
             'price' => null,
+            'single_item_price' => null,
+            'bundle_offer' => null,
+            'bundle_offer_authoritative' => false,
             'currency' => null,
             'in_stock' => null,
             'image_url' => null,
@@ -428,31 +410,16 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * @return array{
-     *   status: ScrapeStatus,
-     *   price: ?string,
-     *   currency: ?string,
-     *   in_stock: ?bool,
-     *   image_url: ?string,
-     *   gtin: ?string,
-     *   gtin_authoritative: bool,
-     *   raw: ?string,
-     *   error: ?string,
-     *   adapter_key: ?string,
-     *   fetch_result: ?FetchResult,
-     *   pack_size: ?PackSize,
-     *   pack_size_authoritative: bool,
-     *   conditional_offer: ?ConditionalOffer,
-     *   conditional_offer_authoritative: bool,
-     *   promotion_window: ?PromotionWindow,
-     *   promotion_window_authoritative: bool,
-     * }
+     * @return CheckOutcome
      */
     private function genericFailure(string $message): array
     {
         return [
             'status' => ScrapeStatus::HttpError,
             'price' => null,
+            'single_item_price' => null,
+            'bundle_offer' => null,
+            'bundle_offer_authoritative' => false,
             'currency' => null,
             'in_stock' => null,
             'image_url' => null,
@@ -475,25 +442,7 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      * Persist the price_check row + offer state + invoke recompute, all under
      * one transaction with offer→product lock order.
      *
-     * @param  array{
-     *   status: ScrapeStatus,
-     *   price: ?string,
-     *   currency: ?string,
-     *   in_stock: ?bool,
-     *   image_url: ?string,
-     *   gtin: ?string,
-     *   gtin_authoritative: bool,
-     *   raw: ?string,
-     *   error: ?string,
-     *   adapter_key: ?string,
-     *   fetch_result: ?FetchResult,
-     *   pack_size: ?PackSize,
-     *   pack_size_authoritative: bool,
-     *   conditional_offer: ?ConditionalOffer,
-     *   conditional_offer_authoritative: bool,
-     *   promotion_window: ?PromotionWindow,
-     *   promotion_window_authoritative: bool,
-     * }  $outcome
+     * @param  CheckOutcome  $outcome
      */
     private function persist(Shop $shop, array $outcome): void
     {
@@ -528,21 +477,18 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             // above has already read the raw value.
             $storedCurrency = Iso4217::normalize($reported);
 
-            $check = PriceCheck::create([
-                'shop_id' => $locked->id,
-                'price' => $outcome['price'],
-                'currency' => $storedCurrency,
-                'in_stock' => $outcome['in_stock'],
-                'status' => $status,
-                'error' => $outcome['error'],
-                'checked_at' => $now,
-            ]);
-
             $updates = ['last_checked_at' => $now, 'last_status' => $status];
+            $pricing = ResolvedBundlePricing::merge(
+                shop: $locked,
+                singleItemPrice: $outcome['single_item_price'],
+                offer: $outcome['bundle_offer'],
+                offerAuthoritative: $outcome['bundle_offer_authoritative'],
+                reportedWindow: $outcome['promotion_window'],
+                windowAuthoritative: $outcome['promotion_window_authoritative'],
+            );
 
             if ($status === ScrapeStatus::Ok) {
-                $updates += [
-                    'current_price' => $outcome['price'],
+                $updates += $pricing->shopUpdates() + [
                     // Unknown stays unknown: coercing it to true is what
                     // reported a sold-out product as available.
                     'current_in_stock' => $outcome['in_stock'],
@@ -593,16 +539,10 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 // leaves it alone.
                 // Same clearing rule again: a source that reads promotion
                 // fields and finds none ends the promotion on screen.
-                $window = $outcome['promotion_window'];
-                if ($window !== null || $outcome['promotion_window_authoritative']) {
-                    // Stored in UTC, the app's timezone. Eloquent writes a
-                    // date by formatting it, which prints the wall clock of
-                    // whatever zone it carries — an Amsterdam 23:59:59 would
-                    // land in the column as 23:59:59 UTC, two hours late.
-                    $updates['promotion_starts_at'] = $window?->startsAt?->utc();
-                    $updates['promotion_ends_at'] = $window?->endsAt->utc();
-                    $updates['promotion_label'] = $window?->label;
-                }
+                $updates += $pricing->promotionUpdates(
+                    $outcome['promotion_window'],
+                    $outcome['promotion_window_authoritative'],
+                );
 
                 $offer = $outcome['conditional_offer'];
                 if ($offer !== null || $outcome['conditional_offer_authoritative']) {
@@ -613,12 +553,25 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 }
             } else {
                 $updates['last_error'] = $outcome['error'];
+                $updates += ResolvedBundlePricing::expiredFailureUpdates($locked);
 
                 $counters = $this->incrementCountersFor($locked, $status);
                 $updates += $counters;
 
                 $updates += $this->healthTransitionsFor($counters);
             }
+
+            $check = PriceCheck::create($pricing->priceCheckAttributes(
+                $status === ScrapeStatus::Ok,
+                $outcome['price'],
+            ) + [
+                'shop_id' => $locked->id,
+                'currency' => $storedCurrency,
+                'in_stock' => $outcome['in_stock'],
+                'status' => $status,
+                'error' => $outcome['error'],
+                'checked_at' => $now,
+            ]);
 
             $locked->forceFill($updates)->save();
 

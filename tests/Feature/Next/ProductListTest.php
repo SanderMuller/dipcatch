@@ -120,3 +120,21 @@ it('shows the cheapest price and the shop count', function (): void {
         ->assertSee('€12.49')
         ->assertSee('2');
 });
+
+it('discloses bundle quantity beside the effective price', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'cheapest_price' => '2.00']);
+    $shop = Shop::factory()->for($product)->create([
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertSee('2 for €4.00')
+        ->assertSee('Single item €2.85');
+});

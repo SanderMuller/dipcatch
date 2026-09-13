@@ -6,6 +6,7 @@ use App\Enums\ShopHealth;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
+use App\Support\BundlePriceLabel;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Contracts\View\View;
@@ -36,14 +37,16 @@ final class PublicProductController extends Controller
 
         /** @var EloquentCollection<int, Shop> $shops */
         $shops = $product->shops()
-            ->select(['id', 'product_id', 'host', 'current_price', 'current_in_stock', 'currency', 'last_checked_at', 'url', 'pack_quantity', 'pack_unit'])
+            ->select(['id', 'product_id', 'host', 'current_price', 'single_item_price', 'bundle_quantity', 'bundle_total_price', 'promotion_starts_at', 'promotion_ends_at', 'promotion_label', 'current_in_stock', 'currency', 'last_checked_at', 'url', 'pack_quantity', 'pack_unit'])
             ->where('active', true)
             ->where(fn (EloquentBuilder $stock): EloquentBuilder => $stock
                 ->where('current_in_stock', true)
                 ->orWhereNull('current_in_stock'))
             ->where('health', '!=', ShopHealth::Dead->value)
+            ->where('currency', $product->currency)
             ->whereNotNull('current_price')
-            ->orderBy('current_price')
+            ->orderBy('current_price')->oldest()
+            ->orderBy('id')
             ->get();
 
         $chart = $this->chartPayload($product);
@@ -65,7 +68,7 @@ final class PublicProductController extends Controller
      * contributes two points (started_at, ended_at) so the line steps when
      * the cheapest shop changes; the open segment's right edge is "now".
      *
-     * @return list<array{x: string, y: string|null}>
+     * @return list<array{x: string, y: string|null, bundle: ?string}>
      */
     private function chartPayload(Product $product): array
     {
@@ -73,7 +76,7 @@ final class PublicProductController extends Controller
 
         /** @var EloquentCollection<int, ProductCheapestHistory> $segments */
         $segments = ProductCheapestHistory::query()
-            ->select(['cheapest_price', 'started_at', 'ended_at'])
+            ->select(['cheapest_price', 'single_item_price', 'bundle_quantity', 'bundle_total_price', 'started_at', 'ended_at'])
             ->where('product_id', $product->id)
             ->overlapping($cutoff)
             ->inOrder()
@@ -88,8 +91,9 @@ final class PublicProductController extends Controller
             // clip its left edge to the cutoff. The heading above the canvas
             // promises 90 days and the time axis has no floor of its own.
             $started = $segment->started_at->max($cutoff);
-            $points[] = ['x' => $started->toIso8601String(), 'y' => $price];
-            $points[] = ['x' => $ended->toIso8601String(), 'y' => $price];
+            $bundle = BundlePriceLabel::forHistory($segment, $product->currency);
+            $points[] = ['x' => $started->toIso8601String(), 'y' => $price, 'bundle' => $bundle];
+            $points[] = ['x' => $ended->toIso8601String(), 'y' => $price, 'bundle' => $bundle];
         }
 
         return $points;
