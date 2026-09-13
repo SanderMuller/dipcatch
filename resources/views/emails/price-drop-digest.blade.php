@@ -38,6 +38,9 @@ Your tracked prices changed:
 <tr>
 <td style="padding: 0 0 12px; color: #18181b; line-height: 1.2;">
 <span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::format($event->new_price, $event->currency) }}</span>
+@if ($bundle !== null && $singleItemPrice !== null)
+<del title="Regular price" style="margin-left: 8px; color: #a1a1aa; font-size: 16px;">{{ \App\Support\MoneyFormatter::format($singleItemPrice, $event->currency) }}</del>
+@endif
 <span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; white-space: nowrap;">↓ {{ number_format((float) $event->drop_pct, 1, '.', '') }}% · {{ \App\Support\MoneyFormatter::format($event->drop_abs, $event->currency) }}</span>
 </td>
 </tr>
@@ -47,7 +50,7 @@ Your tracked prices changed:
 <span style="display: inline-block; margin-right: 7px; padding: 2px 7px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;">Deal</span>
 <strong>{{ \App\Support\BundlePriceLabel::condition($bundle, $event->currency) }}</strong>
 @if ($singleItemPrice !== null)
-<span style="color: #71717a;"> · Normal price: {{ \App\Support\MoneyFormatter::format($singleItemPrice, $event->currency) }} each</span>
+<span style="color: #71717a;"> · Normal price: <del title="Regular price">{{ \App\Support\MoneyFormatter::format($singleItemPrice, $event->currency) }}</del> each</span>
 @endif
 </td>
 </tr>

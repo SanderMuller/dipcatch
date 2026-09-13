@@ -102,7 +102,7 @@
             <div class="p-5">
                 <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Cheapest now') }}</dt>
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
-                    {{ \App\Support\MoneyFormatter::format($product->cheapest_price === null ? null : (string) $product->cheapest_price, $product->currency) }}
+                    <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
                 </dd>
                 @if ($product->cheapestShop)
                     <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
@@ -116,7 +116,7 @@
                 <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Best value') }}</dt>
                 @php($bestValueShop = $product->bestValueShop())
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
-                    {{ \App\Livewire\Products\ProductList::unitPriceState($bestValueShop, $product) }}
+                    <x-shop-price :shop="$bestValueShop" unit />
                 </dd>
                 @if ($bestValueShop)
                     <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
@@ -183,7 +183,7 @@
                                 </flux:table.cell>
                                 <flux:table.cell class="align-top tabular-nums">
                                     <p class="text-base font-medium text-zinc-900 sm:text-sm dark:text-zinc-100">
-                                        {{ \App\Support\MoneyFormatter::format($shop->current_price === null ? null : (string) $shop->current_price, $shop->currency) }}
+                                        <x-shop-price :shop="$shop" />
                                     </p>
                                     {{-- A price that is only good until a date says so, or the
                                          number reads as permanent when it is not. --}}
@@ -197,7 +197,7 @@
                                         </flux:text>
                                     @endif
                                     <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-zinc-500 sm:text-sm @4xl:hidden dark:text-zinc-400">
-                                        <span>{{ \App\Livewire\Products\ProductList::unitPriceState($shop, $product) }}</span>
+                                        <x-shop-price :shop="$shop" unit />
                                         <span aria-hidden="true">·</span>
                                         @if ($shop->current_in_stock === true)
                                             <flux:badge size="sm" color="green">{{ __('In stock') }}</flux:badge>
@@ -211,7 +211,7 @@
                                     </div>
                                 </flux:table.cell>
                                 <flux:table.cell class="hidden tabular-nums @4xl:table-cell">
-                                    {{ \App\Livewire\Products\ProductList::unitPriceState($shop, $product) }}
+                                    <x-shop-price :shop="$shop" unit />
                                 </flux:table.cell>
                                 <flux:table.cell class="hidden @4xl:table-cell">
                                     @if ($shop->current_in_stock === true)

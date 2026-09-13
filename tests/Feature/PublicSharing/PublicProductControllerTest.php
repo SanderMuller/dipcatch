@@ -51,6 +51,8 @@ test('bundle price always shows quantity total and single-item price', function 
         'bundle_quantity' => 2,
         'bundle_total_price' => '4.00',
         'currency' => 'EUR',
+        'pack_quantity' => '1500',
+        'pack_unit' => 'ml',
     ]);
 
     $this->get('/p/' . str_repeat('a', 32))
@@ -58,6 +60,8 @@ test('bundle price always shows quantity total and single-item price', function 
         ->assertSeeInOrder(['€2.00', '2 for €4.00', 'Cheapest across'], escape: false)
         ->assertSee('2 for €4.00', escape: false)
         ->assertSee('or €2.85 each', escape: false)
+        ->assertSee('title="Regular price"', escape: false)
+        ->assertSeeText('€1.90 /l')
         ->assertSee('Tracked on DipCatch: cheapest at €2.00 · 2 for €4.00 · or €2.85 each', escape: false);
 });
 

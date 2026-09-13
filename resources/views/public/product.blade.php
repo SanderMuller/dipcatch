@@ -92,7 +92,7 @@
                 </h1>
 
                 @if ($priceLine !== null)
-                    <p class="mt-3 text-3xl font-bold tabular-nums">{{ $priceLine }}</p>
+                    <p class="mt-3 text-3xl font-bold tabular-nums"><x-shop-price :shop="$headlineShop" /></p>
                     @if ($headlineBundleLabel !== null)
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $headlineBundleLabel }}</p>
                     @endif
@@ -198,7 +198,7 @@
                                 <div class="w-full text-left sm:w-auto sm:text-right">
                                     <div class="flex items-center justify-start gap-1 sm:justify-end">
                                         <p class="text-sm font-semibold tabular-nums">
-                                            {{ MoneyFormatter::format((string) $shop->current_price, $shop->currency) }}
+                                            <x-shop-price :shop="$shop" />
                                         </p>
                                         <svg viewBox="0 0 16 16" fill="none" class="size-4 text-zinc-400" aria-hidden="true">
                                             <path d="M6 12l4-4-4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -212,7 +212,7 @@
                                     @endphp
                                     @if ($shopUnitPrice !== null)
                                         <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-                                            {{ MoneyFormatter::format($shopUnitPrice, $shop->currency) }} {{ $shop->unitPriceLabel() }}
+                                            <x-shop-price :shop="$shop" unit />
                                         </p>
                                     @endif
                                 </div>

@@ -47,11 +47,18 @@ test('a promotion that has not started says from when, never ended', function ()
     [$user, $product] = seedShopWith([
         'promotion_starts_at' => now()->addDays(3),
         'promotion_ends_at' => now()->addDays(9),
+        'promotion_label' => '2 voor 4.00',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'current_price' => '2.69',
+        'single_item_price' => '2.69',
     ]);
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->assertSeeText('Offer period:')
+        ->assertSeeText('Upcoming deal')
+        ->assertSeeText('2 for €4.00')
+        ->assertSeeText('Normal price: €2.69 each')
         ->assertSeeText('from ' . now()->addDays(3)->setTimezone('Europe/Amsterdam')->format('j M'))
         ->assertDontSeeText('ended');
 });

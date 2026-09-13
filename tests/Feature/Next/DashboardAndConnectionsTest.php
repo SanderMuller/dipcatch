@@ -103,12 +103,20 @@ it('shows zero savings rather than nothing for a new account', function (): void
 
 it('discloses bundle terms beside dashboard effective prices', function (): void {
     $user = User::factory()->create();
-    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'cheapest_price' => '2.00']);
+    $product = Product::factory()->for($user)->create([
+        'currency' => 'EUR',
+        'cheapest_price' => '2.00',
+        'last_notified_price' => '2.75',
+        'last_notified_at' => now(),
+    ]);
     $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/producten/fanta-cassis',
         'current_price' => '2.00',
         'single_item_price' => '2.85',
         'bundle_quantity' => 2,
         'bundle_total_price' => '4.00',
+        'pack_quantity' => '1500',
+        'pack_unit' => 'ml',
     ]);
     $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
 
@@ -116,7 +124,11 @@ it('discloses bundle terms beside dashboard effective prices', function (): void
 
     livewire(Dashboard::class)
         ->assertSee('2 for €4.00')
-        ->assertSee('or €2.85 each');
+        ->assertSeeText('Normal price: €2.85 each')
+        ->assertSee('title="Regular price"', escape: false)
+        ->assertSeeText('€1.90 /l')
+        ->assertSeeHtml('href="https://jumbo.com/producten/fanta-cassis"')
+        ->assertSeeHtml('target="_blank"');
 });
 
 it('shows the mcp endpoint and an empty connection list', function (): void {

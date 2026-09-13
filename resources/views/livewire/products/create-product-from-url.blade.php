@@ -45,10 +45,27 @@
         @php
             $previewPackSize = $this->snapshotPackSize();
             $previewUnitPrice = null;
+            $previewRegularPrice = is_string($snapshot['single_item_price'] ?? null) ? $snapshot['single_item_price'] : null;
+            $previewRegularUnitPrice = null;
+            $bundleLabel = \App\Support\BundlePriceLabel::forSnapshot($snapshot);
+            $bundleQuantity = $snapshot['bundle_quantity'] ?? null;
+            $bundleTotalPrice = $snapshot['bundle_total_price'] ?? null;
+            $hasLivePreviewBundle = $bundleLabel !== null
+                && is_int($bundleQuantity)
+                && $bundleQuantity > 0
+                && is_string($bundleTotalPrice)
+                && is_string($snapshot['price'] ?? null)
+                && bccomp($snapshot['price'], bcdiv($bundleTotalPrice, (string) $bundleQuantity, 2), 2) === 0;
             if ($previewPackSize !== null && is_string($snapshot['price'] ?? null)) {
                 $previewUnitPriceValue = $previewPackSize->unitPriceFor($snapshot['price']);
                 if ($previewUnitPriceValue !== null) {
                     $previewUnitPrice = \App\Support\MoneyFormatter::format($previewUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
+                }
+                if ($previewRegularPrice !== null) {
+                    $previewRegularUnitPriceValue = $previewPackSize->unitPriceFor($previewRegularPrice);
+                    if ($previewRegularUnitPriceValue !== null) {
+                        $previewRegularUnitPrice = \App\Support\MoneyFormatter::format($previewRegularUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
+                    }
                 }
             }
         @endphp
@@ -72,17 +89,27 @@
                     </div>
                     <div class="mt-1 text-lg font-semibold tabular-nums">
                         {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
+                        @if ($hasLivePreviewBundle)
+                            @if ($previewRegularPrice !== null)
+                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
+                            @endif
+                        @endif
                         @if (($snapshot['in_stock'] ?? null) === false)
                             <flux:badge color="amber" size="sm" class="ms-2">Out of stock</flux:badge>
                         @elseif (($snapshot['in_stock'] ?? null) === null)
                             <flux:badge color="zinc" size="sm" class="ms-2">Stock unknown</flux:badge>
                         @endif
                     </div>
-                    @if ($bundleLabel = \App\Support\BundlePriceLabel::forSnapshot($snapshot))
+                    @if ($bundleLabel)
                         <flux:text size="sm" class="mt-1 text-zinc-500">{{ $bundleLabel }}</flux:text>
                     @endif
                     @if ($previewUnitPrice !== null)
-                        <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500">{{ $previewUnitPrice }}</flux:text>
+                        <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500">
+                            {{ $previewUnitPrice }}
+                            @if ($hasLivePreviewBundle && $previewRegularUnitPrice !== null)
+                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ $previewRegularUnitPrice }}</del>
+                            @endif
+                        </flux:text>
                     @endif
                     @if ($adapterKey === 'user-selector')
                         <flux:text size="sm" class="mt-1 text-zinc-500">Extracted via manual selector.</flux:text>

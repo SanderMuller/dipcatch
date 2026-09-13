@@ -129,6 +129,8 @@ it('discloses bundle quantity beside the effective price', function (): void {
         'single_item_price' => '2.85',
         'bundle_quantity' => 2,
         'bundle_total_price' => '4.00',
+        'pack_quantity' => '1500',
+        'pack_unit' => 'ml',
     ]);
     $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
 
@@ -136,5 +138,7 @@ it('discloses bundle quantity beside the effective price', function (): void {
 
     livewire(ProductList::class)
         ->assertSee('2 for €4.00')
-        ->assertSee('or €2.85 each');
+        ->assertSee('or €2.85 each')
+        ->assertSee('title="Regular price"', escape: false)
+        ->assertSeeText('€1.90 /l');
 });

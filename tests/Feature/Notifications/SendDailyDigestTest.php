@@ -224,7 +224,9 @@ test('digest reads bundle terms from protected triggering check', function (): v
 
     expect($html)->toContain('2 for €4.00')
         ->and($html)->toContain('Deal')
-        ->and($html)->toContain('Normal price: €2.85 each')
+        ->and($html)->toContain('Normal price:')
+        ->and($html)->toContain('€2.85')
+        ->and($html)->toContain('<del title="Regular price"')
         ->and($html)->not->toContain('or €2.85 each');
 });
 

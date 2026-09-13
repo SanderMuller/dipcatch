@@ -65,7 +65,8 @@ it('discloses bundle terms in notification rows', function (): void {
 
     livewire(Bell::class)
         ->assertSee('2 for €4.00')
-        ->assertSee('or €2.85 each');
+        ->assertSee('or €2.85 each')
+        ->assertSee('title="Regular price"', escape: false);
 });
 
 it('counts only unread notifications', function (): void {

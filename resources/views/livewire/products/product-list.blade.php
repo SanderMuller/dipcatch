@@ -68,7 +68,7 @@
                                      md: hides, so a phone row carries them here instead
                                      of losing them. --}}
                                 <flux:text size="sm" class="text-zinc-500 md:hidden">
-                                    {{ \App\Livewire\Products\ProductList::unitPriceState($product->cheapestShop, $product) }}
+                                    <x-shop-price :shop="$product->cheapestShop" unit />
                                     · {{ trans_choice(':count shop|:count shops', $product->shops_count, ['count' => $product->shops_count]) }}
                                 </flux:text>
                             </div>
@@ -76,7 +76,7 @@
                     </flux:table.cell>
                     <flux:table.cell class="tabular-nums">
                         <flux:text class="font-medium">
-                            {{ \App\Support\MoneyFormatter::format($product->cheapest_price === null ? null : (string) $product->cheapest_price, $product->currency) }}
+                            <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
                         </flux:text>
                         @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
                             <flux:text size="sm" class="text-zinc-500">{{ $bundleLabel }}</flux:text>
@@ -87,11 +87,11 @@
                         @endif
                     </flux:table.cell>
                     <flux:table.cell class="hidden tabular-nums md:table-cell">
-                        {{ \App\Livewire\Products\ProductList::unitPriceState($product->cheapestShop, $product) }}
+                        <x-shop-price :shop="$product->cheapestShop" unit />
                     </flux:table.cell>
                     <flux:table.cell class="hidden tabular-nums md:table-cell">
                         @php($bestValueShop = $product->bestValueShop())
-                        {{ \App\Livewire\Products\ProductList::unitPriceState($bestValueShop, $product) }}
+                        <x-shop-price :shop="$bestValueShop" unit />
                         @php($bestBundle = \App\Support\BundlePriceLabel::forShop($bestValueShop))
                         @php($best = $bestBundle === null ? \App\Support\PromotionLabel::withHost($bestValueShop) : $bestValueShop?->host . ' · ' . $bestBundle)
                         @if ($best)

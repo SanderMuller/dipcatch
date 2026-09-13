@@ -83,7 +83,7 @@
                                 <div class="min-w-0">
                                     <flux:text class="truncate font-medium">{{ Str::limit($product->title, 40) }}</flux:text>
                                     <flux:text size="sm" class="truncate text-zinc-500 tabular-nums">
-                                        {{ \App\Support\MoneyFormatter::format($product->cheapest_price === null ? null : (string) $product->cheapest_price, $product->currency) }}
+                                        <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
                                         @if ($product->cheapestShop)
                                             · {{ $product->cheapestShop->host }}
                                         @endif
@@ -122,26 +122,31 @@
                         </flux:table.cell>
                         <flux:table.cell class="tabular-nums">
                             <flux:text class="font-medium text-emerald-600 dark:text-emerald-400">
-                                {{ \App\Support\MoneyFormatter::format($product->cheapest_price === null ? null : (string) $product->cheapest_price, $product->currency) }}
+                                <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
                             </flux:text>
-                            @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
-                                <flux:text size="sm" class="text-zinc-500">{{ $bundleLabel }}</flux:text>
+                            @if ($product->cheapestShop)
+                                <x-shop-deal :shop="$product->cheapestShop" :show-source="false" class="mt-2 min-w-52 max-w-sm whitespace-normal" />
                             @endif
                         </flux:table.cell>
                         <flux:table.cell class="hidden tabular-nums md:table-cell">
                             @php($bestValueShop = $product->bestValueShop())
-                            {{ \App\Livewire\Products\ProductList::unitPriceState($bestValueShop, $product) }}
-                            @php($bestBundleLabel = \App\Support\BundlePriceLabel::forShop($bestValueShop))
-                            @php($bestLabel = $bestBundleLabel === null ? \App\Support\PromotionLabel::withHost($bestValueShop) : $bestValueShop?->host . ' · ' . $bestBundleLabel)
-                            @if ($bestLabel)
-                                <flux:text size="sm" class="text-zinc-500">{{ $bestLabel }}</flux:text>
+                            <p class="font-medium text-zinc-900 dark:text-zinc-100">
+                                <x-shop-price :shop="$bestValueShop" unit />
+                            </p>
+                            @if ($bestValueShop)
+                                <div class="mt-1 text-zinc-500 dark:text-zinc-400">
+                                    <x-shop-link :shop="$bestValueShop" />
+                                </div>
+                                <x-shop-deal :shop="$bestValueShop" :show-source="false" class="mt-2 min-w-52 max-w-sm whitespace-normal" />
                             @endif
                         </flux:table.cell>
                         <flux:table.cell class="hidden tabular-nums text-zinc-500 md:table-cell">
                             {{ \App\Support\MoneyFormatter::format($product->last_notified_price === null ? null : (string) $product->last_notified_price, $product->currency) }}
                         </flux:table.cell>
                         <flux:table.cell class="hidden md:table-cell">
-                            @if ($product->cheapestShop) {!! \App\Support\Favicon::html($product->cheapestShop->host) !!} @endif
+                            @if ($product->cheapestShop)
+                                <x-shop-link :shop="$product->cheapestShop" />
+                            @endif
                         </flux:table.cell>
                     </flux:table.row>
                 @empty

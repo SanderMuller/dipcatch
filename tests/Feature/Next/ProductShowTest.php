@@ -57,8 +57,8 @@ it('discloses bundle terms in headline and shop row', function (): void {
         'bundle_total_price' => '4.00',
         'promotion_ends_at' => now()->addDays(2),
         'promotion_label' => '2 voor 4,00',
-        'pack_quantity' => 1,
-        'pack_unit' => 'piece',
+        'pack_quantity' => '1500',
+        'pack_unit' => 'ml',
     ]);
     $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
 
@@ -66,7 +66,9 @@ it('discloses bundle terms in headline and shop row', function (): void {
 
     $component = livewire(ProductShow::class, ['product' => $product])
         ->assertSee('2 for €4.00')
-        ->assertSee('Normal price: €2.85 each')
+        ->assertSeeText('Normal price: €2.85 each')
+        ->assertSee('title="Regular price"', escape: false)
+        ->assertSeeText('€1.90 /l')
         ->assertSee('Shop page:')
         ->assertSee('2 voor 4,00');
 
