@@ -28,7 +28,10 @@ test('still succeeds without a pack size when the payload is missing', function 
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->price)->toBe('1.99')
         ->and($result->snapshot?->packSize)->toBeNull()
-        ->and($result->snapshot?->packSizeAuthoritative)->toBeFalse();
+        ->and($result->snapshot?->packSizeAuthoritative)->toBeFalse()
+        // Lidl's JSON-LD states no period, so its authority claim must not
+        // survive to clear a promotion an earlier check read.
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeFalse();
 });
 
 test('fails with a lidl-specific reason when the page has no JSON-LD', function (): void {

@@ -46,10 +46,7 @@ final readonly class SparAdapter implements HostSpecificAdapter, ShopAdapter
             return $result;
         }
 
-        return ExtractionResult::success($snapshot->with(
-            packSize: $packSize,
-            packSizeAuthoritative: true,
-        ));
+        return ExtractionResult::success($snapshot->withPackSize($packSize));
     }
 
     /**

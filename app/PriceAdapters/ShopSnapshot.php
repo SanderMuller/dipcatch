@@ -6,6 +6,13 @@ namespace App\PriceAdapters;
  * Successful adapter extraction. Prices are decimal strings (compatible with
  * `bccomp` + the existing `PriceCheck.price` decimal(12,2) column) — no cent
  * integers anywhere.
+ *
+ * A host adapter augments a snapshot through the `with*` copy methods, one
+ * per concept. Calling one is the claim of authority over that concept, so
+ * passing null clears the inherited value; an adapter that does not read
+ * promotion windows never calls `withPromotionWindow()`, and the inherited
+ * window survives. `withoutPromotionWindowAuthority()` is the one exception,
+ * for an adapter that must withdraw a claim it knows to be empty.
  */
 final readonly class ShopSnapshot
 {
@@ -78,45 +85,49 @@ final readonly class ShopSnapshot
         return $this->bundleOffer->isCheaperThan($this->price) ? $bundlePrice : $this->price;
     }
 
+    public function withPackSize(string $packSize): self
+    {
+        return clone($this, ['packSize' => $packSize, 'packSizeAuthoritative' => true]);
+    }
+
+    public function withPromotionWindow(?PromotionWindow $promotionWindow): self
+    {
+        return clone($this, ['promotionWindow' => $promotionWindow, 'promotionWindowAuthoritative' => true]);
+    }
+
     /**
-     * A copy with some fields replaced.
+     * Withdraw an inherited claim of promotion authority.
      *
-     * Host adapters that augment a JSON-LD snapshot used to rebuild it field
-     * by field, which silently dropped every field added to this class
-     * afterwards — two adapters had to be edited for each one.
-     *
-     * @param  array<string, mixed>|null  $raw
+     * A host adapter whose own promotion source is unavailable on this page
+     * calls this when the snapshot it augments claims authority it does not
+     * have. Without it the null window would clear a promotion that is still
+     * running — see {@see Hosts\LidlAdapter}.
      */
-    public function with(
-        ?string $packSize = null,
-        ?bool $packSizeAuthoritative = null,
-        ?PromotionWindow $promotionWindow = null,
-        ?bool $promotionWindowAuthoritative = null,
-        ?bool $inStock = null,
-        ?string $stockSignal = null,
-        ?string $currency = null,
-        ?BundleOffer $bundleOffer = null,
-        ?bool $bundleOfferAuthoritative = null,
-        ?array $raw = null,
-    ): self {
-        return new self(
-            title: $this->title,
-            imageUrl: $this->imageUrl,
-            price: $this->price,
-            currency: $currency ?? $this->currency,
-            inStock: $inStock ?? $this->inStock,
-            raw: $raw ?? $this->raw,
-            packSize: $packSize ?? $this->packSize,
-            packSizeAuthoritative: $packSizeAuthoritative ?? $this->packSizeAuthoritative,
-            gtin: $this->gtin,
-            gtinAuthoritative: $this->gtinAuthoritative,
-            conditionalOffer: $this->conditionalOffer,
-            conditionalOfferAuthoritative: $this->conditionalOfferAuthoritative,
-            promotionWindow: $promotionWindow ?? $this->promotionWindow,
-            promotionWindowAuthoritative: $promotionWindowAuthoritative ?? $this->promotionWindowAuthoritative,
-            stockSignal: $stockSignal ?? $this->stockSignal,
-            bundleOffer: $bundleOfferAuthoritative === null ? $this->bundleOffer : $bundleOffer,
-            bundleOfferAuthoritative: $bundleOfferAuthoritative ?? $this->bundleOfferAuthoritative,
-        );
+    public function withoutPromotionWindowAuthority(): self
+    {
+        return clone($this, ['promotionWindowAuthoritative' => false]);
+    }
+
+    public function withBundleOffer(?BundleOffer $bundleOffer): self
+    {
+        return clone($this, ['bundleOffer' => $bundleOffer, 'bundleOfferAuthoritative' => true]);
+    }
+
+    public function withStock(bool $inStock, string $stockSignal): self
+    {
+        return clone($this, ['inStock' => $inStock, 'stockSignal' => $stockSignal]);
+    }
+
+    public function withCurrency(string $currency): self
+    {
+        return clone($this, ['currency' => $currency]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     */
+    public function withRaw(array $raw): self
+    {
+        return clone($this, ['raw' => $raw]);
     }
 }

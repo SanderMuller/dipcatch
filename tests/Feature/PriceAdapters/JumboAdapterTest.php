@@ -202,3 +202,26 @@ test('rejects bundle dates that cannot form a promotion window and records a dia
         ->and($snapshot?->bundleOfferAuthoritative)->toBeTrue()
         ->and($snapshot?->raw['bundle_diagnostic'] ?? null)->toBe('invalid_promotion_window');
 });
+
+test('a page with no promotion block keeps the period the JSON-LD stated', function (): void {
+    $validUntil = CarbonImmutable::now()->addDays(7)->toDateString();
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => 'Milner 35+ Jong Kaas Stuk 450 g',
+        'offers' => [
+            '@type' => 'Offer',
+            'price' => '7.59',
+            'priceCurrency' => 'EUR',
+            'priceValidUntil' => $validUntil,
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $html = '<html><head><script type="application/ld+json">' . $json . '</script></head><body>'
+        . '<div class="product-panel-info">' . jumboPriceComponent('Prijs: € 7,59', '7', '59') . '</div>'
+        . '</body></html>';
+
+    $result = $this->adapter->extract('https://www.jumbo.com/producten/milner-194089STK', $html);
+
+    expect($result->snapshot?->promotionWindow?->endsAt?->toDateString())->toBe($validUntil)
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});

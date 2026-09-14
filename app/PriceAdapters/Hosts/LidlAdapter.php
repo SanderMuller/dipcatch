@@ -47,16 +47,24 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
         assert($snapshot instanceof ShopSnapshot);
 
         $data = NuxtData::decode($html);
-        $packaging = self::packagingFromNuxtPayload($html, HostUrl::lastSegmentDigits($url, 'p'));
 
-        return ExtractionResult::success($snapshot->with(
-            packSize: $packaging ?? $snapshot->packSize,
-            packSizeAuthoritative: $packaging !== null ? true : null,
-            promotionWindow: $data === null ? null : self::promotionWindow($data),
-            // The payload always carries the availability record; an offer
-            // that ended simply stops stating a period.
-            promotionWindowAuthoritative: $data !== null,
-        ));
+        // Lidl's JSON-LD states no `priceValidUntil`, so the blanket
+        // authority it claims covers nothing. Withdraw it when the payload
+        // that does carry the period is absent, or a null window clears a
+        // promotion an earlier check read from that payload.
+        if ($data === null) {
+            return ExtractionResult::success($snapshot->withoutPromotionWindowAuthority());
+        }
+
+        $packaging = self::packagingFromNuxtPayload($data, HostUrl::lastSegmentDigits($url, 'p'));
+
+        if ($packaging !== null) {
+            $snapshot = $snapshot->withPackSize($packaging);
+        }
+
+        // The payload always carries the availability record; an offer
+        // that ended simply stops stating a period.
+        return ExtractionResult::success($snapshot->withPromotionWindow(self::promotionWindow($data)));
     }
 
     /**
@@ -101,14 +109,11 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
      * The product record is the dict carrying both `productId` and `price`;
      * `productId` disambiguates when related products ride along. The chain
      * is product → price record → packaging record → `text`.
+     *
+     * @param  list<mixed>  $data
      */
-    private static function packagingFromNuxtPayload(string $html, ?string $productId): ?string
+    private static function packagingFromNuxtPayload(array $data, ?string $productId): ?string
     {
-        $data = NuxtData::decode($html);
-        if ($data === null) {
-            return null;
-        }
-
         $deref = static fn (mixed $v): mixed => is_int($v) && isset($data[$v]) ? $data[$v] : null;
 
         $fallback = null;

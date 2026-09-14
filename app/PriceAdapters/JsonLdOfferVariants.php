@@ -144,32 +144,23 @@ final readonly class JsonLdOfferVariants
      */
     private static function namedByUrl(array $offers, string $url): ?array
     {
-        $best = null;
-        $bestPrecision = 0;
-        $tied = false;
+        /** @var PrecisionRanking<array<string, mixed>> $ranking */
+        $ranking = new PrecisionRanking();
 
         foreach ($offers as $offer) {
             $offerUrl = JsonLdEntities::nonEmptyString($offer['url'] ?? null);
             $precision = $offerUrl === null ? -1 : EntityUrl::precision($offerUrl, $url);
 
-            if ($precision <= 0) {
-                continue;
-            }
-
-            if ($precision > $bestPrecision) {
-                $best = $offer;
-                $bestPrecision = $precision;
-                $tied = false;
-
-                continue;
-            }
-
-            if ($precision === $bestPrecision) {
-                $tied = true;
+            // An offer that names the page but no variant of it names
+            // nothing here: the page URL is what every offer shares.
+            if ($precision > 0) {
+                $ranking->offer($offer, $precision);
             }
         }
 
-        return $best === null || $tied ? null : [$best, $bestPrecision];
+        $winner = $ranking->winner();
+
+        return $winner === null ? null : [$winner, $ranking->bestPrecision()];
     }
 
     /**

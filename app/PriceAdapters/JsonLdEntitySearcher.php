@@ -44,11 +44,11 @@ final readonly class JsonLdEntitySearcher
      */
     public function finish(JsonLdSearchState $state): void
     {
-        if (! $state->tied) {
+        if (! $state->tied()) {
             return;
         }
 
-        foreach ($state->topMatches as $match) {
+        foreach ($state->topMatches() as $match) {
             $candidate = self::candidateFor($match[0]);
 
             if ($candidate !== null) {
@@ -70,27 +70,27 @@ final readonly class JsonLdEntitySearcher
             return;
         }
 
-        $matched = JsonLdMatch::attempt($entity, $url, $variantKey);
+        $evaluation = JsonLdMatch::evaluate($entity, $url, $variantKey);
 
-        if ($matched === null) {
+        // An entity with no usable offer answers nothing here, not even the
+        // key — {@see self::scanVariants()} rules the other way.
+        if ($evaluation->match === null) {
             $state->product ??= $entity;
 
             return;
         }
 
-        if ($variantKey !== null && JsonLdMatch::keyMatches($entity, $variantKey)) {
+        if ($evaluation->keyMatched) {
             $state->keyMatched = true;
         }
 
-        $precision = JsonLdMatch::precision($entity, $url, $variantKey);
-
-        if ($precision > 0) {
-            $state->offer($matched, $precision);
+        if ($evaluation->precision > 0) {
+            $state->offer($evaluation->match, $evaluation->precision);
 
             return;
         }
 
-        $state->namesPageOnly ??= $matched;
+        $state->namesPageOnly ??= $evaluation->match;
     }
 
     /**
@@ -119,26 +119,27 @@ final readonly class JsonLdEntitySearcher
                 continue;
             }
 
-            if ($variantKey !== null && JsonLdMatch::keyMatches($variant, $variantKey)) {
+            $evaluation = JsonLdMatch::evaluate($variant, $url, $variantKey);
+
+            // A variant answering to the key has answered it, offer or no
+            // offer — {@see self::weigh()} rules the other way.
+            if ($evaluation->keyMatched) {
                 $state->keyMatched = true;
             }
 
-            $matched = JsonLdMatch::attempt($variant, $url, $variantKey);
-            $precision = $matched === null ? -1 : JsonLdMatch::precision($variant, $url, $variantKey);
-
-            if ($matched !== null && $precision > 0) {
-                $state->offer($matched, $precision);
+            if ($evaluation->match === null) {
+                self::collect($variant, $state);
 
                 continue;
             }
 
-            if ($matched !== null) {
-                $fitsPageOnly[] = $matched;
+            if ($evaluation->precision > 0) {
+                $state->offer($evaluation->match, $evaluation->precision);
 
                 continue;
             }
 
-            self::collect($variant, $state);
+            $fitsPageOnly[] = $evaluation->match;
         }
 
         // One variant fitting the request identifies it even when its URL
