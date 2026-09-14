@@ -109,3 +109,29 @@ test('an unanswered variant question is put to the user, not answered by the CSS
     expect($answered->isSuccess())->toBeTrue()
         ->and($answered->snapshot?->price)->toBe('59.99');
 });
+
+test('a blank og:title says nothing, so the fallback name stands', function (): void {
+    $html = <<<'HTML'
+<html><head><meta property="og:title" content="   "></head><body>
+  <span class="z-product-price__amount" data-zta="reducedPriceAmount">€ 12,34</span>
+</body></html>
+HTML;
+
+    $result = $this->adapter->extract('https://www.zooplus.de/shop/foo', $html);
+
+    expect($result->snapshot?->title)->toBe('Zooplus product');
+});
+
+test('the scoped product h1 wins over og:title, and a bare h1 is not read', function (): void {
+    $html = <<<'HTML'
+<html><head><meta property="og:title" content="Og name"></head><body>
+  <h1>Related products</h1>
+  <h1 data-zta="ProductTitle__Title">Product name</h1>
+  <span class="z-product-price__amount" data-zta="reducedPriceAmount">€ 12,34</span>
+</body></html>
+HTML;
+
+    $result = $this->adapter->extract('https://www.zooplus.de/shop/foo', $html);
+
+    expect($result->snapshot?->title)->toBe('Product name');
+});
