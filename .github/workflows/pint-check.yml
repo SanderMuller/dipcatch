@@ -1,0 +1,58 @@
+name: pint-check
+
+on:
+  push:
+    paths:
+      - '**.php'
+      - 'pint.json'
+      - '.github/workflows/pint-check.yml'
+  pull_request:
+    paths:
+      - '**.php'
+      - 'pint.json'
+      - '.github/workflows/pint-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pint-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pint-check:
+    runs-on: ubuntu-latest
+    environment: Testing
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: bcmath, redis
+          coverage: none
+
+      - name: Add Flux Credentials Loaded From ENV
+        run: composer config http-basic.composer.fluxui.dev "${{ secrets.FLUX_USERNAME }}" "${{ secrets.FLUX_LICENSE_KEY }}"
+
+      - name: Install composer dependencies
+        uses: ramsey/composer-install@v4
+
+      - name: Cache Pint results
+        uses: actions/cache@v6
+        with:
+          path: .cache/pint/
+          key: pint-cache-${{ hashFiles('pint.json') }}
+          restore-keys: pint-cache-
+
+      - name: Ensure Pint cache directory exists
+        run: mkdir -p .cache/pint
+
+      - name: Run Pint (test)
+        run: vendor/bin/pint --test --parallel
