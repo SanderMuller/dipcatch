@@ -11,7 +11,7 @@ use App\Models\User;
  * authorizes `delete` against the related model, and an absent policy
  * denies everything.
  */
-class ShopPolicy
+final class ShopPolicy
 {
     public function viewAny(User $user): bool
     {

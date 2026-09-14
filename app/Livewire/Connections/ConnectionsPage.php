@@ -15,7 +15,7 @@ use Livewire\Component;
  * Without this an authorisation can only ever be granted, never withdrawn,
  * which is not a reasonable thing to ask someone to live with.
  */
-class ConnectionsPage extends Component
+final class ConnectionsPage extends Component
 {
     public function user(): User
     {

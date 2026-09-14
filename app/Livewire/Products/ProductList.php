@@ -26,7 +26,7 @@ use Livewire\WithPagination;
  * goes through `ProductPolicy`, which the resource documented as its second
  * line of defence.
  */
-class ProductList extends Component
+final class ProductList extends Component
 {
     use WithPagination;
 

@@ -8,6 +8,8 @@ use Throwable;
 /**
  * Reads a Checkout session back from Stripe. A seam, so the checkout flow
  * can be driven in tests without a network call.
+ *
+ * Not final: the suite substitutes an anonymous subclass.
  */
 class CheckoutSessions
 {

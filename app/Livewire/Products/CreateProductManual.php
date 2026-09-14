@@ -16,7 +16,7 @@ use Livewire\Component;
  * The documented fallback for a shop the scraper cannot read, so it is not an
  * admin affordance and does not disappear with the Filament panel.
  */
-class CreateProductManual extends Component
+final class CreateProductManual extends Component
 {
     public string $title = '';
 

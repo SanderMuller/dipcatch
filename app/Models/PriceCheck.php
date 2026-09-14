@@ -29,7 +29,7 @@ use InvalidArgumentException;
  */
 #[WithoutTimestamps]
 #[Unguarded]
-class PriceCheck extends Model
+final class PriceCheck extends Model
 {
     /** @use HasFactory<PriceCheckFactory> */
     use HasFactory;

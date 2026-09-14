@@ -80,6 +80,7 @@
         "phpstan/phpstan-phpunit": "^2.0.18",
         "phpstan/phpstan-strict-rules": "^2.0.12",
         "rector/rector": "^2.6.6",
+        "rector/swiss-knife": "^2.4",
         "sandermuller/boost-skills": "^2.41.0",
         "sandermuller/laravel-fluent-validation-phpstan": "^0.3.0",
         "sandermuller/laravel-fluent-validation-rector": "^1.11.1",
@@ -138,8 +139,10 @@
         "rector": "vendor/bin/rector process",
         "test-coverage": "vendor/bin/pest --coverage",
         "sync-ai": "php artisan project-boost:sync",
+        "finalize-classes": "@php -d memory_limit=2G vendor/bin/swiss-knife finalize-classes app --no-progress --skip-file app/Billing/ChargeOwnerResolver.php --skip-file app/Billing/CheckoutSessions.php --skip-file app/Billing/StripeCustomers.php",
         "qa": [
             "@rector",
+            "@finalize-classes",
             "@format",
             "@phpstan-simplified"
         ],

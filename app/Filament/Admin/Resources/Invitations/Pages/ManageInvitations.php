@@ -7,7 +7,7 @@ use App\Models\Invitation;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 
-class ManageInvitations extends ManageRecords
+final class ManageInvitations extends ManageRecords
 {
     protected static string $resource = InvitationResource::class;
 

@@ -24,7 +24,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 #[IsDestructive(false)]
 #[IsOpenWorld(false)]
-class PriceHistoryTool extends Tool
+final class PriceHistoryTool extends Tool
 {
     use InteractsWithOwner;
 

@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property User|null $inviter
  */
 #[Unguarded]
-class Invitation extends Model
+final class Invitation extends Model
 {
     /** @use HasFactory<InvitationFactory> */
     use HasFactory, HasUuids;

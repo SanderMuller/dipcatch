@@ -19,7 +19,7 @@ use Filament\Tables\Table;
  * unconfigured: an owner still has users to look at before they sell
  * anything.
  */
-class UserResource extends Resource
+final class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 

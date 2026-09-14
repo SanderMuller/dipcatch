@@ -23,7 +23,7 @@ use Laravel\Cashier\Subscription;
  * Money stays with {@see RevenueOverviewWidget}: this widget counts people,
  * that one counts euros.
  */
-class SubscriptionOverviewWidget extends BaseWidget
+final class SubscriptionOverviewWidget extends BaseWidget
 {
     protected static bool $isLazy = false;
 

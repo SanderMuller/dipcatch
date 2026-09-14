@@ -32,7 +32,7 @@ use UnexpectedValueException;
  * }
  */
 #[Title('Security settings')]
-class Security extends Component
+final class Security extends Component
 {
     use PasswordValidationRules;
 

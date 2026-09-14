@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 
 #[Signature('dipcatch:recheck-offers')]
 #[Description('Dispatch CheckShopPrice jobs for offers that are due for a recheck.')]
-class RecheckActiveShopsCommand extends Command
+final class RecheckActiveShopsCommand extends Command
 {
     public function handle(): int
     {

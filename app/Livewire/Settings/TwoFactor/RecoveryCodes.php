@@ -11,7 +11,7 @@ use Livewire\Component;
 use TypeError;
 use UnexpectedValueException;
 
-class RecoveryCodes extends Component
+final class RecoveryCodes extends Component
 {
     #[Locked]
     public array $recoveryCodes = [];

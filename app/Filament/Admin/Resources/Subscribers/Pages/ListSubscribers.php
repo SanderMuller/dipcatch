@@ -6,7 +6,7 @@ use App\Filament\Admin\Resources\Subscribers\SubscriberResource;
 use App\Filament\Admin\Widgets\RevenueOverviewWidget;
 use Filament\Resources\Pages\ListRecords;
 
-class ListSubscribers extends ListRecords
+final class ListSubscribers extends ListRecords
 {
     protected static string $resource = SubscriberResource::class;
 

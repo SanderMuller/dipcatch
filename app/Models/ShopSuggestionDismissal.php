@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[WithoutTimestamps]
 #[Unguarded]
-class ShopSuggestionDismissal extends Model
+final class ShopSuggestionDismissal extends Model
 {
     /**
      * @return BelongsTo<Product, $this>

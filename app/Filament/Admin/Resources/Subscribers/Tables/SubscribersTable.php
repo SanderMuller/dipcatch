@@ -16,7 +16,7 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 
-class SubscribersTable
+final class SubscribersTable
 {
     public static function configure(Table $table): Table
     {

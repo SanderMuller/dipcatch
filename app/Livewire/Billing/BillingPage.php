@@ -21,7 +21,7 @@ use Livewire\Component;
  * whether money is offered or refused, so the logic moves unchanged and only
  * the rendering is new.
  */
-class BillingPage extends Component
+final class BillingPage extends Component
 {
     public function render(): View
     {

@@ -22,7 +22,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 
-class InvitationResource extends Resource
+final class InvitationResource extends Resource
 {
     protected static ?string $model = Invitation::class;
 

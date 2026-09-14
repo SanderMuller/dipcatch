@@ -26,7 +26,7 @@ use Illuminate\Support\HtmlString;
  * shop comes back online), and force-mark dead (when a host pattern stops
  * working and we want to clear the recheck queue noise).
  */
-class ShopsTable
+final class ShopsTable
 {
     public static function configure(Table $table): Table
     {

@@ -22,7 +22,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly(false)]
 #[IsDestructive]
 #[IsOpenWorld(false)]
-class DeleteProductTool extends Tool
+final class DeleteProductTool extends Tool
 {
     use InteractsWithOwner;
 

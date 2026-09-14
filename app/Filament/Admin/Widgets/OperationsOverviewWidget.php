@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
  * configured, which left the dashboard empty on a working installation.
  * These numbers come from tables that always exist.
  */
-class OperationsOverviewWidget extends BaseWidget
+final class OperationsOverviewWidget extends BaseWidget
 {
     protected static bool $isLazy = false;
 

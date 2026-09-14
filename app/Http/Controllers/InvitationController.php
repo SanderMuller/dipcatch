@@ -15,7 +15,7 @@ use SanderMuller\FluentValidation\FluentRule;
 use SensitiveParameter;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-class InvitationController extends Controller
+final class InvitationController extends Controller
 {
     public function show(#[SensitiveParameter]
         string $token): View

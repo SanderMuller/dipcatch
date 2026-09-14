@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\BillingIncidentNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Support\Facades\Notification;
 
 /**
@@ -19,11 +20,10 @@ use Illuminate\Support\Facades\Notification;
  * This retries the lookup on its own schedule and applies the block the
  * close event could not.
  */
-class RelinkStripeDispute implements ShouldQueue
+#[Tries(6)]
+final class RelinkStripeDispute implements ShouldQueue
 {
     use Queueable;
-
-    public int $tries = 6;
 
     public function __construct(public int $disputeId) {}
 

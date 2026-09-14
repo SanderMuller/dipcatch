@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Spatie\Health\Checks\Check;
 use Spatie\Health\Checks\Result;
 
-class LastSuccessfulScrapeCheck extends Check
+final class LastSuccessfulScrapeCheck extends Check
 {
     private int $warnAfterHours = 48;
 

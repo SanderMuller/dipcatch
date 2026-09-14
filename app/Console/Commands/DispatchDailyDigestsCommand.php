@@ -21,11 +21,11 @@ use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
  */
 #[Signature('dipcatch:dispatch-daily-digests')]
 #[Description('Dispatch SendDailyDigest jobs for users due for their daily price-drop email.')]
-class DispatchDailyDigestsCommand extends Command
+final class DispatchDailyDigestsCommand extends Command
 {
     public function handle(): int
     {
-        $sendHour = DipConfig::int('dipcatch.digest.send_hour', 9);
+        $sendHour = DipConfig::int('dipcatch.digest.send_hour', 8);
         $batchSize = DipConfig::int('dipcatch.digest.batch_size', 500);
         $nowUtc = CarbonImmutable::now('UTC');
 

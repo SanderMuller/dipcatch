@@ -11,7 +11,7 @@ use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
-class ShopResource extends Resource
+final class ShopResource extends Resource
 {
     protected static ?string $model = Shop::class;
 

@@ -14,7 +14,7 @@ use Livewire\Component;
  * local checkjebon dataset. Accepting one hands its URL to `AddShop`, which
  * probes it and shows the normal preview - the dataset price is never stored.
  */
-class ShopSuggestions extends Component
+final class ShopSuggestions extends Component
 {
     public string $productId;
 

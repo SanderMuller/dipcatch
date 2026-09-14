@@ -11,7 +11,7 @@ use Spatie\Health\Checks\Result;
  * A half-configured Stripe is the dangerous state: enough to look ready,
  * not enough to turn a payment into a subscription.
  */
-class BillingConfigurationCheck extends Check
+final class BillingConfigurationCheck extends Check
 {
     public function run(): Result
     {

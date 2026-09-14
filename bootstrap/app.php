@@ -29,7 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->onOneServer();
 
         $schedule->command(RefreshCheckjebonDatasetCommand::class)
-            ->dailyAt('08:00')
+            ->dailyAt('07:30')
             ->timezone('Europe/Amsterdam')
             ->withoutOverlapping()
             ->onOneServer();
@@ -83,4 +83,5 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return response('The client_id is not a valid client identifier.', 400);
         });
-    })->create();
+    })
+    ->create();

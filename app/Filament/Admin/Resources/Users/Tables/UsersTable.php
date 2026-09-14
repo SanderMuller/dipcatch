@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class UsersTable
+final class UsersTable
 {
     public static function configure(Table $table): Table
     {

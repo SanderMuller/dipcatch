@@ -22,7 +22,7 @@ use Livewire\Component;
  * link at all — so this renders the common denominator and treats every other
  * key as optional.
  */
-class Bell extends Component
+final class Bell extends Component
 {
     /** How many rows the dropdown shows. Older ones live on the notifications page. */
     private const int LIMIT = 10;

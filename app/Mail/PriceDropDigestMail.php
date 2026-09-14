@@ -19,7 +19,7 @@ use Illuminate\Support\Collection;
  * Takes a flat collection of events (caller filters + orders); groups
  * internally and exposes `$grouped` to the Blade view.
  */
-class PriceDropDigestMail extends Mailable
+final class PriceDropDigestMail extends Mailable
 {
     use Queueable, SerializesModels;
 

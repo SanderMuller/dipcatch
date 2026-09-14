@@ -22,7 +22,7 @@ use Laravel\Cashier\Events\WebhookReceived;
  * Every branch is idempotent — Stripe redelivers, and a replay must not
  * record the same money twice or alert twice.
  */
-class HandleStripeWebhook
+final readonly class HandleStripeWebhook
 {
     /**
      * The events Cashier's controller leaves alone.
@@ -36,7 +36,7 @@ class HandleStripeWebhook
         'charge.dispute.closed',
     ];
 
-    public function __construct(private readonly ChargeOwnerResolver $owners) {}
+    public function __construct(private ChargeOwnerResolver $owners) {}
 
     public function handle(WebhookReceived $event): void
     {

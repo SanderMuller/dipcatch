@@ -26,7 +26,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 #[WithoutTimestamps]
 #[Unguarded]
-class CheckjebonPrice extends Model
+final class CheckjebonPrice extends Model
 {
     /**
      * @return array<string, string>

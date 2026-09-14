@@ -59,6 +59,23 @@ trait DrivesShopProbe
      */
     abstract protected function probeSubject(): ?Product;
 
+    /**
+     * Authorizes the hydrated subject. Livewire re-hydrates a public property
+     * from the request on every call without authorizing it, so every public
+     * action here runs this before it touches component state. Create mode has
+     * no subject and leaves it empty.
+     */
+    protected function authorizeProbeSubject(): void {}
+
+    /**
+     * The currency manual entry starts from. An existing product fixes it;
+     * create mode has no product, so the probed currency defines it later.
+     */
+    protected function defaultManualCurrency(): string
+    {
+        return 'EUR';
+    }
+
     public function probe(ProbeShopUrl $probe): void
     {
         $this->runProbe($probe);
@@ -66,10 +83,9 @@ trait DrivesShopProbe
 
     public function probeWithSelectors(ProbeShopUrl $probe): void
     {
-        // Resolve the subject before the early return below: implementations
-        // authorize the hydrated product here, and a public Livewire action
+        // Authorize before the early return below: a public Livewire action
         // must not touch component state for a product the caller cannot see.
-        $this->probeSubject();
+        $this->authorizeProbeSubject();
 
         $price = trim($this->priceSelector);
         if ($price === '') {
@@ -88,7 +104,7 @@ trait DrivesShopProbe
 
     public function selectVariant(ProbeShopUrl $probe): void
     {
-        $this->probeSubject();
+        $this->authorizeProbeSubject();
 
         if ($this->chosenVariantKey === null || $this->chosenVariantKey === '') {
             return;
@@ -99,7 +115,7 @@ trait DrivesShopProbe
 
     public function showManualSelector(): void
     {
-        $this->probeSubject();
+        $this->authorizeProbeSubject();
 
         $this->state = 'manual_selector';
         $this->errorCode = null;
@@ -115,6 +131,7 @@ trait DrivesShopProbe
         ?string $currency = null,
         ?string $variantKey = null,
     ): void {
+        $this->authorizeProbeSubject();
         $this->resetPreview();
         $url = trim($this->url);
 
@@ -289,6 +306,6 @@ trait DrivesShopProbe
             'chosenVariantKey',
         ]);
         $this->state = 'idle';
-        $this->manualCurrency = ($this->probeSubject()?->currency ?: null) ?? 'EUR';
+        $this->manualCurrency = $this->defaultManualCurrency();
     }
 }

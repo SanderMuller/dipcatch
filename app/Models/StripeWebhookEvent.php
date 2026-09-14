@@ -19,7 +19,7 @@ use Throwable;
  * @property CarbonImmutable|null $handled_at
  */
 #[Unguarded]
-class StripeWebhookEvent extends Model
+final class StripeWebhookEvent extends Model
 {
     /**
      * Runs the side effects once for this event id, and only once, even if

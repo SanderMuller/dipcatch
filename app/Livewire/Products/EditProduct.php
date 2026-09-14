@@ -17,7 +17,7 @@ use SanderMuller\FluentValidation\HasFluentValidation;
  * The shops have their own controls on the product page, because adding one
  * costs a live fetch and this form does not.
  */
-class EditProduct extends Component
+final class EditProduct extends Component
 {
     use HasFluentValidation;
 

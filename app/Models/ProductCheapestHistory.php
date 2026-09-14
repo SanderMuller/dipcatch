@@ -32,7 +32,7 @@ use InvalidArgumentException;
  */
 #[WithoutTimestamps]
 #[Unguarded]
-class ProductCheapestHistory extends Model
+final class ProductCheapestHistory extends Model
 {
     /** @use HasFactory<ProductCheapestHistoryFactory> */
     use HasFactory;

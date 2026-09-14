@@ -17,7 +17,7 @@ use Filament\Tables\Table;
  * mirror. Stripe is never called per row — a table that phoned Stripe for
  * each customer would hit the rate limit and stop rendering.
  */
-class SubscriberResource extends Resource
+final class SubscriberResource extends Resource
 {
     protected static ?string $model = User::class;
 

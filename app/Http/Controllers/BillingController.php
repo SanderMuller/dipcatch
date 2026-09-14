@@ -18,7 +18,7 @@ use Throwable;
  * The two round trips to Stripe. Card details never reach this app —
  * Checkout collects them, the Billing Portal changes them.
  */
-class BillingController extends Controller
+final class BillingController extends Controller
 {
     /**
      * The one link the marketing pages point Pro at, for signed-in visitors

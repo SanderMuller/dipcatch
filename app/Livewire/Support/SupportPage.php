@@ -20,7 +20,7 @@ use SanderMuller\FluentValidation\HasFluentValidation;
 use Throwable;
 
 #[Title('Support')]
-class SupportPage extends Component
+final class SupportPage extends Component
 {
     use HasFluentValidation;
 

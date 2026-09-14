@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 #[WithoutTimestamps]
 #[Unguarded]
-class CheckjebonChain extends Model
+final class CheckjebonChain extends Model
 {
     public function productUrl(string $link): string
     {

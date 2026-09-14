@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b137785ec08d51896cdb7c813c4017ad",
+    "content-hash": "318db14769efcb0bead267cef95b05b2",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -13762,6 +13762,56 @@
             "time": "2026-08-29T21:42:57+00:00"
         },
         {
+            "name": "entropy/entropy",
+            "version": "0.4.13",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/TomasVotruba/entropy.git",
+                "reference": "b2c703a93350f49ce67d150bb8560e886be01027"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/TomasVotruba/entropy/zipball/b2c703a93350f49ce67d150bb8560e886be01027",
+                "reference": "b2c703a93350f49ce67d150bb8560e886be01027",
+                "shasum": ""
+            },
+            "require": {
+                "ext-tokenizer": "*",
+                "php": "^8.4",
+                "webmozart/assert": "^2.4"
+            },
+            "require-dev": {
+                "phpstan/extension-installer": "^1.4",
+                "phpstan/phpstan": "^2.1",
+                "phpunit/phpunit": "^12.5",
+                "rector/jack": "^1.0",
+                "rector/rector": "^2.4",
+                "rector/swiss-knife": "^2.4",
+                "shipmonk/composer-dependency-analyser": "^1.8",
+                "symplify/easy-coding-standard": "^13.1",
+                "symplify/phpstan-rules": "^14.10",
+                "tomasvotruba/type-coverage": "^2.2",
+                "tomasvotruba/unused-public": "^2.2",
+                "tracy/tracy": "^2.12"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Entropy\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "proprietary"
+            ],
+            "description": "Entropy framework",
+            "support": {
+                "issues": "https://github.com/TomasVotruba/entropy/issues",
+                "source": "https://github.com/TomasVotruba/entropy/tree/0.4.13"
+            },
+            "time": "2026-09-03T19:53:04+00:00"
+        },
+        {
             "name": "fakerphp/faker",
             "version": "v1.24.1",
             "source": {
@@ -15132,6 +15182,77 @@
                 }
             ],
             "time": "2026-08-11T10:17:44+00:00"
+        },
+        {
+            "name": "nette/robot-loader",
+            "version": "v4.1.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/nette/robot-loader.git",
+                "reference": "44dba0bbb9cb521a3fed15046d3294c85dabe516"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/nette/robot-loader/zipball/44dba0bbb9cb521a3fed15046d3294c85dabe516",
+                "reference": "44dba0bbb9cb521a3fed15046d3294c85dabe516",
+                "shasum": ""
+            },
+            "require": {
+                "ext-tokenizer": "*",
+                "nette/utils": "^4.0.6",
+                "php": "8.1 - 8.5"
+            },
+            "require-dev": {
+                "nette/phpstan-rules": "^1.0",
+                "nette/tester": "^2.6",
+                "phpstan/extension-installer": "^1.4@stable",
+                "phpstan/phpstan": "^2.1.39@stable",
+                "tracy/tracy": "^2.9"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "4.1-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Nette\\": "src"
+                },
+                "classmap": [
+                    "src/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "BSD-3-Clause",
+                "GPL-2.0-only",
+                "GPL-3.0-only"
+            ],
+            "authors": [
+                {
+                    "name": "David Grudl",
+                    "homepage": "https://davidgrudl.com"
+                },
+                {
+                    "name": "Nette Community",
+                    "homepage": "https://nette.org/contributors"
+                }
+            ],
+            "description": "🍀 Nette RobotLoader: high performance and comfortable autoloader that will search and autoload classes within your application.",
+            "homepage": "https://nette.org",
+            "keywords": [
+                "autoload",
+                "class",
+                "interface",
+                "nette",
+                "trait"
+            ],
+            "support": {
+                "issues": "https://github.com/nette/robot-loader/issues",
+                "source": "https://github.com/nette/robot-loader/tree/v4.1.3"
+            },
+            "time": "2026-08-18T10:23:46+00:00"
         },
         {
             "name": "nikic/php-parser",
@@ -17494,6 +17615,75 @@
                 }
             ],
             "time": "2026-09-02T09:38:46+00:00"
+        },
+        {
+            "name": "rector/swiss-knife",
+            "version": "2.4.8",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/rectorphp/swiss-knife.git",
+                "reference": "1f1f853b2cacfed62367953591a29d0e547aec67"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/rectorphp/swiss-knife/zipball/1f1f853b2cacfed62367953591a29d0e547aec67",
+                "reference": "1f1f853b2cacfed62367953591a29d0e547aec67",
+                "shasum": ""
+            },
+            "require": {
+                "entropy/entropy": "^0.4.6",
+                "nette/robot-loader": "^4.1",
+                "nette/utils": "^4.1",
+                "nikic/php-parser": "^5.7",
+                "php": ">=8.4",
+                "symfony/finder": "^8.1",
+                "symfony/yaml": "^8.1",
+                "webmozart/assert": "^2.4"
+            },
+            "require-dev": {
+                "phpstan/extension-installer": "^1.4",
+                "phpstan/phpstan": "^2.2",
+                "phpunit/phpunit": "^12.5",
+                "rector/jack": "^1.1",
+                "rector/rector": "^2.4",
+                "shipmonk/composer-dependency-analyser": "^1.8",
+                "symfony/config": "^6.4",
+                "symfony/dependency-injection": "^6.4",
+                "symplify/easy-coding-standard": "^13.2",
+                "symplify/phpstan-rules": "^14.12",
+                "tomasvotruba/class-leak": "^2.1",
+                "tomasvotruba/unused-public": "^2.2",
+                "tracy/tracy": "^2.12"
+            },
+            "bin": [
+                "bin/swiss-knife"
+            ],
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Rector\\SwissKnife\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Swiss knife in pocket of every upgrade architect",
+            "support": {
+                "issues": "https://github.com/rectorphp/swiss-knife/issues",
+                "source": "https://github.com/rectorphp/swiss-knife/tree/2.4.8"
+            },
+            "funding": [
+                {
+                    "url": "https://www.paypal.me/rectorphp",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/tomasvotruba",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-06-20T16:13:53+00:00"
         },
         {
             "name": "sandermuller/boost-core",

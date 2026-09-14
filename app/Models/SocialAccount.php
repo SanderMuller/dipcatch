@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property User $user
  */
 #[Unguarded]
-class SocialAccount extends Model
+final class SocialAccount extends Model
 {
     /** @use HasFactory<SocialAccountFactory> */
     use HasFactory;

@@ -11,6 +11,8 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Mail;
@@ -25,14 +27,11 @@ use Illuminate\Support\Facades\Mail;
  * inside handle(), which would risk drift around midnight boundaries if the
  * user changed timezone between dispatch and run.
  */
-class SendDailyDigest implements ShouldBeUnique, ShouldQueue
+#[Backoff([60, 300, 1800])]
+#[Tries(3)]
+final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    public int $tries = 3;
-
-    /** @var list<int> Retry backoff in seconds. */
-    public array $backoff = [60, 300, 1800];
 
     public function __construct(
         public User $user,

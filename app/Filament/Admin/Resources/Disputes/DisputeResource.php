@@ -16,7 +16,7 @@ use Filament\Tables\Table;
  * The chargeback queue. Every dispute Stripe reported lands here, so an
  * open one is never missed between mail alerts.
  */
-class DisputeResource extends Resource
+final class DisputeResource extends Resource
 {
     protected static ?string $model = StripeDispute::class;
 
@@ -53,7 +53,7 @@ class DisputeResource extends Resource
         return $open > 0 ? (string) $open : null;
     }
 
-    public static function getNavigationBadgeColor(): ?string
+    public static function getNavigationBadgeColor(): string
     {
         return 'danger';
     }

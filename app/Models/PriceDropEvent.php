@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[WithoutTimestamps]
 #[Unguarded]
-class PriceDropEvent extends Model
+final class PriceDropEvent extends Model
 {
     /** @use HasFactory<PriceDropEventFactory> */
     use HasFactory, HasUuids;

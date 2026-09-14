@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 
 #[Signature('dipcatch:prune-checks')]
 #[Description('Prune price_checks / price_drop_events / cheapest_history older than 365 days, keeping at least 50 most-recent rows per offer/product.')]
-class PruneOldChecksCommand extends Command
+final class PruneOldChecksCommand extends Command
 {
     private const int RETAIN_DAYS = 365;
 

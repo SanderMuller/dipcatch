@@ -30,6 +30,9 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\Attributes\MaxExceptions;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
@@ -82,7 +85,10 @@ use Throwable;
  *   promotion_window_authoritative: bool
  * }
  */
-class CheckShopPrice implements ShouldBeUnique, ShouldQueue
+#[MaxExceptions(1)]
+#[Timeout(30)]
+#[Tries(10)]
+final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -99,32 +105,6 @@ class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      * alive past uniqueFor() and let a duplicate be dispatched alongside it.
      */
     private const int MAX_RELEASE_DELAY_SECONDS = 60;
-
-    /**
-     * A backstop, not the rate-limit control — that is the release budget
-     * above, which gives up at 5. This only catches a job that dies without
-     * running its own error handling (SIGKILL, OOM, a deploy mid-run), which
-     * `$maxExceptions` cannot see because no exception is ever thrown.
-     *
-     * It must stay above MAX_RATE_LIMIT_ATTEMPTS, or it would fail the job
-     * before the release budget is spent — the original bug, in slower motion.
-     *
-     * A wall-clock `retryUntil()` cannot replace it: the worker stamps the
-     * deadline at dispatch, and RecheckActiveShopsCommand dispatches with up to
-     * RecheckJitter::maxSeconds() of jitter, so a high draw would burn the
-     * window before the first attempt and dead-letter the job unrun.
-     */
-    public int $tries = 10;
-
-    /**
-     * Everything that is not a release still runs once. The worker counts this
-     * only from its exception handler, and a `release()` returns normally, so
-     * a thrown exception and a timeout fail immediately while the rate-limit
-     * branch keeps retrying. That is the split this job needs.
-     */
-    public int $maxExceptions = 1;
-
-    public int $timeout = 30;
 
     /**
      * Lock-key scope per origin, indexed by `(int) $manual`. A scope rather

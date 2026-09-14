@@ -22,7 +22,7 @@ use Spatie\Health\Checks\Result;
  * — and a chain that has never produced a row is reported separately, since
  * no age can reveal it.
  */
-class CheckjebonFreshnessCheck extends Check
+final class CheckjebonFreshnessCheck extends Check
 {
     private int $warnAfterHours = 48;
 

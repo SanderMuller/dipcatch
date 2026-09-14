@@ -26,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read User|null $user
  */
 #[Unguarded]
-class StripeDispute extends Model
+final class StripeDispute extends Model
 {
     /** @use HasFactory<StripeDisputeFactory> */
     use HasFactory;

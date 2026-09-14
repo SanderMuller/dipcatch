@@ -17,7 +17,7 @@ use Laravel\Cashier\Subscription;
  * subscriptions times the configured price — a trialing account pays
  * nothing yet, so it is counted separately rather than folded into MRR.
  */
-class RevenueOverviewWidget extends BaseWidget
+final class RevenueOverviewWidget extends BaseWidget
 {
     protected static bool $isLazy = false;
 

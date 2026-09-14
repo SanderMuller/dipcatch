@@ -18,7 +18,7 @@ use Illuminate\Support\HtmlString;
  * new adapter or a changed selector, and grouping the count by host is what
  * says which one is worth the work.
  */
-class ShopsNeedingAttentionWidget extends BaseWidget
+final class ShopsNeedingAttentionWidget extends BaseWidget
 {
     protected static ?int $sort = 3;
 

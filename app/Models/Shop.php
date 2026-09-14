@@ -41,7 +41,7 @@ use InvalidArgumentException;
  * @property CarbonInterface|null $repointed_at When this offer was last pointed at a different URL.
  */
 #[Unguarded]
-class Shop extends Model
+final class Shop extends Model
 {
     /** @use HasFactory<ShopFactory> */
     use HasFactory, HasUuids;
@@ -76,7 +76,7 @@ class Shop extends Model
 
     protected static function booted(): void
     {
-        static::creating(function (self $shop): void {
+        self::creating(function (self $shop): void {
             if (! is_string($shop->url) || $shop->url === '') {
                 return;
             }

@@ -11,6 +11,8 @@ use Throwable;
  * therefore needs one Stripe call. It happens once per dispute webhook, not
  * per rendered row, and a failure is survivable: the dispute is still stored
  * and still alerts the owner, just without a linked account.
+ *
+ * Not final: the suite substitutes an anonymous subclass.
  */
 class ChargeOwnerResolver
 {

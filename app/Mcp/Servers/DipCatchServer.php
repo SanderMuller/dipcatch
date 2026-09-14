@@ -43,7 +43,7 @@ Every tool acts on this user's own data and takes no user id. Free accounts have
 a product limit; when it is reached the tool says so and writes nothing, and the
 answer is to upgrade rather than to retry.
 TEXT)]
-class DipCatchServer extends Server
+final class DipCatchServer extends Server
 {
     /**
      * @var array<int, class-string<Tool>>

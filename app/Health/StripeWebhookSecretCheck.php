@@ -13,7 +13,7 @@ use Spatie\Health\Checks\Result;
  * The check is only meaningful once Stripe is configured at all: an
  * install with no Stripe secret sells nothing and has no endpoint.
  */
-class StripeWebhookSecretCheck extends Check
+final class StripeWebhookSecretCheck extends Check
 {
     public function run(): Result
     {

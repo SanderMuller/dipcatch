@@ -24,7 +24,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly(false)]
 #[IsDestructive]
 #[IsOpenWorld(false)]
-class RemoveShopTool extends Tool
+final class RemoveShopTool extends Tool
 {
     use InteractsWithOwner;
 

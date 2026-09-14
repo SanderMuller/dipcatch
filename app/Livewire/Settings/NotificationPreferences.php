@@ -17,7 +17,7 @@ use Livewire\Component;
  * and renaming it means a migration over a column holding live preferences.
  * See specs/flux-user-app-migration.md, Resolved Questions 6.
  */
-class NotificationPreferences extends Component
+final class NotificationPreferences extends Component
 {
     public bool $notify_via_email = false;
 

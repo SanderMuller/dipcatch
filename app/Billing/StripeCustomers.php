@@ -12,6 +12,8 @@ use Laravel\Cashier\Cashier;
  * call that guarantees a deleted account is never billed again. Charges,
  * invoices and disputes survive it, so the payment history this app keeps
  * stays true.
+ *
+ * Not final: the suite substitutes an anonymous subclass.
  */
 class StripeCustomers
 {

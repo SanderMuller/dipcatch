@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  * their plan changed, so a downgrade costs them the next product, never an
  * existing one.
  */
-class PlanLimits
+final class PlanLimits
 {
     /**
      * Null when the plan is unlimited.

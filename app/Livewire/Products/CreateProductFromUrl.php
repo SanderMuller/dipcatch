@@ -7,7 +7,6 @@ use App\Actions\Products\ProductDraft;
 use App\Actions\Shops\ProbeOutcome;
 use App\Billing\PlanLimitReached;
 use App\Livewire\Concerns\DrivesShopProbe;
-use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Services\Drops\TierDefaults;
@@ -30,7 +29,7 @@ use SanderMuller\FluentValidation\HasFluentValidation;
  * probeSubject() is null, so per-product dedupe and currency-mismatch
  * checks are skipped — the probed currency defines the product).
  */
-class CreateProductFromUrl extends Component
+final class CreateProductFromUrl extends Component
 {
     use DrivesShopProbe;
     use HasFluentValidation;
@@ -46,7 +45,8 @@ class CreateProductFromUrl extends Component
     /** @var array{id: string, title: string}|null Another product of this user already tracking the pasted URL. */
     public ?array $existingTrackedProduct = null;
 
-    protected function probeSubject(): ?Product
+    /** Create mode has no product yet: the probed currency defines one. */
+    protected function probeSubject(): null
     {
         return null;
     }

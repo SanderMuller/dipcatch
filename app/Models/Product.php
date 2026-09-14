@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  * @property CarbonImmutable|null $history_kept_from
  */
 #[Unguarded]
-class Product extends Model
+final class Product extends Model
 {
     /** @use HasFactory<ProductFactory> */
     use HasFactory, HasUuids;

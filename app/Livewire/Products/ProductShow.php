@@ -27,7 +27,7 @@ use Livewire\Component;
  * one place — `$range` arrives from the client, and
  * `HistoryWindow::start()` clamps it whatever the menu offered.
  */
-class ProductShow extends Component
+final class ProductShow extends Component
 {
     public Product $product;
 

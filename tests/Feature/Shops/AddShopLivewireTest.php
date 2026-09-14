@@ -327,3 +327,24 @@ test('confirm stores no pack size when the title names none', function (): void 
         ->and($shop->unitPrice())->toBeNull()
         ->and($shop->unitPriceLabel())->toBeNull();
 });
+
+/**
+ * Livewire re-hydrates `$product` from the request on every action without
+ * authorizing it, so each public probe action authorizes the product itself.
+ * Mounting is not enough: the caller can change between mount and action.
+ */
+test('every public probe action refuses a product the caller does not own', function (string $action): void {
+    Http::fake();
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $component = Livewire::actingAs($product->user()->sole())
+        ->test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->set('priceSelector', '.cost')
+        ->set('chosenVariantKey', 'v1');
+
+    $this->actingAs(Product::factory()->create()->user()->sole());
+
+    $component->call($action)->assertForbidden();
+
+    Http::assertNothingSent();
+})->with(['probe', 'probeWithSelectors', 'selectVariant', 'showManualSelector']);

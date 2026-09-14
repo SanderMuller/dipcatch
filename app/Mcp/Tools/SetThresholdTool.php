@@ -23,7 +23,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly(false)]
 #[IsDestructive]
 #[IsOpenWorld(false)]
-class SetThresholdTool extends Tool
+final class SetThresholdTool extends Tool
 {
     use InteractsWithOwner;
 

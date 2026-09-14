@@ -29,7 +29,7 @@ use Throwable;
  * `none`, which does send the session cookie on that POST, but `lax` is the
  * safer setting and a deployment that chooses it must not break Apple login.
  */
-class SocialLoginController extends Controller
+final class SocialLoginController extends Controller
 {
     public function redirect(string $provider): Response
     {

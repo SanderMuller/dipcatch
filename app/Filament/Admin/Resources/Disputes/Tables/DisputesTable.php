@@ -12,7 +12,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Str;
 
-class DisputesTable
+final class DisputesTable
 {
     public static function configure(Table $table): Table
     {

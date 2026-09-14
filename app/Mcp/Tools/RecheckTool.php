@@ -25,7 +25,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly(false)]
 #[IsDestructive(false)]
 #[IsOpenWorld(false)]
-class RecheckTool extends Tool
+final class RecheckTool extends Tool
 {
     use InteractsWithOwner;
 

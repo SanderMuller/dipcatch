@@ -189,7 +189,6 @@ return RectorConfig::configure()
      * @see vendor/driftingly/rector-laravel/config/sets/laravel90.php:61
      */
     ->withSkip([
-        AddOverrideAttributeToOverriddenMethodsRector::class,
         AddOverrideAttributeToOverriddenPropertiesRector::class,
         // Larastan can't introspect models that declare their table via
         // #[Table] attribute — it still reads `protected $table`. Keep the
@@ -211,7 +210,6 @@ return RectorConfig::configure()
         FlipTypeControlToUseExclusiveTypeRector::class,
         InlineIsAInstanceOfRector::class,
         LocallyCalledStaticMethodToNonStaticRector::class,
-        NullToStrictStringFuncCallArgRector::class,
         PostIncDecToPreIncDecRector::class,
         PreferPHPUnitThisCallRector::class,
         RedirectRouteToToRouteHelperRector::class,
@@ -266,15 +264,16 @@ return RectorConfig::configure()
         FluentValidationSetList::POLISH,
         FluentValidationSetList::SIMPLIFY,
         HihahoSetList::ALL,
-        LaravelSetList::LARAVEL_130,
         LaravelSetList::LARAVEL_CODE_QUALITY,
         LaravelSetList::LARAVEL_ARRAYACCESS_TO_METHOD_CALL,
         LaravelSetList::LARAVEL_COLLECTION,
         LaravelSetList::LARAVEL_CONTAINER_STRING_TO_FULLY_QUALIFIED_NAME,
         LaravelSetList::LARAVEL_FACADE_ALIASES_TO_FULL_NAMES,
-        LivewireLevelSetList::UP_TO_LIVEWIRE,
         PestSetList::CODING_STYLE,
     ])
+    ->withComposerBased(
+        laravel: true,
+    )
     // If needed, we can update the parallel settings to make sure Rector doesn't start generating errors on large codebases
     ->withParallel(300, $maxParallelProcesses, 15)
     // here we can define, what prepared sets of rules will be applied

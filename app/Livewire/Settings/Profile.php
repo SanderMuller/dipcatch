@@ -12,7 +12,7 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 #[Title('Profile settings')]
-class Profile extends Component
+final class Profile extends Component
 {
     use ProfileValidationRules;
 

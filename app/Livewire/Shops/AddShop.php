@@ -17,7 +17,7 @@ use Livewire\Component;
  * Add-shop form for an existing product. The probe state machine lives
  * in DrivesShopProbe; this component owns persistence on Confirm.
  */
-class AddShop extends Component
+final class AddShop extends Component
 {
     use DrivesShopProbe;
 
@@ -46,17 +46,25 @@ class AddShop extends Component
         $this->runProbe($probe);
     }
 
+    protected function probeSubject(): Product
+    {
+        return $this->product;
+    }
+
     /**
-     * Called by `runProbe()` on every probe path — `probe()`,
-     * `probeWithSelectors()` and `selectVariant()` alike. Livewire
-     * re-hydrates `$product` from the request on each call without
-     * authorizing it, so the ownership check belongs here, not in mount().
+     * Runs on every probe path — `probe()`, `probeWithSelectors()`,
+     * `selectVariant()` and `showManualSelector()` alike. Livewire re-hydrates
+     * `$product` from the request on each call without authorizing it, so the
+     * ownership check belongs here, not in mount().
      */
-    protected function probeSubject(): ?Product
+    protected function authorizeProbeSubject(): void
     {
         Gate::authorize('view', $this->product);
+    }
 
-        return $this->product;
+    protected function defaultManualCurrency(): string
+    {
+        return $this->product->currency !== '' ? $this->product->currency : 'EUR';
     }
 
     public function confirm(): void

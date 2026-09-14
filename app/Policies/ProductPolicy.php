@@ -5,7 +5,7 @@ namespace App\Policies;
 use App\Models\Product;
 use App\Models\User;
 
-class ProductPolicy
+final class ProductPolicy
 {
     public function viewAny(User $user): bool
     {

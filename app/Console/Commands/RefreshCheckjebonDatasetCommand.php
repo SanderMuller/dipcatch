@@ -14,7 +14,7 @@ use JsonException;
 
 #[Signature('dipcatch:refresh-checkjebon')]
 #[Description('Refresh the local checkjebon.nl price dataset (every chain with rows) from the upstream daily JSON.')]
-class RefreshCheckjebonDatasetCommand extends Command
+final class RefreshCheckjebonDatasetCommand extends Command
 {
     private const string DATASET_URL = 'https://raw.githubusercontent.com/supermarkt/checkjebon/main/data/supermarkets.json';
 

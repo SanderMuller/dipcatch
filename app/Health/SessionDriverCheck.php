@@ -13,7 +13,7 @@ use Spatie\Health\Checks\Result;
  * the browser never stores the `authToken`, and every "Allow" fails with a
  * 403 from Passport.
  */
-class SessionDriverCheck extends Check
+final class SessionDriverCheck extends Check
 {
     public function run(): Result
     {

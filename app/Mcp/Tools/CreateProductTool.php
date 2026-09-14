@@ -34,7 +34,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly(false)]
 #[IsDestructive(false)]
 #[IsOpenWorld(false)]
-class CreateProductTool extends Tool
+final class CreateProductTool extends Tool
 {
     use InteractsWithOwner;
 

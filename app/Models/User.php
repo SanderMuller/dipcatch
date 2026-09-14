@@ -53,7 +53,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  */
 #[Fillable(['name', 'email', 'password', 'is_admin', 'timezone'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements FilamentUser, MustVerifyEmail, OAuthenticatable, PasskeyUser
+final class User extends Authenticatable implements FilamentUser, MustVerifyEmail, OAuthenticatable, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use Billable, HasApiTokens, HasFactory, HasPushSubscriptions, Notifiable, PasskeyAuthenticatable, Subscribes, TwoFactorAuthenticatable;

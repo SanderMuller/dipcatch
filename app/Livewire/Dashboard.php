@@ -23,7 +23,7 @@ use Livewire\Component;
  * Every figure is scoped to the signed-in user; the Filament widgets did the
  * same and nothing else enforces it.
  */
-class Dashboard extends Component
+final class Dashboard extends Component
 {
     public function render(): View
     {
