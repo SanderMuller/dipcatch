@@ -51,7 +51,7 @@ final readonly class AttachShop
     {
         $shop = $this->write($product, $draft);
         $trackedPrice = $draft->trackedPrice();
-        $appliedBundle = $draft->bundleOffer?->effectiveUnitPrice() === $trackedPrice
+        $appliedBundle = $draft->bundleOffer?->isTrackedAt($trackedPrice) === true
             ? $draft->bundleOffer
             : null;
 

@@ -40,6 +40,62 @@ final readonly class BundleOffer
         return bccomp($this->effectiveUnitPrice(), $singleItemPrice, 2) < 0;
     }
 
+    /**
+     * Whether this offer is the one a price was tracked at.
+     *
+     * The comparison is numeric, so `2.0` and `2.00` are the same price. The
+     * callers each held their own version of this test, two of them by string
+     * identity, which was correct only while both sides happened to be
+     * normalised.
+     */
+    public function isTrackedAt(?string $price): bool
+    {
+        if ($price === null || ! self::isMoney($price)) {
+            return false;
+        }
+
+        return bccomp($price, $this->effectiveUnitPrice(), 2) === 0;
+    }
+
+    /**
+     * Rebuild an offer from the `bundle_quantity` / `bundle_total_price` pair
+     * as it comes back out of storage.
+     *
+     * The types are checked, never cast. The three models that hold the pair
+     * cast the columns themselves (`integer` and `decimal:2`), and the two
+     * readers that take an untyped array already refused anything else, so a
+     * value of another type is a caller defect rather than input to coerce.
+     */
+    public static function stored(mixed $quantity, mixed $totalPrice): ?self
+    {
+        if (! is_int($quantity) || ! is_string($totalPrice)) {
+            return null;
+        }
+
+        try {
+            return new self($quantity, $totalPrice);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    /**
+     * The stored offer, but only when it beats the single-item price it is
+     * stored beside. An offer that costs more per item than buying one is not
+     * an offer, and every reader of the stored pair wants it gone — a caller
+     * that shows it would price a bundle above the shelf price.
+     */
+    public static function storedIfCheaper(mixed $quantity, mixed $totalPrice, ?string $singleItemPrice): ?self
+    {
+        $offer = self::stored($quantity, $totalPrice);
+
+        if ($offer === null || $singleItemPrice === null || ! $offer->isCheaperThan($singleItemPrice)) {
+            return null;
+        }
+
+        return $offer;
+    }
+
     public static function fromLabel(string $label, string $singleItemPrice): ?self
     {
         if (! self::isMoney($singleItemPrice) || bccomp($singleItemPrice, '0.01', 2) < 0) {

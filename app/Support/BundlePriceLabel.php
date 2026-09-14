@@ -7,7 +7,6 @@ use App\Models\Shop;
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PromotionWindow;
 use Carbon\CarbonImmutable;
-use InvalidArgumentException;
 use Throwable;
 
 final readonly class BundlePriceLabel
@@ -54,20 +53,15 @@ final readonly class BundlePriceLabel
         $single = $snapshot['single_item_price'] ?? null;
         $currency = $snapshot['currency'] ?? null;
 
-        if (! is_int($quantity) || ! is_string($total) || ! is_string($single) || ! is_string($currency)) {
+        if (! is_string($single) || ! is_string($currency)) {
             return null;
         }
 
-        try {
-            $offer = new BundleOffer($quantity, $total);
-        } catch (InvalidArgumentException) {
-            return null;
-        }
-
+        $offer = BundleOffer::storedIfCheaper($quantity, $total, $single);
         $window = self::promotionWindow($snapshot);
         $hasPromotionDate = isset($snapshot['promotion_starts_at']) || isset($snapshot['promotion_ends_at']);
 
-        if (! $offer->isCheaperThan($single) || ($hasPromotionDate && $window === null)) {
+        if ($offer === null || ($hasPromotionDate && $window === null)) {
             return null;
         }
 

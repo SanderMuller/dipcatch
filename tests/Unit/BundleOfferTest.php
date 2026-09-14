@@ -93,3 +93,43 @@ test('snapshot copy clears an inherited promotion window', function (): void {
     expect($cleared->promotionWindow)->toBeNull()
         ->and($cleared->promotionWindowAuthoritative)->toBeTrue();
 });
+
+test('a stored pair rebuilds only from the types the columns hold', function (mixed $quantity, mixed $total): void {
+    expect(BundleOffer::stored($quantity, $total))->toBeNull();
+})->with([
+    'no quantity' => [null, '4.00'],
+    'no total' => [2, null],
+    // The three models cast bundle_quantity to integer, so a string here is a
+    // caller defect. Recorded decision: check the type, never coerce it.
+    'quantity as a string' => ['2', '4.00'],
+    'quantity below two' => [1, '4.00'],
+    'quantity above an unsigned small integer' => [65_536, '4.00'],
+    'total not money' => [2, 'free'],
+    'total of zero' => [2, '0.00'],
+]);
+
+test('a stored pair rebuilds when both columns hold what they should', function (): void {
+    $offer = BundleOffer::stored(2, '4.00');
+
+    expect($offer?->quantity)->toBe(2)
+        ->and($offer?->totalPrice)->toBe('4.00');
+});
+
+test('a stored offer is withheld unless it beats the single-item price', function (): void {
+    expect(BundleOffer::storedIfCheaper(2, '4.00', '2.85'))->not->toBeNull()
+        ->and(BundleOffer::storedIfCheaper(2, '6.00', '2.85'))->toBeNull()
+        ->and(BundleOffer::storedIfCheaper(2, '5.70', '2.85'))->toBeNull()
+        ->and(BundleOffer::storedIfCheaper(2, '4.00', singleItemPrice: null))->toBeNull();
+});
+
+test('the tracked-price test compares numerically, not by string identity', function (): void {
+    $offer = new BundleOffer(2, '4.00');
+
+    expect($offer->effectiveUnitPrice())->toBe('2.00')
+        ->and($offer->isTrackedAt('2.00'))->toBeTrue()
+        // Same price, different spelling. String identity said no.
+        ->and($offer->isTrackedAt('2.0'))->toBeTrue()
+        ->and($offer->isTrackedAt('2.85'))->toBeFalse()
+        ->and($offer->isTrackedAt(price: null))->toBeFalse()
+        ->and($offer->isTrackedAt('free'))->toBeFalse();
+});

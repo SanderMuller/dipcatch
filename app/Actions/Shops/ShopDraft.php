@@ -8,7 +8,6 @@ use App\PriceAdapters\ShopSnapshot;
 use App\Support\ImageUrl;
 use App\Support\PackSize;
 use Carbon\CarbonImmutable;
-use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -152,18 +151,10 @@ final readonly class ShopDraft
      */
     private static function bundleOffer(array $snapshot): ?BundleOffer
     {
-        $quantity = $snapshot['bundle_quantity'] ?? null;
-        $total = self::string($snapshot, 'bundle_total_price');
-
-        if (! is_int($quantity) || $total === null) {
-            return null;
-        }
-
-        try {
-            return new BundleOffer($quantity, $total);
-        } catch (InvalidArgumentException) {
-            return null;
-        }
+        return BundleOffer::stored(
+            $snapshot['bundle_quantity'] ?? null,
+            self::string($snapshot, 'bundle_total_price'),
+        );
     }
 
     /**
