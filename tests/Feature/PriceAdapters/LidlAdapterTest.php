@@ -79,3 +79,13 @@ test('a packaging record for another product is not this product\'s pack size', 
         ->and($result->snapshot?->packSize)->toBeNull()
         ->and($result->snapshot?->packSizeAuthoritative)->toBeFalse();
 });
+
+test('a URL naming no product id still reads the period, but no pack size', function (): void {
+    $result = $this->adapter->extract('https://www.lidl.nl/p/lay-s', lidlPage());
+
+    expect($result->isSuccess())->toBeTrue()
+        // The badge period is the payload's own, not a per-product record.
+        ->and($result->snapshot?->promotionWindow?->isRunning())->toBeTrue()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue()
+        ->and($result->snapshot?->packSize)->toBeNull();
+});

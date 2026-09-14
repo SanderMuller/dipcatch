@@ -71,3 +71,33 @@ test('fails when an etos page has neither JSON-LD nor a sales price', function (
     expect($result->isFailed())->toBeTrue()
         ->and($result->failureReason)->toBe('etos_extraction_failed');
 });
+
+test('etos reads og:title before its h1', function (): void {
+    $html = <<<'HTML'
+<html><head><meta property="og:title" content="Og name"></head><body>
+  <h1>H1 name</h1>
+  <span class="price__item price__item--sales">
+    <span class="price__value" property="price" content="18.85"></span>
+  </span>
+</body></html>
+HTML;
+
+    $result = $this->adapter->extract('https://www.etos.nl/producten/cerave-340', $html);
+
+    expect($result->snapshot?->title)->toBe('Og name');
+});
+
+test('a blank og:image is no image, rather than a blank one', function (): void {
+    $html = <<<'HTML'
+<html><head><meta property="og:image" content="   "></head><body>
+  <h1>CeraVe</h1>
+  <span class="price__item price__item--sales">
+    <span class="price__value" property="price" content="18.85"></span>
+  </span>
+</body></html>
+HTML;
+
+    $result = $this->adapter->extract('https://www.etos.nl/producten/cerave-340', $html);
+
+    expect($result->snapshot?->imageUrl)->toBeNull();
+});
