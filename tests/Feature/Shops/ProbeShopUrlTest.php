@@ -460,3 +460,17 @@ test('the same variant added twice is a duplicate, whichever address was pasted'
 
     expect($outcome->isDuplicate())->toBeTrue();
 });
+
+test('the probed currency is normalized before it reaches the draft', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response(jsonLdPage('50.00', ' eur '), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+
+    $outcome = app(ProbeShopUrl::class)($product, 'https://example.com/p/1', User::factory()->create());
+
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->snapshot?->currency)->toBe('EUR');
+});

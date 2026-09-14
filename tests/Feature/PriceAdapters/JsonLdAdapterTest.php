@@ -926,3 +926,19 @@ test('a key-matching hasVariant entry with no offers reports a missing offer', f
 
     expect($result->failureReason)->toBe('jsonld_no_offer');
 });
+
+test('two offers naming the request equally precisely are put to the user', function (): void {
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => 'Tee',
+        'offers' => [
+            ['@type' => 'Offer', 'sku' => 'L', 'url' => 'https://shop.test/p/1?size=L', 'price' => '10.00', 'priceCurrency' => 'EUR'],
+            ['@type' => 'Offer', 'sku' => 'RED', 'url' => 'https://shop.test/p/1?color=red', 'price' => '12.00', 'priceCurrency' => 'EUR'],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1?size=L&color=red', withJsonLd($json));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and($result->variants)->toHaveCount(2);
+});

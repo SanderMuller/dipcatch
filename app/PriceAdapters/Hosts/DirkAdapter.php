@@ -56,12 +56,14 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
         }
 
         // The payload is the only promotion source this adapter reads, so a
-        // page that carries it and states no period ends the promotion. On a
-        // page served without it Dirk adds no claim of its own, and the
-        // JSON-LD offer's stands.
-        return ExtractionResult::success(
-            $snapshot->withPromotionWindow(self::promotionWindow($data, $productId, $snapshot->price)),
-        );
+        // payload that states no period for this product ends the promotion.
+        // Without a payload, or without an id to find this product's record
+        // by, Dirk read nothing and adds no claim — the JSON-LD offer's stands.
+        if ($productId !== null) {
+            $snapshot = $snapshot->withPromotionWindow(self::promotionWindow($data, $productId, $snapshot->price));
+        }
+
+        return ExtractionResult::success($snapshot);
     }
 
     /**
@@ -77,12 +79,8 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
      *
      * @param  list<mixed>  $data
      */
-    private static function promotionWindow(array $data, ?string $productId, string $price): ?PromotionWindow
+    private static function promotionWindow(array $data, string $productId, string $price): ?PromotionWindow
     {
-        if ($productId === null) {
-            return null;
-        }
-
         foreach (NuxtData::recordsFor($data, ['productId', 'offerPrice'], 'productId', $productId) as $record) {
             $offer = PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'offerPrice'));
 

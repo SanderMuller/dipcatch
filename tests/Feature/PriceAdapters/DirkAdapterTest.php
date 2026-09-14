@@ -94,3 +94,16 @@ test('a page with no offer record reports no period', function (): void {
         ->and($result->snapshot?->promotionWindow)->toBeNull()
         ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
 });
+
+test('a URL naming no product id adds no promotion claim of its own', function (): void {
+    $validUntil = CarbonImmutable::now()->addDays(7)->toDateString();
+    $html = str_replace(
+        '"priceCurrency":"EUR"',
+        '"priceCurrency":"EUR","priceValidUntil":"' . $validUntil . '"',
+        dirkPage(),
+    );
+
+    $result = new DirkAdapter()->extract('https://www.dirk.nl/boodschappen/x/x/kaas', $html);
+
+    expect($result->snapshot?->promotionWindow?->endsAt?->toDateString())->toBe($validUntil);
+});
