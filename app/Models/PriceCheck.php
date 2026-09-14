@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use InvalidArgumentException;
 
 /**
  * @property int $id
@@ -72,18 +71,10 @@ final class PriceCheck extends Model
 
     public function bundleOffer(): ?BundleOffer
     {
-        if ($this->bundle_quantity === null || $this->bundle_total_price === null) {
-            return null;
-        }
-
-        try {
-            $offer = new BundleOffer((int) $this->bundle_quantity, (string) $this->bundle_total_price);
-        } catch (InvalidArgumentException) {
-            return null;
-        }
-
-        $singleItemPrice = $this->singleItemPrice();
-
-        return $singleItemPrice !== null && $offer->isCheaperThan($singleItemPrice) ? $offer : null;
+        return BundleOffer::stored(
+            $this->bundle_quantity,
+            $this->bundle_total_price,
+            $this->singleItemPrice(),
+        );
     }
 }

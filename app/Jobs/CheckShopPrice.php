@@ -510,17 +510,12 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                     $updates['pack_unit'] = $packSize?->unit;
                 }
 
+                $updates += $pricing->promotionUpdates;
+
                 // Same rule as the GTIN: a source that reads conditional
                 // offers and finds none clears the stored one, so a campaign
                 // that ended stops being shown. A source with no such concept
                 // leaves it alone.
-                // Same clearing rule again: a source that reads promotion
-                // fields and finds none ends the promotion on screen.
-                $updates += $pricing->promotionUpdates(
-                    $outcome['promotion_window'],
-                    $outcome['promotion_window_authoritative'],
-                );
-
                 $offer = $outcome['conditional_offer'];
                 if ($offer !== null || $outcome['conditional_offer_authoritative']) {
                     $updates['conditional_price'] = $offer?->price;

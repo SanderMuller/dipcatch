@@ -19,7 +19,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use InvalidArgumentException;
 
 /**
  * @property bool|null $current_in_stock True in stock, false out of stock, null when the shop's page did not say.
@@ -35,6 +34,7 @@ use InvalidArgumentException;
  * @property CarbonInterface|null $promotion_starts_at
  * @property CarbonInterface|null $promotion_ends_at
  * @property string|null $promotion_label
+ * @property string|null $current_price
  * @property string|null $single_item_price
  * @property int|null $bundle_quantity
  * @property string|null $bundle_total_price
@@ -251,30 +251,18 @@ final class Shop extends Model
 
     public function bundleOffer(): ?BundleOffer
     {
-        if ($this->bundle_quantity === null || $this->bundle_total_price === null) {
-            return null;
-        }
-
-        try {
-            $offer = new BundleOffer((int) $this->bundle_quantity, (string) $this->bundle_total_price);
-        } catch (InvalidArgumentException) {
-            return null;
-        }
-
-        $singleItemPrice = $this->singleItemPrice();
-
-        return $singleItemPrice !== null && $offer->isCheaperThan($singleItemPrice) ? $offer : null;
+        return BundleOffer::stored(
+            $this->bundle_quantity,
+            $this->bundle_total_price,
+            $this->singleItemPrice(),
+        );
     }
 
     public function liveBundleOffer(): ?BundleOffer
     {
         $offer = $this->bundleOffer();
 
-        if ($offer === null || $this->current_price === null) {
-            return null;
-        }
-
-        return bccomp((string) $this->current_price, $offer->effectiveUnitPrice(), 2) === 0 ? $offer : null;
+        return $offer !== null && $offer->isTrackedAt($this->current_price) ? $offer : null;
     }
 
     public function faviconUrl(): string

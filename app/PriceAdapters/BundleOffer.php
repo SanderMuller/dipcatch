@@ -40,6 +40,46 @@ final readonly class BundleOffer
         return bccomp($this->effectiveUnitPrice(), $singleItemPrice, 2) < 0;
     }
 
+    /**
+     * Whether this offer is the one a price was tracked at. The comparison is
+     * numeric, so `2.0` and `2.00` are the same price.
+     */
+    public function isTrackedAt(?string $price): bool
+    {
+        if ($price === null || ! self::isMoney($price)) {
+            return false;
+        }
+
+        return bccomp($price, $this->effectiveUnitPrice(), 2) === 0;
+    }
+
+    /**
+     * Rebuild an offer from the `bundle_quantity` / `bundle_total_price` pair
+     * as it comes back out of storage, and only when it still beats the
+     * single-item price stored beside it. An offer costing more per item than
+     * one off the shelf is not an offer, and a reader that showed it would
+     * price a bundle above the shelf price.
+     *
+     * The types are checked, never cast. The three models that hold the pair
+     * cast the columns themselves — `integer` and `decimal:2`, which return an
+     * int and a string whatever was assigned — so a value of another type
+     * reaching here is a caller defect rather than input to coerce.
+     */
+    public static function stored(mixed $quantity, mixed $totalPrice, ?string $singleItemPrice): ?self
+    {
+        if (! is_int($quantity) || ! is_string($totalPrice) || $singleItemPrice === null) {
+            return null;
+        }
+
+        try {
+            $offer = new self($quantity, $totalPrice);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        return $offer->isCheaperThan($singleItemPrice) ? $offer : null;
+    }
+
     public static function fromLabel(string $label, string $singleItemPrice): ?self
     {
         if (! self::isMoney($singleItemPrice) || bccomp($singleItemPrice, '0.01', 2) < 0) {
