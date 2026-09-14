@@ -65,8 +65,10 @@ final readonly class WelkoopAdapter implements HostSpecificAdapter, ShopAdapter
 
     private static function title(Crawler $crawler): string
     {
-        // Welkoop ships og:title under `name`, not `property`.
-        return HostPage::text($crawler, 'h1', 'meta[name="og:title"]', 'meta[property="og:title"]')
+        // Both og:title spellings are tried, `name` before `property`.
+        return HostPage::element($crawler, 'h1')
+            ?? HostPage::meta($crawler, 'meta[name="og:title"]')
+            ?? HostPage::meta($crawler, 'meta[property="og:title"]')
             ?? 'Welkoop product';
     }
 

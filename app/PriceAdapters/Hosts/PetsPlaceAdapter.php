@@ -63,7 +63,9 @@ final readonly class PetsPlaceAdapter extends HostAdapter
 
     private function extractTitle(Crawler $crawler): string
     {
-        return HostPage::text($crawler, 'meta[property="og:title"]', 'h1') ?? 'Pets Place product';
+        return HostPage::meta($crawler, 'meta[property="og:title"]')
+            ?? HostPage::element($crawler, 'h1')
+            ?? 'Pets Place product';
     }
 
     private function extractImage(Crawler $crawler): ?string

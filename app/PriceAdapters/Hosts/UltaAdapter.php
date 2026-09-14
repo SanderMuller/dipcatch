@@ -62,7 +62,9 @@ final readonly class UltaAdapter extends HostAdapter
 
     private static function title(Crawler $crawler): string
     {
-        return HostPage::text($crawler, 'meta[property="og:title"]', 'h1') ?? 'Ulta product';
+        return HostPage::meta($crawler, 'meta[property="og:title"]')
+            ?? HostPage::element($crawler, 'h1')
+            ?? 'Ulta product';
     }
 
     private static function ogImage(Crawler $crawler): ?string

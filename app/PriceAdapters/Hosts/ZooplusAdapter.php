@@ -110,9 +110,9 @@ final readonly class ZooplusAdapter extends HostAdapter
 
     private static function title(Crawler $crawler): string
     {
-        // The scoped h1 is the product's own; a bare h1 also matches the
-        // related-product headings further down the page.
-        return HostPage::text($crawler, 'h1[data-zta="ProductTitle__Title"]', 'meta[property="og:title"]')
+        // Scoped to the product-title component rather than a bare h1.
+        return HostPage::element($crawler, 'h1[data-zta="ProductTitle__Title"]')
+            ?? HostPage::meta($crawler, 'meta[property="og:title"]')
             ?? 'Zooplus product';
     }
 

@@ -77,7 +77,9 @@ final readonly class OrdinaryAdapter extends HostAdapter
 
     private static function title(Crawler $crawler): string
     {
-        return HostPage::text($crawler, 'meta[property="og:title"]', 'h1') ?? 'The Ordinary product';
+        return HostPage::meta($crawler, 'meta[property="og:title"]')
+            ?? HostPage::element($crawler, 'h1')
+            ?? 'The Ordinary product';
     }
 
     private static function ogImage(Crawler $crawler): ?string

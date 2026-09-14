@@ -64,9 +64,11 @@ final readonly class MedpetsAdapter extends HostAdapter
 
     private function extractTitle(Crawler $crawler): string
     {
-        // The h1 states the pack size this page sells; og:title states
-        // the product line without it.
-        return HostPage::text($crawler, 'h1', 'meta[property="og:title"]') ?? 'Medpets product';
+        // Reads the h1 first, where its siblings read og:title first. The
+        // reason is not recorded; the order is preserved as found.
+        return HostPage::element($crawler, 'h1')
+            ?? HostPage::meta($crawler, 'meta[property="og:title"]')
+            ?? 'Medpets product';
     }
 
     private function extractImage(Crawler $crawler): ?string

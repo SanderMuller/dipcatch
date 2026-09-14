@@ -47,8 +47,9 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
 
         // The payload carries related products in the same shape as this one,
         // so without the id from the URL there is no way to tell which records
-        // are ours. Dirk then reads nothing and adds no claim of its own: the
-        // JSON-LD offer's title and period stand.
+        // are ours. Dirk then reads nothing and claims nothing: the JSON-LD
+        // offer's period stands, and the pack size falls to the title parse
+        // that every adapter stating no size already uses.
         if ($data === null || $productId === null) {
             return ExtractionResult::success($snapshot);
         }
@@ -66,11 +67,6 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
         );
     }
 
-    /**
-     * The product record is the dict carrying both `headerText` and
-     * `packaging`; `productId` disambiguates when related products ride
-     * along.
-     */
     /**
      * The offer period behind the price, when the payload holds a price
      * record for this product whose offer price is the price the JSON-LD
@@ -102,6 +98,11 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
     }
 
     /**
+     * The product record is the dict carrying both `headerText` and
+     * `packaging`. A page lists related products in that same shape, so the
+     * id is what makes a record this product's — a payload with no record
+     * under this id states no size, rather than lending a neighbour's.
+     *
      * @param  list<mixed>  $data
      */
     private static function packagingFromNuxtPayload(array $data, string $productId): ?string

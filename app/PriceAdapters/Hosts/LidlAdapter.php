@@ -107,9 +107,11 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
     }
 
     /**
-     * The product record is the dict carrying both `productId` and `price`;
-     * `productId` disambiguates when related products ride along. The chain
-     * is product → price record → packaging record → `text`.
+     * The product record is the dict carrying both `productId` and `price`,
+     * and the chain from there is price record → packaging record → `text`.
+     * A page lists related products in that same shape, so the id is what
+     * makes a record this product's — a payload with no record under this id
+     * states no size, rather than lending a neighbour's.
      *
      * @param  list<mixed>  $data
      */
