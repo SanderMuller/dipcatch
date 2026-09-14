@@ -324,7 +324,7 @@
                     <flux:text class="mt-4 text-zinc-500">{{ __('No price history yet.') }}</flux:text>
                 @else
                     <flux:chart :value="$chart['rows']" class="mt-4 h-72 sm:h-80 min-[112.5rem]:h-120">
-                        <flux:chart.svg>
+                        <flux:chart.svg :gutter="$chart['hasNotified'] ? '52 8 8 8' : '20 8 8 8'">
                             <flux:chart.line field="price" class="text-amber-500 dark:text-amber-400" curve="none" />
                             <flux:chart.area field="price" class="text-amber-200/50 dark:text-amber-400/20" curve="none" />
                             @if ($chart['hasNotified'])
@@ -354,7 +354,7 @@
                             @endif
                         </flux:chart.tooltip>
                         @if ($chart['hasNotified'])
-                            <div class="flex flex-wrap justify-center gap-4 pt-4">
+                            <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-wrap justify-center gap-x-5 gap-y-2">
                                 <flux:chart.legend :label="__('Cheapest')">
                                     <flux:chart.legend.indicator class="bg-amber-500" />
                                 </flux:chart.legend>
