@@ -95,12 +95,10 @@ test('snapshot copy clears an inherited promotion window', function (): void {
 });
 
 test('a stored pair rebuilds only from the types the columns hold', function (mixed $quantity, mixed $total): void {
-    expect(BundleOffer::stored($quantity, $total))->toBeNull();
+    expect(BundleOffer::stored($quantity, $total, '2.85'))->toBeNull();
 })->with([
     'no quantity' => [null, '4.00'],
     'no total' => [2, null],
-    // The three models cast bundle_quantity to integer, so a string here is a
-    // caller defect. Recorded decision: check the type, never coerce it.
     'quantity as a string' => ['2', '4.00'],
     'quantity below two' => [1, '4.00'],
     'quantity above an unsigned small integer' => [65_536, '4.00'],
@@ -109,17 +107,19 @@ test('a stored pair rebuilds only from the types the columns hold', function (mi
 ]);
 
 test('a stored pair rebuilds when both columns hold what they should', function (): void {
-    $offer = BundleOffer::stored(2, '4.00');
+    $offer = BundleOffer::stored(2, '4.00', '2.85');
 
     expect($offer?->quantity)->toBe(2)
         ->and($offer?->totalPrice)->toBe('4.00');
 });
 
 test('a stored offer is withheld unless it beats the single-item price', function (): void {
-    expect(BundleOffer::storedIfCheaper(2, '4.00', '2.85'))->not->toBeNull()
-        ->and(BundleOffer::storedIfCheaper(2, '6.00', '2.85'))->toBeNull()
-        ->and(BundleOffer::storedIfCheaper(2, '5.70', '2.85'))->toBeNull()
-        ->and(BundleOffer::storedIfCheaper(2, '4.00', singleItemPrice: null))->toBeNull();
+    expect(BundleOffer::stored(2, '4.00', '2.85'))->not->toBeNull()
+        ->and(BundleOffer::stored(2, '6.00', '2.85'))->toBeNull()
+        // Exactly the shelf price per item is not cheaper.
+        ->and(BundleOffer::stored(2, '5.70', '2.85'))->toBeNull()
+        ->and(BundleOffer::stored(2, '4.00', singleItemPrice: null))->toBeNull()
+        ->and(BundleOffer::stored(2, '4.00', ''))->toBeNull();
 });
 
 test('the tracked-price test compares numerically, not by string identity', function (): void {

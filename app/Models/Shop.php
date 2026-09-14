@@ -34,6 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $promotion_starts_at
  * @property CarbonInterface|null $promotion_ends_at
  * @property string|null $promotion_label
+ * @property string|null $current_price
  * @property string|null $single_item_price
  * @property int|null $bundle_quantity
  * @property string|null $bundle_total_price
@@ -250,7 +251,7 @@ final class Shop extends Model
 
     public function bundleOffer(): ?BundleOffer
     {
-        return BundleOffer::storedIfCheaper(
+        return BundleOffer::stored(
             $this->bundle_quantity,
             $this->bundle_total_price,
             $this->singleItemPrice(),
@@ -261,16 +262,7 @@ final class Shop extends Model
     {
         $offer = $this->bundleOffer();
 
-        if ($offer === null || ! $offer->isTrackedAt($this->currentPrice())) {
-            return null;
-        }
-
-        return $offer;
-    }
-
-    private function currentPrice(): ?string
-    {
-        return $this->current_price === null ? null : (string) $this->current_price;
+        return $offer !== null && $offer->isTrackedAt($this->current_price) ? $offer : null;
     }
 
     public function faviconUrl(): string

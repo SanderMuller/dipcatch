@@ -11,7 +11,8 @@ final readonly class ResolvedBundlePricing
     /**
      * @param  ?BundleOffer  $appliedOffer  The offer the tracked price was taken from,
      *                                      which is the offer the price check records.
-     *                                      Null when the tracked price is the single-item one.
+     *                                      Null when the tracked price is not the
+     *                                      offer's unit price.
      * @param  array<string, mixed>  $promotionUpdates
      */
     private function __construct(
@@ -19,7 +20,7 @@ final readonly class ResolvedBundlePricing
         public ?string $singleItemPrice,
         public ?BundleOffer $offer,
         public ?BundleOffer $appliedOffer,
-        private array $promotionUpdates,
+        public array $promotionUpdates,
     ) {}
 
     public static function merge(
@@ -109,12 +110,6 @@ final readonly class ResolvedBundlePricing
             'bundle_quantity' => $this->offer?->quantity,
             'bundle_total_price' => $this->offer?->totalPrice,
         ];
-    }
-
-    /** @return array<string, mixed> */
-    public function promotionUpdates(): array
-    {
-        return $this->promotionUpdates;
     }
 
     /** @return array{price: ?string, single_item_price: ?string, bundle_quantity: ?int, bundle_total_price: ?string} */

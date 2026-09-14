@@ -71,7 +71,7 @@ final class PriceCheck extends Model
 
     public function bundleOffer(): ?BundleOffer
     {
-        return BundleOffer::storedIfCheaper(
+        return BundleOffer::stored(
             $this->bundle_quantity,
             $this->bundle_total_price,
             $this->singleItemPrice(),

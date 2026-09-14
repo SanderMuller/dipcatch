@@ -112,13 +112,18 @@ final readonly class ShopDraft
         ?string $variantKey = null,
     ): self {
         $singleItemPrice = self::string($snapshot, 'single_item_price') ?? self::string($snapshot, 'price') ?? '';
-        $bundleOffer = self::bundleOffer($snapshot);
+        $bundleOffer = BundleOffer::stored(
+            $snapshot['bundle_quantity'] ?? null,
+            self::string($snapshot, 'bundle_total_price'),
+            $singleItemPrice,
+        );
         $promotionWindow = self::promotionWindow($snapshot);
         $hasPromotionDate = self::string($snapshot, 'promotion_starts_at') !== null
             || self::string($snapshot, 'promotion_ends_at') !== null;
 
-        if ($bundleOffer !== null
-            && (! $bundleOffer->isCheaperThan($singleItemPrice) || ($hasPromotionDate && $promotionWindow === null))) {
+        // A snapshot stating a promotion date this draft could not parse says
+        // the bundle runs on terms it cannot check, so the bundle is dropped.
+        if ($hasPromotionDate && $promotionWindow === null) {
             $bundleOffer = null;
         }
 
@@ -143,17 +148,6 @@ final readonly class ShopDraft
             singleItemPrice: $singleItemPrice,
             bundleOffer: $bundleOffer,
             promotionWindow: $promotionWindow,
-        );
-    }
-
-    /**
-     * @param  array<string, mixed>  $snapshot
-     */
-    private static function bundleOffer(array $snapshot): ?BundleOffer
-    {
-        return BundleOffer::stored(
-            $snapshot['bundle_quantity'] ?? null,
-            self::string($snapshot, 'bundle_total_price'),
         );
     }
 

@@ -57,7 +57,7 @@ final readonly class BundlePriceLabel
             return null;
         }
 
-        $offer = BundleOffer::storedIfCheaper($quantity, $total, $single);
+        $offer = BundleOffer::stored($quantity, $total, $single);
         $window = self::promotionWindow($snapshot);
         $hasPromotionDate = isset($snapshot['promotion_starts_at']) || isset($snapshot['promotion_ends_at']);
 

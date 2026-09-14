@@ -68,7 +68,11 @@ test('non-authoritative response preserves complete stored bundle pricing', func
         ->and($shop->single_item_price)->toBe('2.85')
         ->and($shop->bundle_total_price)->toBe('4.00')
         ->and($check?->price)->toBe('2.00')
-        ->and($check?->single_item_price)->toBe('2.85');
+        ->and($check?->single_item_price)->toBe('2.85')
+        // The preserve path recovers the applied offer from the stored
+        // columns; without that, the check records no bundle at all.
+        ->and($check?->bundle_quantity)->toBe(2)
+        ->and($check?->bundle_total_price)->toBe('4.00');
 });
 
 test('authoritative empty response clears bundle and restores shelf price', function (): void {
@@ -225,6 +229,50 @@ function reportBundle(ShopSnapshot $snapshot): void
 /**
  * @param  array<string, mixed>  $overrides
  */
+test('a preserved bundle beside a null current price writes no bundle on the check', function (): void {
+    // The stored decision lives only in the columns, and with no current price
+    // there is nothing saying the bundle was the price tracked. Characterizes
+    // today's write; the null current_price itself is a separate defect.
+    $shop = storedBundleShop();
+    $shop->forceFill(['current_price' => null])->save();
+    reportBundle(new ShopSnapshot('Fanta', imageUrl: null, price: '3.10', currency: 'EUR', inStock: true));
+
+    runBundleCheck($shop);
+
+    $check = $shop->fresh()->priceChecks()->first();
+
+    expect($check?->price)->toBeNull()
+        ->and($check?->bundle_quantity)->toBeNull()
+        ->and($check?->bundle_total_price)->toBeNull()
+        ->and($shop->fresh()->bundle_quantity)->toBe(2);
+});
+
+test('a preserved bundle keeps its promotion even when the source clears windows', function (): void {
+    // The snapshot claims promotion authority and states no window, which on
+    // any other path clears the stored promotion. The preserve path writes no
+    // promotion columns at all, so the running promotion survives.
+    $shop = storedBundleShop([
+        'promotion_ends_at' => now()->addDays(3),
+        'promotion_label' => '2 voor 4,00',
+    ]);
+    reportBundle(new ShopSnapshot(
+        'Fanta',
+        imageUrl: null,
+        price: '3.10',
+        currency: 'EUR',
+        inStock: true,
+        promotionWindowAuthoritative: true,
+    ));
+
+    runBundleCheck($shop);
+
+    expect($shop->fresh()->promotion_label)->toBe('2 voor 4,00')
+        ->and($shop->fresh()->promotion_ends_at)->not->toBeNull();
+});
+
+/**
+ * @param  array<string, mixed>  $overrides
+ */
 function storedBundleShop(array $overrides = []): Shop
 {
     return Shop::factory()->for(Product::factory()->create(['currency' => 'EUR']))->state($overrides)->create([
@@ -245,34 +293,3 @@ function runBundleCheck(Shop $shop): void
         app(AhApiSource::class),
     );
 }
-
-test('a preserved bundle beside a null current price writes no bundle on the check', function (): void {
-    // The stored decision lives only in the columns, and with no current price
-    // there is nothing saying the bundle was the price tracked. Characterizes
-    // today's write; the null current_price itself is a separate defect.
-    $shop = storedBundleShop();
-    $shop->forceFill(['current_price' => null])->save();
-    reportBundle(new ShopSnapshot('Fanta', imageUrl: null, price: '3.10', currency: 'EUR', inStock: true));
-
-    runBundleCheck($shop);
-
-    $check = $shop->fresh()->priceChecks()->first();
-
-    expect($check?->price)->toBeNull()
-        ->and($check?->bundle_quantity)->toBeNull()
-        ->and($check?->bundle_total_price)->toBeNull()
-        ->and($shop->fresh()->bundle_quantity)->toBe(2);
-});
-
-test('a preserved bundle writes no promotion columns', function (): void {
-    $shop = storedBundleShop([
-        'promotion_ends_at' => now()->addDays(3),
-        'promotion_label' => '2 voor 4,00',
-    ]);
-    reportBundle(new ShopSnapshot('Fanta', imageUrl: null, price: '3.10', currency: 'EUR', inStock: true));
-
-    runBundleCheck($shop);
-
-    expect($shop->fresh()->promotion_label)->toBe('2 voor 4,00')
-        ->and($shop->fresh()->promotion_ends_at)->not->toBeNull();
-});

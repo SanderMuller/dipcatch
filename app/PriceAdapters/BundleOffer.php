@@ -41,12 +41,8 @@ final readonly class BundleOffer
     }
 
     /**
-     * Whether this offer is the one a price was tracked at.
-     *
-     * The comparison is numeric, so `2.0` and `2.00` are the same price. The
-     * callers each held their own version of this test, two of them by string
-     * identity, which was correct only while both sides happened to be
-     * normalised.
+     * Whether this offer is the one a price was tracked at. The comparison is
+     * numeric, so `2.0` and `2.00` are the same price.
      */
     public function isTrackedAt(?string $price): bool
     {
@@ -59,41 +55,29 @@ final readonly class BundleOffer
 
     /**
      * Rebuild an offer from the `bundle_quantity` / `bundle_total_price` pair
-     * as it comes back out of storage.
+     * as it comes back out of storage, and only when it still beats the
+     * single-item price stored beside it. An offer costing more per item than
+     * one off the shelf is not an offer, and a reader that showed it would
+     * price a bundle above the shelf price.
      *
      * The types are checked, never cast. The three models that hold the pair
-     * cast the columns themselves (`integer` and `decimal:2`), and the two
-     * readers that take an untyped array already refused anything else, so a
-     * value of another type is a caller defect rather than input to coerce.
+     * cast the columns themselves — `integer` and `decimal:2`, which return an
+     * int and a string whatever was assigned — so a value of another type
+     * reaching here is a caller defect rather than input to coerce.
      */
-    public static function stored(mixed $quantity, mixed $totalPrice): ?self
+    public static function stored(mixed $quantity, mixed $totalPrice, ?string $singleItemPrice): ?self
     {
-        if (! is_int($quantity) || ! is_string($totalPrice)) {
+        if (! is_int($quantity) || ! is_string($totalPrice) || $singleItemPrice === null) {
             return null;
         }
 
         try {
-            return new self($quantity, $totalPrice);
+            $offer = new self($quantity, $totalPrice);
         } catch (InvalidArgumentException) {
             return null;
         }
-    }
 
-    /**
-     * The stored offer, but only when it beats the single-item price it is
-     * stored beside. An offer that costs more per item than buying one is not
-     * an offer, and every reader of the stored pair wants it gone — a caller
-     * that shows it would price a bundle above the shelf price.
-     */
-    public static function storedIfCheaper(mixed $quantity, mixed $totalPrice, ?string $singleItemPrice): ?self
-    {
-        $offer = self::stored($quantity, $totalPrice);
-
-        if ($offer === null || $singleItemPrice === null || ! $offer->isCheaperThan($singleItemPrice)) {
-            return null;
-        }
-
-        return $offer;
+        return $offer->isCheaperThan($singleItemPrice) ? $offer : null;
     }
 
     public static function fromLabel(string $label, string $singleItemPrice): ?self
