@@ -43,14 +43,24 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
         assert($snapshot instanceof ShopSnapshot);
 
         $productId = HostUrl::lastNumericSegment($url);
-        $packaging = self::packagingFromNuxtPayload($html, $productId);
+        $data = NuxtData::decode($html);
 
-        return ExtractionResult::success($snapshot->with(
-            packSize: $packaging ?? $snapshot->packSize,
-            packSizeAuthoritative: $packaging !== null ? true : null,
-            promotionWindow: self::promotionWindow($html, $productId, $snapshot->price),
-            promotionWindowAuthoritative: true,
-        ));
+        if ($data === null) {
+            return ExtractionResult::success($snapshot);
+        }
+
+        $packaging = self::packagingFromNuxtPayload($data, $productId);
+
+        if ($packaging !== null) {
+            $snapshot = $snapshot->withPackSize($packaging);
+        }
+
+        // The payload is the only promotion source this adapter reads, so a
+        // page that carries it and states no period ends the promotion. A
+        // page served without it says nothing, and must not clear one.
+        return ExtractionResult::success(
+            $snapshot->withPromotionWindow(self::promotionWindow($data, $productId, $snapshot->price)),
+        );
     }
 
     /**
@@ -63,16 +73,12 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
      * record for this product whose offer price is the price the JSON-LD
      * reported. A record that prices something else describes a different
      * offer, and its dates would be attached to a price they do not cover.
+     *
+     * @param  list<mixed>  $data
      */
-    private static function promotionWindow(string $html, ?string $productId, string $price): ?PromotionWindow
+    private static function promotionWindow(array $data, ?string $productId, string $price): ?PromotionWindow
     {
         if ($productId === null) {
-            return null;
-        }
-
-        $data = NuxtData::decode($html);
-
-        if ($data === null) {
             return null;
         }
 
@@ -96,13 +102,11 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
         return null;
     }
 
-    private static function packagingFromNuxtPayload(string $html, ?string $productId): ?string
+    /**
+     * @param  list<mixed>  $data
+     */
+    private static function packagingFromNuxtPayload(array $data, ?string $productId): ?string
     {
-        $data = NuxtData::decode($html);
-        if ($data === null) {
-            return null;
-        }
-
         $deref = static fn (mixed $v): mixed => is_int($v) && isset($data[$v]) ? $data[$v] : null;
 
         $fallback = null;

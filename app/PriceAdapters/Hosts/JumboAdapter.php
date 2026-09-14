@@ -42,32 +42,23 @@ final readonly class JumboAdapter extends HostAdapter
         $label = $labelNode->count() > 0 ? trim($labelNode->text('')) : null;
         $window = $promotion->count() > 0 ? self::promotionWindow($promotion, $label) : null;
         $hasDateText = $promotion->filter('[data-testid="product-communication"]')->count() > 0;
-        $raw = $result->snapshot->raw;
-        $inStock = $result->snapshot->inStock;
-        $stockSignal = $result->snapshot->stockSignal;
+        $snapshot = $result->snapshot;
 
-        if ($inStock === null && self::hasEnabledAddToCartButton($product)) {
-            $inStock = true;
-            $stockSignal = 'jumbo:add-to-cart';
+        if ($snapshot->inStock === null && self::hasEnabledAddToCartButton($product)) {
+            $snapshot = $snapshot->withStock(true, 'jumbo:add-to-cart');
         }
 
         if ($hasDateText && $window === null) {
-            $raw['bundle_diagnostic'] = 'invalid_promotion_window';
+            $snapshot = $snapshot->withRaw([...$snapshot->raw, 'bundle_diagnostic' => 'invalid_promotion_window']);
         }
 
         $offer = is_string($label) && (! $hasDateText || $window !== null)
-            ? BundleOffer::fromLabel($label, $result->snapshot->price)
+            ? BundleOffer::fromLabel($label, $snapshot->price)
             : null;
 
-        return ExtractionResult::success($result->snapshot->with(
-            promotionWindow: $window,
-            promotionWindowAuthoritative: true,
-            inStock: $inStock,
-            stockSignal: $stockSignal,
-            bundleOffer: $offer,
-            bundleOfferAuthoritative: true,
-            raw: $raw,
-        ));
+        return ExtractionResult::success(
+            $snapshot->withPromotionWindow($window)->withBundleOffer($offer),
+        );
     }
 
     public function key(): string

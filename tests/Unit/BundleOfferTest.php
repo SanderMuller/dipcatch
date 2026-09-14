@@ -60,19 +60,38 @@ test('snapshot uses bundle only while its promotion runs', function (): void {
     $snapshot = new ShopSnapshot('Fanta', imageUrl: null, price: '2.85', currency: 'EUR', inStock: true, bundleOffer: $offer);
 
     expect($snapshot->trackedPrice())->toBe('2.00')
-        ->and($snapshot->with(promotionWindow: $running)->trackedPrice())->toBe('2.00')
-        ->and($snapshot->with(promotionWindow: $expired)->trackedPrice())->toBe('2.85');
+        ->and($snapshot->withPromotionWindow($running)->trackedPrice())->toBe('2.00')
+        ->and($snapshot->withPromotionWindow($expired)->trackedPrice())->toBe('2.85');
 });
 
 test('snapshot copy preserves or authoritatively clears bundle state', function (): void {
     $offer = new BundleOffer(2, '4.00');
     $snapshot = new ShopSnapshot('Fanta', imageUrl: null, price: '2.85', currency: 'EUR', inStock: true, bundleOffer: $offer, bundleOfferAuthoritative: true);
 
-    $preserved = $snapshot->with(packSize: '1.5 l');
-    $cleared = $snapshot->with(bundleOfferAuthoritative: true);
+    $preserved = $snapshot->withPackSize('1.5 l');
+    $cleared = $snapshot->withBundleOffer(bundleOffer: null);
 
     expect($preserved->bundleOffer)->toBe($offer)
         ->and($preserved->bundleOfferAuthoritative)->toBeTrue()
+        ->and($preserved->packSize)->toBe('1.5 l')
+        ->and($preserved->packSizeAuthoritative)->toBeTrue()
         ->and($cleared->bundleOffer)->toBeNull()
         ->and($cleared->bundleOfferAuthoritative)->toBeTrue();
+});
+
+test('snapshot copy clears an inherited promotion window', function (): void {
+    $snapshot = new ShopSnapshot(
+        'Fanta',
+        imageUrl: null,
+        price: '2.85',
+        currency: 'EUR',
+        inStock: true,
+        promotionWindow: PromotionWindow::make(endsAt: CarbonImmutable::now()->addDay()),
+        promotionWindowAuthoritative: true,
+    );
+
+    $cleared = $snapshot->withPromotionWindow(promotionWindow: null);
+
+    expect($cleared->promotionWindow)->toBeNull()
+        ->and($cleared->promotionWindowAuthoritative)->toBeTrue();
 });

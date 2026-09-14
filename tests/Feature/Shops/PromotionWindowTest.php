@@ -88,7 +88,7 @@ test('the snapshot copy helper carries every field through', function (): void {
         promotionWindowAuthoritative: true,
     );
 
-    $copy = $original->with(packSize: '150 g', packSizeAuthoritative: true);
+    $copy = $original->withPackSize('150 g');
 
     expect($copy->packSize)->toBe('150 g')
         ->and($copy->packSizeAuthoritative)->toBeTrue()

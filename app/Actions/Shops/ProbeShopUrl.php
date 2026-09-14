@@ -187,7 +187,7 @@ final readonly class ProbeShopUrl
             return ProbeOutcome::extractionFailed('currency_not_a_code');
         }
 
-        $snapshot = $snapshot->with(currency: $currency);
+        $snapshot = $snapshot->withCurrency($currency);
 
         if ($product instanceof Product && strcasecmp($currency, $product->currency) !== 0) {
             return ProbeOutcome::failed(ProbeFailure::CurrencyMismatch, [

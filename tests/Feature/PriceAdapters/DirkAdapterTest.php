@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\PriceAdapters\Hosts\DirkAdapter;
+use Carbon\CarbonImmutable;
 
 beforeEach(function (): void {
     $this->adapter = new DirkAdapter();
@@ -29,6 +30,34 @@ test('still succeeds without a pack size when the payload is missing', function 
         ->and($result->snapshot?->price)->toBe('1.69')
         ->and($result->snapshot?->packSize)->toBeNull()
         ->and($result->snapshot?->packSizeAuthoritative)->toBeFalse();
+});
+
+test('a page served without the payload keeps the period the JSON-LD stated', function (): void {
+    $validUntil = CarbonImmutable::now()->addDays(7)->toDateString();
+    $html = str_replace(
+        '"priceCurrency":"EUR"',
+        '"priceCurrency":"EUR","priceValidUntil":"' . $validUntil . '"',
+        dirkPage(),
+    );
+    $html = (string) preg_replace('/<script type="application\/json" id="__NUXT_DATA__">.*?<\/script>/s', '', $html);
+
+    $result = new DirkAdapter()->extract('https://www.dirk.nl/boodschappen/x/x/x/115212', $html);
+
+    expect($result->snapshot?->promotionWindow?->endsAt?->toDateString())->toBe($validUntil);
+});
+
+test('a payload that prices another offer clears the period the JSON-LD stated', function (): void {
+    $validUntil = CarbonImmutable::now()->addDays(7)->toDateString();
+    $html = str_replace(
+        '"priceCurrency":"EUR"',
+        '"priceCurrency":"EUR","priceValidUntil":"' . $validUntil . '"',
+        dirkPage(offerPrice: '2.49'),
+    );
+
+    $result = new DirkAdapter()->extract('https://www.dirk.nl/boodschappen/x/x/x/115212', $html);
+
+    expect($result->snapshot?->promotionWindow)->toBeNull()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
 });
 
 test('fails with a dirk-specific reason when the page has no JSON-LD', function (): void {
