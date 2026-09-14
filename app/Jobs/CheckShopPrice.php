@@ -516,10 +516,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 // leaves it alone.
                 // Same clearing rule again: a source that reads promotion
                 // fields and finds none ends the promotion on screen.
-                $updates += $pricing->promotionUpdates(
-                    $outcome['promotion_window'],
-                    $outcome['promotion_window_authoritative'],
-                );
+                $updates += $pricing->promotionUpdates();
 
                 $offer = $outcome['conditional_offer'];
                 if ($offer !== null || $outcome['conditional_offer_authoritative']) {
