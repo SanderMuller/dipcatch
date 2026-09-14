@@ -36,10 +36,7 @@ test('happy path: valid slug renders product summary + shop list', function (): 
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertSee('Acme Headphones', escape: false)
-        ->assertSee('€85.00', escape: false)
-        ->assertSee('bol.com', escape: false);
+    $response->assertOk()->assertSeeHtml('Acme Headphones')->assertSeeHtml('€85.00')->assertSeeHtml('bol.com');
 });
 
 test('bundle price always shows quantity total and single-item price', function (): void {
@@ -55,14 +52,7 @@ test('bundle price always shows quantity total and single-item price', function 
         'pack_unit' => 'ml',
     ]);
 
-    $this->get('/p/' . str_repeat('a', 32))
-        ->assertOk()
-        ->assertSeeInOrder(['€2.00', '2 for €4.00', 'Cheapest across'], escape: false)
-        ->assertSee('2 for €4.00', escape: false)
-        ->assertSee('or €2.85 each', escape: false)
-        ->assertSee('title="Regular price"', escape: false)
-        ->assertSeeText('€1.90 /l')
-        ->assertSee('Tracked on DipCatch: cheapest at €2.00 · 2 for €4.00 · or €2.85 each', escape: false);
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()->assertSeeHtmlInOrder(['€2.00', '2 for €4.00', 'Cheapest across'])->assertSeeHtml('2 for €4.00')->assertSeeHtml('or €2.85 each')->assertSeeHtml('title="Regular price"')->assertSeeText('€1.90 /l')->assertSeeHtml('Tracked on DipCatch: cheapest at €2.00 · 2 for €4.00 · or €2.85 each');
 });
 
 test('equal prices use the same stable shop order as the cheapest-price engine', function (): void {
@@ -81,10 +71,7 @@ test('equal prices use the same stable shop order as the cheapest-price engine',
         'created_at' => now(),
     ]);
 
-    $this->get('/p/' . str_repeat('a', 32))
-        ->assertOk()
-        ->assertSeeInOrder(['oldest.test', 'newer.test'], escape: false)
-        ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at €2.00">', escape: false);
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()->assertSeeHtmlInOrder(['oldest.test', 'newer.test'])->assertSeeHtml('<meta property="og:description" content="Tracked on DipCatch: cheapest at €2.00">');
 });
 
 test('headline and shop list ignore offers in another currency', function (): void {
@@ -100,11 +87,7 @@ test('headline and shop list ignore offers in another currency', function (): vo
         'currency' => 'EUR',
     ]);
 
-    $this->get('/p/' . str_repeat('a', 32))
-        ->assertOk()
-        ->assertSee('euro.test', escape: false)
-        ->assertDontSee('wrong-currency.test', escape: false)
-        ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at €2.00">', escape: false);
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()->assertSeeHtml('euro.test')->assertDontSeeHtml('wrong-currency.test')->assertSeeHtml('<meta property="og:description" content="Tracked on DipCatch: cheapest at €2.00">');
 });
 
 test('unknown slug returns 404', function (): void {
@@ -139,8 +122,7 @@ test('eligibility filter omits inactive shops', function (): void {
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertSee('visible.test', escape: false)
-        ->assertDontSee('inactive.test', escape: false);
+    $response->assertSeeHtml('visible.test')->assertDontSeeHtml('inactive.test');
 });
 
 test('eligibility filter omits out-of-stock shops', function (): void {
@@ -156,8 +138,7 @@ test('eligibility filter omits out-of-stock shops', function (): void {
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertSee('in-stock.test', escape: false)
-        ->assertDontSee('oos.test', escape: false);
+    $response->assertSeeHtml('in-stock.test')->assertDontSeeHtml('oos.test');
 });
 
 test('eligibility filter omits dead shops', function (): void {
@@ -173,8 +154,7 @@ test('eligibility filter omits dead shops', function (): void {
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertSee('healthy.test', escape: false)
-        ->assertDontSee('dead.test', escape: false);
+    $response->assertSeeHtml('healthy.test')->assertDontSeeHtml('dead.test');
 });
 
 test('eligibility filter omits shops with null current_price', function (): void {
@@ -190,8 +170,7 @@ test('eligibility filter omits shops with null current_price', function (): void
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertSee('priced.test', escape: false)
-        ->assertDontSee('nullprice.test', escape: false);
+    $response->assertSeeHtml('priced.test')->assertDontSeeHtml('nullprice.test');
 });
 
 test('private shop fields never appear in the response body', function (): void {
@@ -238,9 +217,7 @@ test('private product fields never appear in the response body', function (): vo
 test('guest viewer sees the page without an auth redirect', function (): void {
     makeSharedProduct();
 
-    $this->get('/p/' . str_repeat('a', 32))
-        ->assertOk()
-        ->assertSee('DipCatch', escape: false);  // footer link signals successful render
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()->assertSeeHtml('DipCatch');  // footer link signals successful render
 });
 
 test('response includes X-Robots-Tag noindex header', function (): void {
@@ -257,11 +234,7 @@ test('emits OG + Twitter meta tags with safeImageUrl-guarded image', function ()
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertSee('<meta property="og:title" content="Acme Headphones">', escape: false)
-        ->assertSee('<meta property="og:description" content="Tracked on DipCatch: cheapest at €85.00">', escape: false)
-        ->assertSee('<meta property="og:image" content="https://example.com/img.png">', escape: false)
-        ->assertSee('<meta name="twitter:card" content="summary_large_image">', escape: false)
-        ->assertSee('<meta name="twitter:image" content="https://example.com/img.png">', escape: false);
+    $response->assertSeeHtml('<meta property="og:title" content="Acme Headphones">')->assertSeeHtml('<meta property="og:description" content="Tracked on DipCatch: cheapest at €85.00">')->assertSeeHtml('<meta property="og:image" content="https://example.com/img.png">')->assertSeeHtml('<meta name="twitter:card" content="summary_large_image">')->assertSeeHtml('<meta name="twitter:image" content="https://example.com/img.png">');
 });
 
 test('OG image is omitted when image_url uses a non-http scheme', function (): void {
@@ -269,10 +242,7 @@ test('OG image is omitted when image_url uses a non-http scheme', function (): v
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertSee('<meta name="twitter:card" content="summary">', escape: false)
-        ->assertDontSee('og:image', escape: false)
-        ->assertDontSee('twitter:image', escape: false)
-        ->assertDontSee('javascript:alert', escape: false);
+    $response->assertSeeHtml('<meta name="twitter:card" content="summary">')->assertDontSeeHtml('og:image')->assertDontSeeHtml('twitter:image')->assertDontSeeHtml('javascript:alert');
 });
 
 test('OG image is omitted when image_url is null', function (): void {
@@ -280,8 +250,7 @@ test('OG image is omitted when image_url is null', function (): void {
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertSee('<meta name="twitter:card" content="summary">', escape: false)
-        ->assertDontSee('og:image', escape: false);
+    $response->assertSeeHtml('<meta name="twitter:card" content="summary">')->assertDontSeeHtml('og:image');
 });
 
 test('chart payload renders inline with started/ended segment data', function (): void {
@@ -302,12 +271,7 @@ test('chart payload renders inline with started/ended segment data', function ()
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertSee('Price (last 90 days)', escape: false)
-        ->assertSee('id="price-history-chart"', escape: false)
-        ->assertSee('"y":"100.00"', escape: false)
-        ->assertSee('"y":"85.00"', escape: false)
-        ->assertSee('cdn.jsdelivr.net/npm/chart.js', escape: false);
+    $response->assertOk()->assertSeeHtml('Price (last 90 days)')->assertSeeHtml('id="price-history-chart"')->assertSeeHtml('"y":"100.00"')->assertSeeHtml('"y":"85.00"')->assertSeeHtml('cdn.jsdelivr.net/npm/chart.js');
 });
 
 test('chart + Chart.js script are not emitted when history is empty', function (): void {
@@ -318,10 +282,7 @@ test('chart + Chart.js script are not emitted when history is empty', function (
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertDontSee('Price (last 90 days)', escape: false)
-        ->assertDontSee('id="price-history-chart"', escape: false)
-        ->assertDontSee('cdn.jsdelivr.net/npm/chart.js', escape: false);
+    $response->assertOk()->assertDontSeeHtml('Price (last 90 days)')->assertDontSeeHtml('id="price-history-chart"')->assertDontSeeHtml('cdn.jsdelivr.net/npm/chart.js');
 });
 
 test('chart payload excludes history segments older than 90 days', function (): void {
@@ -341,9 +302,7 @@ test('chart payload excludes history segments older than 90 days', function (): 
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertDontSee('"y":"999.99"', escape: false)
-        ->assertSee('"y":"85.00"', escape: false);
+    $response->assertOk()->assertDontSeeHtml('"y":"999.99"')->assertSeeHtml('"y":"85.00"');
 });
 
 test('stale cheapest_price is suppressed when no shop is currently eligible', function (): void {
@@ -358,10 +317,7 @@ test('stale cheapest_price is suppressed when no shop is currently eligible', fu
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertSee('No live price available right now', escape: false)
-        ->assertDontSee('€85.00', escape: false)
-        ->assertDontSee('gone.test', escape: false);
+    $response->assertOk()->assertSeeHtml('No live price available right now')->assertDontSeeHtml('€85.00')->assertDontSeeHtml('gone.test');
 });
 
 test('shop with a pack size renders its unit price under the price', function (): void {
@@ -376,8 +332,7 @@ test('shop with a pack size renders its unit price under the price', function ()
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertSee('€8.45 /kg', escape: false);
+    $response->assertOk()->assertSeeHtml('€8.45 /kg');
 });
 
 test('shop without a pack size shows no unit price', function (): void {
@@ -392,10 +347,7 @@ test('shop without a pack size shows no unit price', function (): void {
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertDontSee('/kg', escape: false)
-        ->assertDontSee(' /l', escape: false)
-        ->assertDontSee('/stuk', escape: false);
+    $response->assertOk()->assertDontSeeHtml('/kg')->assertDontSeeHtml(' /l')->assertDontSeeHtml('/stuk');
 });
 
 test('throttle: the 121st request in a minute returns 429', function (): void {
@@ -423,9 +375,7 @@ test('chart payload includes a long-running segment that started before the wind
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertSee('id="price-history-chart"', escape: false)
-        ->assertSee('"y":"85.00"', escape: false);
+    $response->assertOk()->assertSeeHtml('id="price-history-chart"')->assertSeeHtml('"y":"85.00"');
 });
 
 test('chart payload clips a segment that started before the window to the cutoff', function (): void {
@@ -442,10 +392,7 @@ test('chart payload clips a segment that started before the window to the cutoff
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertSee('"y":"85.00"', escape: false)
-        ->assertDontSee(now()->subDays(400)->format('Y-m-d'), escape: false)
-        ->assertSee(now()->subDays(90)->format('Y-m-d'), escape: false);
+    $response->assertOk()->assertSeeHtml('"y":"85.00"')->assertDontSeeHtml(now()->subDays(400)->format('Y-m-d'))->assertSeeHtml(now()->subDays(90)->format('Y-m-d'));
 });
 
 test('chart payload includes a segment that started before the window and ended inside it', function (): void {
@@ -468,9 +415,7 @@ test('chart payload includes a segment that started before the window and ended 
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertSee('"y":"120.00"', escape: false)
-        ->assertSee('"y":"85.00"', escape: false);
+    $response->assertOk()->assertSeeHtml('"y":"120.00"')->assertSeeHtml('"y":"85.00"');
 });
 
 test('chart payload never carries another products segments', function (): void {
@@ -496,7 +441,5 @@ test('chart payload never carries another products segments', function (): void 
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()
-        ->assertSee('"y":"85.00"', escape: false)
-        ->assertDontSee('"y":"777.77"', escape: false);
+    $response->assertOk()->assertSeeHtml('"y":"85.00"')->assertDontSeeHtml('"y":"777.77"');
 });

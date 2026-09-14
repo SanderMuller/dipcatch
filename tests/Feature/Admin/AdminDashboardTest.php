@@ -173,10 +173,7 @@ it('sizes the admin brand logo without relying on a compiled theme', function ()
     // The admin panel compiles no Vite theme, so Tailwind utilities written in
     // a Blade partial do not exist in its CSS. The 512px logo then rendered at
     // full size and covered the sidebar. Inline styles are what fixed it.
-    $this->get('/admin')
-        ->assertOk()
-        ->assertSee('height:2rem', escape: false)
-        ->assertSee('images/dipcatch-logo.png', escape: false);
+    $this->get('/admin')->assertOk()->assertSeeHtml('height:2rem')->assertSeeHtml('images/dipcatch-logo.png');
 });
 
 it('shows subscription entitlement even with no Stripe configured', function (): void {

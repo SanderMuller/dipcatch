@@ -86,9 +86,7 @@ test('the page offers a Claude install link with the encoded mcp url', function 
     $href = 'https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=DipCatch&connectorUrl=' . rawurlencode($endpoint);
 
     livewire(ConnectionsPage::class)
-        ->assertOk()
-        ->assertSee('Connect Claude')
-        ->assertSee(htmlspecialchars($href, ENT_QUOTES | ENT_HTML5), escape: false)
+        ->assertOk()->assertSee('Connect Claude')->assertSeeHtml(htmlspecialchars($href, ENT_QUOTES | ENT_HTML5))
         ->assertDontSee('Developer Mode');
 });
 
@@ -114,7 +112,7 @@ test('the ChatGPT install button stays hidden for a non-https or non-chatgpt url
         ->assertDontSee('Install in ChatGPT');
 
     if ($url !== '') {
-        $page->assertDontSee($url, escape: false);
+        $page->assertDontSeeHtml($url);
     }
 })->with([
     'empty' => [''],
@@ -131,9 +129,7 @@ test('the ChatGPT install button uses a valid chatgpt.com listing url', function
 
     livewire(ConnectionsPage::class)
         ->assertOk()
-        ->assertSee('Install in ChatGPT')
-        ->assertSee('Opens the DipCatch plugin in ChatGPT. Connect it there, then allow access.')
-        ->assertSee($listing, escape: false)
+        ->assertSee('Install in ChatGPT')->assertSee('Opens the DipCatch plugin in ChatGPT. Connect it there, then allow access.')->assertSeeHtml($listing)
         ->assertDontSee('ChatGPT needs DipCatch in its plugin directory.');
 })->with([
     'apex' => ['https://chatgpt.com/g/g-dipcatch'],

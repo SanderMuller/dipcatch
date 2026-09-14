@@ -7,11 +7,7 @@ test('login screen can be rendered', function (): void {
     $response = $this->get(route('login'));
 
     $response
-        ->assertOk()
-        ->assertSee('Sign in with a passkey')
-        ->assertSee("options: '" . route('passkey.login-options') . "'", false)
-        ->assertSee("submit: '" . route('passkey.login') . "'", false)
-        ->assertDontSee(route('passkey.confirm-options'), false);
+        ->assertOk()->assertSee('Sign in with a passkey')->assertSeeHtml("options: '" . route('passkey.login-options') . "'")->assertSeeHtml("submit: '" . route('passkey.login') . "'")->assertDontSeeHtml(route('passkey.confirm-options'));
 });
 
 test('login screen leads with social login and keeps the passkey below the form', function (): void {
@@ -51,10 +47,7 @@ test('login screen hides a provider that is not fully set up', function (): void
         'redirect' => 'https://dipcatch.test/auth/apple/callback',
     ]);
 
-    $this->get(route('login'))
-        ->assertOk()
-        ->assertSee(route('social.redirect', 'google'), false)
-        ->assertDontSee(route('social.redirect', 'apple'), false)
+    $this->get(route('login'))->assertOk()->assertSeeHtml(route('social.redirect', 'google'))->assertDontSeeHtml(route('social.redirect', 'apple'))
         // The header names what is on the page. It must not promise Apple
         // when the button for it is gone.
         ->assertSee('Continue with Google, or use your email and password')
@@ -64,10 +57,7 @@ test('login screen hides a provider that is not fully set up', function (): void
 test('register screen offers the same providers, with its own separator', function (): void {
     configureSocialProviders();
 
-    $this->get(route('register'))
-        ->assertOk()
-        ->assertSee(route('social.redirect', 'google'), false)
-        ->assertSee(route('social.redirect', 'apple'), false)
+    $this->get(route('register'))->assertOk()->assertSeeHtml(route('social.redirect', 'google'))->assertSeeHtml(route('social.redirect', 'apple'))
         // The register page passes its own wording; the login page's would be
         // wrong here and nothing else would catch the prop being dropped.
         ->assertSee('or sign up with email')
@@ -80,10 +70,7 @@ test('login and register screens show no social login until the env values are s
 
     foreach ([route('login'), route('register')] as $url) {
         $this->get($url)
-            ->assertOk()
-            ->assertDontSee('Continue with')
-            ->assertDontSee('/auth/google/redirect', false)
-            ->assertDontSee('/auth/apple/redirect', false)
+            ->assertOk()->assertDontSee('Continue with')->assertDontSeeHtml('/auth/google/redirect')->assertDontSeeHtml('/auth/apple/redirect')
             // The separator belongs to the provider block and goes with it,
             // so an empty block leaves no stray divider behind.
             ->assertDontSee('or with email')

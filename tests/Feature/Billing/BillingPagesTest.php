@@ -232,5 +232,5 @@ test('a comped account with no Stripe customer is offered no billing portal', fu
 
     $this->actingAs($user);
 
-    $this->get('/app/billing')->assertOk()->assertDontSee('billing/portal', escape: false);
+    $this->get('/app/billing')->assertOk()->assertDontSeeHtml('billing/portal');
 });

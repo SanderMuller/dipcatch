@@ -307,9 +307,7 @@ test('a use-case page offers a shop request mailto when a contact address is set
 
     $this->get('/price-alerts/groceries')
         ->assertOk()
-        ->assertSee('Shops with a reader of their own')
-        ->assertSee('Request a shop')
-        ->assertSee('mailto:hello@example.test?subject=', escape: false);
+        ->assertSee('Shops with a reader of their own')->assertSee('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
 });
 
 test('a use-case page marks no header link as the current page', function (): void {

@@ -21,13 +21,7 @@ test('page titles carry no stray whitespace', function (string $url): void {
 ]);
 
 test('every indexable marketing page ships a full social card', function (string $url): void {
-    $this->get($url)
-        ->assertOk()
-        ->assertSee('<meta property="og:title"', escape: false)
-        ->assertSee('<meta property="og:description"', escape: false)
-        ->assertSee('<meta property="og:url"', escape: false)
-        ->assertSee('<meta name="twitter:card" content="summary_large_image">', escape: false)
-        ->assertSee('<meta name="twitter:title"', escape: false)
+    $this->get($url)->assertOk()->assertSeeHtml('<meta property="og:title"')->assertSeeHtml('<meta property="og:description"')->assertSeeHtml('<meta property="og:url"')->assertSeeHtml('<meta name="twitter:card" content="summary_large_image">')->assertSeeHtml('<meta name="twitter:title"')
         ->assertSee('og-default.png');
 })->with(['homepage' => '/', 'pricing' => '/pricing', 'privacy' => '/privacy']);
 
@@ -44,14 +38,11 @@ test('the social image is the size the card specs ask for', function (): void {
 });
 
 test('the social card declares the image dimensions so scrapers need not fetch it', function (): void {
-    $this->get('/')
-        ->assertOk()
-        ->assertSee('<meta property="og:image:width" content="1200">', escape: false)
-        ->assertSee('<meta property="og:image:height" content="630">', escape: false);
+    $this->get('/')->assertOk()->assertSeeHtml('<meta property="og:image:width" content="1200">')->assertSeeHtml('<meta property="og:image:height" content="630">');
 });
 
 test('pages describe themselves to search engines', function (string $url, string $needle): void {
-    $this->get($url)->assertOk()->assertSee($needle, escape: false);
+    $this->get($url)->assertOk()->assertSeeHtml($needle);
 })->with([
     'homepage' => ['/', '<meta name="description"'],
     'pricing' => ['/pricing', 'Pro removes the limits'],
@@ -67,9 +58,7 @@ test('the registration page stays indexable because it is where visitors convert
 });
 
 test('every other auth page tells search engines to stay out', function (string $url): void {
-    $this->get($url)
-        ->assertOk()
-        ->assertSee('<meta name="robots" content="noindex">', escape: false);
+    $this->get($url)->assertOk()->assertSeeHtml('<meta name="robots" content="noindex">');
 })->with([
     'login' => '/login',
     'forgot password' => '/forgot-password',
@@ -92,28 +81,19 @@ test('the app shell emits no social card of its own', function (): void {
 });
 
 test('the Dutch homepage names its own locale and the alternate', function (): void {
-    $this->get(route('home', ['lang' => 'nl']))
-        ->assertOk()
-        ->assertSee('<meta property="og:locale" content="nl_NL">', escape: false)
-        ->assertSee('<meta property="og:locale:alternate" content="en_US">', escape: false);
+    $this->get(route('home', ['lang' => 'nl']))->assertOk()->assertSeeHtml('<meta property="og:locale" content="nl_NL">')->assertSeeHtml('<meta property="og:locale:alternate" content="en_US">');
 });
 
 test('the English homepage names its own locale and the alternate', function (): void {
-    $this->get(route('home'))
-        ->assertOk()
-        ->assertSee('<meta property="og:locale" content="en_US">', escape: false)
-        ->assertSee('<meta property="og:locale:alternate" content="nl_NL">', escape: false);
+    $this->get(route('home'))->assertOk()->assertSeeHtml('<meta property="og:locale" content="en_US">')->assertSeeHtml('<meta property="og:locale:alternate" content="nl_NL">');
 });
 
 test('the font stylesheet asks for a swap so text paints before the webfont lands', function (): void {
-    $this->get('/')->assertOk()->assertSee('display=swap', escape: false);
+    $this->get('/')->assertOk()->assertSeeHtml('display=swap');
 });
 
 test('pages declare a theme colour for both schemes', function (): void {
-    $this->get('/')
-        ->assertOk()
-        ->assertSee('<meta name="theme-color" content="#fffbeb" media="(prefers-color-scheme: light)">', escape: false)
-        ->assertSee('<meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)">', escape: false);
+    $this->get('/')->assertOk()->assertSeeHtml('<meta name="theme-color" content="#fffbeb" media="(prefers-color-scheme: light)">')->assertSeeHtml('<meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)">');
 });
 
 test('signing in changes the page body but not what crawlers read', function (): void {

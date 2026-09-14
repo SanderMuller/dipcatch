@@ -10,11 +10,7 @@ test('confirm password screen can be rendered', function (): void {
 
     $response
         ->assertOk()
-        ->assertSee('Confirm with passkey')
-        ->assertSee('Or confirm with password')
-        ->assertSee("options: '" . route('passkey.confirm-options') . "'", false)
-        ->assertSee("submit: '" . route('passkey.confirm') . "'", false)
-        ->assertDontSee(route('passkey.login-options'), false);
+        ->assertSee('Confirm with passkey')->assertSee('Or confirm with password')->assertSeeHtml("options: '" . route('passkey.confirm-options') . "'")->assertSeeHtml("submit: '" . route('passkey.confirm') . "'")->assertDontSeeHtml(route('passkey.login-options'));
 });
 
 test('confirm password screen omits passkeys when the feature is disabled', function (): void {

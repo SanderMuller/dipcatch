@@ -7,14 +7,11 @@ use App\Models\PriceDropEvent;
 use App\Models\User;
 use App\Support\Config as DipConfig;
 use Carbon\CarbonImmutable;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Mail;
 
 /**
@@ -31,7 +28,7 @@ use Illuminate\Support\Facades\Mail;
 #[Tries(3)]
 final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Queueable;
 
     public function __construct(
         public User $user,

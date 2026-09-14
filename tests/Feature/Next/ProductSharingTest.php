@@ -120,9 +120,7 @@ it('offers sharing on the product page', function (): void {
     $this->actingAs($user);
 
     $this->get(route('app.products.show', $product))
-        ->assertOk()
-        ->assertSee('Public sharing')
-        ->assertSee('generateShareLink', escape: false);
+        ->assertOk()->assertSee('Public sharing')->assertSeeHtml('generateShareLink');
 });
 
 it('shows the link itself once the product is shared', function (): void {
@@ -131,8 +129,6 @@ it('shows the link itself once the product is shared', function (): void {
 
     $this->actingAs($user);
 
-    $this->get(route('app.products.show', $product))
-        ->assertOk()
-        ->assertSee(route('product.public', ['slug' => str_repeat('f', 32)]), escape: false)
+    $this->get(route('app.products.show', $product))->assertOk()->assertSeeHtml(route('product.public', ['slug' => str_repeat('f', 32)]))
         ->assertSee('Stop sharing');
 });

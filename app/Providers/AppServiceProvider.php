@@ -47,7 +47,7 @@ final class AppServiceProvider extends ServiceProvider
         // expensive part.
         $this->app->scoped(SuggestShops::class);
 
-        $this->app->singleton(AdapterResolver::class, function (): AdapterResolver {
+        $this->app->singleton(function (): AdapterResolver {
             /** @var list<class-string<ShopAdapter>> $classes */
             $classes = (array) config('dipcatch.adapters', []);
 

@@ -5,11 +5,7 @@ use App\Support\MoneyFormatter;
 use App\Support\SupportedShops;
 
 test('the homepage carries SEO and sharing meta', function (): void {
-    $this->get(route('home'))
-        ->assertOk()
-        ->assertSee('<meta name="description"', escape: false)
-        ->assertSee('property="og:title"', escape: false)
-        ->assertSee('rel="canonical"', escape: false)
+    $this->get(route('home'))->assertOk()->assertSeeHtml('<meta name="description"')->assertSeeHtml('property="og:title"')->assertSeeHtml('rel="canonical"')
         ->assertSee('Price alerts for the things you buy anyway');
 });
 
@@ -35,10 +31,10 @@ test('the header offers account creation to guests and the app to members', func
 
 test('the contact link only renders when a contact address is configured', function (): void {
     config()->set('site.contact_email');
-    $this->get(route('home'))->assertDontSee('mailto:', escape: false);
+    $this->get(route('home'))->assertDontSeeHtml('mailto:');
 
     config()->set('site.contact_email', 'hello@example.test');
-    $this->get(route('home'))->assertSee('mailto:hello@example.test', escape: false);
+    $this->get(route('home'))->assertSeeHtml('mailto:hello@example.test');
 });
 
 test('the privacy page renders for guests', function (): void {
@@ -70,8 +66,7 @@ test('the hero leads with the compare-across-shops headline', function (): void 
 test('the phone mock shows grocery examples from supported shops only', function (): void {
     $response = $this->get(route('home'))->assertOk();
 
-    $response->assertSee('Lay’s Naturel 200 g', escape: false)
-        ->assertSee('Beemster Extra Belegen 48+ 150 g', escape: false)
+    $response->assertSeeHtml('Lay’s Naturel 200 g')->assertSeeHtml('Beemster Extra Belegen 48+ 150 g')
         ->assertSee('Page toiletpapier 24 rollen')
         ->assertSee('ah.nl')
         ->assertSee('dirk.nl')
@@ -96,11 +91,7 @@ test('the phone mock is an informative image with a label matching the cards', f
 
     $response = $this->get(route('home'))->assertOk();
 
-    $response->assertSee('role="img"', escape: false)
-        ->assertSee('aria-label="' . e(__('Example alerts: :items', ['items' => $firstCard])), escape: false)
-        ->assertSee(e($old), escape: false)
-        ->assertSee(e($new), escape: false)
-        ->assertSee(e($unit), escape: false);
+    $response->assertSeeHtml('role="img"')->assertSeeHtml('aria-label="' . e(__('Example alerts: :items', ['items' => $firstCard])))->assertSeeHtml(e($old))->assertSeeHtml(e($new))->assertSeeHtml(e($unit));
 });
 
 test('the homepage renders no decorative image element', function (): void {
@@ -161,9 +152,7 @@ test('the shop list names the homepage hosts without contradicting itself', func
 });
 
 test('the privacy page explains that shared product images load from the shop', function (): void {
-    $this->get(route('privacy'))
-        ->assertOk()
-        ->assertSee('loaded straight from the shop’s own servers', escape: false);
+    $this->get(route('privacy'))->assertOk()->assertSeeHtml('loaded straight from the shop’s own servers');
 });
 
 test('the FAQ section shows every question the page defines', function (): void {
@@ -244,9 +233,7 @@ test('the homepage speaks about repeat purchases, not only supermarkets', functi
 });
 
 test('shop pills carry the brand name a person would search for', function (): void {
-    $this->get(route('home'))
-        ->assertOk()
-        ->assertSee('title="Albert Heijn"', escape: false)
+    $this->get(route('home'))->assertOk()->assertSeeHtml('title="Albert Heijn"')
         ->assertSee('ah.nl');
 });
 
@@ -287,9 +274,7 @@ test('the homepage says most shops work from a pasted link', function (): void {
     $this->get(route('home'))
         ->assertOk()
         ->assertSee('Most shops work if you paste a product link')
-        ->assertSee('What if my shop is not listed?')
-        ->assertSee('Request a shop')
-        ->assertSee('mailto:hello@example.test?subject=', escape: false);
+        ->assertSee('What if my shop is not listed?')->assertSee('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
 });
 
 test('the FAQ answers how to catch a lower price at another shop', function (): void {

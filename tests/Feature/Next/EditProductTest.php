@@ -163,9 +163,7 @@ it('reaches the form from the product page', function (): void {
 
     $this->actingAs($user);
 
-    $this->get(route('app.products.show', $product))
-        ->assertOk()
-        ->assertSee(route('app.products.edit', $product), escape: false);
+    $this->get(route('app.products.show', $product))->assertOk()->assertSeeHtml(route('app.products.edit', $product));
 });
 
 it('opens a shop for editing from the product page and saves a note', function (): void {
@@ -177,9 +175,7 @@ it('opens a shop for editing from the product page and saves a note', function (
 
     $this->actingAs($user);
 
-    $this->get(route('app.products.show', $product))
-        ->assertOk()
-        ->assertSee("editShop('" . $shop->id . "')", escape: false);
+    $this->get(route('app.products.show', $product))->assertOk()->assertSeeHtml("editShop('" . $shop->id . "')");
 
     livewire(ProductShow::class, ['product' => $product])
         ->call('editShop', $shop->id)

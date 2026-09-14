@@ -11,44 +11,30 @@ test('the bare marketing URL renders English whatever Accept-Language says', fun
     $germanHeader = $this->withHeaders(['Accept-Language' => 'de-DE,de;q=0.9'])->get(route('home'))->assertOk();
 
     foreach ([$withoutHeader, $dutchHeader, $germanHeader] as $response) {
-        $response->assertSee('<html lang="en"', escape: false)
-            ->assertDontSee('<html lang="nl"', escape: false)
-            ->assertSee('Same product, every shop, one alert.')
-            ->assertSee('<link rel="canonical" href="' . route('home') . '">', escape: false)
-            ->assertSee('<meta property="og:locale" content="en_US">', escape: false)
-            ->assertDontSee('Zelfde product', escape: false);
+        $response->assertSeeHtml('<html lang="en"')->assertDontSeeHtml('<html lang="nl"')->assertSee('Same product, every shop, one alert.')->assertSeeHtml('<link rel="canonical" href="' . route('home') . '">')->assertSeeHtml('<meta property="og:locale" content="en_US">')->assertDontSeeHtml('Zelfde product');
     }
 });
 
 test('the bare privacy URL renders English whatever Accept-Language says', function (): void {
     $this->withHeaders(['Accept-Language' => 'nl-NL,nl;q=0.9'])
-        ->get(route('privacy'))
-        ->assertOk()
-        ->assertSee('<html lang="en"', escape: false)
+        ->get(route('privacy'))->assertOk()->assertSeeHtml('<html lang="en"')
         ->assertSee('What we store');
 });
 
 test('?lang=nl renders Dutch and ?lang=en renders English', function (): void {
-    $this->get(route('home', ['lang' => 'nl']))
-        ->assertOk()
-        ->assertSee('<html lang="nl"', escape: false)
-        ->assertSee('Zelfde product, elke winkel, één melding.', escape: false);
+    $this->get(route('home', ['lang' => 'nl']))->assertOk()->assertSeeHtml('<html lang="nl"')->assertSeeHtml('Zelfde product, elke winkel, één melding.');
 
-    $this->get(route('home', ['lang' => 'en']))
-        ->assertOk()
-        ->assertSee('<html lang="en"', escape: false)
+    $this->get(route('home', ['lang' => 'en']))->assertOk()->assertSeeHtml('<html lang="en"')
         ->assertSee('Same product, every shop, one alert.');
 
-    $this->get(route('privacy', ['lang' => 'nl']))
-        ->assertOk()
-        ->assertSee('<html lang="nl"', escape: false)
+    $this->get(route('privacy', ['lang' => 'nl']))->assertOk()->assertSeeHtml('<html lang="nl"')
         ->assertSee('Wat we opslaan');
 });
 
 test('a malformed ?lang value renders English and never reaches the page', function (string $value, array $forbidden): void {
     $response = $this->get('/?lang=' . urlencode($value))->assertOk();
 
-    $response->assertSee('<html lang="en"', escape: false)
+    $response->assertSeeHtml('<html lang="en"')
         ->assertSee('Same product, every shop, one alert.');
 
     $content = (string) $response->getContent();
@@ -66,9 +52,7 @@ test('a malformed ?lang value renders English and never reaches the page', funct
 
 test('the Accept-Language header cannot override a malformed ?lang value', function (): void {
     $this->withHeaders(['Accept-Language' => 'nl-NL,nl;q=0.9'])
-        ->get('/?lang=fr')
-        ->assertOk()
-        ->assertSee('<html lang="en"', escape: false);
+        ->get('/?lang=fr')->assertOk()->assertSeeHtml('<html lang="en"');
 });
 
 test('canonical, hreflang and og:locale describe two reciprocal representations', function (string $route, ?string $lang, ?string $canonicalLang, string $ogLocale): void {
@@ -78,11 +62,7 @@ test('canonical, hreflang and og:locale describe two reciprocal representations'
 
     $response = $this->get($lang === null ? $bare : route($route, ['lang' => $lang]))->assertOk();
 
-    $response->assertSee('<link rel="canonical" href="' . $canonical . '">', escape: false)
-        ->assertSee('<link rel="alternate" hreflang="en" href="' . $bare . '">', escape: false)
-        ->assertSee('<link rel="alternate" hreflang="nl" href="' . $dutch . '">', escape: false)
-        ->assertSee('<link rel="alternate" hreflang="x-default" href="' . $bare . '">', escape: false)
-        ->assertSee('<meta property="og:locale" content="' . $ogLocale . '">', escape: false);
+    $response->assertSeeHtml('<link rel="canonical" href="' . $canonical . '">')->assertSeeHtml('<link rel="alternate" hreflang="en" href="' . $bare . '">')->assertSeeHtml('<link rel="alternate" hreflang="nl" href="' . $dutch . '">')->assertSeeHtml('<link rel="alternate" hreflang="x-default" href="' . $bare . '">')->assertSeeHtml('<meta property="og:locale" content="' . $ogLocale . '">');
 })->with([
     'homepage, bare URL' => ['home', null, null, 'en_US'],
     'homepage, ?lang=nl' => ['home', 'nl', 'nl', 'nl_NL'],
@@ -93,21 +73,13 @@ test('canonical, hreflang and og:locale describe two reciprocal representations'
 ]);
 
 test('both marketing pages carry a language toggle linking to their own two representations', function (): void {
-    $this->get(route('home'))
-        ->assertOk()
-        ->assertSee('href="' . route('home', ['lang' => 'nl']) . '" hreflang="nl"', escape: false)
-        ->assertSee('href="' . route('home', ['lang' => 'en']) . '" hreflang="en"', escape: false);
+    $this->get(route('home'))->assertOk()->assertSeeHtml('href="' . route('home', ['lang' => 'nl']) . '" hreflang="nl"')->assertSeeHtml('href="' . route('home', ['lang' => 'en']) . '" hreflang="en"');
 
-    $this->get(route('privacy'))
-        ->assertOk()
-        ->assertSee('href="' . route('privacy', ['lang' => 'nl']) . '" hreflang="nl"', escape: false)
-        ->assertSee('href="' . route('privacy', ['lang' => 'en']) . '" hreflang="en"', escape: false);
+    $this->get(route('privacy'))->assertOk()->assertSeeHtml('href="' . route('privacy', ['lang' => 'nl']) . '" hreflang="nl"')->assertSeeHtml('href="' . route('privacy', ['lang' => 'en']) . '" hreflang="en"');
 
     // A use-case page carries a slug, so the toggle has to rebuild the URL from
     // the route's parameters rather than its name alone.
-    $this->get('/price-alerts/coffee')
-        ->assertOk()
-        ->assertSee('href="' . route('use-case', ['slug' => 'coffee', 'lang' => 'nl']) . '" hreflang="nl"', escape: false);
+    $this->get('/price-alerts/coffee')->assertOk()->assertSeeHtml('href="' . route('use-case', ['slug' => 'coffee', 'lang' => 'nl']) . '" hreflang="nl"');
 });
 
 test('the language toggle leaks no route defaults into its URLs', function (string $url): void {
@@ -121,23 +93,15 @@ test('the language toggle leaks no route defaults into its URLs', function (stri
 })->with(['homepage' => '/', 'pricing' => '/pricing', 'privacy' => '/privacy', 'use case' => '/price-alerts/coffee']);
 
 test('links between the marketing pages carry the current ?lang value', function (): void {
-    $this->get(route('home', ['lang' => 'nl']))
-        ->assertOk()
-        ->assertSee('href="' . route('privacy', ['lang' => 'nl']) . '"', escape: false);
+    $this->get(route('home', ['lang' => 'nl']))->assertOk()->assertSeeHtml('href="' . route('privacy', ['lang' => 'nl']) . '"');
 
-    $this->get(route('privacy', ['lang' => 'nl']))
-        ->assertOk()
-        ->assertSee('href="' . route('home', ['lang' => 'nl']) . '"', escape: false);
+    $this->get(route('privacy', ['lang' => 'nl']))->assertOk()->assertSeeHtml('href="' . route('home', ['lang' => 'nl']) . '"');
 });
 
 test('the bare URLs link to each other without a ?lang value', function (): void {
-    $this->get(route('home'))
-        ->assertOk()
-        ->assertSee('href="' . route('privacy') . '"', escape: false);
+    $this->get(route('home'))->assertOk()->assertSeeHtml('href="' . route('privacy') . '"');
 
-    $this->get('/?lang=fr')
-        ->assertOk()
-        ->assertSee('href="' . route('privacy') . '"', escape: false);
+    $this->get('/?lang=fr')->assertOk()->assertSeeHtml('href="' . route('privacy') . '"');
 });
 
 test('the marketing routes stay out of shared caches', function (string $path): void {
@@ -155,9 +119,7 @@ test('the marketing routes stay out of shared caches', function (string $path): 
 test('a Dutch marketing request does not leak its locale into the next request', function (): void {
     // Octane keeps the container between requests, so the middleware must put
     // the locale back. Both requests run in this one process.
-    $this->get(route('home', ['lang' => 'nl']))
-        ->assertOk()
-        ->assertSee('<html lang="nl"', escape: false);
+    $this->get(route('home', ['lang' => 'nl']))->assertOk()->assertSeeHtml('<html lang="nl"');
 
     expect(App::getLocale())->toBe('en');
 

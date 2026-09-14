@@ -111,9 +111,5 @@ it('carries the whole push lifecycle, not just the toggle', function (): void {
     // Rebuilding only the preference would leave a saved channel that cannot
     // deliver: the permission prompt, service worker and subscription all live
     // in the shared partial.
-    $this->get(route('app.notifications'))
-        ->assertOk()
-        ->assertSee('serviceWorker', escape: false)
-        ->assertSee('pushManager', escape: false)
-        ->assertSee('is not supported on this device', escape: false);
+    $this->get(route('app.notifications'))->assertOk()->assertSeeHtml('serviceWorker')->assertSeeHtml('pushManager')->assertSeeHtml('is not supported on this device');
 });

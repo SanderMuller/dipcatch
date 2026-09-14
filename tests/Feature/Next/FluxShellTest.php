@@ -53,9 +53,7 @@ it('links the shell navigation at every section', function (): void {
     $this->actingAs(User::factory()->create());
 
     $this->get(route('app.dashboard'))
-        ->assertOk()
-        ->assertSee('Products')
-        ->assertSee('Plan &amp; billing', escape: false)
+        ->assertOk()->assertSee('Products')->assertSeeHtml('Plan &amp; billing')
         ->assertSee('Notifications')
         ->assertSee('Connections');
 });
@@ -74,9 +72,7 @@ it('detects the timezone on any authenticated page, not only settings', function
 
     // It fired panel-wide under Filament. A user who never opens settings would
     // otherwise keep a wrong digest hour.
-    $this->get(route('app.dashboard'))
-        ->assertOk()
-        ->assertSee('auto-detect', escape: false);
+    $this->get(route('app.dashboard'))->assertOk()->assertSeeHtml('auto-detect');
 });
 
 it('does not re-detect a timezone the user has already settled', function (): void {
@@ -85,7 +81,5 @@ it('does not re-detect a timezone the user has already settled', function (): vo
         'timezone_detected_at' => now(),
     ]));
 
-    $this->get(route('app.dashboard'))
-        ->assertOk()
-        ->assertDontSee('auto-detect', escape: false);
+    $this->get(route('app.dashboard'))->assertOk()->assertDontSeeHtml('auto-detect');
 });

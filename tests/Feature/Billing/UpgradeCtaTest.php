@@ -34,9 +34,7 @@ it('offers Pro on the pricing page through the one upgrade link', function (): v
     // pass or fail for the wrong reason.
     configureStripe();
 
-    $this->get(route('pricing'))
-        ->assertOk()
-        ->assertSee(route('upgrade'), escape: false);
+    $this->get(route('pricing'))->assertOk()->assertSeeHtml(route('upgrade'));
 });
 
 it('points a subscriber at their plan rather than at another upgrade', function (): void {
@@ -48,7 +46,5 @@ it('points a subscriber at their plan rather than at another upgrade', function 
     $this->actingAs($user);
 
     $this->get(route('pricing'))
-        ->assertOk()
-        ->assertSee('Your plan')
-        ->assertDontSee(route('upgrade'), escape: false);
+        ->assertOk()->assertSee('Your plan')->assertDontSeeHtml(route('upgrade'));
 });

@@ -33,9 +33,7 @@ it('links the pricing page from the header of every marketing page', function ()
 });
 
 it('marks the current page in the header nav', function (): void {
-    $this->get('/pricing')
-        ->assertOk()
-        ->assertSee('aria-current="page"', escape: false);
+    $this->get('/pricing')->assertOk()->assertSeeHtml('aria-current="page"');
 });
 
 it('carries a mobile menu with the same links as the bar', function (): void {

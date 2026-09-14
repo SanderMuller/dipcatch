@@ -5,10 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 test('an unmatched URL renders the branded 404 with a way back', function (): void {
     $this->get('/this-route-does-not-exist')
-        ->assertNotFound()
-        ->assertSee(__('This page does not exist'))
-        ->assertSee(route('home'), escape: false)
-        ->assertSee(route('pricing'), escape: false);
+        ->assertNotFound()->assertSee(__('This page does not exist'))->assertSeeHtml(route('home'))->assertSeeHtml(route('pricing'));
 });
 
 test('the 404 tells crawlers not to index it and emits no social card', function (): void {
@@ -46,9 +43,7 @@ describe('the 500 page', function (): void {
 
     test('renders the branded page with a way back', function (): void {
         $this->get('/__throws')
-            ->assertServerError()
-            ->assertSee(__('Something went wrong on our side'))
-            ->assertSee(route('home'), escape: false);
+            ->assertServerError()->assertSee(__('Something went wrong on our side'))->assertSeeHtml(route('home'));
     });
 
     test('tells crawlers not to index it', function (): void {
@@ -61,10 +56,10 @@ describe('the 500 page', function (): void {
     test('offers the contact address only when one is configured', function (): void {
         config()->set('site.contact_email', 'hello@example.test');
 
-        $this->get('/__throws')->assertServerError()->assertSee('mailto:hello@example.test', escape: false);
+        $this->get('/__throws')->assertServerError()->assertSeeHtml('mailto:hello@example.test');
 
         config()->set('site.contact_email');
 
-        $this->get('/__throws')->assertServerError()->assertDontSee('mailto:', escape: false);
+        $this->get('/__throws')->assertServerError()->assertDontSeeHtml('mailto:');
     });
 });

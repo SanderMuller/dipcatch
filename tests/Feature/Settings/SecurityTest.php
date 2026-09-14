@@ -177,10 +177,7 @@ test('security settings page escapes passkey names', function (): void {
 
     $this->actingAs($user)
         ->withSession(['auth.password_confirmed_at' => Carbon::now()->getTimestamp()])
-        ->get(route('security.edit'))
-        ->assertOk()
-        ->assertDontSee("<script>alert('xss')</script>", false)
-        ->assertSee('&lt;script&gt;', false);
+        ->get(route('security.edit'))->assertOk()->assertDontSeeHtml("<script>alert('xss')</script>")->assertSeeHtml('&lt;script&gt;');
 });
 
 test('passkeys are loaded newest first for the security page', function (): void {
