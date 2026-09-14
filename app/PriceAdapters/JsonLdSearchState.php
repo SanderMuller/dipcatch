@@ -21,17 +21,17 @@ final class JsonLdSearchState
     public array $variants = [];
 
     /**
-     * The most precise entity that identified the request, and the score it
-     * reached. A tie means two entities are equally precise, so neither
-     * identifies anything.
+     * The entities that identified the request, ranked by how precisely
+     * each one names it.
      *
-     * @var array{0: array<string, mixed>, 1: array<string, mixed>}|null
+     * @var PrecisionRanking<array{0: array<string, mixed>, 1: array<string, mixed>}>
      */
-    public ?array $best = null;
+    private PrecisionRanking $ranking;
 
-    public int $bestPrecision = 0;
-
-    public bool $tied = false;
+    public function __construct()
+    {
+        $this->ranking = new PrecisionRanking();
+    }
 
     /**
      * True once some entity or offer answered to the caller's `variant_key`.
@@ -39,15 +39,6 @@ final class JsonLdSearchState
      * a URL match on the page itself.
      */
     public bool $keyMatched = false;
-
-    /**
-     * Every entity that reached the top precision. More than one means the
-     * page does not say which of them the request asked for, so they are
-     * what the chooser offers.
-     *
-     * @var list<array{0: array<string, mixed>, 1: array<string, mixed>}>
-     */
-    public array $topMatches = [];
 
     /**
      * A Product whose URL names the page but not a variant of it. Held
@@ -73,25 +64,31 @@ final class JsonLdSearchState
      */
     public function offer(array $match, int $precision): void
     {
-        if ($this->best === null || $precision > $this->bestPrecision) {
-            $this->best = $match;
-            $this->bestPrecision = $precision;
-            $this->tied = false;
-            $this->topMatches = [$match];
-
-            return;
-        }
-
-        if ($precision === $this->bestPrecision) {
-            $this->tied = true;
-            $this->topMatches[] = $match;
-        }
+        $this->ranking->offer($match, $precision);
     }
 
     /** True when one entity identified the request more precisely than any other. */
     public function identified(): bool
     {
-        return $this->best !== null && ! $this->tied;
+        return $this->ranking->identified();
+    }
+
+    /** True when two entities tied on precision, so neither identifies anything. */
+    public function tied(): bool
+    {
+        return $this->ranking->tied();
+    }
+
+    /**
+     * Every entity that reached the top precision. More than one means the
+     * page does not say which of them the request asked for, so they are
+     * what the chooser offers.
+     *
+     * @return list<array{0: array<string, mixed>, 1: array<string, mixed>}>
+     */
+    public function topMatches(): array
+    {
+        return $this->ranking->topItems();
     }
 
     /**
@@ -103,7 +100,7 @@ final class JsonLdSearchState
      */
     public function fallback(): array
     {
-        $identified = $this->best ?? $this->namesPageOnly;
+        $identified = $this->ranking->best() ?? $this->namesPageOnly;
 
         if ($identified !== null) {
             return [$identified[0], $identified[1]];
