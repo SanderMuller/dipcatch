@@ -68,3 +68,24 @@ test('badges that disagree on the period yield none', function (): void {
     expect($result->snapshot?->price)->toBe('1.99')
         ->and($result->snapshot?->promotionWindow)->toBeNull();
 });
+
+test('a packaging record for another product is not this product\'s pack size', function (): void {
+    // The payload describes article 999999 while the URL names 10033095.
+    $html = lidlPage(productId: 999999);
+
+    $result = $this->adapter->extract('https://www.lidl.nl/p/lay-s/p10033095', $html);
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->packSize)->toBeNull()
+        ->and($result->snapshot?->packSizeAuthoritative)->toBeFalse();
+});
+
+test('a URL naming no product id still reads the period, but no pack size', function (): void {
+    $result = $this->adapter->extract('https://www.lidl.nl/p/lay-s', lidlPage());
+
+    expect($result->isSuccess())->toBeTrue()
+        // The badge period is the payload's own, not a per-product record.
+        ->and($result->snapshot?->promotionWindow?->isRunning())->toBeTrue()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue()
+        ->and($result->snapshot?->packSize)->toBeNull();
+});

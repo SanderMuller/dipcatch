@@ -110,34 +110,14 @@ final readonly class ZooplusAdapter extends HostAdapter
 
     private static function title(Crawler $crawler): string
     {
-        $h1 = $crawler->filter('h1[data-zta="ProductTitle__Title"]')->first();
-        if ($h1->count() > 0) {
-            $text = trim($h1->text(''));
-            if ($text !== '') {
-                return $text;
-            }
-        }
-
-        $og = $crawler->filter('meta[property="og:title"]')->first();
-        if ($og->count() > 0) {
-            $content = $og->attr('content');
-            if (is_string($content) && $content !== '') {
-                return $content;
-            }
-        }
-
-        return 'Zooplus product';
+        // Scoped to the product-title component rather than a bare h1.
+        return HostPage::element($crawler, 'h1[data-zta="ProductTitle__Title"]')
+            ?? HostPage::meta($crawler, 'meta[property="og:title"]')
+            ?? 'Zooplus product';
     }
 
     private static function ogImage(Crawler $crawler): ?string
     {
-        $og = $crawler->filter('meta[property="og:image"]')->first();
-        if ($og->count() === 0) {
-            return null;
-        }
-
-        $content = $og->attr('content');
-
-        return is_string($content) && $content !== '' ? $content : null;
+        return HostPage::ogImage($crawler);
     }
 }

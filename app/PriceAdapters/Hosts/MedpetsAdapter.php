@@ -64,34 +64,15 @@ final readonly class MedpetsAdapter extends HostAdapter
 
     private function extractTitle(Crawler $crawler): string
     {
-        $h1 = $crawler->filter('h1')->first();
-        if ($h1->count() > 0) {
-            $text = trim($h1->text(''));
-            if ($text !== '') {
-                return $text;
-            }
-        }
-
-        $og = $crawler->filter('meta[property="og:title"]')->first();
-        if ($og->count() > 0) {
-            $content = $og->attr('content');
-            if (is_string($content) && trim($content) !== '') {
-                return trim($content);
-            }
-        }
-
-        return 'Medpets product';
+        // Reads the h1 first, where its siblings read og:title first. The
+        // reason is not recorded; the order is preserved as found.
+        return HostPage::element($crawler, 'h1')
+            ?? HostPage::meta($crawler, 'meta[property="og:title"]')
+            ?? 'Medpets product';
     }
 
     private function extractImage(Crawler $crawler): ?string
     {
-        $og = $crawler->filter('meta[property="og:image"]')->first();
-        if ($og->count() === 0) {
-            return null;
-        }
-
-        $content = $og->attr('content');
-
-        return is_string($content) && $content !== '' ? $content : null;
+        return HostPage::ogImage($crawler);
     }
 }

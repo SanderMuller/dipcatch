@@ -53,3 +53,13 @@ test('fails when a welkoop page has neither a current price nor JSON-LD', functi
     expect($result->isFailed())->toBeTrue()
         ->and($result->failureReason)->toBe('welkoop_extraction_failed');
 });
+
+test('welkoop reads its h1 before og:title, and og:title under name', function (): void {
+    $priced = '<p aria-label="Huidige prijs € 12,34">12,34</p>';
+    $withBoth = '<html><head><meta name="og:title" content="Og name"></head><body>'
+        . '<h1>H1 name</h1>' . $priced . '</body></html>';
+    $ogOnly = '<html><head><meta name="og:title" content="Og name"></head><body>' . $priced . '</body></html>';
+
+    expect(new WelkoopAdapter()->extract('https://www.welkoop.nl/p/1', $withBoth)->snapshot?->title)->toBe('H1 name')
+        ->and(new WelkoopAdapter()->extract('https://www.welkoop.nl/p/1', $ogOnly)->snapshot?->title)->toBe('Og name');
+});

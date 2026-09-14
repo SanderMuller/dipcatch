@@ -63,3 +63,18 @@ test('fails when a medpets page has neither JSON-LD nor a product price', functi
     expect($result->isFailed())->toBeTrue()
         ->and($result->failureReason)->toBe('medpets_extraction_failed');
 });
+
+test('medpets reads its h1 before og:title', function (): void {
+    $html = <<<'HTML'
+<html><head><meta property="og:title" content="4lazylegs Hondendraagzak"></head><body>
+  <h1>4lazylegs Hondendraagzak 12x100 g</h1>
+  <div data-product-price="38.6"></div>
+</body></html>
+HTML;
+
+    $result = $this->adapter->extract('https://www.medpets.nl/4lazylegs-hondendraagzak', $html);
+
+    // The h1 states the pack size, and PackSize::resolve parses the title for
+    // it. Reading og:title first would price this per item instead of per kg.
+    expect($result->snapshot?->title)->toBe('4lazylegs Hondendraagzak 12x100 g');
+});

@@ -45,7 +45,12 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
         $productId = HostUrl::lastNumericSegment($url);
         $data = NuxtData::decode($html);
 
-        if ($data === null) {
+        // The payload carries related products in the same shape as this one,
+        // so without the id from the URL there is no way to tell which records
+        // are ours. Dirk then reads nothing and claims nothing: the JSON-LD
+        // offer's period stands, and the pack size falls to the title parse
+        // that every adapter stating no size already uses.
+        if ($data === null || $productId === null) {
             return ExtractionResult::success($snapshot);
         }
 
@@ -55,22 +60,13 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
             $snapshot = $snapshot->withPackSize($packaging);
         }
 
-        // The payload is the only promotion source this adapter reads, so a
-        // payload that states no period for this product ends the promotion.
-        // Without a payload, or without an id to find this product's record
-        // by, Dirk read nothing and adds no claim — the JSON-LD offer's stands.
-        if ($productId !== null) {
-            $snapshot = $snapshot->withPromotionWindow(self::promotionWindow($data, $productId, $snapshot->price));
-        }
-
-        return ExtractionResult::success($snapshot);
+        // The payload is the only promotion source this adapter reads, so one
+        // that states no period for this product ends the promotion.
+        return ExtractionResult::success(
+            $snapshot->withPromotionWindow(self::promotionWindow($data, $productId, $snapshot->price)),
+        );
     }
 
-    /**
-     * The product record is the dict carrying both `headerText` and
-     * `packaging`; `productId` disambiguates when related products ride
-     * along.
-     */
     /**
      * The offer period behind the price, when the payload holds a price
      * record for this product whose offer price is the price the JSON-LD
@@ -102,32 +98,23 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
     }
 
     /**
+     * The product record is the dict carrying both `headerText` and
+     * `packaging`. A page lists related products in that same shape, so the
+     * id is what makes a record this product's — a payload with no record
+     * under this id states no size, rather than lending a neighbour's.
+     *
      * @param  list<mixed>  $data
      */
-    private static function packagingFromNuxtPayload(array $data, ?string $productId): ?string
+    private static function packagingFromNuxtPayload(array $data, string $productId): ?string
     {
-        $deref = static fn (mixed $v): mixed => is_int($v) && isset($data[$v]) ? $data[$v] : null;
+        foreach (NuxtData::recordsFor($data, ['packaging', 'headerText'], 'productId', $productId) as $record) {
+            $packaging = NuxtData::value($data, $record, 'packaging');
 
-        $fallback = null;
-
-        foreach ($data as $element) {
-            if (! is_array($element) || ! isset($element['packaging'], $element['headerText'])) {
-                continue;
-            }
-
-            $packaging = $deref($element['packaging']);
-            if (! is_string($packaging) || $packaging === '') {
-                continue;
-            }
-
-            $recordId = $deref($element['productId'] ?? null);
-            if ($productId !== null && (is_string($recordId) || is_int($recordId)) && (string) $recordId === $productId) {
+            if (is_string($packaging) && $packaging !== '') {
                 return $packaging;
             }
-
-            $fallback ??= $packaging;
         }
 
-        return $fallback;
+        return null;
     }
 }

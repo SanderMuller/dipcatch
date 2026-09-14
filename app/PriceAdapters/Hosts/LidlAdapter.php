@@ -56,7 +56,8 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
             return ExtractionResult::success($snapshot->withoutPromotionWindowAuthority());
         }
 
-        $packaging = self::packagingFromNuxtPayload($data, HostUrl::lastSegmentDigits($url, 'p'));
+        $productId = HostUrl::lastSegmentDigits($url, 'p');
+        $packaging = $productId === null ? null : self::packagingFromNuxtPayload($data, $productId);
 
         if ($packaging !== null) {
             $snapshot = $snapshot->withPackSize($packaging);
@@ -106,43 +107,39 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
     }
 
     /**
-     * The product record is the dict carrying both `productId` and `price`;
-     * `productId` disambiguates when related products ride along. The chain
-     * is product → price record → packaging record → `text`.
+     * The product record is the dict carrying both `productId` and `price`,
+     * and the chain from there is price record → packaging record → `text`.
+     * A page lists related products in that same shape, so the id is what
+     * makes a record this product's — a payload with no record under this id
+     * states no size, rather than lending a neighbour's.
      *
      * @param  list<mixed>  $data
      */
-    private static function packagingFromNuxtPayload(array $data, ?string $productId): ?string
+    private static function packagingFromNuxtPayload(array $data, string $productId): ?string
     {
-        $deref = static fn (mixed $v): mixed => is_int($v) && isset($data[$v]) ? $data[$v] : null;
+        foreach (NuxtData::recordsFor($data, ['productId', 'price'], 'productId', $productId) as $record) {
+            $price = NuxtData::value($data, $record, 'price');
 
-        $fallback = null;
-
-        foreach ($data as $element) {
-            if (! is_array($element) || ! isset($element['productId'], $element['price'])) {
-                continue;
-            }
-
-            $price = $deref($element['price']);
             if (! is_array($price)) {
                 continue;
             }
 
-            $packagingRecord = $deref($price['packaging'] ?? null);
-            $packaging = is_array($packagingRecord) ? $deref($packagingRecord['text'] ?? null) : null;
-            if (! is_string($packaging) || $packaging === '') {
+            /** @var array<string, mixed> $price */
+            $packagingRecord = NuxtData::value($data, $price, 'packaging');
+
+            if (! is_array($packagingRecord)) {
                 continue;
             }
 
-            $recordId = $deref($element['productId']);
-            if ($productId !== null && (is_string($recordId) || is_int($recordId)) && (string) $recordId === $productId) {
+            /** @var array<string, mixed> $packagingRecord */
+            $packaging = NuxtData::value($data, $packagingRecord, 'text');
+
+            if (is_string($packaging) && $packaging !== '') {
                 return $packaging;
             }
-
-            $fallback ??= $packaging;
         }
 
-        return $fallback;
+        return null;
     }
 
     /**

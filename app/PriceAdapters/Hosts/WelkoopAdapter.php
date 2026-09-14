@@ -65,27 +65,11 @@ final readonly class WelkoopAdapter implements HostSpecificAdapter, ShopAdapter
 
     private static function title(Crawler $crawler): string
     {
-        $h1 = $crawler->filter('h1')->first();
-        if ($h1->count() > 0) {
-            $text = trim($h1->text(''));
-            if ($text !== '') {
-                return $text;
-            }
-        }
-
-        foreach (['meta[name="og:title"]', 'meta[property="og:title"]'] as $selector) {
-            $og = $crawler->filter($selector)->first();
-            if ($og->count() === 0) {
-                continue;
-            }
-
-            $content = $og->attr('content');
-            if (is_string($content) && trim($content) !== '') {
-                return trim($content);
-            }
-        }
-
-        return 'Welkoop product';
+        // Both og:title spellings are tried, `name` before `property`.
+        return HostPage::element($crawler, 'h1')
+            ?? HostPage::meta($crawler, 'meta[name="og:title"]')
+            ?? HostPage::meta($crawler, 'meta[property="og:title"]')
+            ?? 'Welkoop product';
     }
 
     private static function jsonLdImage(Crawler $crawler): ?string
