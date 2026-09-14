@@ -48,8 +48,12 @@ final readonly class LidlAdapter implements HostSpecificAdapter, ShopAdapter
 
         $data = NuxtData::decode($html);
 
+        // Lidl's JSON-LD states no `priceValidUntil`, so the blanket
+        // authority it claims covers nothing. Withdraw it when the payload
+        // that does carry the period is absent, or a null window clears a
+        // promotion an earlier check read from that payload.
         if ($data === null) {
-            return ExtractionResult::success($snapshot);
+            return ExtractionResult::success($snapshot->withoutPromotionWindowAuthority());
         }
 
         $packaging = self::packagingFromNuxtPayload($data, HostUrl::lastSegmentDigits($url, 'p'));

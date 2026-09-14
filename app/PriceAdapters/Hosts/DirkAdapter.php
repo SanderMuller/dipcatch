@@ -56,8 +56,9 @@ final readonly class DirkAdapter implements HostSpecificAdapter, ShopAdapter
         }
 
         // The payload is the only promotion source this adapter reads, so a
-        // page that carries it and states no period ends the promotion. A
-        // page served without it says nothing, and must not clear one.
+        // page that carries it and states no period ends the promotion. On a
+        // page served without it Dirk adds no claim of its own, and the
+        // JSON-LD offer's stands.
         return ExtractionResult::success(
             $snapshot->withPromotionWindow(self::promotionWindow($data, $productId, $snapshot->price)),
         );

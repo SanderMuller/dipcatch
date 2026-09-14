@@ -6,6 +6,13 @@ namespace App\PriceAdapters;
  * Successful adapter extraction. Prices are decimal strings (compatible with
  * `bccomp` + the existing `PriceCheck.price` decimal(12,2) column) — no cent
  * integers anywhere.
+ *
+ * A host adapter augments a snapshot through the `with*` copy methods, one
+ * per concept. Calling one is the claim of authority over that concept, so
+ * passing null clears the inherited value; an adapter that does not read
+ * promotion windows never calls `withPromotionWindow()`, and the inherited
+ * window survives. `withoutPromotionWindowAuthority()` is the one exception,
+ * for an adapter that must withdraw a claim it knows to be empty.
  */
 final readonly class ShopSnapshot
 {
@@ -78,13 +85,6 @@ final readonly class ShopSnapshot
         return $this->bundleOffer->isCheaperThan($this->price) ? $bundlePrice : $this->price;
     }
 
-    /**
-     * The augmenting copies a host adapter makes on top of a JSON-LD
-     * snapshot. There is one method per concept, and calling it *is* the
-     * claim of authority over that concept — an adapter that does not read
-     * promotion windows never calls {@see self::withPromotionWindow()}, and
-     * the inherited window survives. Passing null therefore clears.
-     */
     public function withPackSize(string $packSize): self
     {
         return clone($this, ['packSize' => $packSize, 'packSizeAuthoritative' => true]);
@@ -93,6 +93,19 @@ final readonly class ShopSnapshot
     public function withPromotionWindow(?PromotionWindow $promotionWindow): self
     {
         return clone($this, ['promotionWindow' => $promotionWindow, 'promotionWindowAuthoritative' => true]);
+    }
+
+    /**
+     * Withdraw an inherited claim of promotion authority.
+     *
+     * A host adapter whose own promotion source is unavailable on this page
+     * calls this when the snapshot it augments claims authority it does not
+     * have. Without it the null window would clear a promotion that is still
+     * running — see {@see Hosts\LidlAdapter}.
+     */
+    public function withoutPromotionWindowAuthority(): self
+    {
+        return clone($this, ['promotionWindowAuthoritative' => false]);
     }
 
     public function withBundleOffer(?BundleOffer $bundleOffer): self

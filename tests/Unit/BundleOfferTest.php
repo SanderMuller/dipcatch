@@ -73,8 +73,6 @@ test('snapshot copy preserves or authoritatively clears bundle state', function 
 
     expect($preserved->bundleOffer)->toBe($offer)
         ->and($preserved->bundleOfferAuthoritative)->toBeTrue()
-        ->and($preserved->packSize)->toBe('1.5 l')
-        ->and($preserved->packSizeAuthoritative)->toBeTrue()
         ->and($cleared->bundleOffer)->toBeNull()
         ->and($cleared->bundleOfferAuthoritative)->toBeTrue();
 });

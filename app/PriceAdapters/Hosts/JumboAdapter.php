@@ -56,8 +56,13 @@ final readonly class JumboAdapter extends HostAdapter
             ? BundleOffer::fromLabel($label, $snapshot->price)
             : null;
 
+        // The promotion block is authoritative, but it states only the
+        // periods it runs itself. When it names none, the period the JSON-LD
+        // offer stated still stands.
         return ExtractionResult::success(
-            $snapshot->withPromotionWindow($window)->withBundleOffer($offer),
+            $snapshot
+                ->withPromotionWindow($window ?? $snapshot->promotionWindow)
+                ->withBundleOffer($offer),
         );
     }
 

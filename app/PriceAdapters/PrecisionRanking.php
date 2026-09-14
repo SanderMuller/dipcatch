@@ -54,8 +54,7 @@ final class PrecisionRanking
     }
 
     /**
-     * The item that named the request most precisely, tie or no tie. Use
-     * {@see self::winner()} to get it only when it stands alone.
+     * The item that named the request most precisely, tie or no tie.
      *
      * @return TItem|null
      */
@@ -66,7 +65,8 @@ final class PrecisionRanking
 
     /**
      * The single most precise item, or null when none reached the top score
-     * alone.
+     * alone. This is the only accessor a caller can use without a null
+     * check of its own, which is why it exists beside {@see self::best()}.
      *
      * @return TItem|null
      */
@@ -82,8 +82,7 @@ final class PrecisionRanking
     }
 
     /**
-     * Every item that reached the top score. More than one means the page
-     * does not say which of them the request asked for.
+     * Every item that reached the top score.
      *
      * @return list<TItem>
      */
