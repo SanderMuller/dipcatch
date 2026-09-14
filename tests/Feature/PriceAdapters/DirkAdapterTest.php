@@ -107,3 +107,14 @@ test('a URL naming no product id adds no promotion claim of its own', function (
 
     expect($result->snapshot?->promotionWindow?->endsAt?->toDateString())->toBe($validUntil);
 });
+
+test('a packaging record for another product is not this product\'s pack size', function (): void {
+    // The payload prices article 999999 while the URL names 115212.
+    $html = dirkPage(productId: '999999');
+
+    $result = $this->adapter->extract('https://www.dirk.nl/boodschappen/x/x/x/115212', $html);
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->packSize)->toBeNull()
+        ->and($result->snapshot?->packSizeAuthoritative)->toBeFalse();
+});
