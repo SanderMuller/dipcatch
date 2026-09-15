@@ -5,6 +5,7 @@ namespace App\PriceAdapters\Hosts;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\ExtractionResult;
+use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
@@ -91,19 +92,11 @@ final readonly class JumboAdapter extends HostAdapter
             return null;
         }
 
-        $titleNode = $crawler->filter('meta[property="og:title"]')->first();
-        $title = $titleNode->count() > 0 ? trim((string) $titleNode->attr('content')) : '';
-        if ($title === '') {
-            $h1 = $crawler->filter('h1')->first();
-            $title = $h1->count() > 0 ? trim($h1->text('')) : 'Jumbo product';
-        }
-
-        $imageNode = $crawler->filter('meta[property="og:image"]')->first();
-        $image = $imageNode->count() > 0 ? $imageNode->attr('content') : null;
-
         return new ShopSnapshot(
-            title: $title,
-            imageUrl: $image,
+            title: PageMarkup::meta($crawler, 'meta[property="og:title"]')
+                ?? PageMarkup::element($crawler, 'h1')
+                ?? 'Jumbo product',
+            imageUrl: PageMarkup::ogImage($crawler),
             price: $price,
             currency: $currency,
             inStock: true,

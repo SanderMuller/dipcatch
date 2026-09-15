@@ -64,18 +64,13 @@ final readonly class OpenGraphAdapter implements ShopAdapter
         return $crawler;
     }
 
+    /**
+     * Open Graph is published under `property`, but enough pages spell it
+     * `name` that both are read, in that order.
+     */
     private static function meta(Crawler $crawler, string $property): ?string
     {
-        $node = $crawler->filter('meta[property="' . $property . '"]')->first();
-        if ($node->count() === 0) {
-            $node = $crawler->filter('meta[name="' . $property . '"]')->first();
-        }
-        if ($node->count() === 0) {
-            return null;
-        }
-
-        $content = $node->attr('content');
-
-        return is_string($content) && $content !== '' ? $content : null;
+        return PageMarkup::meta($crawler, 'meta[property="' . $property . '"]')
+            ?? PageMarkup::meta($crawler, 'meta[name="' . $property . '"]');
     }
 }

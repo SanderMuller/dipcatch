@@ -2,6 +2,7 @@
 
 namespace App\PriceAdapters\Hosts;
 
+use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopSnapshot;
 use Symfony\Component\DomCrawler\Crawler;
@@ -111,13 +112,13 @@ final readonly class ZooplusAdapter extends HostAdapter
     private static function title(Crawler $crawler): string
     {
         // Scoped to the product-title component rather than a bare h1.
-        return HostPage::element($crawler, 'h1[data-zta="ProductTitle__Title"]')
-            ?? HostPage::meta($crawler, 'meta[property="og:title"]')
+        return PageMarkup::element($crawler, 'h1[data-zta="ProductTitle__Title"]')
+            ?? PageMarkup::meta($crawler, 'meta[property="og:title"]')
             ?? 'Zooplus product';
     }
 
     private static function ogImage(Crawler $crawler): ?string
     {
-        return HostPage::ogImage($crawler);
+        return PageMarkup::ogImage($crawler);
     }
 }

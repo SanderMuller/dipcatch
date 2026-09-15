@@ -78,3 +78,16 @@ test('failed when bol page has neither JSON-LD nor known price markers', functio
     expect($result->isFailed())->toBeTrue()
         ->and($result->failureReason)->toBe('bol_extraction_failed');
 });
+
+test('a blank product title falls back to the shop name, not to nothing', function (): void {
+    $html = <<<'HTML'
+<html><body>
+  <h1 class="product-title">   </h1>
+  <span data-test="price">€ 19,99</span>
+</body></html>
+HTML;
+
+    $result = $this->adapter->extract('https://bol.com/p/1', $html);
+
+    expect($result->snapshot?->title)->toBe('Bol product');
+});

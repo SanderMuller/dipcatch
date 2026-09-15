@@ -124,43 +124,14 @@ final readonly class UserSelectorAdapter implements HostSpecificAdapter, ShopAda
             }
         }
 
-        $og = $crawler->filter('meta[property="og:image"]')->first();
-        if ($og->count() > 0) {
-            $content = $og->attr('content');
-            if (is_string($content) && $content !== '') {
-                return $content;
-            }
-        }
-
-        return null;
+        return PageMarkup::ogImage($crawler);
     }
 
     private static function fallbackTitle(Crawler $crawler): string
     {
-        $og = $crawler->filter('meta[property="og:title"]')->first();
-        if ($og->count() > 0) {
-            $content = self::nonEmpty($og->attr('content'));
-            if ($content !== null) {
-                return $content;
-            }
-        }
-
-        $h1 = $crawler->filter('h1')->first();
-        if ($h1->count() > 0) {
-            $text = self::nonEmpty($h1->text(''));
-            if ($text !== null) {
-                return $text;
-            }
-        }
-
-        $title = $crawler->filter('title')->first();
-        if ($title->count() > 0) {
-            $text = self::nonEmpty($title->text(''));
-            if ($text !== null) {
-                return $text;
-            }
-        }
-
-        return 'Unknown';
+        return PageMarkup::meta($crawler, 'meta[property="og:title"]')
+            ?? PageMarkup::element($crawler, 'h1')
+            ?? PageMarkup::element($crawler, 'title')
+            ?? 'Unknown';
     }
 }

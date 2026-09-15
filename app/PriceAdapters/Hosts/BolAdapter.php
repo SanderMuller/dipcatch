@@ -2,6 +2,7 @@
 
 namespace App\PriceAdapters\Hosts;
 
+use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopSnapshot;
 use Symfony\Component\DomCrawler\Crawler;
@@ -41,15 +42,9 @@ final readonly class BolAdapter extends HostAdapter
             return null;
         }
 
-        $titleNode = $crawler->filter('h1.product-title')->first();
-        $title = $titleNode->count() > 0 ? trim($titleNode->text('')) : 'Bol product';
-
-        $imageNode = $crawler->filter('meta[property="og:image"]')->first();
-        $image = $imageNode->count() > 0 ? $imageNode->attr('content') : null;
-
         return new ShopSnapshot(
-            title: $title,
-            imageUrl: $image,
+            title: PageMarkup::element($crawler, 'h1.product-title') ?? 'Bol product',
+            imageUrl: PageMarkup::ogImage($crawler),
             price: $price,
             currency: $currency,
             inStock: true,

@@ -225,3 +225,13 @@ test('a page with no promotion block keeps the period the JSON-LD stated', funct
     expect($result->snapshot?->promotionWindow?->endsAt?->toDateString())->toBe($validUntil)
         ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
 });
+
+test('a blank h1 falls back to the shop name, not to nothing', function (): void {
+    $html = '<html><body><h1>   </h1>'
+        . jumboPriceComponent('Prijs: € 7,59', '7', '59')
+        . '</body></html>';
+
+    $result = $this->adapter->extract('https://www.jumbo.com/producten/milner-194089STK', $html);
+
+    expect($result->snapshot?->title)->toBe('Jumbo product');
+});

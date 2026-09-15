@@ -5,6 +5,7 @@ namespace App\PriceAdapters\Hosts;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
+use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
@@ -66,9 +67,9 @@ final readonly class WelkoopAdapter implements HostSpecificAdapter, ShopAdapter
     private static function title(Crawler $crawler): string
     {
         // Both og:title spellings are tried, `name` before `property`.
-        return HostPage::element($crawler, 'h1')
-            ?? HostPage::meta($crawler, 'meta[name="og:title"]')
-            ?? HostPage::meta($crawler, 'meta[property="og:title"]')
+        return PageMarkup::element($crawler, 'h1')
+            ?? PageMarkup::meta($crawler, 'meta[name="og:title"]')
+            ?? PageMarkup::meta($crawler, 'meta[property="og:title"]')
             ?? 'Welkoop product';
     }
 
