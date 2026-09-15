@@ -50,19 +50,24 @@ final class ImageUrl
      */
     private static function withoutCredentials(string $baseUrl): string
     {
-        $at = strpos($baseUrl, '@');
-        $authorityStart = strpos($baseUrl, '//');
+        $marker = strpos($baseUrl, '//');
 
-        if ($at === false || $authorityStart === false || $at < $authorityStart) {
+        if ($marker === false) {
             return $baseUrl;
         }
 
-        $pathStart = strpos($baseUrl, '/', $authorityStart + 2);
+        // The authority runs from `//` to the first delimiter after it. An
+        // `@` anywhere past that belongs to the path, the query or the
+        // fragment, and is not a credential.
+        $start = $marker + 2;
+        $length = strcspn($baseUrl, '/?#', $start);
+        $authority = substr($baseUrl, $start, $length);
+        $at = strrpos($authority, '@');
 
-        if ($pathStart !== false && $at > $pathStart) {
+        if ($at === false) {
             return $baseUrl;
         }
 
-        return substr($baseUrl, 0, $authorityStart + 2) . substr($baseUrl, $at + 1);
+        return substr($baseUrl, 0, $start) . substr($authority, $at + 1) . substr($baseUrl, $start + $length);
     }
 }

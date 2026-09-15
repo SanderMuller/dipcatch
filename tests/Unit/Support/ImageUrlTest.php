@@ -83,3 +83,13 @@ test('a colon in the first path segment reads as a scheme, so the image is dropp
         ->and(ImageUrl::absolute('./a.jpg:1', 'https://shop.test/p/detail/1'))
         ->toBe('https://shop.test/p/detail/a.jpg:1');
 });
+
+test('an at sign outside the authority is not credentials', function (string $base, string $expected): void {
+    expect(ImageUrl::absolute('/a.jpg', $base))->toBe($expected);
+})->with([
+    'in the query of a pathless url' => ['https://shop.test?email=a@b.test', 'https://shop.test/a.jpg'],
+    'in the fragment of a pathless url' => ['https://shop.test#a@b.test', 'https://shop.test/a.jpg'],
+    'in the path' => ['https://shop.test/p/@brand/1', 'https://shop.test/a.jpg'],
+    'in the query after a path' => ['https://shop.test/p/1?to=a@b.test', 'https://shop.test/a.jpg'],
+    'credentials and an at sign in the query' => ['https://u:pw@shop.test/p/1?to=a@b.test', 'https://shop.test/a.jpg'],
+]);
