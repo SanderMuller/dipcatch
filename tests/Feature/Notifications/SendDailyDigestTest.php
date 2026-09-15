@@ -274,3 +274,27 @@ test('the digest mailable renders end to end without the mail fake', function ()
 
     expect($html)->toContain('Digest product')->toContain('€1.69');
 });
+
+test('the digest leaves out an image whose stored url is not http(s)', function (): void {
+    Mail::swap(app('mail.manager'));
+
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create([
+        'title' => 'Digest product',
+        'image_url' => 'ftp://example.com/img.png',
+    ]);
+    $shop = Shop::factory()->for($product)->create();
+    $events = PriceDropEvent::factory()->count(1)->for($user)->create([
+        'product_id' => $product->id,
+        'triggered_by_shop_id' => $shop->id,
+        'currency' => 'EUR',
+        'new_price' => '1.69',
+        'drop_abs' => '0.50',
+        'drop_pct' => '22.8',
+    ]);
+
+    $html = new PriceDropDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render();
+
+    expect($html)->toContain('Digest product')
+        ->and($html)->not->toContain('ftp://example.com/img.png');
+});

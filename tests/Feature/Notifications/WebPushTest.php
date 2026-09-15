@@ -203,3 +203,25 @@ test('target alerts state bundle quantity and exact total', function (): void {
         ->and($target->toDatabase($user)['single_item_price'])->toBe('2.85')
         ->and($unitTarget->toDatabase($user)['bundle_quantity'])->toBe(2);
 });
+
+test('a push icon falls back to the favicon when the stored image url is not http(s)', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create([
+        'currency' => 'EUR',
+        'title' => 'Acme Headphones',
+        'image_url' => 'ftp://example.com/img.png',
+    ]);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://bol.com/p/x',
+        'current_price' => '85.00',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '85.00'])->save();
+
+    $drop = new PriceDropNotification($product, pushOutcome(), (string) Str::uuid());
+    $target = new TargetPriceNotification($product, $shop, '85.00');
+    $unitTarget = new UnitPriceTargetNotification($product, $shop, '85.00');
+
+    expect($drop->toWebPush($user)->toArray()['icon'])->toBe('/favicon.svg')
+        ->and($target->toWebPush($user)->toArray()['icon'])->toBe('/favicon.svg')
+        ->and($unitTarget->toWebPush($user)->toArray()['icon'])->toBe('/favicon.svg');
+});

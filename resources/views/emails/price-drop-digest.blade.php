@@ -18,9 +18,12 @@ Your tracked prices changed:
 </td>
 </tr>
 <tr>
-@if (! empty($product->image_url))
+@php
+$image = $product->safeImageUrl();
+@endphp
+@if ($image !== null)
 <td width="120" valign="top" style="width: 120px; padding: 20px 0 20px 20px; vertical-align: top;">
-<img src="{{ $product->image_url }}" alt="{{ $product->title }}" width="100" style="display: block; width: 100px; max-width: 100%; height: auto; max-height: 140px; object-fit: contain;">
+<img src="{{ $image }}" alt="{{ $product->title }}" width="100" style="display: block; width: 100px; max-width: 100%; height: auto; max-height: 140px; object-fit: contain;">
 </td>
 @endif
 <td valign="top" style="padding: 20px; vertical-align: top;">
