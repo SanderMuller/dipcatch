@@ -39,6 +39,30 @@ final class ImageUrl
             return null;
         }
 
-        return self::safe(UriResolver::resolve($url, $baseUrl));
+        return self::safe(UriResolver::resolve($url, self::withoutCredentials($baseUrl)));
+    }
+
+    /**
+     * A shop can redirect to a URL carrying credentials, and the resolver
+     * copies the base's authority verbatim. Storing those in `image_url` would
+     * put the shop's own credentials into a page and an email, so they are
+     * dropped here — an image never needs them.
+     */
+    private static function withoutCredentials(string $baseUrl): string
+    {
+        $at = strpos($baseUrl, '@');
+        $authorityStart = strpos($baseUrl, '//');
+
+        if ($at === false || $authorityStart === false || $at < $authorityStart) {
+            return $baseUrl;
+        }
+
+        $pathStart = strpos($baseUrl, '/', $authorityStart + 2);
+
+        if ($pathStart !== false && $at > $pathStart) {
+            return $baseUrl;
+        }
+
+        return substr($baseUrl, 0, $authorityStart + 2) . substr($baseUrl, $at + 1);
     }
 }

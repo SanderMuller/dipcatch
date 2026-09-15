@@ -62,3 +62,24 @@ test('a blank image reference is no image, not the page it came from', function 
     'empty' => [''],
     'whitespace' => ['   '],
 ]);
+
+test('credentials in the page url stay out of the image url', function (string $image, string $expected): void {
+    expect(ImageUrl::absolute($image, 'https://user:pw@shop.test/p/detail/1'))->toBe($expected);
+})->with([
+    'root relative' => ['/a.jpg', 'https://shop.test/a.jpg'],
+    'directory relative' => ['a.jpg', 'https://shop.test/p/detail/a.jpg'],
+    'query only' => ['?v=2', 'https://shop.test/p/detail/1?v=2'],
+]);
+
+test('an at sign in the path is not credentials', function (): void {
+    expect(ImageUrl::absolute('a.jpg', 'https://shop.test/p/@brand/1'))
+        ->toBe('https://shop.test/p/@brand/a.jpg');
+});
+
+test('a colon in the first path segment reads as a scheme, so the image is dropped', function (): void {
+    // RFC 3986 section 4.2: such a reference has to be written `./a.jpg:1`.
+    // The hand-rolled resolver was lenient here; the standard one is not.
+    expect(ImageUrl::absolute('a.jpg:1', 'https://shop.test/p/detail/1'))->toBeNull()
+        ->and(ImageUrl::absolute('./a.jpg:1', 'https://shop.test/p/detail/1'))
+        ->toBe('https://shop.test/p/detail/a.jpg:1');
+});
