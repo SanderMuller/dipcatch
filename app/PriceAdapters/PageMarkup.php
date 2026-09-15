@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace App\PriceAdapters\Hosts;
+namespace App\PriceAdapters;
 
 use App\Support\PackSize;
 use Symfony\Component\DomCrawler\Crawler;
@@ -15,7 +15,7 @@ use Symfony\Component\DomCrawler\Crawler;
  * title for a pack size whenever the source states none, so the order a host
  * reads its title in decides the unit price on screen.
  */
-final readonly class HostPage
+final readonly class PageMarkup
 {
     /** What a `meta` tag states in its `content` attribute. */
     public static function meta(Crawler $crawler, string $selector): ?string

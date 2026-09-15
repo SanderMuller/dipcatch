@@ -6,6 +6,7 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
@@ -92,14 +93,14 @@ final readonly class LookfantasticAdapter implements HostSpecificAdapter, ShopAd
 
     private static function title(Crawler $crawler): string
     {
-        return HostPage::meta($crawler, 'meta[property="og:title"]')
-            ?? HostPage::element($crawler, 'h1')
+        return PageMarkup::meta($crawler, 'meta[property="og:title"]')
+            ?? PageMarkup::element($crawler, 'h1')
             ?? 'Lookfantastic product';
     }
 
     private static function ogImage(Crawler $crawler): ?string
     {
-        return HostPage::ogImage($crawler);
+        return PageMarkup::ogImage($crawler);
     }
 
     private static function currencyFromPriceText(string $text, ?string $fallback): string

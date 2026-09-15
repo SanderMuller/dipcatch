@@ -2,6 +2,7 @@
 
 namespace App\PriceAdapters\Hosts;
 
+use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopSnapshot;
 use Symfony\Component\DomCrawler\Crawler;
@@ -66,13 +67,13 @@ final readonly class MedpetsAdapter extends HostAdapter
     {
         // Reads the h1 first, where its siblings read og:title first. The
         // reason is not recorded; the order is preserved as found.
-        return HostPage::element($crawler, 'h1')
-            ?? HostPage::meta($crawler, 'meta[property="og:title"]')
+        return PageMarkup::element($crawler, 'h1')
+            ?? PageMarkup::meta($crawler, 'meta[property="og:title"]')
             ?? 'Medpets product';
     }
 
     private function extractImage(Crawler $crawler): ?string
     {
-        return HostPage::ogImage($crawler);
+        return PageMarkup::ogImage($crawler);
     }
 }

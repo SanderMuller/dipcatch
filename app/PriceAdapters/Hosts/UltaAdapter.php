@@ -2,6 +2,7 @@
 
 namespace App\PriceAdapters\Hosts;
 
+use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopSnapshot;
 use Symfony\Component\DomCrawler\Crawler;
@@ -62,13 +63,13 @@ final readonly class UltaAdapter extends HostAdapter
 
     private static function title(Crawler $crawler): string
     {
-        return HostPage::meta($crawler, 'meta[property="og:title"]')
-            ?? HostPage::element($crawler, 'h1')
+        return PageMarkup::meta($crawler, 'meta[property="og:title"]')
+            ?? PageMarkup::element($crawler, 'h1')
             ?? 'Ulta product';
     }
 
     private static function ogImage(Crawler $crawler): ?string
     {
-        return HostPage::ogImage($crawler);
+        return PageMarkup::ogImage($crawler);
     }
 }
