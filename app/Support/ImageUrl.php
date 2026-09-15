@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Symfony\Component\DomCrawler\UriResolver;
+
 final class ImageUrl
 {
     /**
@@ -25,6 +27,11 @@ final class ImageUrl
      * hand back `/img/p.jpg` or `//cdn/p.jpg`. Resolve those against the page
      * they came from — safe() drops an unresolved relative URL, and the image
      * is lost.
+     *
+     * The blank guard is load-bearing, not defensive: RFC 3986 resolves an
+     * empty reference to the base URI itself, so without it a page stating
+     * `<meta property="og:image" content="">` would store its own address as
+     * the product photo.
      */
     public static function absolute(mixed $url, string $baseUrl): ?string
     {
@@ -32,33 +39,35 @@ final class ImageUrl
             return null;
         }
 
-        $url = trim($url);
+        return self::safe(UriResolver::resolve($url, self::withoutCredentials($baseUrl)));
+    }
 
-        if (is_string(parse_url($url, PHP_URL_SCHEME))) {
-            return self::safe($url);
+    /**
+     * A shop can redirect to a URL carrying credentials, and the resolver
+     * copies the base's authority verbatim. Storing those in `image_url` would
+     * put the shop's own credentials into a page and an email, so they are
+     * dropped here — an image never needs them.
+     */
+    private static function withoutCredentials(string $baseUrl): string
+    {
+        $marker = strpos($baseUrl, '//');
+
+        if ($marker === false) {
+            return $baseUrl;
         }
 
-        $base = parse_url($baseUrl);
-        $scheme = $base['scheme'] ?? null;
-        $host = $base['host'] ?? null;
+        // The authority runs from `//` to the first delimiter after it. An
+        // `@` anywhere past that belongs to the path, the query or the
+        // fragment, and is not a credential.
+        $start = $marker + 2;
+        $length = strcspn($baseUrl, '/?#', $start);
+        $authority = substr($baseUrl, $start, $length);
+        $at = strrpos($authority, '@');
 
-        if (! is_string($scheme) || ! is_string($host)) {
-            return null;
+        if ($at === false) {
+            return $baseUrl;
         }
 
-        $authority = $host . (isset($base['port']) ? ':' . $base['port'] : '');
-
-        if (str_starts_with($url, '//')) {
-            return self::safe($scheme . ':' . $url);
-        }
-
-        if (str_starts_with($url, '/')) {
-            return self::safe($scheme . '://' . $authority . $url);
-        }
-
-        $path = is_string($base['path'] ?? null) ? $base['path'] : '/';
-        $directory = substr($path, 0, (int) strrpos($path, '/') + 1);
-
-        return self::safe($scheme . '://' . $authority . $directory . $url);
+        return substr($baseUrl, 0, $start) . substr($authority, $at + 1) . substr($baseUrl, $start + $length);
     }
 }
