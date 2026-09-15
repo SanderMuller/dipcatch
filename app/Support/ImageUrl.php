@@ -10,6 +10,10 @@ final class ImageUrl
      * Image URLs come from scraped markup and from user input, so a
      * `javascript:` or `data:` payload must never reach an `<img src>` or an
      * `og:image`. Returns null for anything that is not http(s).
+     *
+     * RFC 3986 states the scheme is case-insensitive, and `parse_url()`
+     * returns it as written, so `HTTPS://…` is a valid URL the comparison
+     * must accept.
      */
     public static function safe(mixed $url): ?string
     {
@@ -18,6 +22,7 @@ final class ImageUrl
         }
 
         $scheme = parse_url($url, PHP_URL_SCHEME);
+        $scheme = is_string($scheme) ? strtolower($scheme) : $scheme;
 
         return $scheme === 'http' || $scheme === 'https' ? $url : null;
     }

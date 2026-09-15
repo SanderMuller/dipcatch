@@ -7,6 +7,8 @@ test('safe keeps http and https urls', function (string $url): void {
 })->with([
     'https://shop.test/a.jpg',
     'http://shop.test/a.jpg',
+    'HTTPS://shop.test/a.jpg',
+    'HtTp://shop.test/a.jpg',
 ]);
 
 test('safe rejects anything that is not http(s)', function (mixed $url): void {
