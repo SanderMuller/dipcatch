@@ -26,7 +26,7 @@ final class JsonLdSearchState
      *
      * @var PrecisionRanking<array{0: array<string, mixed>, 1: array<string, mixed>}>
      */
-    private PrecisionRanking $ranking;
+    private readonly PrecisionRanking $ranking;
 
     public function __construct()
     {

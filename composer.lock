@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "069d49d1b339e6a123e91b629bf858be",
+    "content-hash": "aaccc1232b697d2832aae8e14330b0bc",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -3150,16 +3150,16 @@
         },
         {
             "name": "laravel/mcp",
-            "version": "v0.9.5",
+            "version": "v1.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/mcp.git",
-                "reference": "923d8d8cd9ed46766d1a8b5269f8b4afc4c91c53"
+                "reference": "cfa4f38f82873eeb6848527883545f98f871e229"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/mcp/zipball/923d8d8cd9ed46766d1a8b5269f8b4afc4c91c53",
-                "reference": "923d8d8cd9ed46766d1a8b5269f8b4afc4c91c53",
+                "url": "https://api.github.com/repos/laravel/mcp/zipball/cfa4f38f82873eeb6848527883545f98f871e229",
+                "reference": "cfa4f38f82873eeb6848527883545f98f871e229",
                 "shasum": ""
             },
             "require": {
@@ -3220,7 +3220,7 @@
                 "issues": "https://github.com/laravel/mcp/issues",
                 "source": "https://github.com/laravel/mcp"
             },
-            "time": "2026-09-09T12:56:57+00:00"
+            "time": "2026-09-14T14:35:19+00:00"
         },
         {
             "name": "laravel/octane",
@@ -18072,16 +18072,16 @@
         },
         {
             "name": "sandermuller/richter",
-            "version": "v0.68.0",
+            "version": "v0.69.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/SanderMuller/richter.git",
-                "reference": "345c3d9787b09fdfe307dd1eb0472c42ca73a36e"
+                "reference": "76002ed49aca9043caaaccba37a65e963d910d65"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SanderMuller/richter/zipball/345c3d9787b09fdfe307dd1eb0472c42ca73a36e",
-                "reference": "345c3d9787b09fdfe307dd1eb0472c42ca73a36e",
+                "url": "https://api.github.com/repos/SanderMuller/richter/zipball/76002ed49aca9043caaaccba37a65e963d910d65",
+                "reference": "76002ed49aca9043caaaccba37a65e963d910d65",
                 "shasum": ""
             },
             "require": {
@@ -18090,20 +18090,20 @@
                 "illuminate/process": "^12.0||^13.0",
                 "illuminate/routing": "^12.0||^13.0",
                 "illuminate/support": "^12.0||^13.0",
-                "laramint/laravel-brain": "^2.6.0",
+                "laramint/laravel-brain": "^2.7.0",
                 "nikic/php-parser": "^5.0",
                 "php": "^8.4",
                 "spatie/laravel-package-tools": "^1.93",
                 "symfony/finder": "^7.2||^8.0"
             },
             "conflict": {
-                "laravel/mcp": "<0.8.0 || >=0.10.0"
+                "laravel/mcp": "<0.8.0 || >=0.10.0 <1.0.0 || >=2.0.0"
             },
             "require-dev": {
                 "driftingly/rector-laravel": "^2.5",
                 "larastan/larastan": "^3.10",
                 "laravel/boost": "^2.5.3",
-                "laravel/mcp": "^0.8||^0.9.3",
+                "laravel/mcp": "^0.8||^0.9.3||^1.0",
                 "laravel/pao": "^1.1.4",
                 "laravel/pint": "^1.30.5",
                 "nunomaduro/collision": "^8.9.5",
@@ -18123,7 +18123,7 @@
                 "tomasvotruba/type-coverage": "^2.3"
             },
             "suggest": {
-                "laravel/mcp": "Exposes the impact, trace, detect-changes and affected-tests tools plus orientation resources over MCP — supported range ^0.8||^0.9; richter registers a local MCP server when installed."
+                "laravel/mcp": "Exposes the impact, trace, detect-changes and affected-tests tools plus orientation resources over MCP — supported range ^0.8||^0.9||^1.0; richter registers a local MCP server when installed."
             },
             "type": "library",
             "extra": {
@@ -18158,9 +18158,9 @@
             ],
             "support": {
                 "issues": "https://github.com/SanderMuller/richter/issues",
-                "source": "https://github.com/SanderMuller/richter/tree/v0.68.0"
+                "source": "https://github.com/SanderMuller/richter/tree/v0.69.0"
             },
-            "time": "2026-09-02T21:40:08+00:00"
+            "time": "2026-09-15T10:59:10+00:00"
         },
         {
             "name": "sebastian/cli-parser",

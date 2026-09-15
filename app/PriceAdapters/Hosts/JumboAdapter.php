@@ -46,7 +46,7 @@ final readonly class JumboAdapter extends HostAdapter
         $snapshot = $result->snapshot;
 
         if ($snapshot->inStock === null && self::hasEnabledAddToCartButton($product)) {
-            $snapshot = $snapshot->withStock(true, 'jumbo:add-to-cart');
+            $snapshot = $snapshot->withStock(inStock: true, stockSignal: 'jumbo:add-to-cart');
         }
 
         if ($hasDateText && $window === null) {

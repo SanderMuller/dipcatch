@@ -97,7 +97,7 @@ final readonly class AdapterResolver
             return $result;
         }
 
-        return ExtractionResult::success($snapshot->withStock(false, 'text: ' . $phrase))
+        return ExtractionResult::success($snapshot->withStock(inStock: false, stockSignal: 'text: ' . $phrase))
             ->withAdapterKey((string) $result->adapterKey);
     }
 
