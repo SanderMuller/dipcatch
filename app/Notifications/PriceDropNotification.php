@@ -96,7 +96,7 @@ final class PriceDropNotification extends Notification implements ShouldQueue
         return new WebPushMessage()
             ->title('Price drop: ' . $this->product->title)
             ->body($body)
-            ->icon($this->product->image_url ?? '/favicon.svg')
+            ->icon($this->product->safeImageUrl() ?? '/favicon.svg')
             ->data(['url' => route('app.products.show', $this->product)]);
     }
 

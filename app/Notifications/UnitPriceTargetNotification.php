@@ -74,7 +74,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
         return new WebPushMessage()
             ->title('Unit price target: ' . $this->product->title)
             ->body($this->body())
-            ->icon($this->product->image_url ?? '/favicon.svg')
+            ->icon($this->product->safeImageUrl() ?? '/favicon.svg')
             ->data(['url' => route('app.products.show', $this->product)]);
     }
 
