@@ -2,6 +2,7 @@
 
 namespace App\PriceAdapters\Hosts;
 
+use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopSnapshot;
 use JsonException;
@@ -143,14 +144,7 @@ final readonly class AmazonAdapter extends HostAdapter
             }
         }
 
-        $og = $crawler->filter('meta[property="og:image"]')->first();
-        if ($og->count() === 0) {
-            return null;
-        }
-
-        $content = $og->attr('content');
-
-        return is_string($content) && $content !== '' ? $content : null;
+        return PageMarkup::ogImage($crawler);
     }
 
     private function extractInStock(Crawler $crawler): bool

@@ -77,3 +77,29 @@ HTML;
 
     expect($result->snapshot?->title)->toBe('Sneakers');
 });
+
+test('a blank property price falls through to the name spelling', function (): void {
+    $html = <<<'HTML'
+<meta property="og:price:amount" content="" />
+<meta name="og:price:amount" content="89.99" />
+<meta property="og:price:currency" content="EUR" />
+HTML;
+
+    $result = $this->adapter->extract('https://x.test', $html);
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('89.99');
+});
+
+test('a price tag stating nothing is no price here, whatever the blank looks like', function (string $content): void {
+    // Skip, not fail: the adapter has no price to offer and the weaker
+    // adapters get their turn. An empty `content` already skipped; a
+    // whitespace one used to fail the whole chain instead.
+    $html = '<meta property="og:price:amount" content="' . $content . '" />'
+        . '<meta property="og:price:currency" content="EUR" />';
+
+    expect($this->adapter->extract('https://x.test', $html)->isSkip())->toBeTrue();
+})->with([
+    'empty' => [''],
+    'whitespace' => ['   '],
+]);
