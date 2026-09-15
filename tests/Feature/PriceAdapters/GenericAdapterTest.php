@@ -60,3 +60,16 @@ HTML;
     expect($result->snapshot?->imageUrl)->toBe('https://shop.test/p.jpg')
         ->and($result->snapshot?->currency)->toBe('GBP');
 });
+
+test('a blank h1 gives the page title its turn', function (): void {
+    $html = <<<'HTML'
+<html><head><title>Page title</title></head><body>
+  <h1>   </h1>
+  <span class="price">€ 29,99</span>
+</body></html>
+HTML;
+
+    $result = $this->adapter->extract('https://x.test', $html);
+
+    expect($result->snapshot?->title)->toBe('Page title');
+});

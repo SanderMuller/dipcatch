@@ -64,3 +64,16 @@ HTML;
 
     expect($result->snapshot?->inStock)->toBeFalse();
 });
+
+test('a blank property spelling falls through to the name spelling', function (): void {
+    $html = <<<'HTML'
+<meta property="og:title" content="" />
+<meta name="og:title" content="Sneakers" />
+<meta property="og:price:amount" content="89.99" />
+<meta property="og:price:currency" content="EUR" />
+HTML;
+
+    $result = $this->adapter->extract('https://x.test', $html);
+
+    expect($result->snapshot?->title)->toBe('Sneakers');
+});

@@ -121,35 +121,13 @@ final readonly class GenericAdapter implements ShopAdapter
 
     private static function detectTitle(Crawler $crawler): string
     {
-        $h1 = $crawler->filter('h1')->first();
-        if ($h1->count() > 0) {
-            $text = trim($h1->text(''));
-            if ($text !== '') {
-                return $text;
-            }
-        }
-
-        $titleTag = $crawler->filter('title')->first();
-        if ($titleTag->count() > 0) {
-            $text = trim($titleTag->text(''));
-            if ($text !== '') {
-                return $text;
-            }
-        }
-
-        return 'Unknown';
+        return PageMarkup::element($crawler, 'h1')
+            ?? PageMarkup::element($crawler, 'title')
+            ?? 'Unknown';
     }
 
     private static function detectImage(Crawler $crawler): ?string
     {
-        $og = $crawler->filter('meta[property="og:image"]')->first();
-        if ($og->count() > 0) {
-            $content = $og->attr('content');
-            if (is_string($content) && $content !== '') {
-                return $content;
-            }
-        }
-
-        return null;
+        return PageMarkup::ogImage($crawler);
     }
 }
