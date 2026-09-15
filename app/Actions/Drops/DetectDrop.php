@@ -2,17 +2,22 @@
 
 namespace App\Actions\Drops;
 
+use App\Jobs\CheckShopPrice;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
+use App\Services\AhApi\AhApiSource;
+use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\Drops\DropEvaluator;
 use App\Services\Drops\DropOutcome;
 use App\Services\Drops\NotificationBudget;
 use App\Services\Drops\Reference;
 use App\Services\Drops\ReferenceValue;
 use App\Support\Numeric;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -60,7 +65,116 @@ final readonly class DetectDrop
             return;
         }
 
+        // A large drop belongs to confirmLargeDrop(), which the recompute
+        // calls before its own `$changed` gate. Notifying here as well would
+        // send the alert on one reading — the thing this guard exists to stop.
+        if ($outcome->needsConfirmation) {
+            return;
+        }
+
         $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId);
+    }
+
+    /**
+     * Decide a large drop — one at or past `drops.confirm_above_pct` below the
+     * reference. Such a drop is what a mis-extraction looks like: a unit price,
+     * a "from" price, another variant. It notifies only when the shop's
+     * previous eligible reading agreed, so one bad read cannot mail anyone.
+     *
+     * Called from `recomputeCheapestShop()` inside the product row lock and
+     * **before** its `$changed` early return: the confirming reading is the
+     * same price again, so it trips neither that gate nor the `down`
+     * direction, and `__invoke()` would never see it.
+     *
+     * Nothing is written. The second opinion is the shop's own price-check
+     * history, so a swallowed or failed confirmation job costs nothing — the
+     * next scheduled check is an equally valid second reading.
+     */
+    public function confirmLargeDrop(
+        Product $product,
+        string $newPrice,
+        ?int $triggeringPriceCheckId,
+        ReferenceValue $reference,
+    ): void {
+        if ($triggeringPriceCheckId === null) {
+            return;
+        }
+
+        // Evaluated before anything is loaded: this runs on every recompute,
+        // inside the product row lock, and an ordinary check must leave the
+        // critical section without a further query.
+        $outcome = $this->evaluator->evaluate($product, $newPrice, $reference);
+
+        if (! $outcome->belowThreshold || ! $outcome->needsConfirmation) {
+            return;
+        }
+
+        $trigger = PriceCheck::query()->find($triggeringPriceCheckId);
+
+        // `CheckShopPrice::persist()` recomputes on every outcome, a failure
+        // included, and a failed check leaves the shop's price cached. Without
+        // this the failure would re-evaluate that cached drop and notify,
+        // anchored to a check that read nothing.
+        if ($trigger === null || ! $trigger->isEligible()) {
+            return;
+        }
+
+        // The drop must belong to the shop this check read.
+        if ($trigger->shop_id !== $product->cheapest_shop_id) {
+            return;
+        }
+
+        if (bccomp(Numeric::str((string) $trigger->price), Numeric::str($newPrice), self::BC_SCALE) !== 0) {
+            return;
+        }
+
+        // A dataset or API shop reads a structured field and never fetches a
+        // page, so a second reading is the same row again and confirms
+        // nothing. Those shops alert on one reading, as they always have.
+        if ($this->readsWithoutFetching($trigger->shop)) {
+            $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId);
+
+            return;
+        }
+
+        $previous = PriceCheck::query()
+            ->where('shop_id', $trigger->shop_id)
+            ->where('id', '<', $trigger->id)
+            ->eligible()
+            ->latest('id')
+            ->first();
+
+        // The predecessor has to be a large drop in its own right. A merely
+        // discounted one — below the notify threshold but above the
+        // confirmation ceiling — would let a single anomalous reading through
+        // on its coat-tails, which is the whole failure this guard exists for.
+        if ($previous !== null && $this->qualifiesAsLargeDrop($product, (string) $previous->price, $reference)) {
+            $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId);
+
+            return;
+        }
+
+        // This reading is the transition. Ask for a second one now rather than
+        // waiting for the shop's next scheduled check.
+        $shop = $trigger->shop;
+
+        DB::afterCommit(function () use ($shop): void {
+            CheckShopPrice::dispatch($shop, confirmation: true)
+                ->delay(now()->addMinutes(Config::integer('dipcatch.drops.confirm_delay_minutes')));
+        });
+    }
+
+    private function qualifiesAsLargeDrop(Product $product, string $price, ReferenceValue $reference): bool
+    {
+        $outcome = $this->evaluator->evaluate($product, $price, $reference);
+
+        return $outcome->belowThreshold && $outcome->needsConfirmation;
+    }
+
+    private function readsWithoutFetching(Shop $shop): bool
+    {
+        return app(AhApiSource::class)->supports($shop->host)
+            || app(CheckjebonSource::class)->supports($shop->host);
     }
 
     /**

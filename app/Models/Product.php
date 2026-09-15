@@ -240,6 +240,13 @@ final class Product extends Model
                 'cheapest_price' => $newPrice,
             ])->save();
 
+            // Before the `$changed` gate on purpose: a confirming reading is
+            // the same price again, so it changes nothing and never reaches
+            // the detector call at the bottom of this transaction.
+            if ($reference !== null && $newPrice !== null && $newOfferId !== null) {
+                app(DetectDrop::class)->confirmLargeDrop($locked, $newPrice, $triggeringPriceCheckId, $reference);
+            }
+
             $changed = $previousOfferId !== $newOfferId
                 || $previousPrice !== $newPrice
                 || $openSegment?->singleItemPrice() !== $singleItemPrice

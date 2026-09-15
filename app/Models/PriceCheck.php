@@ -6,8 +6,10 @@ use App\Enums\ScrapeStatus;
 use App\PriceAdapters\BundleOffer;
 use Carbon\CarbonImmutable;
 use Database\Factories\PriceCheckFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -47,6 +49,32 @@ final class PriceCheck extends Model
             'checked_at' => 'datetime',
             'status' => ScrapeStatus::class,
         ];
+    }
+
+    /**
+     * A reading that can stand as an observation of the shop's price: it
+     * succeeded, it carries a price, and the offer was not out of stock.
+     * `recomputeCheapestShop()` excludes an out-of-stock offer from cheapest
+     * selection, so such a reading never had a drop of its own and must not
+     * confirm another one.
+     *
+     * @param  EloquentBuilder<PriceCheck>  $query
+     */
+    #[Scope]
+    protected function eligible(EloquentBuilder $query): void
+    {
+        $query->where('status', ScrapeStatus::Ok)
+            ->whereNotNull('price')
+            ->where(fn (EloquentBuilder $stock): EloquentBuilder => $stock
+                ->where('in_stock', true)
+                ->orWhereNull('in_stock'));
+    }
+
+    public function isEligible(): bool
+    {
+        return $this->status === ScrapeStatus::Ok
+            && $this->price !== null
+            && $this->in_stock !== false;
     }
 
     /**

@@ -12,6 +12,7 @@ function dropOutcome(): DropOutcome
 {
     return new DropOutcome(
         belowThreshold: true,
+        needsConfirmation: false,
         referencePrice: '100.00',
         referenceKind: 'median_30d',
         dropAbsolute: '15.00',

@@ -673,3 +673,31 @@ test('a person-initiated recheck does not unlock the offers queued recheck', fun
 
     expect(DB::table('jobs')->count())->toBe(1);
 });
+
+test('each origin keys its own uniqueness lock', function (): void {
+    $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
+
+    $auto = new CheckShopPrice($shop)->uniqueId();
+    $manual = new CheckShopPrice($shop, manual: true)->uniqueId();
+    $confirmation = new CheckShopPrice($shop, confirmation: true)->uniqueId();
+
+    // The first two strings are the contract the scheduler and the person-
+    // initiated recheck have relied on since before the confirmation scope
+    // existed; a third origin must not have renamed them.
+    expect($auto)->toBe("check-shop:{$shop->id}:{$shop->url_hash}:auto")
+        ->and($manual)->toBe("check-shop:{$shop->id}:{$shop->url_hash}:manual")
+        ->and($confirmation)->toBe("check-shop:{$shop->id}:{$shop->url_hash}:confirmation");
+});
+
+test('an automated recheck lock does not swallow the confirmation re-fetch', function (): void {
+    config()->set('queue.default', 'database');
+    Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '60.00'));
+    Cache::put('dipcatch:robots:shop.test', [], 3600);
+
+    $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
+
+    dispatch(new CheckShopPrice($shop));
+    dispatch(new CheckShopPrice($shop, confirmation: true));
+
+    expect(DB::table('jobs')->count())->toBe(2);
+});

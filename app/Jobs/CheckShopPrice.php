@@ -104,12 +104,18 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     private const int MAX_RELEASE_DELAY_SECONDS = 60;
 
     /**
-     * Lock-key scope per origin, indexed by `(int) $manual`. A scope rather
-     * than a flag in the key so the two never share a lock.
+     * Lock-key scope per origin. A scope rather than a flag in the key so no
+     * two origins share a lock. `confirmation` is the re-fetch a large drop
+     * asks for: without its own scope the scheduled check's key would swallow
+     * it, because that key is held for a full jitter window plus a buffer.
      */
-    private const array LOCK_SCOPES = ['auto', 'manual'];
+    private const string SCOPE_AUTO = 'auto';
 
-    public function __construct(public Shop $shop, public bool $manual = false) {}
+    private const string SCOPE_MANUAL = 'manual';
+
+    private const string SCOPE_CONFIRMATION = 'confirmation';
+
+    public function __construct(public Shop $shop, public bool $manual = false, public bool $confirmation = false) {}
 
     public function uniqueId(): string
     {
@@ -122,7 +128,11 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         // `CallQueuedHandler` force-releases the key when the job finishes.
         // On a shared key that unlocks the offer's queued recheck, and the
         // next scheduler tick queues a second check for the same offer.
-        $scope = self::LOCK_SCOPES[(int) $this->manual];
+        $scope = match (true) {
+            $this->confirmation => self::SCOPE_CONFIRMATION,
+            $this->manual => self::SCOPE_MANUAL,
+            default => self::SCOPE_AUTO,
+        };
 
         return "check-shop:{$this->shop->id}:{$this->shop->url_hash}:{$scope}";
     }

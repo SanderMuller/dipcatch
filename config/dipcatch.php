@@ -88,6 +88,17 @@ return [
         'jitter_minutes' => (int) env('DIPCATCH_RECHECK_JITTER_MINUTES', 30),
     ],
 
+    'drops' => [
+        // A drop of at least this many percent below the reference is not
+        // notified on one reading. The shop's previous successful reading
+        // must qualify too — see App\Actions\Drops\DetectDrop.
+        'confirm_above_pct' => (int) env('DIPCATCH_DROPS_CONFIRM_ABOVE_PCT', 40),
+        // How long the confirming re-fetch waits before it runs. Long enough
+        // for a shop's own cache to settle, short enough that a real promotion
+        // still alerts within the hour.
+        'confirm_delay_minutes' => (int) env('DIPCATCH_DROPS_CONFIRM_DELAY_MINUTES', 10),
+    ],
+
     'digest' => [
         // Local hour-of-day at which each user's daily digest fires. 24h.
         'send_hour' => (int) env('DIPCATCH_DIGEST_SEND_HOUR', 9),
