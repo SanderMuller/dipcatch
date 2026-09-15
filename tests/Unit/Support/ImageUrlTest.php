@@ -39,3 +39,26 @@ test('absolute rejects an unsafe scheme and an unusable base', function (): void
         ->and(ImageUrl::absolute('/a.jpg', ''))->toBeNull()
         ->and(ImageUrl::absolute(url: null, baseUrl: 'https://shop.test/p/1'))->toBeNull();
 });
+
+test('absolute canonicalizes dot segments', function (string $image, string $expected): void {
+    expect(ImageUrl::absolute($image, 'https://shop.test/p/detail/1'))->toBe($expected);
+})->with([
+    'parent' => ['../img/a.jpg', 'https://shop.test/p/img/a.jpg'],
+    'current' => ['./a.jpg', 'https://shop.test/p/detail/a.jpg'],
+]);
+
+test('absolute resolves a query-only or fragment-only reference against the page itself', function (): void {
+    expect(ImageUrl::absolute('?size=large', 'https://shop.test/p/detail/1?x=2'))
+        ->toBe('https://shop.test/p/detail/1?size=large')
+        ->and(ImageUrl::absolute('#hero', 'https://shop.test/p/detail/1?x=2'))
+        ->toBe('https://shop.test/p/detail/1?x=2#hero');
+});
+
+test('a blank image reference is no image, not the page it came from', function (mixed $image): void {
+    // RFC 3986 resolves an empty reference to the base URI, so dropping this
+    // guard would store the product page as the product photo.
+    expect(ImageUrl::absolute($image, 'https://shop.test/p/detail/1'))->toBeNull();
+})->with([
+    'empty' => [''],
+    'whitespace' => ['   '],
+]);
