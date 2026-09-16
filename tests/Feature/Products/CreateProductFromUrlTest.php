@@ -99,6 +99,21 @@ test('empty title blocks confirm and persists nothing', function (): void {
     expect(Product::query()->where('user_id', $user->id)->count())->toBe(0);
 });
 
+test('an edited image url whose scheme is not http(s) blocks confirm', function (): void {
+    Http::fake(fakeCreateFlowOffer());
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->set('imageUrl', 'ftp://shop.example.com/img.jpg')
+        ->call('confirm')
+        ->assertHasErrors(['imageUrl']);
+
+    expect(Product::query()->where('user_id', $user->id)->count())->toBe(0);
+});
+
 test('URL already tracked on another product of this user shows a warning but confirm still works', function (): void {
     Http::fake(fakeCreateFlowOffer());
     $user = User::factory()->create();

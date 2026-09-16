@@ -36,7 +36,7 @@
         "livewire/flux-pro": "^2.19",
         "livewire/livewire": "^4.4.5",
         "resend/resend-php": "^1.15",
-        "sandermuller/laravel-fluent-validation": "^1.33.0",
+        "sandermuller/laravel-fluent-validation": "^1.34.0",
         "sandermuller/laravel-queue-insights": "^0.34.0",
         "sandermuller/stopwatch": "^0.14.0",
         "shuvroroy/filament-spatie-laravel-health": "^3.3.3",
