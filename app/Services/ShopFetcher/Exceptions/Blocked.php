@@ -2,10 +2,12 @@
 
 namespace App\Services\ShopFetcher\Exceptions;
 
+use App\Enums\ScrapeStatus;
+
 final class Blocked extends FetchException
 {
-    public function code(): string
+    public function status(): ScrapeStatus
     {
-        return 'blocked';
+        return ScrapeStatus::Blocked;
     }
 }

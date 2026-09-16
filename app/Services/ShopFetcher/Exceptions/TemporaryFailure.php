@@ -2,6 +2,8 @@
 
 namespace App\Services\ShopFetcher\Exceptions;
 
+use App\Enums\ScrapeStatus;
+
 /**
  * Transient server errors (5xx). Health-counted separately from the main
  * failure counter — see `offers.consecutive_5xx_failures` and the per-job
@@ -14,8 +16,8 @@ final class TemporaryFailure extends FetchException
         parent::__construct("Upstream HTTP {$statusCode}.");
     }
 
-    public function code(): string
+    public function status(): ScrapeStatus
     {
-        return '5xx';
+        return ScrapeStatus::TransientServerError;
     }
 }

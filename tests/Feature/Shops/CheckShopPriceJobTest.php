@@ -119,6 +119,30 @@ test('5xx increments the 5xx counter only', function (): void {
         ->and($shop->last_status)->toBe(ScrapeStatus::TransientServerError);
 });
 
+test('a block is persisted as blocked', function (): void {
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('nope', 403),
+    ]);
+
+    $shop = Shop::factory()->create([
+        'url' => 'https://shop.test/p/1',
+        'consecutive_failures' => 0,
+        'consecutive_5xx_failures' => 0,
+    ]);
+
+    new CheckShopPrice($shop)->handle(
+        app(ShopFetcher::class),
+        app(AdapterResolver::class),
+        app(CheckjebonSource::class),
+        app(AhApiSource::class),
+    );
+
+    $shop->refresh();
+    expect($shop->last_status)->toBe(ScrapeStatus::Blocked)
+        ->and($shop->consecutive_5xx_failures)->toBe(0);
+});
+
 test('main counter reaching dead_after flips health to dead + active=false', function (): void {
     config()->set('dipcatch.shop.dead_after', 3);
 

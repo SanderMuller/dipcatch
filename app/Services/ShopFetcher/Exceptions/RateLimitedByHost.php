@@ -2,6 +2,8 @@
 
 namespace App\Services\ShopFetcher\Exceptions;
 
+use App\Enums\ScrapeStatus;
+
 final class RateLimitedByHost extends FetchException
 {
     public const string SOURCE_LOCAL = 'local';        // our own per-host throttle
@@ -19,8 +21,8 @@ final class RateLimitedByHost extends FetchException
         );
     }
 
-    public function code(): string
+    public function status(): ScrapeStatus
     {
-        return 'rate_limited';
+        return ScrapeStatus::RateLimited;
     }
 }
