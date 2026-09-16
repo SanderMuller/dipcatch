@@ -235,10 +235,12 @@ final readonly class ShopFetcher
      * Guard one request against its host's robots.txt, before it goes out.
      * Called for the entry URL and again for every redirect hop.
      *
-     * On the hop path Guzzle rejects a non-http(s) Location before this
-     * runs (`RedirectMiddleware::redirectUri()`), so the scheme rule that
-     * `decompose()` applies is a second layer there, not the one that
-     * stops such a hop today.
+     * On the hop path both rules `decompose()` applies are a second layer,
+     * and each sits behind a different first one. Guzzle rejects a
+     * non-http(s) Location in `RedirectMiddleware::redirectUri()` before
+     * this runs. A Location with no host reaches it — Guzzle keeps
+     * `https:/elsewhere` verbatim — but `UrlSafetyGuard::assertSafe()`,
+     * called one line earlier, refuses it in production.
      */
     private function assertRobotsAllows(string $url): void
     {

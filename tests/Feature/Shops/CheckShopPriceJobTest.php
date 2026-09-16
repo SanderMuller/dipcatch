@@ -144,6 +144,31 @@ test('a block is persisted as blocked', function (): void {
         ->and($shop->consecutive_5xx_failures)->toBe(0);
 });
 
+test('a 404 is persisted as http_error', function (): void {
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('gone', 404),
+    ]);
+
+    $shop = Shop::factory()->create([
+        'url' => 'https://shop.test/p/1',
+        'consecutive_failures' => 0,
+        'consecutive_5xx_failures' => 0,
+    ]);
+
+    new CheckShopPrice($shop)->handle(
+        app(ShopFetcher::class),
+        app(AdapterResolver::class),
+        app(CheckjebonSource::class),
+        app(AhApiSource::class),
+    );
+
+    $shop->refresh();
+    expect($shop->last_status)->toBe(ScrapeStatus::HttpError)
+        ->and($shop->consecutive_failures)->toBe(1)
+        ->and($shop->consecutive_5xx_failures)->toBe(0);
+});
+
 test('main counter reaching dead_after flips health to dead + active=false', function (): void {
     config()->set('dipcatch.shop.dead_after', 3);
 
