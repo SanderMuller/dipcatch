@@ -65,7 +65,7 @@ final class EditProduct extends Component
     {
         return [
             'title' => FluentRule::string('Title')->required()->max(255),
-            'imageUrl' => FluentRule::url('Image URL')->nullable()->max(2048),
+            'imageUrl' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
             'currency' => FluentRule::string('Currency')->required()->in(Iso4217::CODES),
             // A threshold of zero would alert on a price that did not move.
             'dropThresholdPct' => FluentRule::numeric('Drop threshold (%)')

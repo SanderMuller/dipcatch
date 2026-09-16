@@ -9,6 +9,9 @@ use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
+use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentValidation;
 
 /**
  * Track a product by hand.
@@ -18,6 +21,8 @@ use Livewire\Component;
  */
 final class CreateProductManual extends Component
 {
+    use HasFluentValidation;
+
     public string $title = '';
 
     public string $image_url = '';
@@ -30,15 +35,23 @@ final class CreateProductManual extends Component
 
     public ?string $limitMessage = null;
 
+    /**
+     * @return array<string, FluentRuleContract>
+     */
+    public function rules(): array
+    {
+        return [
+            'title' => FluentRule::string('Title')->required()->max(255),
+            'image_url' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
+            'currency' => FluentRule::string('Currency')->required()->min(3)->max(3),
+            'drop_threshold_pct' => FluentRule::numeric('Drop threshold (%)')->nullable()->min(0)->max(100),
+            'drop_threshold_abs' => FluentRule::numeric('Drop threshold (absolute)')->nullable()->min(0),
+        ];
+    }
+
     public function save(): void
     {
-        $this->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'image_url' => ['nullable', 'url', 'max:2048'],
-            'currency' => ['required', 'string', 'size:3'],
-            'drop_threshold_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'drop_threshold_abs' => ['nullable', 'numeric', 'min:0'],
-        ]);
+        $this->validate();
 
         $user = $this->user();
 

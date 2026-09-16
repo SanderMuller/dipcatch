@@ -58,7 +58,7 @@ final class CreateProductFromUrl extends Component
     {
         return [
             'title' => FluentRule::string('Title')->required()->max(255),
-            'imageUrl' => FluentRule::url('Image URL')->nullable()->max(2048),
+            'imageUrl' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
             'thresholdPct' => FluentRule::numeric('Drop threshold (%)')
                 ->required()
                 ->between(0.01, 99.98999999999999),

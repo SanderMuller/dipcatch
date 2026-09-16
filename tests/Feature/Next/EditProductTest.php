@@ -102,6 +102,20 @@ it('refuses a title that is not there', function (): void {
     expect($product->fresh()?->title)->toBe('Kept');
 });
 
+it('refuses an image url whose scheme is not http(s)', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'image_url' => null]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->set('imageUrl', 'ftp://example.test/pack.jpg')
+        ->call('save')
+        ->assertHasErrors('imageUrl');
+
+    expect($product->fresh()?->image_url)->toBeNull();
+});
+
 it('keeps a unit price target a free account cannot be alerted on', function (): void {
     // The number is stored on any plan and starts working on upgrade, which
     // is what DetectUnitPriceTarget already assumes.
