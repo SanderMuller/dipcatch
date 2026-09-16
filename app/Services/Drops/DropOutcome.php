@@ -8,6 +8,7 @@ final class DropOutcome extends Data
 {
     public function __construct(
         public bool $belowThreshold,
+        public bool $needsConfirmation,
         public string $referencePrice,
         public string $referenceKind,
         public string $dropAbsolute,

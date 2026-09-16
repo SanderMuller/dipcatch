@@ -4,6 +4,7 @@ namespace App\Services\Drops;
 
 use App\Models\Product;
 use App\Support\Numeric;
+use Illuminate\Support\Facades\Config;
 
 final class DropEvaluator
 {
@@ -35,6 +36,7 @@ final class DropEvaluator
 
         return new DropOutcome(
             belowThreshold: $belowThreshold,
+            needsConfirmation: $this->needsConfirmation($dropPercent),
             referencePrice: $ref->value,
             referenceKind: $ref->kind,
             dropAbsolute: $dropAbsolute,
@@ -42,6 +44,18 @@ final class DropEvaluator
             thresholdAbs: $thresholdAbs,
             thresholdPct: $thresholdPct,
         );
+    }
+
+    /**
+     * A drop this deep is not notified on one reading. `DetectDrop` asks the
+     * shop's previous successful reading to agree first — one mis-extraction
+     * (a unit price, a "from" price, another variant) reads exactly like this.
+     */
+    private function needsConfirmation(string $dropPercent): bool
+    {
+        $ceiling = (string) Config::integer('dipcatch.drops.confirm_above_pct');
+
+        return bccomp(Numeric::str($dropPercent), Numeric::str($ceiling), self::BC_SCALE) >= 0;
     }
 
     private function meetsAbsThreshold(string $dropAbsolute, string $thresholdAbs): bool
