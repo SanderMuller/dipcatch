@@ -72,18 +72,7 @@ final readonly class ShopFetcher
 
     public function fetch(string $url): FetchResult
     {
-        $parsed = parse_url($url);
-        if ($parsed === false || ! isset($parsed['scheme'], $parsed['host'])) {
-            throw new InvalidArgumentException("Invalid URL: '{$url}'.");
-        }
-
-        $scheme = strtolower($parsed['scheme']);
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            throw new InvalidArgumentException("Unsupported scheme '{$scheme}' in '{$url}'.");
-        }
-
-        $host = UrlNormalizer::normalizeHost($parsed['host']);
-        $path = $parsed['path'] ?? '/';
+        ['host' => $host, 'path' => $path, 'scheme' => $scheme] = self::decompose($url);
 
         try {
             $this->safety->assertSafe($url);
@@ -216,20 +205,48 @@ final readonly class ShopFetcher
     }
 
     /**
-     * Guard one redirect hop against the target host's robots.txt, before
-     * that request goes out.
+     * Split a fetch URL into the three pieces the robots policy asks for.
+     *
+     * Both the entry URL and every redirect hop come through here, so one
+     * rule set decides what a fetchable URL is. The hop path used to read
+     * the same URL more leniently — it defaulted a missing scheme to
+     * `https` and allowed a hop it could not parse.
+     *
+     * @return array{host: string, path: string, scheme: string}
      */
-    private function assertRobotsAllows(string $url): void
+    private static function decompose(string $url): array
     {
         $parsed = parse_url($url);
 
-        if ($parsed === false || ! isset($parsed['host'])) {
-            return;
+        if ($parsed === false || ! isset($parsed['scheme'], $parsed['host'])) {
+            throw new InvalidArgumentException("Invalid URL: '{$url}'.");
         }
 
-        $host = UrlNormalizer::normalizeHost($parsed['host']);
-        $path = $parsed['path'] ?? '/';
-        $scheme = strtolower($parsed['scheme'] ?? 'https');
+        $scheme = strtolower($parsed['scheme']);
+
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            throw new InvalidArgumentException("Unsupported scheme '{$scheme}' in '{$url}'.");
+        }
+
+        return [
+            'host' => UrlNormalizer::normalizeHost($parsed['host']),
+            'path' => $parsed['path'] ?? '/',
+            'scheme' => $scheme,
+        ];
+    }
+
+    /**
+     * Guard one redirect hop against the target host's robots.txt, before
+     * that request goes out.
+     *
+     * Guzzle rejects a non-http(s) Location before this callback runs
+     * (`RedirectMiddleware::redirectUri()`), so the scheme rule that
+     * `decompose()` applies is a second layer here, not the one that stops
+     * such a hop today.
+     */
+    private function assertRobotsAllows(string $url): void
+    {
+        ['host' => $host, 'path' => $path, 'scheme' => $scheme] = self::decompose($url);
 
         if (! $this->robots->isAllowed($host, $path, $scheme)) {
             throw new RobotsDisallowed("robots.txt disallows {$host}{$path}");
