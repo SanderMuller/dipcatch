@@ -140,6 +140,7 @@ test('a block is persisted as blocked', function (): void {
 
     $shop->refresh();
     expect($shop->last_status)->toBe(ScrapeStatus::Blocked)
+        ->and($shop->consecutive_failures)->toBe(1)
         ->and($shop->consecutive_5xx_failures)->toBe(0);
 });
 

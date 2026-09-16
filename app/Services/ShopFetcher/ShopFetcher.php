@@ -72,7 +72,7 @@ final readonly class ShopFetcher
 
     public function fetch(string $url): FetchResult
     {
-        ['host' => $host, 'path' => $path, 'scheme' => $scheme] = self::decompose($url);
+        $host = self::decompose($url)['host'];
 
         try {
             $this->safety->assertSafe($url);
@@ -80,9 +80,7 @@ final readonly class ShopFetcher
             throw new HttpError(0);
         }
 
-        if (! $this->robots->isAllowed($host, $path, $scheme)) {
-            throw new RobotsDisallowed("robots.txt disallows {$host}{$path}");
-        }
+        $this->assertRobotsAllows($url);
 
         $this->throttle($host);
 
@@ -207,10 +205,8 @@ final readonly class ShopFetcher
     /**
      * Split a fetch URL into the three pieces the robots policy asks for.
      *
-     * Both the entry URL and every redirect hop come through here, so one
-     * rule set decides what a fetchable URL is. The hop path used to read
-     * the same URL more leniently — it defaulted a missing scheme to
-     * `https` and allowed a hop it could not parse.
+     * The entry URL and every redirect hop come through here, so one rule
+     * set decides what a fetchable URL is.
      *
      * @return array{host: string, path: string, scheme: string}
      */
@@ -236,13 +232,13 @@ final readonly class ShopFetcher
     }
 
     /**
-     * Guard one redirect hop against the target host's robots.txt, before
-     * that request goes out.
+     * Guard one request against its host's robots.txt, before it goes out.
+     * Called for the entry URL and again for every redirect hop.
      *
-     * Guzzle rejects a non-http(s) Location before this callback runs
-     * (`RedirectMiddleware::redirectUri()`), so the scheme rule that
-     * `decompose()` applies is a second layer here, not the one that stops
-     * such a hop today.
+     * On the hop path Guzzle rejects a non-http(s) Location before this
+     * runs (`RedirectMiddleware::redirectUri()`), so the scheme rule that
+     * `decompose()` applies is a second layer there, not the one that
+     * stops such a hop today.
      */
     private function assertRobotsAllows(string $url): void
     {
