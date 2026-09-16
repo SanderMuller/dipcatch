@@ -2,6 +2,7 @@
 
 namespace App\Services\ShopFetcher\Exceptions;
 
+use App\Enums\ScrapeStatus;
 use App\Support\UnservableShops;
 
 /**
@@ -18,8 +19,8 @@ final class NotServable extends FetchException
         parent::__construct("{$host} renders its prices in the browser ({$reason}).");
     }
 
-    public function code(): string
+    public function status(): ScrapeStatus
     {
-        return 'needs_js';
+        return ScrapeStatus::NeedsJs;
     }
 }

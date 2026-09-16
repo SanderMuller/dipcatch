@@ -2,6 +2,8 @@
 
 namespace App\Services\ShopFetcher\Exceptions;
 
+use App\Enums\ScrapeStatus;
+
 /**
  * Non-5xx, non-block HTTP failure (404, 410, etc.).
  */
@@ -12,8 +14,8 @@ final class HttpError extends FetchException
         parent::__construct("HTTP {$statusCode}.");
     }
 
-    public function code(): string
+    public function status(): ScrapeStatus
     {
-        return 'http_error';
+        return ScrapeStatus::HttpError;
     }
 }

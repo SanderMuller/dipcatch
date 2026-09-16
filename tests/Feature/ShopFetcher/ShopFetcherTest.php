@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\ScrapeStatus;
 use App\Services\ShopFetcher\Exceptions\Blocked;
 use App\Services\ShopFetcher\Exceptions\HttpError;
 use App\Services\ShopFetcher\Exceptions\NotServable;
@@ -178,7 +179,7 @@ test('a host that never serves its prices is refused after the fetch', function 
 test('the refusal reports as needs_js, the same dead end as a JS-rendered page', function (): void {
     $exception = new NotServable('plus.nl', 'plus_spa');
 
-    expect($exception->code())->toBe('needs_js')
+    expect($exception->status())->toBe(ScrapeStatus::NeedsJs)
         ->and($exception->reason)->toBe('plus_spa');
 });
 

@@ -366,14 +366,8 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      */
     private function failureOutcome(FetchException $e): array
     {
-        // Each FetchException subclass already exposes its discriminant via
-        // code() (e.g. 'blocked', 'http_error') — and they map 1:1 to
-        // ScrapeStatus values. Use that mapping directly instead of
-        // re-deriving with `match ($e instanceof X)`.
-        $status = ScrapeStatus::tryFrom($e->code()) ?? ScrapeStatus::Failed;
-
         return [
-            'status' => $status,
+            'status' => $e->status(),
             'price' => null,
             'single_item_price' => null,
             'bundle_offer' => null,

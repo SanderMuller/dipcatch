@@ -2,12 +2,10 @@
 
 namespace App\Services\ShopFetcher\Exceptions;
 
+use App\Enums\ScrapeStatus;
 use RuntimeException;
 
 abstract class FetchException extends RuntimeException
 {
-    /**
-     * Stable code matching `price_checks.status` / offer `last_status`.
-     */
-    abstract public function code(): string;
+    abstract public function status(): ScrapeStatus;
 }
