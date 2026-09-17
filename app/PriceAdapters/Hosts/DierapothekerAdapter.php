@@ -5,6 +5,7 @@ namespace App\PriceAdapters\Hosts;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
+use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
@@ -105,8 +106,6 @@ final readonly class DierapothekerAdapter implements HostSpecificAdapter, ShopAd
 
     private static function gtin(Crawler $crawler): ?string
     {
-        $meta = $crawler->filter('meta[itemprop="gtin13"]')->first();
-
-        return $meta->count() === 0 ? null : Gtin::normalize($meta->attr('content'));
+        return Gtin::normalize(PageMarkup::meta($crawler, 'meta[itemprop="gtin13"]'));
     }
 }

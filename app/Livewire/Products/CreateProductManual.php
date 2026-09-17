@@ -6,6 +6,7 @@ use App\Billing\PlanLimitReached;
 use App\Billing\PlanLimits;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\Iso4217;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -43,7 +44,7 @@ final class CreateProductManual extends Component
         return [
             'title' => FluentRule::string('Title')->required()->max(255),
             'image_url' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
-            'currency' => FluentRule::string('Currency')->required()->min(3)->max(3),
+            'currency' => FluentRule::string('Currency')->required()->in(Iso4217::CODES),
             'drop_threshold_pct' => FluentRule::numeric('Drop threshold (%)')->nullable()->min(0)->max(100),
             'drop_threshold_abs' => FluentRule::numeric('Drop threshold (absolute)')->nullable()->min(0),
         ];

@@ -68,6 +68,31 @@ final readonly class BundlePriceLabel
         return self::withPromotion($offer, $currency, $single, $window);
     }
 
+    /**
+     * True when the preview price is the bundle's unit price, so the single
+     * item price beside it is the regular one worth striking through.
+     *
+     * The blades used to divide the total themselves at scale 2, which
+     * truncates where {@see BundleOffer::effectiveUnitPrice()} rounds: a
+     * "2 for 2.99" preview reads 1.49 that way and 1.50 here, so the
+     * comparison failed and the regular price disappeared.
+     *
+     * @param  array<string, mixed>  $snapshot
+     */
+    public static function snapshotPriceIsBundleUnit(array $snapshot): bool
+    {
+        $price = $snapshot['price'] ?? null;
+        $single = $snapshot['single_item_price'] ?? null;
+
+        if (! is_string($price) || ! is_string($single)) {
+            return false;
+        }
+
+        $offer = BundleOffer::stored($snapshot['bundle_quantity'] ?? null, $snapshot['bundle_total_price'] ?? null, $single);
+
+        return $offer?->isTrackedAt($price) === true;
+    }
+
     private static function withPromotion(
         BundleOffer $offer,
         string $currency,
