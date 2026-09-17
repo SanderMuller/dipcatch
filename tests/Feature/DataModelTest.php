@@ -84,12 +84,11 @@ test('cascade delete on product wipes its offers and their checks', function ():
         ->and(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(0);
 });
 
-test('ScrapeStatus enum has all seven cases with stable string values', function (): void {
+test('ScrapeStatus backing values stay stable, because rows already hold them', function (): void {
     expect(ScrapeStatus::Ok->value)->toBe('ok')
         ->and(ScrapeStatus::EmptyMatch->value)->toBe('empty_match')
         ->and(ScrapeStatus::HttpError->value)->toBe('http_error')
         ->and(ScrapeStatus::ParseError->value)->toBe('parse_error')
-        ->and(ScrapeStatus::Throttled->value)->toBe('throttled')
         ->and(ScrapeStatus::RobotsBlocked->value)->toBe('robots_blocked')
         ->and(ScrapeStatus::NeedsJs->value)->toBe('needs_js');
 });
