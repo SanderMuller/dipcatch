@@ -413,6 +413,13 @@ test('a currency mismatch does not overwrite the price', function (): void {
         ->and($shop->currency)->toBe('EUR')
         ->and($shop->last_status)->toBe(ScrapeStatus::CurrencyMismatch)
         ->and($shop->consecutive_failures)->toBe(1);
+
+    // The failed check still records what the shop quoted. A mismatch is the
+    // one failure reached by downgrading a successful read, so the price is
+    // there to be stored — the owner needs to see the number that was refused.
+    $check = PriceCheck::query()->where('shop_id', $shop->id)->latest('id')->first();
+    expect((string) $check?->price)->toBe('9.00')
+        ->and($check?->single_item_price)->toBeNull();
 });
 
 test('a currency mismatch fires no drop event and no notification', function (): void {
