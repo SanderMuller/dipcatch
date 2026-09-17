@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Drops\DetectTargetPrice;
 use App\Actions\Drops\DetectUnitPriceTarget;
+use App\Actions\Shops\CheckOutcome;
 use App\Actions\Shops\ResolvedBundlePricing;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
@@ -11,20 +12,15 @@ use App\Models\PriceCheck;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
-use App\PriceAdapters\BundleOffer;
-use App\PriceAdapters\ConditionalOffer;
-use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\Exceptions\FetchException;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
-use App\Services\ShopFetcher\FetchResult;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Config as DipConfig;
 use App\Support\ImageUrl;
 use App\Support\Iso4217;
-use App\Support\PackSize;
 use App\Support\RecheckJitter;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -58,29 +54,6 @@ use Throwable;
  *   - consecutive_failures >= dead_after           → health=dead, active=false
  *   - consecutive_5xx_failures >= failing_5xx_after → health=failing
  *   - consecutive_5xx_failures >= dead_5xx_after    → health=dead, active=false
- *
- * @phpstan-type CheckOutcome array{
- *   status: ScrapeStatus,
- *   price: ?string,
- *   single_item_price: ?string,
- *   bundle_offer: ?BundleOffer,
- *   bundle_offer_authoritative: bool,
- *   currency: ?string,
- *   in_stock: ?bool,
- *   image_url: ?string,
- *   gtin: ?string,
- *   gtin_authoritative: bool,
- *   raw: ?string,
- *   error: ?string,
- *   adapter_key: ?string,
- *   fetch_result: ?FetchResult,
- *   pack_size: ?PackSize,
- *   pack_size_authoritative: bool,
- *   conditional_offer: ?ConditionalOffer,
- *   conditional_offer_authoritative: bool,
- *   promotion_window: ?PromotionWindow,
- *   promotion_window_authoritative: bool
- * }
  */
 #[MaxExceptions(1)]
 #[Timeout(30)]
@@ -191,7 +164,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
             // The host stayed saturated across the whole budget. Record the
             // throttling rather than losing the cycle silently.
-            $outcome = $this->failureOutcome($e);
+            $outcome = CheckOutcome::failure($e->status(), $e->getMessage());
         }
 
         $this->persist($shop, $outcome);
@@ -202,78 +175,33 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      * adapter chain, no per-host rate limiting (it is a local DB read). A
      * miss maps to `EmptyMatch` so a delisted product walks the existing
      * failure counters into `failing` / `dead`.
-     *
-     * @return CheckOutcome
      */
-    private function checkjebonOutcome(Shop $shop, CheckjebonSource $checkjebon): array
+    private function checkjebonOutcome(Shop $shop, CheckjebonSource $checkjebon): CheckOutcome
     {
         $result = $checkjebon->resolve($shop->url);
         $snapshot = $result->snapshot;
 
         if ($snapshot === null) {
-            return [
-                'status' => ScrapeStatus::EmptyMatch,
-                'price' => null,
-                'single_item_price' => null,
-                'bundle_offer' => null,
-                'bundle_offer_authoritative' => false,
-                'currency' => null,
-                'in_stock' => null,
-                'image_url' => null,
-                'gtin' => null,
-                'gtin_authoritative' => false,
-                'raw' => null,
-                'error' => 'checkjebon:' . $result->missReason,
-                'adapter_key' => null,
-                'fetch_result' => null,
-                'pack_size' => null,
-                'pack_size_authoritative' => false,
-                'conditional_offer' => null,
-                'conditional_offer_authoritative' => false,
-                'promotion_window' => null,
-                'promotion_window_authoritative' => false,
-            ];
+            return CheckOutcome::failure(ScrapeStatus::EmptyMatch, 'checkjebon:' . $result->missReason);
         }
 
         return $this->sourceOutcome($snapshot, 'checkjebon');
     }
 
     /**
-     * @return CheckOutcome
+     * A source that hands back a snapshot without fetching a page: its image
+     * URL is already absolute, so there is no page to resolve it against.
      */
-    private function sourceOutcome(ShopSnapshot $snapshot, string $adapterKey): array
+    private function sourceOutcome(ShopSnapshot $snapshot, string $adapterKey): CheckOutcome
     {
-        return [
-            'status' => ScrapeStatus::Ok,
-            'price' => $snapshot->price,
-            'single_item_price' => $snapshot->price,
-            'bundle_offer' => $snapshot->bundleOffer,
-            'bundle_offer_authoritative' => $snapshot->bundleOfferAuthoritative,
-            'currency' => $snapshot->currency,
-            'in_stock' => $snapshot->inStock,
-            'image_url' => ImageUrl::safe($snapshot->imageUrl),
-            'gtin' => $snapshot->gtin,
-            'gtin_authoritative' => $snapshot->gtinAuthoritative,
-            'raw' => null,
-            'error' => null,
-            'adapter_key' => $adapterKey,
-            'fetch_result' => null,
-            'pack_size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title),
-            'conditional_offer' => $snapshot->conditionalOffer,
-            'conditional_offer_authoritative' => $snapshot->conditionalOfferAuthoritative,
-            'promotion_window' => $snapshot->promotionWindow,
-            'promotion_window_authoritative' => $snapshot->promotionWindowAuthoritative,
-            'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
-        ];
+        return CheckOutcome::success($snapshot, $adapterKey, ImageUrl::safe($snapshot->imageUrl));
     }
 
     /**
      * Network-side: fetch HTML + run adapter chain. Returns a classified
      * outcome with everything `persist()` needs.
-     *
-     * @return CheckOutcome
      */
-    private function fetchAndExtract(Shop $shop, ShopFetcher $fetcher, AdapterResolver $resolver): array
+    private function fetchAndExtract(Shop $shop, ShopFetcher $fetcher, AdapterResolver $resolver): CheckOutcome
     {
         try {
             $fetch = $fetcher->fetch($shop->url);
@@ -281,13 +209,13 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             // This arm exists to PREVENT the broader FetchException catch
             // below from misclassifying rate-limit as a failed check —
             // RateLimitedByHost extends FetchException, so without this
-            // specific arm it would fall into failureOutcome(). handle()
-            // turns the re-thrown exception into a job release.
+            // specific arm it would fall into the failure outcome below.
+            // handle() turns the re-thrown exception into a job release.
             throw $e;
         } catch (FetchException $e) {
-            return $this->failureOutcome($e);
+            return CheckOutcome::failure($e->status(), $e->getMessage());
         } catch (Throwable $e) {
-            return $this->genericFailure($e->getMessage());
+            return CheckOutcome::failure(ScrapeStatus::HttpError, $e->getMessage());
         }
 
         $context = new AdapterContext(
@@ -308,124 +236,26 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         );
 
         if (! $extraction->isSuccess()) {
-            return [
-                'status' => ScrapeStatus::ParseError,
-                'price' => null,
-                'single_item_price' => null,
-                'bundle_offer' => null,
-                'bundle_offer_authoritative' => false,
-                'currency' => null,
-                'in_stock' => null,
-                'image_url' => null,
-                'gtin' => null,
-                'gtin_authoritative' => false,
-                'raw' => null,
-                'error' => $extraction->failureReason,
-                'adapter_key' => $extraction->adapterKey,
-                'fetch_result' => $fetch,
-                'pack_size' => null,
-                'pack_size_authoritative' => false,
-                'conditional_offer' => null,
-                'conditional_offer_authoritative' => false,
-                'promotion_window' => null,
-                'promotion_window_authoritative' => false,
-            ];
+            return CheckOutcome::failure(ScrapeStatus::ParseError, $extraction->failureReason);
         }
 
         $snapshot = $extraction->snapshot;
         assert($snapshot !== null);
 
-        return [
-            'status' => ScrapeStatus::Ok,
-            'price' => $snapshot->price,
-            'single_item_price' => $snapshot->price,
-            'bundle_offer' => $snapshot->bundleOffer,
-            'bundle_offer_authoritative' => $snapshot->bundleOfferAuthoritative,
-            'currency' => $snapshot->currency,
-            'in_stock' => $snapshot->inStock,
-            'image_url' => ImageUrl::absolute($snapshot->imageUrl, $fetch->finalUrl),
-            'gtin' => $snapshot->gtin,
-            'gtin_authoritative' => $snapshot->gtinAuthoritative,
-            'raw' => null,
-            'error' => null,
-            'adapter_key' => $extraction->adapterKey,
-            'fetch_result' => $fetch,
-            // Scraped adapters carry no structured size — the title is the
-            // only source, and it is never authoritative.
-            'pack_size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title),
-            'conditional_offer' => $snapshot->conditionalOffer,
-            'conditional_offer_authoritative' => $snapshot->conditionalOfferAuthoritative,
-            'promotion_window' => $snapshot->promotionWindow,
-            'promotion_window_authoritative' => $snapshot->promotionWindowAuthoritative,
-            'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
-        ];
-    }
-
-    /**
-     * @return CheckOutcome
-     */
-    private function failureOutcome(FetchException $e): array
-    {
-        return [
-            'status' => $e->status(),
-            'price' => null,
-            'single_item_price' => null,
-            'bundle_offer' => null,
-            'bundle_offer_authoritative' => false,
-            'currency' => null,
-            'in_stock' => null,
-            'image_url' => null,
-            'gtin' => null,
-            'gtin_authoritative' => false,
-            'raw' => null,
-            'error' => $e->getMessage(),
-            'adapter_key' => null,
-            'fetch_result' => null,
-            'pack_size' => null,
-            'pack_size_authoritative' => false,
-            'conditional_offer' => null,
-            'conditional_offer_authoritative' => false,
-            'promotion_window' => null,
-            'promotion_window_authoritative' => false,
-        ];
-    }
-
-    /**
-     * @return CheckOutcome
-     */
-    private function genericFailure(string $message): array
-    {
-        return [
-            'status' => ScrapeStatus::HttpError,
-            'price' => null,
-            'single_item_price' => null,
-            'bundle_offer' => null,
-            'bundle_offer_authoritative' => false,
-            'currency' => null,
-            'in_stock' => null,
-            'image_url' => null,
-            'gtin' => null,
-            'gtin_authoritative' => false,
-            'raw' => null,
-            'error' => $message,
-            'adapter_key' => null,
-            'fetch_result' => null,
-            'pack_size' => null,
-            'pack_size_authoritative' => false,
-            'conditional_offer' => null,
-            'conditional_offer_authoritative' => false,
-            'promotion_window' => null,
-            'promotion_window_authoritative' => false,
-        ];
+        // A scraped image URL can be relative, so it resolves against the page
+        // the body actually came from.
+        return CheckOutcome::success(
+            $snapshot,
+            $extraction->adapterKey,
+            ImageUrl::absolute($snapshot->imageUrl, $fetch->finalUrl),
+        );
     }
 
     /**
      * Persist the price_check row + offer state + invoke recompute, all under
      * one transaction with offer→product lock order.
-     *
-     * @param  CheckOutcome  $outcome
      */
-    private function persist(Shop $shop, array $outcome): void
+    private function persist(Shop $shop, CheckOutcome $outcome): void
     {
         $now = now();
 
@@ -438,9 +268,10 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $status = $outcome['status'];
+            $status = $outcome->status;
+            $snapshot = $outcome->snapshot;
 
-            $reported = strtoupper(trim((string) ($outcome['currency'] ?? '')));
+            $reported = strtoupper(trim($snapshot->currency ?? ''));
             $expected = strtoupper(trim($locked->currency));
 
             // A shop that starts quoting another currency is not a cheaper shop. The
@@ -461,18 +292,21 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $updates = ['last_checked_at' => $now, 'last_status' => $status];
             $pricing = ResolvedBundlePricing::merge(
                 shop: $locked,
-                singleItemPrice: $outcome['single_item_price'],
-                offer: $outcome['bundle_offer'],
-                offerAuthoritative: $outcome['bundle_offer_authoritative'],
-                reportedWindow: $outcome['promotion_window'],
-                windowAuthoritative: $outcome['promotion_window_authoritative'],
+                singleItemPrice: $snapshot?->price,
+                offer: $snapshot?->bundleOffer,
+                offerAuthoritative: $snapshot->bundleOfferAuthoritative ?? false,
+                reportedWindow: $snapshot?->promotionWindow,
+                windowAuthoritative: $snapshot->promotionWindowAuthoritative ?? false,
             );
 
-            if ($status === ScrapeStatus::Ok) {
+            // Only a successful check carries a snapshot, so the two always
+            // travel together. Reading it as a condition rather than asserting
+            // it means a violation takes the failure branch instead of fataling.
+            if ($status === ScrapeStatus::Ok && $snapshot !== null) {
                 $updates += $pricing->shopUpdates() + [
                     // Unknown stays unknown: coercing it to true is what
                     // reported a sold-out product as available.
-                    'current_in_stock' => $outcome['in_stock'],
+                    'current_in_stock' => $snapshot->inStock,
                     // An empty currency is no signal at all — keep the last known one
                     // rather than blanking the column.
                     'currency' => $storedCurrency ?? $locked->currency,
@@ -485,14 +319,14 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                         : $locked->health,
                 ];
 
-                if ($outcome['adapter_key'] !== null) {
-                    $updates['adapter_key'] = $outcome['adapter_key'];
+                if ($outcome->adapterKey !== null) {
+                    $updates['adapter_key'] = $outcome->adapterKey;
                 }
 
                 // Keep the last known image when an extraction returns none —
                 // an empty picker is worse than a slightly stale thumbnail.
-                if ($outcome['image_url'] !== null) {
-                    $updates['image_url'] = $outcome['image_url'];
+                if ($outcome->imageUrl !== null) {
+                    $updates['image_url'] = $outcome->imageUrl;
                 }
 
                 // The GTIN follows the opposite rule: an adapter that reads
@@ -500,16 +334,16 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 // value is cleared — a mismatch warning must not outlive the
                 // data it was raised on. A source with no GTIN concept (the
                 // AH API, the dataset) leaves the value alone.
-                if ($outcome['gtin'] !== null || $outcome['gtin_authoritative']) {
-                    $updates['gtin'] = $outcome['gtin'];
+                if ($snapshot->gtin !== null || $snapshot->gtinAuthoritative) {
+                    $updates['gtin'] = $snapshot->gtin;
                 }
 
                 // An authoritative size is written verbatim — an empty or
                 // unparseable one clears the columns, because a stale unit
                 // price is worse than none. A title fallback only ever fills:
                 // a flaky title must not wipe a known size (spec Section 4).
-                $packSize = $outcome['pack_size'];
-                if ($outcome['pack_size_authoritative'] || $packSize !== null) {
+                $packSize = $outcome->packSize();
+                if ($snapshot->packSizeAuthoritative || $packSize !== null) {
                     $updates['pack_quantity'] = $packSize?->quantity;
                     $updates['pack_unit'] = $packSize?->unit;
                 }
@@ -520,15 +354,15 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 // offers and finds none clears the stored one, so a campaign
                 // that ended stops being shown. A source with no such concept
                 // leaves it alone.
-                $offer = $outcome['conditional_offer'];
-                if ($offer !== null || $outcome['conditional_offer_authoritative']) {
+                $offer = $snapshot->conditionalOffer;
+                if ($offer !== null || $snapshot->conditionalOfferAuthoritative) {
                     $updates['conditional_price'] = $offer?->price;
                     $updates['conditional_label'] = $offer?->label;
                     $updates['conditional_starts_at'] = $offer?->startsAt?->utc();
                     $updates['conditional_ends_at'] = $offer?->endsAt?->utc();
                 }
             } else {
-                $updates['last_error'] = $outcome['error'];
+                $updates['last_error'] = $outcome->error;
                 $updates += ResolvedBundlePricing::expiredFailureUpdates($locked);
 
                 $counters = $this->incrementCountersFor($locked, $status);
@@ -539,13 +373,13 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
             $check = PriceCheck::create($pricing->priceCheckAttributes(
                 $status === ScrapeStatus::Ok,
-                $outcome['price'],
+                $snapshot?->price,
             ) + [
                 'shop_id' => $locked->id,
                 'currency' => $storedCurrency,
-                'in_stock' => $outcome['in_stock'],
+                'in_stock' => $snapshot?->inStock,
                 'status' => $status,
-                'error' => $outcome['error'],
+                'error' => $outcome->error,
                 'checked_at' => $now,
             ]);
 
