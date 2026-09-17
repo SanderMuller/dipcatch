@@ -21,6 +21,7 @@ use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Config as DipConfig;
 use App\Support\ImageUrl;
 use App\Support\Iso4217;
+use App\Support\PackSize;
 use App\Support\RecheckJitter;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -242,8 +243,6 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         $snapshot = $extraction->snapshot;
         assert($snapshot !== null);
 
-        // A scraped image URL can be relative, so it resolves against the page
-        // the body actually came from.
         return CheckOutcome::success(
             $snapshot,
             $extraction->adapterKey,
@@ -274,20 +273,18 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $reported = strtoupper(trim($snapshot->currency ?? ''));
             $expected = strtoupper(trim($locked->currency));
 
-            // A shop that starts quoting another currency is not a cheaper shop. The
-            // add path already refuses this (ProbeShopUrl, ProbeFailure::CurrencyMismatch);
-            // without the same check here the offer competes numerically against the
-            // others and fires a drop alert for a price that does not exist.
-            // An empty currency is no signal at all, not a mismatch — some adapters
-            // legitimately return none.
-            if ($status === ScrapeStatus::Ok && $reported !== '' && $reported !== $expected) {
-                $status = ScrapeStatus::CurrencyMismatch;
-            }
+            $status = self::afterCurrencyCheck($status, $reported, $expected);
 
             // The column is char(3). A shop quoting " EUR " or "Euro" is a
             // shop stating no code we can store, and the mismatch check
             // above has already read the raw value.
             $storedCurrency = Iso4217::normalize($reported);
+
+            // Only a success carries a snapshot. Deciding that once keeps the
+            // offer row and the price_checks row on the same side: read
+            // separately, an Ok without a snapshot would write a successful
+            // check beside a shop update that counted a failure.
+            $succeeded = $status === ScrapeStatus::Ok && $snapshot !== null;
 
             $updates = ['last_checked_at' => $now, 'last_status' => $status];
             $pricing = ResolvedBundlePricing::merge(
@@ -299,10 +296,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 windowAuthoritative: $snapshot->promotionWindowAuthoritative ?? false,
             );
 
-            // Only a successful check carries a snapshot, so the two always
-            // travel together. Reading it as a condition rather than asserting
-            // it means a violation takes the failure branch instead of fataling.
-            if ($status === ScrapeStatus::Ok && $snapshot !== null) {
+            if ($succeeded) {
                 $updates += $pricing->shopUpdates() + [
                     // Unknown stays unknown: coercing it to true is what
                     // reported a sold-out product as available.
@@ -342,7 +336,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 // unparseable one clears the columns, because a stale unit
                 // price is worse than none. A title fallback only ever fills:
                 // a flaky title must not wipe a known size (spec Section 4).
-                $packSize = $outcome->packSize();
+                $packSize = PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title);
                 if ($snapshot->packSizeAuthoritative || $packSize !== null) {
                     $updates['pack_quantity'] = $packSize?->quantity;
                     $updates['pack_unit'] = $packSize?->unit;
@@ -372,7 +366,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             }
 
             $check = PriceCheck::create($pricing->priceCheckAttributes(
-                $status === ScrapeStatus::Ok,
+                $succeeded,
                 $snapshot?->price,
             ) + [
                 'shop_id' => $locked->id,
@@ -399,6 +393,24 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 app(DetectTargetPrice::class)($product);
             }
         });
+    }
+
+    /**
+     * A shop that starts quoting another currency is not a cheaper shop. The
+     * add path already refuses this (ProbeShopUrl, ProbeFailure::CurrencyMismatch);
+     * without the same check here the offer competes numerically against the
+     * others and fires a drop alert for a price that does not exist.
+     *
+     * An empty reported currency is no signal at all, not a mismatch — some
+     * adapters legitimately return none.
+     */
+    private static function afterCurrencyCheck(ScrapeStatus $status, string $reported, string $expected): ScrapeStatus
+    {
+        if ($status !== ScrapeStatus::Ok || $reported === '' || $reported === $expected) {
+            return $status;
+        }
+
+        return ScrapeStatus::CurrencyMismatch;
     }
 
     /**
