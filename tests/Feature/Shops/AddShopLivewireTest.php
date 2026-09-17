@@ -348,3 +348,28 @@ test('every public probe action refuses a product the caller does not own', func
 
     Http::assertNothingSent();
 })->with(['probe', 'probeWithSelectors', 'selectVariant', 'showManualSelector']);
+
+/**
+ * `2 for 2.99` divides to 1.495, which `BundleOffer` rounds to 1.50 and the
+ * preview used to truncate to 1.49. The comparison then failed and the regular
+ * price beside the bundle price disappeared.
+ */
+test('the preview strikes through the regular price when the bundle total does not divide cleanly', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('state', 'preview')
+        ->set('host', 'shop.example.com')
+        ->set('snapshot', [
+            'title' => 'Fizzy water',
+            'price' => '1.50',
+            'single_item_price' => '1.79',
+            'bundle_quantity' => 2,
+            'bundle_total_price' => '2.99',
+            'currency' => 'EUR',
+            'in_stock' => true,
+        ])
+        ->assertSee('€1.79')
+        ->assertSee('Regular price');
+});

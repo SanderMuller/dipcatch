@@ -6,6 +6,7 @@ use App\Billing\PlanLimitReached;
 use App\Billing\PlanLimits;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\Iso4217;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -43,7 +44,7 @@ final class CreateProductManual extends Component
         return [
             'title' => FluentRule::string('Title')->required()->max(255),
             'image_url' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
-            'currency' => FluentRule::string('Currency')->required()->min(3)->max(3),
+            'currency' => FluentRule::string('Currency')->required()->in(Iso4217::CODES),
             'drop_threshold_pct' => FluentRule::numeric('Drop threshold (%)')->nullable()->min(0)->max(100),
             'drop_threshold_abs' => FluentRule::numeric('Drop threshold (absolute)')->nullable()->min(0),
         ];
@@ -51,6 +52,12 @@ final class CreateProductManual extends Component
 
     public function save(): void
     {
+        // The currency is a free-text field here, not the listbox EditProduct
+        // uses, so "eur" is a reasonable thing to type. Normalize before the
+        // allowlist runs; a value that is not three letters is left as typed
+        // so the rule reports it rather than an empty field.
+        $this->currency = Iso4217::normalize($this->currency) ?? $this->currency;
+
         $this->validate();
 
         $user = $this->user();
