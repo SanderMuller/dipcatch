@@ -1,0 +1,54 @@
+name: frontend
+
+on:
+  push:
+    paths:
+      - 'resources/js/**'
+      - 'tsconfig*.json'
+      - 'package.json'
+      - 'yarn.lock'
+      - 'vite.config.js'
+      - '.oxlintrc.json'
+      - '.github/workflows/frontend.yml'
+  pull_request:
+    paths:
+      - 'resources/js/**'
+      - 'tsconfig*.json'
+      - 'package.json'
+      - 'yarn.lock'
+      - 'vite.config.js'
+      - '.oxlintrc.json'
+      - '.github/workflows/frontend.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: yarn
+
+      - name: Install node dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Lint
+        run: yarn lint-all
+
+      - name: Type check
+        run: yarn typecheck

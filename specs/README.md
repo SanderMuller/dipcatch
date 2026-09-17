@@ -34,6 +34,8 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 
 - **[chatgpt-plugin-directory.md](chatgpt-plugin-directory.md)** — list DipCatch in the ChatGPT Plugins Directory: MCP tool annotations, OpenAI domain-challenge endpoint, Connections Connect/Install buttons and copy, privacy text for connected assistants. Claude gets an install link; ChatGPT Free cannot paste `/mcp`.
 
+- **[adapter-canary.md](adapter-canary.md)** — one known product URL per host adapter, fetched daily in production, asserting the adapter still claims the page, still reads a price, and reads one that has not moved implausibly since the last run. Catches the adapter that breaks on a host nobody tracks, and the one that still returns a number after a redesign but reads the wrong element. Also fixes health mail, which currently reaches `your@example.com` and is never scheduled.
+
 - **[confirm-large-drops-before-alerting.md](confirm-large-drops-before-alerting.md)** — a drop of 40% or more below the reference notifies only when the shop's previous successful reading also qualified; a re-fetch is dispatched at once so the second reading lands in minutes. Closes the gap where one mis-extraction (unit price, "from" price, wrong variant) mails the user a drop that never happened. Stateless — no migration. Checkjebon and AH shops are exempt because they read a structured field, not a page.
 
 - **[superadmin-and-comped-accounts.md](superadmin-and-comped-accounts.md)** — a Users screen in the existing admin panel showing every account and its plan, plus comped Pro accounts via a `comped_until` column taught to both `Subscribes::plan()` and `ProUsers::ids()`.

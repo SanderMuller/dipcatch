@@ -259,6 +259,7 @@ return RectorConfig::configure()
     ->withSets([
         FluentValidationSetList::ALL,
         FluentValidationSetList::POLISH,
+        FluentValidationSetList::SCHEMA,
         FluentValidationSetList::SIMPLIFY,
         HihahoSetList::ALL,
         LaravelSetList::LARAVEL_CODE_QUALITY,
@@ -269,6 +270,7 @@ return RectorConfig::configure()
         PestSetList::CODING_STYLE,
     ])
     ->withComposerBased(
+        phpunit: true,
         laravel: true,
     )
     // If needed, we can update the parallel settings to make sure Rector doesn't start generating errors on large codebases

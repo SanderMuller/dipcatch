@@ -53,10 +53,17 @@ parameters:
         outputPath: .config/named-arguments-manifest.json
 
     paths:
+        # `.config/` holds PHP that runs in the application (boost.php,
+        # pipeline.php). It is not Laravel's `config/`, and nothing else covers it.
+        - .config
         - app
         - bootstrap
         - config
         - database/factories
+        # Without this path nothing analyses a migration, so a schema change
+        # ships having passed every check that ran — and any rule that reads
+        # migration DDL passes while inspecting nothing.
+        - database/migrations
         - database/seeders
         - routes
         - tests/Feature
@@ -185,6 +192,27 @@ parameters:
           path: app/Policies
         - identifier: complexity.classLike
           path: app/Models
+
+        # Vendor-published migrations (spatie/laravel-health, webpush, passport).
+        # They read their table and connection names from config, which PHPStan
+        # resolves as mixed. The path stays analysed so SlowMigrationDdlRule
+        # still reads their DDL; rewriting
+        # a published migration would change which connection it targets.
+        -
+            identifier: argument.type
+            paths:
+                - database/migrations/2026_04_26_171404_create_health_tables.php
+                - database/migrations/2026_04_27_083838_create_push_subscriptions_table.php
+        -
+            identifier: return.type
+            path: database/migrations/2026_09_06_2229*_create_oauth_*_table.php
+        # BladeRenderer is marked @internal by sandermuller/project-boost-laravel,
+        # but registering it is the documented way to render the `.blade.php`
+        # vendor skills (laravel/mcp, passport, socialite). Without it they are
+        # skipped silently.
+        -
+            identifier: new.internalClass
+            path: .config/boost.php
 
     excludePaths:
         - bootstrap/cache

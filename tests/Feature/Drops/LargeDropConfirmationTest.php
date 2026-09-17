@@ -59,7 +59,8 @@ function confirmationProduct(string $host = 'shop.example.com'): Shop
     return $shop->refresh();
 }
 
-/** Store a reading on the shop and run the recompute the way the job does. */
+/** Store a reading on the shop and run the recompute the way the job does.
+ * @param array<string, mixed> $attributes */
 function reading(Shop $shop, ?string $price, array $attributes = []): PriceCheck
 {
     $check = PriceCheck::factory()->for($shop)->create(['price' => $price] + $attributes);
@@ -85,9 +86,9 @@ test('a first large reading notifies nothing and asks for a second opinion', fun
         $delay = $job->delay;
 
         return $job->shop->id === $shop->id
-            && $job->confirmation === true
+            && $job->confirmation
             && $delay instanceof DateTimeInterface
-            && round((float) now()->diffInMinutes($delay, true)) === 10.0;
+            && round(now()->diffInMinutes($delay, true)) === 10.0;
     });
 });
 

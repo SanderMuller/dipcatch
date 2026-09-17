@@ -7,7 +7,7 @@ use Spatie\Health\Models\HealthCheckResultHistoryItem;
 use Spatie\Health\ResultStores\EloquentHealthResultStore;
 
 return new class extends Migration {
-    public function up()
+    public function up(): void
     {
         $connection = (new HealthCheckResultHistoryItem())->getConnectionName();
         $tableName = EloquentHealthResultStore::getHistoryItemInstance()->getTable();

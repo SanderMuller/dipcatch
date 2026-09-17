@@ -3,6 +3,7 @@
 use SanderMuller\BoostCore\Config\BoostConfig;
 use SanderMuller\BoostCore\Enums\Agent;
 use SanderMuller\BoostCore\Enums\Tag;
+use SanderMuller\ProjectBoostLaravel\Rendering\BladeRenderer;
 
 /**
  * boost-core configuration.
@@ -18,12 +19,18 @@ return BoostConfig::configure()
     // Example: Agent::CLAUDE_CODE, Agent::CURSOR, Agent::COPILOT
     ->withAgents([
         Agent::CLAUDE_CODE,
+        Agent::CODEX,
         Agent::COPILOT,
     ])
 
     // Vendor packages allowed to publish skills/guidelines into your project.
     // Each entry is a Composer package name. Add via `vendor/bin/boost scan` or hand-edit.
     ->withAllowedVendors([
+        'barryvdh/laravel-debugbar',
+        'laravel/boost',
+        'laravel/mcp',
+        'laravel/passport',
+        'laravel/socialite',
         'sandermuller/boost-skills',
         'sandermuller/laravel-fluent-validation',
         'sandermuller/laravel-fluent-validation-rector',
@@ -44,6 +51,9 @@ return BoostConfig::configure()
         Tag::Laravel,
         Tag::Frontend,
         Tag::Database,
+        Tag::Livewire,
+        Tag::Filament,
+        Tag::Tailwind,
         Tag::Github,
         'release-automation',
         'voice',
@@ -65,6 +75,12 @@ return BoostConfig::configure()
         ],
         'quality' => [
             'rector' => true,
+            // This project declares three pipelines, so evaluate has to be told
+            // which one to ask about; without a name it gets an error listing
+            // them and runs every check itself. `closeout` rather than `change`
+            // because evaluate is a completion-level activity — it runs before
+            // review, and only that walk covers Rector and the whole PHP suite.
+            'pipeline' => 'closeout',
         ],
     ])
 
@@ -83,6 +99,12 @@ return BoostConfig::configure()
         'sandermuller/boost-skills:pre-release',
         'sandermuller/boost-skills:release-notes',
         'sandermuller/boost-skills:upgrading',
+        // Subagents share the skill deny-list. This project authors its own
+        // DipCatch-specific tech-lead-reviewer and test-coverage-auditor in
+        // `.ai/subagents/`; without these two entries both names are declared
+        // twice and Claude Code picks one by filesystem read order.
+        'sandermuller/boost-skills:tech-lead-reviewer',
+        'sandermuller/boost-skills:test-coverage-auditor',
     ])
 
     ->withExcludedGuidelines([
@@ -93,4 +115,8 @@ return BoostConfig::configure()
         'laravel/boost:phpunit-core',
         'laravel/boost:sail-core',
         'laravel/boost:wayfinder-core',
-    ]);
+    ])
+
+    // Without a renderer, the `.blade.php` vendor skills of laravel/mcp,
+    // laravel/passport and laravel/socialite are skipped silently.
+    ->withSkillRenderers([new BladeRenderer()]);
