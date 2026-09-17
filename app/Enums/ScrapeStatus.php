@@ -24,7 +24,4 @@ enum ScrapeStatus: string
     case RateLimited = 'rate_limited';
     case TransientServerError = '5xx';
     case RobotsDisallowed = 'robots_disallowed';
-
-    /** Written only by `ShopFactory::dead()`; no production path stores it. */
-    case Dead = 'dead';
 }

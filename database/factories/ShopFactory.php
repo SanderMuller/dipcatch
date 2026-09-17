@@ -52,12 +52,18 @@ class ShopFactory extends Factory
         ]);
     }
 
+    /**
+     * `health` and `last_status` are different enums, and only `health` goes
+     * dead. A shop dies from repeated failures, so `last_status` holds the
+     * one that killed it — `CheckShopPrice` never writes the column on the
+     * transition, and neither does the admin's "Mark dead" action.
+     */
     public function dead(): static
     {
         return $this->state(fn (array $attributes): array => [
             'active' => false,
             'health' => 'dead',
-            'last_status' => 'dead',
+            'last_status' => 'http_error',
             'consecutive_failures' => 10,
         ]);
     }
