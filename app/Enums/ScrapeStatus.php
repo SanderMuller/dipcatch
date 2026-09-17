@@ -9,8 +9,14 @@ enum ScrapeStatus: string
     case HttpError = 'http_error';
     case ParseError = 'parse_error';
     case CurrencyMismatch = 'currency_mismatch';
-    case Throttled = 'throttled';
+
+    /**
+     * Do not write this. The pre-adapter `HtmlScraper` stored it through
+     * `RecordScrape`, so old rows can still hold it and the cast needs the
+     * case. A robots refusal today is {@see self::RobotsDisallowed}.
+     */
     case RobotsBlocked = 'robots_blocked';
+
     case NeedsJs = 'needs_js';
 
     case Pending = 'pending';
@@ -18,6 +24,7 @@ enum ScrapeStatus: string
     case RateLimited = 'rate_limited';
     case TransientServerError = '5xx';
     case RobotsDisallowed = 'robots_disallowed';
+
+    /** Written only by `ShopFactory::dead()`; no production path stores it. */
     case Dead = 'dead';
-    case Failed = 'failed';
 }
