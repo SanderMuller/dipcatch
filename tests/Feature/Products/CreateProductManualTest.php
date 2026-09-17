@@ -22,6 +22,19 @@ it('creates a product the scraper cannot read', function (): void {
         ->and($product->image_url)->toBe('https://example.test/beans.jpg');
 });
 
+it('accepts a currency typed in lower case', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    livewire(CreateProductManual::class)
+        ->set('title', 'Local roastery beans')
+        ->set('currency', 'eur')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(Product::query()->where('user_id', $user->id)->sole()->currency)->toBe('EUR');
+});
+
 it('refuses a currency that is not an ISO 4217 code', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);

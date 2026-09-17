@@ -52,6 +52,12 @@ final class CreateProductManual extends Component
 
     public function save(): void
     {
+        // The currency is a free-text field here, not the listbox EditProduct
+        // uses, so "eur" is a reasonable thing to type. Normalize before the
+        // allowlist runs; a value that is not three letters is left as typed
+        // so the rule reports it rather than an empty field.
+        $this->currency = Iso4217::normalize($this->currency) ?? $this->currency;
+
         $this->validate();
 
         $user = $this->user();
