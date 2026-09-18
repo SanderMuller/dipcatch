@@ -69,6 +69,39 @@ it('discloses bundle terms in notification rows', function (): void {
         ->assertSee('title="Regular price"', escape: false);
 });
 
+it('leaves out a bundle line whose row carries no single item price', function (): void {
+    $user = User::factory()->create();
+    storeNotification($user, [
+        'new_price' => '2.00',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+    ]);
+
+    $this->actingAs($user);
+
+    // Without the single-item price there is nothing to compare against, so
+    // the row cannot state that the bundle is the cheaper way to buy.
+    livewire(Bell::class)
+        ->assertSee('Coffee beans 1 kg')
+        ->assertDontSee('2 for €4.00');
+});
+
+it('leaves out a bundle line that costs more per item than the shelf price', function (): void {
+    $user = User::factory()->create();
+    storeNotification($user, [
+        'new_price' => '3.00',
+        'single_item_price' => '2.50',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '6.00',
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(Bell::class)
+        ->assertSee('Coffee beans 1 kg')
+        ->assertDontSee('2 for €6.00');
+});
+
 it('counts only unread notifications', function (): void {
     $user = User::factory()->create();
     storeNotification($user);

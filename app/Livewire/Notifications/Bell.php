@@ -3,6 +3,7 @@
 namespace App\Livewire\Notifications;
 
 use App\Models\User;
+use App\Support\BundlePriceLabel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Notifications\DatabaseNotification;
@@ -89,8 +90,9 @@ final class Bell extends Component
             'price' => $this->text($data, 'new_price'),
             'currency' => $this->text($data, 'currency'),
             'singleItemPrice' => $this->text($data, 'single_item_price'),
-            'bundleQuantity' => is_int($data['bundle_quantity'] ?? null) ? $data['bundle_quantity'] : null,
-            'bundleTotalPrice' => $this->text($data, 'bundle_total_price'),
+            // One label for the whole bundle line, so the dropdown reads a
+            // stored payload the same way every other surface does.
+            'bundleLabel' => BundlePriceLabel::forSnapshot($data),
         ];
     }
 

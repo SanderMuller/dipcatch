@@ -205,6 +205,39 @@ test('target alerts state bundle quantity and exact total', function (): void {
         ->and($unitTarget->toDatabase($user)['bundle_quantity'])->toBe(2);
 });
 
+test('the bundle offer survives the queue serialization every alert goes through', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Fanta']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'pack_quantity' => '1.50',
+        'pack_unit' => 'l',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '2.00'])->save();
+
+    // All three implement ShouldQueue, so the offer object reaches the render
+    // through PHP serialization rather than the constructor.
+    $notifications = [
+        new PriceDropNotification($product, pushOutcome(), (string) Str::uuid()),
+        new TargetPriceNotification($product, $shop, '2.00'),
+        new UnitPriceTargetNotification($product, $shop, '1.33'),
+    ];
+
+    foreach ($notifications as $notification) {
+        $revived = unserialize(serialize($notification));
+
+        expect($revived->snapshotBundle?->quantity)->toBe(2)
+            ->and($revived->snapshotBundle?->totalPrice)->toBe('4.00')
+            ->and($revived->toWebPush($user)->toArray()['body'])
+            ->toBe($notification->toWebPush($user)->toArray()['body'])
+            ->and($revived->toDatabase($user))->toBe($notification->toDatabase($user));
+    }
+});
+
 test('a push icon falls back to the favicon when the stored image url is not http(s)', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([

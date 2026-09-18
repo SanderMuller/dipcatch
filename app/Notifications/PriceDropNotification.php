@@ -6,8 +6,10 @@ use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PriceNormalizer;
 use App\Services\Drops\DropOutcome;
+use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
 use App\Support\Numeric;
 use Illuminate\Bus\Queueable;
@@ -39,9 +41,7 @@ final class PriceDropNotification extends Notification implements ShouldQueue
 
     public readonly ?string $snapshotSingleItemPrice;
 
-    public readonly ?int $snapshotBundleQuantity;
-
-    public readonly ?string $snapshotBundleTotalPrice;
+    public readonly ?BundleOffer $snapshotBundle;
 
     public function __construct(
         public Product $product,
@@ -55,12 +55,10 @@ final class PriceDropNotification extends Notification implements ShouldQueue
         $this->snapshotPrice = $product->cheapest_price === null ? '0.00' : (string) $product->cheapest_price;
         $this->snapshotHost = is_string($cheapest?->host) && $cheapest->host !== '' ? $cheapest->host : null;
         $this->snapshotOfferUrl = is_string($cheapest?->url) && $cheapest->url !== '' ? $cheapest->url : null;
-        $bundle = $useTriggeringCheck ? $triggeringCheck->bundleOffer() : $cheapest?->liveBundleOffer();
-        $this->snapshotSingleItemPrice = $bundle === null
+        $this->snapshotBundle = $useTriggeringCheck ? $triggeringCheck->bundleOffer() : $cheapest?->liveBundleOffer();
+        $this->snapshotSingleItemPrice = $this->snapshotBundle === null
             ? null
             : ($useTriggeringCheck ? $triggeringCheck->singleItemPrice() : $cheapest?->singleItemPrice());
-        $this->snapshotBundleQuantity = $bundle?->quantity;
-        $this->snapshotBundleTotalPrice = $bundle?->totalPrice;
 
         // Defence in depth. `DetectDrop` already sends after its transaction
         // commits, so this is here for any future caller that notifies inside
@@ -116,8 +114,8 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             'currency' => $this->product->currency,
             'new_price' => $this->snapshotPrice,
             'single_item_price' => $this->snapshotSingleItemPrice,
-            'bundle_quantity' => $this->snapshotBundleQuantity,
-            'bundle_total_price' => $this->snapshotBundleTotalPrice,
+            'bundle_quantity' => $this->snapshotBundle?->quantity,
+            'bundle_total_price' => $this->snapshotBundle?->totalPrice,
             'host' => $this->snapshotHost,
             'offer_url' => $this->snapshotOfferUrl,
             'reference_price' => $this->outcome->referencePrice,
@@ -130,14 +128,9 @@ final class PriceDropNotification extends Notification implements ShouldQueue
 
     private function bundleSuffix(): string
     {
-        if ($this->snapshotBundleQuantity === null || $this->snapshotBundleTotalPrice === null) {
-            return '';
-        }
-
-        return ' · ' . __(':quantity for :total', [
-            'quantity' => $this->snapshotBundleQuantity,
-            'total' => MoneyFormatter::format($this->snapshotBundleTotalPrice, $this->product->currency),
-        ]);
+        return $this->snapshotBundle === null
+            ? ''
+            : ' · ' . BundlePriceLabel::condition($this->snapshotBundle, $this->product->currency);
     }
 
     private function checkRepresentsCurrentPricing(PriceCheck $check, Product $product, ?Shop $shop): bool

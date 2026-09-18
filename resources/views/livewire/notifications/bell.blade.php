@@ -33,16 +33,13 @@
                     @if ($item['price'] !== null)
                         <flux:text size="sm" class="text-zinc-500">
                             {{ \App\Support\MoneyFormatter::format($item['price'], $item['currency'] ?? 'EUR') }}
-                            @if ($item['bundleQuantity'] !== null && $item['bundleTotalPrice'] !== null && $item['singleItemPrice'] !== null)
+                            @if ($item['bundleLabel'] !== null && $item['singleItemPrice'] !== null)
                                 <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($item['singleItemPrice'], $item['currency'] ?? 'EUR') }}</del>
                             @endif
                             @if ($item['host'] !== null) · {{ $item['host'] }} @endif
                         </flux:text>
-                        @if ($item['bundleQuantity'] !== null && $item['bundleTotalPrice'] !== null)
-                            <flux:text size="sm" class="text-zinc-500">
-                                {{ __(':quantity for :total', ['quantity' => $item['bundleQuantity'], 'total' => \App\Support\MoneyFormatter::format($item['bundleTotalPrice'], $item['currency'] ?? 'EUR')]) }}
-                                @if ($item['singleItemPrice'] !== null) · {{ __('or :price each', ['price' => \App\Support\MoneyFormatter::format($item['singleItemPrice'], $item['currency'] ?? 'EUR')]) }} @endif
-                            </flux:text>
+                        @if ($item['bundleLabel'] !== null)
+                            <flux:text size="sm" class="text-zinc-500">{{ $item['bundleLabel'] }}</flux:text>
                         @endif
                     @elseif ($item['body'] !== null)
                         <flux:text size="sm" class="text-zinc-500">{{ $item['body'] }}</flux:text>

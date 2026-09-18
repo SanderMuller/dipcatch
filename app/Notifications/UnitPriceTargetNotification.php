@@ -5,6 +5,8 @@ namespace App\Notifications;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\PriceAdapters\BundleOffer;
+use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,9 +33,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
 
     public readonly ?string $snapshotSingleItemPrice;
 
-    public readonly ?int $snapshotBundleQuantity;
-
-    public readonly ?string $snapshotBundleTotalPrice;
+    public readonly ?BundleOffer $snapshotBundle;
 
     public function __construct(
         public Product $product,
@@ -43,10 +43,8 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
         $this->snapshotHost = $shop->host;
         $this->snapshotPrice = $shop->current_price === null ? null : (string) $shop->current_price;
         $this->snapshotUnitLabel = $shop->unitPriceLabel();
-        $bundle = $shop->liveBundleOffer();
-        $this->snapshotSingleItemPrice = $bundle === null ? null : $shop->singleItemPrice();
-        $this->snapshotBundleQuantity = $bundle?->quantity;
-        $this->snapshotBundleTotalPrice = $bundle?->totalPrice;
+        $this->snapshotBundle = $shop->liveBundleOffer();
+        $this->snapshotSingleItemPrice = $this->snapshotBundle === null ? null : $shop->singleItemPrice();
 
         $this->afterCommit();
     }
@@ -95,8 +93,8 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
                 : (string) $this->product->unit_price_target,
             'new_price' => $this->snapshotPrice,
             'single_item_price' => $this->snapshotSingleItemPrice,
-            'bundle_quantity' => $this->snapshotBundleQuantity,
-            'bundle_total_price' => $this->snapshotBundleTotalPrice,
+            'bundle_quantity' => $this->snapshotBundle?->quantity,
+            'bundle_total_price' => $this->snapshotBundle?->totalPrice,
             'host' => $this->snapshotHost,
             'view_url' => route('app.products.show', $this->product),
         ];
@@ -111,12 +109,9 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
             ? ''
             : ' (' . MoneyFormatter::format($this->snapshotPrice, $this->product->currency) . ')';
 
-        $bundle = $this->snapshotBundleQuantity === null || $this->snapshotBundleTotalPrice === null
+        $bundle = $this->snapshotBundle === null
             ? ''
-            : ' · ' . __(':quantity for :total', [
-                'quantity' => $this->snapshotBundleQuantity,
-                'total' => MoneyFormatter::format($this->snapshotBundleTotalPrice, $this->product->currency),
-            ]);
+            : ' · ' . BundlePriceLabel::condition($this->snapshotBundle, $this->product->currency);
 
         return $this->product->title . ' is ' . $unit . $price . $bundle . ' at ' . $this->snapshotHost;
     }
