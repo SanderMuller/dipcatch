@@ -160,6 +160,54 @@ test('second run within the same digest window sends no new mail', function (): 
     Mail::assertSent(PriceDropDigestMail::class, 1);
 });
 
+test('the cursor lands on the instant the window ends, not a later clock read', function (): void {
+    $user = User::factory()->create([
+        'notify_via_email' => true,
+        'last_digest_sent_at' => null,
+    ]);
+    $product = Product::factory()->for($user)->create();
+    PriceDropEvent::factory()
+        ->for($user)
+        ->for($product)
+        ->state(['fired_at' => now()->subHour()])
+        ->create();
+
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    expect($user->fresh()->last_digest_sent_at?->toIso8601String())
+        ->toBe(CarbonImmutable::create(2026, 1, 15, 9, 30, 0, 'UTC')?->toIso8601String());
+});
+
+test('an event fired after the window stays above the cursor and arrives next run', function (): void {
+    $user = User::factory()->create([
+        'notify_via_email' => true,
+        'last_digest_sent_at' => null,
+    ]);
+    $product = Product::factory()->for($user)->create();
+    PriceDropEvent::factory()
+        ->for($user)
+        ->for($product)
+        ->state(['fired_at' => now()->subHour()])
+        ->create();
+    // Stands in for a drop committed while the digest query ran: its
+    // `fired_at` is stamped inside a transaction that had not yet committed.
+    PriceDropEvent::factory()
+        ->for($user)
+        ->for($product)
+        ->state(['fired_at' => now()->addSeconds(30)])
+        ->create();
+
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    Mail::assertSent(PriceDropDigestMail::class, fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 1);
+
+    Date::setTestNow(CarbonImmutable::create(2026, 1, 15, 10, 30, 0, 'UTC'));
+    $user->refresh();
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    Mail::assertSent(PriceDropDigestMail::class, 2);
+});
+
 test('the digest table renders money as symbol-first, not the ISO code', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
