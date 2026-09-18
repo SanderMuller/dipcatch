@@ -50,10 +50,10 @@ final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
     public function handle(): void
     {
         $lookbackDays = DipConfig::int('dipcatch.digest.lookback_days', 7);
-        // One clock read for the window's end and for the cursor, so the
-        // cursor never moves past an event the SELECT could not see. An
-        // event committed after this instant stays above the cursor and
-        // arrives in the next digest.
+        // One clock read for the window's end and for the cursor, so the two
+        // cannot drift apart. Both columns hold whole seconds, so an event
+        // stamped inside this same second is still lost; the bound only
+        // rescues one stamped later.
         $now = CarbonImmutable::now();
         // Coalesce null to "24h ago" for first-ever digests; cap at the
         // configured lookback to avoid emailing a giant backlog if mail

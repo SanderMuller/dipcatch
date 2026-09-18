@@ -26,6 +26,7 @@ use NotificationChannels\WebPush\WebPushMessage;
 final class PriceDropNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+    use RestoresQueuedBundleSnapshot;
 
     /**
      * Snapshot of host/url/price at dispatch time. Pinned here so a recompute
@@ -88,7 +89,7 @@ final class PriceDropNotification extends Notification implements ShouldQueue
     {
         $priceLine = MoneyFormatter::format($this->snapshotPrice, $this->product->currency);
         $body = $this->product->title . ' is now ' . $priceLine
-            . $this->bundleSuffix()
+            . BundlePriceLabel::suffix($this->snapshotBundle, $this->product->currency)
             . ($this->snapshotHost !== null ? ' at ' . $this->snapshotHost : '');
 
         return new WebPushMessage()
@@ -124,13 +125,6 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             'drop_absolute' => $this->outcome->dropAbsolute,
             'view_url' => route('app.products.show', $this->product),
         ];
-    }
-
-    private function bundleSuffix(): string
-    {
-        return $this->snapshotBundle === null
-            ? ''
-            : ' · ' . BundlePriceLabel::condition($this->snapshotBundle, $this->product->currency);
     }
 
     private function checkRepresentsCurrentPricing(PriceCheck $check, Product $product, ?Shop $shop): bool

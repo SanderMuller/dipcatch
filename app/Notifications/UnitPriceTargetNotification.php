@@ -24,6 +24,7 @@ use NotificationChannels\WebPush\WebPushMessage;
 final class UnitPriceTargetNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+    use RestoresQueuedBundleSnapshot;
 
     public readonly string $snapshotHost;
 
@@ -109,9 +110,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
             ? ''
             : ' (' . MoneyFormatter::format($this->snapshotPrice, $this->product->currency) . ')';
 
-        $bundle = $this->snapshotBundle === null
-            ? ''
-            : ' · ' . BundlePriceLabel::condition($this->snapshotBundle, $this->product->currency);
+        $bundle = BundlePriceLabel::suffix($this->snapshotBundle, $this->product->currency);
 
         return $this->product->title . ' is ' . $unit . $price . $bundle . ' at ' . $this->snapshotHost;
     }

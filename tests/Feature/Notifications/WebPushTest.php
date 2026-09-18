@@ -238,6 +238,26 @@ test('the bundle offer survives the queue serialization every alert goes through
     }
 });
 
+test('an alert queued before the bundle offer replaced the two scalars still renders', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Fanta']);
+
+    // The payload shape queued before the two scalars became one offer.
+    $revived = new ReflectionClass(TargetPriceNotification::class)->newInstanceWithoutConstructor();
+    $revived->__unserialize([
+        'product' => $product,
+        'snapshotHost' => 'jumbo.com',
+        'snapshotPrice' => '2.00',
+        'snapshotSingleItemPrice' => '2.85',
+        'snapshotBundleQuantity' => 2,
+        'snapshotBundleTotalPrice' => '4.00',
+    ]);
+
+    expect($revived->snapshotBundle?->quantity)->toBe(2)
+        ->and($revived->toWebPush($user)->toArray()['body'])->toContain('2 for €4.00')
+        ->and($revived->toDatabase($user)['bundle_total_price'])->toBe('4.00');
+});
+
 test('a push icon falls back to the favicon when the stored image url is not http(s)', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([

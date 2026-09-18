@@ -160,7 +160,7 @@ test('second run within the same digest window sends no new mail', function (): 
     Mail::assertSent(PriceDropDigestMail::class, 1);
 });
 
-test('the cursor lands on the instant the window ends, not a later clock read', function (): void {
+test('an event fired in the same second as the window end is still mailed', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
         'last_digest_sent_at' => null,
@@ -171,11 +171,19 @@ test('the cursor lands on the instant the window ends, not a later clock read', 
         ->for($product)
         ->state(['fired_at' => now()->subHour()])
         ->create();
+    // Both columns hold whole seconds, so this is the live boundary rather
+    // than a corner: every drop that fires in the run's own second lands
+    // here. Narrowing the bound to `<` would drop it from the mail and then
+    // bury it under the cursor, which is the loss the change set out to fix.
+    PriceDropEvent::factory()
+        ->for($user)
+        ->for($product)
+        ->state(['fired_at' => now()])
+        ->create();
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    expect($user->fresh()->last_digest_sent_at?->toIso8601String())
-        ->toBe(CarbonImmutable::create(2026, 1, 15, 9, 30, 0, 'UTC')?->toIso8601String());
+    Mail::assertSent(PriceDropDigestMail::class, fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 2);
 });
 
 test('an event fired after the window stays above the cursor and arrives next run', function (): void {
@@ -189,8 +197,8 @@ test('an event fired after the window stays above the cursor and arrives next ru
         ->for($product)
         ->state(['fired_at' => now()->subHour()])
         ->create();
-    // Stands in for a drop committed while the digest query ran: its
-    // `fired_at` is stamped inside a transaction that had not yet committed.
+    // A drop stamped in a later second than the run that is selecting now.
+    // The bound must leave it above the cursor so the next run picks it up.
     PriceDropEvent::factory()
         ->for($user)
         ->for($product)
@@ -205,7 +213,14 @@ test('an event fired after the window stays above the cursor and arrives next ru
     $user->refresh();
     new SendDailyDigest($user, '2026-01-15')->handle();
 
+    // Exactly the held-back event, not a re-send of the first one.
     Mail::assertSent(PriceDropDigestMail::class, 2);
+    Mail::assertSent(
+        PriceDropDigestMail::class,
+        fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 1
+            && $mail->grouped->flatMap(fn (array $group): mixed => $group['events'])
+                ->every(fn (PriceDropEvent $event): bool => $event->fired_at?->second === 30),
+    );
 });
 
 test('the digest table renders money as symbol-first, not the ISO code', function (): void {

@@ -19,6 +19,15 @@ final readonly class BundlePriceLabel
         ]);
     }
 
+    /**
+     * The bundle clause a notification body appends to its price sentence,
+     * or an empty string when there is no offer to state.
+     */
+    public static function suffix(?BundleOffer $offer, string $currency): string
+    {
+        return $offer === null ? '' : ' · ' . self::condition($offer, $currency);
+    }
+
     public static function forShop(?Shop $shop): ?string
     {
         $offer = $shop?->liveBundleOffer();

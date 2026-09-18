@@ -90,8 +90,9 @@ final class Bell extends Component
             'price' => $this->text($data, 'new_price'),
             'currency' => $this->text($data, 'currency'),
             'singleItemPrice' => $this->text($data, 'single_item_price'),
-            // One label for the whole bundle line, so the dropdown reads a
-            // stored payload the same way every other surface does.
+            // One label for the whole bundle line. This applies the same
+            // cheaper-than test the payload was written under, so a row that
+            // fails it renders no bundle line at all.
             'bundleLabel' => BundlePriceLabel::forSnapshot($data),
         ];
     }
