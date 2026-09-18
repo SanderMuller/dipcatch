@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3c3102e56f5180a7b755e128a5afce54",
+    "content-hash": "6359e6282b05c39331719af8bb5cb289",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -852,16 +852,16 @@
         },
         {
             "name": "danharrin/livewire-rate-limiting",
-            "version": "v2.2.1",
+            "version": "v2.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/danharrin/livewire-rate-limiting.git",
-                "reference": "69436717dc70e30f80d7f8fd02504c22992a9ad5"
+                "reference": "46c4ceaf7997c713c79afe7c507a39649f6c9d6f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/danharrin/livewire-rate-limiting/zipball/69436717dc70e30f80d7f8fd02504c22992a9ad5",
-                "reference": "69436717dc70e30f80d7f8fd02504c22992a9ad5",
+                "url": "https://api.github.com/repos/danharrin/livewire-rate-limiting/zipball/46c4ceaf7997c713c79afe7c507a39649f6c9d6f",
+                "reference": "46c4ceaf7997c713c79afe7c507a39649f6c9d6f",
                 "shasum": ""
             },
             "require": {
@@ -902,7 +902,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-08-06T08:41:51+00:00"
+            "time": "2026-09-18T07:38:01+00:00"
         },
         {
             "name": "dasprid/enum",
@@ -12937,16 +12937,16 @@
         },
         {
             "name": "entropy/entropy",
-            "version": "0.4.13",
+            "version": "0.4.14",
             "source": {
                 "type": "git",
                 "url": "https://github.com/TomasVotruba/entropy.git",
-                "reference": "b2c703a93350f49ce67d150bb8560e886be01027"
+                "reference": "ac1cd962db108e674d897957f251e27ab49f5180"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/TomasVotruba/entropy/zipball/b2c703a93350f49ce67d150bb8560e886be01027",
-                "reference": "b2c703a93350f49ce67d150bb8560e886be01027",
+                "url": "https://api.github.com/repos/TomasVotruba/entropy/zipball/ac1cd962db108e674d897957f251e27ab49f5180",
+                "reference": "ac1cd962db108e674d897957f251e27ab49f5180",
                 "shasum": ""
             },
             "require": {
@@ -12981,9 +12981,9 @@
             "description": "Entropy framework",
             "support": {
                 "issues": "https://github.com/TomasVotruba/entropy/issues",
-                "source": "https://github.com/TomasVotruba/entropy/tree/0.4.13"
+                "source": "https://github.com/TomasVotruba/entropy/tree/0.4.14"
             },
-            "time": "2026-09-03T19:53:04+00:00"
+            "time": "2026-09-17T21:52:48+00:00"
         },
         {
             "name": "fakerphp/faker",
@@ -13577,20 +13577,20 @@
         },
         {
             "name": "laramint/laravel-stress",
-            "version": "v1.0.2",
+            "version": "v1.0.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laramint/laravel-stress.git",
-                "reference": "adbdea7b2e49d4e6c8d3616d46eb20ba6e03cacb"
+                "reference": "87abdd5d65a7cb47f079a33daf1552d1520cee07"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laramint/laravel-stress/zipball/adbdea7b2e49d4e6c8d3616d46eb20ba6e03cacb",
-                "reference": "adbdea7b2e49d4e6c8d3616d46eb20ba6e03cacb",
+                "url": "https://api.github.com/repos/laramint/laravel-stress/zipball/87abdd5d65a7cb47f079a33daf1552d1520cee07",
+                "reference": "87abdd5d65a7cb47f079a33daf1552d1520cee07",
                 "shasum": ""
             },
             "require": {
-                "guzzlehttp/guzzle": "^7.0",
+                "guzzlehttp/guzzle": "^7.0|^8.0",
                 "illuminate/support": "^9.0|^10.0|^11.0|^12.0|^13.0",
                 "php": ">=8.1"
             },
@@ -13628,9 +13628,9 @@
             ],
             "support": {
                 "issues": "https://github.com/laramint/laravel-stress/issues",
-                "source": "https://github.com/laramint/laravel-stress/tree/v1.0.2"
+                "source": "https://github.com/laramint/laravel-stress/tree/v1.0.3"
             },
-            "time": "2026-05-06T18:24:33+00:00"
+            "time": "2026-09-18T01:30:51+00:00"
         },
         {
             "name": "larastan/larastan",
@@ -16792,26 +16792,25 @@
         },
         {
             "name": "rector/swiss-knife",
-            "version": "2.4.8",
+            "version": "2.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/rectorphp/swiss-knife.git",
-                "reference": "1f1f853b2cacfed62367953591a29d0e547aec67"
+                "reference": "ba2b1571aa12e3924a81db82a12107a86525d4ee"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/rectorphp/swiss-knife/zipball/1f1f853b2cacfed62367953591a29d0e547aec67",
-                "reference": "1f1f853b2cacfed62367953591a29d0e547aec67",
+                "url": "https://api.github.com/repos/rectorphp/swiss-knife/zipball/ba2b1571aa12e3924a81db82a12107a86525d4ee",
+                "reference": "ba2b1571aa12e3924a81db82a12107a86525d4ee",
                 "shasum": ""
             },
             "require": {
-                "entropy/entropy": "^0.4.6",
+                "entropy/entropy": "^0.4.14",
+                "ext-tokenizer": "*",
                 "nette/robot-loader": "^4.1",
                 "nette/utils": "^4.1",
-                "nikic/php-parser": "^5.7",
+                "nikic/php-parser": "^5.9",
                 "php": ">=8.4",
-                "symfony/finder": "^8.1",
-                "symfony/yaml": "^8.1",
                 "webmozart/assert": "^2.4"
             },
             "require-dev": {
@@ -16845,7 +16844,7 @@
             "description": "Swiss knife in pocket of every upgrade architect",
             "support": {
                 "issues": "https://github.com/rectorphp/swiss-knife/issues",
-                "source": "https://github.com/rectorphp/swiss-knife/tree/2.4.8"
+                "source": "https://github.com/rectorphp/swiss-knife/tree/2.6.0"
             },
             "funding": [
                 {
@@ -16857,7 +16856,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-06-20T16:13:53+00:00"
+            "time": "2026-09-17T22:18:45+00:00"
         },
         {
             "name": "sandermuller/boost-core",
