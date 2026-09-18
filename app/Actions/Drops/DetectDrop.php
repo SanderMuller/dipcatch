@@ -253,16 +253,40 @@ final readonly class DetectDrop
                 return;
             }
 
+            // Everything that can abandon the send is resolved before the
+            // latch is armed, so an armed latch always has an event row behind
+            // it. Armed without one, the product would suppress every later
+            // drop at or above this price for an alert nobody received — and a
+            // plain `return` inside this closure commits.
+            $triggerCheck = $this->resolveTriggerCheck($locked, $triggeringPriceCheckId);
+
+            if ($triggerCheck === null) {
+                // The one branch here that abandons a real drop. Nothing is
+                // written, and `recomputeCheapestShop()` has already moved
+                // `cheapest_price`, so the next check at this price fails the
+                // `$changed` gate and never reaches detection again. Without a
+                // line here the alert is lost with no trace.
+                Log::warning('Drop abandoned: no price check to anchor it to', [
+                    'alert' => 'price_drop',
+                    'product_id' => $locked->id,
+                    'cheapest_shop_id' => $locked->cheapest_shop_id,
+                    'triggering_price_check_id' => $triggeringPriceCheckId,
+                    'new_price' => $newPrice,
+                ]);
+
+                return;
+            }
+
+            $user = $locked->user;
+
+            if ($user === null) {
+                return;
+            }
+
             $locked->forceFill([
                 'last_notified_price' => $newPrice,
                 'last_notified_at' => now(),
             ])->save();
-
-            $triggerCheck = $this->resolveTriggerCheck($locked, $triggeringPriceCheckId);
-
-            if ($triggerCheck === null) {
-                return;
-            }
 
             $event = PriceDropEvent::create([
                 'product_id' => $locked->id,
@@ -277,11 +301,6 @@ final readonly class DetectDrop
                 'drop_abs' => $outcome->dropAbsolute,
                 'fired_at' => now(),
             ]);
-
-            $user = $locked->user;
-            if ($user === null) {
-                return;
-            }
 
             // The event row belongs inside the transaction; the budget and the
             // send do not. Asking spends a slot of the hourly ceiling, and the
@@ -324,8 +343,11 @@ final readonly class DetectDrop
 
     /**
      * Prefer the explicit triggering check id passed in by the recompute
-     * caller. Fall back to the latest check on the cheapest offer for paths
-     * that don't carry an explicit id (e.g. tests, manual triggers).
+     * caller. Fall back to the latest check on the cheapest offer for the
+     * callers that carry none: saving or removing a shop from the product
+     * page, the MCP remove-shop tool, and the admin revive action, which
+     * passes the shop's latest successful check and has none to pass when
+     * every `ok` row has been pruned.
      */
     private function resolveTriggerCheck(Product $product, ?int $triggeringPriceCheckId): ?PriceCheck
     {

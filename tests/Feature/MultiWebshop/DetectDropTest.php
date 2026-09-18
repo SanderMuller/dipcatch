@@ -156,3 +156,43 @@ test('no drop fires against the price the offer held before it was repointed', f
     expect(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(0);
     Notification::assertNothingSent();
 });
+
+/**
+ * The null-id path resolves the trigger from the cheapest shop's latest
+ * check. A shop with no checks yet resolves to none, and the send is
+ * abandoned — so the latch must not have been armed on the way past. An armed
+ * latch would suppress every later drop at or above this price for an alert
+ * that was never sent.
+ */
+test('a drop that cannot resolve a trigger check leaves the notification latch alone', function (): void {
+    $product = Product::factory()->create();
+    $shop = Shop::factory()->for($product)->create(['current_price' => '70.00']);
+    $product->forceFill([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '70.00',
+        'drop_threshold_pct' => '10.00',
+        'drop_threshold_abs' => '5.00',
+    ])->save();
+
+    foreach (range(1, 8) as $i) {
+        ProductCheapestHistory::factory()->for($product)->create([
+            'cheapest_shop_id' => $shop->id,
+            'cheapest_price' => '100.00',
+            'started_at' => now()->subDays(20 + $i),
+            'ended_at' => now()->subDays(19 + $i),
+        ]);
+    }
+
+    // No price_checks row for the cheapest shop, and no explicit trigger id.
+    expect(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(0);
+
+    app(DetectDrop::class)($product, null);
+
+    $product->refresh();
+
+    expect($product->last_notified_price)->toBeNull()
+        ->and($product->last_notified_at)->toBeNull()
+        ->and(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(0);
+
+    Notification::assertNothingSent();
+});
