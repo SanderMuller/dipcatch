@@ -160,6 +160,37 @@ test('second run within the same digest window sends no new mail', function (): 
     Mail::assertSent(PriceDropDigestMail::class, 1);
 });
 
+test('the cursor is the instant the window ended, not a later clock read', function (): void {
+    $user = User::factory()->create([
+        'notify_via_email' => true,
+        'last_digest_sent_at' => null,
+    ]);
+    $product = Product::factory()->for($user)->create();
+    PriceDropEvent::factory()
+        ->for($user)
+        ->for($product)
+        ->state(['fired_at' => now()->subHour()])
+        ->create();
+
+    // A clock that advances one second per read. Under the frozen clock the
+    // rest of this file uses, a job reading `now()` once and a job reading
+    // it three times stamp the same value, so neither test can tell them
+    // apart. Every instant is built up front: calling a Carbon constructor
+    // inside the closure re-enters it and hangs the run.
+    $base = CarbonImmutable::parse('2026-01-15 09:30:00', 'UTC');
+    $reads = [$base, $base->addSeconds(1), $base->addSeconds(2), $base->addSeconds(3)];
+    Date::setTestNow(function () use (&$reads): CarbonImmutable {
+        return count($reads) > 1 ? array_shift($reads) : $reads[0];
+    });
+
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    // The first read, because one read now serves both the window's end and
+    // the cursor. Three separate reads would stamp 09:30:02 here.
+    expect($user->fresh()->last_digest_sent_at?->toIso8601String())
+        ->toBe('2026-01-15T09:30:00+00:00');
+});
+
 test('an event fired in the same second as the window end is still mailed', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
