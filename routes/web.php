@@ -81,6 +81,16 @@ Route::get('shops/{slug}', [ShopPageController::class, 'show'])
     ->middleware(MarketingLocale::class)
     ->name('shop');
 
+// The Poiesz page moved when the marketed host was corrected from `poiesz.nl`
+// — a domain the chain does not use — to the one its webshop and its adapter
+// actually answer on. The old address was in the sitemap, so it redirects
+// rather than 404s.
+Route::get('shops/poiesz-nl', fn (): RedirectResponse => redirect()->route(
+    'shop',
+    ['slug' => 'poiesz-supermarkten-nl'] + request()->query(),
+    301,
+))->name('shop.poiesz-legacy');
+
 Route::get('price-alerts/{slug}', UseCasePageController::class)
     ->where('slug', UseCases::slugPattern())
     ->middleware(MarketingLocale::class)

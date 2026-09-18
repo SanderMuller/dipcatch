@@ -68,10 +68,10 @@ return [
          * When set to true, notifications will only be sent when at least one
          * check has a 'failed' status. Warnings will be ignored.
          */
-        'only_on_failure' => false,
+        'only_on_failure' => true,
 
         'mail' => [
-            'to' => 'your@example.com',
+            'to' => array_filter(explode(',', (string) env('FAILED_JOB_MONITOR_NOTIFIABLE', (string) env('ADMIN_EMAIL', '')))),
 
             'from' => [
                 'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),

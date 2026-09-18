@@ -1,0 +1,15 @@
+{
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+        "types": ["node"],
+        "allowJs": true,
+        "checkJs": true
+    },
+    "include": [
+        "resources/js/**/*.js",
+        "resources/js/**/*.ts",
+        "resources/js/**/*.d.ts",
+        "vite.config.js"
+    ],
+    "exclude": ["node_modules", "public", "vendor", "storage"]
+}

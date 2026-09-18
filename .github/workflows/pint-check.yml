@@ -55,4 +55,4 @@ jobs:
         run: mkdir -p .cache/pint
 
       - name: Run Pint (test)
-        run: vendor/bin/pint --test --parallel
+        run: composer lint:check

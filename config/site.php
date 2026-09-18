@@ -34,7 +34,7 @@ return [
      */
     'supported_hosts' => [
         'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl',
-        'dekamarkt.nl', 'poiesz.nl', 'vomar.nl', 'bol.com',
+        'dekamarkt.nl', 'poiesz-supermarkten.nl', 'vomar.nl', 'bol.com',
         'amazon.nl', 'amazon.com', 'amazon.co.uk',
         'zooplus.nl', 'zooplus.co.uk', 'bitiba.nl',
         'dierapotheker.nl', 'petsplace.nl', 'medpets.nl', 'welkoop.nl',
@@ -48,7 +48,7 @@ return [
      */
     'homepage_hosts' => [
         'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl',
-        'dekamarkt.nl', 'poiesz.nl', 'vomar.nl', 'bol.com', 'amazon.nl', 'zooplus.nl',
+        'dekamarkt.nl', 'poiesz-supermarkten.nl', 'vomar.nl', 'bol.com', 'amazon.nl', 'zooplus.nl',
         'etos.nl',
     ],
 
@@ -66,7 +66,7 @@ return [
         'aldi.nl' => 'Aldi',
         'spar.nl' => 'SPAR',
         'dekamarkt.nl' => 'DekaMarkt',
-        'poiesz.nl' => 'Poiesz',
+        'poiesz-supermarkten.nl' => 'Poiesz',
         'vomar.nl' => 'Vomar',
         'bol.com' => 'bol.com',
         'amazon.com' => 'Amazon.com',
@@ -106,7 +106,7 @@ return [
      */
     'use_cases' => [
         'groceries' => [
-            'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl', 'dekamarkt.nl', 'poiesz.nl', 'vomar.nl',
+            'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl', 'dekamarkt.nl', 'poiesz-supermarkten.nl', 'vomar.nl',
             'amazon.nl', 'amazon.com', 'amazon.co.uk',
         ],
         'pet-food' => [

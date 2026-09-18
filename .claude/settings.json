@@ -1,0 +1,183 @@
+{
+    "env": {
+        "ENABLE_LSP_TOOL": "1",
+        "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+        "ENABLE_TOOL_SEARCH": "true"
+    },
+    "attribution": {
+        "sessionUrl": false
+    },
+    "extraKnownMarketplaces": {
+        "hihaho": {
+            "source": {
+                "source": "github",
+                "repo": "hihaho/hihaho"
+            }
+        },
+        "laravel": {
+            "source": {
+                "source": "github",
+                "repo": "laravel/claude-code"
+            }
+        },
+        "webwright": {
+            "source": {
+                "source": "github",
+                "repo": "microsoft/Webwright",
+                "ref": "main",
+                "sha": "4a46f282ec37f27d6003cc498a977939d62d9015"
+            }
+        }
+    },
+    "permissions": {
+        "deny": [
+            "NotebookEdit",
+            "PushNotification",
+            "RemoteTrigger",
+            "EnterPlanMode",
+            "ExitPlanMode",
+            "DesignSync",
+            "mcp__phpstorm__execute_terminal_command",
+            "mcp__phpstorm__read_file",
+            "mcp__phpstorm__search_text",
+            "mcp__phpstorm__search_regex",
+            "mcp__atlassian__executeDestructive",
+            "mcp__atlassian__deleteJiraIssue",
+            "mcp__atlassian__deleteJiraComment",
+            "mcp__atlassian__deleteJiraIssueAttachment",
+            "Read(.env)",
+            "Edit(.env)",
+            "Read(.env.local)",
+            "Edit(.env.local)",
+            "Read(.env.prod)",
+            "Edit(.env.prod)",
+            "Read(.env.production)",
+            "Edit(.env.production)",
+            "Read(.env.staging)",
+            "Edit(.env.staging)",
+            "Read(.env.test)",
+            "Edit(.env.test)",
+            "Read(.env.testing)",
+            "Edit(.env.testing)",
+            "Read(.env.backup)",
+            "Edit(.env.backup)",
+            "Read(.env.bak)",
+            "Edit(.env.bak)",
+            "Read(.env.old)",
+            "Edit(.env.old)",
+            "Read(.env.dusk.local)",
+            "Edit(.env.dusk.local)",
+            "Read(.env.development)",
+            "Edit(.env.development)",
+            "Read(.env.dev)",
+            "Edit(.env.dev)",
+            "Read(.env.docker)",
+            "Edit(.env.docker)",
+            "Read(.env.vapor)",
+            "Edit(.env.vapor)",
+            "Read(.env.sandbox)",
+            "Edit(.env.sandbox)",
+            "Read(.env.e2e)",
+            "Edit(.env.e2e)",
+            "Read(.env.live)",
+            "Edit(.env.live)",
+            "Read(.env.secrets)",
+            "Edit(.env.secrets)",
+            "Read(//**/.env)",
+            "Edit(//**/.env)",
+            "Read(//**/.env.local)",
+            "Edit(//**/.env.local)",
+            "Read(//**/.env.prod)",
+            "Edit(//**/.env.prod)",
+            "Read(//**/.env.production)",
+            "Edit(//**/.env.production)",
+            "Read(//**/.env.staging)",
+            "Edit(//**/.env.staging)",
+            "Read(//**/.env.test)",
+            "Edit(//**/.env.test)",
+            "Read(//**/.env.testing)",
+            "Edit(//**/.env.testing)",
+            "Read(//**/.env.backup)",
+            "Edit(//**/.env.backup)",
+            "Read(//**/.env.bak)",
+            "Edit(//**/.env.bak)",
+            "Read(//**/.env.old)",
+            "Edit(//**/.env.old)",
+            "Read(//**/.env.dusk.local)",
+            "Edit(//**/.env.dusk.local)",
+            "Read(//**/.env.development)",
+            "Edit(//**/.env.development)",
+            "Read(//**/.env.dev)",
+            "Edit(//**/.env.dev)",
+            "Read(//**/.env.docker)",
+            "Edit(//**/.env.docker)",
+            "Read(//**/.env.vapor)",
+            "Edit(//**/.env.vapor)",
+            "Read(//**/.env.sandbox)",
+            "Edit(//**/.env.sandbox)",
+            "Read(//**/.env.e2e)",
+            "Edit(//**/.env.e2e)",
+            "Read(//**/.env.live)",
+            "Edit(//**/.env.live)",
+            "Read(//**/.env.secrets)",
+            "Edit(//**/.env.secrets)",
+            "Bash(twg jira workitem delete:*)",
+            "Bash(twg jira workitem comment delete:*)",
+            "Bash(twg jira workitem attachment delete:*)",
+            "Bash(twg jira space delete:*)",
+            "Bash(twg jira workitem archive:*)",
+            "Bash(twg jira workitem unlink:*)",
+            "Bash(twg jira workitem worklog delete:*)",
+            "Bash(twg jira workitem property delete:*)"
+        ]
+    },
+    "disableBundledSkills": false,
+    "disableWorkflows": true,
+    "disableRemoteControl": true,
+    "disableClaudeAiConnectors": true,
+    "disableArtifact": true,
+    "enabledPlugins": {
+        "context7@claude-plugins-official": true,
+        "laravel-simplifier@laravel": true,
+        "php-lsp@claude-plugins-official": false,
+        "phpantom-lsp@hihaho": true,
+        "security-guidance@claude-plugins-official": true,
+        "typescript-lsp@claude-plugins-official": true,
+        "webwright@webwright": true
+    },
+    "hooks": {
+        "SessionStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/boost-sync-check.sh\"",
+                        "timeout": 20
+                    }
+                ]
+            }
+        ],
+        "PreToolUse": [
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/env-guard.sh\"",
+                        "timeout": 5
+                    },
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/twg-guard.sh\"",
+                        "timeout": 5
+                    },
+                    {
+                        "type": "command",
+                        "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/vendor-sync-check.sh\"",
+                        "timeout": 5
+                    }
+                ]
+            }
+        ]
+    }
+}

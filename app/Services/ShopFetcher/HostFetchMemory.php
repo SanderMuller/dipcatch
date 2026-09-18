@@ -57,8 +57,17 @@ final readonly class HostFetchMemory
     /**
      * Record the failure a fetch threw, under the kind it belongs to.
      */
-    public function recordFailure(string $host, Blocked|TemporaryFailure $failure): void
+    /**
+     * `$remember` is false for a fetch whose result says nothing about the
+     * host — the adapter canary reads pages no user tracks, so recording its
+     * outcome here would invent failures, or erase real ones.
+     */
+    public function recordFailure(string $host, Blocked|TemporaryFailure $failure, bool $remember = true): void
     {
+        if (! $remember) {
+            return;
+        }
+
         $this->record($host, $failure instanceof Blocked ? self::KIND_BLOCKED : self::KIND_SILENT);
     }
 
@@ -85,8 +94,12 @@ final readonly class HostFetchMemory
     }
 
     /** One host answered, so nothing it did before still describes it. */
-    public function forget(string $host): void
+    public function forget(string $host, bool $remember = true): void
     {
+        if (! $remember) {
+            return;
+        }
+
         DB::table(self::TABLE)->where('host', $host)->delete();
     }
 }

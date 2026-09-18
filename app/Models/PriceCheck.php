@@ -9,7 +9,7 @@ use Database\Factories\PriceCheckFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -58,14 +58,14 @@ final class PriceCheck extends Model
      * selection, so such a reading never had a drop of its own and must not
      * confirm another one.
      *
-     * @param  EloquentBuilder<PriceCheck>  $query
+     * @param EloquentQueryBuilder<PriceCheck> $query
      */
     #[Scope]
-    protected function eligible(EloquentBuilder $query): void
+    protected function eligible(EloquentQueryBuilder $query): void
     {
         $query->where('status', ScrapeStatus::Ok)
             ->whereNotNull('price')
-            ->where(fn (EloquentBuilder $stock): EloquentBuilder => $stock
+            ->where(fn (EloquentQueryBuilder $stock): EloquentQueryBuilder => $stock
                 ->where('in_stock', true)
                 ->orWhereNull('in_stock'));
     }

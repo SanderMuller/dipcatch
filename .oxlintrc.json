@@ -1,0 +1,190 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": [
+        "typescript"
+    ],
+    "jsPlugins": [
+        {
+            "name": "stylistic",
+            "specifier": "@stylistic/eslint-plugin"
+        }
+    ],
+    "categories": {
+        "correctness": "off"
+    },
+    "ignorePatterns": [],
+    "rules": {
+        "complexity": [
+            "error",
+            {
+                "max": 40
+            }
+        ],
+        "eqeqeq": "warn",
+        "for-direction": "error",
+        "no-async-promise-executor": "error",
+        "no-case-declarations": "error",
+        "no-compare-neg-zero": "error",
+        "no-cond-assign": "warn",
+        "no-constant-binary-expression": "error",
+        "no-constant-condition": "warn",
+        "no-control-regex": "error",
+        "no-debugger": "error",
+        "no-delete-var": "error",
+        "no-dupe-else-if": "warn",
+        "no-duplicate-case": "error",
+        "no-duplicate-imports": "warn",
+        "no-else-return": "warn",
+        "no-empty": "error",
+        "no-empty-character-class": "error",
+        "no-empty-pattern": "error",
+        "no-empty-static-block": "error",
+        "no-ex-assign": "error",
+        "no-extra-boolean-cast": "error",
+        "no-fallthrough": "error",
+        "no-global-assign": "error",
+        "no-implied-eval": "warn",
+        "no-invalid-regexp": "error",
+        "no-irregular-whitespace": "error",
+        "no-lonely-if": "warn",
+        "no-loss-of-precision": "error",
+        "no-misleading-character-class": "error",
+        "no-nested-ternary": "error",
+        "no-nonoctal-decimal-escape": "error",
+        "no-prototype-builtins": "error",
+        "no-regex-spaces": "error",
+        "no-self-assign": "error",
+        "no-shadow-restricted-names": "error",
+        "no-sparse-arrays": "error",
+        "no-unassigned-vars": "error",
+        "no-undef": "off",
+        "no-unexpected-multiline": "error",
+        "no-unmodified-loop-condition": "warn",
+        "no-unreachable": "warn",
+        "no-unsafe-finally": "error",
+        "no-unsafe-optional-chaining": "error",
+        "no-unused-labels": "error",
+        "no-unused-private-class-members": "warn",
+        "no-unused-vars": "off",
+        "no-useless-assignment": "error",
+        "no-useless-backreference": "error",
+        "no-useless-catch": "error",
+        "no-useless-escape": "error",
+        "no-var": "warn",
+        "prefer-const": "warn",
+        "preserve-caught-error": "error",
+        "require-yield": "error",
+        "stylistic/function-call-argument-newline": [
+            "error",
+            "consistent"
+        ],
+        "stylistic/keyword-spacing": [
+            "warn",
+            {
+                "overrides": {
+                    "this": {
+                        "before": false
+                    }
+                }
+            }
+        ],
+        "stylistic/max-statements-per-line": [
+            "error",
+            {
+                "max": 1
+            }
+        ],
+        "stylistic/no-multi-spaces": [
+            "warn",
+            {
+                "ignoreEOLComments": true
+            }
+        ],
+        "stylistic/quotes": [
+            "error",
+            "single",
+            {
+                "avoidEscape": true,
+                "allowTemplateLiterals": "always"
+            }
+        ],
+        "stylistic/semi": [
+            "error",
+            "always"
+        ],
+        "stylistic/space-unary-ops": [
+            "warn",
+            {
+                "words": true,
+                "nonwords": true,
+                "overrides": {
+                    "-": false,
+                    "--": false,
+                    "=": false,
+                    "+": false,
+                    "++": false,
+                    "!!": false,
+                    "ts-non-null": false
+                }
+            }
+        ],
+        "typescript/no-floating-promises": "error",
+        "typescript/no-unused-vars": "off",
+        "use-isnan": "error",
+        "valid-typeof": "error"
+    },
+    "overrides": [
+        {
+            "files": [
+                "**/*.js"
+            ],
+            "rules": {
+                "constructor-super": "error",
+                "getter-return": "error",
+                "no-class-assign": "error",
+                "no-const-assign": "error",
+                "no-dupe-class-members": "error",
+                "no-dupe-keys": "error",
+                "no-func-assign": "error",
+                "no-import-assign": "error",
+                "no-new-native-nonconstructor": "error",
+                "no-obj-calls": "error",
+                "no-redeclare": "error",
+                "no-setter-return": "error",
+                "no-this-before-super": "error",
+                "no-unsafe-negation": "error",
+                "no-with": "error"
+            }
+        },
+        {
+            "files": [
+                "**/*.ts"
+            ],
+            "rules": {
+                "typescript/consistent-type-imports": [
+                    "error",
+                    {
+                        "prefer": "type-imports"
+                    }
+                ],
+                "typescript/explicit-function-return-type": [
+                    "error",
+                    {
+                        "allowExpressions": true,
+                        "allowTypedFunctionExpressions": true,
+                        "allowHigherOrderFunctions": true
+                    }
+                ],
+                "typescript/explicit-member-accessibility": [
+                    "error",
+                    {
+                        "accessibility": "explicit"
+                    }
+                ],
+                "typescript/no-explicit-any": "error",
+                "typescript/prefer-as-const": "error",
+                "typescript/prefer-readonly": "warn"
+            }
+        }
+    ]
+}

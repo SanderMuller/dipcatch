@@ -159,7 +159,7 @@ final readonly class DetectDrop
         $shop = $trigger->shop;
 
         DB::afterCommit(function () use ($shop): void {
-            CheckShopPrice::dispatch($shop, confirmation: true)
+            dispatch(new CheckShopPrice($shop, confirmation: true))
                 ->delay(now()->addMinutes(Config::integer('dipcatch.drops.confirm_delay_minutes')));
         });
     }

@@ -4,7 +4,11 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "typecheck": "tsc --noEmit",
+        "lint": "files=$(git diff --name-only HEAD -- 'resources/js/*.js' 'resources/js/*.ts'); [ -z \"$files\" ] || oxlint --type-aware $files",
+        "lint-all": "oxlint --type-aware resources/js",
+        "qa": "yarn lint-all && yarn typecheck"
     },
     "dependencies": {
         "@laravel/passkeys": "^0.2.0",
@@ -21,6 +25,11 @@
         "lightningcss-linux-x64-gnu": "^1.29.1"
     },
     "devDependencies": {
-        "playwright": "^1.63.0"
+        "@stylistic/eslint-plugin": "^5.10.0",
+        "@types/node": "^26.6.1",
+        "oxlint": "^1.83.0",
+        "oxlint-tsgolint": "^7.0.2001",
+        "playwright": "^1.63.0",
+        "typescript": "^7.0.2"
     }
 }

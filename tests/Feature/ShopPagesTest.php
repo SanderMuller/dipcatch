@@ -101,3 +101,19 @@ it('says a shop page is not the only shop that works', function (): void {
 it('reaches the shops hub from the homepage', function (): void {
     $this->get('/')->assertOk()->assertSeeHtml(route('shops'));
 });
+
+test('the old poiesz address redirects to the corrected one', function (): void {
+    // The marketed host was corrected from `poiesz.nl`, which the chain does
+    // not use, to the one its webshop answers on. The old page was in the
+    // sitemap, so it must not 404.
+    $this->get('/shops/poiesz-nl')
+        ->assertRedirect('/shops/poiesz-supermarkten-nl')
+        ->assertStatus(301);
+
+    $this->get('/shops/poiesz-supermarkten-nl')->assertOk()->assertSee('Poiesz');
+});
+
+test('the poiesz redirect keeps the language query', function (): void {
+    $this->get('/shops/poiesz-nl?lang=nl')
+        ->assertRedirect('/shops/poiesz-supermarkten-nl?lang=nl');
+});
