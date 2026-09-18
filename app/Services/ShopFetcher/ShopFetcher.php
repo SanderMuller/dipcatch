@@ -70,7 +70,15 @@ final readonly class ShopFetcher
         private HostFetchMemory $memory,
     ) {}
 
-    public function fetch(string $url): FetchResult
+    /**
+     * `$rememberHost` writes what this fetch learned into the host failure
+     * memory. The adapter canary passes false: it fetches pages no user
+     * tracks, and a canary success would otherwise erase the failures a real
+     * probe recorded, while a canary block would invent failures of its own.
+     * Every guard — URL safety, robots, the per-host rate limit, the body cap
+     * — applies either way.
+     */
+    public function fetch(string $url, bool $rememberHost = true): FetchResult
     {
         $host = self::decompose($url)['host'];
 
@@ -87,17 +95,7 @@ final readonly class ShopFetcher
         // Remember how this host answers: a caller told "try again shortly"
         // for the tenth deterministic refusal in a row is being sent back to
         // do the same thing again.
-        try {
-            $response = $this->sendRequest($url);
-
-            $this->classify($response);
-        } catch (Blocked|TemporaryFailure $e) {
-            $this->memory->recordFailure($host, $e);
-
-            throw $e;
-        }
-
-        $this->memory->forget($host);
+        $response = $this->sendAndRemember($url, $host, $rememberHost);
 
         $html = $this->prepareBody($response);
 
@@ -200,6 +198,28 @@ final readonly class ShopFetcher
         } catch (Throwable) {
             throw new HttpError(0);
         }
+    }
+
+    /**
+     * Send the request and record what the host answered, unless the caller
+     * asked not to — the adapter canary fetches pages no user tracks, so its
+     * result must not rewrite what a real probe learned about the host.
+     */
+    private function sendAndRemember(string $url, string $host, bool $rememberHost): Response
+    {
+        try {
+            $response = $this->sendRequest($url);
+
+            $this->classify($response);
+        } catch (Blocked|TemporaryFailure $e) {
+            $this->memory->recordFailure($host, $e, $rememberHost);
+
+            throw $e;
+        }
+
+        $this->memory->forget($host, $rememberHost);
+
+        return $response;
     }
 
     /**

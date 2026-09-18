@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Actions\Suggestions\SuggestShops;
 use App\Billing\StripeTax;
+use App\Health\AdapterCanaryCheck;
 use App\Health\BillingConfigurationCheck;
 use App\Health\CheckjebonFreshnessCheck;
 use App\Health\LastSuccessfulScrapeCheck;
@@ -186,6 +187,7 @@ final class AppServiceProvider extends ServiceProvider
             LastSuccessfulScrapeCheck::new()
                 ->warnAfterHours(48)
                 ->failAfterHours(96),
+            AdapterCanaryCheck::new(),
             CheckjebonFreshnessCheck::new()
                 ->warnAfterHours(48)
                 ->failAfterHours(96),

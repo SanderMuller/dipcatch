@@ -45,7 +45,9 @@ final class CreateProductManual extends Component
             'title' => FluentRule::string('Title')->required()->max(255),
             'image_url' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
             'currency' => FluentRule::string('Currency')->required()->in(Iso4217::CODES),
-            'drop_threshold_pct' => FluentRule::numeric('Drop threshold (%)')->nullable()->min(0)->max(100),
+            'drop_threshold_pct' => FluentRule::numeric('Drop threshold (%)')
+                ->nullable()
+                ->between(0, 100),
             'drop_threshold_abs' => FluentRule::numeric('Drop threshold (absolute)')->nullable()->min(0),
         ];
     }

@@ -4,6 +4,7 @@ use App\Console\Commands\DispatchDailyDigestsCommand;
 use App\Console\Commands\PruneOldChecksCommand;
 use App\Console\Commands\RecheckActiveShopsCommand;
 use App\Console\Commands\RefreshCheckjebonDatasetCommand;
+use App\Console\Commands\RunAdapterCanaryCommand;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\QueryException;
@@ -30,6 +31,24 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->command(RefreshCheckjebonDatasetCommand::class)
             ->dailyAt('07:30')
+            ->timezone('Europe/Amsterdam')
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        $schedule->command(RunAdapterCanaryCommand::class)
+            ->dailyAt('05:15')
+            ->timezone('Europe/Amsterdam')
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        // Spatie's registered ScheduleCheck fails until this heartbeat runs,
+        // so without it the first health mail is a false alarm.
+        $schedule->command('health:schedule-check-heartbeat')
+            ->everyMinute()
+            ->onOneServer();
+
+        $schedule->command('health:check')
+            ->dailyAt('05:45')
             ->timezone('Europe/Amsterdam')
             ->withoutOverlapping()
             ->onOneServer();
