@@ -5,6 +5,8 @@ namespace App\Notifications;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\PriceAdapters\BundleOffer;
+use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -19,14 +21,13 @@ use NotificationChannels\WebPush\WebPushMessage;
 final class TargetPriceNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+    use RestoresQueuedBundleSnapshot;
 
     public readonly string $snapshotHost;
 
     public readonly ?string $snapshotSingleItemPrice;
 
-    public readonly ?int $snapshotBundleQuantity;
-
-    public readonly ?string $snapshotBundleTotalPrice;
+    public readonly ?BundleOffer $snapshotBundle;
 
     public function __construct(
         public Product $product,
@@ -34,10 +35,8 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
         public readonly string $snapshotPrice,
     ) {
         $this->snapshotHost = $shop->host;
-        $bundle = $shop->liveBundleOffer();
-        $this->snapshotSingleItemPrice = $bundle === null ? null : $shop->singleItemPrice();
-        $this->snapshotBundleQuantity = $bundle?->quantity;
-        $this->snapshotBundleTotalPrice = $bundle?->totalPrice;
+        $this->snapshotBundle = $shop->liveBundleOffer();
+        $this->snapshotSingleItemPrice = $this->snapshotBundle === null ? null : $shop->singleItemPrice();
 
         $this->afterCommit();
     }
@@ -81,8 +80,8 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
             'currency' => $this->product->currency,
             'new_price' => $this->snapshotPrice,
             'single_item_price' => $this->snapshotSingleItemPrice,
-            'bundle_quantity' => $this->snapshotBundleQuantity,
-            'bundle_total_price' => $this->snapshotBundleTotalPrice,
+            'bundle_quantity' => $this->snapshotBundle?->quantity,
+            'bundle_total_price' => $this->snapshotBundle?->totalPrice,
             'target_price' => $this->product->target_price === null
                 ? null
                 : (string) $this->product->target_price,
@@ -95,19 +94,7 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
     {
         return $this->product->title
             . ' is ' . MoneyFormatter::format($this->snapshotPrice, $this->product->currency)
-            . $this->bundleSuffix()
+            . BundlePriceLabel::suffix($this->snapshotBundle, $this->product->currency)
             . ' at ' . $this->snapshotHost;
-    }
-
-    private function bundleSuffix(): string
-    {
-        if ($this->snapshotBundleQuantity === null || $this->snapshotBundleTotalPrice === null) {
-            return '';
-        }
-
-        return ' · ' . __(':quantity for :total', [
-            'quantity' => $this->snapshotBundleQuantity,
-            'total' => MoneyFormatter::format($this->snapshotBundleTotalPrice, $this->product->currency),
-        ]);
     }
 }

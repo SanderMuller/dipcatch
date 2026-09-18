@@ -50,18 +50,24 @@ final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
     public function handle(): void
     {
         $lookbackDays = DipConfig::int('dipcatch.digest.lookback_days', 7);
+        // One clock read for the window's end and for the cursor, so the two
+        // cannot drift apart. Both columns hold whole seconds, so an event
+        // stamped inside this same second is still lost; the bound only
+        // rescues one stamped later.
+        $now = CarbonImmutable::now();
         // Coalesce null to "24h ago" for first-ever digests; cap at the
         // configured lookback to avoid emailing a giant backlog if mail
         // bounced for days.
-        $minSince = CarbonImmutable::now()->subDays($lookbackDays);
+        $minSince = $now->subDays($lookbackDays);
         $lastSent = $this->user->last_digest_sent_at;
         $since = $lastSent instanceof CarbonImmutable
             ? $lastSent->max($minSince)
-            : CarbonImmutable::now()->subDay()->max($minSince);
+            : $now->subDay()->max($minSince);
 
         $events = PriceDropEvent::query()
             ->where('user_id', $this->user->id)
             ->where('fired_at', '>', $since)
+            ->where('fired_at', '<=', $now)
             ->with(['product', 'triggeredByShop', 'priceCheck'])
             ->oldest('fired_at')
             ->get();
@@ -77,7 +83,7 @@ final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
         // retry. Trade-off: a failed mail loses that batch from the email
         // channel — but those drops are still in the DB and were already
         // delivered live via the Filament bell + web push channels.
-        $this->user->forceFill(['last_digest_sent_at' => CarbonImmutable::now()])->save();
+        $this->user->forceFill(['last_digest_sent_at' => $now])->save();
 
         Mail::to($this->user->email)->send(new PriceDropDigestMail($this->user, $events));
     }
