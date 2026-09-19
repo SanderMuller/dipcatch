@@ -7,6 +7,8 @@ use App\Livewire\Products\ProductShow;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Services\TypeSafe\TypeSafeClient;
+use Illuminate\Support\Facades\Http;
 
 use function Pest\Livewire\livewire;
 
@@ -390,4 +392,148 @@ it('keeps a category the automatic job wrote while the form was open', function 
 
     expect($fresh?->category)->toBe(ProductCategory::CoffeeTea)
         ->and($fresh?->category_set_by)->toBe(CategorySource::Auto);
+});
+
+it('names the unit once the shops have read a pack size', function (string $unit, string $expected): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create();
+    Shop::factory()->for($product)->create(['pack_quantity' => 500, 'pack_unit' => $unit]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->assertSee($expected)
+        ->assertDontSee('Target price per kilo, litre or piece');
+})->with([
+    'grams' => ['g', 'Target price per kilo'],
+    'millilitres' => ['ml', 'Target price per litre'],
+    'pieces' => ['piece', 'Target price per piece'],
+]);
+
+it('names the unit the comparison actually uses when the shops disagree', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create();
+    Shop::factory()->count(2)->for($product)->create(['pack_quantity' => 500, 'pack_unit' => 'g']);
+    // One shop reporting pieces against two reporting grams is ordinary, and
+    // best value compares inside the larger group, so the label follows it
+    // rather than offering a choice the reader does not have.
+    Shop::factory()->for($product)->create(['pack_quantity' => 12, 'pack_unit' => 'piece']);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->assertSee('Target price per kilo')
+        ->assertDontSee('Target price per piece');
+});
+
+it('keeps the three-way wording while no shop has read a pack size', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create();
+    Shop::factory()->for($product)->create(['pack_quantity' => null, 'pack_unit' => null]);
+
+    $this->actingAs($user);
+
+    // The explanation under the field is the Pro one for a free account, so
+    // this pins the label; `unitPriceUnit()` is what decides both.
+    livewire(EditProduct::class, ['product' => $product])
+        ->assertSee('Target price per kilo, litre or piece');
+
+    expect($product->unitPriceUnit())->toBeNull();
+});
+
+it('shows a free account the suggestion button disabled, with the way to Pro', function (): void {
+    config()->set('services.typesafe.key', 'test-key');
+    Http::fake();
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->assertSee('Suggest a category')
+        ->assertSee('Pro suggests a category for you.')
+        ->assertSeeHtml(route('upgrade'))
+        ->call('suggestCategory')
+        ->assertSet('suggestedCategory', null);
+
+    Http::assertNothingSent();
+});
+
+it('hides the suggestion button without a key, and when a category is already set', function (): void {
+    config()->set('services.typesafe.key', '');
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])->assertDontSee('Suggest a category');
+
+    config()->set('services.typesafe.key', 'test-key');
+    $sorted = Product::factory()->categorised(ProductCategory::PetFood)->create(['user_id' => $user->id]);
+
+    livewire(EditProduct::class, ['product' => $sorted])->assertDontSee('Suggest a category');
+});
+
+it('suggests a category to a Pro account, which can use it and save it as its own choice', function (): void {
+    config()->set('services.typesafe.key', 'test-key');
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response(typesafeAnswer(['food' => 0.95, 'home' => 0.05], ['food' => ['coffee_tea' => 0.95, 'pantry' => 0.05]]))]);
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Aroma Rood 500 g']);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->assertSee('Suggest a category')
+        ->call('suggestCategory')
+        ->assertSet('suggestedCategory', 'food.coffee_tea')
+        ->assertSee('Suggested:')
+        ->assertSee('Coffee & tea')
+        ->assertSee('Use it')
+        ->call('acceptSuggestion')
+        ->assertSet('category', 'food.coffee_tea')
+        ->assertSet('suggestedCategory', null)
+        ->assertSee('Category set. Save changes to keep it.')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    Http::assertSentCount(1);
+    expect($product->fresh()?->category)->toBe(ProductCategory::CoffeeTea)
+        ->and($product->fresh()?->category_set_by)->toBe(CategorySource::User);
+});
+
+it('drops a declined suggestion and leaves the category empty', function (): void {
+    config()->set('services.typesafe.key', 'test-key');
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response(typesafeAnswer(['food' => 0.95, 'home' => 0.05], ['food' => ['coffee_tea' => 0.95, 'pantry' => 0.05]]))]);
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->call('suggestCategory')
+        ->assertSet('suggestedCategory', 'food.coffee_tea')
+        ->call('declineSuggestion')
+        ->assertSet('suggestedCategory', null)
+        ->assertSet('category', '')
+        ->assertSee('Suggest a category');
+});
+
+it('says so when the suggestion request fails, and stores nothing', function (): void {
+    config()->set('services.typesafe.key', 'test-key');
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response([], 401)]);
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->call('suggestCategory')
+        ->assertSet('suggestedCategory', null)
+        ->assertSee('No suggestion right now. Try again in a moment.');
+
+    expect($product->fresh()?->category)->toBeNull();
 });

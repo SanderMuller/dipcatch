@@ -646,13 +646,17 @@ it('clears a category, and a clear is a choice too', function (): void {
         ->and($product->category_set_by)->toBe(CategorySource::User);
 });
 
-it('refuses a department key, which is not a category', function (): void {
+it('refuses a department key, and says a department is the mistake', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create(['category' => null]);
 
+    // A live session sent "food" and got "The selected category is invalid",
+    // which tells a caller nothing about why, so it retries the same shape.
     DipCatchServer::actingAs($user)
         ->tool(SetCategoryTool::class, ['product_id' => (string) $product->id, 'category' => 'food'])
-        ->assertHasErrors();
+        ->assertHasErrors()
+        ->assertSee('A department key like')
+        ->assertSee('food.snacks_sweets');
 
     expect($product->refresh()->category)->toBeNull();
 });

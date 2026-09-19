@@ -174,6 +174,41 @@ final class Product extends Model
      * sharing one unit: EUR/kg and EUR/piece are not comparable numbers.
      * When the sized shops disagree on the unit, the largest group wins.
      */
+    /**
+     * The unit the unit-price comparison runs in — `g`, `ml` or `piece` — or
+     * null while no shop has read a pack size.
+     *
+     * Shops can disagree: one reporting pieces while the rest report grams is
+     * ordinary, and {@see bestValueShop()} resolves it by comparing only
+     * inside the largest group. This answers with that same group's unit, so
+     * a screen can name the unit the alert will actually use instead of
+     * offering the reader a choice it does not have.
+     *
+     * Not filtered by stock or health, unlike best value: a label describes
+     * the product, and it should not change because a shop went out of stock.
+     */
+    public function unitPriceUnit(): ?string
+    {
+        $counts = [];
+
+        foreach ($this->shops as $shop) {
+            if (is_string($shop->pack_unit) && $shop->pack_unit !== '') {
+                $counts[$shop->pack_unit] = ($counts[$shop->pack_unit] ?? 0) + 1;
+            }
+        }
+
+        if ($counts === []) {
+            return null;
+        }
+
+        // Most shops win; an even split falls back to the alphabetically
+        // first unit, so the same product always answers the same way.
+        ksort($counts);
+        arsort($counts);
+
+        return array_key_first($counts);
+    }
+
     public function bestValueShop(): ?Shop
     {
         $candidates = $this->shops
