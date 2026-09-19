@@ -266,3 +266,45 @@ test('additive piece sizes parse to null', function (): void {
     expect(PackSize::parse('2 stuks + 2 stuks'))->toBeNull()
         ->and(PackSize::parse('4 rollen + 2 rollen'))->toBeNull();
 });
+
+// --- resolve: a shop that states one item's size -----------------------------
+
+test('a stated size that is one item of a multipack in the title gives way to the pack', function (): void {
+    // A clearance shop reported "55 g" for a box of twelve bars. Taken at
+    // face value the box looks twelve times dearer per kilo than it is, and
+    // that number is what best value and the unit-price alerts run on.
+    $size = PackSize::resolve('55 g', authoritative: true, title: 'Barebells Protein Bar Cookies & Cream - 12 x 55 g');
+
+    expect($size->quantity)->toBe(660.0)
+        ->and($size->unit)->toBe('g');
+});
+
+test('the same holds for a unit the title spells differently', function (): void {
+    $size = PackSize::resolve('45 gram', authoritative: true, title: 'Barebells Spread Bar - 12 x 45 gram');
+
+    expect($size->quantity)->toBe(540.0)
+        ->and($size->unit)->toBe('g');
+});
+
+test('a stated pack total is left alone', function (): void {
+    $size = PackSize::resolve('660 g', authoritative: true, title: 'Barebells Protein Bar - 12 x 55 g');
+
+    expect($size->quantity)->toBe(660.0);
+});
+
+test('a stated size the title does not contradict is left alone', function (string $stated, string $title, float $expected): void {
+    expect(PackSize::resolve($stated, authoritative: true, title: $title)->quantity)->toBe($expected);
+})->with([
+    // The shop knows its own packaging better than a title does: only an
+    // exact match against the multipack's own per-item size overrides it.
+    'no multipack in the title' => ['55 g', 'Barebells single bar 55 g', 55.0],
+    'a size that is not the item size' => ['500 g', 'Koffie 12 x 55 g', 500.0],
+    'a plain single pack' => ['500 g', 'Koffiebonen 500 g', 500.0],
+]);
+
+test('an authoritative empty size still clears the pack data', function (): void {
+    // Unchanged by the rule above: a shop that stops stating a size must be
+    // able to clear a stale one (spec Section 4).
+    expect(PackSize::resolve(packSize: null, authoritative: true, title: 'Barebells 12 x 55 g'))->toBeNull()
+        ->and(PackSize::resolve(packSize: null, authoritative: false, title: 'Barebells 12 x 55 g')?->quantity)->toBe(660.0);
+});
