@@ -15,6 +15,12 @@ function expectedToolAnnotations(): array
             'destructiveHint' => false,
             'openWorldHint' => false,
         ],
+        'list_categories' => [
+            'title' => 'List categories',
+            'readOnlyHint' => true,
+            'destructiveHint' => false,
+            'openWorldHint' => false,
+        ],
         'get_product' => [
             'title' => 'Get product',
             'readOnlyHint' => true,

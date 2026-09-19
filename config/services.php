@@ -49,6 +49,13 @@ return [
         'redirect' => env('APPLE_REDIRECT_URI'),
     ],
 
+    // TypeSafe, the model behind automatic product categories. An empty key
+    // hides the feature: the settings switch is not rendered and nothing is
+    // sent. Never commit a real key.
+    'typesafe' => [
+        'key' => env('TYPESAFE_API_KEY'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

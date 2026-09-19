@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Billing\Plan;
+use App\Enums\ProductDepartment;
 use App\Livewire\Products\ProductShow;
 use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
@@ -711,4 +712,42 @@ function configureStripe(): void
     config()->set('cashier.webhook.secret', 'whsec_1');
     config()->set('plans.stripe.pro_price_id', 'price_1');
     config()->set('plans.enabled');
+}
+
+/**
+ * A full systemone answer: the given department probabilities, the given leaf
+ * probabilities per department, and an even spread for every other leaf
+ * question so each real department is scorable.
+ *
+ * @param  array<string, float>  $departments
+ * @param  array<string, array<string, float>>  $leaves
+ * @return array<string, mixed>
+ */
+function typesafeAnswer(array $departments, array $leaves = []): array
+{
+    $answers = [
+        'department' => ['type' => 'choice', 'choice' => array_key_first($departments), 'probabilities' => $departments, 'confidence' => 0.5],
+    ];
+
+    foreach (ProductDepartment::real() as $department) {
+        $probabilities = $leaves[$department->value] ?? null;
+
+        if ($probabilities === null) {
+            $count = count($department->categories());
+            $probabilities = [];
+
+            foreach ($department->categories() as $category) {
+                $probabilities[$category->leafKey()] = round(1 / $count, 4);
+            }
+        }
+
+        $answers['leaf_' . $department->value] = [
+            'type' => 'choice',
+            'choice' => array_key_first($probabilities),
+            'probabilities' => $probabilities,
+            'confidence' => 0.5,
+        ];
+    }
+
+    return ['model' => 'jev-latest', 'answers' => $answers, 'usage' => ['input_tokens' => 1200, 'output_tokens' => 90]];
 }

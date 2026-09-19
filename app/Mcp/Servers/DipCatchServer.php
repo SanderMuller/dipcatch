@@ -6,6 +6,7 @@ use App\Mcp\Tools\AddShopTool;
 use App\Mcp\Tools\CreateProductTool;
 use App\Mcp\Tools\DeleteProductTool;
 use App\Mcp\Tools\GetProductTool;
+use App\Mcp\Tools\ListCategoriesTool;
 use App\Mcp\Tools\ListProductsTool;
 use App\Mcp\Tools\PriceHistoryTool;
 use App\Mcp\Tools\RecheckTool;
@@ -51,6 +52,7 @@ final class DipCatchServer extends Server
      */
     protected array $tools = [
         ListProductsTool::class,
+        ListCategoriesTool::class,
         GetProductTool::class,
         CreateProductTool::class,
         AddShopTool::class,

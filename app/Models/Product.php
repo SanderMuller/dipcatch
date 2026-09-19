@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Actions\Drops\DetectDrop;
+use App\Enums\CategorySource;
+use App\Enums\ProductCategory;
 use App\Enums\ShopHealth;
 use App\Services\Drops\Reference;
 use App\Support\ImageUrl;
@@ -19,6 +21,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
 /**
+ * @property ProductCategory|null $category
+ * @property CategorySource|null $category_set_by
  * @property CarbonImmutable|null $history_kept_from
  */
 #[Unguarded]
@@ -66,6 +70,8 @@ final class Product extends Model
             'last_notified_at' => 'datetime',
             'history_kept_from' => 'datetime',
             'active' => 'boolean',
+            'category' => ProductCategory::class,
+            'category_set_by' => CategorySource::class,
         ];
     }
 

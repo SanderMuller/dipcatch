@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Products;
 
+use App\Enums\CategorySource;
+use App\Enums\ProductCategory;
 use App\Models\Product;
 use App\Support\Iso4217;
 use Illuminate\Contracts\View\View;
@@ -39,6 +41,16 @@ final class EditProduct extends Component
 
     public bool $active = true;
 
+    /** A `ProductCategory` value, or empty for no category. */
+    public string $category = '';
+
+    /**
+     * The category as the form loaded it. The model is rehydrated from the
+     * database on every request, so comparing against it would read a
+     * category the after-response job wrote mid-edit as a clear.
+     */
+    public string $loadedCategory = '';
+
     public ?string $message = null;
 
     public function mount(Product $product): void
@@ -56,6 +68,8 @@ final class EditProduct extends Component
         $this->targetPrice = $product->target_price === null ? null : (string) $product->target_price;
         $this->unitPriceTarget = $product->unit_price_target === null ? null : (string) $product->unit_price_target;
         $this->active = $product->active;
+        $this->category = $product->category->value ?? '';
+        $this->loadedCategory = $this->category;
     }
 
     /**
@@ -74,6 +88,7 @@ final class EditProduct extends Component
             'dropThresholdAbs' => FluentRule::numeric('Alert me when it drops by (amount)')->nullable()->min(0.01),
             'targetPrice' => FluentRule::numeric('Target price')->nullable()->min(0.01),
             'unitPriceTarget' => FluentRule::numeric('Target price per kilo, litre or piece')->nullable()->min(0.01),
+            'category' => FluentRule::string('Category')->nullable()->in(ProductCategory::values()),
         ];
     }
 
@@ -82,6 +97,14 @@ final class EditProduct extends Component
         $this->authorize('update', $this->product);
 
         $this->validate();
+
+        // A choice, a clear included, is final; an untouched field is not a choice.
+        if ($this->category !== $this->loadedCategory) {
+            $this->product->forceFill([
+                'category' => ProductCategory::tryFrom($this->category),
+                'category_set_by' => CategorySource::User,
+            ]);
+        }
 
         $this->product->forceFill([
             'title' => trim($this->title),
@@ -132,6 +155,7 @@ final class EditProduct extends Component
     {
         return view('livewire.products.edit-product', [
             'currencies' => Iso4217::options(),
+            'categoryGroups' => ProductCategory::grouped(),
             'shopImages' => $this->shopImages(),
             'allowsUnitPriceAlerts' => $this->product->user?->entitlements()->allowsUnitPriceAlerts() === true,
         ]);

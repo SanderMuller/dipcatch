@@ -70,6 +70,12 @@ final readonly class Entitlements
         return $this->value('unit_price_alerts') === true;
     }
 
+    /** The plan half of `User::wantsAutoCategories()`. */
+    public function allowsAutoCategories(): bool
+    {
+        return $this->value('auto_categories') === true;
+    }
+
     private function number(string $key, string $fallbackKey, int $default): int
     {
         $value = $this->value($key);

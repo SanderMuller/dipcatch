@@ -30,6 +30,17 @@
             <div class="mt-4 space-y-4">
                 <flux:input wire:model="title" :label="__('Title')" required />
 
+                <flux:select wire:model="category" :label="__('Category')" data-test="product-category">
+                    <flux:select.option value="">{{ __('No category') }}</flux:select.option>
+                    @foreach ($categoryGroups as $departmentValue => $categories)
+                        <flux:select.group :label="\App\Enums\ProductDepartment::from($departmentValue)->label()">
+                            @foreach ($categories as $leaf)
+                                <flux:select.option value="{{ $leaf->value }}">{{ $leaf->label() }}</flux:select.option>
+                            @endforeach
+                        </flux:select.group>
+                    @endforeach
+                </flux:select>
+
                 <flux:input wire:model="imageUrl" :label="__('Image URL')" type="url" placeholder="https://…" />
 
                 @if ($shopImages !== [])

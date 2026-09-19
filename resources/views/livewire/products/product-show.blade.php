@@ -16,6 +16,12 @@
                     <flux:badge size="sm" :color="$product->active ? 'green' : 'zinc'">
                         {{ $product->active ? __('Active') : __('Paused') }}
                     </flux:badge>
+                    @if ($product->category !== null)
+                        ·
+                        <a href="{{ route('app.products.index', ['category' => $product->category->value]) }}" wire:navigate data-test="product-category-badge">
+                            <flux:badge size="sm" color="zinc">{{ $product->category->label() }}</flux:badge>
+                        </a>
+                    @endif
                 </flux:text>
             </div>
         </div>

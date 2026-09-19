@@ -1,10 +1,12 @@
 <?php declare(strict_types=1);
 
+use App\Enums\ProductCategory;
 use App\Livewire\Products\ProductList;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Livewire\Livewire;
 
 use function Pest\Livewire\livewire;
 
@@ -211,4 +213,94 @@ it('links the price and best-value shops out to the page that sells the product'
         // The shop's own logo, so the row is recognisable before it is read.
         ->assertSeeHtml('favicons?domain=' . $shop->host)
         ->assertSeeHtml('href="' . $shop->url . '"');
+});
+
+it('filters by one category', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'title' => 'Aroma Rood']);
+    Product::factory()->categorised(ProductCategory::PetFood)->create(['user_id' => $user->id, 'title' => 'Kitten kibble']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Unsorted thing']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('category', 'food.coffee_tea')
+        ->assertSee('Aroma Rood')
+        ->assertDontSee('Kitten kibble')
+        ->assertDontSee('Unsorted thing');
+});
+
+it('filters by a whole department', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'title' => 'Aroma Rood']);
+    Product::factory()->categorised(ProductCategory::Frozen)->create(['user_id' => $user->id, 'title' => 'Frozen peas']);
+    Product::factory()->categorised(ProductCategory::PetFood)->create(['user_id' => $user->id, 'title' => 'Kitten kibble']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('category', 'food')
+        ->assertSee('Aroma Rood')
+        ->assertSee('Frozen peas')
+        ->assertDontSee('Kitten kibble');
+});
+
+it('reads a category it does not know as all', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'title' => 'Aroma Rood']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Unsorted thing']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('category', 'nonsense')
+        ->assertSee('Aroma Rood')
+        ->assertSee('Unsorted thing');
+});
+
+it('shows the empty no-match state when a department holds no products', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'title' => 'Aroma Rood']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('category', 'pets')
+        ->assertDontSee('Aroma Rood')
+        ->assertSee('No product in that category.')
+        ->assertDontSee('Nothing tracked yet.');
+});
+
+it('offers every department with an option for the whole department and shows a badge only on categorised rows', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'title' => 'Aroma Rood']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Unsorted thing']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertSee('All categories')
+        ->assertSee('All food & drinks')
+        ->assertSeeHtml('value="pets"')
+        ->assertSeeHtml('value="pets.pet_food"')
+        ->assertSeeHtml('data-test="product-category-badge"')
+        ->assertSee('Coffee & tea');
+});
+
+it('reads the category filter from the URL', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'title' => 'Aroma Rood']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Unsorted thing']);
+
+    $this->actingAs($user);
+
+    Livewire::withQueryParams(['category' => 'food.coffee_tea'])
+        ->test(ProductList::class)
+        ->assertSee('Aroma Rood')
+        ->assertDontSee('Unsorted thing');
+
+    Livewire::withQueryParams(['category' => 'nonsense'])
+        ->test(ProductList::class)
+        ->assertSee('Aroma Rood')
+        ->assertSee('Unsorted thing');
 });

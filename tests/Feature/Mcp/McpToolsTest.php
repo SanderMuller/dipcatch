@@ -1,12 +1,15 @@
 <?php declare(strict_types=1);
 
 use App\Billing\PlanLimits;
+use App\Enums\CategorySource;
+use App\Enums\ProductCategory;
 use App\Mcp\Servers\DipCatchServer;
 use App\Mcp\Support\DraftToken;
 use App\Mcp\Tools\AddShopTool;
 use App\Mcp\Tools\CreateProductTool;
 use App\Mcp\Tools\DeleteProductTool;
 use App\Mcp\Tools\GetProductTool;
+use App\Mcp\Tools\ListCategoriesTool;
 use App\Mcp\Tools\ListProductsTool;
 use App\Mcp\Tools\PriceHistoryTool;
 use App\Mcp\Tools\RemoveShopTool;
@@ -16,6 +19,7 @@ use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 
@@ -507,4 +511,98 @@ it('will not rename another account\'s product', function (): void {
         ->assertHasErrors();
 
     expect($theirs->refresh()->title)->toBe('Theirs');
+});
+
+it('lists every department with its categories', function (): void {
+    DipCatchServer::actingAs(User::factory()->create())
+        ->tool(ListCategoriesTool::class)
+        ->assertOk()
+        ->assertSee('food.coffee_tea')
+        ->assertSee('Coffee & tea')
+        ->assertSee('other.other');
+});
+
+it('carries the category, its label and its department on a product, null when unset', function (): void {
+    $me = User::factory()->create();
+    $sorted = Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $me->id, 'title' => 'Sorted']);
+    Product::factory()->create(['user_id' => $me->id, 'title' => 'Unsorted']);
+
+    DipCatchServer::actingAs($me)->tool(ListProductsTool::class)
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('products.0.category', 'food.coffee_tea')
+            ->where('products.0.category_label', 'Coffee & tea')
+            ->where('products.0.department', 'food')
+            ->where('products.1.category', null)
+            ->where('products.1.category_label', null)
+            ->where('products.1.department', null)
+            ->etc());
+
+    DipCatchServer::actingAs($me)->tool(GetProductTool::class, ['product_id' => (string) $sorted->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json->where('category', 'food.coffee_tea')->etc());
+});
+
+it('filters the product list by a category or a whole department, and errors on an unknown key', function (): void {
+    $me = User::factory()->create();
+    Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $me->id, 'title' => 'Aroma Rood']);
+    Product::factory()->categorised(ProductCategory::Frozen)->create(['user_id' => $me->id, 'title' => 'Frozen peas']);
+    Product::factory()->categorised(ProductCategory::PetFood)->create(['user_id' => $me->id, 'title' => 'Kitten kibble']);
+
+    DipCatchServer::actingAs($me)->tool(ListProductsTool::class, ['category' => 'food.coffee_tea'])
+        ->assertOk()
+        ->assertSee('Aroma Rood')
+        ->assertDontSee('Frozen peas')
+        ->assertDontSee('Kitten kibble');
+
+    DipCatchServer::actingAs($me)->tool(ListProductsTool::class, ['category' => 'food'])
+        ->assertOk()
+        ->assertSee('Aroma Rood')
+        ->assertSee('Frozen peas')
+        ->assertDontSee('Kitten kibble');
+
+    DipCatchServer::actingAs($me)->tool(ListProductsTool::class, ['category' => 'unicorns'])
+        ->assertHasErrors(['No such category.']);
+});
+
+it('stores a category passed on create as the users own choice', function (): void {
+    $me = User::factory()->create();
+    $draft = DraftToken::issue($me, ['title' => 'Coffee 500 g', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true], 'https://ah.nl/p/coffee', 'ah', variantKey: null);
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $draft, 'confirm' => true, 'category' => 'food.coffee_tea'])
+        ->assertOk()
+        ->assertSee('food.coffee_tea');
+
+    $product = $me->products()->sole();
+
+    expect($product->category)->toBe(ProductCategory::CoffeeTea)
+        ->and($product->category_set_by)->toBe(CategorySource::User);
+});
+
+it('sends nothing to the categoriser when the created product already carries a category', function (): void {
+    config()->set('services.typesafe.key', 'test-key');
+    Http::fake();
+    $me = User::factory()->create(['auto_categories' => true]);
+    subscribeUser($me);
+    $draft = DraftToken::issue($me, ['title' => 'Coffee 500 g', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true], 'https://ah.nl/p/coffee', 'ah', variantKey: null);
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $draft, 'confirm' => true, 'category' => 'food.coffee_tea'])
+        ->assertOk();
+
+    app()->terminate();
+
+    Http::assertNothingSent();
+});
+
+it('rejects a category key the taxonomy does not know on create', function (): void {
+    $me = User::factory()->create();
+    $draft = DraftToken::issue($me, ['title' => 'Coffee 500 g', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true], 'https://ah.nl/p/coffee', 'ah', variantKey: null);
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $draft, 'confirm' => true, 'category' => 'food.unicorns'])
+        ->assertHasErrors();
+
+    expect($me->products()->count())->toBe(0);
 });

@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 
+use App\Enums\CategorySource;
+use App\Enums\ProductCategory;
 use App\Livewire\Products\EditProduct;
 use App\Livewire\Products\ProductShow;
 use App\Models\Product;
@@ -301,4 +303,91 @@ it('refuses a shop of my own that belongs to another product', function (): void
 
     expect($untouched?->notes)->toBe('untouched')
         ->and((string) $untouched?->current_price)->toBe('10.00');
+});
+
+it('saves a category chosen by hand and marks it as the users choice', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->assertSee('No category')
+        ->assertSee('Coffee & tea')
+        ->set('category', 'food.coffee_tea')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $fresh = $product->fresh();
+
+    expect($fresh?->category)->toBe(ProductCategory::CoffeeTea)
+        ->and($fresh?->category_set_by)->toBe(CategorySource::User);
+});
+
+it('marks a cleared category as the users choice so nothing fills it again', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()
+        ->categorised(ProductCategory::CoffeeTea, CategorySource::Auto)
+        ->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->assertSet('category', 'food.coffee_tea')
+        ->set('category', '')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $fresh = $product->fresh();
+
+    expect($fresh?->category)->toBeNull()
+        ->and($fresh?->category_set_by)->toBe(CategorySource::User);
+});
+
+it('keeps an automatic category as automatic when the form is saved without touching it', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()
+        ->categorised(ProductCategory::CoffeeTea, CategorySource::Auto)
+        ->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->set('title', 'Renamed')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($product->fresh()?->category_set_by)->toBe(CategorySource::Auto);
+});
+
+it('rejects a category the taxonomy does not know', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->set('category', 'food.unicorns')
+        ->call('save')
+        ->assertHasErrors(['category']);
+
+    expect($product->fresh()?->category)->toBeNull();
+});
+
+it('keeps a category the automatic job wrote while the form was open', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    $form = livewire(EditProduct::class, ['product' => $product])->assertSet('category', '');
+
+    $product->forceFill(['category' => ProductCategory::CoffeeTea, 'category_set_by' => CategorySource::Auto])->save();
+
+    $form->set('title', 'Renamed while sorting')->call('save')->assertHasNoErrors();
+
+    $fresh = $product->fresh();
+
+    expect($fresh?->category)->toBe(ProductCategory::CoffeeTea)
+        ->and($fresh?->category_set_by)->toBe(CategorySource::Auto);
 });
