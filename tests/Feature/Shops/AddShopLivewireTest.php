@@ -100,6 +100,22 @@ test('robots-blocked URL is rejected without persisting', function (): void {
     expect(Shop::query()->count())->toBe(0);
 });
 
+test('an unservable shop explains itself instead of printing the raw error code', function (): void {
+    Http::fake(); // any HTTP call would be an unexpected fetch — the check is host-based, before any fetch.
+    $product = Product::factory()->create();
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://www.plus.nl/product/fanta-orange-fles-1500-ml-991700')
+        ->call('probe')
+        ->assertSet('state', 'error')
+        ->assertSet('errorCode', 'shop_not_servable')
+        ->assertSee('builds its prices in the browser')
+        ->assertDontSee('shop_not_servable');
+
+    Http::assertNothingSent();
+});
+
 test('currency mismatch is surfaced inline', function (): void {
     Http::fake(fakeJsonLdOffer('https://shop.example.com/p/1', '50.00', 'GBP'));
     $product = Product::factory()->create(['currency' => 'EUR']);
