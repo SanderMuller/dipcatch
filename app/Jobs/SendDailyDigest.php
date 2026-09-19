@@ -49,7 +49,11 @@ final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        $lookbackDays = DipConfig::int('dipcatch.digest.lookback_days', 7);
+        // Floored at a day. `.env.example` advertises this knob, and a 0 or
+        // negative value collapses the window to `fired_at > $now AND
+        // fired_at <= $now` — empty on every run, for every user, with no
+        // mail, no cursor movement and no error to say why.
+        $lookbackDays = max(1, DipConfig::int('dipcatch.digest.lookback_days', 7));
         // One clock read for the window's end and for the cursor, so the two
         // cannot drift apart. Both columns hold whole seconds, so an event
         // stamped inside this same second is still lost; the bound only

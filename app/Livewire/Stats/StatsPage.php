@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Notifications\TargetPriceNotification;
 use App\Notifications\UnitPriceTargetNotification;
+use App\PriceAdapters\BundleOffer;
+use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Notifications\DatabaseNotification;
@@ -46,7 +48,7 @@ final class StatsPage extends Component
      * unread. The bell clears itself on open, so without this a drop that
      * already happened is unreachable.
      *
-     * @return Collection<int, array{title: string, url: ?string, percent: ?string, amount: ?string, bundle: non-falsy-string|null, sentAt: ?string}>
+     * @return Collection<int, array{title: string, url: ?string, percent: ?string, amount: ?string, bundle: ?string, sentAt: ?string}>
      */
     private function recentAlerts(): Collection
     {
@@ -74,18 +76,19 @@ final class StatsPage extends Component
                 $amount = $data['drop_absolute'] ?? null;
 
                 $percent = self::percentage($rawPercent);
-                $bundle = null;
 
-                if (is_int($data['bundle_quantity'] ?? null) && is_numeric($data['bundle_total_price'] ?? null)) {
-                    $translatedBundle = __(':quantity for :total', [
-                        'quantity' => $data['bundle_quantity'],
-                        'total' => MoneyFormatter::format((string) $data['bundle_total_price'], $currency),
-                    ]);
-
-                    $bundle = is_string($translatedBundle) && $translatedBundle !== '' && $translatedBundle !== '0'
-                        ? $translatedBundle
-                        : null;
-                }
+                // Read through the same gate the bell uses, so one stored row
+                // cannot claim a bundle on this page and be refused on that
+                // one. `stored()` drops an offer that is not cheaper per item
+                // than the single price beside it. The short condition, not
+                // the full label: this row is one inline clause.
+                $single = $data['single_item_price'] ?? null;
+                $offer = BundleOffer::stored(
+                    $data['bundle_quantity'] ?? null,
+                    $data['bundle_total_price'] ?? null,
+                    is_string($single) ? $single : null,
+                );
+                $bundle = $offer === null ? null : BundlePriceLabel::condition($offer, $currency);
 
                 return [
                     'title' => is_string($data['title'] ?? null) ? $data['title'] : '—',
