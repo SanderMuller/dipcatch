@@ -4,6 +4,7 @@ namespace App\Actions\Products;
 
 use App\Enums\CategorySource;
 use App\Models\Product;
+use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\CategoryVerdict;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
@@ -27,6 +28,12 @@ final class CategoriseProduct
         }
 
         if ($product->user?->wantsAutoCategories() !== true) {
+            return;
+        }
+
+        if (! app(CategorisationBudget::class)->allows($product->user)) {
+            Log::info('Automatic categorisation skipped: the daily budget is spent.', ['product_id' => $product->id]);
+
             return;
         }
 

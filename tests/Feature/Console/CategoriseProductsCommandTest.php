@@ -4,10 +4,12 @@ use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 
 beforeEach(function (): void {
     config()->set('services.typesafe.key', 'test-key');
@@ -184,4 +186,24 @@ it('writes each row as it is answered, so a rerun after an interruption continue
     // The call that threw is not recorded as sent, so two of three are.
     Http::assertSentCount(2);
     expect($second->fresh()?->category)->toBe(ProductCategory::CoffeeTea);
+});
+
+it('is scheduled nightly', function (): void {
+    Artisan::call('schedule:list');
+
+    expect(Artisan::output())->toContain('dipcatch:categorise-products');
+});
+
+it('skips products past the account budget without a request', function (): void {
+    config()->set('dipcatch.categories.daily_limit_per_user', 1);
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response(confidentCoffeeAnswer())]);
+    $pro = optedInProUser();
+    RateLimiter::clear(CategorisationBudget::userKey($pro));
+    Product::factory()->count(2)->create(['user_id' => $pro->id]);
+
+    $this->artisan('dipcatch:categorise-products')
+        ->expectsOutputToContain('1 categorised, 1 skipped, 0 failed.')
+        ->assertSuccessful();
+
+    Http::assertSentCount(1);
 });

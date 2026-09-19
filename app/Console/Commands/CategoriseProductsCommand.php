@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Actions\Products\CategoriseProduct;
 use App\Billing\ProUsers;
 use App\Models\Product;
+use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
 use Illuminate\Console\Attributes\Description;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 #[Description('Sort the uncategorised products of accounts that opted in to automatic categories.')]
 final class CategoriseProductsCommand extends Command
 {
-    public function handle(TypeSafeClient $client): int
+    public function handle(TypeSafeClient $client, CategorisationBudget $budget): int
     {
         if (! TypeSafeClient::configured()) {
             $this->error('TYPESAFE_API_KEY is not set; nothing can be categorised.');
@@ -51,7 +52,7 @@ final class CategoriseProductsCommand extends Command
         $outputTokens = 0;
 
         foreach ($products as $product) {
-            if ($product->user?->wantsAutoCategories() !== true) {
+            if ($product->user?->wantsAutoCategories() !== true || ! $budget->allows($product->user)) {
                 $skipped++;
 
                 continue;

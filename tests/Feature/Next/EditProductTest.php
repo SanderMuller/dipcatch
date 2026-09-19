@@ -7,8 +7,10 @@ use App\Livewire\Products\ProductShow;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 
 use function Pest\Livewire\livewire;
 
@@ -582,4 +584,23 @@ it('forgets a declined suggestion as the users decision, and a saved category cl
         ->and($declined->fresh()?->category_set_by)->toBe(CategorySource::User)
         ->and($accepted->fresh()?->suggested_category)->toBeNull()
         ->and($accepted->fresh()?->category)->toBe(ProductCategory::CoffeeTea);
+});
+
+it('tells a Pro account when the daily suggestion budget is spent, and sends nothing', function (): void {
+    config()->set('services.typesafe.key', 'test-key');
+    config()->set('dipcatch.categories.daily_limit_per_user', 1);
+    Http::fake();
+    $user = User::factory()->create();
+    subscribeUser($user);
+    RateLimiter::hit(CategorisationBudget::userKey($user), 86400);
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->call('suggestCategory')
+        ->assertSet('suggestedCategory', null)
+        ->assertSee("You have used today's suggestions.");
+
+    Http::assertNothingSent();
 });

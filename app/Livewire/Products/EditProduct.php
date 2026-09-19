@@ -5,6 +5,7 @@ namespace App\Livewire\Products;
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Models\Product;
+use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
 use App\Support\Iso4217;
@@ -153,6 +154,12 @@ final class EditProduct extends Component
 
         if ($this->product->suggested_category !== null) {
             $this->suggestedCategory = $this->product->suggested_category->value;
+
+            return;
+        }
+
+        if ($this->product->user === null || ! app(CategorisationBudget::class)->allows($this->product->user)) {
+            $this->suggestionMessage = __('You have used today\'s suggestions. Try again tomorrow.');
 
             return;
         }

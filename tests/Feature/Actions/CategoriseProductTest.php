@@ -10,6 +10,7 @@ use App\Mcp\Support\DraftToken;
 use App\Mcp\Tools\CreateProductTool;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\Request;
@@ -204,4 +205,24 @@ it('clears a stale suggestion when a confident answer places the product', funct
 
     expect($product->fresh()?->category)->toBe(ProductCategory::CoffeeTea)
         ->and($product->fresh()?->suggested_category)->toBeNull();
+});
+
+it('sends nothing once the account has spent its daily budget', function (): void {
+    config()->set('dipcatch.categories.daily_limit_per_user', 1);
+    fakeConfidentCoffee();
+    $user = proUserWantingCategories();
+    RateLimiter::clear(CategorisationBudget::userKey($user));
+    $this->actingAs($user);
+
+    foreach (['First', 'Second'] as $title) {
+        livewire(CreateProductManual::class)
+            ->set('title', $title)
+            ->set('currency', 'EUR')
+            ->call('save')
+            ->assertHasNoErrors();
+        app()->terminate();
+    }
+
+    Http::assertSentCount(1);
+    expect(Product::query()->where('user_id', $user->id)->whereNotNull('category')->count())->toBe(1);
 });
