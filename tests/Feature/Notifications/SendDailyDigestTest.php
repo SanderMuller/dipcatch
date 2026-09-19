@@ -178,7 +178,7 @@ test('the cursor is the instant the window ended, not a later clock read', funct
     // apart. Every instant is built up front: calling a Carbon constructor
     // inside the closure re-enters it and hangs the run.
     $base = CarbonImmutable::parse('2026-01-15 09:30:00', 'UTC');
-    $reads = [$base, $base->addSeconds(1), $base->addSeconds(2), $base->addSeconds(3)];
+    $reads = [$base, $base->addSeconds(), $base->addSeconds(2), $base->addSeconds(3)];
     Date::setTestNow(function () use (&$reads): CarbonImmutable {
         return count($reads) > 1 ? array_shift($reads) : $reads[0];
     });
