@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Drops\DetectDrop;
+use App\Enums\ScrapeStatus;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
@@ -195,4 +196,108 @@ test('a drop that cannot resolve a trigger check leaves the notification latch a
         ->and(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(0);
 
     Notification::assertNothingSent();
+});
+
+test('the fallback skips an ineligible later check and anchors to the eligible one', function (): void {
+    $product = Product::factory()->create();
+    $shop = Shop::factory()->for($product)->create(['current_price' => '70.00']);
+    $product->forceFill([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '70.00',
+        'drop_threshold_pct' => '10.00',
+        'drop_threshold_abs' => '5.00',
+    ])->save();
+
+    foreach (range(1, 8) as $i) {
+        ProductCheapestHistory::factory()->for($product)->create([
+            'cheapest_shop_id' => $shop->id,
+            'cheapest_price' => '100.00',
+            'started_at' => now()->subDays(20 + $i),
+            'ended_at' => now()->subDays(19 + $i),
+        ]);
+    }
+
+    $good = PriceCheck::factory()->for($shop)->create([
+        'price' => '70.00',
+        'checked_at' => now()->subHour(),
+    ]);
+    // Newer by checked_at, and the row the old fallback would have taken. A
+    // failed check reads nothing, so anchoring here would hand the digest a
+    // row with no price to draw bundle terms from.
+    PriceCheck::factory()->for($shop)->create([
+        'price' => null,
+        'status' => ScrapeStatus::HttpError,
+        'checked_at' => now(),
+    ]);
+
+    app(DetectDrop::class)($product, null);
+
+    $event = PriceDropEvent::query()->where('product_id', $product->id)->sole();
+
+    expect($event->price_check_id)->toBe((int) $good->id);
+
+    Notification::assertSentTo($product->user, PriceDropNotification::class);
+});
+
+test('the fallback refuses a check that read a different price than the drop', function (): void {
+    $product = Product::factory()->create();
+    $shop = Shop::factory()->for($product)->create(['current_price' => '70.00']);
+    $product->forceFill([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '70.00',
+        'drop_threshold_pct' => '10.00',
+        'drop_threshold_abs' => '5.00',
+    ])->save();
+
+    foreach (range(1, 8) as $i) {
+        ProductCheapestHistory::factory()->for($product)->create([
+            'cheapest_shop_id' => $shop->id,
+            'cheapest_price' => '100.00',
+            'started_at' => now()->subDays(20 + $i),
+            'ended_at' => now()->subDays(19 + $i),
+        ]);
+    }
+
+    // Eligible, but it read 80.00 — it is not the reading that produced this
+    // 70.00 drop, so it cannot speak for it. The digest renders the struck
+    // regular price and the bundle terms off whatever row is anchored here.
+    PriceCheck::factory()->for($shop)->create(['price' => '80.00']);
+
+    app(DetectDrop::class)($product, null);
+
+    $product->refresh();
+
+    expect(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(0)
+        ->and($product->last_notified_price)->toBeNull();
+
+    Notification::assertNothingSent();
+});
+
+test('the fallback accepts a check whose price differs only in trailing zeros', function (): void {
+    $product = Product::factory()->create();
+    $shop = Shop::factory()->for($product)->create(['current_price' => '70.00']);
+    $product->forceFill([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '70.00',
+        'drop_threshold_pct' => '10.00',
+        'drop_threshold_abs' => '5.00',
+    ])->save();
+
+    foreach (range(1, 8) as $i) {
+        ProductCheapestHistory::factory()->for($product)->create([
+            'cheapest_shop_id' => $shop->id,
+            'cheapest_price' => '100.00',
+            'started_at' => now()->subDays(20 + $i),
+            'ended_at' => now()->subDays(19 + $i),
+        ]);
+    }
+
+    // '70.0' and '70.00' are one price. A SQL string equality here would
+    // abandon the drop; bccomp does not.
+    $check = PriceCheck::factory()->for($shop)->create(['price' => '70.0']);
+
+    app(DetectDrop::class)($product, null);
+
+    expect(PriceDropEvent::query()->where('product_id', $product->id)->sole()->price_check_id)
+        ->toBe((int) $check->id);
 });
