@@ -48,13 +48,22 @@ final class CreateProductTool extends Tool
 
     public function handle(Request $request): Response|ResponseFactory
     {
+        // Both arguments key on `confirm`, because `confirm` is the only thing
+        // the handler below branches on. Keyed on each other instead, a draft
+        // sent without `confirm` left `url` unrequired, and the preview branch
+        // then probed an empty string — answering "that does not look like a
+        // URL" at a caller that sent no URL and a perfectly good draft.
         $validated = $request->validate([
-            'url' => ['required_without:draft', 'nullable', 'string', 'max:2048'],
-            'draft' => ['required_if:confirm,true', 'nullable', 'string'],
+            'url' => ['required_unless:confirm,true', 'nullable', 'string', 'max:2048'],
+            'draft' => ['required_if:confirm,true', 'prohibited_unless:confirm,true', 'nullable', 'string'],
             'confirm' => ['nullable', 'boolean'],
             'title' => ['nullable', 'string', 'max:255'],
             'variant_key' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', 'string', Rule::enum(ProductCategory::class)],
+        ], [
+            'url.required_unless' => 'Pass a url to preview a product page.',
+            'draft.prohibited_unless' => 'A draft only creates the product when confirm is true. Call again with the same draft and confirm: true.',
+            'draft.required_if' => 'Pass the draft from the preview call alongside confirm: true.',
         ]);
 
         $user = $this->user($request);

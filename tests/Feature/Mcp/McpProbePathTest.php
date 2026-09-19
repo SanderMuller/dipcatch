@@ -71,6 +71,36 @@ test('a draft issued from a real probe confirms into exactly one product', funct
         ->and((string) $me->products()->first()?->shops()->first()?->current_price)->toBe('50.00');
 });
 
+test('a create_product draft sent without confirm is told to confirm, not that its url is bad', function (): void {
+    // Both rules used to key on each other rather than on `confirm`: a draft
+    // with no `confirm` left `url` unrequired, and the preview branch probed
+    // the empty string it got instead.
+    DipCatchServer::actingAs(User::factory()->create())
+        ->tool(CreateProductTool::class, ['draft' => 'a-token'])
+        ->assertHasErrors()
+        ->assertSee('confirm: true')
+        ->assertDontSee('does not look like a URL');
+});
+
+test('an add_shop draft sent without confirm is told to confirm, not that its url is bad', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'currency' => 'EUR']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'draft' => 'a-token'])
+        ->assertHasErrors()
+        ->assertSee('confirm: true')
+        ->assertDontSee('does not look like a URL');
+});
+
+test('confirming with no draft asks for the draft alone, not for a url as well', function (): void {
+    DipCatchServer::actingAs(User::factory()->create())
+        ->tool(CreateProductTool::class, ['confirm' => true])
+        ->assertHasErrors()
+        ->assertSee('Pass the draft from the preview call')
+        ->assertDontSee('Pass a url');
+});
+
 test('a page with no readable price is explained, not just refused', function (): void {
     Http::fake([
         'https://shop.example.com/robots.txt' => Http::response('', 404),
