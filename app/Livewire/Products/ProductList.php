@@ -37,14 +37,27 @@ final class ProductList extends Component
     #[Url(except: 'all')]
     public string $status = 'all';
 
-    #[Url(except: 'created_at')]
-    public string $sort = 'created_at';
+    #[Url(except: self::DEFAULT_SORT)]
+    public string $sort = self::DEFAULT_SORT;
 
-    #[Url(except: 'desc')]
-    public string $direction = 'desc';
+    private const string DEFAULT_SORT = 'created_at';
 
-    /** Only these are sortable; anything else arriving from the URL is ignored. */
-    private const array SORTABLE = ['title', 'cheapest_price', 'created_at', 'shops_count'];
+    /**
+     * The sort options, each with the direction that makes it read the way its
+     * label promises: newest first, but A before Z.
+     *
+     * Sorting used to live on the table headers, where it asked a person to
+     * know that "Best price" was clickable and to guess what a second click
+     * did. One named choice states both the column and the direction.
+     *
+     * @var array<string, 'asc'|'desc'>
+     */
+    private const array SORTS = [
+        'created_at' => 'desc',
+        'title' => 'asc',
+        'cheapest_price' => 'asc',
+        'biggest_drop' => 'desc',
+    ];
 
     public function updatedStatus(): void
     {
@@ -56,14 +69,8 @@ final class ProductList extends Component
         $this->resetPage();
     }
 
-    public function sortBy(string $column): void
+    public function updatedSort(): void
     {
-        if (! in_array($column, self::SORTABLE, strict: true)) {
-            return;
-        }
-
-        $this->direction = $this->sort === $column && $this->direction === 'asc' ? 'desc' : 'asc';
-        $this->sort = $column;
         $this->resetPage();
     }
 
@@ -93,8 +100,7 @@ final class ProductList extends Component
      */
     private function products(): LengthAwarePaginator
     {
-        $sort = in_array($this->sort, self::SORTABLE, strict: true) ? $this->sort : 'created_at';
-        $direction = $this->direction === 'asc' ? 'asc' : 'desc';
+        $sort = array_key_exists($this->sort, self::SORTS) ? $this->sort : self::DEFAULT_SORT;
 
         return Product::query()
             ->where('user_id', auth()->id())
@@ -109,9 +115,46 @@ final class ProductList extends Component
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', $this->status === 'active'),
             )
             ->withCount('shops')
+            ->withMax('priceDropEvents as biggest_drop', 'drop_pct')
             ->with(['cheapestShop', 'shops'])
-            ->orderBy($sort, $direction)
+            // A product that never dropped, or has no price yet, sorts last
+            // whichever way the list runs, rather than heading a list of
+            // drops with rows that have none.
+            ->orderByRaw(self::orderBy($sort))
+            // A tie has to break the same way every time, or a row can appear
+            // on two pages and another on none. The ids are UUIDv7, so this
+            // also reads as newest first.
+            ->orderBy('id', 'desc')
             ->paginate();
+    }
+
+    /** The sort keys a view offers, in the order they are shown. */
+    public static function sortOptions(): array
+    {
+        return array_keys(self::SORTS);
+    }
+
+    /**
+     * The ORDER BY for one sort key, written out rather than assembled: the
+     * query builder takes a literal string here, and a clause built from
+     * parts is exactly what that rule is guarding against.
+     *
+     * Empty values go last either way, so a list of drops does not open with
+     * rows that have none, and a list by price does not open with rows that
+     * have no price yet.
+     *
+     * @return literal-string
+     */
+    private static function orderBy(string $sort): string
+    {
+        return match ($sort) {
+            // Postgres orders capitals before lowercase, so "apple" would
+            // follow "Zest" without this.
+            'title' => 'LOWER(title) asc',
+            'cheapest_price' => 'cheapest_price asc NULLS LAST',
+            'biggest_drop' => 'biggest_drop desc NULLS LAST',
+            default => 'created_at desc',
+        };
     }
 
     private function canAddProduct(): bool

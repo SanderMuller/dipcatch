@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Livewire\Products\ProductList;
+use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -60,19 +61,68 @@ it('searches by title', function (): void {
         ->assertDontSee('Dish soap');
 });
 
-it('sorts by a whitelisted column and ignores anything else', function (): void {
+it('sorts by name, and ignores a sort key it does not offer', function (): void {
     $user = User::factory()->create();
-    Product::factory()->create(['user_id' => $user->id, 'title' => 'Beta']);
-    Product::factory()->create(['user_id' => $user->id, 'title' => 'Alpha']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Beta', 'created_at' => now()->subDay()]);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'alpha', 'created_at' => now()]);
 
     $this->actingAs($user);
 
-    $component = livewire(ProductList::class)->call('sortBy', 'title');
-    expect($component->get('sort'))->toBe('title');
+    // Lowercase first: Postgres orders capitals ahead of lowercase, so a bare
+    // ORDER BY title would put "Beta" in front of "alpha".
+    livewire(ProductList::class)
+        ->set('sort', 'title')
+        ->assertSeeInOrder(['alpha', 'Beta']);
 
-    // `sort` arrives from the URL, so an unlisted column must not reach the query.
-    $component->call('sortBy', 'user_id');
-    expect($component->get('sort'))->toBe('title');
+    // `sort` arrives from the URL, so a key the dropdown does not offer must
+    // not reach the query. It falls back to newest first.
+    livewire(ProductList::class)
+        ->set('sort', 'user_id')
+        ->assertOk()
+        ->assertSeeInOrder(['alpha', 'Beta']);
+});
+
+it('sorts by the biggest drop, with products that never dropped last', function (): void {
+    $user = User::factory()->create();
+    $small = Product::factory()->create(['user_id' => $user->id, 'title' => 'Small drop']);
+    $big = Product::factory()->create(['user_id' => $user->id, 'title' => 'Big drop']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Never dropped']);
+
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $small->id, 'drop_pct' => 5]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $big->id, 'drop_pct' => 40]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('sort', 'biggest_drop')
+        ->assertSeeInOrder(['Big drop', 'Small drop', 'Never dropped']);
+});
+
+it('sorts by the lowest price, with products that have none last', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Dearer', 'cheapest_price' => '9.00']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Cheaper', 'cheapest_price' => '2.00']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'No price yet', 'cheapest_price' => null]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('sort', 'cheapest_price')
+        ->assertSeeInOrder(['Cheaper', 'Dearer', 'No price yet']);
+});
+
+it('offers the sort as a named choice, not as clickable table headers', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    // The headers asked a person to know they were clickable, and to guess
+    // what a second click did.
+    livewire(ProductList::class)
+        ->assertSeeHtml('data-test="product-sort"')
+        ->assertSee('Biggest drop first')
+        ->assertDontSeeHtml('wire:click="sortBy');
 });
 
 it('offers the create action below the plan limit', function (): void {
