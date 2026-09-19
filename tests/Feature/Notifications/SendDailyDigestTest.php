@@ -160,6 +160,26 @@ test('second run within the same digest window sends no new mail', function (): 
     Mail::assertSent(PriceDropDigestMail::class, 1);
 });
 
+test('a zero lookback still sends a digest rather than going silent forever', function (): void {
+    // A 0 would make the window `fired_at > $now AND fired_at <= $now`, which
+    // no event can satisfy: no mail, no cursor movement, no error, for good.
+    config()->set('dipcatch.digest.lookback_days', 0);
+    $user = User::factory()->create([
+        'notify_via_email' => true,
+        'last_digest_sent_at' => null,
+    ]);
+    $product = Product::factory()->for($user)->create();
+    PriceDropEvent::factory()
+        ->for($user)
+        ->for($product)
+        ->state(['fired_at' => now()->subHour()])
+        ->create();
+
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    Mail::assertSent(PriceDropDigestMail::class, fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 1);
+});
+
 test('the cursor is the instant the window ended, not a later clock read', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
