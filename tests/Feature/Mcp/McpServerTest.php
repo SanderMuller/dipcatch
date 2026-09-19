@@ -7,6 +7,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Str;
+use Laravel\Mcp\Server\Attributes\Version;
 use Laravel\Passport\Http\Middleware\CheckToken;
 use Laravel\Passport\Passport;
 
@@ -198,4 +199,20 @@ it('lets a well-formed client_id through to Passport', function (): void {
     // test that reaches the real authorize route rather than rendering the
     // consent blade with fabricated parameters.
     expect($response->getStatusCode())->toBeLessThan(500);
+});
+
+it('advertises a version that moves with the tool roster', function (): void {
+    // A client caches the roster and its schemas: the package declares
+    // `tools.listChanged: false`, and a stateless HTTP server cannot push a
+    // change notification. The version is the only staleness signal there is,
+    // and two tools were once added without moving it.
+    $defaults = new ReflectionClass(DipCatchServer::class)->getDefaultProperties();
+    $declared = $defaults['tools'] ?? null;
+
+    $version = new ReflectionClass(DipCatchServer::class)
+        ->getAttributes(Version::class)[0] ?? null;
+
+    expect($version)->not->toBeNull()
+        ->and($version->newInstance()->value)->toBe('1.2.0')
+        ->and($declared)->toHaveCount(11);
 });

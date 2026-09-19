@@ -20,7 +20,17 @@ use Laravel\Mcp\Server\Attributes\Version;
 use Laravel\Mcp\Server\Tool;
 
 #[Name('DipCatch')]
-#[Version('1.1.0')]
+/*
+ * Move this whenever a tool is added, removed, or changes its schema.
+ *
+ * The package declares `tools.listChanged: false`, which tells a client the
+ * roster never changes and licenses it to cache the list and the schemas for
+ * the life of the connection. A stateless HTTP server has no channel to push a
+ * change notification on, so the advertised version is the only signal a client
+ * gets that its cached copy is stale. Two tools were added without moving it,
+ * and a live session kept seeing the nine that came before them.
+ */
+#[Version('1.2.0')]
 #[Instructions(<<<'TEXT'
 DipCatch tracks the price of things this user buys more than once, across Dutch
 supermarkets and webshops, and tells them when one drops.
