@@ -100,8 +100,11 @@ it('caps a run at --limit and --user', function (): void {
 });
 
 it('keeps going after one product fails, and counts it', function (): void {
+    // Two server errors exhaust the retry for the first product; a rejected
+    // key would stop the run instead.
     Http::fake([TypeSafeClient::ENDPOINT => Http::sequence()
-        ->push([], 401)
+        ->push([], 500)
+        ->push([], 500)
         ->push(confidentCoffeeAnswer())]);
     $pro = optedInProUser();
     [$first, $second] = Product::factory()->count(2)->sequence(['created_at' => now()->subMinute()], ['created_at' => now()])->create(['user_id' => $pro->id]);
@@ -124,6 +127,18 @@ it('counts an answer below the guards as skipped and stores nothing', function (
         ->assertSuccessful();
 
     expect($product->fresh()?->category)->toBeNull();
+});
+
+it('stops at the first rejected key instead of failing every product', function (): void {
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response(['error' => 'unauthorized'], 401)]);
+    $pro = optedInProUser();
+    Product::factory()->count(3)->create(['user_id' => $pro->id]);
+
+    $this->artisan('dipcatch:categorise-products')
+        ->expectsOutputToContain('TypeSafe rejects TYPESAFE_API_KEY')
+        ->assertFailed();
+
+    Http::assertSentCount(1);
 });
 
 it('refuses to run without a key', function (): void {

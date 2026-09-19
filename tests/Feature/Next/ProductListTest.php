@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Livewire\Products\ProductList;
 use App\Models\PriceDropEvent;
@@ -271,20 +272,59 @@ it('shows the empty no-match state when a department holds no products', functio
         ->assertDontSee('Nothing tracked yet.');
 });
 
-it('offers every department with an option for the whole department and shows a badge only on categorised rows', function (): void {
+it('offers only the categories this account uses, grouped with an option for the whole department', function (): void {
     $user = User::factory()->create();
     Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'title' => 'Aroma Rood']);
+    Product::factory()->categorised(ProductCategory::PetFood)->create(['user_id' => $user->id, 'title' => 'Kitten kibble']);
     Product::factory()->create(['user_id' => $user->id, 'title' => 'Unsorted thing']);
+    Product::factory()->categorised(ProductCategory::Cycling)->create(['title' => 'Somebody elses bike']);
 
     $this->actingAs($user);
 
     livewire(ProductList::class)
         ->assertSee('All categories')
         ->assertSee('All food & drinks')
-        ->assertSeeHtml('value="pets"')
+        ->assertSeeHtml('value="food.coffee_tea"')
         ->assertSeeHtml('value="pets.pet_food"')
+        ->assertDontSeeHtml('value="food.frozen"')
+        ->assertDontSeeHtml('value="sports.cycling"')
+        ->assertDontSee('All sports & outdoor')
         ->assertSeeHtml('data-test="product-category-badge"')
         ->assertSee('Coffee & tea');
+});
+
+it('offers a filtered department with only its used categories, or none when it has no products', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'title' => 'Aroma Rood']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('category', 'food')
+        ->assertSee('All food & drinks')
+        ->assertSeeHtml('value="food.coffee_tea"')
+        ->assertDontSeeHtml('value="food.frozen"');
+
+    livewire(ProductList::class)
+        ->set('category', 'pets')
+        ->assertSee('All pets')
+        ->assertDontSeeHtml('value="pets.pet_food"')
+        ->assertSee('No product in that category.');
+});
+
+it('keeps the current filter offered after its last product lost that category', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'title' => 'Aroma Rood']);
+
+    $this->actingAs($user);
+
+    $list = livewire(ProductList::class)->set('category', 'food.coffee_tea');
+
+    $product->forceFill(['category' => null, 'category_set_by' => CategorySource::User])->save();
+
+    $list->call('$refresh')
+        ->assertSeeHtml('value="food.coffee_tea"')
+        ->assertSee('No product in that category.');
 });
 
 it('reads the category filter from the URL', function (): void {

@@ -81,6 +81,7 @@ enum ProductCategory: string
     case Fitness = 'sports.fitness';
     case Cycling = 'sports.cycling';
     case Camping = 'sports.camping';
+    case SportsNutrition = 'sports.nutrition';
 
     case Books = 'media_office.books';
     case MusicFilm = 'media_office.music_film';
@@ -167,6 +168,7 @@ enum ProductCategory: string
             self::Fitness => __('Fitness equipment'),
             self::Cycling => __('Cycling'),
             self::Camping => __('Camping & outdoor'),
+            self::SportsNutrition => __('Sports nutrition'),
             self::Books => __('Books'),
             self::MusicFilm => __('Music & film'),
             self::Office => __('Office & school supplies'),
@@ -188,7 +190,7 @@ enum ProductCategory: string
             self::DairyEggs => 'Milk, yoghurt, cheese, butter, cream, eggs, plant milks',
             self::Bakery => 'Bread, rolls, pastry, cake, crackers, breakfast cereals',
             self::Pantry => 'Pasta, rice, flour, oil, sauces, spices, tinned and jarred food, baking goods',
-            self::SnacksSweets => 'Crisps, nuts, chocolate, sweets, biscuits, bars',
+            self::SnacksSweets => 'Crisps, nuts, chocolate, sweets, biscuits, cereal bars; not protein or sports bars',
             self::Frozen => 'Frozen meals, frozen vegetables, ice cream, frozen pizza',
             self::SoftDrinks => 'Water, soda, juice, energy drinks, syrup, plant-based drinks sold as beverages',
             self::CoffeeTea => 'Coffee beans, ground coffee, pods and capsules, tea, hot chocolate',
@@ -245,6 +247,7 @@ enum ProductCategory: string
             self::Fitness => 'Dumbbells, kettlebells, yoga mats, exercise bikes, treadmills, resistance bands',
             self::Cycling => 'Bicycles, e-bikes, helmets, bike lights, locks, tyres, cycling clothing',
             self::Camping => 'Tents, sleeping bags, camping stoves, backpacks, hiking gear, coolers',
+            self::SportsNutrition => 'Protein bars and powders, creatine, energy gels, sports drinks, pre-workout',
             self::Books => 'Printed books, e-books, audiobooks, comics, magazines',
             self::MusicFilm => 'CDs, vinyl, DVDs, Blu-rays, musical instruments',
             self::Office => 'Pens, paper, notebooks, folders, printer ink, school supplies',

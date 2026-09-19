@@ -61,6 +61,12 @@ final class CategoriseProductsCommand extends Command
                 $failed++;
                 $this->warn("{$product->title}: {$e->getMessage()}");
 
+                if ($e->isRejectedKey()) {
+                    $this->error('TypeSafe rejects TYPESAFE_API_KEY in this environment. Check the value, then redeploy so the cached config picks it up.');
+
+                    return self::FAILURE;
+                }
+
                 continue;
             }
 

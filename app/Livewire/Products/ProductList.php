@@ -4,6 +4,7 @@ namespace App\Livewire\Products;
 
 use App\Billing\PlanLimits;
 use App\Enums\ProductCategory;
+use App\Enums\ProductDepartment;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Support\MoneyFormatter;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -102,7 +104,7 @@ final class ProductList extends Component
         return view('livewire.products.product-list', [
             'products' => $this->products(),
             'canAddProduct' => $this->canAddProduct(),
-            'categoryGroups' => ProductCategory::grouped(),
+            'categoryGroups' => $this->categoryGroups(),
         ]);
     }
 
@@ -142,6 +144,44 @@ final class ProductList extends Component
             // also reads as newest first.
             ->orderBy('id', 'desc')
             ->paginate();
+    }
+
+    /**
+     * The current filter stays offered even when its last product was just
+     * cleared, or the select would show a blank value.
+     *
+     * @return array<string, list<ProductCategory>> department value => categories the account uses
+     */
+    private function categoryGroups(): array
+    {
+        /** @var Collection<int, ProductCategory> $used the column is cast, so pluck() yields enums */
+        $used = Product::query()
+            ->where('user_id', auth()->id())
+            ->whereNotNull('category')
+            ->distinct()
+            ->pluck('category');
+
+        $selectedCategory = ProductCategory::tryFrom($this->category);
+        $selectedDepartment = ProductDepartment::tryFrom($this->category);
+
+        if ($selectedCategory !== null) {
+            $used->push($selectedCategory);
+        }
+
+        $groups = [];
+
+        foreach (ProductCategory::grouped() as $department => $categories) {
+            $offered = array_values(array_filter(
+                $categories,
+                static fn (ProductCategory $category): bool => $used->contains($category),
+            ));
+
+            if ($offered !== [] || $department === $selectedDepartment?->value) {
+                $groups[$department] = $offered;
+            }
+        }
+
+        return $groups;
     }
 
     /** The sort keys a view offers, in the order they are shown. */

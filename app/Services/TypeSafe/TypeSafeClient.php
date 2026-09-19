@@ -60,11 +60,11 @@ final readonly class TypeSafeClient
         try {
             $response = $this->request()->post(self::ENDPOINT, $body);
         } catch (ConnectionException $e) {
-            throw new TypeSafeRequestFailed('TypeSafe unreachable: ' . $e->getMessage(), $e->getCode(), previous: $e);
+            throw new TypeSafeRequestFailed('TypeSafe unreachable: ' . $e->getMessage(), previous: $e);
         }
 
         if (! $response->successful()) {
-            throw new TypeSafeRequestFailed("TypeSafe answered {$response->status()}.");
+            throw new TypeSafeRequestFailed("TypeSafe answered {$response->status()}.", status: $response->status());
         }
 
         $payload = $response->json();

@@ -61,7 +61,7 @@ enum ProductDepartment: string
             self::GardenDiy => 'Garden and do-it-yourself: plants, garden tools, hand and power tools, paint, barbecue',
             self::Clothing => 'Worn on the body: clothing for women, men or children, shoes, bags, jewellery, watches',
             self::Toys => 'Play: toys, board games, puzzles, video games, consoles, building sets',
-            self::Sports => 'Sport and outdoor activity: sportswear, fitness equipment, bicycles, camping gear',
+            self::Sports => 'Sport and outdoor activity: sportswear, fitness equipment, bicycles, camping gear, sports nutrition such as protein bars',
             self::MediaOffice => 'Books, music, film, office and school supplies',
             self::CarTravel => 'Car parts and car care, luggage and travel gear',
             self::Other => 'Nothing above fits, or the product cannot be told from the evidence',

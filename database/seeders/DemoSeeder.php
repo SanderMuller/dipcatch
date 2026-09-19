@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Billing\Plan;
+use App\Enums\CategorySource;
+use App\Enums\ProductCategory;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Models\Invitation;
@@ -19,6 +21,7 @@ use App\Services\Drops\ReferenceValue;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\DemoOffer;
 use Database\Seeders\Demo\DemoProduct;
+use Database\Seeders\Demo\GeneratedCatalog;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -52,8 +55,30 @@ final class DemoSeeder extends Seeder
 
     private const string FALLBACK_ADMIN_EMAIL = 'admin@dipcatch.test';
 
-    /** Days of price history written per offer. */
+    /** Days of price history written per offer, unless the spec asks for fewer. */
     private const int HISTORY_DAYS = 75;
+
+    /**
+     * Generated products on top of the curated catalogs. The demo account is
+     * the one a walkthrough uses, so it gets enough to page, search and sort
+     * through; the free account stops one short of `plans.free.max_products`,
+     * so the limit counter shows a number and the add button still works.
+     */
+    private const int DEMO_GENERATED = 38;
+
+    private const int PRO_GENERATED = 27;
+
+    private const int FREE_GENERATED = 17;
+
+    /** Products per ordinary account, so the admin panel lists many owners. */
+    private const int CROWD_GENERATED = 4;
+
+    /**
+     * The admin account is the one whoever seeds this database logs in as, so
+     * it gets a populated app of its own rather than the single sample product
+     * `ZooplusFeliwaySeeder` leaves on it.
+     */
+    private const int ADMIN_GENERATED = 30;
 
     public function run(): void
     {
@@ -78,29 +103,31 @@ final class DemoSeeder extends Seeder
             'comped_until' => now()->addYear(),
             'comped_reason' => 'Demo account',
             'notify_via_push' => true,
+            'auto_categories' => true,
         ]);
 
-        $pro = $this->createUser(self::PRO_EMAIL, 'Petra Pro');
+        $pro = $this->createUser(self::PRO_EMAIL, 'Petra Pro', ['auto_categories' => true]);
         $free = $this->createUser(self::FREE_EMAIL, 'Frank Free');
         $this->createUser(self::EMPTY_EMAIL, 'Nina Newbie');
 
-        foreach ($this->demoCatalog() as $spec) {
-            $this->seedProduct($demo, $spec);
-        }
+        // Offset past the demo account's slice, so the two do not track the
+        // same list of products.
+        $this->seedCatalog($admin, GeneratedCatalog::make(self::ADMIN_GENERATED, offset: self::DEMO_GENERATED));
 
-        foreach ($this->proCatalog() as $spec) {
-            $this->seedProduct($pro, $spec);
-        }
+        $this->seedCatalog($demo, $this->demoCatalog());
+        $this->seedCatalog($demo, GeneratedCatalog::make(self::DEMO_GENERATED));
 
-        foreach ($this->freeCatalog() as $spec) {
-            $this->seedProduct($free, $spec);
-        }
+        $this->seedCatalog($pro, $this->proCatalog());
+        $this->seedCatalog($pro, GeneratedCatalog::make(self::PRO_GENERATED));
+
+        $this->seedCatalog($free, $this->freeCatalog());
+        $this->seedCatalog($free, GeneratedCatalog::make(self::FREE_GENERATED));
 
         $this->seedBilling($pro);
         $this->seedCrowd($admin);
         $this->seedInvitations($admin);
 
-        $this->command->info('DemoSeeder: demo data seeded.');
+        $this->command->info('DemoSeeder: demo data seeded — ' . Product::query()->count() . ' products across ' . User::query()->count() . ' accounts.');
         $this->command->info('  App    https://dipcatch.test  — ' . self::DEMO_EMAIL . ' / ' . self::PASSWORD);
         $this->command->info('  Admin  https://dipcatch.test/admin — ' . $admin->email . ' / ' . self::PASSWORD . ' (unless ADMIN_PASSWORD is set)');
     }
@@ -119,11 +146,27 @@ final class DemoSeeder extends Seeder
             $admin = User::query()->where('email', $configured)->first();
 
             if ($admin instanceof User) {
+                $admin->forceFill(self::developerPerks())->save();
+
                 return $admin;
             }
         }
 
-        return $this->createUser(self::FALLBACK_ADMIN_EMAIL, 'Demo Admin', ['is_admin' => true]);
+        return $this->createUser(self::FALLBACK_ADMIN_EMAIL, 'Demo Admin', ['is_admin' => true, ...self::developerPerks()]);
+    }
+
+    /**
+     * Only here, never in `AdminUserSeeder`: this seeder does not run in production.
+     *
+     * @return array<string, mixed>
+     */
+    private static function developerPerks(): array
+    {
+        return [
+            'comped_until' => Plan::COMPED_FOREVER,
+            'comped_reason' => 'Developer account',
+            'auto_categories' => true,
+        ];
     }
 
     /**
@@ -150,6 +193,7 @@ final class DemoSeeder extends Seeder
         return [
             new DemoProduct(
                 title: 'Douwe Egberts Aroma Rood koffiebonen 1 kg',
+                category: ProductCategory::CoffeeTea,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi123456/douwe-egberts-aroma-rood-bonen', 13.99, 1000, 'g'),
                     new DemoOffer('jumbo.com', 'producten/douwe-egberts-aroma-rood-koffiebonen-1kg', 12.49, 1000, 'g'),
@@ -161,6 +205,8 @@ final class DemoSeeder extends Seeder
             ),
             new DemoProduct(
                 title: 'Zeeuws Meisje Roomboter 250 g',
+                categorySource: CategorySource::Auto,
+                category: ProductCategory::DairyEggs,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi222333/zeeuws-meisje-roomboter', 3.29, 250, 'g'),
                     new DemoOffer('jumbo.com', 'producten/zeeuws-meisje-roomboter-250g', 3.09, 250, 'g'),
@@ -170,6 +216,7 @@ final class DemoSeeder extends Seeder
             ),
             new DemoProduct(
                 title: 'Coca-Cola Zero Sugar 6 x 1,5 L',
+                category: ProductCategory::SoftDrinks,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi334455/coca-cola-zero-6-pack', 11.94, 9000, 'ml'),
                     new DemoOffer('jumbo.com', 'producten/coca-cola-zero-sugar-6x1-5l', 10.99, 9000, 'ml', promotion: 'live'),
@@ -177,6 +224,7 @@ final class DemoSeeder extends Seeder
             ),
             new DemoProduct(
                 title: 'Pampers Baby-Dry maat 4 (174 stuks)',
+                category: ProductCategory::NappiesWipes,
                 offers: [
                     new DemoOffer('bol.com', 'nl/nl/p/pampers-baby-dry-maat-4-174-luiers/9200000098765432', 44.99, 174, 'piece'),
                     new DemoOffer('amazon.nl', 'dp/B08PAMPERS4', 41.95, 174, 'piece'),
@@ -185,6 +233,7 @@ final class DemoSeeder extends Seeder
             ),
             new DemoProduct(
                 title: 'Whiskas Adult kattenvoer 100 zakjes',
+                category: ProductCategory::PetFood,
                 offers: [
                     new DemoOffer('zooplus.nl', 'shop/katten/kattenvoer_nat/whiskas/100-zakjes/123456', 39.99, 100, 'piece'),
                     new DemoOffer('bol.com', 'nl/nl/p/whiskas-adult-100-zakjes/9200000011112222', 43.50, 100, 'piece', state: 'out_of_stock'),
@@ -192,6 +241,7 @@ final class DemoSeeder extends Seeder
             ),
             new DemoProduct(
                 title: 'Philips Hue White and Color Ambiance E27 (2-pack)',
+                category: ProductCategory::SmartHome,
                 offers: [
                     new DemoOffer('coolblue.nl', 'product/912345/philips-hue-white-and-color-e27-duopack.html', 89.00, 2, 'piece'),
                     new DemoOffer('bol.com', 'nl/nl/p/philips-hue-white-and-color-e27-2-pack/9200000033334444', 94.99, 2, 'piece', state: 'unknown_stock'),
@@ -200,6 +250,7 @@ final class DemoSeeder extends Seeder
             ),
             new DemoProduct(
                 title: 'Nespresso Vertuo Barista Creations (30 capsules)',
+                category: ProductCategory::CoffeeTea,
                 offers: [
                     new DemoOffer('bol.com', 'nl/nl/p/nespresso-vertuo-barista-30-capsules/9200000055556666', 21.45, 30, 'piece', state: 'failing'),
                     new DemoOffer('amazon.nl', 'dp/B08VERTUO30', 19.99, 30, 'piece'),
@@ -207,6 +258,8 @@ final class DemoSeeder extends Seeder
             ),
             new DemoProduct(
                 title: 'Grolsch Premium Pilsner 24 x 30 cl',
+                categorySource: CategorySource::Auto,
+                category: ProductCategory::Alcohol,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi556677/grolsch-premium-pilsner-24-pack', 18.99, 7200, 'ml', conditional: true),
                     new DemoOffer('jumbo.com', 'producten/grolsch-premium-pilsner-24x30cl', 17.49, 7200, 'ml', promotion: 'expired'),
@@ -214,6 +267,7 @@ final class DemoSeeder extends Seeder
             ),
             new DemoProduct(
                 title: 'Garmin Forerunner 265',
+                category: ProductCategory::Wearables,
                 offers: [
                     new DemoOffer('coolblue.nl', 'product/934567/garmin-forerunner-265-zwart.html', 399.00, 1, 'piece'),
                     new DemoOffer('bol.com', 'nl/nl/p/garmin-forerunner-265/9200000077778888', 429.00, 1, 'piece', state: 'dead'),
@@ -237,6 +291,7 @@ final class DemoSeeder extends Seeder
         return [
             new DemoProduct(
                 title: 'Sony WH-1000XM5 koptelefoon',
+                category: ProductCategory::Audio,
                 offers: [
                     new DemoOffer('coolblue.nl', 'product/901234/sony-wh-1000xm5-zwart.html', 299.00, 1, 'piece'),
                     new DemoOffer('bol.com', 'nl/nl/p/sony-wh-1000xm5/9200000044445555', 319.00, 1, 'piece'),
@@ -246,6 +301,8 @@ final class DemoSeeder extends Seeder
             ),
             new DemoProduct(
                 title: 'Lay\'s Oven Baked Paprika 150 g',
+                categorySource: CategorySource::Auto,
+                category: ProductCategory::SnacksSweets,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi667788/lays-oven-baked-paprika', 2.19, 150, 'g'),
                     new DemoOffer('dirk.nl', 'boodschappen/snacks/chips/lays-oven-baked/5678', 1.99, 150, 'g'),
@@ -253,6 +310,7 @@ final class DemoSeeder extends Seeder
             ),
             new DemoProduct(
                 title: 'Royal Canin Medium Adult 15 kg',
+                category: ProductCategory::PetFood,
                 offers: [
                     new DemoOffer('zooplus.nl', 'shop/honden/droogvoer/royal_canin/medium/223344', 74.99, 15000, 'g'),
                     new DemoOffer('bol.com', 'nl/nl/p/royal-canin-medium-adult-15kg/9200000066667777', 79.95, 15000, 'g', state: 'failing'),
@@ -272,15 +330,22 @@ final class DemoSeeder extends Seeder
                 // One offer only, so the "add a second shop" NextStepsWidget
                 // has something to point at.
                 title: 'Robijn Wasmiddel Color 40 wasbeurten',
+                category: ProductCategory::Laundry,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi889900/robijn-color-wasmiddel', 9.99, 40, 'piece'),
                 ],
             ),
             new DemoProduct(
+                // Offers up to `plans.free.max_shops_per_product`, so the
+                // shop-limit panel and the upgrade path it offers render on
+                // an account that has genuinely reached the ceiling.
                 title: 'Tony\'s Chocolonely Melk 180 g',
+                category: ProductCategory::SnacksSweets,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi990011/tonys-chocolonely-melk', 3.49, 180, 'g'),
                     new DemoOffer('jumbo.com', 'producten/tonys-chocolonely-melk-180g', 3.19, 180, 'g'),
+                    new DemoOffer('dirk.nl', 'boodschappen/snoep/chocolade/tonys-chocolonely-melk/9012', 2.99, 180, 'g'),
+                    new DemoOffer('bol.com', 'nl/nl/p/tonys-chocolonely-melk-180-g/9200000022223333', 3.75, 180, 'g'),
                 ],
             ),
         ];
@@ -290,8 +355,21 @@ final class DemoSeeder extends Seeder
     // Product construction
     // ---------------------------------------------------------------------
 
+    /**
+     * @param  list<DemoProduct>  $catalog
+     */
+    private function seedCatalog(User $user, array $catalog): void
+    {
+        foreach ($catalog as $spec) {
+            $this->seedProduct($user, $spec);
+        }
+    }
+
     private function seedProduct(User $user, DemoProduct $spec): void
     {
+        $historyDays = $spec->historyDays ?? self::HISTORY_DAYS;
+        $ageDays = max($spec->ageDays ?? $historyDays + 5, $historyDays + 5);
+
         $product = Product::factory()->create([
             'user_id' => $user->id,
             'title' => $spec->title,
@@ -302,19 +380,23 @@ final class DemoSeeder extends Seeder
             'unit_price_target' => $spec->unitPriceTarget,
             'share_slug' => $spec->shareSlug,
             'active' => $spec->active,
-            'created_at' => now()->subDays(self::HISTORY_DAYS + 5),
+            'category' => $spec->category,
+            'category_set_by' => $spec->category === null ? null : $spec->categorySource,
+            'created_at' => now()->subDays($ageDays),
         ]);
 
         /** @var list<array{shop: Shop, prices: array<int, float>}> $offers */
         $offers = [];
 
         foreach ($spec->offers as $offer) {
-            $offers[] = $this->seedShop($product, $offer);
+            $offers[] = $this->seedShop($product, $offer, $historyDays, $ageDays);
         }
 
-        $this->seedCheapestHistory($product, $offers);
+        $this->seedCheapestHistory($product, $offers, $historyDays);
 
-        if ($spec->drop !== null) {
+        // A drop needs a price to have dropped to. A product whose offers are
+        // all ineligible has no cheapest pointer, so there is nothing to fire.
+        if ($spec->drop !== null && $product->cheapest_price !== null) {
             $this->seedDrop($user, $product, $spec->drop);
         }
     }
@@ -322,11 +404,11 @@ final class DemoSeeder extends Seeder
     /**
      * @return array{shop: Shop, prices: array<int, float>}
      */
-    private function seedShop(Product $product, DemoOffer $offer): array
+    private function seedShop(Product $product, DemoOffer $offer, int $historyDays, int $ageDays): array
     {
-        $prices = $this->priceWalk($offer->price);
+        $prices = $this->priceWalk($offer->price, $historyDays);
 
-        $createdAt = now()->subDays(self::HISTORY_DAYS + 4);
+        $createdAt = now()->subDays($ageDays - 1);
 
         $shop = Shop::factory()->create([
             'product_id' => $product->id,
@@ -393,7 +475,7 @@ final class DemoSeeder extends Seeder
             'created_at' => $createdAt,
         ]);
 
-        $this->seedPriceChecks($shop, $prices, $offer->state, $shop->current_in_stock);
+        $this->seedPriceChecks($shop, $prices, $offer->state, $shop->current_in_stock, $historyDays);
 
         return ['shop' => $shop, 'prices' => $prices];
     }
@@ -404,18 +486,18 @@ final class DemoSeeder extends Seeder
      *
      * @return array<int, float> index 0 = oldest day, last = today
      */
-    private function priceWalk(float $current): array
+    private function priceWalk(float $current, int $historyDays): array
     {
         $prices = [];
 
-        for ($day = 0; $day < self::HISTORY_DAYS; $day++) {
-            $progress = $day / (self::HISTORY_DAYS - 1);
+        for ($day = 0; $day < $historyDays; $day++) {
+            $progress = $day / ($historyDays - 1);
             $drift = 1.0 + 0.14 * (1 - $progress);
             $noise = 1.0 + fake()->randomFloat(4, -0.02, 0.02);
             $prices[] = round($current * $drift * $noise, 2);
         }
 
-        $prices[self::HISTORY_DAYS - 1] = $current;
+        $prices[$historyDays - 1] = $current;
 
         return $prices;
     }
@@ -426,12 +508,12 @@ final class DemoSeeder extends Seeder
      *                              must agree with it, or the offer reads as
      *                              sold out while its last check says stocked.
      */
-    private function seedPriceChecks(Shop $shop, array $prices, string $state, ?bool $inStock): void
+    private function seedPriceChecks(Shop $shop, array $prices, string $state, ?bool $inStock, int $historyDays): void
     {
         $rows = [];
 
         foreach ($prices as $day => $price) {
-            $checkedAt = now()->subDays(self::HISTORY_DAYS - 1 - $day)->setTime(6, 0);
+            $checkedAt = now()->subDays($historyDays - 1 - $day)->setTime(6, 0);
 
             $rows[] = [
                 'shop_id' => $shop->id,
@@ -474,7 +556,7 @@ final class DemoSeeder extends Seeder
      *
      * @param  list<array{shop: Shop, prices: array<int, float>}>  $offers
      */
-    private function seedCheapestHistory(Product $product, array $offers): void
+    private function seedCheapestHistory(Product $product, array $offers, int $historyDays): void
     {
         $eligible = array_values(array_filter(
             $offers,
@@ -491,7 +573,7 @@ final class DemoSeeder extends Seeder
         $openShopId = null;
         $openStart = null;
 
-        for ($day = 0; $day < self::HISTORY_DAYS; $day++) {
+        for ($day = 0; $day < $historyDays; $day++) {
             $best = $eligible[0]['prices'][$day];
             $bestShopId = $eligible[0]['shop']->id;
 
@@ -502,7 +584,7 @@ final class DemoSeeder extends Seeder
                 }
             }
 
-            $startedAt = now()->subDays(self::HISTORY_DAYS - 1 - $day)->setTime(6, 5);
+            $startedAt = now()->subDays($historyDays - 1 - $day)->setTime(6, 5);
 
             if ($openPrice !== null && abs($best - $openPrice) < 0.005 && $openShopId === $bestShopId) {
                 continue;
@@ -697,7 +779,8 @@ final class DemoSeeder extends Seeder
     /**
      * The other accounts an admin screen is meant to show: unverified, with
      * two-factor, on a trial, cancelling, past due, comped, and one blocked
-     * after a lost chargeback.
+     * after a lost chargeback. The plain accounts track products of their own,
+     * so the admin product and offer screens list more than four owners.
      */
     private function seedCrowd(User $admin): void
     {
@@ -709,7 +792,14 @@ final class DemoSeeder extends Seeder
 
         User::factory()->count(6)->create([
             'created_at' => fn (): CarbonImmutable => CarbonImmutable::now()->subDays(fake()->numberBetween(1, 300)),
-        ]);
+        ])->each(function (User $user, int $index): void {
+            // A different slice of the pool per account, so the admin product
+            // list does not read as the same product repeated per owner.
+            $this->seedCatalog($user, GeneratedCatalog::make(
+                self::CROWD_GENERATED,
+                offset: $index * self::CROWD_GENERATED,
+            ));
+        });
 
         User::factory()->count(2)->unverified()->create();
         User::factory()->withTwoFactor()->create();

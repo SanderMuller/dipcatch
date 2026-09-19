@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 
+use App\Billing\PlanLimits;
+use App\Enums\CategorySource;
 use App\Enums\ShopHealth;
 use App\Filament\Admin\Widgets\OperationsOverviewWidget;
 use App\Filament\Admin\Widgets\ShopsNeedingAttentionWidget;
@@ -36,6 +38,78 @@ it('gives the demo user products, offers and price history', function (): void {
     expect($demo->products()->count())->toBeGreaterThanOrEqual(8)
         ->and(Shop::query()->whereIn('product_id', $demo->products()->pluck('id'))->count())->toBeGreaterThanOrEqual(15)
         ->and(PriceCheck::query()->count())->toBeGreaterThan(500);
+});
+
+it('fills the demo account past one page of products', function (): void {
+    $demo = User::query()->where('email', 'demo@dipcatch.test')->sole();
+
+    // The product list paginates at Laravel's default 15, so a walkthrough
+    // only exercises paging, search and sorting above that.
+    expect($demo->products()->count())->toBeGreaterThan(30)
+        ->and($demo->products()->where('active', false)->count())->toBeGreaterThan(0)
+        ->and($demo->products()->distinct()->count('title'))->toBe($demo->products()->count());
+});
+
+it('leaves the free account one product short of its plan limit', function (): void {
+    $free = User::query()->where('email', 'free@dipcatch.test')->sole();
+    $limit = $free->entitlements()->maxProducts();
+
+    expect($limit)->not->toBeNull()
+        ->and($free->products()->count())->toBe($limit - 1)
+        ->and(app(PlanLimits::class)->canAddProduct($free))->toBeTrue();
+});
+
+it('puts one free product at the plan shop ceiling', function (): void {
+    $free = User::query()->where('email', 'free@dipcatch.test')->sole();
+    $ceiling = $free->entitlements()->maxShopsPerProduct();
+
+    $offerCounts = $free->products()->withCount('shops')->get()->pluck('shops_count');
+
+    expect($ceiling)->not->toBeNull()
+        // Both ends of the shop limit: one product cannot take another offer,
+        // and one still shows the "add a second shop" next step.
+        ->and($offerCounts->max())->toBe($ceiling)
+        ->and($offerCounts->min())->toBe(1);
+});
+
+it('gives the admin account a populated app of its own', function (): void {
+    $admin = User::query()->where('is_admin', true)->orderBy('id')->firstOrFail();
+
+    // Whoever seeds the database logs in as this account, so an app that
+    // looks empty there reads as a seeder that did nothing.
+    expect($admin->products()->count())->toBeGreaterThan(15);
+});
+
+it('gives the ordinary accounts products of their own', function (): void {
+    $owners = Product::query()->distinct()->count('user_id');
+
+    // Not just the four named demo accounts: the admin product list and the
+    // per-account screens need more than one owner to be worth looking at.
+    expect($owners)->toBeGreaterThan(6);
+});
+
+it('sorts most seeded products into a category from the taxonomy and leaves some unsorted', function (): void {
+    $demo = User::query()->where('email', 'demo@dipcatch.test')->sole();
+    $products = $demo->products()->get();
+    $sorted = $products->filter(fn (Product $product): bool => $product->category !== null);
+
+    expect($sorted->count())->toBeGreaterThan($products->count() / 2)
+        ->and($products->count() - $sorted->count())->toBeGreaterThan(0)
+        ->and($sorted->pluck('category_set_by')->unique()->all())->toContain(CategorySource::User, CategorySource::Auto)
+        ->and($products->whereNull('category')->pluck('category_set_by')->filter()->all())->toBeEmpty()
+        ->and($sorted->map(fn (Product $product): string => $product->category?->department()->value ?? '')->unique()->count())->toBeGreaterThan(3)
+        ->and($demo->auto_categories)->toBeTrue()
+        ->and(User::query()->where('email', 'pro@dipcatch.test')->sole()->auto_categories)->toBeTrue()
+        ->and(User::query()->where('email', 'free@dipcatch.test')->sole()->auto_categories)->toBeFalse();
+});
+
+it('comps the developer account for good and opts it in to automatic categories', function (): void {
+    $admin = User::query()->where('is_admin', true)->orderBy('id')->firstOrFail();
+
+    expect($admin->isComped())->toBeTrue()
+        ->and($admin->comped_until?->toDateString())->toBe('2099-12-31')
+        ->and($admin->comped_reason)->toBe('Developer account')
+        ->and($admin->auto_categories)->toBeTrue();
 });
 
 it('points every product at one of its own offers', function (): void {

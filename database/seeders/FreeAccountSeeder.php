@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Billing\Entitlements;
 use App\Billing\Plan;
+use App\Enums\CategorySource;
+use App\Enums\ProductCategory;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -14,10 +16,17 @@ use Illuminate\Support\Str;
  * One account on the Free plan, with a product already at the plan's shop
  * ceiling.
  *
- * `DemoSeeder` seeds a free account too, but it bails out as soon as its own
- * demo user exists, so it cannot add one to a database that is already
- * seeded. This seeder is safe to run at any time and takes the address from
- * the environment, which is what lets someone log in as themselves.
+ * A fresh `migrate:fresh --seed` does not need this: `DemoSeeder` seeds a free
+ * account at the same ceiling. That seeder bails out as soon as its own demo
+ * user exists, though, so it cannot add one to a database that is already
+ * seeded, and it takes no address from the environment. This one is safe to
+ * run at any time and lets someone log in as themselves:
+ *
+ *     php artisan db:seed --class=FreeAccountSeeder
+ *
+ * Deliberately not called from `DatabaseSeeder`. It would overwrite the demo
+ * free account, and it recomputes the cheapest offer through the domain
+ * engine, which queues a real price-drop notification per product.
  *
  * The point of the ceiling is the screen behind it: the shop limit panel and
  * the upgrade path only render for an account that has actually reached it.
@@ -60,8 +69,8 @@ final class FreeAccountSeeder extends Seeder
 
         $maxShops = Entitlements::of(Plan::Free)->maxShopsPerProduct() ?? 4;
 
-        $this->seedProduct($user, 'Coffee beans 1 kg', '18.99', $maxShops);
-        $this->seedProduct($user, 'Cat food 10 kg', '39.95', 2);
+        $this->seedProduct($user, 'Coffee beans 1 kg', '18.99', $maxShops, ProductCategory::CoffeeTea);
+        $this->seedProduct($user, 'Cat food 10 kg', '39.95', 2, ProductCategory::PetFood);
 
         $this->command->info('FreeAccountSeeder: ' . $email . ' seeded on the Free plan.');
         $this->command->info('  One product sits at the ' . $maxShops . '-shop ceiling, one has room for more.');
@@ -71,11 +80,18 @@ final class FreeAccountSeeder extends Seeder
      * Prices step down per shop so the cheapest one is never the first row,
      * which is what the table is there to show.
      */
-    private function seedProduct(User $user, string $title, string $price, int $shopCount): void
+    private function seedProduct(User $user, string $title, string $price, int $shopCount, ProductCategory $category): void
     {
         $product = Product::query()->updateOrCreate(
             ['user_id' => $user->id, 'title' => $title],
-            ['currency' => 'EUR', 'drop_threshold_pct' => 10.00, 'active' => true, 'image_url' => null],
+            [
+                'currency' => 'EUR',
+                'drop_threshold_pct' => 10.00,
+                'active' => true,
+                'image_url' => null,
+                'category' => $category,
+                'category_set_by' => CategorySource::User,
+            ],
         );
 
         $hosts = ['ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'spar.nl', 'aldi.nl'];
