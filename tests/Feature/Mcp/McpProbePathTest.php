@@ -93,6 +93,33 @@ test('an add_shop draft sent without confirm is told to confirm, not that its ur
         ->assertDontSee('does not look like a URL');
 });
 
+test('confirm: 1 is refused rather than read as a preview', function (): void {
+    // `boolean` without `strict` accepts 1, which then fails the handler's
+    // `=== true` and falls into the preview branch — the same empty-URL probe,
+    // reached through a value the caller meant as a confirmation.
+    Http::fake(fakeJsonLdOffer());
+
+    $me = User::factory()->create();
+
+    $outcome = app(ProbeShopUrl::class)(null, 'https://shop.example.com/p/1', $me);
+
+    $token = DraftToken::issue(
+        $me,
+        ShopDraft::flatten($outcome),
+        (string) $outcome->normalizedUrl,
+        (string) $outcome->adapterKey,
+        variantKey: null,
+    );
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $token, 'confirm' => 1])
+        ->assertHasErrors()
+        ->assertSee('not 1 or 0')
+        ->assertDontSee('does not look like a URL');
+
+    expect($me->products()->count())->toBe(0);
+});
+
 test('confirming with no draft asks for the draft alone, not for a url as well', function (): void {
     DipCatchServer::actingAs(User::factory()->create())
         ->tool(CreateProductTool::class, ['confirm' => true])

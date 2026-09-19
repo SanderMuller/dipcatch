@@ -56,12 +56,18 @@ final class CreateProductTool extends Tool
         $validated = $request->validate([
             'url' => ['required_unless:confirm,true', 'nullable', 'string', 'max:2048'],
             'draft' => ['required_if:confirm,true', 'prohibited_unless:confirm,true', 'nullable', 'string'],
-            'confirm' => ['nullable', 'boolean'],
+            // `strict`, because the branch below compares with `===`. Plain
+            // `boolean` accepts 1 and "1", which pass every rule here and then
+            // fail that comparison — the same empty-URL probe, reached through
+            // a value the caller meant as a confirmation. Refusing it is also
+            // the safer half: confirming is the step that writes.
+            'confirm' => ['nullable', 'boolean:strict'],
             'title' => ['nullable', 'string', 'max:255'],
             'variant_key' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', 'string', Rule::enum(ProductCategory::class)],
         ], [
             'url.required_unless' => 'Pass a url to preview a product page.',
+            'confirm.boolean' => 'confirm takes true or false, not 1 or 0.',
             'draft.prohibited_unless' => 'A draft only creates the product when confirm is true. Call again with the same draft and confirm: true.',
             'draft.required_if' => 'Pass the draft from the preview call alongside confirm: true.',
         ]);
