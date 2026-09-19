@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Suggestions\SuggestShops;
+use App\Models\CheckjebonChain;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\ShopSuggestionDismissal;
@@ -258,4 +259,20 @@ test('a chain whose dataset links do not resolve is never suggested', function (
     // Every DekaMarkt id in the dataset answers "Het artikel is niet
     // gevonden" — a row nobody can open is worse than no row.
     expect(suggest(beemsterProduct()))->toBeEmpty();
+});
+
+test('a price row whose chain is not recorded yet is not suggested', function (): void {
+    // The state the importer now creates on purpose, between the price
+    // upsert and the chain write. `freshChains()` reads the chain table, so
+    // the row is never a candidate — there is no `base_url` to build a
+    // product URL from, and guessing one would send the user nowhere.
+    seedChains();
+    seedBeemsterCatalogue();
+
+    CheckjebonChain::query()->where('chain', 'ah')->delete();
+
+    $suggestions = app(SuggestShops::class)(beemsterProduct());
+
+    expect(collect($suggestions)->pluck('chain')->all())->not->toContain('ah')
+        ->and($suggestions)->not->toBeEmpty();
 });
