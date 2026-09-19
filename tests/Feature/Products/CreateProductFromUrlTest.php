@@ -10,12 +10,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
 
-function fakeCreateFlowOffer(string $url = 'https://shop.example.com/p/1', string $price = '50.00', string $currency = 'EUR'): array
+function fakeCreateFlowOffer(string $url = 'https://shop.example.com/p/1', string $price = '50.00', string $currency = 'EUR', string $title = 'Demo Item'): array
 {
     $host = parse_url($url, PHP_URL_HOST) ?: 'shop.example.com';
     $json = json_encode([
         '@type' => 'Product',
-        'name' => 'Demo Item',
+        'name' => $title,
         'image' => 'https://shop.example.com/img.jpg',
         'offers' => [
             '@type' => 'Shop',
@@ -50,6 +50,20 @@ test('probe success prefills title, image, and tier-default thresholds', functio
         ->assertSet('thresholdPct', '10.00')
         ->assertSet('thresholdAbs', '7.00')
         ->assertSet('existingTrackedProduct', null);
+});
+
+test('the prefilled title has the shop name and buying word taken off', function (): void {
+    // Cleaning lives in the draft, so the web preview gets it as well as the
+    // MCP tools. What the page calls itself is written for search engines.
+    // "Example" is the shop's name in shop.example.com, and "kopen" the
+    // buying word behind it.
+    Http::fake(fakeCreateFlowOffer(title: 'Demo Item - 12 x 55 g kopen | Example'));
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('title', 'Demo Item - 12 x 55 g');
 });
 
 test('confirm creates product + shop + initial price check and recomputes cheapest', function (): void {

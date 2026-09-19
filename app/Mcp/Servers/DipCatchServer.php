@@ -11,6 +11,7 @@ use App\Mcp\Tools\PriceHistoryTool;
 use App\Mcp\Tools\RecheckTool;
 use App\Mcp\Tools\RemoveShopTool;
 use App\Mcp\Tools\SetThresholdTool;
+use App\Mcp\Tools\SetTitleTool;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -56,6 +57,7 @@ final class DipCatchServer extends Server
         RecheckTool::class,
         RemoveShopTool::class,
         SetThresholdTool::class,
+        SetTitleTool::class,
         PriceHistoryTool::class,
         DeleteProductTool::class,
     ];

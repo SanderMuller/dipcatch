@@ -15,8 +15,15 @@ use Illuminate\Support\Facades\RateLimiter;
  */
 final readonly class ProbeBudget
 {
-    /** Public so a caller-facing message can state the number. */
-    public const int PER_MINUTE = 6;
+    /**
+     * Public so a caller-facing message can state the number.
+     *
+     * Matches the fetcher's default per-host ceiling, so one account working
+     * through a list of products is held by the shops' own pace rather than
+     * by a tighter budget on top of it. Only a real page fetch spends from
+     * it: confirming a draft writes what the earlier probe already read.
+     */
+    public const int PER_MINUTE = 12;
 
     /**
      * Take one page from this account's budget. Returns null when it was

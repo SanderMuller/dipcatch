@@ -121,7 +121,7 @@ test('invalid URL returns invalid_url failure (no fetch)', function (): void {
     Http::assertNothingSent();
 });
 
-test('per-user rate limit kicks in after 6 probes in a minute', function (): void {
+test('per-user rate limit kicks in once the minute budget is spent', function (): void {
     Http::fake([
         'https://example.com/robots.txt' => Http::response('', 404),
         'https://example.com/p/*' => Http::response(jsonLdPage(), 200),
@@ -130,12 +130,12 @@ test('per-user rate limit kicks in after 6 probes in a minute', function (): voi
     $product = Product::factory()->create();
     $user = User::factory()->create();
 
-    foreach (range(1, 6) as $i) {
+    foreach (range(1, ProbeBudget::PER_MINUTE) as $i) {
         $outcome = app(ProbeShopUrl::class)($product, "https://example.com/p/{$i}", $user);
         expect($outcome->isSuccess())->toBeTrue();
     }
 
-    $blocked = app(ProbeShopUrl::class)($product, 'https://example.com/p/7', $user);
+    $blocked = app(ProbeShopUrl::class)($product, 'https://example.com/p/over', $user);
     expect($blocked->errorCode)->toBe(ProbeFailure::ProbeRateLimited);
 });
 

@@ -105,7 +105,7 @@ final class CreateProductTool extends Tool
             'url' => $schema->string()->description('A product page at a shop. Required unless confirming a draft.'),
             'draft' => $schema->string()->description('The draft token from the previous call.'),
             'confirm' => $schema->boolean()->description('Set true, with a draft, to actually create the product.'),
-            'title' => $schema->string()->description('Overrides the title read from the page.'),
+            'title' => $schema->string()->description('Overrides the title read from the page. DipCatch already strips the shop name, "kopen" and Shopify\'s "- Default Title"; pass this when what is left still is not the product\'s name — brand, product, flavour, pack size, nothing else.'),
             'variant_key' => $schema->string()->description('Which variant to track, when the previous call reported several.'),
         ];
     }

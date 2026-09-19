@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\ProbeBudget;
 use App\Livewire\Shops\AddShop;
 use App\Livewire\Suggestions\ShopSuggestions;
 use App\Models\Product;
@@ -154,12 +155,11 @@ test('accepting several suggestions in a row hits the per-user probe budget', fu
 
     $component = Livewire::test(AddShop::class, ['product' => $product]);
 
-    // ProbeShopUrl allows six probes per user per minute.
-    foreach (range(1, 6) as $attempt) {
+    foreach (range(1, ProbeBudget::PER_MINUTE) as $attempt) {
         $component->call('useSuggestion', "https://shop.example.com/p/{$attempt}");
     }
 
-    $component->call('useSuggestion', 'https://shop.example.com/p/7')
+    $component->call('useSuggestion', 'https://shop.example.com/p/over')
         ->assertSet('state', 'error')
         ->assertSet('errorCode', 'probe_rate_limited');
 });

@@ -11,6 +11,7 @@ use App\Mcp\Tools\ListProductsTool;
 use App\Mcp\Tools\PriceHistoryTool;
 use App\Mcp\Tools\RemoveShopTool;
 use App\Mcp\Tools\SetThresholdTool;
+use App\Mcp\Tools\SetTitleTool;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
@@ -426,4 +427,63 @@ it('returns history older than the free window to a pro account', function (): v
         ->tool(PriceHistoryTool::class, ['product_id' => (string) $product->id])
         ->assertOk()
         ->assertSee('999.99');
+});
+
+it('renames a product without touching its prices or shops', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['title' => 'Barebells Cookies & Cream - 12 x 55 g kopen']);
+    $shop = Shop::factory()->for($product)->create();
+
+    $response = DipCatchServer::actingAs($user)
+        ->tool(SetTitleTool::class, [
+            'product_id' => (string) $product->id,
+            'title' => 'Barebells Protein Bar Cookies & Cream 12 x 55 g',
+        ]);
+
+    $response->assertOk();
+
+    $product->refresh();
+
+    expect($product->title)->toBe('Barebells Protein Bar Cookies & Cream 12 x 55 g')
+        // The point of the tool: a rename that keeps the history a delete and
+        // recreate would have thrown away.
+        ->and($product->shops()->pluck('id')->all())->toBe([$shop->id]);
+});
+
+it('stores the new name exactly as it was given', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['title' => 'Old name']);
+    Shop::factory()->for($product)->create(['url' => 'https://bio-markt.nl/p/1']);
+
+    // Correcting a name the automatic cleanup got wrong is what this tool is
+    // for, so it must not run that cleanup over the correction.
+    DipCatchServer::actingAs($user)
+        ->tool(SetTitleTool::class, [
+            'product_id' => (string) $product->id,
+            'title' => 'Melk - Bio',
+        ])->assertOk();
+
+    expect($product->refresh()->title)->toBe('Melk - Bio');
+});
+
+it('refuses a title with nothing in it', function (): void {
+    // Caught by the validator's own "required" rule, before the body runs.
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['title' => 'Kept']);
+
+    DipCatchServer::actingAs($user)
+        ->tool(SetTitleTool::class, ['product_id' => (string) $product->id, 'title' => '   '])
+        ->assertHasErrors();
+
+    expect($product->refresh()->title)->toBe('Kept');
+});
+
+it('will not rename another account\'s product', function (): void {
+    $theirs = Product::factory()->create(['title' => 'Theirs']);
+
+    DipCatchServer::actingAs(User::factory()->create())
+        ->tool(SetTitleTool::class, ['product_id' => (string) $theirs->id, 'title' => 'Mine now'])
+        ->assertHasErrors();
+
+    expect($theirs->refresh()->title)->toBe('Theirs');
 });

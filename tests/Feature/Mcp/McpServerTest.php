@@ -90,7 +90,7 @@ it('exposes every tool under a readable name', function (): void {
         }
     }
 
-    expect($tools)->toHaveCount(9);
+    expect($tools)->toHaveCount(10);
 
     foreach ($tools as $tool) {
         $name = app($tool)->name();

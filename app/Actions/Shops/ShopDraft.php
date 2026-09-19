@@ -7,6 +7,7 @@ use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\ImageUrl;
 use App\Support\PackSize;
+use App\Support\ProductTitle;
 use Carbon\CarbonImmutable;
 use Throwable;
 
@@ -69,7 +70,10 @@ final readonly class ShopDraft
         }
 
         return [
-            'title' => $snapshot->title,
+            // Cleaned here rather than in each client: the web preview, the
+            // MCP tools and anything written from this array all want the
+            // product's name without the shop's search-engine tail.
+            'title' => ProductTitle::clean($snapshot->title, $outcome->host),
             'image_url' => ImageUrl::absolute($snapshot->imageUrl, $outcome->normalizedUrl ?? ''),
             'gtin' => $snapshot->gtin,
             'price' => $snapshot->trackedPrice(),
