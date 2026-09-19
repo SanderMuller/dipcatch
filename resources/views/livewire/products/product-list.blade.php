@@ -2,7 +2,7 @@
     <div>
         <flux:heading size="xl" level="1" class="tracking-tight">{{ __('Products') }}</flux:heading>
         <flux:text class="mt-1 text-zinc-600 dark:text-zinc-400">
-            {{ __('Everything you follow, best price first.') }}
+            {{ __('Everything you follow. Newest first, until you sort them another way.') }}
         </flux:text>
     </div>
 
@@ -35,22 +35,26 @@
             <flux:radio value="active">{{ __('Active') }}</flux:radio>
             <flux:radio value="paused">{{ __('Paused') }}</flux:radio>
         </flux:radio.group>
+
+        {{-- Named choices, beside the search and the filter. The table headers
+             used to carry the sorting, which asked a person to know that a
+             heading was clickable and to guess what a second click did. --}}
+        <flux:select class="max-w-56" wire:model.live="sort" :label:sr="__('Sort by')" data-test="product-sort">
+            <flux:select.option value="created_at">{{ __('Newest first') }}</flux:select.option>
+            <flux:select.option value="title">{{ __('Name A-Z') }}</flux:select.option>
+            <flux:select.option value="cheapest_price">{{ __('Lowest price first') }}</flux:select.option>
+            <flux:select.option value="biggest_drop">{{ __('Biggest drop first') }}</flux:select.option>
+        </flux:select>
     </div>
 
     <flux:table :paginate="$products" class="mt-6">
         <flux:table.columns>
-            <flux:table.column sortable :sorted="$sort === 'title'" :direction="$sort === 'title' ? $direction : null" wire:click="sortBy('title')">
-                {{ __('Product') }}
-            </flux:table.column>
+            <flux:table.column>{{ __('Product') }}</flux:table.column>
             <flux:table.column>{{ __('Status') }}</flux:table.column>
-            <flux:table.column sortable :sorted="$sort === 'cheapest_price'" :direction="$sort === 'cheapest_price' ? $direction : null" wire:click="sortBy('cheapest_price')">
-                {{ __('Best price') }}
-            </flux:table.column>
+            <flux:table.column>{{ __('Best price') }}</flux:table.column>
             <flux:table.column class="hidden md:table-cell">{{ __('Price per kilo or piece') }}</flux:table.column>
             <flux:table.column class="hidden md:table-cell">{{ __('Best value') }}</flux:table.column>
-            <flux:table.column class="hidden md:table-cell" sortable :sorted="$sort === 'shops_count'" :direction="$sort === 'shops_count' ? $direction : null" wire:click="sortBy('shops_count')">
-                {{ __('Shops') }}
-            </flux:table.column>
+            <flux:table.column class="hidden md:table-cell">{{ __('Shops') }}</flux:table.column>
         </flux:table.columns>
 
         <flux:table.rows>
