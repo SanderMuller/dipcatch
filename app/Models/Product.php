@@ -29,6 +29,30 @@ final class Product extends Model
 
     private const int BC_SCALE = 4;
 
+    protected static function booted(): void
+    {
+        self::saving(function (self $product): void {
+            // Updates only: every attribute is dirty on a fresh insert, and a
+            // freshly created row has no prior target for a latch to be
+            // stale against. Without this guard, a factory `create()` that
+            // sets a target and its latch in the same call would have the
+            // latch wiped before the row is ever written.
+            if (! $product->exists) {
+                return;
+            }
+
+            if ($product->isDirty('target_price')) {
+                $product->target_price_notified = null;
+                $product->target_price_notified_at = null;
+            }
+
+            if ($product->isDirty('unit_price_target')) {
+                $product->unit_price_notified = null;
+                $product->unit_price_notified_at = null;
+            }
+        });
+    }
+
     /**
      * @return array<string, string>
      */

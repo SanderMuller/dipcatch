@@ -60,6 +60,74 @@ test('a value above the target says nothing', function (): void {
     expect($product->refresh()->unit_price_notified)->toBeNull();
 });
 
+test('clearing the target clears a stale latch', function (): void {
+    $product = targetProduct('5.50');
+
+    app(DetectUnitPriceTarget::class)($product);
+    expect($product->refresh()->unit_price_notified)->not->toBeNull();
+
+    $product->forceFill(['unit_price_target' => null])->save();
+
+    expect($product->refresh()->unit_price_notified)->toBeNull();
+});
+
+test('raising the target past the old latch lets the alert fire again', function (): void {
+    $product = targetProduct('5.50');
+
+    // €1.99 for 370 g arms the latch at 5.38/kg for real.
+    app(DetectUnitPriceTarget::class)($product);
+    Notification::assertSentToTimes($product->user, UnitPriceTargetNotification::class);
+
+    // Raise the target without the price moving. Under the stale latch,
+    // 5.38 "already notified" suppresses every check until the price falls
+    // further — the owner asked to hear about anything at 6.00/kg or less
+    // and hears nothing.
+    $product->forceFill(['unit_price_target' => '6.00'])->save();
+
+    app(DetectUnitPriceTarget::class)($product->refresh());
+
+    Notification::assertSentToTimes($product->user, UnitPriceTargetNotification::class, 2);
+});
+
+test('a save that leaves the target untouched does not re-arm the latch', function (): void {
+    $product = targetProduct('5.50');
+
+    app(DetectUnitPriceTarget::class)($product);
+    Notification::assertSentToTimes($product->user, UnitPriceTargetNotification::class);
+
+    // Neither of these touches unit_price_target; the latch must survive.
+    $product->forceFill(['active' => false])->save();
+    $product->recomputeCheapestShop();
+
+    app(DetectUnitPriceTarget::class)($product->refresh());
+
+    Notification::assertSentToTimes($product->user, UnitPriceTargetNotification::class);
+});
+
+test('re-saving the same target value does not clear the latch', function (): void {
+    $product = targetProduct('5.50');
+
+    app(DetectUnitPriceTarget::class)($product);
+    expect($product->refresh()->unit_price_notified)->not->toBeNull();
+
+    $product->forceFill(['unit_price_target' => '5.50'])->save();
+
+    expect($product->refresh()->unit_price_notified)->not->toBeNull();
+});
+
+test('a target and its latch set together at creation both survive', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->for($user)->create([
+        'currency' => 'EUR',
+        'unit_price_target' => '5.50',
+        'unit_price_notified' => '5.38',
+        'unit_price_notified_at' => now(),
+    ]);
+
+    expect($product->unit_price_notified)->not->toBeNull();
+});
+
 test('a product with no target is left alone', function (): void {
     $product = targetProduct(null);
 
