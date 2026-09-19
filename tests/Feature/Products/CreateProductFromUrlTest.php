@@ -1,10 +1,15 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\ProbeBudget;
+use App\Actions\Shops\ProbeShopUrl;
 use App\Livewire\Products\CreateProductFromUrl;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Services\ShopFetcher\HostFetchMemory;
+use App\Services\ShopFetcher\ShopFetcher;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -170,7 +175,11 @@ test('fetch-level failure shows the error state', function (): void {
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'error')
-        ->assertSet('errorCode', 'temporary_failure');
+        ->assertSet('errorCode', 'temporary_failure')
+        // The status reaches the sentence. Nothing pinned that: the template
+        // falls back to '5xx', so a context key that stopped arriving would
+        // still render a plausible line.
+        ->assertSee('The shop is having a server problem (HTTP 500).');
 });
 
 test('an unservable shop explains itself instead of printing the raw error code', function (): void {
@@ -272,4 +281,125 @@ test('extraction failure offers a shop request mailto', function (): void {
         ->assertSet('errorCode', 'extraction_failed')
         ->assertSee('Request a shop')
         ->assertSee(rawurlencode('https://shop.example.com/p/1'), escape: false);
+});
+
+/**
+ * The probe-error partial's remaining interpolated arms. Each pulls a number
+ * out of `$errorContext` — a failure count, a retry delay, an HTTP status —
+ * and each falls back to a plausible-looking default when the key is absent:
+ * '0', '~60', '5xx'. A key that stopped arriving would therefore still render
+ * a sentence that reads fine and tells the shopper something untrue. Only
+ * `probe_rate_limited`'s key was pinned anywhere, and that at the action
+ * level, so these drive the real failure rather than setting the properties.
+ */
+test('a blocking shop names Cloudflare on the first refusal', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response('Forbidden', 403),
+    ]);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('errorCode', 'blocked')
+        ->assertSee('This shop is blocking automated checks (Cloudflare/Akamai).')
+        ->assertDontSee('blocked our last');
+});
+
+test('a persistently blocking shop counts the refusals instead', function (): void {
+    // PERSISTENT_AFTER is 3, and this probe adds the fourth.
+    foreach (range(1, 3) as $ignored) {
+        app(HostFetchMemory::class)->record('shop.example.com', HostFetchMemory::KIND_BLOCKED);
+    }
+
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response('Forbidden', 403),
+    ]);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('errorCode', 'blocked')
+        ->assertSee('This shop has blocked our last 4 requests.')
+        ->assertDontSee('Cloudflare');
+});
+
+test('a shop that has gone quiet for a while counts the silences', function (): void {
+    foreach (range(1, 3) as $ignored) {
+        app(HostFetchMemory::class)->record('shop.example.com', HostFetchMemory::KIND_SILENT);
+    }
+
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response('Server error', 500),
+    ]);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('errorCode', 'temporary_failure')
+        // Apostrophes render as &#039;, so this asserts the half that carries
+        // the interpolated count.
+        ->assertSee('answered our last 4 requests')
+        ->assertDontSee('server problem');
+});
+
+test('a 429 from the shop states the wait it asked for', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response('Slow down', 429, ['Retry-After' => '90']),
+    ]);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('errorCode', 'host_rate_limited')
+        ->assertSee('This shop returned a rate-limit response (HTTP 429). Try again in 90 seconds.');
+});
+
+test('our own per-host throttle says so rather than blaming the shop', function (): void {
+    // Spend the host bucket, so the fetch never leaves the building.
+    $limit = config()->integer('dipcatch.fetcher.rate_limit_per_minute');
+    foreach (range(1, $limit) as $ignored) {
+        RateLimiter::hit(ShopFetcher::throttleKey('shop.example.com'));
+    }
+
+    Http::fake();
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('errorCode', 'local_throttle')
+        ->assertSee('spacing out checks to this shop to be polite')
+        // A real delay, not the template's '~60' fallback. The exact number
+        // depends on where in the window the bucket was spent, so the tilde
+        // is what separates "a value arrived" from "the key did not".
+        ->assertDontSee('Try again in ~60 seconds');
+
+    // Robots is consulted at ShopFetcher:91, before the throttle at :93, so a
+    // robots request does go out. The page itself must not.
+    Http::assertNotSent(fn (Request $request): bool => $request->url() === 'https://shop.example.com/p/1');
+});
+
+test('too many probes in a minute states the wait', function (): void {
+    Http::fake(fakeCreateFlowOffer());
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    foreach (range(1, ProbeBudget::PER_MINUTE) as $i) {
+        app(ProbeShopUrl::class)(null, "https://shop.example.com/p/{$i}", $user);
+    }
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/over')
+        ->call('probe')
+        ->assertSet('errorCode', 'probe_rate_limited')
+        ->assertSee('You have checked too many links in the last minute.')
+        ->assertDontSee('Try again in ~60 seconds');
 });
