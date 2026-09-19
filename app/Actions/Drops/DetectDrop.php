@@ -159,8 +159,31 @@ final readonly class DetectDrop
         $shop = $trigger->shop;
 
         DB::afterCommit(function () use ($shop): void {
-            dispatch(new CheckShopPrice($shop, confirmation: true))
-                ->delay(now()->addMinutes(Config::integer('dipcatch.drops.confirm_delay_minutes')));
+            try {
+                dispatch(new CheckShopPrice($shop, confirmation: true))
+                    ->delay(now()->addMinutes(Config::integer('dipcatch.drops.confirm_delay_minutes')));
+            } catch (Throwable $e) {
+                // `CheckShopPrice` stages this callback before the unit-price
+                // and target-price ones for the same check, so a rethrow
+                // costs both of those alerts on top of this dispatch — and
+                // `maxExceptions = 1` means it fails the job outright rather
+                // than retrying, so it buys no recovery either.
+                //
+                // Unlike the sends, nothing is lost for good here: no alert
+                // was due on this reading, and the shop's next scheduled
+                // check re-enters this path with this reading as the
+                // predecessor, which qualifies as a large drop in its own
+                // right. The confirmation is delayed to that check rather
+                // than skipped. `report()` keeps the trace.
+                report($e);
+
+                Log::error('Confirmation check failed to dispatch', [
+                    'alert' => 'price_drop',
+                    'shop_id' => $shop->id,
+                    'product_id' => $shop->product_id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
         });
     }
 

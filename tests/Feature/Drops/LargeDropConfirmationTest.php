@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 
@@ -90,6 +92,41 @@ test('a first large reading notifies nothing and asks for a second opinion', fun
             && $delay instanceof DateTimeInterface
             && round(now()->diffInMinutes($delay, true)) === 10.0;
     });
+});
+
+test('a confirmation the closure cannot complete is reported, not thrown', function (): void {
+    Exceptions::fake();
+    Log::spy();
+
+    $shop = confirmationProduct();
+
+    // `Config::integer()` refuses a non-int, so this is the closure's own
+    // failure rather than a mocked queue: the shape a bad deploy-time value
+    // would take. Plan 010's rule is that no `afterCommit` closure in this
+    // directory may let a throw escape — this one is staged before the
+    // unit-price and target-price callbacks for the same check, so a rethrow
+    // costs those alerts too, and `maxExceptions = 1` fails the job outright
+    // rather than retrying it.
+    //
+    // Nothing is asserted about the queue here. `dispatch()` builds a
+    // PendingDispatch before the delay argument is evaluated, so the job is
+    // still pushed by its destructor as the throw unwinds — framework
+    // behaviour this test has no business pinning.
+    config()->set('dipcatch.drops.confirm_delay_minutes', 'ten');
+
+    reading($shop, '40.00');
+
+    Log::shouldHaveReceived('error')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => $message === 'Confirmation check failed to dispatch'
+            && $context['alert'] === 'price_drop'
+            && $context['shop_id'] === $shop->id
+            && $context['product_id'] === $shop->product_id);
+
+    // `report()` is what keeps this catch from being a silent failure.
+    Exceptions::assertReported(
+        fn (InvalidArgumentException $e): bool => str_contains($e->getMessage(), 'confirm_delay_minutes'),
+    );
 });
 
 test('a second reading at the same price confirms the drop and notifies once', function (): void {
