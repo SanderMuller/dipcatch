@@ -78,7 +78,7 @@ test('a create_product draft sent without confirm is told to confirm, not that i
     DipCatchServer::actingAs(User::factory()->create())
         ->tool(CreateProductTool::class, ['draft' => 'a-token'])
         ->assertHasErrors()
-        ->assertSee('confirm: true')
+        ->assertSee('only creates the product when confirm is true')
         ->assertDontSee('does not look like a URL');
 });
 
@@ -89,7 +89,37 @@ test('an add_shop draft sent without confirm is told to confirm, not that its ur
     DipCatchServer::actingAs($me)
         ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'draft' => 'a-token'])
         ->assertHasErrors()
-        ->assertSee('confirm: true')
+        ->assertSee('only adds the shop when confirm is true')
+        ->assertDontSee('does not look like a URL');
+});
+
+test('a stale draft alongside a new url is refused rather than quietly ignored', function (): void {
+    // The old rules validated this and previewed the url, dropping the draft
+    // without saying so.
+    DipCatchServer::actingAs(User::factory()->create())
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1', 'draft' => 'a-token'])
+        ->assertHasErrors()
+        ->assertSee('only creates the product when confirm is true');
+});
+
+test('create_product called with no arguments asks for a url', function (): void {
+    // The only assertion of the `url` rule itself: drop it, or key it back on
+    // `draft`, and this call probes the empty string instead.
+    DipCatchServer::actingAs(User::factory()->create())
+        ->tool(CreateProductTool::class, [])
+        ->assertHasErrors()
+        ->assertSee('Pass a url to preview a product page.')
+        ->assertDontSee('does not look like a URL');
+});
+
+test('add_shop called with only a product asks for a url', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'currency' => 'EUR']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id])
+        ->assertHasErrors()
+        ->assertSee('Pass a url to preview a product page.')
         ->assertDontSee('does not look like a URL');
 });
 
@@ -120,12 +150,39 @@ test('confirm: 1 is refused rather than read as a preview', function (): void {
     expect($me->products()->count())->toBe(0);
 });
 
+test('an add_shop confirm: 1 is refused rather than read as a preview', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'currency' => 'EUR']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'draft' => 'a-token', 'confirm' => 1])
+        ->assertHasErrors()
+        ->assertSee('not 1 or 0')
+        ->assertDontSee('does not look like a URL');
+
+    expect($product->shops()->count())->toBe(0);
+});
+
 test('confirming with no draft asks for the draft alone, not for a url as well', function (): void {
+    // `assertDontSee('url')` rather than the message text: a `url` rule keyed
+    // back on `draft` fires its own default message here, which names the
+    // field but not the phrase.
     DipCatchServer::actingAs(User::factory()->create())
         ->tool(CreateProductTool::class, ['confirm' => true])
         ->assertHasErrors()
         ->assertSee('Pass the draft from the preview call')
-        ->assertDontSee('Pass a url');
+        ->assertDontSee('url');
+});
+
+test('an add_shop confirm with no draft asks for the draft alone', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'currency' => 'EUR']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'confirm' => true])
+        ->assertHasErrors()
+        ->assertSee('Pass the draft from the preview call')
+        ->assertDontSee('url');
 });
 
 test('a page with no readable price is explained, not just refused', function (): void {
