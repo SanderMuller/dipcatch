@@ -110,6 +110,8 @@ final class RefreshCheckjebonDatasetCommand extends Command
             $this->info(sprintf('%s: %d rows upserted, %d delisted rows pruned.', $supermarket, count($rows), $pruned));
         }
 
+        $this->pruneChainsWithoutPrices();
+
         return self::SUCCESS;
     }
 
@@ -178,6 +180,29 @@ final class RefreshCheckjebonDatasetCommand extends Command
         }
 
         return mb_substr($link, 0, 255);
+    }
+
+    /**
+     * Repairs the orphan the old write order could leave behind: a chain row
+     * whose first-ever price upsert died under it. Writing the chain last
+     * stops new ones, but a database upgraded from the old order can already
+     * hold one, and nothing reports it — a chain that stays empty upstream is
+     * skipped by every later run, so the row would sit there for good.
+     *
+     * Safe to run unconditionally. A chain with prices never matches, and a
+     * chain the payload no longer carries has kept its prices since the run
+     * that stored them.
+     */
+    private function pruneChainsWithoutPrices(): void
+    {
+        $orphans = DB::table('checkjebon_chains')
+            ->whereNotIn('chain', DB::table('checkjebon_prices')->distinct()->select('supermarket'))
+            ->delete();
+
+        if ($orphans > 0) {
+            Log::warning('Checkjebon refresh: removed chain rows that held no prices.', ['count' => $orphans]);
+            $this->warn("Removed {$orphans} chain row(s) with no prices.");
+        }
     }
 
     /**

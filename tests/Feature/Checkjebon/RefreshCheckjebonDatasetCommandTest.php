@@ -246,3 +246,22 @@ test('every recorded chain has prices after a successful run', function (): void
     expect(CheckjebonChain::query()->count())->toBeGreaterThan(0)
         ->and(CheckjebonChain::query()->whereNotIn('chain', $withPrices)->pluck('chain')->all())->toBeEmpty();
 });
+
+test('a chain row left without prices by an older run is cleared', function (): void {
+    // The reorder stops new orphans; it cannot repair one already stored.
+    // Nothing reports this row any more, and a chain that stays empty
+    // upstream is skipped by every later run, so the refresh clears it.
+    CheckjebonChain::query()->create([
+        'chain' => 'ghostchain',
+        'label' => 'GhostChain',
+        'base_url' => 'https://www.ghostchain.nl/p/',
+        'refreshed_at' => now()->subDay(),
+    ]);
+
+    Http::fake([checkjebonUrl() => Http::response(checkjebonFixture())]);
+
+    $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
+
+    expect(CheckjebonChain::query()->where('chain', 'ghostchain')->exists())->toBeFalse()
+        ->and(CheckjebonChain::query()->where('chain', 'ah')->exists())->toBeTrue();
+});
