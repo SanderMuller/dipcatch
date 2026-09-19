@@ -45,10 +45,11 @@ final class CreateProductManual extends Component
             'title' => FluentRule::string('Title')->required()->max(255),
             'image_url' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
             'currency' => FluentRule::string('Currency')->required()->in(Iso4217::CODES),
+            // A threshold of zero would alert on a price that did not move.
             'drop_threshold_pct' => FluentRule::numeric('Alert me when it drops by (%)')
                 ->nullable()
-                ->between(0, 100),
-            'drop_threshold_abs' => FluentRule::numeric('Alert me when it drops by (amount)')->nullable()->min(0),
+                ->between(0.01, 99.98999999999999),
+            'drop_threshold_abs' => FluentRule::numeric('Alert me when it drops by (amount)')->nullable()->min(0.01),
         ];
     }
 

@@ -29,6 +29,24 @@ final class Product extends Model
 
     private const int BC_SCALE = 4;
 
+    protected static function booted(): void
+    {
+        // `updating` only, not `saving`: it never fires on insert, so a
+        // fresh row's own target and latch (set together, e.g. by a
+        // factory) survive untouched.
+        self::updating(function (self $product): void {
+            if ($product->isDirty('target_price')) {
+                $product->target_price_notified = null;
+                $product->target_price_notified_at = null;
+            }
+
+            if ($product->isDirty('unit_price_target')) {
+                $product->unit_price_notified = null;
+                $product->unit_price_notified_at = null;
+            }
+        });
+    }
+
     /**
      * @return array<string, string>
      */
