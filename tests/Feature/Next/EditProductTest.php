@@ -74,6 +74,54 @@ it('reads an empty field as no alert of that kind', function (): void {
         ->and($fresh?->unit_price_target)->toBeNull();
 });
 
+it('clears a stale target latch when the target changes through the edit form', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create([
+        'user_id' => $user->id,
+        'target_price' => '18.00',
+        'target_price_notified' => '17.05',
+        'target_price_notified_at' => now(),
+        'unit_price_target' => '5.50',
+        'unit_price_notified' => '5.38',
+        'unit_price_notified_at' => now(),
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->set('targetPrice', '30.00')
+        ->set('unitPriceTarget', '6.00')
+        ->call('save');
+
+    $fresh = $product->fresh();
+
+    expect($fresh?->target_price_notified)->toBeNull()
+        ->and($fresh?->target_price_notified_at)->toBeNull()
+        ->and($fresh?->unit_price_notified)->toBeNull()
+        ->and($fresh?->unit_price_notified_at)->toBeNull();
+});
+
+it('leaves an armed latch alone when the edit form does not change the target', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create([
+        'user_id' => $user->id,
+        'target_price' => '18.00',
+        'target_price_notified' => '17.05',
+        'target_price_notified_at' => now(),
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->set('title', 'A different title')
+        ->call('save');
+
+    $fresh = $product->fresh();
+
+    expect($fresh?->target_price_notified)->toBe('17.05')
+        ->and($fresh?->target_price_notified_at)->not->toBeNull();
+});
+
 it('refuses a threshold of zero rather than alerting on a price that did not move', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id, 'drop_threshold_pct' => '10.00']);

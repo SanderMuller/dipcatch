@@ -87,6 +87,77 @@ test('a price back above the target clears the latch', function (): void {
     expect($product->refresh()->target_price_notified)->toBeNull();
 });
 
+test('clearing the target clears a stale latch', function (): void {
+    $product = targetPriceProduct('18.00');
+
+    app(DetectTargetPrice::class)($product);
+    expect($product->refresh()->target_price_notified)->not->toBeNull();
+
+    $product->forceFill(['target_price' => null])->save();
+
+    expect($product->refresh()->target_price_notified)->toBeNull();
+});
+
+test('raising the target past the old latch lets the alert fire again', function (): void {
+    $product = targetPriceProduct('18.00');
+
+    // Arms the latch at the real price for real: this is not a column
+    // assertion, it is the shopper actually getting told once.
+    app(DetectTargetPrice::class)($product);
+    Notification::assertSentToTimes($product->user, TargetPriceNotification::class);
+
+    // Raise the target well past the price the latch fired at. Without the
+    // clear, the stale latch (17.05) still beats any price down to 17.05,
+    // so the owner who asked to hear about anything under 30 hears nothing
+    // until the price falls under 17.05 again.
+    $product->forceFill(['target_price' => '30.00'])->save();
+
+    app(DetectTargetPrice::class)($product->refresh());
+
+    Notification::assertSentToTimes($product->user, TargetPriceNotification::class, 2);
+});
+
+test('a save that leaves the target untouched does not re-arm the latch', function (): void {
+    $product = targetPriceProduct('18.00');
+
+    app(DetectTargetPrice::class)($product);
+    Notification::assertSentToTimes($product->user, TargetPriceNotification::class);
+
+    // Neither of these touches target_price; the latch must survive both.
+    $product->forceFill(['active' => false])->save();
+    $product->recomputeCheapestShop();
+
+    app(DetectTargetPrice::class)($product->refresh());
+
+    Notification::assertSentToTimes($product->user, TargetPriceNotification::class);
+});
+
+test('re-saving the same target value does not clear the latch', function (): void {
+    $product = targetPriceProduct('18.00');
+
+    app(DetectTargetPrice::class)($product);
+    expect($product->refresh()->target_price_notified)->not->toBeNull();
+
+    // Same value, re-typed: decimal-cast comparison must see this as
+    // unchanged, not dirty.
+    $product->forceFill(['target_price' => '18.00'])->save();
+
+    expect($product->refresh()->target_price_notified)->not->toBeNull();
+});
+
+test('a target and its latch set together at creation both survive', function (): void {
+    // Every attribute is dirty on insert. Without the update-only guard,
+    // the hook would wipe this latch before the row is ever written.
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create([
+        'target_price' => '18.00',
+        'target_price_notified' => '17.05',
+        'target_price_notified_at' => now(),
+    ]);
+
+    expect($product->target_price_notified)->not->toBeNull();
+});
+
 test('a product without a target says nothing', function (): void {
     $product = targetPriceProduct(null);
 
@@ -105,6 +176,46 @@ test('set_threshold stores a target price on a free account, with no Pro caveat'
         ->assertDontSee('Pro feature');
 
     expect((float) $product->fresh()?->target_price)->toBe(18.0);
+});
+
+test('set_threshold changing the target clears a stale latch', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create([
+        'user_id' => $me->id,
+        'target_price' => '18.00',
+        'target_price_notified' => '17.05',
+        'target_price_notified_at' => now(),
+    ]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'target_price' => 30])
+        ->assertOk();
+
+    $fresh = $product->fresh();
+
+    expect((float) $fresh?->target_price)->toBe(30.0)
+        ->and($fresh?->target_price_notified)->toBeNull()
+        ->and($fresh?->target_price_notified_at)->toBeNull();
+});
+
+test('set_threshold re-sending the same target through the tool does not clear the latch', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create([
+        'user_id' => $me->id,
+        'target_price' => '18.00',
+        'target_price_notified' => '17.05',
+        'target_price_notified_at' => now(),
+    ]);
+
+    DipCatchServer::actingAs($me)
+        // The tool assigns a float; the stored value is a decimal-cast
+        // string. This proves that type difference does not read as dirty.
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'target_price' => 18])
+        ->assertOk();
+
+    $fresh = $product->fresh();
+
+    expect($fresh?->target_price_notified)->toBe('17.05');
 });
 
 test('the notification budget still caps a target alert', function (): void {
