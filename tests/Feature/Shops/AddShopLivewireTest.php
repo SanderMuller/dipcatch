@@ -77,7 +77,12 @@ test('duplicate URL surfaces duplicate error without fetch', function (): void {
         ->set('url', 'https://shop.example.com/p/1?utm_source=x')
         ->call('probe')
         ->assertSet('state', 'error')
-        ->assertSet('errorCode', 'duplicate');
+        ->assertSet('errorCode', 'duplicate')
+        // The rendered sentence, not just the code behind it. This copy lives
+        // in a partial shared with create-product-from-url, so a careless edit
+        // there is the way it breaks — and the host is interpolated, so an
+        // unresolved `$dupHost` would still pass an errorCode assertion.
+        ->assertSee('This URL is already tracked for this product (shop.example.com).');
 });
 
 test('robots-blocked URL is rejected without persisting', function (): void {
@@ -127,7 +132,11 @@ test('currency mismatch is surfaced inline', function (): void {
         ->assertSet('state', 'error')
         ->assertSet('errorCode', 'currency_mismatch')
         ->assertSet('errorContext.expected', 'EUR')
-        ->assertSet('errorContext.actual', 'GBP');
+        ->assertSet('errorContext.actual', 'GBP')
+        // Both currencies reach the sentence. The template falls back to '?'
+        // for either, so asserting the codes render is what separates a
+        // working line from one that says "sells in ? but is tracked in ?".
+        ->assertSee('That shop sells in GBP but this product is tracked in EUR.');
 });
 
 test('extraction failure flips into manual_selector state without persisting', function (): void {
