@@ -43,6 +43,24 @@
             </div>
         </flux:card>
 
+        @if ($autoCategoriesAvailable)
+            <flux:card>
+                <flux:heading size="lg">{{ __('Products') }}</flux:heading>
+
+                <div class="mt-4 space-y-4">
+                    <flux:switch
+                        wire:model="auto_categories"
+                        :disabled="! $allowsAutoCategories"
+                        :label="__('Sort new products into a category automatically')"
+                        :description="$allowsAutoCategories
+                            ? __('Products you add from now on. Products you already track keep their category.')
+                            : __('Pro sorts products for you. Your choice is kept, and it starts working when you upgrade.')"
+                        data-test="auto-categories"
+                    />
+                </div>
+            </flux:card>
+        @endif
+
         <div class="flex flex-wrap items-center gap-3">
             <flux:button type="submit" variant="primary">{{ __('Save settings') }}</flux:button>
             <flux:button type="button" variant="ghost" wire:click="sendTest">{{ __('Send a test notification') }}</flux:button>

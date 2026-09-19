@@ -3,6 +3,7 @@
 namespace App\Livewire\Products;
 
 use App\Billing\PlanLimits;
+use App\Enums\ProductCategory;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -37,6 +38,10 @@ final class ProductList extends Component
     #[Url(except: 'all')]
     public string $status = 'all';
 
+    /** A department key, a category key, or empty for all. Anything else reads as all. */
+    #[Url(except: '')]
+    public string $category = '';
+
     #[Url(except: self::DEFAULT_SORT)]
     public string $sort = self::DEFAULT_SORT;
 
@@ -69,6 +74,11 @@ final class ProductList extends Component
         $this->resetPage();
     }
 
+    public function updatedCategory(): void
+    {
+        $this->resetPage();
+    }
+
     public function updatedSort(): void
     {
         $this->resetPage();
@@ -92,6 +102,7 @@ final class ProductList extends Component
         return view('livewire.products.product-list', [
             'products' => $this->products(),
             'canAddProduct' => $this->canAddProduct(),
+            'categoryGroups' => ProductCategory::grouped(),
         ]);
     }
 
@@ -101,6 +112,7 @@ final class ProductList extends Component
     private function products(): LengthAwarePaginator
     {
         $sort = array_key_exists($this->sort, self::SORTS) ? $this->sort : self::DEFAULT_SORT;
+        $categories = ProductCategory::leavesFor($this->category);
 
         return Product::query()
             ->where('user_id', auth()->id())
@@ -113,6 +125,10 @@ final class ProductList extends Component
             ->when(
                 in_array($this->status, ['active', 'paused'], strict: true),
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', $this->status === 'active'),
+            )
+            ->when(
+                $categories !== null,
+                fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []),
             )
             ->withCount('shops')
             ->withMax('priceDropEvents as biggest_drop', 'drop_pct')

@@ -6,6 +6,7 @@ use App\Actions\Shops\AttachShop;
 use App\Actions\Shops\ShopDraft;
 use App\Billing\PlanLimitReached;
 use App\Billing\PlanLimits;
+use App\Enums\CategorySource;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,7 @@ final readonly class CreateProductWithShop
      */
     public function __invoke(User $actor, ProductDraft $product, ShopDraft $shop): Product
     {
-        return DB::transaction(function () use ($actor, $product, $shop): Product {
+        $created = DB::transaction(function () use ($actor, $product, $shop): Product {
             $this->limits->guardProduct($actor);
 
             $created = Product::query()->create([
@@ -37,11 +38,17 @@ final readonly class CreateProductWithShop
                 'drop_threshold_pct' => $product->dropThresholdPct,
                 'drop_threshold_abs' => $product->dropThresholdAbs,
                 'active' => true,
+                'category' => $product->category,
+                'category_set_by' => $product->category === null ? null : CategorySource::User,
             ]);
 
             $this->attachShop->firstShopOf($created, $shop);
 
             return $created;
         });
+
+        CategoriseProduct::afterResponseFor($created);
+
+        return $created;
     }
 }

@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\ProductCategory;
 use App\Livewire\Products\ProductShow;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
@@ -499,4 +500,25 @@ it('links the alert threshold to the edit form', function (): void {
         ->assertSee('Alerts below')
         ->assertSeeHtml('data-test="edit-alert-threshold"')
         ->assertSeeHtml(route('app.products.edit', $product));
+});
+
+it('shows the category as a badge that links to the list filtered on it', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'currency' => 'EUR']);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee('Coffee & tea')
+        ->assertSeeHtml(route('app.products.index', ['category' => 'food.coffee_tea']));
+});
+
+it('shows no category badge on a product without one', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertDontSeeHtml('data-test="product-category-badge"');
 });

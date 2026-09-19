@@ -36,6 +36,9 @@ final readonly class ProductPresenter
             // caller has to cross-reference `is_cheapest` against each shop's
             // stock before it can say "cheapest is X" honestly.
             'cheapest_stock' => self::stock($product->cheapestShop?->current_in_stock),
+            'category' => $product->category?->value,
+            'category_label' => $product->category?->label(),
+            'department' => $product->category?->department()->value,
         ];
     }
 

@@ -11,6 +11,13 @@ final class Config
         return is_int($value) ? $value : (is_numeric($value) ? (int) $value : $default);
     }
 
+    public static function float(string $key, float $default): float
+    {
+        $value = config($key);
+
+        return is_numeric($value) ? (float) $value : $default;
+    }
+
     public static function string(string $key, string $default = ''): string
     {
         $value = config($key);

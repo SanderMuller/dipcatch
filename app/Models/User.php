@@ -41,6 +41,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property bool $notify_via_filament
  * @property bool $notify_via_push
  * @property string $timezone
+ * @property bool $auto_categories
  * @property CarbonImmutable|null $last_digest_sent_at
  * @property CarbonImmutable|null $timezone_detected_at
  * @property string|null $two_factor_secret
@@ -75,6 +76,7 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
             'notify_via_email' => 'boolean',
             'notify_via_filament' => 'boolean',
             'notify_via_push' => 'boolean',
+            'auto_categories' => 'boolean',
             'last_digest_sent_at' => 'datetime',
             'timezone_detected_at' => 'datetime',
         ];
@@ -98,6 +100,12 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
     public function socialAccounts(): HasMany
     {
         return $this->hasMany(SocialAccount::class);
+    }
+
+    /** The one guard for automatic categories: opted in, and the plan allows it. */
+    public function wantsAutoCategories(): bool
+    {
+        return $this->auto_categories && $this->entitlements()->allowsAutoCategories();
     }
 
     public function canAccessPanel(Panel $panel): bool

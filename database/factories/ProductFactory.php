@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\CategorySource;
+use App\Enums\ProductCategory;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -29,7 +31,17 @@ class ProductFactory extends Factory
             'cheapest_price' => null,
             'share_slug' => null,
             'active' => true,
+            'category' => null,
+            'category_set_by' => null,
         ];
+    }
+
+    public function categorised(ProductCategory $category, CategorySource $source = CategorySource::User): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'category' => $category,
+            'category_set_by' => $source,
+        ]);
     }
 
     public function inactive(): static

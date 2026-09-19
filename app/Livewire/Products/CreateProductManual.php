@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Products;
 
+use App\Actions\Products\CategoriseProduct;
 use App\Billing\PlanLimitReached;
 use App\Billing\PlanLimits;
 use App\Models\Product;
@@ -88,6 +89,8 @@ final class CreateProductManual extends Component
 
             return;
         }
+
+        CategoriseProduct::afterResponseFor($product);
 
         $this->redirectRoute('app.products.show', $product, navigate: true);
     }

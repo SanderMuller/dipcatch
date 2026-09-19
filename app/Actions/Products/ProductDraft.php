@@ -2,6 +2,8 @@
 
 namespace App\Actions\Products;
 
+use App\Enums\ProductCategory;
+
 /**
  * The product half of a create. Both thresholds are separate `decimal(_, 2)`
  * columns and the URL-first web path requires both, so neither collapses into
@@ -15,5 +17,6 @@ final readonly class ProductDraft
         public ?string $imageUrl = null,
         public ?string $dropThresholdPct = null,
         public ?string $dropThresholdAbs = null,
+        public ?ProductCategory $category = null,
     ) {}
 }

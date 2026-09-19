@@ -110,6 +110,19 @@ return [
         'lookback_days' => (int) env('DIPCATCH_DIGEST_LOOKBACK_DAYS', 7),
     ],
 
+    // Automatic product categories, see App\Services\TypeSafe\TypeSafeClient.
+    'categories' => [
+        // Below this path score the category is left empty. The score is
+        // computed in CategoryScorer from the answer probabilities; it is
+        // not the API's per-answer `confidence` field.
+        'min_path_score' => (float) env('DIPCATCH_CATEGORIES_MIN_PATH_SCORE', 0.5),
+        // Winner divided by runner-up; below this the answer is a coin flip
+        // and the category is left empty.
+        'min_separation' => (float) env('DIPCATCH_CATEGORIES_MIN_SEPARATION', 1.5),
+        // Quality over latency: the call runs after the response is sent.
+        'timeout_seconds' => (int) env('DIPCATCH_CATEGORIES_TIMEOUT', 20),
+    ],
+
     // Price extraction chain. Order is priority — user selectors first, then
     // host-specific, then generic fallback. See AdapterResolver for semantics.
     'adapters' => [

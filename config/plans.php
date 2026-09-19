@@ -52,6 +52,7 @@ return [
         'recheck_interval_hours' => env('PLAN_FREE_RECHECK_INTERVAL_HOURS'),
         'notifications_hourly_limit' => env('PLAN_FREE_NOTIFICATIONS_HOURLY_LIMIT'),
         'unit_price_alerts' => false,
+        'auto_categories' => false,
         // Days of price history the chart will plot. Null is unlimited.
         // Data older than this is still stored — see the retention rule in
         // PruneOldChecksCommand — it simply cannot be read on this plan.
@@ -64,6 +65,7 @@ return [
         'recheck_interval_hours' => (int) env('PLAN_PRO_RECHECK_INTERVAL_HOURS', 6),
         'notifications_hourly_limit' => (int) env('PLAN_PRO_NOTIFICATIONS_HOURLY_LIMIT', 200),
         'unit_price_alerts' => true,
+        'auto_categories' => true,
         'history_days' => null,
     ],
 

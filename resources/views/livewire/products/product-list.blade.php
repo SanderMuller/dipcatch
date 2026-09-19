@@ -36,6 +36,21 @@
             <flux:radio value="paused">{{ __('Paused') }}</flux:radio>
         </flux:radio.group>
 
+        {{-- An optgroup label cannot be picked, so each department opens with
+             an option that stands for the whole department. --}}
+        <flux:select class="max-w-56" wire:model.live="category" :label:sr="__('Category')" data-test="product-category-filter">
+            <flux:select.option value="">{{ __('All categories') }}</flux:select.option>
+            @foreach ($categoryGroups as $departmentValue => $categories)
+                @php($department = \App\Enums\ProductDepartment::from($departmentValue))
+                <flux:select.group :label="$department->label()">
+                    <flux:select.option value="{{ $department->value }}">{{ __('All :department', ['department' => Str::lcfirst($department->label())]) }}</flux:select.option>
+                    @foreach ($categories as $leaf)
+                        <flux:select.option value="{{ $leaf->value }}">{{ $leaf->label() }}</flux:select.option>
+                    @endforeach
+                </flux:select.group>
+            @endforeach
+        </flux:select>
+
         {{-- Named choices, beside the search and the filter. The table headers
              used to carry the sorting, which asked a person to know that a
              heading was clickable and to guess what a second click did. --}}
@@ -65,6 +80,9 @@
                             <x-product-thumb :product="$product" size="size-12 sm:size-14" />
                             <div class="min-w-0">
                                 <flux:text class="font-medium">{{ Str::limit($product->title, 60) }}</flux:text>
+                                @if ($product->category !== null)
+                                    <flux:badge size="sm" color="zinc" class="mt-1" data-test="product-category-badge">{{ $product->category->label() }}</flux:badge>
+                                @endif
                                 {{-- The unit price and the shop count sit in columns that
                                      md: hides, so a phone row carries them here instead
                                      of losing them. --}}
@@ -127,7 +145,13 @@
                 <flux:table.row>
                     <flux:table.cell colspan="6" class="py-10 text-center">
                         <flux:text class="text-zinc-500">
-                            {{ $search === '' ? __('Nothing tracked yet.') : __('No product matches that search.') }}
+                            @if ($search !== '')
+                                {{ __('No product matches that search.') }}
+                            @elseif (\App\Enums\ProductCategory::leavesFor($category) !== null)
+                                {{ __('No product in that category.') }}
+                            @else
+                                {{ __('Nothing tracked yet.') }}
+                            @endif
                         </flux:text>
                     </flux:table.cell>
                 </flux:table.row>

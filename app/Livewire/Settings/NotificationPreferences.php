@@ -4,6 +4,7 @@ namespace App\Livewire\Settings;
 
 use App\Models\User;
 use App\Notifications\TestNotification;
+use App\Services\TypeSafe\TypeSafeClient;
 use App\Support\IanaTimezones;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
@@ -29,10 +30,13 @@ final class NotificationPreferences extends Component
 
     public string $timezone = 'Europe/Amsterdam';
 
+    public bool $auto_categories = false;
+
     public function mount(): void
     {
         $user = $this->user();
 
+        $this->auto_categories = (bool) $user->auto_categories;
         $this->notify_via_email = (bool) $user->notify_via_email;
         $this->notify_via_filament = (bool) $user->notify_via_filament;
         $this->notify_via_push = (bool) $user->notify_via_push;
@@ -54,6 +58,9 @@ final class NotificationPreferences extends Component
             'notify_via_push' => $this->notify_via_push,
             'default_currency' => $this->default_currency !== '' ? $this->default_currency : 'EUR',
             'timezone' => $timezone,
+            // Stored on any plan. Entitlements decide whether it does
+            // anything, so a choice made on a trial survives the downgrade.
+            'auto_categories' => $this->auto_categories,
             // An explicit save is the strongest signal of intent, so stamp it:
             // the browser-detected timezone POST must never overwrite a choice
             // the user made deliberately.
@@ -77,6 +84,8 @@ final class NotificationPreferences extends Component
     {
         return view('livewire.settings.notification-preferences', [
             'timezones' => IanaTimezones::options(),
+            'autoCategoriesAvailable' => TypeSafeClient::configured(),
+            'allowsAutoCategories' => $this->user()->entitlements()->allowsAutoCategories(),
         ]);
     }
 

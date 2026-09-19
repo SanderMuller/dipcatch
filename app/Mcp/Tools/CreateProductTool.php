@@ -8,6 +8,7 @@ use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\ShopDraft;
 use App\Billing\PlanLimitReached;
+use App\Enums\ProductCategory;
 use App\Mcp\Concerns\InteractsWithOwner;
 use App\Mcp\Support\DraftFailure;
 use App\Mcp\Support\DraftToken;
@@ -17,6 +18,7 @@ use App\Models\Product;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -52,6 +54,7 @@ final class CreateProductTool extends Tool
             'confirm' => ['nullable', 'boolean'],
             'title' => ['nullable', 'string', 'max:255'],
             'variant_key' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'string', Rule::enum(ProductCategory::class)],
         ]);
 
         $user = $this->user($request);
@@ -66,7 +69,10 @@ final class CreateProductTool extends Tool
             try {
                 $product = app(CreateProductWithShop::class)(
                     $user,
-                    new ProductDraft(title: $this->productTitle($validated, $draft)),
+                    new ProductDraft(
+                        title: $this->productTitle($validated, $draft),
+                        category: is_string($validated['category'] ?? null) ? ProductCategory::from($validated['category']) : null,
+                    ),
                     $draft,
                 );
             } catch (PlanLimitReached $e) {
@@ -107,6 +113,7 @@ final class CreateProductTool extends Tool
             'confirm' => $schema->boolean()->description('Set true, with a draft, to actually create the product.'),
             'title' => $schema->string()->description('Overrides the title read from the page. DipCatch already strips the shop name, "kopen" and Shopify\'s "- Default Title"; pass this when what is left still is not the product\'s name — brand, product, flavour, pack size, nothing else.'),
             'variant_key' => $schema->string()->description('Which variant to track, when the previous call reported several.'),
+            'category' => $schema->string()->description('A category key from list_categories, such as "food.coffee_tea". Stored as the user\'s own choice, so nothing sorts the product again.'),
         ];
     }
 
