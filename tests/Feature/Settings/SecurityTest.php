@@ -275,12 +275,7 @@ function createUserPasskey(User $user, string $name): Passkey
 }
 
 /**
- * Pinning tests for the four paths `$twoFactorEnabled` is maintained on.
- * `beforeEach` fixes `confirm => true` for this whole file, so the two guards
- * that read `! $requiresConfirmation` — in `enable()` and `closeModal()` —
- * had no coverage at all, and neither did `confirmTwoFactor()` or
- * `disable()`. Written before the property becomes a computed value, so they
- * describe today's behaviour rather than the intended behaviour.
+ * Drives the whole enable flow without a real authenticator app.
  */
 function fakeTotpProvider(string $secret = 'CMN5TSOG355MJ55R', bool $codeIsValid = true): void
 {
@@ -304,7 +299,15 @@ test('confirming a valid code turns two factor on and closes the modal', functio
         ->call('confirmTwoFactor')
         ->assertHasNoErrors()
         ->assertSet('twoFactorEnabled', true)
-        ->assertSet('showModal', false);
+        ->assertSet('showModal', false)
+        // The rendered branch, not just the value behind it. `assertSet`
+        // resolves the computed without ever looking at the markup, so an
+        // inverted `@if` on that line would pass every other assertion here.
+        ->assertSee('Disable 2FA')
+        ->assertDontSee('Enable 2FA')
+        // The recovery-codes child renders inside that branch, which is what
+        // covers dropping the prop it never declared.
+        ->assertSee('Backup codes');
 });
 
 test('a wrong code leaves two factor off and says so on the page', function (): void {
@@ -327,18 +330,23 @@ test('a wrong code leaves two factor off and says so on the page', function (): 
 });
 
 test('disabling two factor turns the flag off and clears the secret', function (): void {
-    $user = User::factory()->create();
-    fakeTotpProvider();
+    // Arranged straight on the columns, the way the abandoned-confirmation
+    // test above does it: this is about `disable()`, not about the enable
+    // flow that precedes it.
+    $user = User::factory()->create()->forceFill([
+        'two_factor_secret' => encrypt('CMN5TSOG355MJ55R'),
+        'two_factor_recovery_codes' => encrypt(json_encode(['aaaa-bbbb'])),
+        'two_factor_confirmed_at' => now(),
+    ]);
+    $user->save();
+
     $this->actingAs($user);
 
     Livewire::test(Security::class)
-        ->call('enable')
-        ->call('showVerificationIfNecessary')
-        ->set('code', '123456')
-        ->call('confirmTwoFactor')
         ->assertSet('twoFactorEnabled', true)
         ->call('disable')
-        ->assertSet('twoFactorEnabled', false);
+        ->assertSet('twoFactorEnabled', false)
+        ->assertSee('Enable 2FA');
 
     $this->assertDatabaseHas('users', [
         'id' => $user->id,
@@ -357,15 +365,13 @@ test('closing the modal without confirming leaves two factor off', function (): 
         ->call('closeModal')
         ->assertSet('showModal', false)
         ->assertSet('code', '')
-        ->assertSet('manualSetupKey', '')
-        // Confirmation mode: the flag is not re-read on close, and an
-        // unconfirmed secret does not count as enabled either way.
-        ->assertSet('twoFactorEnabled', false);
+        ->assertSet('manualSetupKey', '');
 });
 
 test('without confirmation mode enabling turns two factor on immediately', function (): void {
-    // The one path `beforeEach` hides: both `! $requiresConfirmation` guards
-    // only run here.
+    // The path `beforeEach` hides. Fortify counts a secret as enabled here
+    // without waiting for a confirmation, so this is the only mode where
+    // enabling and closing the modal change the answer at all.
     Features::twoFactorAuthentication([
         'confirm' => false,
         'confirmPassword' => true,

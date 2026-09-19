@@ -278,7 +278,6 @@ final class Security extends Component
         assert($user instanceof User);
 
         $disableTwoFactorAuthentication($user);
-
     }
 
     /**
@@ -298,17 +297,12 @@ final class Security extends Component
     }
 
     /**
-     * Derived rather than mirrored. Fortify already answers this from
-     * `two_factor_secret` and `two_factor_confirmed_at`, and it branches on
-     * the `confirm` option itself, so the two `! $requiresConfirmation`
-     * guards that used to keep a copy in step were repairs for the copy, not
-     * for the domain. A computed value never enters the dehydrated payload,
-     * so it needs no `#[Locked]`.
-     *
-     * It is memoised per request, which is safe here only because nothing
-     * reads it before the actions that change those columns: the first read
-     * is the render that follows. A future caller that reads it, mutates and
-     * re-reads inside one request would need `unset($this->twoFactorEnabled)`.
+     * Exact because Fortify's actions mutate the very `Auth::user()`
+     * instance this reads, so a render after any of them sees the new
+     * attributes. It is also memoised per request, which is safe only while
+     * nothing reads it before those actions run — the first read is the
+     * render that follows. A caller that read it, mutated and re-read inside
+     * one request would need `unset($this->twoFactorEnabled)`.
      */
     #[Computed]
     public function twoFactorEnabled(): bool
