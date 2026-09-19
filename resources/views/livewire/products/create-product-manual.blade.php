@@ -21,8 +21,8 @@
         <flux:input wire:model="currency" :label="__('Currency')" maxlength="3" required />
 
         <div class="grid gap-4 sm:grid-cols-2">
-            <flux:input wire:model="drop_threshold_pct" :label="__('Alert me when it drops by (%)')" type="number" step="0.01" />
-            <flux:input wire:model="drop_threshold_abs" :label="__('Alert me when it drops by (amount)')" type="number" step="0.01" />
+            <flux:input wire:model="drop_threshold_pct" :label="__('Alert me when it drops by (%)')" type="number" step="0.01" min="0.01" max="99.99" />
+            <flux:input wire:model="drop_threshold_abs" :label="__('Alert me when it drops by (amount)')" type="number" step="0.01" min="0.01" />
         </div>
 
         <flux:button type="submit" variant="primary">{{ __('Save product') }}</flux:button>

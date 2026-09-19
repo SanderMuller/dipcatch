@@ -48,6 +48,34 @@ it('refuses a currency that is not an ISO 4217 code', function (): void {
     expect(Product::query()->where('user_id', $user->id)->count())->toBe(0);
 });
 
+it('refuses a zero drop threshold percent', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    livewire(CreateProductManual::class)
+        ->set('title', 'Local roastery beans')
+        ->set('currency', 'EUR')
+        ->set('drop_threshold_pct', '0')
+        ->call('save')
+        ->assertHasErrors('drop_threshold_pct');
+
+    expect(Product::query()->where('user_id', $user->id)->count())->toBe(0);
+});
+
+it('refuses a zero drop threshold amount', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    livewire(CreateProductManual::class)
+        ->set('title', 'Local roastery beans')
+        ->set('currency', 'EUR')
+        ->set('drop_threshold_abs', '0')
+        ->call('save')
+        ->assertHasErrors('drop_threshold_abs');
+
+    expect(Product::query()->where('user_id', $user->id)->count())->toBe(0);
+});
+
 it('refuses an image url whose scheme is not http(s)', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);
