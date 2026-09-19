@@ -11,6 +11,9 @@ use App\Mcp\Support\DraftFailure;
 use App\Mcp\Support\DraftToken;
 use App\Mcp\Support\ProbeReporter;
 use App\Mcp\Support\ProductPresenter;
+use App\Models\Product;
+use App\Models\Shop;
+use App\Support\PackSize;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Validation\Rule;
@@ -107,11 +110,90 @@ final class AddShopTool extends Tool
 
         $snapshot = ShopDraft::flatten($outcome);
 
-        return Response::structured([
-            'found' => $this->reporter->preview($snapshot, $outcome),
+        $preview = ['found' => $this->reporter->preview($snapshot, $outcome)];
+
+        $mismatch = self::packSizeMismatch($product, $snapshot);
+
+        if ($mismatch !== null) {
+            $preview['pack_size_note'] = $mismatch;
+        }
+
+        return Response::structured($preview + [
             'draft' => DraftToken::issue($this->user($request), $snapshot, (string) $outcome->normalizedUrl, (string) $outcome->adapterKey, $variantKey, $this->key($product)),
             'next' => 'Show this to the user. If they agree, call add_shop again with the draft and confirm: true.',
         ]);
+    }
+
+    /**
+     * Says so when this page sells a different amount from the shops already
+     * on the product.
+     *
+     * Not a refusal: a near-match is often what a person wants, and shops do
+     * write the same pack differently. But a 227 g bag attached to a 333 g
+     * product reads as a cheaper price rather than a smaller bag, and a caller
+     * that does not compare the numbers itself has nothing to show the user.
+     *
+     * @param  array<string, mixed>  $snapshot
+     */
+    private static function packSizeMismatch(Product $product, array $snapshot): ?string
+    {
+        $drafted = PackSize::resolve(
+            is_string($snapshot['pack_size'] ?? null) ? $snapshot['pack_size'] : null,
+            (bool) ($snapshot['pack_size_authoritative'] ?? false),
+            is_string($snapshot['title'] ?? null) ? $snapshot['title'] : null,
+        );
+
+        if (! $drafted instanceof PackSize) {
+            return null;
+        }
+
+        $existing = $product->shops
+            ->map(self::packOf(...))
+            ->filter()
+            ->map(fn (PackSize $size): string => $size->quantity . '|' . $size->unit)
+            ->unique();
+
+        // Nothing to compare against, or the product already holds a mixture
+        // the caller can see for itself in get_product.
+        if ($existing->count() !== 1) {
+            return null;
+        }
+
+        if ($existing->first() === $drafted->quantity . '|' . $drafted->unit) {
+            return null;
+        }
+
+        return sprintf(
+            'This page sells %s. The shops already on this product sell %s. That is a different pack, not a cheaper price — add it only if the user wants the smaller or larger size tracked alongside.',
+            self::amount($drafted),
+            self::amount($product->shops->map(self::packOf(...))->filter()->first()),
+        );
+    }
+
+    /**
+     * The pack a shop reports, read from its own columns. `Shop::packSize()`
+     * is private, and a message is not a reason to widen it.
+     */
+    private static function packOf(Shop $shop): ?PackSize
+    {
+        if ($shop->pack_quantity === null || ! is_string($shop->pack_unit)) {
+            return null;
+        }
+
+        return PackSize::of((float) $shop->pack_quantity, $shop->pack_unit);
+    }
+
+    private static function amount(?PackSize $size): string
+    {
+        if (! $size instanceof PackSize) {
+            return 'an unknown amount';
+        }
+
+        return match ($size->unit) {
+            'g' => rtrim(rtrim(number_format($size->quantity, 1, '.', ''), '0'), '.') . ' g',
+            'ml' => rtrim(rtrim(number_format($size->quantity, 1, '.', ''), '0'), '.') . ' ml',
+            default => rtrim(rtrim(number_format($size->quantity, 1, '.', ''), '0'), '.') . ' pieces',
+        };
     }
 
     /**

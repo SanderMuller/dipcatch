@@ -804,3 +804,59 @@ it('says nothing about units when every shop agrees', function (): void {
         ->assertOk()
         ->assertDontSee('never reaches');
 });
+
+it('says at preview time when the pack differs from the shops already tracked', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/2' => Http::response(jsonLdPage('1.99', 'EUR', 'Twix Minis 227 g'), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['pack_quantity' => 333, 'pack_unit' => 'g']);
+
+    // A 227 g bag on a 333 g product reads as a cheaper price rather than a
+    // smaller bag, and a caller that does not compare the numbers itself has
+    // nothing to show the user.
+    DipCatchServer::actingAs($user)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'url' => 'https://shop.example.com/p/2'])
+        ->assertOk()
+        ->assertSee('This page sells 227 g')
+        ->assertSee('already on this product sell 333 g')
+        ->assertSee('a different pack, not a cheaper price');
+});
+
+it('says nothing when the pack matches', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/3' => Http::response(jsonLdPage('2.49', 'EUR', 'Twix Minis 333 g'), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['pack_quantity' => 333, 'pack_unit' => 'g']);
+
+    DipCatchServer::actingAs($user)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'url' => 'https://shop.example.com/p/3'])
+        ->assertOk()
+        ->assertDontSee('different pack');
+});
+
+it('says nothing when the product already holds a mixture', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/4' => Http::response(jsonLdPage('1.99', 'EUR', 'Twix Minis 227 g'), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['pack_quantity' => 333, 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['pack_quantity' => 240, 'pack_unit' => 'g']);
+
+    // The caller can see the mixture in get_product; repeating it here would
+    // fire on every further shop and stop being read.
+    DipCatchServer::actingAs($user)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'url' => 'https://shop.example.com/p/4'])
+        ->assertOk()
+        ->assertDontSee('different pack');
+});
