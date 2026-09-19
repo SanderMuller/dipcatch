@@ -13,6 +13,7 @@ use App\Mcp\Support\ProbeReporter;
 use App\Mcp\Support\ProductPresenter;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -42,26 +43,27 @@ final class AddShopTool extends Tool
 
     public function handle(Request $request): Response|ResponseFactory
     {
-        // Both arguments key on `confirm`, because `confirm` is the only thing
-        // the handler below branches on. Keyed on each other instead, a draft
-        // sent without `confirm` left `url` unrequired, and the preview branch
-        // then probed an empty string — answering "that does not look like a
-        // URL" at a caller that sent no URL and a perfectly good draft.
+        // One message per mistake. `required_without:draft` and
+        // `required_unless:confirm,true` are each true too often on their own,
+        // and either one alone leaves a case answering with two sentences that
+        // steer opposite ways.
+        $arguments = $request->all();
+        $confirming = ($arguments['confirm'] ?? null) === true;
+        $draftSent = ($arguments['draft'] ?? '') !== '';
+
         $validated = $request->validate([
             'product_id' => ['required', 'uuid'],
-            'url' => ['required_unless:confirm,true', 'nullable', 'string', 'max:2048'],
+            'url' => [Rule::requiredIf(! $confirming && ! $draftSent), 'nullable', 'string', 'max:2048'],
             'draft' => ['required_if:confirm,true', 'prohibited_unless:confirm,true', 'nullable', 'string'],
-            // `strict`, because the branch below compares with `===`. Plain
-            // `boolean` accepts 1 and "1", which pass every rule here and then
-            // fail that comparison — the same empty-URL probe, reached through
-            // a value the caller meant as a confirmation. Refusing it is also
-            // the safer half: confirming is the step that writes.
+            // `strict`, because 1 and "1" pass a plain `boolean` and then fail
+            // the `=== true` below — the preview branch, on a call that meant
+            // to confirm.
             'confirm' => ['nullable', 'boolean:strict'],
             'variant_key' => ['nullable', 'string', 'max:255'],
         ], [
-            'url.required_unless' => 'Pass a url to preview a product page.',
-            'confirm.boolean' => 'confirm takes true or false, not 1 or 0.',
-            'draft.prohibited_unless' => 'A draft only adds the shop when confirm is true. Call again with the same draft and confirm: true.',
+            'url.required' => 'Pass a url to preview a product page.',
+            'confirm.boolean' => 'confirm takes a JSON boolean: true or false, not a number and not a string.',
+            'draft.prohibited_unless' => 'A draft adds the shop only with confirm: true. Send the draft again with confirm: true once the user has agreed to the preview, or drop the draft to preview a url instead.',
             'draft.required_if' => 'Pass the draft from the preview call alongside confirm: true.',
         ]);
 
@@ -71,7 +73,7 @@ final class AddShopTool extends Tool
             return Response::error('No such product.');
         }
 
-        if (($validated['confirm'] ?? false) === true) {
+        if ($confirming) {
             $draft = DraftToken::open($this->user($request), $this->str($validated, 'draft'), $this->key($product));
 
             if ($draft instanceof DraftFailure) {
@@ -119,8 +121,8 @@ final class AddShopTool extends Tool
     {
         return [
             'product_id' => $schema->string()->format('uuid')->description('The product to add this shop to.')->required(),
-            'url' => $schema->string()->description('A product page at another shop. Required unless confirming a draft.'),
-            'draft' => $schema->string()->description('The draft token from the previous call.'),
+            'url' => $schema->string()->description('A product page at another shop. Required unless confirm is true.'),
+            'draft' => $schema->string()->description('The draft token from the previous call. Send it only alongside confirm: true; on its own it is refused.'),
             'confirm' => $schema->boolean()->description('Set true, with a draft, to actually add the shop.'),
             'variant_key' => $schema->string()->description('Which variant to track, when the previous call reported several.'),
         ];

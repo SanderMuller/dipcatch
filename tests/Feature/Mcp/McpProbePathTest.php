@@ -78,8 +78,9 @@ test('a create_product draft sent without confirm is told to confirm, not that i
     DipCatchServer::actingAs(User::factory()->create())
         ->tool(CreateProductTool::class, ['draft' => 'a-token'])
         ->assertHasErrors()
-        ->assertSee('only creates the product when confirm is true')
-        ->assertDontSee('does not look like a URL');
+        ->assertSee('creates the product only with confirm: true')
+        ->assertDontSee('does not look like a URL')
+        ->assertDontSee('Pass a url');
 });
 
 test('an add_shop draft sent without confirm is told to confirm, not that its url is bad', function (): void {
@@ -89,8 +90,9 @@ test('an add_shop draft sent without confirm is told to confirm, not that its ur
     DipCatchServer::actingAs($me)
         ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'draft' => 'a-token'])
         ->assertHasErrors()
-        ->assertSee('only adds the shop when confirm is true')
-        ->assertDontSee('does not look like a URL');
+        ->assertSee('adds the shop only with confirm: true')
+        ->assertDontSee('does not look like a URL')
+        ->assertDontSee('Pass a url');
 });
 
 test('a stale draft alongside a new url is refused rather than quietly ignored', function (): void {
@@ -99,7 +101,7 @@ test('a stale draft alongside a new url is refused rather than quietly ignored',
     DipCatchServer::actingAs(User::factory()->create())
         ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1', 'draft' => 'a-token'])
         ->assertHasErrors()
-        ->assertSee('only creates the product when confirm is true');
+        ->assertSee('creates the product only with confirm: true');
 });
 
 test('create_product called with no arguments asks for a url', function (): void {
@@ -144,7 +146,7 @@ test('confirm: 1 is refused rather than read as a preview', function (): void {
     DipCatchServer::actingAs($me)
         ->tool(CreateProductTool::class, ['draft' => $token, 'confirm' => 1])
         ->assertHasErrors()
-        ->assertSee('not 1 or 0')
+        ->assertSee('confirm takes a JSON boolean')
         ->assertDontSee('does not look like a URL');
 
     expect($me->products()->count())->toBe(0);
@@ -157,10 +159,21 @@ test('an add_shop confirm: 1 is refused rather than read as a preview', function
     DipCatchServer::actingAs($me)
         ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'draft' => 'a-token', 'confirm' => 1])
         ->assertHasErrors()
-        ->assertSee('not 1 or 0')
+        ->assertSee('confirm takes a JSON boolean')
         ->assertDontSee('does not look like a URL');
 
     expect($product->shops()->count())->toBe(0);
+});
+
+test('confirm takes only a real boolean', function (): void {
+    // `boolean:strict` is what keeps the rules and the `=== true` branch in
+    // one domain. "true" was always refused; 0 and "1" were not.
+    foreach (['true', 0, '1'] as $confirm) {
+        DipCatchServer::actingAs(User::factory()->create())
+            ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1', 'confirm' => $confirm])
+            ->assertHasErrors()
+            ->assertSee('confirm takes a JSON boolean');
+    }
 });
 
 test('confirming with no draft asks for the draft alone, not for a url as well', function (): void {
