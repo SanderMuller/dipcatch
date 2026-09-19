@@ -109,7 +109,11 @@ test('ages on the oldest chain, so one fresh chain cannot mask a stale one', fun
         ->and($result->meta['oldest_chain'])->toBe('jumbo');
 });
 
-test('reports a known chain that has never produced a row', function (): void {
+test('a chain row with no prices of its own does not change the verdict', function (): void {
+    // The importer writes a chain only after its prices, so this row cannot
+    // arrive through a run any more. The check therefore reads age alone and
+    // ignores it, rather than reporting it as a second kind of failure.
+    // `RefreshCheckjebonDatasetCommandTest` pins the invariant itself.
     freshnessShop();
     freshnessRow(now()->subHour());
 
@@ -122,6 +126,7 @@ test('reports a known chain that has never produced a row', function (): void {
 
     $result = new CheckjebonFreshnessCheck()->run();
 
-    expect($result->status->value)->toBe('failed')
-        ->and($result->meta['chains_without_rows'])->toBe(['plus']);
+    expect($result->status->value)->toBe('ok')
+        ->and($result->meta['oldest_chain'])->toBe('ah')
+        ->and($result->meta)->not->toHaveKey('chains_without_rows');
 });

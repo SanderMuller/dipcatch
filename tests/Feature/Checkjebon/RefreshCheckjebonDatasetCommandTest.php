@@ -118,7 +118,7 @@ test('a chain the app has never heard of is imported from the payload alone', fu
         ->and(CheckjebonChain::query()->where('chain', 'newchain')->value('base_url'))->toBe('https://www.newchain.nl/p/');
 });
 
-test('an empty chain gets no metadata, so the health check does not report it forever', function (): void {
+test('an empty chain gets no metadata, so no chain is recorded without prices', function (): void {
     Http::fake([checkjebonUrl() => Http::response(checkjebonFixture())]);
 
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
@@ -230,7 +230,19 @@ test('a chain is recorded only after its prices are stored', function (): void {
 
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
 
-    expect($writes)->not->toBeEmpty()
-        ->and(array_search('checkjebon_chains', $writes, true))
-        ->toBeGreaterThan(array_search('checkjebon_prices', $writes, true));
+    expect($writes)->toContain('checkjebon_prices')
+        ->and(array_last($writes))->toBe('checkjebon_chains');
+});
+
+test('every recorded chain has prices after a successful run', function (): void {
+    // The invariant that replaced the health check's `chains_without_rows`
+    // branch. Nothing else asserts it end to end.
+    Http::fake([checkjebonUrl() => Http::response(checkjebonFixture())]);
+
+    $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
+
+    $withPrices = CheckjebonPrice::query()->distinct()->pluck('supermarket')->all();
+
+    expect(CheckjebonChain::query()->count())->toBeGreaterThan(0)
+        ->and(CheckjebonChain::query()->whereNotIn('chain', $withPrices)->pluck('chain')->all())->toBeEmpty();
 });
