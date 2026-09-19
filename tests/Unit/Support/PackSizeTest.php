@@ -286,6 +286,22 @@ test('the same holds for a unit the title spells differently', function (): void
         ->and($size->unit)->toBe('g');
 });
 
+test('a leading piece count with the size elsewhere is a multipack too', function (string $title): void {
+    // Foodello writes every listing this way: "12st ... 55g", no x, no spaces.
+    // A forced recheck reported 55 g for a box of twelve until this.
+    expect(PackSize::resolve('55 g', authoritative: true, title: $title)->quantity)->toBe(660.0);
+})->with([
+    '12st Barebells Hazelnut Nougat eiwitrepen 55g',
+    '12st-barebells-coco-choco-soft-protein-bar-55g',
+    '12 stuks Barebells 55 g',
+]);
+
+test('a leading count needs one size in the title, not several', function (): void {
+    // "and 1 kg free" says something this rule cannot read, so the shop's
+    // own figure stands.
+    expect(PackSize::resolve('55 g', authoritative: true, title: '12 stuks 55 g en 1 kg gratis')->quantity)->toBe(55.0);
+});
+
 test('a stated pack total is left alone', function (): void {
     $size = PackSize::resolve('660 g', authoritative: true, title: 'Barebells Protein Bar - 12 x 55 g');
 

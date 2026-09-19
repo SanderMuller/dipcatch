@@ -162,8 +162,8 @@ final readonly class PackSize
      * authoritative — an authoritative empty or unparseable size must stay
      * null so persistence can clear stale pack data (spec Section 4).
      *
-     * One exception, in {@see describesOneItem()}: a shop that states the
-     * size of a single item while its own title spells out a multipack has
+     * One exception, in {@see StatedPackSize::wholePack()}: a shop that states
+     * the size of a single item while its own title counts the items has
      * described the item, not the pack.
      */
     public static function resolve(?string $packSize, bool $authoritative, ?string $title): ?self
@@ -171,7 +171,7 @@ final readonly class PackSize
         $parsed = self::parse($packSize);
 
         if ($parsed !== null) {
-            return self::describesOneItem($parsed, $title) ? self::parse($title) : $parsed;
+            return StatedPackSize::wholePack($parsed, $title) ?? $parsed;
         }
 
         if ($authoritative) {
@@ -182,35 +182,34 @@ final readonly class PackSize
     }
 
     /**
-     * True when the structured size is the size of one item out of a
-     * multipack the title states.
+     * How many items a title counts, whichever way it writes them: `12 x 55 g`
+     * and a leading piece count (`12st ...`, `12 stuks ...`) both give 12.
      *
-     * A shop selling a box of twelve bars that reports "55 g" is describing
-     * one bar. Taken at face value it makes the box look twelve times more
-     * expensive per kilo than it is, which is the number "best value" and
-     * the unit-price alerts are built on.
-     *
-     * Deliberately narrow: the structured size has to equal the multipack's
-     * own per-item size exactly. Any other disagreement leaves the shop's
-     * figure alone, because the shop usually knows its own packaging better
-     * than a title does.
+     * Null when the title counts nothing, or counts more than one thing.
      */
-    private static function describesOneItem(self $structured, ?string $title): bool
+    public static function itemCountIn(string $title): ?float
     {
-        $item = self::multipackItem($title);
+        $sizeUnitAlt = self::alternation(array_keys(self::MASS_UNITS))
+            . '|' . self::alternation(array_keys(self::VOLUME_UNITS))
+            . '|' . self::alternation(self::PIECE_WORDS);
 
-        return $item instanceof self
-            && $item->unit === $structured->unit
-            && abs($item->quantity - $structured->quantity) < 0.0001;
-    }
+        $counted = '/' . self::NUMBER . '\s*[x\x{00D7}]\s*' . self::NUMBER . '\s*(' . $sizeUnitAlt . ')\b/iu';
 
-    /** The size of one item in a counted multipack (`12 x 55 g` gives 55 g). */
-    private static function multipackItem(?string $title): ?self
-    {
-        if ($title === null || trim($title) === '') {
-            return null;
+        if (preg_match_all($counted, $title, $matches, PREG_SET_ORDER) === 1) {
+            return self::toNumber($matches[0][1]);
         }
 
+        $pieces = array_unique(self::collectValues($title, self::alternation(self::PIECE_WORDS), units: null));
+
+        return count($pieces) === 1 ? reset($pieces) : null;
+    }
+
+    /**
+     * The item size a `<count> x <size>` title states, so a caller can tell it
+     * apart from the size of the whole pack.
+     */
+    public static function crossFormItemIn(string $title): ?self
+    {
         $sizeUnitAlt = self::alternation(array_keys(self::MASS_UNITS))
             . '|' . self::alternation(array_keys(self::VOLUME_UNITS))
             . '|' . self::alternation(self::PIECE_WORDS);
@@ -221,14 +220,14 @@ final readonly class PackSize
             return null;
         }
 
-        [, $count, $size, $unit] = array_values($matches[0]);
+        return self::parse($matches[0][2] . ' ' . $matches[0][3]);
+    }
 
-        // More than one item, or it is not a pack at all.
-        if (self::toNumber($count) <= 1) {
-            return null;
-        }
-
-        return self::parse($size . ' ' . $unit);
+    public function isSameSizeAs(?self $other): bool
+    {
+        return $other instanceof self
+            && $other->unit === $this->unit
+            && abs($other->quantity - $this->quantity) < 0.0001;
     }
 
     /**
