@@ -5,8 +5,11 @@ namespace App\Livewire\Products;
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Models\Product;
+use App\Services\TypeSafe\TypeSafeClient;
+use App\Services\TypeSafe\TypeSafeRequestFailed;
 use App\Support\Iso4217;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
 use SanderMuller\FluentValidation\FluentRule;
@@ -52,6 +55,11 @@ final class EditProduct extends Component
     public string $loadedCategory = '';
 
     public ?string $message = null;
+
+    /** A category Jev proposed, as a `ProductCategory` value, until accepted or declined. */
+    public ?string $suggestedCategory = null;
+
+    public ?string $suggestionMessage = null;
 
     public function mount(Product $product): void
     {
@@ -123,6 +131,54 @@ final class EditProduct extends Component
         $this->redirectRoute('app.products.show', $this->product, navigate: true);
     }
 
+    /**
+     * One request on the person's own click, so the answer is shown for a
+     * decision rather than stored. Guards match the settings switch, a Pro
+     * plan and a configured key; the opt-in is not needed for an explicit ask.
+     */
+    public function suggestCategory(): void
+    {
+        $this->authorize('update', $this->product);
+        $this->suggestionMessage = null;
+
+        if (! TypeSafeClient::configured() || ! $this->allowsAutoCategories()) {
+            return;
+        }
+
+        try {
+            $verdict = app(TypeSafeClient::class)->categorise($this->product);
+        } catch (TypeSafeRequestFailed $e) {
+            Log::warning('Category suggestion failed.', ['product_id' => $this->product->id, 'error' => $e->getMessage(), 'exception' => $e]);
+            $this->suggestionMessage = __('No suggestion right now. Try again in a moment.');
+
+            return;
+        }
+
+        if ($verdict->winner === null) {
+            $this->suggestionMessage = __('Nothing fits this product well enough to suggest.');
+
+            return;
+        }
+
+        $this->suggestedCategory = $verdict->winner->value;
+    }
+
+    public function acceptSuggestion(): void
+    {
+        if ($this->suggestedCategory === null) {
+            return;
+        }
+
+        $this->category = $this->suggestedCategory;
+        $this->suggestedCategory = null;
+        $this->message = __('Category set. Save changes to keep it.');
+    }
+
+    public function declineSuggestion(): void
+    {
+        $this->suggestedCategory = null;
+    }
+
     public function delete(): void
     {
         $this->authorize('delete', $this->product);
@@ -156,9 +212,18 @@ final class EditProduct extends Component
         return view('livewire.products.edit-product', [
             'currencies' => Iso4217::options(),
             'categoryGroups' => ProductCategory::grouped(),
+            'suggestionAvailable' => TypeSafeClient::configured(),
+            'allowsAutoCategories' => $this->allowsAutoCategories(),
+            'suggestedLabel' => ProductCategory::tryFrom((string) $this->suggestedCategory)?->label(),
             'shopImages' => $this->shopImages(),
             'allowsUnitPriceAlerts' => $this->product->user?->entitlements()->allowsUnitPriceAlerts() === true,
+            'unitWord' => $this->unitWord(),
         ]);
+    }
+
+    private function allowsAutoCategories(): bool
+    {
+        return $this->product->user?->entitlements()->allowsAutoCategories() === true;
     }
 
     /**
@@ -179,6 +244,25 @@ final class EditProduct extends Component
         }
 
         return $images;
+    }
+
+    /**
+     * The unit this product's alert compares in, named rather than listed.
+     * Null while no shop has read a pack size, when the reader really does
+     * not know yet and neither do we.
+     */
+    private function unitWord(): ?string
+    {
+        $word = match ($this->product->unitPriceUnit()) {
+            'g' => __('kilo'),
+            'ml' => __('litre'),
+            'piece' => __('piece'),
+            default => null,
+        };
+
+        // `__()` is typed as array|string: a key that maps to an array is not
+        // a word, and reads here as no unit at all.
+        return is_string($word) ? $word : null;
     }
 
     private function blankToNull(?string $value): ?string

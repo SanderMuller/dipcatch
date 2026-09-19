@@ -44,9 +44,14 @@ final class SetCategoryTool extends Tool
 
     public function handle(Request $request): Response|ResponseFactory
     {
+        // The default message is "The selected category is invalid", which
+        // leaves a caller that sent a department key ("food") with no idea
+        // that a department is the mistake, so it retries the same shape.
         $validated = $request->validate([
             'product_id' => ['required', 'uuid'],
             'category' => ['present', 'nullable', 'string', Rule::in(ProductCategory::values())],
+        ], [
+            'category.in' => 'No such category. A department key like "food" is not a category: call list_categories and pick one of the categories inside the department, such as "food.snacks_sweets".',
         ]);
 
         $product = $this->ownedProduct($request, $this->str($validated, 'product_id'));

@@ -41,6 +41,30 @@
                     @endforeach
                 </flux:select>
 
+                @if ($suggestionAvailable && $category === '')
+                    <div class="flex flex-wrap items-center gap-3" data-test="category-suggestion">
+                        @if ($suggestedCategory !== null)
+                            <flux:text>{{ __('Suggested:') }} <span class="font-medium">{{ $suggestedLabel }}</span></flux:text>
+                            <flux:button size="sm" variant="primary" wire:click="acceptSuggestion">{{ __('Use it') }}</flux:button>
+                            <flux:button size="sm" variant="ghost" wire:click="declineSuggestion">{{ __('Not this one') }}</flux:button>
+                        @elseif ($allowsAutoCategories)
+                            <flux:button size="sm" icon="sparkles" wire:click="suggestCategory" wire:loading.attr="disabled" wire:target="suggestCategory">
+                                {{ __('Suggest a category') }}
+                            </flux:button>
+                            <flux:text size="sm" class="text-zinc-500" wire:loading wire:target="suggestCategory">{{ __('Looking at the product…') }}</flux:text>
+                            @if ($suggestionMessage)
+                                <flux:text size="sm" class="text-zinc-500" wire:loading.remove wire:target="suggestCategory">{{ $suggestionMessage }}</flux:text>
+                            @endif
+                        @else
+                            {{-- Disabled, not hidden: the button is the pitch. --}}
+                            <flux:tooltip :content="__('Pro suggests a category for you.')">
+                                <flux:button size="sm" icon="sparkles" disabled>{{ __('Suggest a category') }}</flux:button>
+                            </flux:tooltip>
+                            <flux:link :href="route('upgrade')" class="text-sm">{{ __('Get Pro') }}</flux:link>
+                        @endif
+                    </div>
+                @endif
+
                 <flux:input wire:model="imageUrl" :label="__('Image URL')" type="url" placeholder="https://…" />
 
                 @if ($shopImages !== [])
@@ -95,10 +119,16 @@
 
                 <flux:input
                     wire:model="unitPriceTarget"
-                    :label="__('Target price per kilo, litre or piece')"
-                    :description="$allowsUnitPriceAlerts
-                        ? __('We tell you when the best value reaches this price per kilo, litre or piece.')
-                        : __('Pro alerts on this. We keep the number, and it starts working when you upgrade.')"
+                    {{-- The unit is named once the shops have read a pack size,
+                         because by then it is not a choice the reader makes. --}}
+                    :label="$unitWord
+                        ? __('Target price per :unit', ['unit' => $unitWord])
+                        : __('Target price per kilo, litre or piece')"
+                    :description="! $allowsUnitPriceAlerts
+                        ? __('Pro alerts on this. We keep the number, and it starts working when you upgrade.')
+                        : ($unitWord
+                            ? __('We tell you when the best value reaches this price per :unit.', ['unit' => $unitWord])
+                            : __('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.'))"
                     type="number"
                     step="0.01"
                     min="0.01"
