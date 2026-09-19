@@ -1,7 +1,7 @@
 @php
     // English only and outside MarketingLocale: the readers are shop
     // operators deciding whether to allow the crawler, not customers.
-    $userAgent = config('scraper.user_agent');
+    $userAgent = config('dipcatch.fetcher.user_agent');
     $intervalHours = config('dipcatch.recheck.interval_hours', 6);
     $contactEmail = config('site.contact_email');
 @endphp

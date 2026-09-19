@@ -61,7 +61,16 @@ return [
     ],
 
     'fetcher' => [
-        'user_agent' => (string) env('DIPCATCH_FETCHER_USER_AGENT', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15'),
+        /*
+         * The one identity: what the shop requests send, what the robots.txt
+         * rules are matched against, and what the /bot page publishes.
+         *
+         * It used to impersonate Safari while /bot told operators we send
+         * `DipCatchBot` and that disallowing it in robots.txt would stop us.
+         * The rule was matched against the impersonated string, so it was
+         * matched on "Mozilla" and the published control did nothing.
+         */
+        'user_agent' => (string) env('DIPCATCH_FETCHER_USER_AGENT', 'DipCatchBot/1.0 (+https://dipcatch.eu/bot)'),
         'timeout_seconds' => (int) env('DIPCATCH_FETCHER_TIMEOUT', 10),
         'body_cap_bytes' => (int) env('DIPCATCH_FETCHER_BODY_CAP_BYTES', 2_000_000),
         'rate_limit_per_minute' => (int) env('DIPCATCH_FETCHER_RATE_LIMIT_PER_MINUTE', 30),
@@ -121,6 +130,9 @@ return [
         'min_separation' => (float) env('DIPCATCH_CATEGORIES_MIN_SEPARATION', 1.5),
         // Quality over latency: the call runs after the response is sent.
         'timeout_seconds' => (int) env('DIPCATCH_CATEGORIES_TIMEOUT', 20),
+        // Paid calls per account and app-wide per day. Zero lifts a cap.
+        'daily_limit_per_user' => (int) env('DIPCATCH_CATEGORIES_DAILY_LIMIT_PER_USER', 50),
+        'daily_limit' => (int) env('DIPCATCH_CATEGORIES_DAILY_LIMIT', 2000),
     ],
 
     // Price extraction chain. Order is priority — user selectors first, then

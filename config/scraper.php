@@ -2,8 +2,6 @@
 
 return [
 
-    'user_agent' => env('SCRAPER_USER_AGENT', 'DipCatchBot/1.0 (+https://dipcatch.eu/bot)'),
-
     'timeout' => 15,
 
     'max_redirects' => 5,

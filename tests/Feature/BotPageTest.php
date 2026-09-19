@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Services\ShopFetcher\RobotsTxtPolicy;
 use Illuminate\Support\Facades\Config;
 
 test('a shop operator who looks up the crawler finds a page explaining it', function (): void {
@@ -9,8 +10,8 @@ test('a shop operator who looks up the crawler finds a page explaining it', func
         ->assertSee('robots.txt');
 });
 
-test('the page shows the exact user agent the scraper sends', function (): void {
-    config()->set('scraper.user_agent', 'DipCatchBot/9.9 (+https://dipcatch.eu/bot)');
+test('the page shows the exact user agent the fetcher sends', function (): void {
+    config()->set('dipcatch.fetcher.user_agent', 'DipCatchBot/9.9 (+https://dipcatch.eu/bot)');
 
     $this->get('/bot')->assertOk()->assertSee('DipCatchBot/9.9 (+https://dipcatch.eu/bot)');
 });
@@ -45,7 +46,23 @@ test('the bot page is reachable without signing in', function (): void {
 });
 
 test('the user agent points at the domain the site actually runs on', function (): void {
-    expect(Config::string('scraper.user_agent'))->toContain('dipcatch.eu/bot');
+    expect(Config::string('dipcatch.fetcher.user_agent'))->toContain('dipcatch.eu/bot');
+});
+
+test('the crawler sends the name it publishes, and obeys robots.txt under that name', function (): void {
+    // These were three different strings: the requests impersonated Safari,
+    // /bot published DipCatchBot, and the robots rules were matched against
+    // the impersonated string — so an operator who followed the published
+    // instruction and disallowed DipCatchBot was ignored.
+    $sent = Config::string('dipcatch.fetcher.user_agent');
+
+    $nameFromUa = new ReflectionMethod(RobotsTxtPolicy::class, 'nameFromUa');
+
+    expect($sent)->toStartWith('DipCatchBot/')
+        ->and($nameFromUa->invoke(null, $sent))->toBe('DipCatchBot')
+        ->and($sent)->not->toContain('Mozilla');
+
+    $this->get('/bot')->assertOk()->assertSee($sent);
 });
 
 test('no configuration or example env still names the old domain', function (string $path): void {
