@@ -16,12 +16,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 trait Subscribes
 {
     /**
-     * Stripe statuses that end the entitlement outright, matching the ones
-     * Cashier's `active()` scope excludes.
-     */
-    private const array ENDED_STATUSES = ['unpaid', 'incomplete_expired'];
-
-    /**
      * Pro as a gift rather than a payment.
      *
      * Blocked beats comped on purpose: an account blocked for a lost
@@ -54,18 +48,18 @@ trait Subscribes
             return $this->onTrial() ? Plan::Pro : Plan::Free;
         }
 
-        // Stripe has given up collecting. `valid()` would still say yes
-        // while `ends_at` is in the future, and `ProUsers` — which the
-        // scheduler reads — would say no. Two answers for one account.
-        if (in_array($subscription->stripe_status, self::ENDED_STATUSES, strict: true)) {
-            return Plan::Free;
-        }
-
-        // `valid()` covers active, trialing and the cancelled-but-not-yet-
-        // expired grace period. `keepPastDueSubscriptionsActive()` in
-        // AppServiceProvider adds past due, so Pro survives the dunning
-        // retries.
-        return $subscription->valid() ? Plan::Pro : Plan::Free;
+        // `active()`, not `valid()`, because `ProUsers` — the scheduler's
+        // reader — selects on Cashier's `active()` scope, and the two are one
+        // predicate: the scope's "ends_at is null or on grace period" is what
+        // `active()`'s `! ended()` expands to, and both consult the same
+        // `Cashier::$deactivatePastDue` and `$deactivateIncomplete` statics.
+        // Naming it here is what makes the two readers agree by construction
+        // rather than by a hand-maintained status list.
+        //
+        // It still covers trialing and the cancelled-but-not-yet-expired
+        // grace period, and `keepPastDueSubscriptionsActive()` in
+        // AppServiceProvider keeps Pro through the dunning retries.
+        return $subscription->active() ? Plan::Pro : Plan::Free;
     }
 
     public function isPro(): bool
