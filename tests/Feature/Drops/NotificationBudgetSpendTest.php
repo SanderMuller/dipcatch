@@ -298,3 +298,62 @@ test('a drop transaction that commits spends one slot', function (): void {
     // `CheckShopPrice::persist()` produces. It must still arrive.
     Notification::assertSentTo($user, PriceDropNotification::class);
 });
+
+test('a denied drop budget keeps the latch and drops that alert', function (): void {
+    config()->set('plans.free.notifications_hourly_limit', 1);
+
+    $user = User::factory()->create(['notify_via_filament' => true]);
+    [$product, $checkId] = budgetDroppingProduct($user);
+
+    RateLimiter::hit(NotificationBudget::key($user), 3600);
+
+    DB::transaction(function () use ($product, $checkId): void {
+        app(DetectDrop::class)($product, $checkId);
+    });
+
+    // The latch is armed inside the transaction, before the ceiling is asked
+    // from the commit callback. It stays armed, so this drop is dropped rather
+    // than retried at the same price on the next check. The unit-price and
+    // target-price denial tests both cite DetectDrop for this behaviour; until
+    // now nothing pinned it here.
+    $product->refresh();
+
+    expect((string) $product->last_notified_price)->toBe('85.00')
+        ->and($product->last_notified_at)->not->toBeNull();
+
+    Notification::assertNothingSent();
+
+    // Suppression is real-time only. The event row is committed either way and
+    // `SendDailyDigest` filters on nothing but the user and the window, so the
+    // shopper still reads this drop in the daily mail.
+    expect(PriceDropEvent::query()->count())->toBe(1);
+});
+
+test('a suppressed drop alert says so in the log', function (): void {
+    config()->set('plans.free.notifications_hourly_limit', 1);
+
+    $user = User::factory()->create(['notify_via_filament' => true]);
+    [$product, $checkId] = budgetDroppingProduct($user);
+
+    RateLimiter::hit(NotificationBudget::key($user), 3600);
+
+    Log::spy();
+
+    DB::transaction(function () use ($product, $checkId): void {
+        app(DetectDrop::class)($product, $checkId);
+    });
+
+    // Plan 010 requires all three detectors to name the alert they suppressed.
+    // The unit-price and target-price halves of that were pinned; this one was
+    // not, so the grep in its done-criteria could pass while the behaviour
+    // regressed.
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => $message === 'Notification suppressed by hourly rate limit'
+            && $context['alert'] === 'price_drop'
+            && $context['user_id'] === $user->id
+            && $context['product_id'] === $product->id
+            && $context['price_drop_event_id'] !== null);
+
+    Notification::assertNothingSent();
+});
