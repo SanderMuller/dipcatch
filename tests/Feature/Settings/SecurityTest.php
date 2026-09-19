@@ -273,3 +273,111 @@ function createUserPasskey(User $user, string $name): Passkey
         'credential' => [],
     ]);
 }
+
+/**
+ * Pinning tests for the four paths `$twoFactorEnabled` is maintained on.
+ * `beforeEach` fixes `confirm => true` for this whole file, so the two guards
+ * that read `! $requiresConfirmation` — in `enable()` and `closeModal()` —
+ * had no coverage at all, and neither did `confirmTwoFactor()` or
+ * `disable()`. Written before the property becomes a computed value, so they
+ * describe today's behaviour rather than the intended behaviour.
+ */
+function fakeTotpProvider(string $secret = 'CMN5TSOG355MJ55R', bool $codeIsValid = true): void
+{
+    mock(TwoFactorAuthenticationProvider::class)
+        ->shouldReceive('generateSecretKey')->andReturn($secret)
+        ->shouldReceive('qrCodeUrl')->andReturn('otpauth://totp/Dipcatch?secret=' . $secret)
+        ->shouldReceive('verify')->andReturn($codeIsValid);
+}
+
+test('confirming a valid code turns two factor on and closes the modal', function (): void {
+    fakeTotpProvider();
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(Security::class)
+        ->call('enable')
+        ->assertSet('showModal', true)
+        // The QR step comes first; the code field only renders after this.
+        ->call('showVerificationIfNecessary')
+        ->assertSet('showVerificationStep', true)
+        ->set('code', '123456')
+        ->call('confirmTwoFactor')
+        ->assertHasNoErrors()
+        ->assertSet('twoFactorEnabled', true)
+        ->assertSet('showModal', false);
+});
+
+test('a wrong code leaves two factor off and says so on the page', function (): void {
+    // The audit carried a claim that this message is swallowed because
+    // Fortify throws into a named bag. It is not: Livewire flattens the bag
+    // into `default` and the field renders it. Nothing asserted that.
+    fakeTotpProvider(codeIsValid: false);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(Security::class)
+        ->call('enable')
+        ->call('showVerificationIfNecessary')
+        ->set('code', '000000')
+        ->call('confirmTwoFactor')
+        ->assertSet('twoFactorEnabled', false)
+        // Still on the verification step, so the field that carries the
+        // error is on the page to carry it.
+        ->assertSet('showVerificationStep', true)
+        ->assertSee('The provided two factor authentication code was invalid.');
+});
+
+test('disabling two factor turns the flag off and clears the secret', function (): void {
+    $user = User::factory()->create();
+    fakeTotpProvider();
+    $this->actingAs($user);
+
+    Livewire::test(Security::class)
+        ->call('enable')
+        ->call('showVerificationIfNecessary')
+        ->set('code', '123456')
+        ->call('confirmTwoFactor')
+        ->assertSet('twoFactorEnabled', true)
+        ->call('disable')
+        ->assertSet('twoFactorEnabled', false);
+
+    $this->assertDatabaseHas('users', [
+        'id' => $user->id,
+        'two_factor_secret' => null,
+        'two_factor_confirmed_at' => null,
+    ]);
+});
+
+test('closing the modal without confirming leaves two factor off', function (): void {
+    fakeTotpProvider();
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(Security::class)
+        ->call('enable')
+        ->assertSet('showModal', true)
+        ->call('closeModal')
+        ->assertSet('showModal', false)
+        ->assertSet('code', '')
+        ->assertSet('manualSetupKey', '')
+        // Confirmation mode: the flag is not re-read on close, and an
+        // unconfirmed secret does not count as enabled either way.
+        ->assertSet('twoFactorEnabled', false);
+});
+
+test('without confirmation mode enabling turns two factor on immediately', function (): void {
+    // The one path `beforeEach` hides: both `! $requiresConfirmation` guards
+    // only run here.
+    Features::twoFactorAuthentication([
+        'confirm' => false,
+        'confirmPassword' => true,
+    ]);
+
+    fakeTotpProvider();
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(Security::class)
+        ->assertSet('requiresConfirmation', false)
+        ->call('enable')
+        ->assertSet('twoFactorEnabled', true)
+        ->call('closeModal')
+        ->assertSet('twoFactorEnabled', true);
+});
