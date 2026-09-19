@@ -178,7 +178,7 @@ final readonly class PackSize
             return null;
         }
 
-        return self::parse($title);
+        return StatedPackSize::fromTitle($title);
     }
 
     /**
@@ -189,13 +189,7 @@ final readonly class PackSize
      */
     public static function itemCountIn(string $title): ?float
     {
-        $sizeUnitAlt = self::alternation(array_keys(self::MASS_UNITS))
-            . '|' . self::alternation(array_keys(self::VOLUME_UNITS))
-            . '|' . self::alternation(self::PIECE_WORDS);
-
-        $counted = '/' . self::NUMBER . '\s*[x\x{00D7}]\s*' . self::NUMBER . '\s*(' . $sizeUnitAlt . ')\b/iu';
-
-        if (preg_match_all($counted, $title, $matches, PREG_SET_ORDER) === 1) {
+        if (preg_match_all(self::crossFormPattern(), $title, $matches, PREG_SET_ORDER) === 1) {
             return self::toNumber($matches[0][1]);
         }
 
@@ -210,17 +204,40 @@ final readonly class PackSize
      */
     public static function crossFormItemIn(string $title): ?self
     {
-        $sizeUnitAlt = self::alternation(array_keys(self::MASS_UNITS))
-            . '|' . self::alternation(array_keys(self::VOLUME_UNITS))
-            . '|' . self::alternation(self::PIECE_WORDS);
-
-        $counted = '/' . self::NUMBER . '\s*[x\x{00D7}]\s*' . self::NUMBER . '\s*(' . $sizeUnitAlt . ')\b/iu';
-
-        if (preg_match_all($counted, $title, $matches, PREG_SET_ORDER) !== 1) {
+        if (preg_match_all(self::crossFormPattern(), $title, $matches, PREG_SET_ORDER) !== 1) {
             return null;
         }
 
         return self::parse($matches[0][2] . ' ' . $matches[0][3]);
+    }
+
+    /** A number followed by a piece word, for a caller that needs its position. */
+    public static function pieceCountPattern(): string
+    {
+        return '/' . self::NUMBER . '\s*(?:' . self::alternation(self::PIECE_WORDS) . ')\b/iu';
+    }
+
+    /** A number followed by a weight or volume unit, same purpose. */
+    public static function sizePattern(): string
+    {
+        return '/' . self::NUMBER . '\s*(?:' . self::alternation(array_keys(self::MASS_UNITS))
+            . '|' . self::alternation(array_keys(self::VOLUME_UNITS)) . ')\b/iu';
+    }
+
+    /** True when the title writes its multipack as `<count> x <size>`. */
+    public static function hasCrossForm(string $title): bool
+    {
+        return preg_match(self::crossFormPattern(), $title) === 1;
+    }
+
+    /** `<count> x <size><unit>`, the shape every caller here looks for first. */
+    private static function crossFormPattern(): string
+    {
+        $sizeUnitAlt = self::alternation(array_keys(self::MASS_UNITS))
+            . '|' . self::alternation(array_keys(self::VOLUME_UNITS))
+            . '|' . self::alternation(self::PIECE_WORDS);
+
+        return '/' . self::NUMBER . '\s*[x\x{00D7}]\s*' . self::NUMBER . '\s*(' . $sizeUnitAlt . ')\b/iu';
     }
 
     public function isSameSizeAs(?self $other): bool

@@ -296,6 +296,19 @@ test('a leading piece count with the size elsewhere is a multipack too', functio
     '12 stuks Barebells 55 g',
 ]);
 
+test('a title that counts first and sizes last is a pack, with no stated size at all', function (string $title, float $expected): void {
+    // The live case: Foodello states no structured size, so the title is all
+    // there is, and it read as one 55 g bar instead of a box of twelve.
+    expect(PackSize::resolve(packSize: null, authoritative: false, title: $title)->quantity)->toBe($expected);
+})->with([
+    'the shop house style' => ['12st Barebells Hazelnut Nougat eiwitrepen 55g', 660.0],
+    'spelled out' => ['12 stuks 55 g', 660.0],
+    // Order is the signal: this is 500 g holding twenty sachets.
+    'size before the count' => ['Koffie 500 g 20 zakjes', 500.0],
+    'a count with no size' => ['Eieren 12 stuks', 12.0],
+    'no count at all' => ['Melk 1 L', 1000.0],
+]);
+
 test('a leading count needs one size in the title, not several', function (): void {
     // "and 1 kg free" says something this rule cannot read, so the shop's
     // own figure stands.

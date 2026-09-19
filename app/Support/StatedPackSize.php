@@ -39,6 +39,65 @@ final readonly class StatedPackSize
         return $count > 1 ? PackSize::of($stated->quantity * $count, $stated->unit) : null;
     }
 
+    /**
+     * The pack a title implies when the shop states no size of its own.
+     *
+     * Same reading as {@see wholePack()}, from the title alone: a title that
+     * counts its items and then sizes one of them describes a pack of that
+     * many. Foodello states no structured size at all, so this is the path
+     * its rows take.
+     */
+    public static function fromTitle(?string $title): ?PackSize
+    {
+        if ($title === null) {
+            return null;
+        }
+
+        $parsed = PackSize::parse($title);
+        $count = self::leadingCountBeforeSize($title);
+
+        if (! $parsed instanceof PackSize || $count === null || $parsed->unit === 'piece') {
+            return $parsed;
+        }
+
+        return PackSize::of($parsed->quantity * $count, $parsed->unit) ?? $parsed;
+    }
+
+    /**
+     * The count in a title that counts its items first and sizes one of them
+     * last — `12st Barebells ... 55g`. Null unless the count comes before the
+     * size.
+     *
+     * The order is the whole signal. "Koffie 500 g 20 zakjes" is 500 g holding
+     * twenty sachets, not twenty times 500 g, and it is told apart from the
+     * shape above only by which of the two comes first.
+     */
+    private static function leadingCountBeforeSize(string $title): ?float
+    {
+        if (PackSize::hasCrossForm($title)) {
+            return null;
+        }
+
+        $count = self::firstMatch(PackSize::pieceCountPattern(), $title);
+        $size = self::firstMatch(PackSize::sizePattern(), $title);
+
+        if ($count === null || $size === null || $count['offset'] >= $size['offset'] || $count['value'] <= 1) {
+            return null;
+        }
+
+        return $count['value'];
+    }
+
+    /** @return array{value: float, offset: int}|null */
+    private static function firstMatch(string $pattern, string $title): ?array
+    {
+        if (preg_match($pattern, $title, $match, PREG_OFFSET_CAPTURE) !== 1) {
+            return null;
+        }
+
+        return ['value' => (float) str_replace(',', '.', $match[1][0]), 'offset' => (int) $match[0][1]];
+    }
+
     /** True when the size the shop states is the size of one item in the title. */
     private static function restatesTheItem(PackSize $stated, string $title): bool
     {
