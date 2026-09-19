@@ -14,6 +14,7 @@ use App\Mcp\Tools\ListProductsTool;
 use App\Mcp\Tools\PriceHistoryTool;
 use App\Mcp\Tools\RemoveShopTool;
 use App\Mcp\Tools\SetCategoryTool;
+use App\Mcp\Tools\SetImageTool;
 use App\Mcp\Tools\SetThresholdTool;
 use App\Mcp\Tools\SetTitleTool;
 use App\Models\Product;
@@ -664,4 +665,75 @@ it('will not categorise another account\'s product', function (): void {
         ->assertHasErrors();
 
     expect($theirs->refresh()->category)->toBeNull();
+});
+
+it('shows the picture the named shop reported', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['image_url' => null]);
+    $shop = Shop::factory()->for($product)->create(['image_url' => 'https://shop.example.com/bar.jpg']);
+
+    DipCatchServer::actingAs($user)
+        ->tool(SetImageTool::class, ['product_id' => (string) $product->id, 'shop_id' => (string) $shop->id])
+        ->assertOk();
+
+    expect($product->refresh()->image_url)->toBe('https://shop.example.com/bar.jpg');
+});
+
+it('takes no image address from the caller, only a shop', function (): void {
+    // The whole point: a picture read off a product page is content the shop
+    // controls, so the caller names a shop it already tracks and the server
+    // reads that shop's own stored image.
+    $properties = data_get(app(SetImageTool::class)->toArray(), 'inputSchema.properties');
+
+    expect($properties)->toBeArray()
+        ->and(array_keys((array) $properties))->toBe(['product_id', 'shop_id']);
+});
+
+it('refuses a shop that belongs to another product of the same user', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['image_url' => null]);
+    $other = Product::factory()->for($user)->create();
+    $elsewhere = Shop::factory()->for($other)->create(['image_url' => 'https://shop.example.com/other.jpg']);
+
+    // Same owner, wrong product: that picture is of a different thing.
+    DipCatchServer::actingAs($user)
+        ->tool(SetImageTool::class, ['product_id' => (string) $product->id, 'shop_id' => (string) $elsewhere->id])
+        ->assertHasErrors();
+
+    expect($product->refresh()->image_url)->toBeNull();
+});
+
+it('says so when the chosen shop has no picture yet', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['image_url' => 'https://shop.example.com/kept.jpg']);
+    $shop = Shop::factory()->for($product)->create(['image_url' => null]);
+
+    DipCatchServer::actingAs($user)
+        ->tool(SetImageTool::class, ['product_id' => (string) $product->id, 'shop_id' => (string) $shop->id])
+        ->assertHasErrors();
+
+    expect($product->refresh()->image_url)->toBe('https://shop.example.com/kept.jpg');
+});
+
+it('will not take a picture for another account\'s product', function (): void {
+    $theirs = Product::factory()->create(['image_url' => null]);
+    $shop = Shop::factory()->for($theirs)->create(['image_url' => 'https://shop.example.com/theirs.jpg']);
+
+    DipCatchServer::actingAs(User::factory()->create())
+        ->tool(SetImageTool::class, ['product_id' => (string) $theirs->id, 'shop_id' => (string) $shop->id])
+        ->assertHasErrors();
+
+    expect($theirs->refresh()->image_url)->toBeNull();
+});
+
+it('tells a caller which shops can supply a picture', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create();
+    Shop::factory()->for($product)->create(['image_url' => 'https://shop.example.com/has.jpg']);
+    Shop::factory()->for($product)->create(['image_url' => null]);
+
+    $response = DipCatchServer::actingAs($user)
+        ->tool(GetProductTool::class, ['product_id' => (string) $product->id]);
+
+    $response->assertOk()->assertSee('"has_image":true')->assertSee('"has_image":false');
 });

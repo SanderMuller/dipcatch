@@ -36,6 +36,7 @@ final readonly class ProductPresenter
             // caller has to cross-reference `is_cheapest` against each shop's
             // stock before it can say "cheapest is X" honestly.
             'cheapest_stock' => self::stock($product->cheapestShop?->current_in_stock),
+            'image_url' => $product->safeImageUrl(),
             'category' => $product->category?->value,
             'category_label' => $product->category?->label(),
             'department' => $product->category?->department()->value,
@@ -65,6 +66,9 @@ final readonly class ProductPresenter
                 'stock' => self::stock($shop->current_in_stock),
                 'pack_quantity' => $shop->pack_quantity === null ? null : (float) $shop->pack_quantity,
                 'pack_unit' => $shop->pack_unit,
+                // Which shops can supply a picture, so a caller choosing one
+                // for set_image can see the choice rather than guess at it.
+                'has_image' => $shop->safeImageUrl() !== null,
                 'is_cheapest' => $shop->getKey() === $product->cheapest_shop_id,
                 'last_checked_at' => $checked instanceof CarbonInterface ? $checked->toIso8601String() : null,
             ];

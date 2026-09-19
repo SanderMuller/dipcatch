@@ -69,6 +69,12 @@ function expectedToolAnnotations(): array
             'destructiveHint' => true,
             'openWorldHint' => false,
         ],
+        'set_image' => [
+            'title' => 'Set product image',
+            'readOnlyHint' => false,
+            'destructiveHint' => true,
+            'openWorldHint' => false,
+        ],
         'remove_shop' => [
             'title' => 'Remove shop',
             'readOnlyHint' => false,

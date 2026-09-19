@@ -91,7 +91,7 @@ it('exposes every tool under a readable name', function (): void {
         }
     }
 
-    expect($tools)->toHaveCount(12);
+    expect($tools)->toHaveCount(13);
 
     foreach ($tools as $tool) {
         $name = app($tool)->name();
@@ -213,6 +213,6 @@ it('advertises a version that moves with the tool roster', function (): void {
         ->getAttributes(Version::class)[0] ?? null;
 
     expect($version)->not->toBeNull()
-        ->and($version->newInstance()->value)->toBe('1.3.0')
-        ->and($declared)->toHaveCount(12);
+        ->and($version->newInstance()->value)->toBe('1.4.0')
+        ->and($declared)->toHaveCount(13);
 });
