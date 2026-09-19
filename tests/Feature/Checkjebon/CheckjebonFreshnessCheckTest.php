@@ -110,10 +110,8 @@ test('ages on the oldest chain, so one fresh chain cannot mask a stale one', fun
 });
 
 test('a chain row with no prices of its own does not change the verdict', function (): void {
-    // The importer writes a chain only after its prices, so this row cannot
-    // arrive through a run any more. The check therefore reads age alone and
-    // ignores it, rather than reporting it as a second kind of failure.
-    // `RefreshCheckjebonDatasetCommandTest` pins the invariant itself.
+    // The check reads age alone now. `RefreshCheckjebonDatasetCommandTest`
+    // pins the invariant that makes this row unreachable through a run.
     freshnessShop();
     freshnessRow(now()->subHour());
 

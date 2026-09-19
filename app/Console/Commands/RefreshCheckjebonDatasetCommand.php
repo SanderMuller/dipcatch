@@ -77,8 +77,8 @@ final class RefreshCheckjebonDatasetCommand extends Command
             if ($rows === []) {
                 // An upstream scrape hiccup (like ALDI's standing 0 rows) must
                 // not wipe local data — keep whatever the last good run stored.
-                // No metadata either: a chain with no rows would otherwise be
-                // reported as missing for as long as upstream stays empty.
+                // No chain row either: one without prices under it is the
+                // state this command exists to keep out of the table.
                 Log::warning('Checkjebon refresh: supermarket empty or missing upstream; rows kept.', [
                     'supermarket' => $supermarket,
                 ]);
@@ -103,8 +103,11 @@ final class RefreshCheckjebonDatasetCommand extends Command
             // Last, so a chain row always implies that chain has prices. The
             // run is not transactional, so writing it first left a first-ever
             // import that died mid-upsert with a chain and nothing under it.
-            // The reverse gap is harmless: prices with no chain row yet are
-            // skipped by `SuggestShops::bestPerChain()` until the next run.
+            // Prices with no chain row are the safe half of the pair:
+            // `SuggestShops::freshChains()` reads the chain table, so
+            // `candidateRows()` never selects them. That is a one-run gap
+            // after a crash, but a permanent one for a chain whose upstream
+            // entry carries no `u` — see `storeChain()`.
             $this->storeChain($decoded, $supermarket, $runStartedAt);
 
             $this->info(sprintf('%s: %d rows upserted, %d delisted rows pruned.', $supermarket, count($rows), $pruned));
@@ -220,6 +223,13 @@ final class RefreshCheckjebonDatasetCommand extends Command
         $label = $entry['c'] ?? null;
 
         if (! is_string($baseUrl) || $baseUrl === '') {
+            // Permanent, not a gap that closes: prices keep arriving and no
+            // chain row is ever written, so `freshChains()` never yields the
+            // chain and nothing suggests it. Silence here reads as success.
+            Log::warning('Checkjebon refresh: chain has no base URL upstream; it cannot be suggested.', [
+                'supermarket' => $supermarket,
+            ]);
+
             return;
         }
 

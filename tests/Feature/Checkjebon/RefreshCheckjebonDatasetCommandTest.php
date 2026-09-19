@@ -118,7 +118,7 @@ test('a chain the app has never heard of is imported from the payload alone', fu
         ->and(CheckjebonChain::query()->where('chain', 'newchain')->value('base_url'))->toBe('https://www.newchain.nl/p/');
 });
 
-test('an empty chain gets no metadata, so no chain is recorded without prices', function (): void {
+test('an empty chain gets no metadata, so an empty upstream records no chain', function (): void {
     Http::fake([checkjebonUrl() => Http::response(checkjebonFixture())]);
 
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
@@ -220,23 +220,40 @@ test('a chain is recorded only after its prices are stored', function (): void {
 
     $writes = [];
 
+    // The verb matters as much as the table. `pruneChainsWithoutPrices()`
+    // ends every run with a delete against `checkjebon_chains`, so asking
+    // only which table was touched last says nothing about where the upsert
+    // went.
+    // Anchored on the statement's own target, not on any mention of the
+    // table: the cleanup's `where chain not in (select ... from
+    // checkjebon_prices)` names both tables in one delete.
     DB::listen(function (QueryExecuted $query) use (&$writes): void {
-        foreach (['checkjebon_prices', 'checkjebon_chains'] as $table) {
-            if (str_contains($query->sql, $table) && ! str_starts_with($query->sql, 'select')) {
-                $writes[] = $table;
-            }
+        if (preg_match('/^(insert into|update|delete from) "(checkjebon_\w+)"/', $query->sql, $match) === 1) {
+            $writes[] = $match[1] . ' ' . $match[2];
         }
     });
 
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
 
-    expect($writes)->toContain('checkjebon_prices')
-        ->and(array_last($writes))->toBe('checkjebon_chains');
+    $chainUpserts = array_keys($writes, 'insert into checkjebon_chains', true);
+    $priceWrites = [
+        ...array_keys($writes, 'insert into checkjebon_prices', true),
+        ...array_keys($writes, 'delete from checkjebon_prices', true),
+    ];
+
+    $lastPriceWrite = $priceWrites === [] ? -1 : max($priceWrites);
+
+    // Exactly one, so "write it early for the log line and again at the end"
+    // cannot satisfy this while reopening the window it exists to close.
+    expect($lastPriceWrite)->toBeGreaterThan(-1)
+        ->and($chainUpserts)->toHaveCount(1)
+        ->and($chainUpserts[0])->toBeGreaterThan($lastPriceWrite);
 });
 
 test('every recorded chain has prices after a successful run', function (): void {
-    // The invariant that replaced the health check's `chains_without_rows`
-    // branch. Nothing else asserts it end to end.
+    // The end state, not the proof: both write orders satisfy this on a run
+    // that finishes. The order test above is what pins the mechanism; this
+    // one catches a later change that reintroduces the state some other way.
     Http::fake([checkjebonUrl() => Http::response(checkjebonFixture())]);
 
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
