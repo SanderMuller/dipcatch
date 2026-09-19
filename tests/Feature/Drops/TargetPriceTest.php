@@ -178,6 +178,46 @@ test('set_threshold stores a target price on a free account, with no Pro caveat'
     expect((float) $product->fresh()?->target_price)->toBe(18.0);
 });
 
+test('set_threshold changing the target clears a stale latch', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create([
+        'user_id' => $me->id,
+        'target_price' => '18.00',
+        'target_price_notified' => '17.05',
+        'target_price_notified_at' => now(),
+    ]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'target_price' => 30])
+        ->assertOk();
+
+    $fresh = $product->fresh();
+
+    expect((float) $fresh?->target_price)->toBe(30.0)
+        ->and($fresh?->target_price_notified)->toBeNull()
+        ->and($fresh?->target_price_notified_at)->toBeNull();
+});
+
+test('set_threshold re-sending the same target through the tool does not clear the latch', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create([
+        'user_id' => $me->id,
+        'target_price' => '18.00',
+        'target_price_notified' => '17.05',
+        'target_price_notified_at' => now(),
+    ]);
+
+    DipCatchServer::actingAs($me)
+        // The tool assigns a float; the stored value is a decimal-cast
+        // string. This proves that type difference does not read as dirty.
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'target_price' => 18])
+        ->assertOk();
+
+    $fresh = $product->fresh();
+
+    expect($fresh?->target_price_notified)->toBe('17.05');
+});
+
 test('the notification budget still caps a target alert', function (): void {
     $product = targetPriceProduct('18.00');
     $user = $product->user;

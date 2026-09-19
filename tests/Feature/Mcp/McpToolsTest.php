@@ -305,6 +305,27 @@ it('sets the unit price target without a caveat for a Pro account', function ():
     expect((float) $product->fresh()?->unit_price_target)->toBe(6.5);
 });
 
+it('set_threshold changing the unit price target clears a stale latch', function (): void {
+    $me = User::factory()->create();
+    subscribeUser($me);
+    $product = Product::factory()->create([
+        'user_id' => $me->id,
+        'unit_price_target' => '5.50',
+        'unit_price_notified' => '5.38',
+        'unit_price_notified_at' => now(),
+    ]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 6.0])
+        ->assertOk();
+
+    $fresh = $product->fresh();
+
+    expect((float) $fresh?->unit_price_target)->toBe(6.0)
+        ->and($fresh?->unit_price_notified)->toBeNull()
+        ->and($fresh?->unit_price_notified_at)->toBeNull();
+});
+
 it('leaves the drop thresholds alone when only a unit price target is given', function (): void {
     $me = User::factory()->create();
     $product = Product::factory()->create([

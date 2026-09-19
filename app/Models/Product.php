@@ -31,16 +31,10 @@ final class Product extends Model
 
     protected static function booted(): void
     {
-        self::saving(function (self $product): void {
-            // Updates only: every attribute is dirty on a fresh insert, and a
-            // freshly created row has no prior target for a latch to be
-            // stale against. Without this guard, a factory `create()` that
-            // sets a target and its latch in the same call would have the
-            // latch wiped before the row is ever written.
-            if (! $product->exists) {
-                return;
-            }
-
+        // `updating` only, not `saving`: it never fires on insert, so a
+        // fresh row's own target and latch (set together, e.g. by a
+        // factory) survive untouched.
+        self::updating(function (self $product): void {
             if ($product->isDirty('target_price')) {
                 $product->target_price_notified = null;
                 $product->target_price_notified_at = null;
