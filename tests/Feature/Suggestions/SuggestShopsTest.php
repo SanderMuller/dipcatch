@@ -249,15 +249,93 @@ test('the chain set is read once per request, not once per caller', function ():
     $product = beemsterProduct();
     $action = app(SuggestShops::class);
 
-    $action($product);
+    $first = $action($product);
 
     DB::enableQueryLog();
 
-    $action->hasUsableCatalogue();
-    $action($product);
+    // The value too, not only the query count: a memo that answers once and
+    // then returns nothing would satisfy an empty log.
+    expect($action->hasUsableCatalogue())->toBeTrue()
+        ->and($action($product))->toEqual($first)
+        ->and($action->hasUsableCatalogue())->toBeTrue()
+        ->and(DB::getQueryLog())->toBeEmpty();
+});
+
+test('a second product reuses the chain set without reusing the suggestions', function (): void {
+    // `__invoke()` reaches the chain set through `eligibleChains()`, but only
+    // for a product the per-product memo has not seen. Asking for one is the
+    // only way to exercise that path warm — a second product must still cost
+    // its candidate rows, and must not inherit the first product's tracked
+    // chains.
+    seedChains();
+    seedBeemsterCatalogue();
+
+    $action = app(SuggestShops::class);
     $action->hasUsableCatalogue();
 
-    expect(DB::getQueryLog())->toBeEmpty();
+    $second = Product::factory()->create([
+        'title' => 'Beemster Extra belegen 48+ plakken',
+        'currency' => 'EUR',
+    ]);
+
+    DB::enableQueryLog();
+
+    $suggestions = $action($second);
+
+    $chainSetQueries = array_filter(
+        DB::getQueryLog(),
+        static fn (array $entry): bool => str_contains((string) $entry['query'], 'checkjebon_chains')
+            || str_contains((string) $entry['query'], 'max(refreshed_at)'),
+    );
+
+    expect($chainSetQueries)->toBeEmpty()
+        ->and(DB::getQueryLog())->not->toBeEmpty()
+        ->and(collect($suggestions)->pluck('chain')->all())->toContain('ah');
+});
+
+test('a product that already tracks every fresh chain still has a usable catalogue', function (): void {
+    // `hasUsableCatalogue()` reads the fresh set, `__invoke()` the eligible
+    // one. Memoizing the eligible set instead would make the panel fall
+    // silent here rather than say no other shop sells this.
+    seedChains();
+    seedRow('ah', 'Beemster Extra belegen 48+ plakken', '150 g', '3.49');
+
+    $product = Product::factory()->create([
+        'title' => 'Beemster Extra belegen 48+ plakken',
+        'currency' => 'EUR',
+    ]);
+
+    Shop::factory()->for($product)->create(['url' => 'https://www.ah.nl/producten/product/wi1/beemster']);
+
+    $action = app(SuggestShops::class);
+
+    expect($action($product))->toBeEmpty()
+        ->and($action->hasUsableCatalogue())->toBeTrue();
+});
+
+test('an empty catalogue is read once too', function (): void {
+    // `??=` memoizes an empty set; `?:` or an `empty()` guard would re-query
+    // on every call, which is the one case a stale dataset guarantees.
+    $action = app(SuggestShops::class);
+
+    expect($action->hasUsableCatalogue())->toBeFalse();
+
+    DB::enableQueryLog();
+
+    expect($action->hasUsableCatalogue())->toBeFalse()
+        ->and(DB::getQueryLog())->toBeEmpty();
+});
+
+test('the action is scoped to the request, so the chain set cannot outlive one', function (): void {
+    // The memo holds the freshness cutoff as well as the rows. Under Octane a
+    // singleton would carry both into every later request the worker serves.
+    $first = app(SuggestShops::class);
+
+    expect(app(SuggestShops::class))->toBe($first);
+
+    app()->forgetScopedInstances();
+
+    expect(app(SuggestShops::class))->not->toBe($first);
 });
 
 test('a dismissal does not re-read the chain set', function (): void {

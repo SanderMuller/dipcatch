@@ -48,14 +48,16 @@ final class SuggestShops
     private array $memo = [];
 
     /**
-     * The fresh chain set, memoized for the request. One set serves every
-     * product, so this is keyed by nothing — unlike `$memo` above. Both entry
-     * points read it: `hasUsableCatalogue()` directly, and `__invoke()`
-     * through `eligibleChains()`, which is why the two queries ran three
-     * times over on a product page that renders the component twice.
+     * One set for every product, unlike `$memo` above, because chain
+     * freshness does not depend on which product is asking.
      *
-     * `dismiss()` must not clear this. A dismissal changes which rows are
+     * `dismiss()` must not clear it: a dismissal changes which rows are
      * offered, never which chains are fresh.
+     *
+     * The container flushes this between HTTP requests, Octane operations
+     * and queued jobs, but not inside one `artisan` process — nothing loops
+     * products through this action today, and a command that did would hold
+     * one set, and one freshness cutoff, for its whole run.
      *
      * @var array<string, CheckjebonChain>|null
      */
@@ -145,11 +147,6 @@ final class SuggestShops
     }
 
     /**
-     * Chains holding rows no older than the freshness window, keyed by chain.
-     * Per chain, never one global maximum: the importer keeps a chain's rows
-     * when upstream serves none, so a refreshed AH would otherwise make a
-     * month-old Jumbo catalogue look current.
-     *
      * @return array<string, CheckjebonChain>
      */
     private function freshChains(): array
@@ -158,6 +155,11 @@ final class SuggestShops
     }
 
     /**
+     * Chains holding rows no older than the freshness window, keyed by chain.
+     * Per chain, never one global maximum: the importer keeps a chain's rows
+     * when upstream serves none, so a refreshed AH would otherwise make a
+     * month-old Jumbo catalogue look current.
+     *
      * @return array<string, CheckjebonChain>
      */
     private function readFreshChains(): array
