@@ -41,7 +41,7 @@ Implementation-ready specs live in [`specs/`](specs/README.md). All v1 launch sp
 
 ```bash
 composer setup    # install deps, copy env, key:generate, migrate, build assets
-composer dev      # octane (FrankenPHP, --watch) + queue + pail + vite (concurrent)
+composer dev      # queue + scheduler + pail + vite (concurrent); Herd serves the site
 ```
 
 ### Tests
@@ -59,7 +59,13 @@ composer test-serial     # same suite, one process, for debugging
 own database and its own Redis prefix. Do not start a serial run the moment a parallel one ends —
 the worker databases are still being torn down.
 
-The dev server runs Laravel Octane on FrankenPHP — the same runtime as production — with `--watch` so code changes reload the workers (FrankenPHP watches natively; no Node watcher needed). The FrankenPHP binary downloads on first `php artisan octane:start` and is gitignored.
+Herd serves the site at `dipcatch.test`, so `composer dev` starts no web server of its own: it runs
+the queue listener, the scheduler, the log tailer and Vite. The scheduler matters locally — the price
+rechecks, the daily digest, the adapter canary and the health heartbeat all reach you only through it.
+
+To exercise production's runtime instead, run `php artisan octane:start --watch` yourself. It is still
+a dependency and still what Laravel Cloud runs; the FrankenPHP binary downloads on first start and is
+gitignored.
 
 ## Deployment (Laravel Cloud)
 
@@ -67,7 +73,7 @@ DipCatch targets [Laravel Cloud](https://cloud.laravel.com/) — fully managed, 
 
 ### Required services
 
-- **App runtime: Laravel Octane (FrankenPHP)** — select the Octane runtime in the Laravel Cloud dashboard; `laravel/octane` + `config/octane.php` ship in the repo. Deploys reload workers automatically. Remember: code changes only apply after a worker reload — locally `composer dev` runs `octane:start --watch` for that.
+- **App runtime: Laravel Octane (FrankenPHP)** — select the Octane runtime in the Laravel Cloud dashboard; `laravel/octane` + `config/octane.php` ship in the repo. Deploys reload workers automatically. Remember: code changes only apply after a worker reload.
 - **Postgres** add-on attached → `DATABASE_URL` injected.
 - **Queue worker** (1 small instance), `redis` driver. Runs `php artisan queue:work --tries=1` — everything (scrape checks, daily digests, notifications) runs on the `default` queue; split into dedicated queues later if volume demands it.
 - **Scheduler** enabled — runs `php artisan schedule:run` minutely.
