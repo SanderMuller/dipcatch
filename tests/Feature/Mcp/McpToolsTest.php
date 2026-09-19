@@ -741,3 +741,66 @@ it('tells a caller which shops can supply a picture', function (): void {
 
     $response->assertOk()->assertSee('"has_image":true')->assertSee('"has_image":false');
 });
+
+it('carries a title given on the draft call through to the product', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(jsonLdPage('9.99', 'EUR', 'Page Title 500 g'), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $user = User::factory()->create();
+
+    // It was read, accepted and dropped: the draft carried the page's title
+    // and the confirm had nothing to use, so the parameter looked like it
+    // worked and the product got the page's name.
+    $draft = DipCatchServer::actingAs($user)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1', 'title' => 'My own name']);
+
+    $draft->assertOk();
+
+    $token = null;
+
+    $draft->assertStructuredContent(function (AssertableJson $json) use (&$token): void {
+        $token = $json->toArray()['draft'] ?? null;
+        $json->etc();
+    });
+
+    expect($token)->toBeString();
+
+    DipCatchServer::actingAs($user)
+        ->tool(CreateProductTool::class, ['draft' => $token, 'confirm' => true])
+        ->assertOk();
+
+    expect(Product::query()->where('user_id', $user->id)->value('title'))->toBe('My own name');
+});
+
+it('says which shops a per-unit target cannot reach', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create();
+    Shop::factory()->count(2)->for($product)->create(['pack_quantity' => 840, 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://ah.nl/p/1',
+        'pack_quantity' => 30,
+        'pack_unit' => 'piece',
+    ]);
+
+    // Accepted with no warning before this: the alert structurally watched
+    // two of three shops and the user saw a threshold that looked set.
+    DipCatchServer::actingAs($user)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 7.0])
+        ->assertOk()
+        ->assertSee('2 of 3 shops report grams')
+        ->assertSee('ah.nl')
+        ->assertSee('never reaches it');
+});
+
+it('says nothing about units when every shop agrees', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create();
+    Shop::factory()->count(2)->for($product)->create(['pack_quantity' => 840, 'pack_unit' => 'g']);
+
+    DipCatchServer::actingAs($user)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 7.0])
+        ->assertOk()
+        ->assertDontSee('never reaches');
+});

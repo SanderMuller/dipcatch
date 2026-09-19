@@ -40,6 +40,13 @@ final readonly class ShopDraft
         public ?string $singleItemPrice = null,
         public ?BundleOffer $bundleOffer = null,
         public ?PromotionWindow $promotionWindow = null,
+        /**
+         * A title the caller supplied instead of the page's, carried from the
+         * preview to the write. Separate from `$title` on purpose: the preview
+         * shows what the page said, and the pack-size fallback parses that,
+         * not a name a person chose.
+         */
+        public ?string $titleOverride = null,
     ) {}
 
     public function trackedPrice(): string
@@ -114,6 +121,7 @@ final readonly class ShopDraft
         ?string $titleSelector = null,
         ?string $imageSelector = null,
         ?string $variantKey = null,
+        ?string $titleOverride = null,
     ): self {
         $singleItemPrice = self::string($snapshot, 'single_item_price') ?? self::string($snapshot, 'price') ?? '';
         $bundleOffer = BundleOffer::stored(
@@ -152,6 +160,7 @@ final readonly class ShopDraft
             singleItemPrice: $singleItemPrice,
             bundleOffer: $bundleOffer,
             promotionWindow: $promotionWindow,
+            titleOverride: $titleOverride,
         );
     }
 

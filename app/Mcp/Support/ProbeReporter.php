@@ -93,6 +93,9 @@ final readonly class ProbeReporter
             ProbeFailure::ExtractionFailed => 'The page loaded but no price could be read from it. Some shops load prices with JavaScript, which DipCatch cannot see.',
             ProbeFailure::CurrencyMismatch => 'That page prices in a different currency from the product.',
             ProbeFailure::NotInDataset => 'That shop is covered by a price dataset that does not list this product yet.',
+            // Without this the default fired, which tells a caller to try a
+            // direct product URL — the one retry that can never work here.
+            ProbeFailure::ShopNotServable => 'That shop builds its prices in the browser, so its pages carry no price to read. It cannot be tracked, and another URL from the same shop will not help.',
             ProbeFailure::TemporaryFailure, ProbeFailure::HttpError => self::persistent($context)
                 ? 'That shop has not answered DipCatch on its last ' . self::failures($context) . ' requests. This is not a passing fault, so another attempt now will fail too.'
                 : 'The shop did not answer. Try again shortly.' . self::streak($context),

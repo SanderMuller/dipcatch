@@ -4,6 +4,8 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\InteractsWithOwner;
 use App\Mcp\Support\ProductPresenter;
+use App\Models\Product;
+use App\Models\Shop;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
@@ -74,14 +76,87 @@ final class SetThresholdTool extends Tool
 
         $summary = $this->presenter->summary($product);
 
+        $notes = [];
+
         // A stored target on a free account is kept and starts working on
         // upgrade, so say that rather than let the caller promise an alert
         // that will not arrive.
         if ($unitPriceTarget !== null && ! $this->user($request)->entitlements()->allowsUnitPriceAlerts()) {
-            $summary['note'] = 'The unit price target is stored, but unit-price alerts are a Pro feature. This account is not alerted on it until it upgrades.';
+            $notes[] = 'The unit price target is stored, but unit-price alerts are a Pro feature. This account is not alerted on it until it upgrades.';
+        }
+
+        if ($unitPriceTarget !== null) {
+            $excluded = self::shopsOutsideTheUnitGroup($product);
+
+            if ($excluded !== '') {
+                $notes[] = $excluded;
+            }
+        }
+
+        if ($notes !== []) {
+            $summary['note'] = implode(' ', $notes);
         }
 
         return Response::structured($summary);
+    }
+
+    /**
+     * Says so when a per-unit target cannot reach some of the product's shops.
+     *
+     * Shops can report different units — 30 pieces at one, 840 g at another —
+     * and the comparison runs inside the largest group only, so a shop outside
+     * it can never satisfy a target set in the group's unit. The target is
+     * still stored: the caller asked for it, most of the shops answer it, and
+     * a unit can change when a shop next reads a pack size. What was missing
+     * was anyone saying that part of the product is out of scope.
+     */
+    private static function shopsOutsideTheUnitGroup(Product $product): string
+    {
+        $unit = $product->unitPriceUnit();
+
+        if ($unit === null) {
+            return 'No shop on this product has read a pack size yet, so there is nothing to compare per unit until one does.';
+        }
+
+        $withPack = $product->shops->filter(
+            fn (Shop $shop): bool => is_string($shop->pack_unit) && $shop->pack_unit !== '',
+        );
+
+        $outside = $withPack->filter(fn (Shop $shop): bool => $shop->pack_unit !== $unit);
+
+        if ($outside->isEmpty()) {
+            return '';
+        }
+
+        return sprintf(
+            '%d of %d shops report %s, and this target is compared %s. %s %s %s, so the target never reaches %s.',
+            $withPack->count() - $outside->count(),
+            $withPack->count(),
+            self::unitNoun($unit),
+            self::unitPhrase($unit),
+            $outside->map(fn (Shop $shop): string => (string) $shop->host)->values()->implode(', '),
+            $outside->count() === 1 ? 'reports' : 'report',
+            self::unitNoun((string) $outside->first()->pack_unit),
+            $outside->count() === 1 ? 'it' : 'them',
+        );
+    }
+
+    private static function unitPhrase(string $unit): string
+    {
+        return match ($unit) {
+            'g' => 'per kilo',
+            'ml' => 'per litre',
+            default => 'per piece',
+        };
+    }
+
+    private static function unitNoun(string $unit): string
+    {
+        return match ($unit) {
+            'g' => 'grams',
+            'ml' => 'millilitres',
+            default => 'pieces',
+        };
     }
 
     /**

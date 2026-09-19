@@ -30,7 +30,7 @@ final readonly class DraftToken
     /**
      * @param  array<string, mixed>  $snapshot
      */
-    public static function issue(User $owner, array $snapshot, string $url, string $adapterKey, ?string $variantKey, ?string $productId = null): string
+    public static function issue(User $owner, array $snapshot, string $url, string $adapterKey, ?string $variantKey, ?string $productId = null, ?string $titleOverride = null): string
     {
         return Crypt::encryptString(json_encode([
             'v' => 1,
@@ -41,6 +41,9 @@ final readonly class DraftToken
             'url' => $url,
             'adapterKey' => $adapterKey,
             'variantKey' => $variantKey,
+            // A title the caller gave on the first call. Without this it was
+            // read, accepted and dropped: the parameter looked like it worked.
+            'titleOverride' => $titleOverride,
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -94,6 +97,7 @@ final readonly class DraftToken
         $url = $payload['url'] ?? null;
         $adapterKey = $payload['adapterKey'] ?? null;
         $variantKey = $payload['variantKey'] ?? null;
+        $titleOverride = $payload['titleOverride'] ?? null;
 
         if (! is_array($snapshot) || ! is_string($url) || ! is_string($adapterKey)) {
             return DraftFailure::Malformed;
@@ -112,6 +116,7 @@ final readonly class DraftToken
             url: $url,
             adapterKey: $adapterKey,
             variantKey: is_string($variantKey) ? $variantKey : null,
+            titleOverride: is_string($titleOverride) ? $titleOverride : null,
         );
     }
 }

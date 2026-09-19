@@ -97,7 +97,14 @@ final class CreateProductTool extends Tool
         return Response::structured([
             'found' => $this->reporter->preview($snapshot, $outcome),
             'already_tracked_as' => $this->existingTitle($user->getKey(), $outcome->normalizedUrl),
-            'draft' => DraftToken::issue($user, $snapshot, (string) $outcome->normalizedUrl, (string) $outcome->adapterKey, $variantKey),
+            'draft' => DraftToken::issue(
+                $user,
+                $snapshot,
+                (string) $outcome->normalizedUrl,
+                (string) $outcome->adapterKey,
+                $variantKey,
+                titleOverride: $this->givenTitle($validated),
+            ),
             'next' => 'Show this to the user. If they agree, call create_product again with the draft and confirm: true.',
         ]);
     }
@@ -122,9 +129,23 @@ final class CreateProductTool extends Tool
      */
     private function productTitle(array $validated, ShopDraft $draft): string
     {
+        // A title on the confirm call wins; one given on the first call is
+        // carried by the draft. Before that it was accepted and dropped, and
+        // the product got the page's name either way.
+        return $this->givenTitle($validated)
+            ?? $draft->titleOverride
+            ?? $draft->title
+            ?? 'Untitled product';
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function givenTitle(array $validated): ?string
+    {
         $given = $validated['title'] ?? null;
 
-        return is_string($given) && trim($given) !== '' ? trim($given) : $draft->title ?? 'Untitled product';
+        return is_string($given) && trim($given) !== '' ? trim($given) : null;
     }
 
     private function existingTitle(mixed $userId, ?string $url): ?string
