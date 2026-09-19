@@ -201,3 +201,60 @@ test('the dataset probe transports the dataset size and confirm stores it', func
     expect((string) $shop->pack_quantity)->toBe('125.00')
         ->and($shop->pack_unit)->toBe('g');
 });
+
+/**
+ * The three `not_in_dataset` reasons each render their own sentence from
+ * `livewire/shops/partials/probe-error.blade.php`, and they are the only
+ * branch in that partial that picks copy from a context value rather than
+ * from the error code. Nothing asserted the rendered text before: the
+ * action-level tests above stop at `$outcome->context`, so a reason that
+ * stopped reaching the template, or an `@elseif` chain that fell through to
+ * the wrong arm, would have passed every one of them.
+ */
+test('a dataset URL with no product id explains that, not the generic miss', function (): void {
+    Http::fake(ahApiDownFakes());
+    seedAhRow();
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        // An AH category page: the host is dataset-served, but no `wi<digits>`
+        // segment means no product id to look up.
+        ->set('url', 'https://www.ah.nl/producten/zuivel')
+        ->call('probe')
+        ->assertSet('state', 'error')
+        ->assertSet('errorCode', 'not_in_dataset')
+        ->assertSet('errorContext.reason', 'unrecognized_url')
+        ->assertSee('No product id found in that URL.')
+        ->assertDontSee('not in the daily price dataset');
+});
+
+test('an unloaded dataset says to load it rather than blaming the product', function (): void {
+    Http::fake(ahApiDownFakes());
+    // No seedAhRow(): the table is empty, which is an operator problem and
+    // not a statement about this product.
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://www.ah.nl/producten/product/wi257/ah-kruiden-roomkaas')
+        ->call('probe')
+        ->assertSet('state', 'error')
+        ->assertSet('errorContext.reason', 'dataset_empty')
+        ->assertSee('The daily price dataset has not been loaded yet.')
+        ->assertSee('php artisan dipcatch:refresh-checkjebon')
+        ->assertDontSee('not in the daily price dataset');
+});
+
+test('a product missing from a loaded dataset gets the generic miss', function (): void {
+    Http::fake(ahApiDownFakes());
+    seedAhRow();
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://www.ah.nl/producten/product/wi999999/unknown')
+        ->call('probe')
+        ->assertSet('state', 'error')
+        ->assertSet('errorContext.reason', 'not_in_dataset')
+        ->assertSee('This product is not in the daily price dataset (checkjebon.nl).')
+        ->assertDontSee('No product id found')
+        ->assertDontSee('has not been loaded yet');
+});
