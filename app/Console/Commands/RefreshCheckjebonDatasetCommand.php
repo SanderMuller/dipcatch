@@ -87,8 +87,6 @@ final class RefreshCheckjebonDatasetCommand extends Command
                 continue;
             }
 
-            $this->storeChain($decoded, $supermarket, $runStartedAt);
-
             foreach (array_chunk($rows, self::UPSERT_CHUNK) as $chunk) {
                 DB::table('checkjebon_prices')->upsert(
                     $chunk,
@@ -101,6 +99,13 @@ final class RefreshCheckjebonDatasetCommand extends Command
                 ->where('supermarket', $supermarket)
                 ->where('refreshed_at', '<', $runStartedAt)
                 ->delete();
+
+            // Last, so a chain row always implies that chain has prices. The
+            // run is not transactional, so writing it first left a first-ever
+            // import that died mid-upsert with a chain and nothing under it.
+            // The reverse gap is harmless: prices with no chain row yet are
+            // skipped by `SuggestShops::bestPerChain()` until the next run.
+            $this->storeChain($decoded, $supermarket, $runStartedAt);
 
             $this->info(sprintf('%s: %d rows upserted, %d delisted rows pruned.', $supermarket, count($rows), $pruned));
         }

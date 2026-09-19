@@ -4,6 +4,8 @@ use App\Console\Commands\RefreshCheckjebonDatasetCommand;
 use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
 use App\Services\Checkjebon\CheckjebonSource;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -202,4 +204,33 @@ test('malformed product rows are skipped, valid ones imported', function (): voi
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
 
     expect(CheckjebonPrice::query()->where('supermarket', 'ah')->pluck('external_id')->all())->toBe(['wi1']);
+});
+
+test('a chain is recorded only after its prices are stored', function (): void {
+    // The invariant is "a chain row implies that chain has prices", and the
+    // write order is what holds it: a run that dies between the two writes
+    // must not leave the chain behind. A crash cannot be simulated here —
+    // the suite wraps each test in a transaction, and a failed statement
+    // aborts the whole one — so the order itself is the assertion.
+    Http::fake([checkjebonUrl() => Http::response(json_encode([
+        ['n' => 'newchain', 'u' => 'https://www.newchain.nl/p/', 'c' => 'NewChain', 'd' => [
+            ['n' => 'New item', 'l' => 'new-item-1', 'p' => 1.99, 's' => '100 g'],
+        ]],
+    ], JSON_THROW_ON_ERROR))]);
+
+    $writes = [];
+
+    DB::listen(function (QueryExecuted $query) use (&$writes): void {
+        foreach (['checkjebon_prices', 'checkjebon_chains'] as $table) {
+            if (str_contains($query->sql, $table) && ! str_starts_with($query->sql, 'select')) {
+                $writes[] = $table;
+            }
+        }
+    });
+
+    $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
+
+    expect($writes)->not->toBeEmpty()
+        ->and(array_search('checkjebon_chains', $writes, true))
+        ->toBeGreaterThan(array_search('checkjebon_prices', $writes, true));
 });
