@@ -52,6 +52,38 @@ it('warns a past due account, keeps its Pro, and does not threaten its data', fu
         ->assertSee('Manage subscription');
 });
 
+it('does not print trial copy beside a Free badge', function (): void {
+    // An expired subscription can still carry a future `trial_ends_at`.
+    // `plan()` reads Free there, so the card must not also claim a running
+    // trial — the two lines sit next to each other in the same header.
+    $user = User::factory()->create();
+    subscribeUser(
+        $user,
+        'canceled',
+        endsAt: CarbonImmutable::now()->subDay(),
+        trialEndsAt: CarbonImmutable::now()->addDays(10),
+    );
+
+    $this->actingAs($user);
+
+    livewire(BillingPage::class)
+        ->assertSee('Free')
+        ->assertDontSee('Trial ends');
+});
+
+it('does not print cancelling copy beside a Free badge', function (): void {
+    // Stripe never collected a first payment, so the grace period on the row
+    // grants nothing.
+    $user = User::factory()->create();
+    subscribeUser($user, 'incomplete', endsAt: CarbonImmutable::now()->addDays(10));
+
+    $this->actingAs($user);
+
+    livewire(BillingPage::class)
+        ->assertSee('Free')
+        ->assertDontSee('Pro runs until');
+});
+
 it('says why pro is off after a lost chargeback, and offers no way to buy again', function (): void {
     configureStripe();
 

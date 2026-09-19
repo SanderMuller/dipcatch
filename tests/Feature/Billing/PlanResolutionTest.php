@@ -2,9 +2,11 @@
 
 use App\Billing\Entitlements;
 use App\Billing\Plan;
+use App\Billing\ProUsers;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\DB;
 
 it('puts a user with no subscription on the free plan', function (): void {
     expect(User::factory()->create()->plan())->toBe(Plan::Free);
@@ -103,4 +105,67 @@ it('gives pro unlimited products and shops', function (): void {
         ->and($entitlements->maxShopsPerProduct())->toBeNull()
         ->and($entitlements->recheckIntervalHours())->toBe(6)
         ->and($entitlements->allowsUnitPriceAlerts())->toBeTrue();
+});
+
+/** The scheduler's reader, asked the same way `proAnswers()` asks it. */
+function inProUsers(User $user): bool
+{
+    return DB::table('users')
+        ->whereIn('id', ProUsers::ids())
+        ->where('id', $user->getKey())
+        ->exists();
+}
+
+/**
+ * The two states where `plan()` and the scheduler's `ProUsers::ids()` used to
+ * disagree. `valid()` is `active() || onTrial() || onGracePeriod()`, and the
+ * subscription's own `trial_ends_at` reaches `onTrial()` independently of
+ * whether the subscription has ended or was ever paid for. `ProUsers` selects
+ * on Cashier's `active()` scope, which asks neither question — so one account
+ * was Pro on the billing page and Free to the scheduler at the same instant.
+ *
+ * Asserted against both readers rather than the `proAnswers()` harness in
+ * CompedAccountsTest: that harness also asserts `SubscribersTable::status()`,
+ * which derives its own label and answers "Trial" for these. Its divergence
+ * on `unpaid` and `incomplete_expired` predates this change; for the rows
+ * below it is this change that makes it disagree, and the same is true of
+ * `UsersTable`'s "Trial" reason. Both are admin-facing labels that read the
+ * subscription directly. The billing page had the same shape and is fixed
+ * here, because a shopper reads that one.
+ */
+it('ends pro on an expired subscription whose own trial is still running', function (): void {
+    $user = User::factory()->create();
+    subscribeUser(
+        $user,
+        'canceled',
+        endsAt: CarbonImmutable::now()->subDay(),
+        trialEndsAt: CarbonImmutable::now()->addDays(10),
+    );
+
+    expect($user->plan())->toBe(Plan::Free)
+        ->and(inProUsers($user))->toBeFalse();
+});
+
+it('ends pro on an incomplete subscription whose own trial is still running', function (): void {
+    // Stripe never collected the first payment. A trial window on the same
+    // row does not make it an entitlement.
+    $user = User::factory()->create();
+    subscribeUser($user, 'incomplete', trialEndsAt: CarbonImmutable::now()->addDays(10));
+
+    expect($user->plan())->toBe(Plan::Free)
+        ->and(inProUsers($user))->toBeFalse();
+});
+
+it('ends pro on an incomplete subscription inside a future grace period', function (): void {
+    // The third state this predicate change makes stricter, and the one the
+    // first commit message missed. `onGracePeriod()` is only inside
+    // `active()` when the status is not separately excluded — and
+    // `incomplete` is, because `Cashier::$deactivateIncomplete` is left at
+    // its default. Stripe never took a first payment, so a future `ends_at`
+    // does not make this an entitlement.
+    $user = User::factory()->create();
+    subscribeUser($user, 'incomplete', endsAt: CarbonImmutable::now()->addDays(10));
+
+    expect($user->plan())->toBe(Plan::Free)
+        ->and(inProUsers($user))->toBeFalse();
 });

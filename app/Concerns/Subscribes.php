@@ -16,12 +16,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 trait Subscribes
 {
     /**
-     * Stripe statuses that end the entitlement outright, matching the ones
-     * Cashier's `active()` scope excludes.
-     */
-    private const array ENDED_STATUSES = ['unpaid', 'incomplete_expired'];
-
-    /**
      * Pro as a gift rather than a payment.
      *
      * Blocked beats comped on purpose: an account blocked for a lost
@@ -54,18 +48,14 @@ trait Subscribes
             return $this->onTrial() ? Plan::Pro : Plan::Free;
         }
 
-        // Stripe has given up collecting. `valid()` would still say yes
-        // while `ends_at` is in the future, and `ProUsers` — which the
-        // scheduler reads — would say no. Two answers for one account.
-        if (in_array($subscription->stripe_status, self::ENDED_STATUSES, strict: true)) {
-            return Plan::Free;
-        }
-
-        // `valid()` covers active, trialing and the cancelled-but-not-yet-
-        // expired grace period. `keepPastDueSubscriptionsActive()` in
-        // AppServiceProvider adds past due, so Pro survives the dunning
-        // retries.
-        return $subscription->valid() ? Plan::Pro : Plan::Free;
+        // `active()`, not `valid()`, because `ProUsers` — the scheduler's
+        // reader — selects on Cashier's `active()` scope, and the instance
+        // method is that same predicate. It is the predicate that matches,
+        // not the answer: `plan()` reads the newest `pro` row while
+        // `ProUsers` matches any active one, so two rows can still disagree.
+        // `keepPastDueSubscriptionsActive()` in AppServiceProvider is what
+        // keeps Pro through the dunning retries.
+        return $subscription->active() ? Plan::Pro : Plan::Free;
     }
 
     public function isPro(): bool

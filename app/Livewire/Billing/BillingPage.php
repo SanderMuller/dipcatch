@@ -80,14 +80,23 @@ final class BillingPage extends Component
         return $date?->timezone($this->user()->timezone ?: 'Europe/Amsterdam')->isoFormat('D MMMM YYYY');
     }
 
+    /**
+     * Both of these explain why the account has Pro, so both are gated on
+     * having it. A subscription can sit in a grace period or carry a future
+     * `trial_ends_at` while `plan()` says Free — an expired or never-paid row
+     * does both — and the card would then print "Trial ends Friday" beside a
+     * Free badge.
+     */
     private function isCancelling(): bool
     {
-        return $this->user()->subscription(Plan::SUBSCRIPTION_TYPE)?->onGracePeriod() === true;
+        return $this->user()->isPro()
+            && $this->user()->subscription(Plan::SUBSCRIPTION_TYPE)?->onGracePeriod() === true;
     }
 
     private function isOnTrial(): bool
     {
-        return $this->user()->subscription(Plan::SUBSCRIPTION_TYPE)?->onTrial() === true;
+        return $this->user()->isPro()
+            && $this->user()->subscription(Plan::SUBSCRIPTION_TYPE)?->onTrial() === true;
     }
 
     private function isBlocked(): bool
