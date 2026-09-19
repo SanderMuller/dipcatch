@@ -46,9 +46,6 @@ final class Security extends Component
     public bool $canManageTwoFactor;
 
     #[Locked]
-    public bool $twoFactorEnabled;
-
-    #[Locked]
     public bool $requiresConfirmation;
 
     #[Locked]
@@ -96,7 +93,6 @@ final class Security extends Component
                 $disableTwoFactorAuthentication($user);
             }
 
-            $this->twoFactorEnabled = $user->hasEnabledTwoFactorAuthentication();
             $this->requiresConfirmation = Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm');
         }
 
@@ -203,10 +199,6 @@ final class Security extends Component
 
         $enableTwoFactorAuthentication($user);
 
-        if (! $this->requiresConfirmation) {
-            $this->twoFactorEnabled = $user->hasEnabledTwoFactorAuthentication();
-        }
-
         $this->loadSetupData();
 
         $this->showModal = true;
@@ -265,8 +257,6 @@ final class Security extends Component
         $confirmTwoFactorAuthentication($user, $this->code);
 
         $this->closeModal();
-
-        $this->twoFactorEnabled = true;
     }
 
     /**
@@ -289,7 +279,6 @@ final class Security extends Component
 
         $disableTwoFactorAuthentication($user);
 
-        $this->twoFactorEnabled = false;
     }
 
     /**
@@ -306,13 +295,28 @@ final class Security extends Component
         );
 
         $this->resetErrorBag();
+    }
 
-        if (! $this->requiresConfirmation) {
-            $user = Auth::user();
-            assert($user instanceof User);
+    /**
+     * Derived rather than mirrored. Fortify already answers this from
+     * `two_factor_secret` and `two_factor_confirmed_at`, and it branches on
+     * the `confirm` option itself, so the two `! $requiresConfirmation`
+     * guards that used to keep a copy in step were repairs for the copy, not
+     * for the domain. A computed value never enters the dehydrated payload,
+     * so it needs no `#[Locked]`.
+     *
+     * It is memoised per request, which is safe here only because nothing
+     * reads it before the actions that change those columns: the first read
+     * is the render that follows. A future caller that reads it, mutates and
+     * re-reads inside one request would need `unset($this->twoFactorEnabled)`.
+     */
+    #[Computed]
+    public function twoFactorEnabled(): bool
+    {
+        $user = Auth::user();
+        assert($user instanceof User);
 
-            $this->twoFactorEnabled = $user->hasEnabledTwoFactorAuthentication();
-        }
+        return $user->hasEnabledTwoFactorAuthentication();
     }
 
     /**

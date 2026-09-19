@@ -46,7 +46,7 @@
                 <flux:subheading>{{ __('Manage your two-factor authentication settings') }}</flux:subheading>
 
                 <div class="flex flex-col w-full mx-auto space-y-6 text-sm" wire:cloak>
-                    @if ($twoFactorEnabled)
+                    @if ($this->twoFactorEnabled)
                         <div class="space-y-4">
                             <flux:text>
                                 {{ __('You will be prompted for a secure, random pin during login, which you can retrieve from the TOTP-supported application on your phone.') }}
@@ -61,7 +61,7 @@
                                 </flux:button>
                             </div>
 
-                            <livewire:settings.two-factor.recovery-codes :$requiresConfirmation/>
+                            <livewire:settings.two-factor.recovery-codes />
                         </div>
                     @else
                         <div class="space-y-4">
