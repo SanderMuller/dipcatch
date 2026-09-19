@@ -108,7 +108,7 @@ test('create_product called with no arguments asks for a url', function (): void
     // The only assertion of the `url` rule itself: drop it, or key it back on
     // `draft`, and this call probes the empty string instead.
     DipCatchServer::actingAs(User::factory()->create())
-        ->tool(CreateProductTool::class, [])
+        ->tool(CreateProductTool::class)
         ->assertHasErrors()
         ->assertSee('Pass a url to preview a product page.')
         ->assertDontSee('does not look like a URL');
