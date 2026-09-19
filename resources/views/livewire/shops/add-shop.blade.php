@@ -16,7 +16,7 @@
                 type="url"
                 wire:model="url"
                 :label="__('Add another shop')"
-                :description="__('Paste a product URL. We will fetch the price and show a preview before saving.')"
+                :description="__('Paste a product link. We check the price and show you a preview before saving.')"
                 placeholder="https://shop.example.com/product/123"
                 required
             />
@@ -123,10 +123,10 @@
             <flux:callout.text>
                 @switch($errorCode)
                     @case('invalid_url')
-                        That doesn't look like a valid URL.
+                        That does not look like a product link.
                         @break
                     @case('empty_url')
-                        Paste a product URL above.
+                        Paste a product link above.
                         @break
                     @case('duplicate')
                         @php $dupHost = $errorContext['existing_shop_host'] ?? null; @endphp
@@ -149,7 +149,7 @@
                         We're spacing out checks to this shop to be polite. Try again in {{ $errorContext['retry_after_seconds'] ?? '~60' }} seconds.
                         @break
                     @case('probe_rate_limited')
-                        You've probed too many URLs in the last minute. Try again in {{ $errorContext['retry_after_seconds'] ?? '~60' }} seconds.
+                        You have checked too many links in the last minute. Try again in {{ $errorContext['retry_after_seconds'] ?? '~60' }} seconds.
                         @break
                     @case('temporary_failure')
                         @if ($errorContext['persistent'] ?? false)
@@ -159,7 +159,7 @@
                         @endif
                         @break
                     @case('http_error')
-                        The shop returned HTTP {{ $errorContext['status'] ?? 'error' }}. Check the URL and try again.
+                        The shop answered with an error. Check the link and try again.
                         @break
                     @case('currency_mismatch')
                         That shop sells in {{ $errorContext['actual'] ?? '?' }} but this product is tracked in {{ $errorContext['expected'] ?? '?' }}. Multi-currency tracking is not supported yet.

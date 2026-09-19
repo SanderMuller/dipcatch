@@ -34,6 +34,18 @@ final class ProductShow extends Component
     #[Url(as: 'range', except: '90')]
     public string $range = '90';
 
+    /**
+     * Opens the add-shop disclosure on arrival.
+     *
+     * The dashboard nudge that asks for a second shop links here, so the
+     * control it promised is already open when the page paints. It is a Url
+     * property rather than a read of `request()`: a Livewire update request
+     * carries no query string, so a request read would snap the form shut on
+     * the first roundtrip.
+     */
+    #[Url(as: 'add-shop', except: false)]
+    public bool $openAddShop = false;
+
     public ?string $shopMessage = null;
 
     /** The shop whose panel is open, and the fields it is editing. */

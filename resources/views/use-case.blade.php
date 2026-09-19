@@ -55,7 +55,7 @@
 
                 <section class="mt-16">
                     @if ($shops !== [])
-                        <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Shops with a reader of their own') }}</h2>
+                        <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Shops we know well') }}</h2>
                         <ul role="list" class="mt-5 flex flex-wrap gap-2">
                             @foreach ($shops as $shop)
                                 {{-- Linked: every one of these shops has a page of its own. --}}
@@ -69,13 +69,13 @@
                         </ul>
                     @endif
                     <p @class(['max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400', 'mt-5' => $shops !== []])>
-                        {{ __('Paste a product URL from any other shop as well. Most shops work. A reader of its own is written when a generic read is not enough.') }}
+                        {{ __('Paste a product link from any other shop as well. Most shops work. We only set a shop up ourselves when its page is too tricky to read otherwise.') }}
                         <x-shop-request-link class="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300" />
                     </p>
                 </section>
 
                 <section class="mt-16">
-                    <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Frequently asked questions') }}</h2>
+                    <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Common questions') }}</h2>
                     <div class="mt-6 space-y-6">
                         @foreach ($useCase->faq as $item)
                             <div class="rounded-2xl bg-white/80 p-6 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:ring-zinc-800">

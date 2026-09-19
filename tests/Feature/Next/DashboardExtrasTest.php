@@ -7,10 +7,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
-use App\Notifications\PriceDropNotification;
-use App\Notifications\TestNotification;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Str;
 
 use function Pest\Livewire\livewire;
 
@@ -107,7 +104,7 @@ it('plots savings as one Flux field per currency', function (): void {
         ->and($last['USD'])->toBe(10.0);
 });
 
-it('shows the savings chart once a drop has fired', function (): void {
+it('keeps the savings chart off the dashboard and links to it instead', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id]);
     PriceDropEvent::factory()->create([
@@ -121,62 +118,12 @@ it('shows the savings chart once a drop has fired', function (): void {
     $this->actingAs($user);
 
     livewire(Dashboard::class)
-        ->assertSee('Savings by month')
-        ->assertSeeHtml('<ui-chart')
-        ->assertDontSee('<canvas', false);
+        ->assertDontSee('Savings by month')
+        ->assertDontSeeHtml('<ui-chart')
+        ->assertSeeHtml(route('app.stats'));
 });
 
-it('says nothing about savings on an account that has never had a drop', function (): void {
-    $this->actingAs(User::factory()->create());
-
-    livewire(Dashboard::class)->assertDontSee('Savings by month');
-});
-
-it('lists alerts that have already been read', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Coffee beans 1 kg']);
-
-    $user->notifications()->create([
-        'id' => (string) Str::uuid(),
-        'type' => PriceDropNotification::class,
-        'data' => [
-            'title' => 'Coffee beans 1 kg',
-            'product_id' => $product->id,
-            'currency' => 'EUR',
-            'drop_percent' => 12.3,
-            'drop_absolute' => '1.50',
-        ],
-        // Read, so the bell has already dropped it.
-        'read_at' => now(),
-    ]);
-
-    $this->actingAs($user);
-
-    livewire(Dashboard::class)
-        ->assertSee('Recent alerts')
-        ->assertSee('Coffee beans 1 kg')
-        ->assertSee('12.3%')
-        ->assertSee('€1.50')
-        ->assertSeeHtml('data-flux-timeline');
-});
-
-it('keeps notifications that are not price alerts out of the history', function (): void {
-    // A billing incident and a test notification share the notifications table
-    // and carry no product: listed here they would be an empty row.
-    $user = User::factory()->create();
-
-    $user->notifications()->create([
-        'id' => (string) Str::uuid(),
-        'type' => TestNotification::class,
-        'data' => ['message' => 'This is a test'],
-    ]);
-
-    $this->actingAs($user);
-
-    livewire(Dashboard::class)->assertDontSee('Recent alerts');
-});
-
-it('shows no alert history to an account with no alerts', function (): void {
+it('keeps the alert history off the dashboard', function (): void {
     $this->actingAs(User::factory()->create());
 
     livewire(Dashboard::class)->assertDontSee('Recent alerts');
@@ -190,6 +137,18 @@ it('nudges an account that tracks a product at only one shop', function (): void
     $this->actingAs($user);
 
     livewire(Dashboard::class)->assertSee('Add a second shop to compare');
+});
+
+it('points the nudge at the product with the add-shop form already open', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id]);
+    Shop::factory()->create(['product_id' => $product->id]);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertSee('Add a shop')
+        ->assertSeeHtml(route('app.products.show', [$product, 'add-shop' => 1]));
 });
 
 it('drops the nudge once any product has two shops', function (): void {

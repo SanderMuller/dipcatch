@@ -30,8 +30,11 @@
 
 <link rel="icon" href="/favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="theme-color" content="#fffbeb" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)">
+{{-- One colour, matching the light canvas: light is the default mode, so a
+     colour keyed on the OS preference painted the wrong browser chrome for an
+     OS-dark visitor who never chose dark. The script below keeps it in step
+     with an explicit choice. --}}
+<meta name="theme-color" content="#fffbeb">
 
 @if (filled($canonical ?? null))
     @php($socialImage = $ogImage ?? asset('images/og-default.png'))
@@ -56,3 +59,12 @@
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @fluxAppearance
+
+{{-- Flux falls back to `system` when nothing is stored, which handed every
+     OS-dark visitor a dark page. Light is the default here. An explicit
+     choice still writes `flux.appearance` and wins on the next load. --}}
+<script>
+    window.Flux.applyAppearance(window.localStorage.getItem('flux.appearance') || 'light');
+    document.querySelector('meta[name="theme-color"]')
+        ?.setAttribute('content', document.documentElement.classList.contains('dark') ? '#09090b' : '#fffbeb');
+</script>

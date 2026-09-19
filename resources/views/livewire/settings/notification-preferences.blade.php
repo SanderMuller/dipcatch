@@ -9,7 +9,7 @@
             <div class="mt-4 space-y-4">
                 <flux:switch
                     wire:model="notify_via_email"
-                    :label="__('Daily email digest')"
+                    :label="__('One email a day')"
                     :description="__('One email per day at 09:00 in your local timezone, grouped by product.')"
                 />
 
@@ -33,7 +33,7 @@
             <flux:heading size="lg">{{ __('Regional') }}</flux:heading>
 
             <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                <flux:select wire:model="timezone" variant="listbox" searchable :label="__('Timezone')" :placeholder="__('Search timezones…')">
+                <flux:select wire:model="timezone" variant="listbox" searchable :label="__('Timezone')" :placeholder="__('Search time zones…')">
                     @foreach ($timezones as $value => $label)
                         <flux:select.option value="{{ $value }}">{{ $label }}</flux:select.option>
                     @endforeach
@@ -44,7 +44,7 @@
         </flux:card>
 
         <div class="flex flex-wrap items-center gap-3">
-            <flux:button type="submit" variant="primary">{{ __('Save preferences') }}</flux:button>
+            <flux:button type="submit" variant="primary">{{ __('Save settings') }}</flux:button>
             <flux:button type="button" variant="ghost" wire:click="sendTest">{{ __('Send a test notification') }}</flux:button>
         </div>
     </form>

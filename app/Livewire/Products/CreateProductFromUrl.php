@@ -59,10 +59,10 @@ final class CreateProductFromUrl extends Component
         return [
             'title' => FluentRule::string('Title')->required()->max(255),
             'imageUrl' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
-            'thresholdPct' => FluentRule::numeric('Drop threshold (%)')
+            'thresholdPct' => FluentRule::numeric('Alert me when it drops by (%)')
                 ->required()
                 ->between(0.01, 99.98999999999999),
-            'thresholdAbs' => FluentRule::numeric('Drop threshold (absolute)')->required()->min(0.01),
+            'thresholdAbs' => FluentRule::numeric('Alert me when it drops by (amount)')->required()->min(0.01),
         ];
     }
 
@@ -122,7 +122,7 @@ final class CreateProductFromUrl extends Component
         } catch (PlanLimitReached $e) {
             Notification::make()
                 ->warning()
-                ->title('Plan limit reached')
+                ->title('You have used all your free products')
                 ->body($e->getMessage())
                 ->persistent()
                 ->send();

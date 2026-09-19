@@ -60,8 +60,8 @@
                     <ol role="list" class="mt-6 grid gap-4 sm:grid-cols-3">
                         @foreach ([
                             ['n' => '01', 'body' => __('Copy the link to the product page at :shop.', ['shop' => $shop->name])],
-                            ['n' => '02', 'body' => __('Paste it into DipCatch. It reads the page and shows you the title, price and pack size before saving anything.')],
-                            ['n' => '03', 'body' => __('Add the same product at another shop, set a threshold, and wait to be told.')],
+                            ['n' => '02', 'body' => __('Paste it into DipCatch. You see the name, the price and the pack size before anything is saved.')],
+                            ['n' => '03', 'body' => __('Add the same product at another shop, say what you want to pay, and wait to hear from us.')],
                         ] as $step)
                             <li class="rounded-2xl bg-white/80 p-6 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:ring-zinc-800">
                                 <span aria-hidden="true" class="inline-flex size-9 items-center justify-center rounded-full bg-amber-100 font-mono text-sm font-semibold text-amber-800 tabular-nums dark:bg-amber-950/60 dark:text-amber-300">{{ $step['n'] }}</span>
@@ -85,7 +85,7 @@
                 @endif
 
                 <section class="mt-16">
-                    <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Frequently asked questions') }}</h2>
+                    <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Common questions') }}</h2>
                     <div class="mt-6 space-y-6">
                         @foreach ($shop->faq as $item)
                             <div class="rounded-2xl bg-white/80 p-6 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:ring-zinc-800">
@@ -95,7 +95,7 @@
                         @endforeach
                     </div>
                     <p class="mt-6 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">
-                        {{ __('Paste a product URL from any other shop as well. Most shops work. A reader of its own is written when a generic read is not enough.') }}
+                        {{ __('Paste a product link from any other shop as well. Most shops work. The ones named here just get extra attention.') }}
                         <x-shop-request-link :host="$shop->host" class="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300" />
                     </p>
                 </section>

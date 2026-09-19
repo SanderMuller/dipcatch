@@ -72,7 +72,7 @@
     }"
 >
     <template x-if="!supported">
-        <flux:text>{{ __('Passkeys are not supported in this browser.') }}</flux:text>
+        <flux:text>{{ __('This browser cannot use passkeys yet. Try a different browser, or sign in with your password.') }}</flux:text>
     </template>
 
     <template x-if="supported && !showForm">
@@ -101,7 +101,7 @@
                 autocomplete="off"
                 data-1p-ignore
             />
-            <flux:text class="!mt-1">{{ __('Give this passkey a name to help you identify it later.') }}</flux:text>
+            <flux:text class="!mt-1">{{ __('Give this a name so you recognise it later, such as the name of this phone or laptop.') }}</flux:text>
 
             <p x-show="error" x-text="error" x-cloak class="text-sm text-red-600 dark:text-red-400"></p>
 

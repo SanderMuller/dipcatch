@@ -1,8 +1,9 @@
-<flux:dropdown position="bottom" align="start">
-    <flux:sidebar.profile
-        :name="auth()->user()->name"
+{{-- The header is horizontal, so this is a compact profile chip rather
+     than the full-width sidebar profile row it replaced. --}}
+<flux:dropdown position="bottom" align="end" {{ $attributes }}>
+    <flux:profile
         :initials="auth()->user()->initials()"
-        icon:trailing="chevrons-up-down"
+        icon-trailing="chevron-down"
         data-test="sidebar-menu-button"
     />
 
@@ -28,6 +29,9 @@
                     {{ __('Admin panel') }}
                 </flux:menu.item>
             @endif
+            <flux:menu.item :href="route('home')" icon="globe-alt" data-test="home-page-link">
+                {{ __('Home page') }}
+            </flux:menu.item>
             <form method="POST" action="{{ route('logout') }}" class="w-full">
                 @csrf
                 <flux:menu.item

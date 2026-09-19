@@ -126,7 +126,9 @@ it('discloses bundle terms beside dashboard effective prices', function (): void
         ->assertSee('2 for €4.00')
         ->assertSeeText('Normal price: €2.85 each')
         ->assertSee('title="Regular price"', escape: false)
-        ->assertSeeText('€1.90 /l')
+        // The unit price belongs to the product page now: the dashboard table
+        // carries the product, the price now and the shop, nothing else.
+        ->assertDontSeeText('€1.90 /l')
         ->assertSeeHtml('href="https://jumbo.com/producten/fanta-cassis"')
         ->assertSeeHtml('target="_blank"');
 });

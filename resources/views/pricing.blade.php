@@ -62,7 +62,7 @@
                             <li>{{ __(':count products', ['count' => $free->maxProducts()]) }}</li>
                             <li>{{ __(':count shops per product', ['count' => $free->maxShopsPerProduct()]) }}</li>
                             <li>{{ __('Prices checked every :hours hours', ['hours' => $free->recheckIntervalHours()]) }}</li>
-                            <li>{{ __('Price drop alerts and the daily digest') }}</li>
+                            <li>{{ __('Price drop alerts and one email a day') }}</li>
                             <li>{{ __(':days days of price history', ['days' => $free->historyDays()]) }}</li>
                         </ul>
 
@@ -87,8 +87,8 @@
                             <li>{{ __('Unlimited products') }}</li>
                             <li>{{ __('Unlimited shops per product') }}</li>
                             <li>{{ __('Prices checked every :hours hours', ['hours' => $pro->recheckIntervalHours()]) }}</li>
-                            <li>{{ __('Unit price alerts, so you can set a target per kilo, litre or piece') }}</li>
-                            <li>{{ __('A higher alert ceiling') }}</li>
+                            <li>{{ __('Alerts on the price per kilo, litre or piece') }}</li>
+                            <li>{{ __('More alerts per hour') }}</li>
                             <li>{{ __('Full price history, kept for as long as you subscribe') }}</li>
                         </ul>
 
@@ -105,7 +105,7 @@
                 </div>
 
                 <p class="mt-8 text-sm text-zinc-500 dark:text-zinc-400">
-                    {{ __('If you drop back to Free, nothing you track is deleted or paused. You keep everything you already added; you just cannot add more until you are back under the free limit.') }}
+                    {{ __('If you go back to Free, nothing you follow is deleted or stopped. You keep everything you added. You just cannot add more until you are under the free limit again.') }}
                 </p>
             </main>
 

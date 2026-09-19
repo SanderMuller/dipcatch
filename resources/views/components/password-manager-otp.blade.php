@@ -1,7 +1,7 @@
 <flux:otp
     name="code"
     id="code"
-    :label="__('Authentication code')"
+    :label="__('Six-digit code')"
     autocomplete="one-time-code"
     {{ $attributes }}
 >

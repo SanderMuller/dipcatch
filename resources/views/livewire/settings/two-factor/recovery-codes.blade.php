@@ -6,10 +6,10 @@
     <div class="px-6 space-y-2">
         <div class="flex items-center gap-2">
             <flux:icon.lock-closed variant="outline" class="size-4"/>
-            <flux:heading size="lg" level="3">{{ __('2FA recovery codes') }}</flux:heading>
+            <flux:heading size="lg" level="3">{{ __('Backup codes') }}</flux:heading>
         </div>
         <flux:text variant="subtle">
-            {{ __('Recovery codes let you regain access if you lose your 2FA device. Store them in a secure password manager.') }}
+            {{ __('These codes let you back in if you lose your phone. Save them somewhere safe, such as your password manager. Each one works once.') }}
         </flux:text>
     </div>
 
@@ -24,7 +24,7 @@
                 aria-expanded="false"
                 aria-controls="recovery-codes-section"
             >
-                {{ __('View recovery codes') }}
+                {{ __('Show backup codes') }}
             </flux:button>
 
             <flux:button
@@ -36,7 +36,7 @@
                 aria-expanded="true"
                 aria-controls="recovery-codes-section"
             >
-                {{ __('Hide recovery codes') }}
+                {{ __('Hide backup codes') }}
             </flux:button>
 
             @if (filled($recoveryCodes))
@@ -80,7 +80,7 @@
                         @endforeach
                     </div>
                     <flux:text variant="subtle" class="text-xs">
-                        {{ __('Each recovery code can be used once to access your account and will be removed after use. If you need more, click Regenerate codes above.') }}
+                        {{ __('Each code works once and then disappears from this list. Running low? Use the button above to make a fresh set.') }}
                     </flux:text>
                 @endif
             </div>

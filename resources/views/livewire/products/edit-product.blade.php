@@ -69,14 +69,14 @@
                     @endforeach
                 </flux:select>
 
-                <flux:input wire:model="dropThresholdPct" :label="__('Drop threshold (%)')" type="number" step="0.01" min="0.01" max="99.99" />
+                <flux:input wire:model="dropThresholdPct" :label="__('Alert me when it drops by (%)')" type="number" step="0.01" min="0.01" max="99.99" />
 
-                <flux:input wire:model="dropThresholdAbs" :label="__('Drop threshold (amount)')" type="number" step="0.01" min="0.01" />
+                <flux:input wire:model="dropThresholdAbs" :label="__('Alert me when it drops by (amount)')" type="number" step="0.01" min="0.01" />
 
                 <flux:input
                     wire:model="targetPrice"
                     :label="__('Target price')"
-                    :description="__('Alerts when the cheapest shop reaches this price.')"
+                    :description="__('We tell you when the cheapest shop reaches this price.')"
                     type="number"
                     step="0.01"
                     min="0.01"
@@ -84,10 +84,10 @@
 
                 <flux:input
                     wire:model="unitPriceTarget"
-                    :label="__('Unit price target')"
+                    :label="__('Target price per kilo, litre or piece')"
                     :description="$allowsUnitPriceAlerts
-                        ? __('Alerts when the best value reaches this price per kilo, litre or piece.')
-                        : __('Pro alerts on this. The number is kept and starts working when you upgrade.')"
+                        ? __('We tell you when the best value reaches this price per kilo, litre or piece.')
+                        : __('Pro alerts on this. We keep the number, and it starts working when you upgrade.')"
                     type="number"
                     step="0.01"
                     min="0.01"

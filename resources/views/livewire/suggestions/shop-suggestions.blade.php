@@ -20,7 +20,7 @@
                 </flux:accordion.heading>
                 <flux:accordion.content>
             <flux:text size="sm" class="text-zinc-500">
-                Matched on name and pack size. Prices come from the daily dataset. DipCatch fetches the live price when you add the shop.
+                Matched on name and pack size. These prices come from a daily list. DipCatch checks the shop itself once you add it.
             </flux:text>
 
             <ul class="mt-3 divide-y divide-zinc-100 dark:divide-white/5">

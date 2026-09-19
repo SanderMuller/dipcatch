@@ -11,6 +11,7 @@ use App\Support\PromotionLabel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Livewire;
 
 use function Pest\Livewire\livewire;
 
@@ -187,6 +188,34 @@ it('keeps the add-shop disclosure out of the morph so it survives the refresh', 
     // strips `open` from a <details> without this. Anchored to the element,
     // because a Flux <dialog> on this page carries the same attribute.
     expect($html)->toContain('<details class="group w-full" wire:ignore.self');
+});
+
+it('opens the add-shop disclosure when the page is asked to', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+
+    $this->actingAs($user);
+
+    Livewire::withQueryParams(['add-shop' => 1]);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product])->html());
+
+    expect($html)->toContain('<details class="group w-full" open wire:ignore.self')
+        // The suggestions panel hides itself against the same flag, so Alpine
+        // must start in the open state too.
+        ->toContain('x-data="{ addOpen: true }"');
+});
+
+it('leaves the add-shop disclosure closed without that request', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product])->html());
+
+    expect($html)->toContain('x-data="{ addOpen: false }"')
+        ->not->toContain('<details class="group w-full" open');
 });
 
 it('replaces the add-shop form with the limit callout when the added shop fills the plan', function (): void {
@@ -457,4 +486,16 @@ it('says the new page could not be read when the re-check fails', function (): v
         ->assertSet('shopMessage', 'Shop URL updated, but no price could be read from the new page. Check that the link opens the product itself.');
 
     expect($shop->refresh()->current_price)->toBeNull();
+});
+
+it('links the alert threshold to the edit form', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee('Alerts below')
+        ->assertSeeHtml('data-test="edit-alert-threshold"')
+        ->assertSeeHtml(route('app.products.edit', $product));
 });

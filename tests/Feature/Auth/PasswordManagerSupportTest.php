@@ -308,7 +308,7 @@ function expectOneTimeCodeOnAnInput(string $html): void
     });
 
     $label = fieldLabel($html, 'ui-otp[name="code"]');
-    Assert::assertStringContainsString('Authentication code', $label->text());
+    Assert::assertStringContainsString('Six-digit code', $label->text());
     Assert::assertStringNotContainsString('sr-only', (string) $label->attr('class'));
 }
 

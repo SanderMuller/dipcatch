@@ -72,7 +72,7 @@ it('states that Dierapotheker reads the article number', function (): void {
 it('lists every shop on the hub, with a link to each', function (): void {
     config()->set('site.contact_email', 'hello@example.test');
 
-    $response = $this->get(route('shops'))->assertOk()->assertSeeHtml('Shops with a dedicated page on DipCatch')->assertSeeHtml('Most shops work as they are')->assertSeeHtml('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
+    $response = $this->get(route('shops'))->assertOk()->assertSeeHtml('Every shop we know well')->assertSeeHtml('Paste a product link from almost any webshop and it works')->assertSeeHtml('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
 
     foreach (ShopPages::all() as $shop) {
         $response->assertSeeHtml(route('shop', ['slug' => $shop->slug]));

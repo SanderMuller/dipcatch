@@ -84,7 +84,7 @@ final class AddShop extends Component
         } catch (PlanLimitReached $e) {
             Notification::make()
                 ->warning()
-                ->title('Plan limit reached')
+                ->title('You have used all your free products')
                 ->body($e->getMessage())
                 ->persistent()
                 ->send();

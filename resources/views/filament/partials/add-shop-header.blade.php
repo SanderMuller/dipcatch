@@ -2,6 +2,10 @@
     /** @var \App\Models\Product $product */
     /** @var int|null $shopLimit Null means the plan sets no ceiling. */
     /** @var bool $canAddShop */
+    /** @var bool $openAddShop Opens the disclosure on arrival, for a link that promised the form. */
+    $openAddShop = $openAddShop ?? false;
+    /** @var string|null $heading Rendered beside the add button, on one row. */
+    $heading = $heading ?? null;
     $shopCount = $product->shops->count();
 @endphp
 
@@ -15,19 +19,17 @@
     no modal machinery; the small Alpine binding below only mirrors its open
     state so one suggestions list shows at a time.
 --}}
-<div class="w-full space-y-4" x-data="{ addOpen: false }">
-    @php($mismatchedGtinHosts = $product->mismatchedGtinHosts())
-
-    @if ($mismatchedGtinHosts !== [])
-        <flux:callout variant="warning" icon="exclamation-triangle">
-            These shops report different article numbers (EAN): {{ implode(', ', $mismatchedGtinHosts) }}. They may be different pack sizes or products.
-        </flux:callout>
-    @endif
-
+<div class="w-full space-y-4" x-data="{ addOpen: {{ $openAddShop ? 'true' : 'false' }} }">
     @if ($canAddShop)
         <div class="grid grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_auto] [&>details[open]]:col-span-full">
-        <div class="min-w-0 pt-2" x-show="! addOpen" x-cloak>
-            @livewire('suggestions.shop-suggestions', ['product' => $product], key('shop-suggestions-panel-' . $product->id))
+        <div class="min-w-0">
+            @if ($heading !== null)
+                <flux:heading size="lg" level="2" class="min-h-9 content-center">{{ $heading }}</flux:heading>
+            @endif
+
+            <div class="pt-2" x-show="! addOpen" x-cloak>
+                @livewire('suggestions.shop-suggestions', ['product' => $product], key('shop-suggestions-panel-' . $product->id))
+            </div>
         </div>
 
         {{-- wire:ignore.self keeps the `open` attribute. The page re-renders
@@ -38,15 +40,19 @@
              the form inside it still update. --}}
         <details
             class="group w-full"
+            @if ($openAddShop) open @endif
             wire:ignore.self
             @toggle="addOpen = $el.open"
             @open-add-shop.window="$el.open = true; addOpen = true; $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'center' }))"
         >
             <summary class="flex cursor-pointer list-none items-center justify-end gap-3 rounded-lg select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-800 [&::-webkit-details-marker]:hidden">
-                {{-- Stays visible while the form is open: that is exactly
-                     when someone wants to know how much room is left. --}}
+                {{-- Only while the form is open. Beside a closed "Add a shop"
+                     button it read as a count of the suggestions below it
+                     rather than as the room left on the plan. At the limit
+                     this whole branch is gone and the callout below explains
+                     it instead. --}}
                 @if ($shopLimit !== null)
-                    <flux:text size="sm" class="text-zinc-500">{{ $shopCount }} of {{ $shopLimit }} shops</flux:text>
+                    <flux:text size="sm" class="text-zinc-500" x-show="addOpen" x-cloak>{{ $shopCount }} of {{ $shopLimit }} shops on your plan</flux:text>
                 @endif
 
                 {{-- Primary while closed, secondary once open: the panel it
@@ -66,6 +72,10 @@
         </details>
         </div>
     @else
+        @if ($heading !== null)
+            <flux:heading size="lg" level="2">{{ $heading }}</flux:heading>
+        @endif
+
         {{-- No Add button and no suggestions: every one of them would end at
              the same refusal on Confirm, after a live fetch of the page.
              Nothing already tracked is affected — the limit only stops the
@@ -78,6 +88,15 @@
             <flux:button class="mt-3" size="sm" :href="route('app.billing')" wire:navigate>
                 Compare plans
             </flux:button>
+        </flux:callout>
+    @endif
+
+    {{-- Below the controls and directly above the rows it describes. --}}
+    @php($mismatchedGtinHosts = $product->mismatchedGtinHosts())
+
+    @if ($mismatchedGtinHosts !== [])
+        <flux:callout variant="warning" icon="exclamation-triangle">
+            These shops report different article numbers (EAN): {{ implode(', ', $mismatchedGtinHosts) }}. They may be different pack sizes or products.
         </flux:callout>
     @endif
 </div>

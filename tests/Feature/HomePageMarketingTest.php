@@ -13,10 +13,10 @@ test('guests see the supported shops, a bottom call to action, and the footer li
     $this->get(route('home'))
         ->assertOk()
         ->assertSee('Works with')
-        ->assertSee('ah.nl')
+        ->assertSee('Albert Heijn')
         ->assertSee('Stop checking prices by hand.')
         ->assertSee(route('privacy'))
-        ->assertSee('verification email');
+        ->assertSee('to check the address is yours');
 });
 
 test('the header offers account creation to guests and the app to members', function (): void {
@@ -60,7 +60,7 @@ test('the hero leads with the compare-across-shops headline', function (): void 
     $this->get(route('home'))
         ->assertOk()
         ->assertSee('Same product, every shop, one alert.')
-        ->assertSee('compares them on price per kilo or per piece');
+        ->assertSee('It compares the price per kilo or per piece');
 });
 
 test('the phone mock shows grocery examples from supported shops only', function (): void {
@@ -232,9 +232,12 @@ test('the homepage speaks about repeat purchases, not only supermarkets', functi
         ->assertSee('skincare');
 });
 
-test('shop pills carry the brand name a person would search for', function (): void {
-    $this->get(route('home'))->assertOk()->assertSeeHtml('title="Albert Heijn"')
-        ->assertSee('ah.nl');
+test('shop pills read as the brand, with the domain one hover away', function (): void {
+    // A shopper looks for "Albert Heijn", not "ah.nl", so the name is what
+    // the pill shows; the domain stays in the title for anyone checking.
+    $this->get(route('home'))->assertOk()
+        ->assertSeeHtml('title="ah.nl"')
+        ->assertSee('Albert Heijn');
 });
 
 test('a host nobody has named falls back to the host itself', function (): void {
@@ -273,7 +276,7 @@ test('the homepage says most shops work from a pasted link', function (): void {
 
     $this->get(route('home'))
         ->assertOk()
-        ->assertSee('Most shops work if you paste a product link')
+        ->assertSee('Paste a link from almost any webshop and it works')
         ->assertSee('What if my shop is not listed?')->assertSee('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
 });
 
@@ -281,4 +284,11 @@ test('the FAQ answers how to catch a lower price at another shop', function (): 
     $this->get(route('home'))
         ->assertOk()
         ->assertSee('How do I know when a product is cheaper somewhere else?');
+});
+
+it('lists a use case by its short label, because the line already says "Price alerts for"', function (): void {
+    $response = $this->get(route('home'))->assertOk();
+
+    $response->assertSeeHtml('>your weekly groceries</a>')
+        ->assertDontSeeHtml('>Price alerts for your weekly groceries</a>');
 });

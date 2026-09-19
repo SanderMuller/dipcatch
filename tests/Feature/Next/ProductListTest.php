@@ -87,7 +87,7 @@ it('states the limit instead of offering creation when the plan is full', functi
 
     $this->actingAs($user);
 
-    livewire(ProductList::class)->assertSee('You have reached your plan limit.');
+    livewire(ProductList::class)->assertSee('You are following as many products as the free plan allows.');
 });
 
 it('renders an empty state and a no-match state', function (): void {
@@ -141,4 +141,24 @@ it('discloses bundle quantity beside the effective price', function (): void {
         ->assertSee('or €2.85 each')
         ->assertSee('title="Regular price"', escape: false)
         ->assertSeeText('€1.90 /l');
+});
+
+it('links the price and best-value shops out to the page that sells the product', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR']);
+    $shop = Shop::factory()->create([
+        'product_id' => $product->id,
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'currency' => 'EUR',
+    ]);
+
+    $product->update(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '2.00']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        // The shop's own logo, so the row is recognisable before it is read.
+        ->assertSeeHtml('favicons?domain=' . $shop->host)
+        ->assertSeeHtml('href="' . $shop->url . '"');
 });

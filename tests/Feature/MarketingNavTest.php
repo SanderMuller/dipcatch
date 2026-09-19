@@ -58,3 +58,35 @@ it('offers a signed-in visitor the app instead of a sign-in link', function (): 
         ->assertSee('Open app')
         ->assertDontSee('Sign in');
 });
+
+it('links the three pages a visitor checks before signing up', function (): void {
+    // Which shops work, what it costs, and what happens when something goes
+    // wrong. Everything else stays in the footer.
+    $html = (string) $this->get('/')->assertOk()->getContent();
+
+    expect(hrefsWithin($html, 'nav[aria-label="Main"] a'))
+        ->toContain(route('shops'))
+        ->toContain(route('pricing'))
+        ->toContain(route('support'));
+});
+
+it('marks the header link for the page being read', function (string $path, string $label): void {
+    $this->get($path)
+        ->assertOk()
+        ->assertSeeHtml('aria-current="page"')
+        ->assertSee($label);
+})->with([
+    'the shops hub' => ['/shops', 'Shops'],
+    // A single shop page belongs to the same section, so the hub stays lit.
+    'one shop page' => ['/shops/jumbo-com', 'Shops'],
+    'pricing' => ['/pricing', 'Pricing'],
+    'help' => ['/support', 'Help'],
+]);
+
+it('carries the same three links into the mobile menu', function (): void {
+    $html = (string) $this->get('/')->assertOk()->getContent();
+
+    expect(hrefsWithin($html, '#marketing-menu a'))
+        ->toContain(route('shops'))
+        ->toContain(route('support'));
+});

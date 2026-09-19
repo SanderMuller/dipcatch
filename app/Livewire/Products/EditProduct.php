@@ -68,12 +68,12 @@ final class EditProduct extends Component
             'imageUrl' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
             'currency' => FluentRule::string('Currency')->required()->in(Iso4217::CODES),
             // A threshold of zero would alert on a price that did not move.
-            'dropThresholdPct' => FluentRule::numeric('Drop threshold (%)')
+            'dropThresholdPct' => FluentRule::numeric('Alert me when it drops by (%)')
                 ->nullable()
                 ->between(0.01, 99.98999999999999),
-            'dropThresholdAbs' => FluentRule::numeric('Drop threshold (absolute)')->nullable()->min(0.01),
+            'dropThresholdAbs' => FluentRule::numeric('Alert me when it drops by (amount)')->nullable()->min(0.01),
             'targetPrice' => FluentRule::numeric('Target price')->nullable()->min(0.01),
-            'unitPriceTarget' => FluentRule::numeric('Unit price target')->nullable()->min(0.01),
+            'unitPriceTarget' => FluentRule::numeric('Target price per kilo, litre or piece')->nullable()->min(0.01),
         ];
     }
 

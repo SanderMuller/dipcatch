@@ -10,19 +10,19 @@
                 id="create-product-url"
                 type="url"
                 wire:model="url"
-                :label="__('Product URL')"
-                :description="__('Paste a product URL. We will fetch the title, image, and price, and suggest drop thresholds.')"
+                :label="__('Product link')"
+                :description="__('Paste a product link. We pick up the name, the photo and the price, and suggest when to alert you.')"
                 placeholder="https://shop.example.com/product/123"
                 required
                 autofocus
             />
             <div class="flex items-center gap-3">
                 <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
-                    <span wire:loading.remove wire:target="probe">Fetch product</span>
-                    <span wire:loading wire:target="probe">Fetching…</span>
+                    <span wire:loading.remove wire:target="probe">Look up this product</span>
+                    <span wire:loading wire:target="probe">Looking it up…</span>
                 </flux:button>
                 <flux:link :href="route('app.products.create-manual')">
-                    Create manually instead
+                    Fill it in myself
                 </flux:link>
             </div>
         </form>
@@ -66,7 +66,7 @@
         <flux:card class="space-y-4">
             @if ($existingTrackedProduct !== null)
                 <flux:callout variant="warning">
-                    This URL is already tracked on
+                    You already follow this link on
                     <flux:link :href="route('app.products.show', $existingTrackedProduct['id'])">{{ $existingTrackedProduct['title'] }}</flux:link>.
                     You can still create a separate product for it.
                 </flux:callout>
@@ -126,7 +126,7 @@
                         min="0.01"
                         max="99.99"
                         wire:model="thresholdPct"
-                        :label="__('Drop threshold (%)')"
+                        :label="__('Alert me when it drops by (%)')"
                         class="tabular-nums"
                     />
                     <flux:input
@@ -135,11 +135,11 @@
                         step="0.01"
                         min="0.01"
                         wire:model="thresholdAbs"
-                        :label="'Drop threshold ('.$snapshot['currency'].')'"
+                        :label="'Alert me when it drops by ('.$snapshot['currency'].')'"
                         class="tabular-nums"
                     />
                 </div>
-                <flux:text size="sm" class="text-zinc-500">Suggested from the price. You get notified when the price drops past either threshold.</flux:text>
+                <flux:text size="sm" class="text-zinc-500">We suggest these from the price. You hear from us as soon as the price drops past either one.</flux:text>
 
                 <div class="flex gap-2">
                     <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
@@ -154,14 +154,14 @@
 
     @if ($state === 'error')
         <flux:callout variant="danger" icon="exclamation-triangle">
-            <flux:callout.heading>Could not fetch that page</flux:callout.heading>
+            <flux:callout.heading>We could not open that page</flux:callout.heading>
             <flux:callout.text>
                 @switch($errorCode)
                     @case('invalid_url')
-                        That doesn't look like a valid URL.
+                        That does not look like a product link.
                         @break
                     @case('empty_url')
-                        Paste a product URL above.
+                        Paste a product link above.
                         @break
                     @case('robots_disallowed')
                         This shop's robots.txt forbids automated access.
@@ -180,7 +180,7 @@
                         We're spacing out checks to this shop to be polite. Try again in {{ $errorContext['retry_after_seconds'] ?? '~60' }} seconds.
                         @break
                     @case('probe_rate_limited')
-                        You've probed too many URLs in the last minute. Try again in {{ $errorContext['retry_after_seconds'] ?? '~60' }} seconds.
+                        You have checked too many links in the last minute. Try again in {{ $errorContext['retry_after_seconds'] ?? '~60' }} seconds.
                         @break
                     @case('temporary_failure')
                         @if ($errorContext['persistent'] ?? false)
@@ -190,7 +190,7 @@
                         @endif
                         @break
                     @case('http_error')
-                        The shop returned HTTP {{ $errorContext['status'] ?? 'error' }}. Check the URL and try again.
+                        The shop answered with an error. Check the link and try again.
                         @break
                     @case('extraction_failed')
                         DipCatch could not read a price from that page. Most shops work from the product URL itself.
@@ -211,7 +211,7 @@
                 @endswitch
             </flux:callout.text>
             <flux:text class="mt-2">
-                Can't reach the page? <flux:link :href="route('app.products.create-manual')">Create the product manually</flux:link> instead.
+                Can't reach the page? You can <flux:link :href="route('app.products.create-manual')">fill the product in yourself</flux:link>.
             </flux:text>
         </flux:callout>
     @endif

@@ -75,7 +75,7 @@ test('the page shows the locked connect copy', function (): void {
         ->assertSee('Connect Claude or ChatGPT to this account, or disconnect an app you already allowed.')
         ->assertSee('Opens Claude with DipCatch filled in. Review the URL, add the connector, then allow access.')
         ->assertSee('ChatGPT needs DipCatch in its plugin directory. That listing is not live yet. Use Claude or this website until it is.')
-        ->assertSee('Other MCP clients can use this URL and then sign in with this account.')
+        ->assertSee('Using a different assistant? Give it this address, then sign in with this account.')
         ->assertDontSee('Developer Mode');
 });
 

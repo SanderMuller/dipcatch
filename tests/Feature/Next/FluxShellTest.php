@@ -1,6 +1,21 @@
 <?php declare(strict_types=1);
 
+use App\Models\Product;
 use App\Models\User;
+
+/**
+ * The main nav bar's inner HTML. Fails the test when the bar is missing
+ * rather than handing back an empty string, which would quietly satisfy
+ * every "does not contain" claim made about it.
+ */
+function mainNav(string $body): string
+{
+    expect($body)->toMatch('#<nav [^>]*aria-label="Main"#');
+
+    preg_match('#<nav [^>]*aria-label="Main"[^>]*>(.*?)</nav>#s', $body, $matches);
+
+    return $matches[1] ?? '';
+}
 
 it('sends an unverified user away from the flux app', function (): void {
     $this->actingAs(User::factory()->unverified()->create());
@@ -82,4 +97,53 @@ it('does not re-detect a timezone the user has already settled', function (): vo
     ]));
 
     $this->get(route('app.dashboard'))->assertOk()->assertDontSeeHtml('auto-detect');
+});
+
+it('offers a way back to the marketing home page', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route('app.dashboard'))
+        ->assertOk()
+        ->assertSee('Home page')
+        ->assertSeeHtml('data-test="home-page-nav"')
+        ->assertSeeHtml('href="' . route('home') . '"');
+});
+
+it('lays the shell out as a horizontal header, not a sidebar', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $body = (string) $this->get(route('app.dashboard'))->getContent();
+
+    // The nav bar itself: primary links, a "More" dropdown for the rest and
+    // a search bar, in place of the Flux sidebar.
+    expect($body)->toContain('data-test="more-menu-button"')
+        ->and($body)->toContain('data-test="app-search-bar"')
+        ->and($body)->not->toContain('data-flux-sidebar');
+});
+
+it('leaves the dashboard out of the bar, because the logo goes there', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $body = (string) $this->get(route('app.dashboard'))->getContent();
+
+    $nav = mainNav($body);
+
+    expect($nav)->not->toBeEmpty()
+        ->and($nav)->not->toContain('Dashboard')
+        ->and($nav)->toContain('Products');
+});
+
+it('does not mark Products as the current page on a product page', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create();
+
+    $this->actingAs($user);
+
+    $body = (string) $this->get(route('app.products.show', $product))->getContent();
+
+    $nav = mainNav($body);
+
+    // The pill read as "you are here", so the way back to the list looked dead.
+    expect($nav)->toContain('Products')
+        ->and($nav)->not->toContain('aria-current');
 });

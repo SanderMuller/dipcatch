@@ -24,12 +24,15 @@ function shopLimitProduct(User $user): Product
     return Product::query()->where('user_id', $user->id)->firstOrFail();
 }
 
-it('shows how much of the shop limit is used before it is reached', function (): void {
+it('keeps the shop count for the add form rather than showing it beside the button', function (): void {
     $product = shopLimitProduct(shopLimitOwner(2));
 
+    // Beside a closed button the count read as a tally of the suggestions
+    // underneath it, so it is revealed with the form instead.
     livewire(ProductShow::class, ['product' => $product])
         ->assertSee('Add a shop')
-        ->assertSee('2 of 4 shops');
+        ->assertSee('2 of 4 shops on your plan')
+        ->assertSeeHtml('x-show="addOpen"');
 });
 
 it('takes the add button away at the limit rather than refusing on confirm', function (): void {
@@ -81,7 +84,7 @@ it('replaces the create button with a way forward at the product limit', functio
     $this->actingAs($user);
 
     livewire(ProductList::class)
-        ->assertSee('You have reached your plan limit.');
+        ->assertSee('You are following as many products as the free plan allows.');
 });
 
 it('keeps the create button below the product limit', function (): void {
@@ -92,5 +95,5 @@ it('keeps the create button below the product limit', function (): void {
 
     livewire(ProductList::class)
         ->assertSee('Track a product')
-        ->assertDontSee('You have reached your plan limit.');
+        ->assertDontSee('You are following as many products as the free plan allows.');
 });

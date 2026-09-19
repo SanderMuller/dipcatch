@@ -35,7 +35,7 @@
 
                 <div class="flex h-full flex-col p-5">
                     <dt class="text-base font-medium text-balance sm:text-sm">{{ __('Other assistants') }}</dt>
-                    <dd class="mt-1 text-pretty text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Other MCP clients can use this URL and then sign in with this account.') }}</dd>
+                    <dd class="mt-1 text-pretty text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Using a different assistant? Give it this address, then sign in with this account.') }}</dd>
                     <dd class="mt-auto min-w-0 pt-4">
                         <flux:input
                             readonly
@@ -54,7 +54,7 @@
 
     <flux:card class="mt-6">
         <div class="flex flex-col gap-4">
-            <flux:heading size="lg">{{ __('Connected applications') }}</flux:heading>
+            <flux:heading size="lg">{{ __('Connected apps') }}</flux:heading>
 
             <ul role="list" class="divide-y divide-zinc-950/5 dark:divide-white/10">
                 @forelse ($connections as $connection)
@@ -72,7 +72,7 @@
                             size="sm"
                             variant="danger"
                             wire:click="revoke('{{ $connection['id'] }}')"
-                            wire:confirm="{{ __('Disconnect this application?') }}"
+                            wire:confirm="{{ __('Disconnect this app?') }}"
                         >
                             {{ __('Disconnect') }}
                         </flux:button>

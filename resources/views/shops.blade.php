@@ -5,7 +5,7 @@
     $langQuery = $requestedLang === null ? [] : ['lang' => $requestedLang];
     $canonical = $locale === 'nl' ? route('shops', ['lang' => 'nl']) : route('shops');
     $contactEmail = config('site.contact_email');
-    $description = __('Shops with a dedicated page on DipCatch, and what it can see at each one: the price, the pack size, and the offer window where the shop states it.');
+    $description = __('Every shop we know well, with a page of its own. Each one says what DipCatch can see there: the price, how much is in the pack, and how long an offer lasts.');
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
@@ -28,7 +28,7 @@
                 <h1 class="max-w-[24ch] text-4xl font-semibold tracking-tight text-balance sm:text-5xl">{{ __('Supported shops') }}</h1>
                 <p class="mt-5 max-w-[60ch] text-lg text-pretty text-zinc-600 dark:text-zinc-300">{{ $description }}</p>
                 <p class="mt-4 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">
-                    {{ __('Paste a product URL from almost any webshop. Most shops work as they are. These pages are shops where a reader was written because the page would otherwise give the wrong price.') }}
+                    {{ __('Paste a product link from almost any webshop and it works. The shops on this page get extra attention, because their pages are the trickiest to read.') }}
                     <x-shop-request-link class="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300" />
                 </p>
 

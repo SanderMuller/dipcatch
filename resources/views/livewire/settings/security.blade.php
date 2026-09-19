@@ -66,7 +66,7 @@
                     @else
                         <div class="space-y-4">
                             <flux:text variant="subtle">
-                                {{ __('When you enable two-factor authentication, you will be prompted for a secure pin during login. This pin can be retrieved from a TOTP-supported application on your phone.') }}
+                                {{ __('With two-factor authentication on, signing in takes one extra step: a six-digit code from an app on your phone, such as Google Authenticator or 1Password. Someone who knows your password still cannot get in without your phone.') }}
                             </flux:text>
 
                             <flux:button
@@ -228,7 +228,7 @@
         @if ($canManagePasskeys)
             <section class="mt-12">
                 <flux:heading>{{ __('Passkeys') }}</flux:heading>
-                <flux:subheading>{{ __('Manage your passkeys for passwordless sign-in') }}</flux:subheading>
+                <flux:subheading>{{ __('Sign in with your face, fingerprint or screen lock instead of a password') }}</flux:subheading>
 
                 <div class="mt-6 flex flex-col w-full mx-auto space-y-6 text-sm" wire:cloak>
                     <div class="border rounded-lg border-zinc-200 dark:border-zinc-700 overflow-hidden">
@@ -271,7 +271,7 @@
                                     <flux:icon.key class="size-7 text-zinc-400 dark:text-zinc-500" />
                                 </div>
                                 <p class="font-medium">{{ __('No passkeys yet') }}</p>
-                                <flux:text class="mt-1">{{ __('Add a passkey to sign in without a password') }}</flux:text>
+                                <flux:text class="mt-1">{{ __('Sign in with your face, fingerprint or screen lock instead of a password') }}</flux:text>
                             </div>
                         @endforelse
                     </div>

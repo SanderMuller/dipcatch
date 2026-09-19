@@ -2,7 +2,7 @@
     'optionsRoute' => 'passkey.login-options',
     'submitRoute' => 'passkey.login',
     'label' => __('Sign in with a passkey'),
-    'loadingLabel' => __('Authenticating...'),
+    'loadingLabel' => __('Checking…'),
     'separator' => __('Or continue with email'),
     // `button` leads the page with the passkey. `link` demotes it to a line
     // of text below the form, for a page where passkeys are the rare route

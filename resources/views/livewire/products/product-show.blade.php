@@ -73,14 +73,14 @@
                         size="sm"
                         variant="danger"
                         wire:click="stopSharing"
-                        wire:confirm="{{ __('Stop sharing? The link will return a 404.') }}"
+                        wire:confirm="{{ __('Stop sharing? The link stops working for everyone.') }}"
                     >
                         {{ __('Stop sharing') }}
                     </flux:button>
                 </div>
 
                 <flux:text size="sm" class="text-zinc-500">
-                    {{ __('A preview someone already has can stay visible for a while after you stop.') }}
+                    {{ __('A preview someone already has can stay visible for a while after you stop sharing.') }}
                 </flux:text>
             @else
                 <flux:text>{{ __('This product has no public link yet.') }}</flux:text>
@@ -100,7 +100,7 @@
     <flux:card class="mt-6 p-0! @container">
         <dl class="grid divide-y divide-zinc-950/5 @3xl:grid-cols-3 @3xl:divide-x @3xl:divide-y-0 dark:divide-white/10">
             <div class="p-5">
-                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Cheapest now') }}</dt>
+                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Best price now') }}</dt>
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
                     <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
                 </dd>
@@ -129,7 +129,22 @@
             </div>
 
             <div class="p-5">
-                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Alerts below') }}</dt>
+                <dt class="flex items-center gap-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
+                    <span class="truncate">{{ __('Alerts below') }}</span>
+                    {{-- The threshold is the one figure on this page the user
+                         sets, so it carries its own way back to the form. --}}
+                    <flux:tooltip :content="__('Edit alert threshold')">
+                        <flux:button
+                            size="xs"
+                            variant="subtle"
+                            icon="pencil-square"
+                            :href="route('app.products.edit', $product)"
+                            wire:navigate
+                            :aria-label="__('Edit alert threshold')"
+                            data-test="edit-alert-threshold"
+                        />
+                    </flux:tooltip>
+                </dt>
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
                     @if ($product->target_price !== null)
                         {{ \App\Support\MoneyFormatter::format((string) $product->target_price, $product->currency) }}
@@ -148,24 +163,23 @@
             <flux:card class="@container">
                 {{-- Not "Also sold at": that phrase belongs to the suggestions panel
                      below, and a test asserts it is absent when nothing matches. --}}
-                <flux:heading size="lg" level="2">{{ __('Tracked shops') }}</flux:heading>
-
-                {{-- The add-shop control and the limit explanation, shared with the
-                     page this replaced: it states the count and the upgrade path
-                     rather than merely disabling a button. --}}
-                <div class="mt-4">
-                    @include('filament.partials.add-shop-header', [
-                        'product' => $product,
-                        'shopLimit' => $shopLimit,
-                        'canAddShop' => $canAddShop,
-                    ])
-                </div>
+                {{-- The heading rides inside the partial so it shares a row with
+                     the add-shop button, rather than sitting on a line of its own
+                     above it. The partial also states the count and the upgrade
+                     path rather than merely disabling a button. --}}
+                @include('filament.partials.add-shop-header', [
+                    'product' => $product,
+                    'shopLimit' => $shopLimit,
+                    'canAddShop' => $canAddShop,
+                    'openAddShop' => $openAddShop,
+                    'heading' => __('Tracked shops'),
+                ])
 
                 <flux:table class="mt-4">
                     <flux:table.columns>
                         <flux:table.column>{{ __('Shop') }}</flux:table.column>
                         <flux:table.column>{{ __('Price') }}</flux:table.column>
-                        <flux:table.column class="hidden @4xl:table-cell">{{ __('Unit price') }}</flux:table.column>
+                        <flux:table.column class="hidden @4xl:table-cell">{{ __('Price per kilo or piece') }}</flux:table.column>
                         <flux:table.column class="hidden @4xl:table-cell">{{ __('In stock') }}</flux:table.column>
                         <flux:table.column class="hidden @4xl:table-cell">{{ __('Last checked') }}</flux:table.column>
                         <flux:table.column align="end">{{ __('Actions') }}</flux:table.column>
@@ -253,7 +267,7 @@
                         @empty
                             <flux:table.row>
                                 <flux:table.cell colspan="6" class="py-10 text-center">
-                                    <flux:text class="text-zinc-500">{{ __('No shops yet. Add one to start tracking a price.') }}</flux:text>
+                                    <flux:text class="text-zinc-500">{{ __('No shops yet. Add one to start following a price.') }}</flux:text>
                                 </flux:table.cell>
                             </flux:table.row>
                         @endforelse
@@ -268,7 +282,7 @@
                                 <div>
                                     <flux:heading size="lg">{{ $editing->host }}</flux:heading>
                                     <flux:text class="mt-1 text-zinc-500">
-                                        {{ __('Repair the link when the shop moves the product, and keep your own notes about buying there.') }}
+                                        {{ __('Fix the link when the shop moves the product, and keep your own notes about buying there.') }}
                                     </flux:text>
                                 </div>
 
@@ -279,8 +293,8 @@
                                 {{-- Saving the URL re-checks the price on the spot, so it is
                                      its own button rather than part of one save. --}}
                                 <div class="space-y-2">
-                                    <flux:input wire:model="editingUrl" :label="__('Product URL')" type="url" />
-                                    <flux:button size="sm" wire:click="saveEditedUrl">{{ __('Save URL and re-check') }}</flux:button>
+                                    <flux:input wire:model="editingUrl" :label="__('Product link')" type="url" />
+                                    <flux:button size="sm" wire:click="saveEditedUrl">{{ __('Save the link and check again') }}</flux:button>
                                 </div>
 
                                 <div class="space-y-2">
@@ -302,7 +316,7 @@
             <flux:card>
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <flux:heading size="lg" level="2">{{ __('Cheapest price history') }}</flux:heading>
+                        <flux:heading size="lg" level="2">{{ __('Best price over time') }}</flux:heading>
                         @if ($historyNotice)
                             <flux:text size="sm" class="mt-1 text-zinc-500">
                                 {{ $historyNotice['reason'] }}
@@ -342,7 +356,7 @@
                         </flux:chart.svg>
                         <flux:chart.tooltip>
                             <flux:chart.tooltip.heading field="date" :format="['month' => 'short', 'day' => 'numeric', 'hour' => 'numeric', 'minute' => '2-digit']" />
-                            <flux:chart.tooltip.value field="price" :label="__('Cheapest')" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
+                            <flux:chart.tooltip.value field="price" :label="__('Best price')" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
                             @if ($chart['hasBundles'])
                                 <flux:chart.tooltip.value field="bundle" :label="__('Deal')" />
                             @endif
@@ -355,7 +369,7 @@
                         </flux:chart.tooltip>
                         @if ($chart['hasNotified'])
                             <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-wrap justify-center gap-x-5 gap-y-2">
-                                <flux:chart.legend :label="__('Cheapest')">
+                                <flux:chart.legend :label="__('Best price')">
                                     <flux:chart.legend.indicator class="bg-amber-500" />
                                 </flux:chart.legend>
                                 <flux:chart.legend :label="__('Notified')">

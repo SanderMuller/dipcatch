@@ -44,7 +44,7 @@
                         <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-50">How often</h2>
                         <p class="mt-2">
                             Once when a user adds the link, then about every {{ $intervalHours }} hours for as long as
-                            they track that product. One request per tracked product, spread out with jitter, and rate
+                            they track that product. One request per tracked product, spread out over time, and rate
                             limited per host.
                         </p>
                     </section>

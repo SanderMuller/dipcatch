@@ -11,7 +11,7 @@
             <div class="p-5">
                 <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Tracked products') }}</dt>
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{{ $trackedProducts }}</dd>
-                <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Active on your watch list.') }}</dd>
+                <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('You are following these right now.') }}</dd>
             </div>
 
             <div class="p-5">
@@ -20,13 +20,18 @@
                     'mt-2 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl',
                     'text-emerald-600 dark:text-emerald-400' => $activeDropCount > 0,
                 ])>{{ $activeDropCount }}</dd>
-                <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Below your threshold right now.') }}</dd>
+                <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Cheaper right now than the price you set.') }}</dd>
             </div>
 
             <div class="p-5">
-                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Lifetime savings') }}</dt>
+                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Saved so far') }}</dt>
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{{ $lifetimeSavings }}</dd>
-                <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Against the price each alert fired from.') }}</dd>
+                <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Compared with the price we alerted you from.') }}</dd>
+                <dd class="mt-1">
+                    <flux:link :href="route('app.stats')" variant="subtle" class="text-base sm:text-sm" wire:navigate data-test="savings-by-month-link">
+                        {{ __('See it by month') }}
+                    </flux:link>
+                </dd>
             </div>
         </dl>
     </flux:card>
@@ -34,7 +39,7 @@
     @unless ($hasAnyProduct)
         <flux:callout class="mt-6" icon="sparkles">
             <flux:callout.heading>{{ __('Track your first product') }}</flux:callout.heading>
-            <flux:callout.text>{{ __('Paste a product URL and DipCatch will watch it across every shop that sells it.') }}</flux:callout.text>
+            <flux:callout.text>{{ __('Paste a product link and DipCatch watches it at every shop that sells it.') }}</flux:callout.text>
             @if ($canAddProduct)
                 <flux:button class="mt-3 rounded-full!" :href="route('app.products.create')" variant="primary" wire:navigate>
                     {{ __('Track a product') }}
@@ -49,8 +54,10 @@
             <flux:callout.text>
                 {{ __('One shop gives you a price history. A second one tells you which shop is cheaper, per kilo, litre or piece.') }}
             </flux:callout.text>
-            <flux:button class="mt-3" :href="route('app.products.show', $watching->first())" variant="primary" wire:navigate>
-                {{ __('Open a product') }}
+            {{-- Lands on the product with the add-shop form already open, so the
+                 button does what its label says in one step. --}}
+            <flux:button class="mt-3" :href="route('app.products.show', [$watching->first(), 'add-shop' => 1])" variant="primary" wire:navigate data-test="add-second-shop">
+                {{ __('Add a shop') }}
             </flux:button>
         </flux:callout>
     @endif
@@ -107,8 +114,6 @@
             <flux:table.columns>
                 <flux:table.column>{{ __('Product') }}</flux:table.column>
                 <flux:table.column>{{ __('Now') }}</flux:table.column>
-                <flux:table.column class="hidden md:table-cell">{{ __('Best value') }}</flux:table.column>
-                <flux:table.column class="hidden md:table-cell">{{ __('Notified at') }}</flux:table.column>
                 <flux:table.column class="hidden md:table-cell">{{ __('Shop') }}</flux:table.column>
             </flux:table.columns>
             <flux:table.rows>
@@ -128,21 +133,6 @@
                                 <x-shop-deal :shop="$product->cheapestShop" :show-source="false" class="mt-2 min-w-52 max-w-sm whitespace-normal" />
                             @endif
                         </flux:table.cell>
-                        <flux:table.cell class="hidden tabular-nums md:table-cell">
-                            @php($bestValueShop = $product->bestValueShop())
-                            <p class="font-medium text-zinc-900 dark:text-zinc-100">
-                                <x-shop-price :shop="$bestValueShop" unit />
-                            </p>
-                            @if ($bestValueShop)
-                                <div class="mt-1 text-zinc-500 dark:text-zinc-400">
-                                    <x-shop-link :shop="$bestValueShop" />
-                                </div>
-                                <x-shop-deal :shop="$bestValueShop" :show-source="false" class="mt-2 min-w-52 max-w-sm whitespace-normal" />
-                            @endif
-                        </flux:table.cell>
-                        <flux:table.cell class="hidden tabular-nums text-zinc-500 md:table-cell">
-                            {{ \App\Support\MoneyFormatter::format($product->last_notified_price === null ? null : (string) $product->last_notified_price, $product->currency) }}
-                        </flux:table.cell>
                         <flux:table.cell class="hidden md:table-cell">
                             @if ($product->cheapestShop)
                                 <x-shop-link :shop="$product->cheapestShop" />
@@ -151,9 +141,9 @@
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="5" class="py-10 text-center">
+                        <flux:table.cell colspan="3" class="py-10 text-center">
                             <flux:text class="text-zinc-500">{{ __('No active drops right now.') }}</flux:text>
-                            <flux:text size="sm" class="text-zinc-400">{{ __("DipCatch is watching. We'll alert you when a price drops below your threshold.") }}</flux:text>
+                            <flux:text size="sm" class="text-zinc-400">{{ __("DipCatch is watching. You hear from us as soon as a price drops far enough.") }}</flux:text>
                         </flux:table.cell>
                     </flux:table.row>
                 @endforelse
@@ -161,94 +151,4 @@
         </flux:table>
     </div>
 
-    @if ($savings)
-        <div class="mt-8">
-            <flux:heading size="lg" level="2">{{ __('Savings by month') }}</flux:heading>
-            <flux:text class="mt-1 text-zinc-600 dark:text-zinc-400">
-                {{ __('Summed across every alert that fired, over the last twelve months. One bar per currency, never converted.') }}
-            </flux:text>
-
-            <flux:card class="mt-4">
-                <flux:chart :value="$savings['rows']" class="aspect-[3/1]">
-                    <flux:chart.svg>
-                        @if (count($savings['series']) > 1)
-                            <flux:chart.group>
-                                @foreach ($savings['series'] as $series)
-                                    <flux:chart.bar :field="$series['field']" :class="$series['color']" />
-                                @endforeach
-                            </flux:chart.group>
-                        @else
-                            @foreach ($savings['series'] as $series)
-                                <flux:chart.bar :field="$series['field']" :class="$series['color']" />
-                            @endforeach
-                        @endif
-                        <flux:chart.axis axis="x" field="date" :format="['month' => 'short', 'year' => '2-digit']">
-                            <flux:chart.axis.tick />
-                            <flux:chart.axis.line />
-                        </flux:chart.axis>
-                        <flux:chart.axis axis="y" tick-start="0">
-                            <flux:chart.axis.grid />
-                            <flux:chart.axis.tick />
-                        </flux:chart.axis>
-                        <flux:chart.cursor type="area" />
-                    </flux:chart.svg>
-                    <flux:chart.tooltip>
-                        <flux:chart.tooltip.heading field="date" :format="['month' => 'long', 'year' => 'numeric']" />
-                        @foreach ($savings['series'] as $series)
-                            <flux:chart.tooltip.value :field="$series['field']" :label="$series['label']" :format="['style' => 'currency', 'currency' => $series['currency']]" />
-                        @endforeach
-                    </flux:chart.tooltip>
-                    @if (count($savings['series']) > 1)
-                        <div class="flex flex-wrap justify-center gap-4 pt-4">
-                            @foreach ($savings['series'] as $series)
-                                <flux:chart.legend :label="$series['label']">
-                                    <flux:chart.legend.indicator :class="$series['legend']" />
-                                </flux:chart.legend>
-                            @endforeach
-                        </div>
-                    @endif
-                </flux:chart>
-            </flux:card>
-        </div>
-    @endif
-
-    @if ($recentAlerts->isNotEmpty())
-        <div class="mt-8">
-            <flux:heading size="lg" level="2">{{ __('Recent alerts') }}</flux:heading>
-            <flux:text class="mt-1 text-zinc-600 dark:text-zinc-400">
-                {{ __('What DipCatch has told you, most recent first. The bell clears itself; this does not.') }}
-            </flux:text>
-
-            <flux:timeline class="mt-4">
-                @foreach ($recentAlerts as $alert)
-                    <flux:timeline.item wire:key="alert-{{ $loop->index }}">
-                        <flux:timeline.indicator color="green">
-                            <flux:icon.arrow-trending-down variant="micro" />
-                        </flux:timeline.indicator>
-                        <flux:timeline.content>
-                            <flux:heading>
-                                @if ($alert['url'])
-                                    <a href="{{ $alert['url'] }}" wire:navigate>{{ Str::limit($alert['title'], 60) }}</a>
-                                @else
-                                    {{ Str::limit($alert['title'], 60) }}
-                                @endif
-                                @if ($alert['sentAt'])
-                                    <flux:text inline>· {{ $alert['sentAt'] }}</flux:text>
-                                @endif
-                            </flux:heading>
-                            <flux:text class="tabular-nums">
-                                {{ $alert['percent'] ?? '—' }}
-                                @if ($alert['amount'])
-                                    · {{ $alert['amount'] }}
-                                @endif
-                                @if ($alert['bundle'])
-                                    · {{ $alert['bundle'] }}
-                                @endif
-                            </flux:text>
-                        </flux:timeline.content>
-                    </flux:timeline.item>
-                @endforeach
-            </flux:timeline>
-        </div>
-    @endif
 </div>

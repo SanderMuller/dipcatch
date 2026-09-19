@@ -6,18 +6,18 @@
     $requestedLang = \App\Http\Middleware\MarketingLocale::requested(request());
     $langQuery = $requestedLang === null ? [] : ['lang' => $requestedLang];
     $canonical = $locale === 'nl' ? route('home', ['lang' => 'nl']) : route('home');
-    $description = __('DipCatch tracks the price of anything you buy more than once, across Dutch supermarkets and webshops. It compares shops on unit price and tells you when one drops.');
+    $description = __('DipCatch follows the price of the things you buy again and again, at Dutch supermarkets and webshops. It works out what a kilo or a piece really costs, and says when one shop drops below the rest.');
     $h1 = __('Same product, every shop, one alert.');
-    $sub = __('DipCatch watches the coffee, cat food, skincare and vacuum filters you buy anyway at Albert Heijn, Jumbo, bol.com, Zooplus and more, compares them on price per kilo or per piece, and tells you when one drops.');
+    $sub = __('You already buy coffee, cat food, skincare and vacuum filters. DipCatch keeps an eye on them at Albert Heijn, Jumbo, bol.com, Zooplus and more. It compares the price per kilo or per piece, and tells you when one gets cheaper.');
     $authed = auth()->check();
     $primaryHref = $authed ? url('/app') : route('register');
     $headerLabel = $authed ? __('Open app') : __('Create account');
     $headerLabelShort = $authed ? __('Open app') : __('Sign up');
     $contactEmail = config('site.contact_email');
     $steps = [
-        ['n' => '01', 'title' => __('Paste a product link'), 'body' => __('DipCatch reads the title, image, price and pack size from the page. You install nothing.')],
-        ['n' => '02', 'title' => __('Add it from other shops'), 'body' => __('Track the same item at other shops and DipCatch shows the cheapest one, with unit prices (€/kg, €/l) so different pack sizes compare fairly.')],
-        ['n' => '03', 'title' => __('You get the dip'), 'body' => __('Prices are re-checked automatically. When one falls past your threshold you hear about it: a daily email digest, a note under the bell in the app, or a browser push if you turn that on.')],
+        ['n' => '01', 'title' => __('Paste a product link'), 'body' => __('DipCatch picks up the name, the photo, the price and the pack size by itself. You install nothing.')],
+        ['n' => '02', 'title' => __('Add it from other shops'), 'body' => __('Add the same thing at other shops. DipCatch shows which one is cheapest and works out the price per kilo or per litre. So you can see whether the big pack really is the better deal.')],
+        ['n' => '03', 'title' => __('You hear about it'), 'body' => __('Say what a good price is for you. We check the shops and let you know the moment one of them goes below it. One email a day, a note in the app, or a message in your browser.')],
     ];
     $supportedShops = \App\Support\SupportedShops::homepage();
     $money = static fn (string $amount): string => \App\Support\MoneyFormatter::format($amount, 'EUR');
@@ -49,17 +49,17 @@
     ];
     $freeProducts = \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->maxProducts();
     $faq = [
-        ['q' => __('Which shops work?'), 'a' => __('Paste a product URL. Most webshops work if the price is on the page. Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart have a reader of their own, including AH Bonus and Dirk promo prices. Shops that block bots or only load prices with JavaScript may not work. You see the result before you confirm.')],
-        ['q' => __('What if my shop is not listed?'), 'a' => __('Paste it anyway. The names on this site are shops with a reader of their own, not the only shops that work. If the price does not come through, send a product URL.')],
-        ['q' => __('How often are prices checked?'), 'a' => __('A shop is checked the moment you add it or change its link. After that DipCatch re-checks it about every :hours hours, give or take half an hour.', ['hours' => config('dipcatch.recheck.interval_hours', 6)])],
+        ['q' => __('Which shops work?'), 'a' => __('Paste a product link. Most webshops work, as long as the price is on the page. These shops are the surest bet: Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart. Offer prices such as AH Bonus and the Dirk deals come through there too. A few shops hide their prices from us, and those will not work. You always see what we found before anything is saved.')],
+        ['q' => __('What if my shop is not listed?'), 'a' => __('Paste it anyway. The shops named on this site are not the only ones that work. If the price does not come through, send us the link and we will look at it.')],
+        ['q' => __('How often are prices checked?'), 'a' => __('A shop is checked the moment you add it or change the link. After that DipCatch looks again about every :hours hours.', ['hours' => config('dipcatch.recheck.interval_hours', 6)])],
         ['q' => __('Is it free?'), 'a' => $freeProducts === null
             ? __('Yes. The free plan has no product limit, you do not need a card, and there is no trial that runs out.')
             : __('Yes, for your first :count products. You do not need a card, and there is no trial that runs out. Pro lifts the limit when you want more.', ['count' => $freeProducts])],
-        ['q' => __('Do I need an extension or app?'), 'a' => __('No. You paste a link in your browser. Alerts arrive as a daily email digest, under the bell in the app, or as a browser push if you turn that on.')],
-        ['q' => __('Can I use DipCatch in ChatGPT or Claude?'), 'a' => __('Yes. Ask it to start tracking something, add another shop to a product you already follow, change when you get alerted, or show you a price history. When it adds a shop or a new product it reads that page back to you first, title and price, so you can spot a link that points at the wrong pack. Connect DipCatch once on the Connections page in your account. That page tells you what Claude and ChatGPT each need today.')],
-        ['q' => __('Can I compare different pack sizes?'), 'a' => __('Yes. When DipCatch can read the pack size, it shows a price per kilo, litre or piece next to that shop, so a 200 g and a 370 g bag compare fairly.')],
-        ['q' => __('Can I share a comparison?'), 'a' => __('Yes. Every product has an optional public page with the current price per shop and, where there is history, a chart of the cheapest price over the last 90 days. Anyone with the link can view it. It shows nothing about your account.')],
-        ['q' => __('How do I know when a product is cheaper somewhere else?'), 'a' => __('Paste the link from the shop you buy at now, then add the same product from the others. DipCatch tells you when the cheapest one drops past your threshold.')],
+        ['q' => __('Do I need an extension or app?'), 'a' => __('No. You paste a link in your browser. You hear from us in one email a day, under the bell in the app, or in your browser if you switch that on.')],
+        ['q' => __('Can I use DipCatch in ChatGPT or Claude?'), 'a' => __('Yes. Ask it to follow something new, to add another shop, to change the price you want, or to show you how a price moved. Before it saves anything, it shows you what it found: the name and the price. That way you can spot a link that points at the wrong pack. Connect DipCatch once on the Connections page in your account.')],
+        ['q' => __('Can I compare different pack sizes?'), 'a' => __('Yes. When DipCatch can read how much is in the pack, it shows a price per kilo, litre or piece next to that shop. A 200 g bag and a 370 g bag then compare fairly.')],
+        ['q' => __('Can I share a comparison?'), 'a' => __('Yes. Every product can get its own public page with the price at each shop. Once there is enough history, it also shows a graph of the lowest price over the last 90 days. Anyone with the link can look at it, and it says nothing about you or your account.')],
+        ['q' => __('How do I know when a product is cheaper somewhere else?'), 'a' => __('Paste the link from the shop you buy at now, then add the same product at the others. DipCatch tells you when the cheapest one goes below the price you set.')],
     ];
     $mockLabel = __('Example alerts: :items', [
         'items' => implode('. ', array_map(
@@ -99,7 +99,7 @@
                 <div aria-hidden="true" class="pointer-events-none absolute right-0 -bottom-32 size-[28rem] rounded-full bg-rose-200/40 blur-3xl dark:hidden"></div>
 
 
-                <main class="relative mx-auto w-full max-w-7xl px-6 lg:px-8">
+                <main class="relative mx-auto w-full max-w-app px-6 lg:px-8">
                     <section class="grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-12 lg:gap-12">
                         <div class="lg:col-span-7">
                             <span class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:text-zinc-300 dark:ring-zinc-800">
@@ -118,7 +118,7 @@
                                         <a href="{{ route('register') }}" class="inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-white dark:text-zinc-900 dark:shadow-none dark:hover:bg-zinc-200">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
                                     </div>
                                     <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                                        {{ __('Free during the beta. You’ll get a verification email first.') }}
+                                        {{ __('Free while we are in beta. We send one email first, to check the address is yours.') }}
                                         {{ __('Already have an account?') }}
                                         <a href="{{ route('login') }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ __('Sign in') }}</a>
                                     </p>
@@ -136,7 +136,10 @@
                                                 {{-- Background image, not an <img>: the edge Markdown twin emits an
                                                      image reference even for an empty alt. --}}
                                                 <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
-                                                <span title="{{ $shop['name'] }}">{{ $shop['host'] }}</span>
+                                                {{-- The brand name, not the domain: a shopper looks for
+                                                     "Albert Heijn", not "ah.nl". The domain stays in the
+                                                     title so the exact site is still one hover away. --}}
+                                                <span title="{{ $shop['host'] }}">{{ $shop['name'] }}</span>
                                             </a>
                                         </li>
                                     @endforeach
@@ -145,7 +148,7 @@
                                     </li>
                                 </ul>
                                 <p class="mt-3 max-w-[48ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
-                                    {{ __('Most shops work if you paste a product link. The names above are shops with a reader of their own.') }}
+                                    {{ __('Paste a link from almost any webshop and it works. These are the ones we check most often.') }}
                                     <x-shop-request-link class="hover:text-zinc-700 dark:hover:text-zinc-300" />
                                 </p>
 
@@ -155,7 +158,7 @@
                                     <nav class="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400" aria-label="{{ __('Price alerts by category') }}">
                                         <span class="font-medium text-zinc-700 dark:text-zinc-300">{{ __('Price alerts for') }}</span>
                                         @foreach ($useCases as $useCase)
-                                            <a href="{{ route('use-case', [...$langQuery, 'slug' => $useCase->slug]) }}" class="underline underline-offset-4 hover:text-zinc-900 dark:hover:text-zinc-100">{{ $useCase->heading }}</a>
+                                            <a href="{{ route('use-case', [...$langQuery, 'slug' => $useCase->slug]) }}" class="underline underline-offset-4 hover:text-zinc-900 dark:hover:text-zinc-100">{{ $useCase->label }}</a>
                                         @endforeach
                                     </nav>
                                 @endif
@@ -203,7 +206,7 @@
 
                     <section id="how-it-works" class="py-20">
                         <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('How a price alert works') }}</h2>
-                        <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('Add a product and set a threshold. DipCatch does the checking, so you do not need a browser extension.') }}</p>
+                        <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('Add a product and say what you want to pay. DipCatch does the checking, so you need nothing extra in your browser.') }}</p>
                         <ol class="mt-10 grid list-none gap-6 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach ($steps as $step)
                                 <li class="rounded-2xl bg-white/80 p-6 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:ring-zinc-800">
@@ -216,7 +219,7 @@
                     </section>
 
                     <section id="faq" class="py-20">
-                        <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Frequently asked questions') }}</h2>
+                        <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Common questions') }}</h2>
                         <div class="mt-10 grid items-start gap-4 sm:grid-cols-2">
                             @foreach (array_chunk($faq, (int) ceil(count($faq) / 2)) as $column)
                                 <flux:accordion transition>
@@ -247,7 +250,7 @@
                     @endguest
                 </main>
 
-                <footer class="relative mx-auto mt-auto w-full max-w-7xl px-6 pb-10 lg:px-8">
+                <footer class="relative mx-auto mt-auto w-full max-w-app px-6 pb-10 lg:px-8">
                     <x-marketing-footer-links :lang-query="$langQuery" :contact-email="$contactEmail" />
                 </footer>
             </div>

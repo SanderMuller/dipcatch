@@ -10,7 +10,7 @@
             id="price-selector"
             wire:model="priceSelector"
             :label="__('Price selector')"
-            :description="__('Right-click the price on the page → Inspect → copy the matching CSS selector.')"
+            :description="__('This is for when nothing else worked. On the shop page, right-click the price, choose Inspect, and copy what the browser shows as the selector.')"
             placeholder=".product-price__amount"
             required
             class="font-mono"
@@ -59,7 +59,7 @@
         <div class="flex gap-2">
             <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
                 <span wire:loading.remove wire:target="probeWithSelectors">Try selector</span>
-                <span wire:loading wire:target="probeWithSelectors">Fetching…</span>
+                <span wire:loading wire:target="probeWithSelectors">Looking it up…</span>
             </flux:button>
             <flux:button type="button" wire:click="cancel">Cancel</flux:button>
         </div>

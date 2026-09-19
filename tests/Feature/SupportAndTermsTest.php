@@ -28,15 +28,27 @@ it('carries the locale through the privacy redirect', function (): void {
 it('shows the support email when one is configured', function (): void {
     config()->set('site.contact_email', 'help@example.test');
 
-    $this->get('/support')->assertOk()->assertSeeHtml('mailto:help@example.test')->assertSeeHtml('"email":"help@example.test"')->assertSeeHtml('Request a shop')->assertSeeHtml('Send a product URL if a paste does not pick up the price');
+    $this->get('/support')
+        ->assertOk()
+        ->assertSeeHtml('mailto:help@example.test')
+        ->assertSeeHtml('"email":"help@example.test"')
+        ->assertSeeHtml('Request a shop')
+        ->assertSeeHtml('Send us a product link if pasting one does not pick up the price')
+        // The form is the first channel offered; email is the fallback for
+        // someone without an account.
+        ->assertSeeHtml('Open the contact form');
 });
 
-it('says where to find the address when no email is configured', function (): void {
+it('still points at the contact form when no email is configured', function (): void {
     // A support page that renders an empty mailto is worse than one that
-    // tells the reader where to look.
+    // names the channel that always exists.
     config()->set('site.contact_email');
 
-    $this->get('/support')->assertOk()->assertDontSeeHtml('mailto:')->assertSeeHtml('The address is on the account page inside the app.');
+    $this->get('/support')
+        ->assertOk()
+        ->assertDontSeeHtml('mailto:')
+        ->assertSeeHtml(route('app.support'))
+        ->assertSeeHtml('Open the contact form');
 });
 
 it('states the trial length the app actually offers', function (): void {

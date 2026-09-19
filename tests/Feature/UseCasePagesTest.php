@@ -298,8 +298,8 @@ test('a use case whose shops are all gone omits the chip list instead of showing
 
     $this->get($case->url())
         ->assertOk()
-        ->assertDontSee(__('Shops with a reader of their own'))
-        ->assertSee('Paste a product URL from any other shop as well');
+        ->assertDontSee(__('Shops we set up ourselves'))
+        ->assertSee('Paste a product link from any other shop as well');
 });
 
 test('a use-case page offers a shop request mailto when a contact address is set', function (): void {
@@ -307,11 +307,12 @@ test('a use-case page offers a shop request mailto when a contact address is set
 
     $this->get('/price-alerts/groceries')
         ->assertOk()
-        ->assertSee('Shops with a reader of their own')->assertSee('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
+        ->assertSee('Shops we know well')->assertSee('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
 });
 
 test('a use-case page marks no header link as the current page', function (): void {
-    // The header links Pricing only (the use-case links live in the footer),
+    // The header links the shops hub, pricing and help (the use-case links
+    // live in the footer),
     // so a use-case page must highlight nothing. Pricing itself highlights one
     // link per nav, and the header renders two navs: desktop and mobile.
     $useCase = (string) $this->get('/price-alerts/coffee')->assertOk()->getContent();

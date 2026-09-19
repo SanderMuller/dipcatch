@@ -1,7 +1,7 @@
 <x-mail::message>
 # {{ $totalDrops === 1 ? '1 price drop today' : $totalDrops . ' price drops today' }}
 
-Your tracked prices changed:
+Prices dropped on what you follow:
 
 @foreach ($grouped as $group)
 @php
@@ -35,7 +35,7 @@ $image = $product->safeImageUrl();
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; margin: 0 0 {{ $loop->last ? '0' : '16px' }}; border-collapse: collapse;">
 <tr>
 <td style="padding: 0 0 8px; color: #71717a; font-size: 13px; line-height: 1.4;">
-{{ $event->triggeredByShop?->host ?? 'Unknown shop' }} · {{ $event->fired_at->setTimezone($user->timezone)->format('H:i') }}
+{{ $event->triggeredByShop?->host ?? 'Shop unknown' }} · {{ $event->fired_at->setTimezone($user->timezone)->format('H:i') }}
 </td>
 </tr>
 <tr>
@@ -70,7 +70,7 @@ View {{ $product->title }}
 
 @endforeach
 
-You get this email because daily digests are on. You can change this in DipCatch notification settings.
+You get this email once a day because you asked us to. You can change that in your DipCatch notification settings.
 
 Thanks,<br>
 {{ config('app.name') }}

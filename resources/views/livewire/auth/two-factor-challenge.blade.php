@@ -25,8 +25,8 @@
         >
             <div x-show="!showRecoveryInput">
                 <x-auth-header
-                    :title="__('Authentication code')"
-                    :description="__('Enter the authentication code provided by your authenticator application.')"
+                    :title="__('Six-digit code')"
+                    :description="__('Open the app on your phone and type the six-digit code it shows.')"
                 />
             </div>
 
@@ -36,7 +36,7 @@
                 <x-auth-header
                     :level="2"
                     :title="__('Recovery code')"
-                    :description="__('Please confirm access to your account by entering one of your emergency recovery codes.')"
+                    :description="__('Type one of the backup codes you saved when you switched this on.')"
                 />
             </div>
 

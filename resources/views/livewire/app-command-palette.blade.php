@@ -1,6 +1,19 @@
-<div>
+<div class="min-w-0 flex-1">
+    {{-- A search field is the centre of the header, as on a shop site. It is a
+         button, not an input: the palette modal owns the real input. --}}
     <flux:modal.trigger name="app-command" shortcut="cmd.k">
-        <flux:button variant="ghost" icon="magnifying-glass" :aria-label="__('Search')" />
+        <button
+            type="button"
+            class="hidden w-full items-center gap-3 rounded-full bg-white/70 px-4 py-2 text-start text-sm text-zinc-500 ring-1 ring-zinc-900/5 transition hover:bg-white sm:flex dark:bg-zinc-900/70 dark:text-zinc-400 dark:ring-white/10 dark:hover:bg-zinc-900"
+            data-test="app-search-bar"
+        >
+            <flux:icon.magnifying-glass class="size-5 shrink-0" />
+            <span class="truncate">{{ __('Search pages and products…') }}</span>
+        </button>
+    </flux:modal.trigger>
+
+    <flux:modal.trigger name="app-command">
+        <flux:button variant="ghost" icon="magnifying-glass" :aria-label="__('Search')" class="sm:hidden" />
     </flux:modal.trigger>
 
     <flux:modal name="app-command" variant="bare" class="my-[12vh] max-h-screen w-full max-w-[30rem] overflow-y-hidden">
@@ -20,7 +33,7 @@
                     {{ __('Plan & billing') }}
                 </flux:command.item>
                 <flux:command.item icon="bell" :href="route('app.notifications')" wire:navigate>
-                    {{ __('Notifications') }}
+                    {{ __('Notification settings') }}
                 </flux:command.item>
                 <flux:command.item icon="puzzle-piece" :href="route('app.connections')" wire:navigate>
                     {{ __('Connections') }}

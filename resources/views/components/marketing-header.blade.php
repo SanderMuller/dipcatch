@@ -1,4 +1,4 @@
-@props(['width' => 'max-w-7xl'])
+@props(['width' => 'max-w-app'])
 
 @php
     // The language links must return to the page the reader is on, so the
@@ -16,8 +16,14 @@
         ? []
         : ['lang' => \App\Http\Middleware\MarketingLocale::requested(request())];
     $authed = auth()->check();
+    // The three questions a visitor asks before signing up: does it work with
+    // my shop, what does it cost, and what happens when something goes wrong.
+    // Every other informational page stays in the footer, where a reader looks
+    // once they are already interested.
     $links = [
+        ['label' => __('Shops'), 'href' => route('shops', $langQuery), 'current' => in_array($route, ['shops', 'shop'], true)],
         ['label' => __('Pricing'), 'href' => route('pricing', $langQuery), 'current' => $route === 'pricing'],
+        ['label' => __('Help'), 'href' => route('support', $langQuery), 'current' => $route === 'support'],
     ];
 @endphp
 

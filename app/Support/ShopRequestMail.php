@@ -26,7 +26,7 @@ final class ShopRequestMail
             : __('Request :shop on DipCatch', ['shop' => $shop]);
 
         $lines = [
-            __('Paste a product URL from the shop. Most shops already work. A reader of its own is written when a generic read is not enough.'),
+            __('Paste a product link from the shop. Most shops already work. We set a shop up ourselves when its pages are too tricky to read otherwise.'),
             '',
             $url === null
                 ? __('Product URL:')

@@ -324,22 +324,22 @@ final class Security extends Component
         if ($this->twoFactorEnabled) {
             return [
                 'title' => __('Two-factor authentication enabled'),
-                'description' => __('Two-factor authentication is now enabled. Scan the QR code or enter the setup key in your authenticator app.'),
+                'description' => __('Two-factor authentication is on. Open the app on your phone and scan this square, or type the setup key below.'),
                 'buttonText' => __('Close'),
             ];
         }
 
         if ($this->showVerificationStep) {
             return [
-                'title' => __('Verify authentication code'),
-                'description' => __('Enter the 6-digit code from your authenticator app.'),
+                'title' => __('Check the code'),
+                'description' => __('Type the six-digit code from the app on your phone.'),
                 'buttonText' => __('Continue'),
             ];
         }
 
         return [
             'title' => __('Enable two-factor authentication'),
-            'description' => __('To finish enabling two-factor authentication, scan the QR code or enter the setup key in your authenticator app.'),
+            'description' => __('Open the app on your phone and scan this square. If the app cannot scan, type the setup key below instead.'),
             'buttonText' => __('Continue'),
         ];
     }

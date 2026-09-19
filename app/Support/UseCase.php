@@ -16,6 +16,8 @@ final readonly class UseCase
     public function __construct(
         public string $slug,
         public string $heading,
+        /** The heading without its "Price alerts for" opening, for a list that already says it. */
+        public string $label,
         public string $description,
         public string $intro,
         public string $example,

@@ -1,7 +1,6 @@
 <!DOCTYPE html>
-{{-- No hardcoded `dark` class: @fluxAppearance decides the mode before
-     first paint from localStorage or the OS. Hardcoding it flashed a dark
-     page at everyone whose system is light. --}}
+{{-- No hardcoded `dark` class: the appearance script in partials.head decides
+     the mode before first paint, defaulting to light. --}}
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
@@ -15,116 +14,145 @@
              untouched; light mode only, as on the marketing page. --}}
         <div aria-hidden="true" class="pointer-events-none fixed -top-40 left-40 -z-10 size-[32rem] rounded-full bg-amber-200/40 blur-3xl dark:hidden"></div>
         <div aria-hidden="true" class="pointer-events-none fixed right-0 -bottom-40 -z-10 size-[32rem] rounded-full bg-rose-200/40 blur-3xl dark:hidden"></div>
-        <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-900/5 bg-amber-50/80 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/80">
-            <flux:sidebar.header>
-                <x-app-logo :sidebar="true" :href="route('app.dashboard')" wire:navigate />
-                {{-- Bell slot, desktop. --}}
-                @includeWhen(view()->exists('partials.notification-bell'), 'partials.notification-bell')
-                <livewire:app-command-palette />
-                <flux:sidebar.collapse class="lg:hidden" />
-            </flux:sidebar.header>
 
-            {{-- Every navigation entry is declared here, in one place. --}}
-            <flux:sidebar.nav>
-                <flux:sidebar.group class="grid">
-                    <flux:sidebar.item icon="home" :href="route('app.dashboard')" :current="request()->routeIs('app.dashboard')" wire:navigate>
-                        {{ __('Dashboard') }}
-                    </flux:sidebar.item>
+        @php
+            // One declaration of the navigation, read by the bar, the "More"
+            // dropdown and the mobile sheet, so the three cannot drift.
+            // No Dashboard entry: the logo goes there, as on a shop header.
+            $dashboardIsCurrent = request()->routeIs('app.dashboard') || request()->routeIs('app.stats');
 
-                    <flux:sidebar.item icon="shopping-bag" :href="route('app.products.index')" :current="request()->routeIs('app.products.*')" wire:navigate>
-                        {{ __('Products') }}
-                    </flux:sidebar.item>
+            $primaryLinks = [
+                // Current on the index only. On a product page the pill read
+                // as "you are here", so the way back to the list looked dead.
+                ['label' => __('Products'), 'href' => route('app.products.index'), 'icon' => 'shopping-bag', 'current' => request()->routeIs('app.products.index'), 'navigate' => true],
+            ];
 
-                    <flux:sidebar.item icon="credit-card" :href="route('app.billing')" :current="request()->routeIs('app.billing')" wire:navigate>
-                        {{ __('Plan & billing') }}
-                    </flux:sidebar.item>
+            $moreLinks = [
+                // "Notifications" read as a list of alerts you have had. The
+                // page is the settings for them.
+                ['label' => __('Notification settings'), 'href' => route('app.notifications'), 'icon' => 'bell', 'current' => request()->routeIs('app.notifications'), 'navigate' => true],
+                ['label' => __('Plan & billing'), 'href' => route('app.billing'), 'icon' => 'credit-card', 'current' => request()->routeIs('app.billing'), 'navigate' => true],
+                ['label' => __('Connections'), 'href' => route('app.connections'), 'icon' => 'puzzle-piece', 'current' => request()->routeIs('app.connections'), 'navigate' => true],
+                ['label' => __('Support'), 'href' => route('app.support'), 'icon' => 'lifebuoy', 'current' => request()->routeIs('app.support'), 'navigate' => true],
+                // Back to the marketing site. No wire:navigate: the marketing
+                // pages use their own layout, so a full page load is correct.
+                ['label' => __('Home page'), 'href' => route('home'), 'icon' => 'globe-alt', 'current' => false, 'navigate' => false, 'test' => 'home-page-nav'],
+            ];
 
-                    <flux:sidebar.item icon="bell" :href="route('app.notifications')" :current="request()->routeIs('app.notifications')" wire:navigate>
-                        {{ __('Notifications') }}
-                    </flux:sidebar.item>
+            $moreIsCurrent = collect($moreLinks)->contains('current', true);
+        @endphp
 
-                    <flux:sidebar.item icon="puzzle-piece" :href="route('app.connections')" :current="request()->routeIs('app.connections')" wire:navigate>
-                        {{ __('Connections') }}
-                    </flux:sidebar.item>
+        <header
+            x-data="{ open: false }"
+            x-on:keydown.escape.window="open = false"
+            class="sticky top-0 z-50 border-b border-zinc-900/5 bg-amber-50/80 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/80"
+        >
+            <div class="mx-auto flex w-full max-w-app items-center gap-3 px-4 py-3 sm:px-6 lg:gap-6 lg:px-8">
+                <a href="{{ route('app.dashboard') }}" wire:navigate aria-label="{{ __('Dashboard') }}" @if ($dashboardIsCurrent) aria-current="page" @endif class="flex shrink-0 items-center gap-2 font-semibold">
+                    <span class="flex aspect-square size-8 items-center justify-center rounded-xl bg-white p-0.5 dark:bg-white">
+                        <x-app-logo-icon class="size-7" />
+                    </span>
+                    <span class="hidden sm:inline">{{ config('app.name') }}</span>
+                </a>
 
-                    <flux:sidebar.item icon="lifebuoy" :href="route('app.support')" :current="request()->routeIs('app.support')" wire:navigate>
-                        {{ __('Support') }}
-                    </flux:sidebar.item>
-                </flux:sidebar.group>
-            </flux:sidebar.nav>
+                <nav class="hidden items-center gap-1 lg:flex" aria-label="{{ __('Main') }}">
+                    @foreach ($primaryLinks as $link)
+                        <a
+                            href="{{ $link['href'] }}"
+                            @if ($link['navigate']) wire:navigate @endif
+                            @if ($link['current']) aria-current="page" @endif
+                            {{-- The current page is a raised white pill: a ring and a small
+                                 shadow lift it off the amber canvas, where a translucent
+                                 fill alone barely read. Hover is a soft tint instead, so
+                                 the two states differ in kind, not only in amount. --}}
+                            @class([
+                                'rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap',
+                                'bg-white text-zinc-900 ring-1 shadow-sm ring-zinc-950/10 dark:bg-zinc-800 dark:text-white dark:shadow-none dark:ring-white/10' => $link['current'],
+                                'text-zinc-600 hover:bg-zinc-950/5 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100' => ! $link['current'],
+                            ])
+                        >{{ $link['label'] }}</a>
+                    @endforeach
 
-            <flux:spacer />
-
-            <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
-        </flux:sidebar>
-
-        <flux:header class="border-b border-zinc-900/5 bg-amber-50/80 backdrop-blur-md lg:hidden dark:border-white/10 dark:bg-zinc-950/80">
-            <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
-
-            <flux:spacer />
-
-            {{-- Bell slot, mobile. --}}
-            @includeWhen(view()->exists('partials.notification-bell'), 'partials.notification-bell')
-
-            <flux:modal.trigger name="app-command">
-                <flux:button variant="ghost" icon="magnifying-glass" :aria-label="__('Search')" />
-            </flux:modal.trigger>
-
-            <flux:dropdown position="top" align="end">
-                <flux:profile
-                    :initials="auth()->user()->initials()"
-                    icon-trailing="chevron-down"
-                />
-
-                <flux:menu>
-                    <flux:menu.radio.group>
-                        <div class="p-0 text-sm font-normal">
-                            <div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
-                                <flux:avatar
-                                    :name="auth()->user()->name"
-                                    :initials="auth()->user()->initials()"
-                                />
-
-                                <div class="grid flex-1 text-start text-sm leading-tight">
-                                    <flux:heading class="truncate">{{ auth()->user()->name }}</flux:heading>
-                                    <flux:text class="truncate">{{ auth()->user()->email }}</flux:text>
-                                </div>
-                            </div>
-                        </div>
-                    </flux:menu.radio.group>
-
-                    <flux:menu.separator />
-
-                    <flux:menu.radio.group>
-                        <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
-                            {{ __('Settings') }}
-                        </flux:menu.item>
-
-                        {{-- Only an admin can open /admin at all (User::canAccessPanel), so this is a shortcut for people who already hold the key, never the thing that grants it. --}}
-                        @if (auth()->user()->is_admin)
-                            <flux:menu.item href="/admin" icon="wrench-screwdriver">
-                                {{ __('Admin panel') }}
-                            </flux:menu.item>
-                        @endif
-                    </flux:menu.radio.group>
-
-                    <flux:menu.separator />
-
-                    <form method="POST" action="{{ route('logout') }}" class="w-full">
-                        @csrf
-                        <flux:menu.item
-                            as="button"
-                            type="submit"
-                            icon="arrow-right-start-on-rectangle"
-                            class="w-full cursor-pointer"
-                            data-test="logout-button"
+                    <flux:dropdown position="bottom" align="start">
+                        <button
+                            type="button"
+                            @class([
+                                'flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap',
+                                'bg-white text-zinc-900 ring-1 shadow-sm ring-zinc-950/10 dark:bg-zinc-800 dark:text-white dark:shadow-none dark:ring-white/10' => $moreIsCurrent,
+                                'text-zinc-600 hover:bg-zinc-950/5 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100' => ! $moreIsCurrent,
+                            ])
+                            data-test="more-menu-button"
                         >
-                            {{ __('Log out') }}
-                        </flux:menu.item>
-                    </form>
-                </flux:menu>
-            </flux:dropdown>
-        </flux:header>
+                            {{ __('More') }}
+                            <flux:icon.chevron-down class="size-4" />
+                        </button>
+
+                        <flux:menu>
+                            @foreach ($moreLinks as $link)
+                                <flux:menu.item
+                                    :href="$link['href']"
+                                    :icon="$link['icon']"
+                                    :wire:navigate="$link['navigate']"
+                                    :data-test="$link['test'] ?? null"
+                                >
+                                    {{ $link['label'] }}
+                                </flux:menu.item>
+                            @endforeach
+                        </flux:menu>
+                    </flux:dropdown>
+                </nav>
+
+                {{-- The search bar is the widest thing in the bar, as on a
+                     shop header. It opens the command palette modal. --}}
+                <livewire:app-command-palette />
+
+                <div class="flex shrink-0 items-center gap-1 sm:gap-2">
+                    {{-- Bell slot. --}}
+                    @includeWhen(view()->exists('partials.notification-bell'), 'partials.notification-bell')
+
+                    <x-appearance-toggle class="hidden sm:flex" />
+
+                    <x-desktop-user-menu class="hidden lg:block" />
+
+                    <button
+                        type="button"
+                        x-on:click="open = ! open"
+                        x-bind:aria-expanded="open ? 'true' : 'false'"
+                        aria-controls="app-menu"
+                        class="flex size-9 items-center justify-center rounded-full text-zinc-600 hover:bg-zinc-950/5 hover:text-zinc-900 lg:hidden dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100"
+                    >
+                        <span class="sr-only" x-text="open ? @js(__('Close menu')) : @js(__('Menu'))">{{ __('Menu') }}</span>
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" class="size-5" aria-hidden="true">
+                            <path x-bind:class="open ? 'hidden' : ''" d="M3 6h14M3 10h14M3 14h14" />
+                            <path x-bind:class="open ? '' : 'hidden'" class="hidden" d="M5 5l10 10M15 5L5 15" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div id="app-menu" x-show="open" x-cloak x-collapse class="lg:hidden">
+                <div class="mx-auto flex w-full max-w-app flex-col gap-1 px-4 py-4 sm:px-6 lg:px-8">
+                    @foreach (array_merge($primaryLinks, $moreLinks) as $link)
+                        <a
+                            href="{{ $link['href'] }}"
+                            @if ($link['navigate']) wire:navigate @endif
+                            @if ($link['current']) aria-current="page" @endif
+                            @isset($link['test']) data-test="{{ $link['test'] }}" @endisset
+                            @class([
+                                'rounded-xl px-3 py-2.5 text-base font-medium',
+                                'bg-white text-zinc-900 ring-1 shadow-sm ring-zinc-950/10 dark:bg-zinc-800 dark:text-white dark:shadow-none dark:ring-white/10' => $link['current'],
+                                'text-zinc-700 hover:bg-zinc-950/5 dark:text-zinc-300 dark:hover:bg-white/10' => ! $link['current'],
+                            ])
+                        >{{ $link['label'] }}</a>
+                    @endforeach
+
+                    <div class="mt-3 flex items-center justify-between border-t border-zinc-200/70 pt-4 dark:border-zinc-800/70">
+                        <x-desktop-user-menu />
+                        <x-appearance-toggle class="sm:hidden" />
+                    </div>
+                </div>
+            </div>
+        </header>
 
         {{ $slot }}
 

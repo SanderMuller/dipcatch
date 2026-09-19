@@ -12,7 +12,7 @@
         <nav class="flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400" aria-label="{{ __('Price alerts by category') }}">
             <span class="font-medium text-zinc-700 dark:text-zinc-300">{{ __('Price alerts for') }}</span>
             @foreach ($useCases as $useCase)
-                <a href="{{ route('use-case', [...$langQuery, 'slug' => $useCase->slug]) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ $useCase->heading }}</a>
+                <a href="{{ route('use-case', [...$langQuery, 'slug' => $useCase->slug]) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ $useCase->label }}</a>
             @endforeach
         </nav>
     @endif

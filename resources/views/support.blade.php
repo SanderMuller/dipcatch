@@ -32,27 +32,33 @@
                 <div class="mt-8 space-y-8 text-base text-zinc-700 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-zinc-900 [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-5 dark:text-zinc-300 dark:[&_h2]:text-zinc-50">
                     <section>
                         <h2>{{ __('Getting in touch') }}</h2>
+                        {{-- The form is the real channel: it asks what kind of
+                             question this is and routes it. It lives behind
+                             sign-in, so say that rather than let a guest hit
+                             the login wall without warning. --}}
+                        <p class="mt-2">
+                            {{ __('The contact form in the app is the quickest way to reach us. It asks what kind of question you have, so it lands in the right place.') }}
+                            <a href="{{ route('app.support') }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ __('Open the contact form') }}</a>{{ __(' (sign in first).') }}
+                        </p>
                         @if (filled($contactEmail))
                             <p class="mt-2">
-                                {{ __('Email is the way to reach us:') }}
+                                {{ __('No account? Email us instead:') }}
                                 <a href="mailto:{{ $contactEmail }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ $contactEmail }}</a>
                             </p>
-                        @else
-                            <p class="mt-2">{{ __('Email is the way to reach us. The address is on the account page inside the app.') }}</p>
                         @endif
                         <p class="mt-2">{{ __('A question about one product is easiest to answer with the link to that product page and the shop it is at. Say what you expected to see and what you saw instead.') }}</p>
                     </section>
 
                     <section>
                         <h2>{{ __('A shop that will not read') }}</h2>
-                        <p class="mt-2">{{ __('DipCatch shows you the title, price and pack size it read before anything is saved, so a shop that cannot be read says so at that point rather than later.') }}</p>
+                        <p class="mt-2">{{ __('Before anything is saved, DipCatch shows you the name, the price and the pack size it read. A shop it cannot read says so right there, not weeks later.') }}</p>
                         <ul class="mt-2">
                             <li>{{ __('Check that the link is the product page itself, not a search result or a category.') }}</li>
-                            <li>{{ __('Some shops block automated requests, and some only put the price on the page with JavaScript afterwards. Neither can be read.') }}</li>
-                            <li>{{ __('When a shop that used to work stops working, the check fails rather than storing a wrong price, and the shop is marked on the product page.') }}</li>
+                            <li>{{ __('Some shops do not let us look at all, and at some the price only appears a moment after the page opens. We cannot read either of those.') }}</li>
+                            <li>{{ __('When a shop that used to work stops working, we store nothing rather than a wrong price. The shop is marked on the product page.') }}</li>
                         </ul>
                         <p class="mt-2">
-                            {{ __('Send a product URL if a paste does not pick up the price. A reader of its own is written when the generic read is not enough. Shops with a reader of their own are listed on the supported shops page.') }}
+                            {{ __('Send us a product link if pasting one does not pick up the price. We set a shop up ourselves when its pages are too tricky to read. Those shops are listed on the supported shops page.') }}
                             <x-shop-request-link class="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300" />
                         </p>
                     </section>

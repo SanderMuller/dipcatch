@@ -57,7 +57,7 @@ it('refuses the product over the limit on the URL-first flow', function (): void
         ->call('probe')
         ->assertSet('state', 'preview')
         ->call('confirm')
-        ->assertNotified('Plan limit reached');
+        ->assertNotified('You have used all your free products');
 
     expect(Product::query()->where('user_id', $user->id)->count())->toBe(20)
         ->and(Shop::query()->count())->toBe(0);
@@ -91,7 +91,7 @@ it('refuses the fifth shop on a product', function (): void {
         ->call('probe')
         ->assertSet('state', 'preview')
         ->call('confirm')
-        ->assertNotified('Plan limit reached');
+        ->assertNotified('You have used all your free products');
 
     expect(Shop::query()->where('product_id', $product->id)->count())->toBe(4);
 });
