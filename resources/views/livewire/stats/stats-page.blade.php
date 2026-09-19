@@ -24,7 +24,7 @@
                             @foreach ($savings['series'] as $series)
                                 <flux:chart.bar :field="$series['field']" :class="$series['color']" />
                             @endforeach
-        @endif
+                        @endif
                     <flux:chart.axis axis="x" field="date" :format="['month' => 'short', 'year' => '2-digit']">
                         <flux:chart.axis.tick />
                         <flux:chart.axis.line />

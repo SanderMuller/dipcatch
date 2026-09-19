@@ -19,7 +19,10 @@
             // One declaration of the navigation, read by the bar, the "More"
             // dropdown and the mobile sheet, so the three cannot drift.
             // No Dashboard entry: the logo goes there, as on a shop header.
-            $dashboardIsCurrent = request()->routeIs('app.dashboard') || request()->routeIs('app.stats');
+            // Stats is its own page and its own entry below, so it does not
+            // fold in here — the logo marked itself as the page being read
+            // while pointing somewhere else.
+            $dashboardIsCurrent = request()->routeIs('app.dashboard');
 
             $primaryLinks = [
                 // Current on the index only. On a product page the pill read
@@ -31,6 +34,10 @@
                 // "Notifications" read as a list of alerts you have had. The
                 // page is the settings for them.
                 ['label' => __('Notification settings'), 'href' => route('app.notifications'), 'icon' => 'bell', 'current' => request()->routeIs('app.notifications'), 'navigate' => true],
+                // Reachable from the savings tile on the dashboard too, but a
+                // page with one subtle link into it and none out is a page a
+                // reader cannot find twice.
+                ['label' => __('Stats'), 'href' => route('app.stats'), 'icon' => 'chart-bar', 'current' => request()->routeIs('app.stats'), 'navigate' => true],
                 ['label' => __('Plan & billing'), 'href' => route('app.billing'), 'icon' => 'credit-card', 'current' => request()->routeIs('app.billing'), 'navigate' => true],
                 ['label' => __('Connections'), 'href' => route('app.connections'), 'icon' => 'puzzle-piece', 'current' => request()->routeIs('app.connections'), 'navigate' => true],
                 ['label' => __('Support'), 'href' => route('app.support'), 'icon' => 'lifebuoy', 'current' => request()->routeIs('app.support'), 'navigate' => true],

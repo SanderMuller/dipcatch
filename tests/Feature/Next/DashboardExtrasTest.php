@@ -7,7 +7,9 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Notifications\PriceDropNotification;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 
 use function Pest\Livewire\livewire;
 
@@ -124,9 +126,32 @@ it('keeps the savings chart off the dashboard and links to it instead', function
 });
 
 it('keeps the alert history off the dashboard', function (): void {
-    $this->actingAs(User::factory()->create());
+    // An account with no alerts would pass this whether the timeline moved or
+    // not, so the alert the history would list is seeded first.
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Coffee beans 1 kg']);
 
-    livewire(Dashboard::class)->assertDontSee('Recent alerts');
+    $user->notifications()->create([
+        'id' => (string) Str::uuid(),
+        'type' => PriceDropNotification::class,
+        'data' => [
+            'title' => 'Coffee beans 1 kg',
+            'product_id' => $product->id,
+            'currency' => 'EUR',
+            'drop_percent' => 12.3,
+            'drop_absolute' => '1.50',
+        ],
+        'read_at' => now(),
+    ]);
+
+    $this->actingAs($user);
+
+    // Not the product title: it is legitimately on the dashboard already,
+    // under "Recently tracked".
+    livewire(Dashboard::class)
+        ->assertDontSee('Recent alerts')
+        ->assertDontSee('12.3%')
+        ->assertDontSeeHtml('data-flux-timeline');
 });
 
 it('nudges an account that tracks a product at only one shop', function (): void {

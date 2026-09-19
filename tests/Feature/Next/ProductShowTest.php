@@ -196,7 +196,8 @@ it('opens the add-shop disclosure when the page is asked to', function (): void 
 
     $this->actingAs($user);
 
-    Livewire::withQueryParams(['add-shop' => 1]);
+    // A string, as a real query string delivers it.
+    Livewire::withQueryParams(['add-shop' => '1']);
 
     $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product])->html());
 

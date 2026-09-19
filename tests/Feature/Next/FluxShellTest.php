@@ -147,3 +147,34 @@ it('does not mark Products as the current page on a product page', function (): 
     expect($nav)->toContain('Products')
         ->and($nav)->not->toContain('aria-current');
 });
+
+it('offers a way into the stats page from the shell, not only from the dashboard card', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    // Asked for from the product list, not the dashboard: the savings tile
+    // carries this same href, so a dashboard request would pass with the shell
+    // entry deleted.
+    $this->get(route('app.products.index'))
+        ->assertOk()
+        ->assertSeeHtml('href="' . route('app.stats') . '"')
+        ->assertSee('Stats');
+});
+
+it('does not mark the logo as the current page while the stats page is open', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $logo = static function (string $url): string {
+        preg_match('#<a[^>]*aria-label="Dashboard"[^>]*>#', (string) test()->get($url)->getContent(), $matches);
+
+        expect($matches)->not->toBeEmpty();
+
+        // The expectation above is what proves the logo is there; the fallback
+        // only satisfies the static analyser, and cannot be reached.
+        return $matches[0] ?? '';
+    };
+
+    // The logo points at the dashboard. Claiming "you are here" on another
+    // page tells a screen reader the wrong thing.
+    expect($logo(route('app.dashboard')))->toContain('aria-current="page"')
+        ->and($logo(route('app.stats')))->not->toContain('aria-current="page"');
+});

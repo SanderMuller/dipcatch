@@ -92,6 +92,14 @@ select:focus[data-flux-control] {
     box-shadow: inset 0 0 0 1px var(--color-zinc-800);
 }
 
+/* Alpine strips `x-cloak` once it has booted. Without this rule the attribute
+   does nothing, and everything marked with it — the mobile menu, the passkey
+   prompts, the shop count beside the add-shop button — paints in its open
+   state for the moment before Alpine runs. */
+[x-cloak] {
+    display: none !important;
+}
+
 
 /*
 | The primary palette the Filament-era views still name

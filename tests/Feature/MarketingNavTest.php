@@ -70,17 +70,19 @@ it('links the three pages a visitor checks before signing up', function (): void
         ->toContain(route('support'));
 });
 
-it('marks the header link for the page being read', function (string $path, string $label): void {
-    $this->get($path)
-        ->assertOk()
-        ->assertSeeHtml('aria-current="page"')
-        ->assertSee($label);
+it('marks the header link for the page being read', function (string $path, string $route): void {
+    $html = (string) $this->get($path)->assertOk()->getContent();
+
+    // Scoped to the marked link itself: a page-wide assertion on the attribute
+    // passes while it sits on the wrong link.
+    expect(hrefsWithin($html, 'nav[aria-label="Main"] a[aria-current="page"]'))
+        ->toBe([route($route)]);
 })->with([
-    'the shops hub' => ['/shops', 'Shops'],
+    'the shops hub' => ['/shops', 'shops'],
     // A single shop page belongs to the same section, so the hub stays lit.
-    'one shop page' => ['/shops/jumbo-com', 'Shops'],
-    'pricing' => ['/pricing', 'Pricing'],
-    'help' => ['/support', 'Help'],
+    'one shop page' => ['/shops/jumbo-com', 'shops'],
+    'pricing' => ['/pricing', 'pricing'],
+    'help' => ['/support', 'support'],
 ]);
 
 it('carries the same three links into the mobile menu', function (): void {
