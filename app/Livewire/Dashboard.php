@@ -63,7 +63,7 @@ final class Dashboard extends Component
             ->where('user_id', $this->user()->id)
             ->whereNotNull('last_notified_price')
             // One query each for the whole list rather than one per row.
-            ->with(['cheapestShop', 'shops'])
+            ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
             ->latest('last_notified_at')
             ->limit(10)
             ->get();
@@ -80,7 +80,7 @@ final class Dashboard extends Component
     {
         return Product::query()
             ->where('user_id', $this->user()->id)
-            ->with('cheapestShop')
+            ->with(['cheapestShop', 'latestPriceDropEvent'])
             ->latest('created_at')
             ->limit(6)
             ->get();

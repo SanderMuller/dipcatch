@@ -140,3 +140,16 @@ it('shows the mcp endpoint and an empty connection list', function (): void {
         ->assertSee('/mcp')
         ->assertSee('Nothing connected yet.');
 });
+
+it('shows the size of each active drop, what it fell from, and how long ago', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Dropped coffee', 'cheapest_price' => '7.99', 'last_notified_price' => '7.99', 'last_notified_at' => now()->subHours(3)]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'reference_price' => '9.99', 'new_price' => '7.99', 'drop_pct' => 20.0, 'currency' => 'EUR']);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertSee('−20%')
+        ->assertSee('Was €9.99')
+        ->assertSee('3 hours ago');
+});

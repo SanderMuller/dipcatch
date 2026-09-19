@@ -537,3 +537,49 @@ it('says so when the suggestion request fails, and stores nothing', function ():
 
     expect($product->fresh()?->category)->toBeNull();
 });
+
+it('keeps a suggestion, so the next visit shows it without asking again', function (): void {
+    config()->set('services.typesafe.key', 'test-key');
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response(typesafeAnswer(['food' => 0.95, 'home' => 0.05], ['food' => ['coffee_tea' => 0.95, 'pantry' => 0.05]]))]);
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])->call('suggestCategory');
+
+    expect($product->fresh()?->suggested_category)->toBe(ProductCategory::CoffeeTea);
+
+    livewire(EditProduct::class, ['product' => $product->fresh()])
+        ->assertSet('suggestedCategory', 'food.coffee_tea')
+        ->assertSee('Use it')
+        ->call('suggestCategory')
+        ->assertSet('suggestedCategory', 'food.coffee_tea');
+
+    Http::assertSentCount(1);
+});
+
+it('forgets a declined suggestion as the users decision, and a saved category clears it', function (): void {
+    config()->set('services.typesafe.key', 'test-key');
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $declined = Product::factory()->create(['user_id' => $user->id, 'suggested_category' => ProductCategory::CoffeeTea]);
+    $accepted = Product::factory()->create(['user_id' => $user->id, 'suggested_category' => ProductCategory::CoffeeTea]);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $declined])
+        ->assertSet('suggestedCategory', 'food.coffee_tea')
+        ->call('declineSuggestion');
+
+    livewire(EditProduct::class, ['product' => $accepted])
+        ->call('acceptSuggestion')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($declined->fresh()?->suggested_category)->toBeNull()
+        ->and($declined->fresh()?->category_set_by)->toBe(CategorySource::User)
+        ->and($accepted->fresh()?->suggested_category)->toBeNull()
+        ->and($accepted->fresh()?->category)->toBe(ProductCategory::CoffeeTea);
+});

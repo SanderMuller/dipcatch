@@ -134,7 +134,7 @@ final class ProductList extends Component
             )
             ->withCount('shops')
             ->withMax('priceDropEvents as biggest_drop', 'drop_pct')
-            ->with(['cheapestShop', 'shops'])
+            ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
             // A product that never dropped, or has no price yet, sorts last
             // whichever way the list runs, rather than heading a list of
             // drops with rows that have none.

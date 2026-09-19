@@ -183,13 +183,25 @@ it('logs a warning and leaves the product untouched when the request fails for g
         ->and($product->fresh()?->category_set_by)->toBeNull();
 });
 
-it('leaves the product untouched when the answer is not confident enough', function (): void {
-    Http::fake([TypeSafeClient::ENDPOINT => Http::response(typesafeAnswer(['other' => 0.9, 'food' => 0.1]))]);
+it('keeps the best guess as a suggestion when the answer is not confident enough', function (): void {
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response(typesafeAnswer(['other' => 0.9, 'food' => 0.1], ['food' => ['coffee_tea' => 0.9, 'pantry' => 0.1]]))]);
     $user = proUserWantingCategories();
     $product = Product::factory()->create(['user_id' => $user->id]);
 
     new CategoriseProduct($product->id)->handle(app(TypeSafeClient::class));
 
     expect($product->fresh()?->category)->toBeNull()
-        ->and($product->fresh()?->category_set_by)->toBeNull();
+        ->and($product->fresh()?->category_set_by)->toBeNull()
+        ->and($product->fresh()?->suggested_category)->toBe(ProductCategory::CoffeeTea);
+});
+
+it('clears a stale suggestion when a confident answer places the product', function (): void {
+    fakeConfidentCoffee();
+    $user = proUserWantingCategories();
+    $product = Product::factory()->create(['user_id' => $user->id, 'suggested_category' => ProductCategory::PetFood]);
+
+    new CategoriseProduct($product->id)->handle(app(TypeSafeClient::class));
+
+    expect($product->fresh()?->category)->toBe(ProductCategory::CoffeeTea)
+        ->and($product->fresh()?->suggested_category)->toBeNull();
 });

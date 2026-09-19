@@ -62,6 +62,8 @@ final class CategoriseProduct
         }
 
         if ($verdict->category === null) {
+            self::store($product, $verdict);
+
             Log::info('Automatic categorisation was not confident enough to store a category.', [
                 'product_id' => $product->id,
                 'winner' => $verdict->winner?->value,
@@ -80,13 +82,21 @@ final class CategoriseProduct
     }
 
     /**
-     * Writes a stored verdict as an automatic category. Conditional on the
-     * source still being null, so an edit saved since the caller's read wins.
-     * Returns false when nothing was written.
+     * Writes a confident verdict as the automatic category, or keeps a
+     * below-guard winner as the suggestion the edit form offers. Both are
+     * conditional on the source still being null, so an edit saved since the
+     * caller's read wins. Returns whether a category was written.
      */
     public static function store(Product $product, CategoryVerdict $verdict): bool
     {
         if ($verdict->category === null) {
+            if ($verdict->winner !== null) {
+                Product::query()
+                    ->whereKey($product->id)
+                    ->whereNull('category_set_by')
+                    ->update(['suggested_category' => $verdict->winner->value]);
+            }
+
             return false;
         }
 
@@ -96,6 +106,7 @@ final class CategoriseProduct
             ->update([
                 'category' => $verdict->category->value,
                 'category_set_by' => CategorySource::Auto->value,
+                'suggested_category' => null,
             ]) === 1;
     }
 }

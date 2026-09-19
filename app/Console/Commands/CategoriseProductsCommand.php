@@ -32,6 +32,8 @@ final class CategoriseProductsCommand extends Command
             ->with(['shops', 'user'])
             ->whereNull('category')
             ->whereNull('category_set_by')
+            // Judged once already; its best guess waits on the edit form.
+            ->whereNull('suggested_category')
             // A pre-filter in SQL: ProUsers ORs the generic trial without
             // looking at the subscription, so each row is re-checked below
             // with the one guard the app uses everywhere.
@@ -84,6 +86,10 @@ final class CategoriseProductsCommand extends Command
             ));
 
             if ($verdict->category === null) {
+                if (! $dryRun) {
+                    CategoriseProduct::store($product, $verdict);
+                }
+
                 $skipped++;
 
                 continue;

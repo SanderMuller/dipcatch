@@ -344,3 +344,23 @@ it('reads the category filter from the URL', function (): void {
         ->assertSee('Aroma Rood')
         ->assertSee('Unsorted thing');
 });
+
+it('shows how far a product in a drop sits below the price it alerted from', function (): void {
+    $user = User::factory()->create();
+    // Alerted at 7.99 (−20%), climbed back to 8.99 since: still latched, now −10%.
+    $dropped = Product::factory()->create(['user_id' => $user->id, 'title' => 'Dropped coffee', 'cheapest_price' => '8.99', 'last_notified_price' => '7.99', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $dropped->id, 'reference_price' => '9.99', 'new_price' => '7.99', 'drop_pct' => 20.0, 'currency' => 'EUR']);
+    $recovered = Product::factory()->create(['user_id' => $user->id, 'title' => 'Recovered tea', 'last_notified_price' => null]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $recovered->id, 'drop_pct' => 35.0]);
+
+    $this->actingAs($user);
+
+    $html = livewire(ProductList::class)
+        ->assertSee('−10%')
+        ->assertDontSee('−20%')
+        ->assertSee('Was €9.99')
+        ->assertDontSee('−35%')
+        ->html();
+
+    expect(substr_count($html, 'data-test="drop-badge"'))->toBe(1);
+});

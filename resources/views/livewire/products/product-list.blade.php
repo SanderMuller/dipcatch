@@ -112,9 +112,13 @@
                         </flux:tooltip>
                     </flux:table.cell>
                     <flux:table.cell class="tabular-nums">
-                        <flux:text class="font-medium">
-                            <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
-                        </flux:text>
+                        @php($inDrop = $product->activeDrop() !== null)
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <flux:text @class(['font-medium', 'text-emerald-600 dark:text-emerald-400' => $inDrop])>
+                                <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
+                            </flux:text>
+                            <x-drop-badge :product="$product" />
+                        </div>
                         {{-- Flux puts whitespace-nowrap on the whole table, so a long
                              promotion line cannot wrap and widens the column until the
                              page scrolls sideways. These lines wrap inside a capped

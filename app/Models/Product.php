@@ -18,12 +18,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 
 /**
  * @property ProductCategory|null $category
  * @property CategorySource|null $category_set_by
+ * @property ProductCategory|null $suggested_category
  * @property CarbonImmutable|null $history_kept_from
+ * @property-read PriceDropEvent|null $latestPriceDropEvent
  */
 #[Unguarded]
 final class Product extends Model
@@ -72,6 +75,7 @@ final class Product extends Model
             'active' => 'boolean',
             'category' => ProductCategory::class,
             'category_set_by' => CategorySource::class,
+            'suggested_category' => ProductCategory::class,
         ];
     }
 
@@ -113,6 +117,55 @@ final class Product extends Model
     public function priceDropEvents(): HasMany
     {
         return $this->hasMany(PriceDropEvent::class);
+    }
+
+    /**
+     * @return HasOne<PriceDropEvent, $this>
+     */
+    public function latestPriceDropEvent(): HasOne
+    {
+        // Not ofMany(): that aggregates MAX over the uuid key, which Postgres refuses.
+        return $this->hasOne(PriceDropEvent::class)->latest('fired_at')->latest('id');
+    }
+
+    /**
+     * The drop the product is still in: the alert that last fired, while the
+     * price has not recovered. `last_notified_price` is the latch DetectDrop
+     * clears on recovery, so the latest event is the current drop only while
+     * the latch is set.
+     */
+    public function activeDrop(): ?PriceDropEvent
+    {
+        if ($this->last_notified_price === null) {
+            return null;
+        }
+
+        return $this->latestPriceDropEvent;
+    }
+
+    /**
+     * How far the current cheapest price sits below the reference the alert
+     * fired from, in whole percent. The latch holds until the price is back
+     * at the reference, so the price can have climbed since the alert; the
+     * event's own percentage is only the fallback when no price is known.
+     */
+    public function activeDropPercent(): ?int
+    {
+        $drop = $this->activeDrop();
+
+        if ($drop === null) {
+            return null;
+        }
+
+        $reference = Numeric::str((string) $drop->reference_price);
+
+        if ($this->cheapest_price === null || bccomp($reference, '0', self::BC_SCALE) <= 0) {
+            return (int) round((float) $drop->drop_pct);
+        }
+
+        $fraction = bcdiv(bcsub($reference, Numeric::str((string) $this->cheapest_price), self::BC_SCALE), $reference, self::BC_SCALE);
+
+        return max(0, (int) round((float) $fraction * 100));
     }
 
     public function isPubliclyShared(): bool

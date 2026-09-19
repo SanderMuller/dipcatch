@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\MoneyFormatter;
 use Database\Factories\PriceDropEventFactory;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
@@ -29,6 +30,12 @@ final class PriceDropEvent extends Model
             'drop_abs' => 'decimal:2',
             'fired_at' => 'datetime',
         ];
+    }
+
+    /** "Was €9.99": the price this alert measured the drop from. */
+    public function wasLabel(): string
+    {
+        return __('Was :price', ['price' => MoneyFormatter::format((string) $this->reference_price, $this->currency)]);
     }
 
     /**

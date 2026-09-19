@@ -1,0 +1,31 @@
+<?php declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        if (Schema::hasColumn('products', 'suggested_category')) {
+            return;
+        }
+
+        Schema::table('products', function (Blueprint $table): void {
+            // A leaf key the categoriser proposed but did not store, kept so
+            // the edit form can offer it without asking again.
+            $table->string('suggested_category')->nullable();
+        });
+    }
+
+    public function down(): void
+    {
+        if (! Schema::hasColumn('products', 'suggested_category')) {
+            return;
+        }
+
+        Schema::table('products', function (Blueprint $table): void {
+            $table->dropColumn('suggested_category');
+        });
+    }
+};

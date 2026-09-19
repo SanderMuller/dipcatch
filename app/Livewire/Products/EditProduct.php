@@ -78,6 +78,7 @@ final class EditProduct extends Component
         $this->active = $product->active;
         $this->category = $product->category->value ?? '';
         $this->loadedCategory = $this->category;
+        $this->suggestedCategory = $this->category === '' ? ($product->suggested_category->value ?? null) : null;
     }
 
     /**
@@ -114,6 +115,10 @@ final class EditProduct extends Component
             ]);
         }
 
+        if ($this->category !== '') {
+            $this->product->forceFill(['suggested_category' => null]);
+        }
+
         $this->product->forceFill([
             'title' => trim($this->title),
             'image_url' => $this->blankToNull($this->imageUrl),
@@ -132,9 +137,10 @@ final class EditProduct extends Component
     }
 
     /**
-     * One request on the person's own click, so the answer is shown for a
-     * decision rather than stored. Guards match the settings switch, a Pro
-     * plan and a configured key; the opt-in is not needed for an explicit ask.
+     * One request on the person's own click, kept on the product so the next
+     * visit shows it without asking again. Guards match the settings switch,
+     * a Pro plan and a configured key; the opt-in is not needed for an
+     * explicit ask.
      */
     public function suggestCategory(): void
     {
@@ -142,6 +148,12 @@ final class EditProduct extends Component
         $this->suggestionMessage = null;
 
         if (! TypeSafeClient::configured() || ! $this->allowsAutoCategories()) {
+            return;
+        }
+
+        if ($this->product->suggested_category !== null) {
+            $this->suggestedCategory = $this->product->suggested_category->value;
+
             return;
         }
 
@@ -161,6 +173,7 @@ final class EditProduct extends Component
         }
 
         $this->suggestedCategory = $verdict->winner->value;
+        $this->product->forceFill(['suggested_category' => $verdict->winner])->save();
     }
 
     public function acceptSuggestion(): void
@@ -174,9 +187,15 @@ final class EditProduct extends Component
         $this->message = __('Category set. Save changes to keep it.');
     }
 
+    /**
+     * A decline is a decision, the same as clearing the select: the source
+     * becomes the person's, so neither the after-response sort nor the backfill
+     * asks for this product again. An explicit "Suggest" click still can.
+     */
     public function declineSuggestion(): void
     {
         $this->suggestedCategory = null;
+        $this->product->forceFill(['suggested_category' => null, 'category_set_by' => CategorySource::User])->save();
     }
 
     public function delete(): void

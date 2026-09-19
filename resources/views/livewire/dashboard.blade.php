@@ -89,7 +89,8 @@
                                 <x-product-thumb :product="$product" size="size-14" />
                                 <div class="min-w-0">
                                     <flux:text class="truncate font-medium">{{ Str::limit($product->title, 40) }}</flux:text>
-                                    <flux:text size="sm" class="truncate text-zinc-500 tabular-nums">
+                                    <flux:text size="sm" class="flex flex-wrap items-center gap-x-1 text-zinc-500 tabular-nums">
+                                        <x-drop-badge :product="$product" />
                                         <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
                                         @if ($product->cheapestShop)
                                             · {{ $product->cheapestShop->host }}
@@ -114,6 +115,7 @@
             <flux:table.columns>
                 <flux:table.column>{{ __('Product') }}</flux:table.column>
                 <flux:table.column>{{ __('Now') }}</flux:table.column>
+                <flux:table.column class="hidden sm:table-cell">{{ __('Since') }}</flux:table.column>
                 <flux:table.column class="hidden md:table-cell">{{ __('Shop') }}</flux:table.column>
             </flux:table.columns>
             <flux:table.rows>
@@ -126,11 +128,22 @@
                             </a>
                         </flux:table.cell>
                         <flux:table.cell class="tabular-nums">
-                            <flux:text class="font-medium text-emerald-600 dark:text-emerald-400">
-                                <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
-                            </flux:text>
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <flux:text class="font-medium text-emerald-600 dark:text-emerald-400">
+                                    <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
+                                </flux:text>
+                                <x-drop-badge :product="$product" />
+                            </div>
+                            @if ($drop = $product->activeDrop())
+                                <flux:text size="sm" class="text-zinc-500">{{ $drop->wasLabel() }}</flux:text>
+                            @endif
                             @if ($product->cheapestShop)
                                 <x-shop-deal :shop="$product->cheapestShop" :show-source="false" class="mt-2 min-w-52 max-w-sm whitespace-normal" />
+                            @endif
+                        </flux:table.cell>
+                        <flux:table.cell class="hidden sm:table-cell">
+                            @if ($product->last_notified_at)
+                                <flux:text size="sm" class="text-zinc-500">{{ $product->last_notified_at->diffForHumans() }}</flux:text>
                             @endif
                         </flux:table.cell>
                         <flux:table.cell class="hidden md:table-cell">
@@ -141,7 +154,7 @@
                     </flux:table.row>
                 @empty
                     <flux:table.row>
-                        <flux:table.cell colspan="3" class="py-10 text-center">
+                        <flux:table.cell colspan="4" class="py-10 text-center">
                             <flux:text class="text-zinc-500">{{ __('No active drops right now.') }}</flux:text>
                             <flux:text size="sm" class="text-zinc-400">{{ __("DipCatch is watching. You hear from us as soon as a price drops far enough.") }}</flux:text>
                         </flux:table.cell>

@@ -117,8 +117,8 @@ it('keeps going after one product fails, and counts it', function (): void {
         ->and($second->fresh()?->category)->toBe(ProductCategory::CoffeeTea);
 });
 
-it('counts an answer below the guards as skipped and stores nothing', function (): void {
-    Http::fake([TypeSafeClient::ENDPOINT => Http::response(typesafeAnswer(['other' => 0.9, 'food' => 0.1]))]);
+it('keeps an answer below the guards as a suggestion, counts it as skipped, and does not ask again', function (): void {
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response(typesafeAnswer(['other' => 0.9, 'food' => 0.1], ['food' => ['coffee_tea' => 0.9, 'pantry' => 0.1]]))]);
     $pro = optedInProUser();
     $product = Product::factory()->create(['user_id' => $pro->id]);
 
@@ -126,7 +126,14 @@ it('counts an answer below the guards as skipped and stores nothing', function (
         ->expectsOutputToContain('0 categorised, 1 skipped, 0 failed.')
         ->assertSuccessful();
 
-    expect($product->fresh()?->category)->toBeNull();
+    expect($product->fresh()?->category)->toBeNull()
+        ->and($product->fresh()?->suggested_category)->toBe(ProductCategory::CoffeeTea);
+
+    $this->artisan('dipcatch:categorise-products')
+        ->expectsOutputToContain('0 categorised, 0 skipped, 0 failed.')
+        ->assertSuccessful();
+
+    Http::assertSentCount(1);
 });
 
 it('stops at the first rejected key instead of failing every product', function (): void {
