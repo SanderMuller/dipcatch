@@ -126,8 +126,12 @@ function inProUsers(User $user): bool
  *
  * Asserted against both readers rather than the `proAnswers()` harness in
  * CompedAccountsTest: that harness also asserts `SubscribersTable::status()`,
- * which derives its own label and answers "Trial" for both of these. That is
- * F32's divergence, not this one. These cases join the harness when F32 lands.
+ * which derives its own label and answers "Trial" for these. Its divergence
+ * on `unpaid` and `incomplete_expired` predates this change; for the rows
+ * below it is this change that makes it disagree, and the same is true of
+ * `UsersTable`'s "Trial" reason. Both are admin-facing labels that read the
+ * subscription directly. The billing page had the same shape and is fixed
+ * here, because a shopper reads that one.
  */
 it('ends pro on an expired subscription whose own trial is still running', function (): void {
     $user = User::factory()->create();
@@ -147,6 +151,20 @@ it('ends pro on an incomplete subscription whose own trial is still running', fu
     // row does not make it an entitlement.
     $user = User::factory()->create();
     subscribeUser($user, 'incomplete', trialEndsAt: CarbonImmutable::now()->addDays(10));
+
+    expect($user->plan())->toBe(Plan::Free)
+        ->and(inProUsers($user))->toBeFalse();
+});
+
+it('ends pro on an incomplete subscription inside a future grace period', function (): void {
+    // The third state this predicate change makes stricter, and the one the
+    // first commit message missed. `onGracePeriod()` is only inside
+    // `active()` when the status is not separately excluded — and
+    // `incomplete` is, because `Cashier::$deactivateIncomplete` is left at
+    // its default. Stripe never took a first payment, so a future `ends_at`
+    // does not make this an entitlement.
+    $user = User::factory()->create();
+    subscribeUser($user, 'incomplete', endsAt: CarbonImmutable::now()->addDays(10));
 
     expect($user->plan())->toBe(Plan::Free)
         ->and(inProUsers($user))->toBeFalse();

@@ -49,16 +49,12 @@ trait Subscribes
         }
 
         // `active()`, not `valid()`, because `ProUsers` — the scheduler's
-        // reader — selects on Cashier's `active()` scope, and the two are one
-        // predicate: the scope's "ends_at is null or on grace period" is what
-        // `active()`'s `! ended()` expands to, and both consult the same
-        // `Cashier::$deactivatePastDue` and `$deactivateIncomplete` statics.
-        // Naming it here is what makes the two readers agree by construction
-        // rather than by a hand-maintained status list.
-        //
-        // It still covers trialing and the cancelled-but-not-yet-expired
-        // grace period, and `keepPastDueSubscriptionsActive()` in
-        // AppServiceProvider keeps Pro through the dunning retries.
+        // reader — selects on Cashier's `active()` scope, and the instance
+        // method is that same predicate. It is the predicate that matches,
+        // not the answer: `plan()` reads the newest `pro` row while
+        // `ProUsers` matches any active one, so two rows can still disagree.
+        // `keepPastDueSubscriptionsActive()` in AppServiceProvider is what
+        // keeps Pro through the dunning retries.
         return $subscription->active() ? Plan::Pro : Plan::Free;
     }
 
