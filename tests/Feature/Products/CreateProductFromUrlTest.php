@@ -159,6 +159,21 @@ test('fetch-level failure shows the error state', function (): void {
         ->assertSet('errorCode', 'temporary_failure');
 });
 
+test('an unservable shop explains itself instead of printing the raw error code', function (): void {
+    Http::fake(); // any HTTP call would be an unexpected fetch — the check is host-based, before any fetch.
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://www.plus.nl/product/fanta-orange-fles-1500-ml-991700')
+        ->call('probe')
+        ->assertSet('state', 'error')
+        ->assertSet('errorCode', 'shop_not_servable')
+        ->assertSee('builds its prices in the browser')
+        ->assertDontSee('shop_not_servable');
+
+    Http::assertNothingSent();
+});
+
 test('extraction failure flips to manual selector and selectors create the product', function (): void {
     Http::fake([
         'https://shop.example.com/robots.txt' => Http::response('', 404),
