@@ -47,6 +47,20 @@ final class SuggestShops
      */
     private array $memo = [];
 
+    /**
+     * The fresh chain set, memoized for the request. One set serves every
+     * product, so this is keyed by nothing — unlike `$memo` above. Both entry
+     * points read it: `hasUsableCatalogue()` directly, and `__invoke()`
+     * through `eligibleChains()`, which is why the two queries ran three
+     * times over on a product page that renders the component twice.
+     *
+     * `dismiss()` must not clear this. A dismissal changes which rows are
+     * offered, never which chains are fresh.
+     *
+     * @var array<string, CheckjebonChain>|null
+     */
+    private ?array $freshChains = null;
+
     /** Preferred prefilter token length — shorter needles match half the catalogue. */
     private const int PREFERRED_PREFILTER_TOKEN = 4;
 
@@ -139,6 +153,14 @@ final class SuggestShops
      * @return array<string, CheckjebonChain>
      */
     private function freshChains(): array
+    {
+        return $this->freshChains ??= $this->readFreshChains();
+    }
+
+    /**
+     * @return array<string, CheckjebonChain>
+     */
+    private function readFreshChains(): array
     {
         $freshness = CheckjebonPrice::query()
             ->selectRaw('supermarket, max(refreshed_at) as chain_refreshed_at')

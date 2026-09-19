@@ -238,6 +238,47 @@ test('a second call inside one request reuses the computed suggestions', functio
     expect(DB::getQueryLog())->toBeEmpty();
 });
 
+test('the chain set is read once per request, not once per caller', function (): void {
+    // `hasUsableCatalogue()` reached the chain set directly, outside the memo
+    // the class already had for suggestions. The product page renders the
+    // component twice and each render calls both entry points, so the two
+    // queries ran three times over.
+    seedChains();
+    seedBeemsterCatalogue();
+
+    $product = beemsterProduct();
+    $action = app(SuggestShops::class);
+
+    $action($product);
+
+    DB::enableQueryLog();
+
+    $action->hasUsableCatalogue();
+    $action($product);
+    $action->hasUsableCatalogue();
+
+    expect(DB::getQueryLog())->toBeEmpty();
+});
+
+test('a dismissal does not re-read the chain set', function (): void {
+    // A dismissal changes which rows are offered, never which chains are
+    // fresh, so it clears the per-product memo and leaves this one alone.
+    seedChains();
+    seedBeemsterCatalogue();
+
+    $product = beemsterProduct();
+    $action = app(SuggestShops::class);
+
+    /** @var ShopSuggestion $dirk */
+    $dirk = collect($action($product))->firstWhere('chain', 'dirk');
+    $action->dismiss($product, 'dirk', $dirk->externalId);
+
+    DB::enableQueryLog();
+    $action->hasUsableCatalogue();
+
+    expect(DB::getQueryLog())->toBeEmpty();
+});
+
 test('dismissing drops the memo so the next call reflects it', function (): void {
     seedChains();
     seedBeemsterCatalogue();
