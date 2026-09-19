@@ -13,6 +13,7 @@ use App\Mcp\Tools\ListCategoriesTool;
 use App\Mcp\Tools\ListProductsTool;
 use App\Mcp\Tools\PriceHistoryTool;
 use App\Mcp\Tools\RemoveShopTool;
+use App\Mcp\Tools\SetCategoryTool;
 use App\Mcp\Tools\SetThresholdTool;
 use App\Mcp\Tools\SetTitleTool;
 use App\Models\Product;
@@ -605,4 +606,62 @@ it('rejects a category key the taxonomy does not know on create', function (): v
         ->assertHasErrors();
 
     expect($me->products()->count())->toBe(0);
+});
+
+it('files a product under a category, and records that a person chose it', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['category' => null, 'category_set_by' => null]);
+    $shop = Shop::factory()->for($product)->create();
+
+    DipCatchServer::actingAs($user)
+        ->tool(SetCategoryTool::class, [
+            'product_id' => (string) $product->id,
+            'category' => 'food.snacks_sweets',
+        ])->assertOk();
+
+    $product->refresh();
+
+    expect($product->category)->toBe(ProductCategory::SnacksSweets)
+        // Automatic categorisation only writes where this is null, so the
+        // choice made here has to survive the next sweep.
+        ->and($product->category_set_by)->toBe(CategorySource::User)
+        ->and($product->shops()->pluck('id')->all())->toBe([$shop->id]);
+});
+
+it('clears a category, and a clear is a choice too', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create([
+        'category' => ProductCategory::SnacksSweets,
+        'category_set_by' => CategorySource::Auto,
+    ]);
+
+    DipCatchServer::actingAs($user)
+        ->tool(SetCategoryTool::class, ['product_id' => (string) $product->id, 'category' => null])
+        ->assertOk();
+
+    $product->refresh();
+
+    expect($product->category)->toBeNull()
+        ->and($product->category_set_by)->toBe(CategorySource::User);
+});
+
+it('refuses a department key, which is not a category', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['category' => null]);
+
+    DipCatchServer::actingAs($user)
+        ->tool(SetCategoryTool::class, ['product_id' => (string) $product->id, 'category' => 'food'])
+        ->assertHasErrors();
+
+    expect($product->refresh()->category)->toBeNull();
+});
+
+it('will not categorise another account\'s product', function (): void {
+    $theirs = Product::factory()->create(['category' => null]);
+
+    DipCatchServer::actingAs(User::factory()->create())
+        ->tool(SetCategoryTool::class, ['product_id' => (string) $theirs->id, 'category' => 'food.snacks_sweets'])
+        ->assertHasErrors();
+
+    expect($theirs->refresh()->category)->toBeNull();
 });
