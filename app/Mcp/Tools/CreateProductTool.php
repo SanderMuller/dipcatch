@@ -48,18 +48,34 @@ final class CreateProductTool extends Tool
 
     public function handle(Request $request): Response|ResponseFactory
     {
+        // One message per mistake. `required_without:draft` and
+        // `required_unless:confirm,true` are each true too often on their own,
+        // and either one alone leaves a case answering with two sentences that
+        // steer opposite ways.
+        $arguments = $request->all();
+        $confirming = ($arguments['confirm'] ?? null) === true;
+        $draftSent = ($arguments['draft'] ?? '') !== '';
+
         $validated = $request->validate([
-            'url' => ['required_without:draft', 'nullable', 'string', 'max:2048'],
-            'draft' => ['required_if:confirm,true', 'nullable', 'string'],
-            'confirm' => ['nullable', 'boolean'],
+            'url' => [Rule::requiredIf(! $confirming && ! $draftSent), 'nullable', 'string', 'max:2048'],
+            'draft' => ['required_if:confirm,true', 'prohibited_unless:confirm,true', 'nullable', 'string'],
+            // `strict`, because 1 and "1" pass a plain `boolean` and then fail
+            // the `=== true` below — the preview branch, on a call that meant
+            // to confirm.
+            'confirm' => ['nullable', 'boolean:strict'],
             'title' => ['nullable', 'string', 'max:255'],
             'variant_key' => ['nullable', 'string', 'max:255'],
             'category' => ['nullable', 'string', Rule::enum(ProductCategory::class)],
+        ], [
+            'url.required' => 'Pass a url to preview a product page.',
+            'confirm.boolean' => 'confirm takes a JSON boolean: true or false, not a number and not a string.',
+            'draft.prohibited_unless' => 'A draft creates the product only with confirm: true. Send the draft again with confirm: true once the user has agreed to the preview, or drop the draft to preview a url instead.',
+            'draft.required_if' => 'Pass the draft from the preview call alongside confirm: true.',
         ]);
 
         $user = $this->user($request);
 
-        if (($validated['confirm'] ?? false) === true) {
+        if ($confirming) {
             $draft = DraftToken::open($user, $this->str($validated, 'draft'));
 
             if ($draft instanceof DraftFailure) {
@@ -108,8 +124,8 @@ final class CreateProductTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'url' => $schema->string()->description('A product page at a shop. Required unless confirming a draft.'),
-            'draft' => $schema->string()->description('The draft token from the previous call.'),
+            'url' => $schema->string()->description('A product page at a shop. Required unless confirm is true.'),
+            'draft' => $schema->string()->description('The draft token from the previous call. Send it only alongside confirm: true; on its own it is refused.'),
             'confirm' => $schema->boolean()->description('Set true, with a draft, to actually create the product.'),
             'title' => $schema->string()->description('Overrides the title read from the page. DipCatch already strips the shop name, "kopen" and Shopify\'s "- Default Title"; pass this when what is left still is not the product\'s name — brand, product, flavour, pack size, nothing else.'),
             'variant_key' => $schema->string()->description('Which variant to track, when the previous call reported several.'),
