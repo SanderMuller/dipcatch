@@ -281,7 +281,7 @@ final readonly class DetectDrop
             // it. Armed without one, the product would suppress every later
             // drop at or above this price for an alert nobody received — and a
             // plain `return` inside this closure commits.
-            $triggerCheck = $this->resolveTriggerCheck($locked, $triggeringPriceCheckId);
+            $triggerCheck = $this->resolveTriggerCheck($locked, $triggeringPriceCheckId, $newPrice);
 
             if ($triggerCheck === null) {
                 // The one branch here that abandons a real drop. Nothing is
@@ -371,8 +371,21 @@ final readonly class DetectDrop
      * page, the MCP remove-shop tool, and the admin revive action, which
      * passes the shop's latest successful check and has none to pass when
      * every `ok` row has been pruned.
+     *
+     * The fallback answers "which check read this price on this shop", so it
+     * applies the same three guards {@see confirmLargeDrop()} applies to an
+     * explicit id: the right shop, an eligible reading, and the drop's own
+     * price. The explicit branch needs none of them here — the direct path
+     * reaches this only through the recompute's `$changed` gate, so the id is
+     * the check that moved the price. `confirmLargeDrop()` runs before that
+     * gate, which is why it guards its own.
+     *
+     * Without the eligibility filter the latest row on a revived shop is
+     * typically the failure that killed it, and the event would anchor to a
+     * check that read nothing — the digest reads bundle terms and the struck
+     * regular price straight off this row.
      */
-    private function resolveTriggerCheck(Product $product, ?int $triggeringPriceCheckId): ?PriceCheck
+    private function resolveTriggerCheck(Product $product, ?int $triggeringPriceCheckId, string $newPrice): ?PriceCheck
     {
         if ($triggeringPriceCheckId !== null) {
             return PriceCheck::query()->find($triggeringPriceCheckId);
@@ -384,10 +397,21 @@ final readonly class DetectDrop
             return null;
         }
 
-        return PriceCheck::query()
+        $candidate = PriceCheck::query()
             ->where('shop_id', $cheapestOfferId)
+            ->eligible()
             ->latest('checked_at')
             ->first();
+
+        if ($candidate === null) {
+            return null;
+        }
+
+        // Compared with bccomp rather than in SQL: these are decimals, and
+        // '10.0' and '10.00' are the same price.
+        return bccomp(Numeric::str((string) $candidate->price), Numeric::str($newPrice), self::BC_SCALE) === 0
+            ? $candidate
+            : null;
     }
 
     private function withinHourlyLimit(User $user): bool
