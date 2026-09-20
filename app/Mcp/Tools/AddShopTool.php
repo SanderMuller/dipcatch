@@ -30,7 +30,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('add_shop')]
 #[Title('Add shop')]
-#[Description('Tracks the same product at another shop, so DipCatch can compare them. Call without `draft` first to see what the page says, then again with the returned `draft` and confirm: true.')]
+#[Description('Tracks the same product at another shop. Add a shop even when its price is high today — tracking exists to catch a future drop, so the test is whether the page sells the same product, not whether it is cheap now. More shops means more chances to catch a promotion. Call without `draft` first to see what the page says, then again with the returned `draft` and confirm: true.')]
 #[IsReadOnly(false)]
 #[IsDestructive(false)]
 #[IsOpenWorld(false)]

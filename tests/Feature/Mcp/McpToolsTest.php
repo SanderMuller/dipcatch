@@ -25,6 +25,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Laravel\Mcp\Server\Attributes\Description;
+use ReflectionClass;
 
 it('lists only the products of the token owner', function (): void {
     $me = User::factory()->create();
@@ -945,4 +947,16 @@ it('flags the same winner on the shop row as in the product header', function ()
         ->and($flagged)->not->toBeNull()
         ->and($flagged['shop_id'])->toBe($payload['best_value_shop_id'])
         ->and($flagged['host'])->toBe('jumbo.com');
+});
+
+it('tells a caller that a dear shop is still worth adding', function (): void {
+    // An agent reading only the tool descriptions will reasonably skip a shop
+    // priced well above the field — every surrounding concept is comparison.
+    // That reasoning costs real coverage: the point of tracking is to catch a
+    // future promotion, and the shop nobody watches is the one that runs it.
+    $description = new ReflectionClass(AddShopTool::class)
+        ->getAttributes(Description::class)[0]->newInstance()->value;
+
+    expect($description)->toContain('even when its price is high today')
+        ->and($description)->toContain('not whether it is cheap now');
 });

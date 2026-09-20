@@ -205,7 +205,9 @@ it('advertises a version that moves with the tool roster', function (): void {
     // A client caches the roster and its schemas: the package declares
     // `tools.listChanged: false`, and a stateless HTTP server cannot push a
     // change notification. The version is the only staleness signal there is,
-    // and two tools were once added without moving it.
+    // and two tools were once added without moving it. A changed description is
+    // cached just as hard as a changed roster, so guidance a caller needs to
+    // read moves it too.
     $defaults = new ReflectionClass(DipCatchServer::class)->getDefaultProperties();
     $declared = $defaults['tools'] ?? null;
 
@@ -213,6 +215,6 @@ it('advertises a version that moves with the tool roster', function (): void {
         ->getAttributes(Version::class)[0] ?? null;
 
     expect($version)->not->toBeNull()
-        ->and($version->newInstance()->value)->toBe('1.5.0')
+        ->and($version->newInstance()->value)->toBe('1.6.0')
         ->and($declared)->toHaveCount(13);
 });

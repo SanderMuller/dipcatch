@@ -32,15 +32,22 @@ use Laravel\Mcp\Server\Tool;
  * gets that its cached copy is stale. Two tools were added without moving it,
  * and a live session kept seeing the nine that came before them.
  */
-#[Version('1.5.0')]
+#[Version('1.6.0')]
 #[Instructions(<<<'TEXT'
 DipCatch tracks the price of things this user buys more than once, across Dutch
 supermarkets and webshops, and tells them when one drops.
 
 A product is one thing the user buys. It holds one or more shops, each a URL at
 a different retailer selling that same thing. DipCatch re-checks each shop and
-reports which is cheapest, comparing on unit price so different pack sizes line
-up honestly.
+answers two questions about it: lowest price, the smallest amount of money at
+the till, and best value, the lowest price per kilo, litre or piece. They are
+often different shops, and a drop alert fires on best value.
+
+**Price is not a reason to skip a shop.** The point of tracking is to catch a
+future drop, so a shop selling the same product at 40% above the field is worth
+adding — that is the one whose promotion nobody else will see. Judge a page on
+whether it sells the same product, in the same size, as the ones already on it.
+More shops means more chances to catch a fall.
 
 A stored price or stock value is as old as its last check, and rechecks run
 on a schedule. When a user says a value is wrong, call recheck rather than
