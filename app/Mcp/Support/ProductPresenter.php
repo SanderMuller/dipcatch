@@ -69,6 +69,12 @@ final readonly class ProductPresenter
                 // Which shops can supply a picture, so a caller choosing one
                 // for set_image can see the choice rather than guess at it.
                 'has_image' => $shop->safeImageUrl() !== null,
+                // Which reader produced this price. Some hosts have two, and
+                // they do not see the same things: the AH API carries the
+                // bonus mechanics, the daily dataset carries none of them. A
+                // shop quietly read from the dataset shows a plausible price
+                // with no promotion on it, and nothing about the row says so.
+                'read_by' => $shop->adapter_key,
                 'is_cheapest' => $shop->getKey() === $product->cheapest_shop_id,
                 'last_checked_at' => $checked instanceof CarbonInterface ? $checked->toIso8601String() : null,
             ];

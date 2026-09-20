@@ -860,3 +860,19 @@ it('says nothing when the product already holds a mixture', function (): void {
         ->assertOk()
         ->assertDontSee('different pack');
 });
+
+it('says which reader produced each price', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create();
+    Shop::factory()->for($product)->create(['url' => 'https://www.ah.nl/producten/product/wi1', 'adapter_key' => 'ah-api']);
+    // The same host has two readers, and they do not see the same things: a
+    // price quietly read from the daily dataset carries no promotion, looks
+    // entirely plausible, and nothing about the row said so.
+    Shop::factory()->for($product)->create(['url' => 'https://www.ah.nl/producten/product/wi2', 'adapter_key' => 'checkjebon']);
+
+    DipCatchServer::actingAs($user)
+        ->tool(GetProductTool::class, ['product_id' => (string) $product->id])
+        ->assertOk()
+        ->assertSee('"read_by":"ah-api"')
+        ->assertSee('"read_by":"checkjebon"');
+});
