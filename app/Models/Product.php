@@ -295,9 +295,10 @@ final class Product extends Model
      */
     public function comparablePacks(): ComparablePacks
     {
-        // Every shop gets an answer; only the sellable ones get a vote on what
-        // this product is measured in. See {@see ComparablePacks::of()}.
-        return ComparablePacks::of($this->shops, (string) $this->currency, $this->eligibleShops());
+        // Every shop gets an answer; only the ones still being tracked get a
+        // vote on what this product is measured in. See
+        // {@see ComparablePacks::of()}.
+        return ComparablePacks::of($this->shops, (string) $this->currency, $this->votingShops());
     }
 
     /**
@@ -315,7 +316,7 @@ final class Product extends Model
 
     /**
      * Shops allowed to win either answer: active, not dead, priced, in this
-     * product's own currency.
+     * product's own currency, and in stock or of unknown stock.
      *
      * Unknown stock still competes — the price is real, and dropping it would
      * hide a shop rather than describe it.
@@ -324,11 +325,50 @@ final class Product extends Model
      */
     private function eligibleShops(): Collection
     {
+        return $this->votingShops()
+            ->filter(fn (Shop $shop): bool => $shop->current_in_stock !== false);
+    }
+
+    /**
+     * Shops allowed to decide what this product is measured in.
+     *
+     * Wider than {@see eligibleShops()} by exactly one thing: stock. A shop
+     * being out of stock today is a fact about this afternoon, not about what
+     * the product is — its 1200 g bag is still a 1200 g bag. Letting stock
+     * decide cost a live product its comparison unit the moment its only sized
+     * shops sold out, and every shop on it then read as unresolvable with no
+     * reason given.
+     *
+     * Still narrower than every shop: a deactivated or dead row is one nobody
+     * tracks any more, and two of those measured in millilitres must not
+     * outvote the one live shop measured in grams.
+     *
+     * @return Collection<int, Shop>
+     */
+    private function votingShops(): Collection
+    {
         return $this->shops->filter(fn (Shop $shop): bool => $shop->active
-            && $shop->current_in_stock !== false
             && $shop->health !== ShopHealth::Dead
             && $shop->currency === $this->currency
             && $shop->current_price !== null);
+    }
+
+    /**
+     * The unit a drop is measured in — null unless some shop can actually be
+     * crowned in it.
+     *
+     * A product can resolve a comparison unit and still have nobody to compare:
+     * every sized shop out of stock, or the only candidates carrying inherited
+     * sizes, which may not win. Calling that "compares per unit" would leave the
+     * product with no basis price at all and stop its alerts without a word. It
+     * falls back to pack prices instead, which is what it did before this
+     * feature existed.
+     */
+    public function dropComparisonUnit(): ?string
+    {
+        $packs = $this->comparablePacks();
+
+        return $packs->cheapestPerUnit($this->eligibleShops()) === null ? null : $packs->unit();
     }
 
     /**
@@ -421,6 +461,10 @@ final class Product extends Model
             $bestValue = self::bestValueAmong($candidates, $packs);
             $bestValueSize = $bestValue === null ? null : $packs->for($bestValue)?->size;
 
+            // Null when nobody can be crowned, which puts this recompute back on
+            // pack prices rather than leaving it with no basis at all.
+            $basisUnit = $bestValue === null ? null : $packs->unit();
+
             $newOfferId = $cheapest?->id;
             $newPrice = $cheapest?->current_price === null
                 ? null
@@ -435,8 +479,8 @@ final class Product extends Model
                 ->first();
 
             $previousBestValueId = $locked->best_value_shop_id;
-            $previousBasis = $locked->dropBasisPrice($packs->unit());
-            $previousBestValuePack = $locked->winningPackPrice($packs->unit());
+            $previousBasis = $locked->dropBasisPrice($basisUnit);
+            $previousBestValuePack = $locked->winningPackPrice($basisUnit);
             $previousBestValueSize = $locked->bestValuePackSize();
             $bestValuePrice = $bestValue?->current_price === null
                 ? null
@@ -457,12 +501,12 @@ final class Product extends Model
             // against a unit-basis price is a category error, so a mismatched
             // pair skips detection entirely and the next recompute gets a
             // consistent one.
-            if ($reference !== null && $reference->unit !== $packs->unit()) {
+            if ($reference !== null && $reference->unit !== $basisUnit) {
                 $reference = null;
             }
 
-            $newBasis = $locked->dropBasisPrice($packs->unit());
-            $newBasisPack = $locked->winningPackPrice($packs->unit());
+            $newBasis = $locked->dropBasisPrice($basisUnit);
+            $newBasisPack = $locked->winningPackPrice($basisUnit);
 
             // Someone correcting a pack size is not a price moving. The same
             // shop, the same money, a different amount: the unit price changes

@@ -54,7 +54,10 @@ final class Reference
             ->inOrder()
             ->get();
 
-        $unit = $product->comparablePacks()->unit();
+        // Not the resolver's unit directly: a product that resolves a unit but
+        // has nobody who can win in it has no basis price either, and measuring
+        // against a reference it cannot answer would stop its alerts silently.
+        $unit = $product->dropComparisonUnit();
 
         $contributing = $unit === null
             ? $segments->values()->all()

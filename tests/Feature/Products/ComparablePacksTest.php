@@ -200,3 +200,45 @@ test('shops that cannot be sold do not decide what the product is measured in', 
     expect($packs->unit())->toBe('g')
         ->and($product->bestValueShop()?->host)->toBe('live.nl');
 });
+
+test('a product keeps its comparison unit when its sized shops go out of stock', function (): void {
+    // The Sanimed shape, live: two shops state 1200 g and both sold out, and the
+    // cheapest shop states nothing. Letting stock decide the unit left every
+    // shop on the product unresolvable — no size, no reason, nothing to compare.
+    $product = productForPacks([
+        'dierenapotheek.nl' => ['current_price' => '25.00', 'pack_quantity' => '1200.00', 'pack_unit' => 'g', 'current_in_stock' => false],
+        'petmarkt.nl' => ['current_price' => '26.00', 'pack_quantity' => '1200.00', 'pack_unit' => 'g', 'current_in_stock' => false],
+        'omnipet.be' => ['current_price' => '20.95', 'pack_quantity' => null, 'pack_unit' => null],
+    ]);
+
+    $packs = packsFor($product);
+
+    expect($packs->unit())->toBe('g')
+        // The silent shop inherits the size its siblings agree on, and says so.
+        ->and(packFor($product, 'omnipet.be')?->provenance)->toBe(PackProvenance::Inferred)
+        // But an inherited size may not win, and the two shops that could are
+        // out of stock — so the product has no winner and drops fall back to
+        // pack prices rather than stopping.
+        ->and($product->bestValueShop())->toBeNull()
+        ->and($product->dropComparisonUnit())->toBeNull();
+});
+
+test('every shop on a product with a comparison unit is resolved or told why not', function (): void {
+    // The invariant section 6 rests on. A shop that is present, priced and in
+    // stock is never silently absent from the comparison.
+    $product = productForPacks([
+        'ah.nl' => ['current_price' => '22.00', 'pack_quantity' => '660.00', 'pack_unit' => 'g'],
+        'jumbo.com' => ['current_price' => '23.00', 'pack_quantity' => '660.00', 'pack_unit' => 'g'],
+        'fitnesscandy.nl' => ['current_price' => '18.00', 'pack_quantity' => '12.00', 'pack_unit' => 'piece'],
+        'barebells.nl' => ['current_price' => '21.00', 'pack_quantity' => null, 'pack_unit' => null],
+    ]);
+
+    $packs = packsFor($product);
+
+    foreach ($product->shops as $shop) {
+        $pack = $packs->for($shop);
+
+        expect($pack)->not->toBeNull()
+            ->and($pack->size !== null || $pack->reason() !== null)->toBeTrue();
+    }
+});

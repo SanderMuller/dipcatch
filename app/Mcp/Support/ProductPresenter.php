@@ -18,6 +18,8 @@ final readonly class ProductPresenter
     {
         $cheapest = $product->cheapestShop;
         $bundle = $cheapest?->liveBundleOffer();
+        $packs = $product->comparablePacks();
+        $bestValue = $product->bestValueShop();
 
         return [
             'product_id' => self::id($product->getKey()),
@@ -28,10 +30,14 @@ final readonly class ProductPresenter
             // which shop is cheapest per kilo, litre or piece, which is the
             // basis a drop alert fires on. They are often different shops.
             'cheapest_price' => self::decimal($product->cheapest_price),
-            'best_value_shop_id' => $product->best_value_shop_id === null ? null : self::id($product->best_value_shop_id),
-            'best_value_price' => self::decimal($product->best_value_price),
-            'best_value_unit_price' => $product->dropBasisPrice($product->best_value_pack_unit),
-            'comparison_unit' => $product->best_value_pack_unit,
+            // Resolved here rather than read back from the stored columns.
+            // Those are written by a recompute, so a product answers null for
+            // them until its next price check — and null reads as "this product
+            // has no per-unit answer", which is a different and wrong statement.
+            'best_value_shop_id' => $bestValue === null ? null : self::id($bestValue->getKey()),
+            'best_value_price' => self::decimal($bestValue?->current_price),
+            'best_value_unit_price' => $bestValue === null ? null : $packs->unitPriceOf($bestValue),
+            'comparison_unit' => $packs->unit(),
             'cheapest_single_item_price' => $cheapest?->singleItemPrice(),
             'cheapest_bundle_quantity' => $bundle?->quantity,
             'cheapest_bundle_total_price' => $bundle?->totalPrice,
