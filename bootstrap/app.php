@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Laravel\Passport\Http\Middleware\CheckToken;
 use Laravel\Passport\Http\Middleware\CheckTokenForAnyScope;
+use Sentry\Laravel\Integration;
 use Zae\StrictTransportSecurity\Middleware\L5\StrictTransportSecurity;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -87,6 +88,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        Integration::handles($exceptions);
+
         // `oauth_clients.id` is a native uuid, so on Postgres a malformed
         // `client_id` raises SQLSTATE 22P02 inside Passport's own controllers
         // and escapes as a 500 on public endpoints. SQLite casts silently, so
