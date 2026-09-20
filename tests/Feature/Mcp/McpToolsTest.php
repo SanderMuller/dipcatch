@@ -5,6 +5,7 @@ use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Mcp\Servers\DipCatchServer;
 use App\Mcp\Support\DraftToken;
+use App\Mcp\Support\ProductPresenter;
 use App\Mcp\Tools\AddShopTool;
 use App\Mcp\Tools\CreateProductTool;
 use App\Mcp\Tools\DeleteProductTool;
@@ -910,4 +911,38 @@ it('says what each shop resolves to per unit, and why when it cannot', function 
         ->assertSee('"pack_size_provenance":"inferred"')
         ->assertSee('Sold by the piece')
         ->assertSee('"is_best_value":true');
+});
+
+it('flags the same winner on the shop row as in the product header', function (): void {
+    // Both readings sit in one payload, so they have to agree. The header was
+    // resolved live while the row still read a column only a recompute writes,
+    // and every row came back false while the header named a winner.
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    foreach ([
+        ['host' => 'dirk.nl', 'price' => '2.55', 'quantity' => '240.00'],
+        ['host' => 'jumbo.com', 'price' => '6.15', 'quantity' => '840.00'],
+    ] as $row) {
+        Shop::factory()->for($product)->create(['url' => 'https://' . $row['host'] . '/p/1'])
+            ->forceFill([
+                'currency' => 'EUR',
+                'current_price' => $row['price'],
+                'current_in_stock' => true,
+                'pack_quantity' => $row['quantity'],
+                'pack_unit' => 'g',
+            ])->save();
+    }
+
+    // Deliberately not recomputed: a caller reading a product between price
+    // checks must still get one consistent answer.
+    $payload = app(ProductPresenter::class)->detail($product->refresh());
+
+    $shops = is_array($payload['shops']) ? $payload['shops'] : [];
+    $flagged = collect($shops)->firstWhere('is_best_value', true);
+
+    expect($payload['best_value_shop_id'])->not->toBeNull()
+        ->and($flagged)->not->toBeNull()
+        ->and($flagged['shop_id'])->toBe($payload['best_value_shop_id'])
+        ->and($flagged['host'])->toBe('jumbo.com');
 });
