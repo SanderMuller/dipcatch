@@ -30,6 +30,12 @@
         }
     },
     "permissions": {
+        "allow": [
+            "Bash(cloud env:vars:*)",
+            "Bash(cloud env:variables:*)",
+            "Bash(cloud environment:vars:*)",
+            "Bash(cloud environment:variables:*)"
+        ],
         "deny": [
             "NotebookEdit",
             "PushNotification",
