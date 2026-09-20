@@ -72,7 +72,33 @@ final readonly class DetectDrop
             return;
         }
 
+        if ($this->triggerStartsAShop($triggeringPriceCheckId)) {
+            return;
+        }
+
         $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId);
+    }
+
+    /**
+     * True when the reading that moved the price is a shop's first.
+     *
+     * A drop is a price falling at shops we were already watching. Adding a
+     * shop that happens to be cheaper moves `cheapest_price` too, and the
+     * reference still describes the shops from before it existed, so the
+     * difference reads as a fall of whatever the new shop undercuts by. Three
+     * of four alerts in one digest were this — a 227 g bag of Twix reported as
+     * 34% off against a 333 g one, on the second the smaller shop was added.
+     *
+     * A caller with no trigger — a test, a manual recompute — cannot be judged
+     * this way and is left alone.
+     */
+    private function triggerStartsAShop(?int $triggeringPriceCheckId): bool
+    {
+        $trigger = $triggeringPriceCheckId === null
+            ? null
+            : PriceCheck::query()->find($triggeringPriceCheckId);
+
+        return $trigger?->joinsAProductAlreadyWatchedElsewhere() === true;
     }
 
     /**
@@ -116,6 +142,12 @@ final readonly class DetectDrop
         // this the failure would re-evaluate that cached drop and notify,
         // anchored to a check that read nothing.
         if ($trigger === null || ! $trigger->isEligible()) {
+            return;
+        }
+
+        // A shop joining a product watched elsewhere is not a fall: see
+        // triggerStartsAShop().
+        if ($trigger->joinsAProductAlreadyWatchedElsewhere()) {
             return;
         }
 

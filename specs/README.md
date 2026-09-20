@@ -19,6 +19,8 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 
 - **[landing-pages-and-marketing-polish.md](landing-pages-and-marketing-polish.md)** — use-case landing pages (`/price-alerts/{slug}`), branded 404/500 views, and marketing markup cleanup judged against the Markdown twin. Laravel Cloud's Markdown for Agents is already enabled at the edge, so no application code renders Markdown. Follows the spec above. Shipped 2026-09-06; the 503 was dropped because nothing invokes `errors::503`. Two ops tasks stay open in the Laravel Cloud dashboard.
 
+- **[unit-aware-drops.md](unit-aware-drops.md)** — decide a drop on a comparable figure. Drops compare the pack price of the cheapest shop, so a smaller pack reads as a fall: a 240 g box of vissticks alerted as 61% off an 840 g box, and a 227 g bag of Twix as 34% off a 333 g one, both on 2026-09-20. Best value already groups by unit and the drop engine does not. Written after the alerts reached a user; the separate bug that fired them the moment a shop was added is fixed. Not started — it opens with a decision between comparing per unit, comparing inside the unit group, or holding the alert back.
+
 - **[unit-pricing.md](unit-pricing.md)** — normalized unit price (€/kg, €/l, €/stuk) per shop, parsed from source size data with title fallback; shown on shops table, previews, public page, products list.
 
 - ~~`multi-webshop-price-tracking.md`~~ — ✅ shipped (Product/Shop split, adapter chain, per-shop checks, ProductCheapestHistory timeline).

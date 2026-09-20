@@ -70,6 +70,43 @@ final class PriceCheck extends Model
                 ->orWhereNull('in_stock'));
     }
 
+    /**
+     * True when this reading is a shop joining a product that was already
+     * being watched elsewhere.
+     *
+     * Two things have to hold. The shop has no earlier usable reading, so
+     * nothing of its own has fallen; and another shop on the same product
+     * does, so the reference describes a world this shop was not in. The gap
+     * between them is then the new shop undercutting the old ones, which is
+     * not a price movement at all.
+     *
+     * A product's only shop is excluded by the second half: its first reading
+     * against the product's own history is an ordinary drop.
+     */
+    public function joinsAProductAlreadyWatchedElsewhere(): bool
+    {
+        if ($this->hasEarlierReadingAtItsOwnShop()) {
+            return false;
+        }
+
+        return self::query()
+            ->where('id', '<', $this->id)
+            ->whereNot('shop_id', $this->shop_id)
+            ->whereHas('shop', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $shop
+                ->where('product_id', $this->shop->product_id))
+            ->eligible()
+            ->exists();
+    }
+
+    private function hasEarlierReadingAtItsOwnShop(): bool
+    {
+        return self::query()
+            ->where('shop_id', $this->shop_id)
+            ->where('id', '<', $this->id)
+            ->eligible()
+            ->exists();
+    }
+
     public function isEligible(): bool
     {
         return $this->status === ScrapeStatus::Ok
