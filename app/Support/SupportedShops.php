@@ -3,17 +3,17 @@
 namespace App\Support;
 
 /**
- * Shops with a dedicated adapter or data source, as favicon + host rows for
- * the public pages. Source: `config/site.php`.
+ * Shops with a dedicated adapter or data source: the host, the favicon, the
+ * name people use and the slug its landing page lives at. Source:
+ * `config/site.php`. `ShopPages` adds the copy on top of these.
  */
 final readonly class SupportedShops
 {
     /**
      * Every host with a shop landing page.
      *
-     * Identity only — host, favicon, name and the slug its page lives at.
-     * Every list that merely links shops reads this; `ShopPages` adds the
-     * copy, which costs about sixteen `__()` lookups per shop.
+     * Every list that only links shops reads this rather than `ShopPages`,
+     * which builds each page's copy.
      *
      * @return list<array{host: string, favicon: string, name: string, slug: string}>
      */
@@ -73,7 +73,7 @@ final readonly class SupportedShops
      * `ah-nl`. It keeps the shop recognisable in the URL. Never reversed to
      * recover the host — a host containing a hyphen would not round-trip.
      */
-    public static function slug(string $host): string
+    private static function slug(string $host): string
     {
         return str_replace('.', '-', $host);
     }

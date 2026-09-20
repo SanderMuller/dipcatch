@@ -40,7 +40,7 @@ final class ShopPages
         $pages = [];
 
         foreach (SupportedShops::rows() as $row) {
-            $pages[] = self::page($row['host'], $row['name']);
+            $pages[] = self::page($row);
         }
 
         return $pages;
@@ -50,19 +50,17 @@ final class ShopPages
     {
         foreach (SupportedShops::rows() as $row) {
             if ($row['slug'] === $slug) {
-                return self::page($row['host'], $row['name']);
+                return self::page($row);
             }
         }
 
-        // Matched forward from the configured hosts, never by reversing the
-        // slug: a host containing a hyphen would not survive the round trip.
         return null;
     }
 
     /**
-     * Read off the identity rows, not the pages. This is what
-     * `slugPattern()` runs on at route registration, and `MarketingPages`
-     * on every sitemap build — neither wants the copy.
+     * Read off the identity rows, not the pages. `slugPattern()` runs this
+     * at route registration, before the locale middleware, and
+     * `MarketingPages` on every sitemap build. Neither wants the copy.
      *
      * @return list<string>
      */
@@ -84,12 +82,17 @@ final class ShopPages
         return implode('|', array_map(static fn (string $slug): string => preg_quote($slug, '/'), $slugs));
     }
 
-    private static function page(string $host, string $name): ShopPage
+    /**
+     * @param  array{host: string, favicon: string, name: string, slug: string}  $row
+     */
+    private static function page(array $row): ShopPage
     {
+        ['host' => $host, 'name' => $name] = $row;
+
         return new ShopPage(
             host: $host,
             name: $name,
-            slug: SupportedShops::slug($host),
+            slug: $row['slug'],
             heading: __('Price alerts for :shop', ['shop' => $name]),
             description: __('Track what you buy at :shop and hear about it when the price drops. DipCatch re-checks the page for you and compares :shop against the other shops that sell the same thing.', ['shop' => $name]),
             intro: __('DipCatch keeps an eye on the products you already buy at :shop. It compares them with the other shops that sell the same thing, and tells you when one goes below the price you set.', ['shop' => $name]),
