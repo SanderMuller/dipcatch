@@ -27,7 +27,23 @@ test('captured AH bundle contracts produce tracked effective prices', function (
 })->with([
     ['ah-fixed-total.json', 'https://www.ah.nl/producten/product/wi597752', '6.49', '6.00'],
     ['ah-later-item.json', 'https://www.ah.nl/producten/product/wi62661', '1.39', '1.05'],
+    // 1+1: two packs for the price of one, so the effective price is half.
+    ['ah-one-plus-one.json', 'https://www.ah.nl/producten/product/wi233499', '17.99', '9.00'],
 ]);
+
+test('a 1 + 1 is read as a bundle, not as its pre-bonus price', function (): void {
+    // AH codes it DISCOUNT_X_PLUS_Y_FREE with count 1 — one item paid for —
+    // and the gate demanded two, so the commonest Dutch promotion there is
+    // fell through and the shop was ranked on 17.99. On a live product that
+    // put 17.99 for 32 rolls behind 11.95 for 16.
+    fakeAhBundleApi('ah-one-plus-one.json');
+
+    $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi233499')->snapshot;
+
+    expect($snapshot?->bundleOffer?->quantity)->toBe(2)
+        ->and($snapshot?->bundleOffer?->totalPrice)->toBe('17.99')
+        ->and($snapshot?->trackedPrice())->toBe('9.00');
+});
 
 test('explicit no-offer card authoritatively clears bundle state', function (): void {
     fakeAhBundleApi('ah-no-offer.json');

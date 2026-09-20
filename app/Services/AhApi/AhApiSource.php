@@ -224,10 +224,20 @@ final readonly class AhApiSource
 
         $count = data_get($label, 'count');
 
-        return in_array(data_get($label, 'code'), [
-            'DISCOUNT_X_FOR_Y',
-            'DISCOUNT_ONE_HALF_PRICE',
-        ], strict: true) && is_int($count) && $count >= 2;
+        if (! is_int($count)) {
+            return false;
+        }
+
+        return match (data_get($label, 'code')) {
+            // `count` is how many items the shopper pays for and `freeCount`
+            // how many come with them, so a 1+1 reads as count 1. Requiring
+            // two here rejected the commonest Dutch promotion there is, and
+            // the shop was ranked on its pre-bonus price: one product had AH
+            // at 17.99 for 32 rolls listed as dearer than 11.95 for 16.
+            'DISCOUNT_X_PLUS_Y_FREE' => $count >= 1 && is_int(data_get($label, 'freeCount')) && data_get($label, 'freeCount') >= 1,
+            'DISCOUNT_X_FOR_Y', 'DISCOUNT_ONE_HALF_PRICE' => $count >= 2,
+            default => false,
+        };
     }
 
     private static function productIdFromUrl(string $url): ?string
