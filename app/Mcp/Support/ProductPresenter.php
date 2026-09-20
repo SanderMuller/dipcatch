@@ -64,6 +64,10 @@ final readonly class ProductPresenter
     {
         $rows = [];
         $packs = $product->comparablePacks();
+        // The same live answer the summary reports. Reading the stored column
+        // here instead left every row flagged false while the header named a
+        // winner, so one payload disagreed with itself.
+        $bestValueId = $product->bestValueShop()?->getKey();
 
         foreach ($product->shops as $shop) {
             $pack = $packs->for($shop);
@@ -101,7 +105,7 @@ final readonly class ProductPresenter
                 'unit_price' => $packs->unitPriceOf($shop),
                 'excluded_reason' => $pack?->reason(),
                 'is_cheapest' => $shop->getKey() === $product->cheapest_shop_id,
-                'is_best_value' => $shop->getKey() === $product->best_value_shop_id,
+                'is_best_value' => $bestValueId !== null && $shop->getKey() === $bestValueId,
                 'last_checked_at' => $checked instanceof CarbonInterface ? $checked->toIso8601String() : null,
             ];
         }
