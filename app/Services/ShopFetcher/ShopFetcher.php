@@ -244,9 +244,15 @@ final readonly class ShopFetcher
             throw new InvalidArgumentException("Unsupported scheme '{$scheme}' in '{$url}'.");
         }
 
+        // The query rides along: robots.txt rules are matched against the path
+        // and the query together, and a shop that disallows `/*?src=` or
+        // `/*srule=` is shutting crawlers out of faceted views, which is
+        // exactly the kind of address a paste can carry.
+        $query = $parsed['query'] ?? null;
+
         return [
             'host' => UrlNormalizer::normalizeHost($parsed['host']),
-            'path' => $parsed['path'] ?? '/',
+            'path' => ($parsed['path'] ?? '/') . (is_string($query) && $query !== '' ? '?' . $query : ''),
             'scheme' => $scheme,
         ];
     }

@@ -186,16 +186,29 @@ final readonly class RobotsTxtPolicy
         return $bestMatch['type'] === 'allow';
     }
 
+    /**
+     * robots.txt path matching, as RFC 9309 defines it: a prefix match, with
+     * `*` standing for any run of characters and a trailing `$` anchoring the
+     * end.
+     *
+     * The wildcard used to be taken literally, which quietly voided every rule
+     * that used one. Etos disallows `/*_*` — any address containing an
+     * underscore — for all crawlers, and we read it as the literal prefix
+     * `/*_*`, which matches nothing, so we would have fetched what they had
+     * forbidden. Most shops write their rules this way.
+     */
     private function patternMatches(string $pattern, string $path): bool
     {
-        // robots.txt path matching: prefix match unless pattern ends with '$'.
-        if (str_ends_with($pattern, '$')) {
-            $pattern = substr($pattern, 0, -1);
+        $anchored = str_ends_with($pattern, '$');
 
-            return $path === $pattern;
+        if ($anchored) {
+            $pattern = substr($pattern, 0, -1);
         }
 
-        return str_starts_with($path, $pattern);
+        // Escape everything, then put the one metacharacter back.
+        $regex = str_replace('\*', '.*', preg_quote($pattern, '#'));
+
+        return preg_match('#^' . $regex . ($anchored ? '$' : '') . '#s', $path) === 1;
     }
 
     private static function nameFromUa(string $ua): string
