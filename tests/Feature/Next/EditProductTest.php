@@ -436,11 +436,11 @@ it('keeps the three-way wording while no shop has read a pack size', function ()
     $this->actingAs($user);
 
     // The explanation under the field is the Pro one for a free account, so
-    // this pins the label; `unitPriceUnit()` is what decides both.
+    // this pins the label; the resolver is what decides both.
     livewire(EditProduct::class, ['product' => $product])
         ->assertSee('Target price per kilo, litre or piece');
 
-    expect($product->unitPriceUnit())->toBeNull();
+    expect($product->comparablePacks()->unit())->toBeNull();
 });
 
 it('shows a free account the suggestion button disabled, with the way to Pro', function (): void {
@@ -603,4 +603,52 @@ it('tells a Pro account when the daily suggestion budget is spent, and sends not
         ->assertSee("You have used today's suggestions.");
 
     Http::assertNothingSent();
+});
+
+it('shows what the product costs now beside each target field', function (): void {
+    // Setting a target means picking a number relative to today's price. Asking
+    // the reader to remember it, or to open the product page in another tab,
+    // is the difference between a considered figure and a guess.
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    // The Lay's case, where the two answers are different shops: ah is the
+    // smaller outlay, dirk the better value.
+    foreach ([
+        ['host' => 'ah.nl', 'price' => '2.19', 'quantity' => '200.00'],
+        ['host' => 'dirk.nl', 'price' => '2.45', 'quantity' => '300.00'],
+    ] as $row) {
+        Shop::factory()->for($product)->create(['url' => 'https://' . $row['host'] . '/p/1'])
+            ->forceFill([
+                'currency' => 'EUR',
+                'current_price' => $row['price'],
+                'current_in_stock' => true,
+                'pack_quantity' => $row['quantity'],
+                'pack_unit' => 'g',
+            ])->save();
+    }
+
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        // The target price is an outlay figure, so it is anchored to the
+        // smallest outlay.
+        ->assertSee('Now €2.19 at ah.nl')
+        // The per-unit target is anchored to the best value, which here is the
+        // other shop.
+        ->assertSee('Now €8.17/kg at dirk.nl');
+});
+
+it('leaves the now-line out when no shop has a usable price', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])
+        ->assertDontSee('Now ')
+        ->assertSee('We tell you when any shop reaches this price.');
 });

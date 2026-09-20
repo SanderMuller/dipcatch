@@ -9,6 +9,8 @@ use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
 use App\Support\Iso4217;
+use App\Support\MoneyFormatter;
+use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -244,6 +246,8 @@ final class EditProduct extends Component
             'shopImages' => $this->shopImages(),
             'allowsUnitPriceAlerts' => $this->product->user?->entitlements()->allowsUnitPriceAlerts() === true,
             'unitWord' => $this->unitWord(),
+            'currentPrice' => $this->currentLowestPrice(),
+            'currentUnitPrice' => $this->currentBestUnitPrice(),
         ]);
     }
 
@@ -273,13 +277,63 @@ final class EditProduct extends Component
     }
 
     /**
+     * What the product costs today at the shop with the smallest outlay, and
+     * where — the figure a target price is set against.
+     *
+     * Null when no shop has a usable price, where a "now" line would be a
+     * number nobody can act on.
+     *
+     * @return array{amount: string, host: string}|null
+     */
+    private function currentLowestPrice(): ?array
+    {
+        $shop = $this->product->cheapestShop;
+
+        if ($shop === null || $shop->current_price === null) {
+            return null;
+        }
+
+        return [
+            'amount' => MoneyFormatter::format((string) $shop->current_price, (string) $this->product->currency),
+            'host' => (string) $shop->host,
+        ];
+    }
+
+    /**
+     * The best price per unit on offer today, and where. The anchor for a
+     * per-unit target, which is a different question and often a different
+     * shop from the one above.
+     *
+     * @return array{amount: string, host: string}|null
+     */
+    private function currentBestUnitPrice(): ?array
+    {
+        $packs = $this->product->comparablePacks();
+        $shop = $packs->cheapestPerUnit($this->product->shops);
+        $unitPrice = $shop === null ? null : $packs->unitPriceOf($shop);
+
+        if ($shop === null || $unitPrice === null) {
+            return null;
+        }
+
+        return [
+            'amount' => MoneyFormatter::format($unitPrice, (string) $this->product->currency)
+                . UnitWord::labelFor($packs->unit()),
+            'host' => (string) $shop->host,
+        ];
+    }
+
+    /**
      * The unit this product's alert compares in, named rather than listed.
      * Null while no shop has read a pack size, when the reader really does
      * not know yet and neither do we.
+     *
+     * Read from the resolver rather than from the majority pack unit, so the
+     * label names the unit the alert actually fires on.
      */
     private function unitWord(): ?string
     {
-        $word = match ($this->product->unitPriceUnit()) {
+        $word = match ($this->product->comparablePacks()->unit()) {
             'g' => __('kilo'),
             'ml' => __('litre'),
             'piece' => __('piece'),
