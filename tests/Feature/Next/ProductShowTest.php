@@ -522,3 +522,34 @@ it('shows no category badge on a product without one', function (): void {
     livewire(ProductShow::class, ['product' => $product])
         ->assertDontSeeHtml('data-test="product-category-badge"');
 });
+
+it('shows why a shop carries no unit price, and marks an inherited size', function (): void {
+    // Section 6 of the spec: a shop outside the unit comparison is present,
+    // priced, and says which fact is missing — never silently absent.
+    $user = User::factory()->create();
+    $product = ownedProduct($user, title: 'Protein bars');
+
+    foreach ([
+        ['host' => 'ah.nl', 'price' => '22.00', 'quantity' => '660.00', 'unit' => 'g'],
+        ['host' => 'jumbo.com', 'price' => '23.00', 'quantity' => '660.00', 'unit' => 'g'],
+        ['host' => 'fitnesscandy.nl', 'price' => '18.00', 'quantity' => '12.00', 'unit' => 'piece'],
+        ['host' => 'barebells.nl', 'price' => '21.00', 'quantity' => null, 'unit' => null],
+    ] as $row) {
+        Shop::factory()->for($product)->create(['url' => 'https://' . $row['host'] . '/p/1'])
+            ->forceFill([
+                'currency' => 'EUR',
+                'current_price' => $row['price'],
+                'current_in_stock' => true,
+                'pack_quantity' => $row['quantity'],
+                'pack_unit' => $row['unit'],
+            ])->save();
+    }
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('fitnesscandy.nl')
+        ->assertSee('Sold by the piece — no item size to compare')
+        ->assertSee('barebells.nl')
+        ->assertSee('estimated');
+});

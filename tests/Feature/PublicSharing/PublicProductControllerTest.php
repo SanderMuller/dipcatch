@@ -443,3 +443,33 @@ test('chart payload never carries another products segments', function (): void 
 
     $response->assertOk()->assertSeeHtml('"y":"85.00"')->assertDontSeeHtml('"y":"777.77"');
 });
+
+test('the shared page names both answers and says why a shop has no unit price', function (): void {
+    $product = makeSharedProduct(['cheapest_price' => '2.55']);
+
+    foreach ([
+        ['host' => 'dirk.nl', 'price' => '2.55', 'quantity' => '240.00', 'unit' => 'g'],
+        ['host' => 'jumbo.com', 'price' => '6.15', 'quantity' => '840.00', 'unit' => 'g'],
+        ['host' => 'ah.nl', 'price' => '6.59', 'quantity' => '30.00', 'unit' => 'piece'],
+    ] as $row) {
+        Shop::factory()->for($product)->create(['url' => 'https://' . $row['host'] . '/p/1'])
+            ->forceFill([
+                'currency' => 'EUR',
+                'current_price' => $row['price'],
+                'current_in_stock' => true,
+                'pack_quantity' => $row['quantity'],
+                'pack_unit' => $row['unit'],
+            ])->save();
+    }
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    // The vissticks: Dirk is the smallest outlay, Jumbo is 31% better per kilo.
+    // Calling the first row "Cheapest" without saying on what basis is the claim
+    // this page used to make.
+    $response->assertOk()
+        ->assertSeeHtml('Lowest price')
+        ->assertSeeHtml('Best value')
+        ->assertSeeHtml('Sold by the piece — no item size to compare')
+        ->assertDontSeeHtml('>Cheapest<');
+});

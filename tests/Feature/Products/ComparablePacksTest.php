@@ -242,3 +242,87 @@ test('every shop on a product with a comparison unit is resolved or told why not
             ->and($pack->size !== null || $pack->reason() !== null)->toBeTrue();
     }
 });
+
+test('an inherited size right on the plausibility boundary is kept', function (): void {
+    // Strictly below 60% of the field median is refused. Exactly on it is not:
+    // a shop can legitimately be 40% cheaper, and the guard exists for sizes
+    // that are wrong, not for offers that are good.
+    $product = productForPacks([
+        'ah.nl' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'jumbo.com' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'silent.nl' => ['current_price' => '12.00', 'pack_quantity' => null, 'pack_unit' => null],
+    ]);
+
+    // Median is 20.00/kg; 12.00 for the same inherited kilo is exactly 60%.
+    expect(packFor($product, 'silent.nl')?->provenance)->toBe(PackProvenance::Inferred);
+
+    $product->shops->where('host', 'silent.nl')->sole()->forceFill(['current_price' => '11.99'])->save();
+
+    expect(packFor($product->refresh(), 'silent.nl')?->exclusion)->toBe(PackExclusion::SizeImplausible);
+});
+
+test('an inherited size far above the field is kept, because it costs nobody anything', function (): void {
+    // The guard is one-sided on purpose. A row stamped too expensive cannot win
+    // and cannot alert either way, so refusing it would remove information
+    // without protecting anyone.
+    $product = productForPacks([
+        'ah.nl' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'jumbo.com' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'silent.nl' => ['current_price' => '80.00', 'pack_quantity' => null, 'pack_unit' => null],
+    ]);
+
+    expect(packFor($product, 'silent.nl')?->provenance)->toBe(PackProvenance::Inferred);
+});
+
+test('a shop free of charge does not win best value', function (): void {
+    // A unit price needs a price above zero. Without the guard a 0.00 row sorts
+    // ahead of everything, because a missing unit price cast to a number is the
+    // smallest number there is.
+    $product = productForPacks([
+        'ah.nl' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'broken.nl' => ['current_price' => '0.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+    ]);
+
+    expect($product->bestValueShop()?->host)->toBe('ah.nl');
+});
+
+test('a stated size nobody can read says so rather than borrowing one', function (): void {
+    // Inheriting here would paper over a bad row with a plausible number.
+    $product = productForPacks([
+        'ah.nl' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'jumbo.com' => ['current_price' => '21.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'broken.nl' => ['current_price' => '19.00', 'pack_quantity' => '500.00', 'pack_unit' => 'furlong'],
+    ]);
+
+    expect(packFor($product, 'broken.nl')?->exclusion)->toBe(PackExclusion::SizeUnknown);
+});
+
+test('two shops tied on unit price resolve to the one added first', function (): void {
+    // Arbitrary ordering previously generated spurious history segments and
+    // re-anchored drop detection. The tie-break has to survive the move out of
+    // SQL, and here the two shops sell different pack sizes at the same rate.
+    $product = Product::factory()->create(['currency' => 'EUR']);
+
+    $first = Shop::factory()->for($product)->create(['url' => 'https://first.nl/p/1']);
+    $first->forceFill([
+        'currency' => 'EUR', 'current_price' => '10.00',
+        'pack_quantity' => '500.00', 'pack_unit' => 'g',
+        'created_at' => now()->subDays(3),
+    ])->save();
+
+    $second = Shop::factory()->for($product)->create(['url' => 'https://second.nl/p/1']);
+    $second->forceFill([
+        'currency' => 'EUR', 'current_price' => '20.00',
+        'pack_quantity' => '1000.00', 'pack_unit' => 'g',
+        'created_at' => now()->subDay(),
+    ])->save();
+
+    $product->refresh()->recomputeCheapestShop();
+
+    expect($product->refresh()->best_value_shop_id)->toBe($first->id);
+
+    // And it stays there across a recompute rather than flipping.
+    $product->refresh()->recomputeCheapestShop();
+
+    expect($product->refresh()->best_value_shop_id)->toBe($first->id);
+});

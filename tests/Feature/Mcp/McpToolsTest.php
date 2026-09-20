@@ -876,3 +876,38 @@ it('says which reader produced each price', function (): void {
         ->assertSee('"read_by":"ah-api"')
         ->assertSee('"read_by":"checkjebon"');
 });
+
+it('says what each shop resolves to per unit, and why when it cannot', function (): void {
+    // A shop outside the unit comparison is never silently absent from the
+    // payload: it keeps its price and carries the one reason a caller can act
+    // on. An inherited size is marked so it does not read like a stated one.
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    foreach ([
+        ['host' => 'ah.nl', 'price' => '22.00', 'quantity' => '660.00', 'unit' => 'g'],
+        ['host' => 'jumbo.com', 'price' => '23.00', 'quantity' => '660.00', 'unit' => 'g'],
+        ['host' => 'fitnesscandy.nl', 'price' => '18.00', 'quantity' => '12.00', 'unit' => 'piece'],
+        ['host' => 'barebells.nl', 'price' => '21.00', 'quantity' => null, 'unit' => null],
+    ] as $row) {
+        Shop::factory()->for($product)->create(['url' => 'https://' . $row['host'] . '/p/1'])
+            ->forceFill([
+                'currency' => 'EUR',
+                'current_price' => $row['price'],
+                'current_in_stock' => true,
+                'pack_quantity' => $row['quantity'],
+                'pack_unit' => $row['unit'],
+            ])->save();
+    }
+
+    $product->refresh()->recomputeCheapestShop();
+
+    DipCatchServer::actingAs($user)
+        ->tool(GetProductTool::class, ['product_id' => (string) $product->id])
+        ->assertOk()
+        ->assertSee('"comparison_unit":"g"')
+        ->assertSee('"pack_size_provenance":"stated"')
+        ->assertSee('"pack_size_provenance":"inferred"')
+        ->assertSee('Sold by the piece')
+        ->assertSee('"is_best_value":true');
+});

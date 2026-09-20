@@ -403,9 +403,17 @@ final class Product extends Model
             return $this->cheapest_price === null ? null : (string) $this->cheapest_price;
         }
 
-        return $this->best_value_price === null
-            ? null
-            : $this->bestValuePackSize()?->unitPriceFor((string) $this->best_value_price);
+        $size = $this->bestValuePackSize();
+
+        // The unit has to be the one this product is actually stored in. A
+        // caller holding a unit from somewhere else — an older event, a
+        // reference computed before a shop changed its pack — would otherwise
+        // get a number in the wrong scale rather than no number at all.
+        if ($size === null || $size->unit !== $unit || $this->best_value_price === null) {
+            return null;
+        }
+
+        return $size->unitPriceFor((string) $this->best_value_price);
     }
 
     /** The pack price of whichever shop the basis is measured on. */
@@ -560,6 +568,13 @@ final class Product extends Model
             ]);
 
             if ($sizeCorrection) {
+                // The latch holds a unit price from before the correction, in
+                // the same unit and so not caught by the basis check. A size
+                // fixed from 660 g to 55 g multiplies every unit price by twelve
+                // and the stale, far lower latch would then suppress every real
+                // drop until a price rise cleared it.
+                app(DetectDrop::class)->clearLatchIfRecovered($locked, newPrice: null, reference: null);
+
                 return;
             }
 

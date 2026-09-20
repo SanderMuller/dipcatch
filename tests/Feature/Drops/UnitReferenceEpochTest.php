@@ -145,3 +145,26 @@ it('does not graduate a median on checks taken before the product could be compa
     expect($reference?->kind)->toBe(ReferenceValue::KIND_INITIAL)
         ->and($reference?->unit)->toBe('g');
 });
+
+it('falls back to pack prices when the product loses its comparison unit', function (): void {
+    // The Sanimed shape at the reference layer: a unit resolves from shops that
+    // cannot win, so there is no basis price. Measuring against a unit reference
+    // there would stop the product's alerts without a word; it keeps comparing
+    // packs instead, which is what it did before.
+    $product = Product::factory()->create(['currency' => 'EUR']);
+
+    $soldOut = epochShop($product, 'dierenapotheek.nl', '1200.00', 'g');
+    $soldOut->forceFill(['current_price' => '25.00', 'current_in_stock' => false])->save();
+
+    $silent = epochShop($product, 'omnipet.be', '1200.00', 'g');
+    $silent->forceFill(['current_price' => '20.95', 'pack_quantity' => null, 'pack_unit' => null])->save();
+
+    epochSegment($product, $silent, '20.95', '1200.00', 'g', 200, null);
+    epochChecks($silent, 12);
+
+    $reference = app(Reference::class)->compute($product->refresh());
+
+    expect($product->dropComparisonUnit())->toBeNull()
+        ->and($reference?->unit)->toBeNull()
+        ->and($reference?->value)->toBe('20.95');
+});

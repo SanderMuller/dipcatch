@@ -138,7 +138,12 @@ final class Reference
             $price = $unit === null
                 ? ($segment->cheapest_price === null ? null : (string) $segment->cheapest_price)
                 : $segment->unitPrice();
-            $pack = ReferenceEpoch::packPriceOf($segment);
+            // On the pack basis both figures are the same series. Taking the
+            // price from `cheapest_price` and the money from the best-value
+            // column would median two different shops' histories against each
+            // other on a product that used to compare per unit and no longer
+            // does.
+            $pack = $unit === null ? $price : ReferenceEpoch::packPriceOf($segment);
 
             if ($seconds === null || $price === null || $pack === null) {
                 continue;

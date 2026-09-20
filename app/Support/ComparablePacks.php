@@ -57,8 +57,14 @@ final readonly class ComparablePacks
      * best-value winner, and switch drop detection off for it entirely. A stale
      * price must not move the plausibility median either.
      *
+     * `$voters` must be a subset of `$shops`. The guarantee that a resolved
+     * unit always has a shop that can win in it rests on it: the unit is the
+     * majority among the voters that state a size, so one of them is `Stated`
+     * and winnable — but only if that voter is also a shop this resolver
+     * answers for.
+     *
      * @param  Collection<int, Shop>  $shops
-     * @param  Collection<int, Shop>|null  $voters  defaults to every shop given
+     * @param  Collection<int, Shop>|null  $voters  a subset of `$shops`; defaults to all of them
      */
     public static function of(Collection $shops, string $currency, ?Collection $voters = null): self
     {
@@ -118,7 +124,12 @@ final readonly class ComparablePacks
      */
     public function winnable(Collection $shops): Collection
     {
-        return $shops->filter(fn (Shop $shop): bool => $this->for($shop)?->canWin() === true);
+        // A usable unit price is part of being winnable, not a detail of the
+        // sort. Without it a shop priced 0.00 sorts first — `unitPriceOf()`
+        // answers null for a price at or below zero, and a null cast to float
+        // is the smallest number there is.
+        return $shops->filter(fn (Shop $shop): bool => $this->for($shop)?->canWin() === true
+            && $this->unitPriceOf($shop) !== null);
     }
 
     /**
@@ -155,6 +166,13 @@ final readonly class ComparablePacks
         }
 
         $size = self::statedSize($shop);
+
+        // A shop that states a size nobody can read is not a shop that stated
+        // nothing. Inheriting its siblings' size would paper over a bad row
+        // with a plausible number; "pack size unknown" points at the fix.
+        if ($size === null && $shop->pack_quantity !== null && $shop->pack_unit !== null) {
+            return ComparablePack::excluded(PackExclusion::SizeUnknown);
+        }
 
         if ($size instanceof PackSize) {
             if ($size->unit === $unit) {
