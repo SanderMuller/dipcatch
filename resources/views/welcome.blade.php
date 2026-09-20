@@ -132,7 +132,7 @@
                                         <li @class(['items-center', 'inline-flex' => $loop->index < 8, 'hidden sm:inline-flex' => $loop->index >= 8])>
                                             {{-- Linked, not decorative: each shop has a page of its own, and
                                                  this row is where a reader looks for it. --}}
-                                            <a href="{{ route('shop', [...$langQuery, 'slug' => \App\Support\ShopPages::slug($shop['host'])]) }}" class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900">
+                                            <a href="{{ route('shop', [...$langQuery, 'slug' => $shop['slug']]) }}" class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900">
                                                 {{-- Background image, not an <img>: the edge Markdown twin emits an
                                                      image reference even for an empty alt. --}}
                                                 <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>

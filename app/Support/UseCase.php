@@ -35,7 +35,7 @@ final readonly class UseCase
      * Limited to hosts still in `site.supported_hosts`, so a shop dropped from
      * the config stops being promised here too.
      *
-     * @return list<array{host: string, favicon: string, name: string}>
+     * @return list<array{host: string, favicon: string, name: string, slug: string}>
      */
     public function shops(): array
     {

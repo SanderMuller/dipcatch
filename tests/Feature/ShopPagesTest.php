@@ -1,6 +1,10 @@
 <?php declare(strict_types=1);
 
+use App\Support\Favicon;
 use App\Support\ShopPages;
+use App\Support\SupportedShops;
+use Illuminate\Contracts\Translation\Translator;
+use Illuminate\Support\Facades\Lang;
 
 it('serves a page for every supported shop', function (): void {
     foreach (ShopPages::all() as $shop) {
@@ -116,4 +120,64 @@ test('the old poiesz address redirects to the corrected one', function (): void 
 test('the poiesz redirect keeps the language query', function (): void {
     $this->get('/shops/poiesz-nl?lang=nl')
         ->assertRedirect('/shops/poiesz-supermarkten-nl?lang=nl');
+});
+
+/**
+ * A translator that refuses to translate. `__()` goes through
+ * `app('translator')->get()`, so anything that builds page copy throws here
+ * and names itself.
+ */
+function refusingTranslator(): Translator
+{
+    return new class implements Translator {
+        public function get($key, array $replace = [], $locale = null): string
+        {
+            throw new RuntimeException('Built page copy: ' . $key);
+        }
+
+        public function choice($key, $number, array $replace = [], $locale = null): string
+        {
+            throw new RuntimeException('Built page copy: ' . $key);
+        }
+
+        public function getLocale(): string
+        {
+            return 'en';
+        }
+
+        public function setLocale($locale): void {}
+    };
+}
+
+it('matches shop routes without building any page copy', function (): void {
+    // `slugPattern()` runs at route registration, before the locale
+    // middleware. `UseCases::slugPattern()` documents this and reads config;
+    // this one built all 27 pages, about 16 `__()` lookups each.
+    $expected = ShopPages::slugPattern();
+
+    Lang::swap(refusingTranslator());
+
+    expect(ShopPages::slugPattern())->toBe($expected)
+        ->and(ShopPages::slugs())->not->toBeEmpty();
+});
+
+it('rejects an unknown slug without building any page copy', function (): void {
+    Lang::swap(refusingTranslator());
+
+    expect(ShopPages::find('not-a-shop'))->toBeNull();
+});
+
+it('carries a slug on the identity row, for a host nobody has named', function (): void {
+    // The slug belongs to the host, not to the copy. Every list that only
+    // links shops reads it from here instead of building 27 pages.
+    config()->set('site.supported_hosts', ['ah.nl', 'unnamed.example']);
+    config()->set('site.shop_names', ['ah.nl' => 'Albert Heijn']);
+
+    Lang::swap(refusingTranslator());
+
+    expect(SupportedShops::rows())->toBe([
+        ['host' => 'ah.nl', 'favicon' => Favicon::url('ah.nl', 32), 'name' => 'Albert Heijn', 'slug' => 'ah-nl'],
+        ['host' => 'unnamed.example', 'favicon' => Favicon::url('unnamed.example', 32), 'name' => 'unnamed.example', 'slug' => 'unnamed-example'],
+    ])
+        ->and(ShopPages::slugs())->toBe(['ah-nl', 'unnamed-example']);
 });

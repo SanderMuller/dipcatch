@@ -48,30 +48,27 @@ final class ShopPages
 
     public static function find(string $slug): ?ShopPage
     {
-        foreach (self::all() as $page) {
-            if ($page->slug === $slug) {
-                return $page;
+        foreach (SupportedShops::rows() as $row) {
+            if ($row['slug'] === $slug) {
+                return self::page($row['host'], $row['name']);
             }
         }
 
+        // Matched forward from the configured hosts, never by reversing the
+        // slug: a host containing a hyphen would not survive the round trip.
         return null;
     }
 
     /**
-     * A host makes a URL-safe slug by swapping its dots: `ah.nl` becomes
-     * `ah-nl`. Reversible, and it keeps the shop recognisable in the URL.
-     */
-    public static function slug(string $host): string
-    {
-        return str_replace('.', '-', $host);
-    }
-
-    /**
+     * Read off the identity rows, not the pages. This is what
+     * `slugPattern()` runs on at route registration, and `MarketingPages`
+     * on every sitemap build — neither wants the copy.
+     *
      * @return list<string>
      */
     public static function slugs(): array
     {
-        return array_map(static fn (ShopPage $page): string => $page->slug, self::all());
+        return array_map(static fn (array $row): string => $row['slug'], SupportedShops::rows());
     }
 
     public static function slugPattern(): string
@@ -92,7 +89,7 @@ final class ShopPages
         return new ShopPage(
             host: $host,
             name: $name,
-            slug: self::slug($host),
+            slug: SupportedShops::slug($host),
             heading: __('Price alerts for :shop', ['shop' => $name]),
             description: __('Track what you buy at :shop and hear about it when the price drops. DipCatch re-checks the page for you and compares :shop against the other shops that sell the same thing.', ['shop' => $name]),
             intro: __('DipCatch keeps an eye on the products you already buy at :shop. It compares them with the other shops that sell the same thing, and tells you when one goes below the price you set.', ['shop' => $name]),
