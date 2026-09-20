@@ -118,5 +118,5 @@ test('no two marketed hosts claim the same landing page', function (): void {
     // second shop silently loses its page.
     $slugs = array_column(SupportedShops::rows(), 'slug');
 
-    expect(array_unique($slugs))->toHaveCount(count($slugs));
+    expect(array_unique($slugs))->toHaveSameSize($slugs);
 });
