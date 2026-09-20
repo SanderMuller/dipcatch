@@ -77,8 +77,8 @@ final class RefreshCheckjebonDatasetCommand extends Command
             if ($rows === []) {
                 // An upstream scrape hiccup (like ALDI's standing 0 rows) must
                 // not wipe local data — keep whatever the last good run stored.
-                // No metadata either: a chain with no rows would otherwise be
-                // reported as missing for as long as upstream stays empty.
+                // No chain row either: one without prices under it is the
+                // state this command exists to keep out of the table.
                 Log::warning('Checkjebon refresh: supermarket empty or missing upstream; rows kept.', [
                     'supermarket' => $supermarket,
                 ]);
@@ -86,8 +86,6 @@ final class RefreshCheckjebonDatasetCommand extends Command
 
                 continue;
             }
-
-            $this->storeChain($decoded, $supermarket, $runStartedAt);
 
             foreach (array_chunk($rows, self::UPSERT_CHUNK) as $chunk) {
                 DB::table('checkjebon_prices')->upsert(
@@ -102,8 +100,20 @@ final class RefreshCheckjebonDatasetCommand extends Command
                 ->where('refreshed_at', '<', $runStartedAt)
                 ->delete();
 
+            // Last, so a chain row always implies that chain has prices. The
+            // run is not transactional, so writing it first left a first-ever
+            // import that died mid-upsert with a chain and nothing under it.
+            // Prices with no chain row are the safe half of the pair:
+            // `SuggestShops::freshChains()` reads the chain table, so
+            // `candidateRows()` never selects them. That is a one-run gap
+            // after a crash, but a permanent one for a chain whose upstream
+            // entry carries no `u` — see `storeChain()`.
+            $this->storeChain($decoded, $supermarket, $runStartedAt);
+
             $this->info(sprintf('%s: %d rows upserted, %d delisted rows pruned.', $supermarket, count($rows), $pruned));
         }
+
+        $this->pruneChainsWithoutPrices();
 
         return self::SUCCESS;
     }
@@ -176,6 +186,29 @@ final class RefreshCheckjebonDatasetCommand extends Command
     }
 
     /**
+     * Repairs the orphan the old write order could leave behind: a chain row
+     * whose first-ever price upsert died under it. Writing the chain last
+     * stops new ones, but a database upgraded from the old order can already
+     * hold one, and nothing reports it — a chain that stays empty upstream is
+     * skipped by every later run, so the row would sit there for good.
+     *
+     * Safe to run unconditionally. A chain with prices never matches, and a
+     * chain the payload no longer carries has kept its prices since the run
+     * that stored them.
+     */
+    private function pruneChainsWithoutPrices(): void
+    {
+        $orphans = DB::table('checkjebon_chains')
+            ->whereNotIn('chain', DB::table('checkjebon_prices')->distinct()->select('supermarket'))
+            ->delete();
+
+        if ($orphans > 0) {
+            Log::warning('Checkjebon refresh: removed chain rows that held no prices.', ['count' => $orphans]);
+            $this->warn("Removed {$orphans} chain row(s) with no prices.");
+        }
+    }
+
+    /**
      * Store the chain's base URL + display name from the dataset's own `u`
      * and `c` fields, so a suggestion can build a product URL without
      * hard-coding one URL shape per chain.
@@ -190,6 +223,13 @@ final class RefreshCheckjebonDatasetCommand extends Command
         $label = $entry['c'] ?? null;
 
         if (! is_string($baseUrl) || $baseUrl === '') {
+            // Permanent, not a gap that closes: prices keep arriving and no
+            // chain row is ever written, so `freshChains()` never yields the
+            // chain and nothing suggests it. Silence here reads as success.
+            Log::warning('Checkjebon refresh: chain has no base URL upstream; it cannot be suggested.', [
+                'supermarket' => $supermarket,
+            ]);
+
             return;
         }
 

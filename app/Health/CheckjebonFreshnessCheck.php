@@ -2,7 +2,6 @@
 
 namespace App\Health;
 
-use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
 use App\Models\Product;
 use App\Models\Shop;
@@ -18,9 +17,9 @@ use Spatie\Health\Checks\Result;
  *
  * The dataset feeds two consumers: price rechecks for `checkjebon` shops,
  * and shop suggestions for every product. Age is therefore measured on the
- * OLDEST imported chain — one refreshed chain must not mask nine stale ones
- * — and a chain that has never produced a row is reported separately, since
- * no age can reveal it.
+ * OLDEST imported chain — one refreshed chain must not mask nine stale ones.
+ * A chain that stops refreshing keeps its rows, so its `max(refreshed_at)`
+ * stops moving and it becomes the oldest chain.
  */
 final class CheckjebonFreshnessCheck extends Check
 {
@@ -68,15 +67,6 @@ final class CheckjebonFreshnessCheck extends Check
                 ->shortSummary('empty');
         }
 
-        $missing = $this->chainsWithoutRows();
-
-        if ($missing !== []) {
-            return Result::make()
-                ->meta(['chains_without_rows' => $missing])
-                ->failed('Checkjebon chains have no rows: ' . implode(', ', $missing) . '.')
-                ->shortSummary(count($missing) . ' chain(s) missing');
-        }
-
         $oldestChain = $oldest->getAttribute('supermarket');
         $refreshedAt = $oldest->getAttribute('chain_refreshed_at');
 
@@ -109,25 +99,5 @@ final class CheckjebonFreshnessCheck extends Check
         }
 
         return $result->ok('Checkjebon dataset is fresh.');
-    }
-
-    /**
-     * Chains the importer knows about that hold no rows at all — an age
-     * comparison can never surface these.
-     *
-     * @return list<string>
-     */
-    private function chainsWithoutRows(): array
-    {
-        $withRows = CheckjebonPrice::query()->distinct()->pluck('supermarket')->all();
-
-        /** @var list<string> $missing */
-        $missing = CheckjebonChain::query()
-            ->whereNotIn('chain', $withRows === [] ? [''] : $withRows)
-            ->orderBy('chain')
-            ->pluck('chain')
-            ->all();
-
-        return $missing;
     }
 }

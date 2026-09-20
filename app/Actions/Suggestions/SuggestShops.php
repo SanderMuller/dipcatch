@@ -47,6 +47,22 @@ final class SuggestShops
      */
     private array $memo = [];
 
+    /**
+     * One set for every product, unlike `$memo` above, because chain
+     * freshness does not depend on which product is asking.
+     *
+     * `dismiss()` must not clear it: a dismissal changes which rows are
+     * offered, never which chains are fresh.
+     *
+     * The container flushes this between HTTP requests, Octane operations
+     * and queued jobs, but not inside one `artisan` process — nothing loops
+     * products through this action today, and a command that did would hold
+     * one set, and one freshness cutoff, for its whole run.
+     *
+     * @var array<string, CheckjebonChain>|null
+     */
+    private ?array $freshChains = null;
+
     /** Preferred prefilter token length — shorter needles match half the catalogue. */
     private const int PREFERRED_PREFILTER_TOKEN = 4;
 
@@ -131,6 +147,14 @@ final class SuggestShops
     }
 
     /**
+     * @return array<string, CheckjebonChain>
+     */
+    private function freshChains(): array
+    {
+        return $this->freshChains ??= $this->readFreshChains();
+    }
+
+    /**
      * Chains holding rows no older than the freshness window, keyed by chain.
      * Per chain, never one global maximum: the importer keeps a chain's rows
      * when upstream serves none, so a refreshed AH would otherwise make a
@@ -138,7 +162,7 @@ final class SuggestShops
      *
      * @return array<string, CheckjebonChain>
      */
-    private function freshChains(): array
+    private function readFreshChains(): array
     {
         $freshness = CheckjebonPrice::query()
             ->selectRaw('supermarket, max(refreshed_at) as chain_refreshed_at')

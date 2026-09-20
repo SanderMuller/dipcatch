@@ -4,6 +4,8 @@ use App\Console\Commands\RefreshCheckjebonDatasetCommand;
 use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
 use App\Services\Checkjebon\CheckjebonSource;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -116,7 +118,7 @@ test('a chain the app has never heard of is imported from the payload alone', fu
         ->and(CheckjebonChain::query()->where('chain', 'newchain')->value('base_url'))->toBe('https://www.newchain.nl/p/');
 });
 
-test('an empty chain gets no metadata, so the health check does not report it forever', function (): void {
+test('an empty chain gets no metadata, so an empty upstream records no chain', function (): void {
     Http::fake([checkjebonUrl() => Http::response(checkjebonFixture())]);
 
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
@@ -202,4 +204,81 @@ test('malformed product rows are skipped, valid ones imported', function (): voi
     $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
 
     expect(CheckjebonPrice::query()->where('supermarket', 'ah')->pluck('external_id')->all())->toBe(['wi1']);
+});
+
+test('a chain is recorded only after its prices are stored', function (): void {
+    // The invariant is "a chain row implies that chain has prices", and the
+    // write order is what holds it: a run that dies between the two writes
+    // must not leave the chain behind. A crash cannot be simulated here —
+    // the suite wraps each test in a transaction, and a failed statement
+    // aborts the whole one — so the order itself is the assertion.
+    Http::fake([checkjebonUrl() => Http::response(json_encode([
+        ['n' => 'newchain', 'u' => 'https://www.newchain.nl/p/', 'c' => 'NewChain', 'd' => [
+            ['n' => 'New item', 'l' => 'new-item-1', 'p' => 1.99, 's' => '100 g'],
+        ]],
+    ], JSON_THROW_ON_ERROR))]);
+
+    $writes = [];
+
+    // The verb matters as much as the table. `pruneChainsWithoutPrices()`
+    // ends every run with a delete against `checkjebon_chains`, so asking
+    // only which table was touched last says nothing about where the upsert
+    // went.
+    // Anchored on the statement's own target, not on any mention of the
+    // table: the cleanup's `where chain not in (select ... from
+    // checkjebon_prices)` names both tables in one delete.
+    DB::listen(function (QueryExecuted $query) use (&$writes): void {
+        if (preg_match('/^(insert into|update|delete from) "(checkjebon_\w+)"/', $query->sql, $match) === 1) {
+            $writes[] = $match[1] . ' ' . $match[2];
+        }
+    });
+
+    $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
+
+    $chainUpserts = array_keys($writes, 'insert into checkjebon_chains', true);
+    $priceWrites = [
+        ...array_keys($writes, 'insert into checkjebon_prices', true),
+        ...array_keys($writes, 'delete from checkjebon_prices', true),
+    ];
+
+    $lastPriceWrite = $priceWrites === [] ? -1 : max($priceWrites);
+
+    // Exactly one, so "write it early for the log line and again at the end"
+    // cannot satisfy this while reopening the window it exists to close.
+    expect($lastPriceWrite)->toBeGreaterThan(-1)
+        ->and($chainUpserts)->toHaveCount(1)
+        ->and($chainUpserts[0])->toBeGreaterThan($lastPriceWrite);
+});
+
+test('every recorded chain has prices after a successful run', function (): void {
+    // The end state, not the proof: both write orders satisfy this on a run
+    // that finishes. The order test above is what pins the mechanism; this
+    // one catches a later change that reintroduces the state some other way.
+    Http::fake([checkjebonUrl() => Http::response(checkjebonFixture())]);
+
+    $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
+
+    $withPrices = CheckjebonPrice::query()->distinct()->pluck('supermarket')->all();
+
+    expect(CheckjebonChain::query()->count())->toBeGreaterThan(0)
+        ->and(CheckjebonChain::query()->whereNotIn('chain', $withPrices)->pluck('chain')->all())->toBeEmpty();
+});
+
+test('a chain row left without prices by an older run is cleared', function (): void {
+    // The reorder stops new orphans; it cannot repair one already stored.
+    // Nothing reports this row any more, and a chain that stays empty
+    // upstream is skipped by every later run, so the refresh clears it.
+    CheckjebonChain::query()->create([
+        'chain' => 'ghostchain',
+        'label' => 'GhostChain',
+        'base_url' => 'https://www.ghostchain.nl/p/',
+        'refreshed_at' => now()->subDay(),
+    ]);
+
+    Http::fake([checkjebonUrl() => Http::response(checkjebonFixture())]);
+
+    $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
+
+    expect(CheckjebonChain::query()->where('chain', 'ghostchain')->exists())->toBeFalse()
+        ->and(CheckjebonChain::query()->where('chain', 'ah')->exists())->toBeTrue();
 });

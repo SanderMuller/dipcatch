@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Suggestions\SuggestShops;
+use App\Models\CheckjebonChain;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\ShopSuggestionDismissal;
@@ -237,6 +238,125 @@ test('a second call inside one request reuses the computed suggestions', functio
     expect(DB::getQueryLog())->toBeEmpty();
 });
 
+test('the chain set is read once per request, not once per caller', function (): void {
+    // `hasUsableCatalogue()` reached the chain set directly, outside the memo
+    // the class already had for suggestions. The product page renders the
+    // component twice and each render calls both entry points, so the two
+    // queries ran three times over.
+    seedChains();
+    seedBeemsterCatalogue();
+
+    $product = beemsterProduct();
+    $action = app(SuggestShops::class);
+
+    $first = $action($product);
+
+    DB::enableQueryLog();
+
+    // The value too, not only the query count: a memo that answers once and
+    // then returns nothing would satisfy an empty log.
+    expect($action->hasUsableCatalogue())->toBeTrue()
+        ->and($action($product))->toEqual($first)
+        ->and($action->hasUsableCatalogue())->toBeTrue()
+        ->and(DB::getQueryLog())->toBeEmpty();
+});
+
+test('a second product reuses the chain set without reusing the suggestions', function (): void {
+    // `__invoke()` reaches the chain set through `eligibleChains()`, but only
+    // for a product the per-product memo has not seen. Asking for one is the
+    // only way to exercise that path warm — a second product must still cost
+    // its candidate rows, and must not inherit the first product's tracked
+    // chains.
+    seedChains();
+    seedBeemsterCatalogue();
+
+    $action = app(SuggestShops::class);
+    $action->hasUsableCatalogue();
+
+    $second = Product::factory()->create([
+        'title' => 'Beemster Extra belegen 48+ plakken',
+        'currency' => 'EUR',
+    ]);
+
+    DB::enableQueryLog();
+
+    $suggestions = $action($second);
+
+    $chainSetQueries = array_filter(
+        DB::getQueryLog(),
+        static fn (array $entry): bool => str_contains((string) $entry['query'], 'checkjebon_chains')
+            || str_contains((string) $entry['query'], 'max(refreshed_at)'),
+    );
+
+    expect($chainSetQueries)->toBeEmpty()
+        ->and(DB::getQueryLog())->not->toBeEmpty()
+        ->and(collect($suggestions)->pluck('chain')->all())->toContain('ah');
+});
+
+test('a product that already tracks every fresh chain still has a usable catalogue', function (): void {
+    // `hasUsableCatalogue()` reads the fresh set, `__invoke()` the eligible
+    // one. Memoizing the eligible set instead would make the panel fall
+    // silent here rather than say no other shop sells this.
+    seedChains();
+    seedRow('ah', 'Beemster Extra belegen 48+ plakken', '150 g', '3.49');
+
+    $product = Product::factory()->create([
+        'title' => 'Beemster Extra belegen 48+ plakken',
+        'currency' => 'EUR',
+    ]);
+
+    Shop::factory()->for($product)->create(['url' => 'https://www.ah.nl/producten/product/wi1/beemster']);
+
+    $action = app(SuggestShops::class);
+
+    expect($action($product))->toBeEmpty()
+        ->and($action->hasUsableCatalogue())->toBeTrue();
+});
+
+test('an empty catalogue is read once too', function (): void {
+    // `??=` memoizes an empty set; `?:` or an `empty()` guard would re-query
+    // on every call, which is the one case a stale dataset guarantees.
+    $action = app(SuggestShops::class);
+
+    expect($action->hasUsableCatalogue())->toBeFalse();
+
+    DB::enableQueryLog();
+
+    expect($action->hasUsableCatalogue())->toBeFalse()
+        ->and(DB::getQueryLog())->toBeEmpty();
+});
+
+test('the action is scoped to the request, so the chain set cannot outlive one', function (): void {
+    // The memo holds the freshness cutoff as well as the rows. Under Octane a
+    // singleton would carry both into every later request the worker serves.
+    $first = app(SuggestShops::class);
+
+    expect(app(SuggestShops::class))->toBe($first);
+
+    app()->forgetScopedInstances();
+
+    expect(app(SuggestShops::class))->not->toBe($first);
+});
+
+test('a dismissal does not re-read the chain set', function (): void {
+    // A dismissal changes which rows are offered, never which chains are
+    // fresh, so it clears the per-product memo and leaves this one alone.
+    seedChains();
+    seedBeemsterCatalogue();
+
+    $product = beemsterProduct();
+    $action = app(SuggestShops::class);
+
+    /** @var ShopSuggestion $dirk */
+    $dirk = collect($action($product))->firstWhere('chain', 'dirk');
+    $action->dismiss($product, 'dirk', $dirk->externalId);
+
+    DB::enableQueryLog();
+    $action->hasUsableCatalogue();
+
+    expect(DB::getQueryLog())->toBeEmpty();
+});
+
 test('dismissing drops the memo so the next call reflects it', function (): void {
     seedChains();
     seedBeemsterCatalogue();
@@ -258,4 +378,20 @@ test('a chain whose dataset links do not resolve is never suggested', function (
     // Every DekaMarkt id in the dataset answers "Het artikel is niet
     // gevonden" — a row nobody can open is worse than no row.
     expect(suggest(beemsterProduct()))->toBeEmpty();
+});
+
+test('a price row whose chain is not recorded yet is not suggested', function (): void {
+    // The state the importer now creates on purpose, between the price
+    // upsert and the chain write. `freshChains()` reads the chain table, so
+    // the row is never a candidate — there is no `base_url` to build a
+    // product URL from, and guessing one would send the user nowhere.
+    seedChains();
+    seedBeemsterCatalogue();
+
+    CheckjebonChain::query()->where('chain', 'ah')->delete();
+
+    $suggestions = app(SuggestShops::class)(beemsterProduct());
+
+    expect(collect($suggestions)->pluck('chain')->all())->not->toContain('ah')
+        ->and($suggestions)->not->toBeEmpty();
 });
