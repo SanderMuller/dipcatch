@@ -2,7 +2,9 @@
 
 @php
     $useCases = \App\Support\UseCases::all();
-    $shops = \App\Support\ShopPages::all();
+    // Identity rows, not pages: this renders on every marketing page and
+    // only needs a name and a slug.
+    $shops = \App\Support\SupportedShops::rows();
 @endphp
 
 {{-- Replaces three drifted per-page footers, so a new landing page is linked
@@ -21,7 +23,7 @@
         <nav @class(['flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400', 'mt-4' => $useCases !== []]) aria-label="{{ __('Price alerts by shop') }}">
             <a href="{{ route('shops', $langQuery) }}" class="font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100">{{ __('Supported shops') }}</a>
             @foreach ($shops as $shop)
-                <a href="{{ route('shop', [...$langQuery, 'slug' => $shop->slug]) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ $shop->name }}</a>
+                <a href="{{ route('shop', [...$langQuery, 'slug' => $shop['slug']]) }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ $shop['name'] }}</a>
             @endforeach
         </nav>
     @endif

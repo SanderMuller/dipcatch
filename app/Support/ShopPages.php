@@ -40,7 +40,7 @@ final class ShopPages
         $pages = [];
 
         foreach (SupportedShops::rows() as $row) {
-            $pages[] = self::page($row['host'], $row['name']);
+            $pages[] = self::page($row);
         }
 
         return $pages;
@@ -48,9 +48,9 @@ final class ShopPages
 
     public static function find(string $slug): ?ShopPage
     {
-        foreach (self::all() as $page) {
-            if ($page->slug === $slug) {
-                return $page;
+        foreach (SupportedShops::rows() as $row) {
+            if ($row['slug'] === $slug) {
+                return self::page($row);
             }
         }
 
@@ -58,20 +58,15 @@ final class ShopPages
     }
 
     /**
-     * A host makes a URL-safe slug by swapping its dots: `ah.nl` becomes
-     * `ah-nl`. Reversible, and it keeps the shop recognisable in the URL.
-     */
-    public static function slug(string $host): string
-    {
-        return str_replace('.', '-', $host);
-    }
-
-    /**
+     * Read off the identity rows, not the pages. `slugPattern()` runs this
+     * at route registration, before the locale middleware, and
+     * `MarketingPages` on every sitemap build. Neither wants the copy.
+     *
      * @return list<string>
      */
     public static function slugs(): array
     {
-        return array_map(static fn (ShopPage $page): string => $page->slug, self::all());
+        return array_map(static fn (array $row): string => $row['slug'], SupportedShops::rows());
     }
 
     public static function slugPattern(): string
@@ -87,12 +82,17 @@ final class ShopPages
         return implode('|', array_map(static fn (string $slug): string => preg_quote($slug, '/'), $slugs));
     }
 
-    private static function page(string $host, string $name): ShopPage
+    /**
+     * @param  array{host: string, favicon: string, name: string, slug: string}  $row
+     */
+    private static function page(array $row): ShopPage
     {
+        ['host' => $host, 'name' => $name] = $row;
+
         return new ShopPage(
             host: $host,
             name: $name,
-            slug: self::slug($host),
+            slug: $row['slug'],
             heading: __('Price alerts for :shop', ['shop' => $name]),
             description: __('Track what you buy at :shop and hear about it when the price drops. DipCatch re-checks the page for you and compares :shop against the other shops that sell the same thing.', ['shop' => $name]),
             intro: __('DipCatch keeps an eye on the products you already buy at :shop. It compares them with the other shops that sell the same thing, and tells you when one goes below the price you set.', ['shop' => $name]),

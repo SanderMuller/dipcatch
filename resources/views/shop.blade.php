@@ -8,7 +8,7 @@
     $canonical = $locale === 'nl' ? $shop->url('nl') : $shop->url();
     $contactEmail = config('site.contact_email');
     $related = $shop->relatedUseCases();
-    $others = collect(\App\Support\ShopPages::all())->reject(fn ($row) => $row->host === $shop->host)->take(6);
+    $others = collect(\App\Support\SupportedShops::rows())->reject(fn (array $row): bool => $row['host'] === $shop->host)->take(6);
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
@@ -105,9 +105,9 @@
                     <ul role="list" class="mt-5 flex flex-wrap gap-2">
                         @foreach ($others as $other)
                             <li>
-                                <a href="{{ route('shop', [...$langQuery, 'slug' => $other->slug]) }}" class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900">
-                                    <span style="background-image: url('{{ $other->favicon() }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
-                                    <span>{{ $other->name }}</span>
+                                <a href="{{ route('shop', [...$langQuery, 'slug' => $other['slug']]) }}" class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900">
+                                    <span style="background-image: url('{{ $other['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
+                                    <span>{{ $other['name'] }}</span>
                                 </a>
                             </li>
                         @endforeach

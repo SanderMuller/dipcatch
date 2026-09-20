@@ -19,6 +19,7 @@ use Laravel\Cashier\Subscription;
 use Livewire\Features\SupportTesting\Testable;
 use Pest\Expectation;
 use PHPUnit\Framework\Assert;
+use Symfony\Component\DomCrawler\Crawler;
 use Tests\TestCase;
 
 use function Pest\Livewire\livewire;
@@ -80,6 +81,20 @@ expect()->extend('toBeSameTimestampAs', function (DateTimeInterface $expected): 
 | global functions to help you to reduce the number of lines of code in your test files.
 |
 */
+
+/**
+ * Every `href` under one selector. Scoped rather than page-wide: a marketing
+ * page links the same routes from its header, its body and its footer, so a
+ * whole-page assertion passes on the wrong one.
+ *
+ * @return list<string>
+ */
+function hrefsWithin(string $html, string $selector): array
+{
+    return new Crawler($html)->filter($selector)->each(
+        static fn (Crawler $node): string => (string) $node->attr('href'),
+    );
+}
 
 /**
  * Clear the Redis bucket a `ThrottleRequestsWithRedis` named limiter writes
