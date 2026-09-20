@@ -7,11 +7,12 @@ use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Enums\ShopHealth;
 use App\Services\Drops\Reference;
+use App\Support\ComparablePacks;
 use App\Support\ImageUrl;
 use App\Support\Numeric;
+use App\Support\PackSize;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProductFactory;
-use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -63,6 +65,8 @@ final class Product extends Model
             'drop_threshold_pct' => 'decimal:2',
             'drop_threshold_abs' => 'decimal:2',
             'cheapest_price' => 'decimal:2',
+            'best_value_price' => 'decimal:2',
+            'best_value_pack_quantity' => 'decimal:2',
             'target_price' => 'decimal:2',
             'target_price_notified' => 'decimal:2',
             'target_price_notified_at' => 'datetime',
@@ -101,6 +105,18 @@ final class Product extends Model
     public function cheapestShop(): BelongsTo
     {
         return $this->belongsTo(Shop::class, 'cheapest_shop_id');
+    }
+
+    /**
+     * The shop with the lowest price per unit — the better deal, and the basis a
+     * drop is decided on. Kept apart from {@see cheapestShop()}, which stays the
+     * smallest amount of money handed over.
+     *
+     * @return BelongsTo<Shop, $this>
+     */
+    public function bestValueShopRelation(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class, 'best_value_shop_id');
     }
 
     /**
@@ -157,13 +173,24 @@ final class Product extends Model
             return null;
         }
 
-        $reference = Numeric::str((string) $drop->reference_price);
+        // Both sides in the basis the alert fired on. Mixing an event's unit
+        // reference with today's pack price answers a question nobody asked and
+        // gets the badge wrong by whatever the pack size is.
+        $unit = is_string($drop->comparison_unit) ? $drop->comparison_unit : null;
+        $referenceValue = $unit === null ? $drop->reference_price : $drop->reference_unit_price;
+        $current = $this->dropBasisPrice($unit);
 
-        if ($this->cheapest_price === null || bccomp($reference, '0', self::BC_SCALE) <= 0) {
+        if ($referenceValue === null) {
             return (int) round((float) $drop->drop_pct);
         }
 
-        $fraction = bcdiv(bcsub($reference, Numeric::str((string) $this->cheapest_price), self::BC_SCALE), $reference, self::BC_SCALE);
+        $reference = Numeric::str((string) $referenceValue);
+
+        if ($current === null || bccomp($reference, '0', self::BC_SCALE) <= 0) {
+            return (int) round((float) $drop->drop_pct);
+        }
+
+        $fraction = bcdiv(bcsub($reference, Numeric::str($current), self::BC_SCALE), $reference, self::BC_SCALE);
 
         return max(0, (int) round((float) $fraction * 100));
     }
@@ -262,36 +289,101 @@ final class Product extends Model
         return array_key_first($counts);
     }
 
+    /**
+     * The resolver for this product's shops: which of them can be compared per
+     * unit, on what size, and why the others cannot.
+     */
+    public function comparablePacks(): ComparablePacks
+    {
+        // Every shop gets an answer; only the sellable ones get a vote on what
+        // this product is measured in. See {@see ComparablePacks::of()}.
+        return ComparablePacks::of($this->shops, (string) $this->currency, $this->eligibleShops());
+    }
+
+    /**
+     * The shop with the lowest price per unit — the better deal.
+     *
+     * Computed live rather than read from the column so a caller that has not
+     * recomputed still gets an answer; {@see recomputeCheapestShop()} stores the
+     * same value under the row lock, and both go through
+     * {@see ComparablePacks} so there is one definition of who is eligible.
+     */
     public function bestValueShop(): ?Shop
     {
-        $candidates = $this->shops
-            ->filter(fn (Shop $shop): bool => $shop->active
-                // Unknown stock still competes: the price is real, and
-                // dropping it would hide a shop rather than describe it.
-                && $shop->current_in_stock !== false
-                && $shop->health !== ShopHealth::Dead
-                && $shop->currency === $this->currency
-                && $shop->unitPrice() !== null);
+        return self::bestValueAmong($this->eligibleShops(), $this->comparablePacks());
+    }
 
-        if ($candidates->isEmpty()) {
+    /**
+     * Shops allowed to win either answer: active, not dead, priced, in this
+     * product's own currency.
+     *
+     * Unknown stock still competes — the price is real, and dropping it would
+     * hide a shop rather than describe it.
+     *
+     * @return Collection<int, Shop>
+     */
+    private function eligibleShops(): Collection
+    {
+        return $this->shops->filter(fn (Shop $shop): bool => $shop->active
+            && $shop->current_in_stock !== false
+            && $shop->health !== ShopHealth::Dead
+            && $shop->currency === $this->currency
+            && $shop->current_price !== null);
+    }
+
+    /**
+     * @param  Collection<int, Shop>  $candidates
+     */
+    private static function bestValueAmong(Collection $candidates, ComparablePacks $packs): ?Shop
+    {
+        return $packs->cheapestPerUnit($candidates);
+    }
+
+    /** The best-value winner's own pack size, as last recomputed. */
+    public function bestValuePackSize(): ?PackSize
+    {
+        if ($this->best_value_pack_quantity === null || ! is_string($this->best_value_pack_unit)) {
             return null;
         }
 
-        // Group by unit AND currency: a EUR/kg figure and a (drifted) GBP/kg
-        // figure are not comparable numbers even though the unit matches.
-        $group = $candidates->countBy(fn (Shop $shop): string => $shop->pack_unit . '|' . $shop->currency)
-            ->sortDesc()
-            ->keys()
-            ->first();
+        return PackSize::of((float) $this->best_value_pack_quantity, $this->best_value_pack_unit);
+    }
 
+    /**
+     * The winning price in the basis a drop is measured in: per unit while the
+     * product has a comparison unit, per pack otherwise.
+     *
+     * One accessor rather than a branch at each call site, because the whole
+     * detection path — direction, reference, recovery, the duplicate latch —
+     * has to agree on the basis or a fall in one reads as a rise in the other.
+     */
+    public function dropBasisPrice(?string $unit): ?string
+    {
+        if ($unit === null) {
+            return $this->cheapest_price === null ? null : (string) $this->cheapest_price;
+        }
+
+        return $this->best_value_price === null
+            ? null
+            : $this->bestValuePackSize()?->unitPriceFor((string) $this->best_value_price);
+    }
+
+    /** The pack price of whichever shop the basis is measured on. */
+    public function winningPackPrice(?string $unit): ?string
+    {
+        $price = $unit === null ? $this->cheapest_price : $this->best_value_price;
+
+        return $price === null ? null : (string) $price;
+    }
+
+    /**
+     * @param  Collection<int, Shop>  $candidates
+     */
+    private static function lowestOutlayAmong(Collection $candidates): ?Shop
+    {
         return $candidates
-            ->filter(fn (Shop $shop): bool => $shop->pack_unit . '|' . $shop->currency === $group)
-            // Unit prices are two-decimal strings; compare them as numbers,
-            // with the oldest shop winning a tie so the answer is stable.
-            ->sortBy([
-                fn (Shop $a, Shop $b): int => (float) $a->unitPrice() <=> (float) $b->unitPrice(),
-                fn (Shop $a, Shop $b): int => $a->created_at <=> $b->created_at,
-            ])
+            ->sort(fn (Shop $a, Shop $b): int => [(float) $a->current_price, $a->created_at, (string) $a->id]
+                <=> [(float) $b->current_price, $b->created_at, (string) $b->id])
             ->first();
     }
 
@@ -314,25 +406,20 @@ final class Product extends Model
                 ? null
                 : (string) $locked->cheapest_price;
 
-            /** @var Shop|null $cheapest */
-            $cheapest = $locked->shops()
-                ->where('active', true)
-                ->where(fn (EloquentBuilder $stock): EloquentBuilder => $stock
-                    ->where('current_in_stock', true)
-                    ->orWhereNull('current_in_stock'))
-                ->where('health', '!=', ShopHealth::Dead->value)
-                ->where('currency', $locked->currency)
-                ->whereNotNull('current_price')
-                ->orderBy('current_price')
-                // Stable tie-break: among equal prices the offer added first
-                // wins, with `id` as a final lexicographic guarantee.
-                // Without this, the engine picked either row arbitrarily on
-                // each recompute, generating spurious
-                // `product_cheapest_history` segments and re-anchoring drop
-                // detection.
-                ->orderBy('created_at')
-                ->orderBy('id')
-                ->first();
+            // Ordering happens in PHP rather than SQL: a unit price is not a
+            // column, and a size inherited from siblings is not on the row at
+            // all. The tie-break moves with it — among equal prices the offer
+            // added first wins, with `id` as a final lexicographic guarantee.
+            // Without it the engine picked either row arbitrarily on each
+            // recompute, generating spurious `product_cheapest_history`
+            // segments and re-anchoring drop detection.
+            $locked->setRelation('shops', $locked->shops()->get());
+            $candidates = $locked->eligibleShops();
+            $packs = $locked->comparablePacks();
+
+            $cheapest = self::lowestOutlayAmong($candidates);
+            $bestValue = self::bestValueAmong($candidates, $packs);
+            $bestValueSize = $bestValue === null ? null : $packs->for($bestValue)?->size;
 
             $newOfferId = $cheapest?->id;
             $newPrice = $cheapest?->current_price === null
@@ -347,19 +434,57 @@ final class Product extends Model
                 ->latest('id')
                 ->first();
 
+            $previousBestValueId = $locked->best_value_shop_id;
+            $previousBasis = $locked->dropBasisPrice($packs->unit());
+            $previousBestValuePack = $locked->winningPackPrice($packs->unit());
+            $previousBestValueSize = $locked->bestValuePackSize();
+            $bestValuePrice = $bestValue?->current_price === null
+                ? null
+                : (string) $bestValue->current_price;
+
             $locked->forceFill([
                 'cheapest_shop_id' => $newOfferId,
                 'cheapest_price' => $newPrice,
+                'best_value_shop_id' => $bestValue?->id,
+                'best_value_price' => $bestValuePrice,
+                'best_value_pack_quantity' => $bestValueSize?->quantity,
+                'best_value_pack_unit' => $bestValueSize?->unit,
             ])->save();
+
+            // The reference was computed before the lock, and a sibling check on
+            // another shop can change a pack size in between — enough to flip
+            // the product's comparison unit. Evaluating a pack-basis reference
+            // against a unit-basis price is a category error, so a mismatched
+            // pair skips detection entirely and the next recompute gets a
+            // consistent one.
+            if ($reference !== null && $reference->unit !== $packs->unit()) {
+                $reference = null;
+            }
+
+            $newBasis = $locked->dropBasisPrice($packs->unit());
+            $newBasisPack = $locked->winningPackPrice($packs->unit());
+
+            // Someone correcting a pack size is not a price moving. The same
+            // shop, the same money, a different amount: the unit price changes
+            // by whatever the correction was, which reads as a spectacular drop
+            // or rise and is neither. The segment is still written — history
+            // has to stay faithful — but nothing is detected on it.
+            $sizeCorrection = $previousBestValueId !== null
+                && $previousBestValueId === $bestValue?->id
+                && $previousBestValuePack === $newBasisPack
+                && $previousBestValueSize?->isSameSizeAs($bestValueSize) === false;
 
             // Before the `$changed` gate on purpose: a confirming reading is
             // the same price again, so it changes nothing and never reaches
             // the detector call at the bottom of this transaction.
-            if ($reference !== null && $newPrice !== null && $newOfferId !== null) {
-                app(DetectDrop::class)->confirmLargeDrop($locked, $newPrice, $triggeringPriceCheckId, $reference);
+            if ($reference !== null && $newBasis !== null && $newOfferId !== null && ! $sizeCorrection) {
+                app(DetectDrop::class)->confirmLargeDrop($locked, $newBasis, $triggeringPriceCheckId, $reference);
             }
 
             $changed = $previousOfferId !== $newOfferId
+                || $previousBestValueId !== $bestValue?->id
+                || $previousBestValuePack !== $newBasisPack
+                || $previousBestValueSize?->isSameSizeAs($bestValueSize) === false
                 || $previousPrice !== $newPrice
                 || $openSegment?->singleItemPrice() !== $singleItemPrice
                 || $openSegment?->bundleOffer()?->quantity !== $bundleOffer?->quantity
@@ -378,6 +503,10 @@ final class Product extends Model
                 'product_id' => $locked->id,
                 'cheapest_shop_id' => $newOfferId,
                 'cheapest_price' => $newPrice,
+                'best_value_shop_id' => $bestValue?->id,
+                'best_value_price' => $bestValuePrice,
+                'pack_quantity' => $bestValueSize?->quantity,
+                'pack_unit' => $bestValueSize?->unit,
                 'single_item_price' => $singleItemPrice,
                 'bundle_quantity' => $bundleOffer?->quantity,
                 'bundle_total_price' => $bundleOffer?->totalPrice,
@@ -386,12 +515,20 @@ final class Product extends Model
                 'triggering_price_check_id' => $triggeringPriceCheckId,
             ]);
 
-            $direction = self::compareDirection($previousPrice, $newPrice);
+            if ($sizeCorrection) {
+                return;
+            }
+
+            // Direction is read in the drop's own basis. On the pack basis it
+            // is the old question; on the unit basis a bigger pack that costs
+            // more money can still be the better deal, and asking the pack
+            // price would send that fall down the recovery branch instead.
+            $direction = self::compareDirection($previousBasis, $newBasis);
             $detector = app(DetectDrop::class);
 
             match ($direction) {
                 'down' => $detector($locked, $triggeringPriceCheckId, $reference),
-                'up', 'null' => $detector->clearLatchIfRecovered($locked, $newPrice, $reference),
+                'up', 'null' => $detector->clearLatchIfRecovered($locked, $newBasis, $reference),
                 default => null,
             };
         });

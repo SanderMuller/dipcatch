@@ -163,7 +163,7 @@ final readonly class PriceHistorySeries
         $units = [];
 
         foreach ($segments as $segment) {
-            $label = $segment->cheapestShop?->packUnitLabel();
+            $label = $segment->packSize()?->label();
 
             if ($label !== null) {
                 $units[$label] = ($units[$label] ?? 0) + 1;
@@ -175,7 +175,7 @@ final readonly class PriceHistorySeries
         }
 
         arsort($units);
-        $label = (string) array_key_first($units);
+        $label = array_key_first($units);
 
         $points = [];
 
@@ -193,15 +193,24 @@ final readonly class PriceHistorySeries
             : ['label' => $label, 'points' => $points];
     }
 
+    /**
+     * Each point is drawn from the size that segment recorded, never from the
+     * shop's size today.
+     *
+     * Reading today's size rewrites the past: Foodello reported 55 g for a box
+     * of twelve, and correcting it to 660 g would have redrawn a month of points
+     * twelvefold. A segment with no recorded size plots nothing rather than a
+     * plausible number.
+     */
     private static function unitPointFor(ProductCheapestHistory $segment, string $label): ?float
     {
-        $shop = $segment->cheapestShop;
+        $size = $segment->packSize();
 
-        if ($shop === null || $shop->packUnitLabel() !== $label) {
+        if ($size === null || $size->label() !== $label) {
             return null;
         }
 
-        $unitPrice = $shop->unitPriceFor($segment->cheapest_price);
+        $unitPrice = $segment->unitPrice();
 
         return $unitPrice === null ? null : (float) $unitPrice;
     }

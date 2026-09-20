@@ -233,3 +233,37 @@ test('the notification budget still caps a target alert', function (): void {
 
     Notification::assertNothingSent();
 });
+
+test('a target fires from the smallest outlay even when another shop is better value', function (): void {
+    // The Lay's case, where the two answers genuinely differ: ah sells 200 g at
+    // 2.19 (10.95/kg), dirk 300 g at 2.45 (8.17/kg). A target is a buy trigger —
+    // "tell me when I can get one for under 2.30" — so it answers on outlay, and
+    // no ranking change can move it.
+    $user = User::factory()->create(['notify_via_filament' => true]);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'target_price' => '2.30']);
+
+    foreach ([
+        ['host' => 'ah.nl', 'price' => '2.19', 'quantity' => '200.00'],
+        ['host' => 'dirk.nl', 'price' => '2.45', 'quantity' => '300.00'],
+    ] as $row) {
+        Shop::factory()->for($product)->create(['url' => 'https://' . $row['host'] . '/p/1'])
+            ->forceFill([
+                'currency' => 'EUR',
+                'current_price' => $row['price'],
+                'current_in_stock' => true,
+                'pack_quantity' => $row['quantity'],
+                'pack_unit' => 'g',
+            ])->save();
+    }
+
+    $product->refresh()->recomputeCheapestShop();
+    $product->refresh();
+
+    expect($product->cheapestShop?->host)->toBe('ah.nl')
+        ->and($product->bestValueShop()?->host)->toBe('dirk.nl');
+
+    app(DetectTargetPrice::class)($product);
+
+    Notification::assertSentTo($product->user, TargetPriceNotification::class);
+    expect((string) $product->refresh()->target_price_notified)->toBe('2.19');
+});

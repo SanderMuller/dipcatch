@@ -50,10 +50,16 @@ final class PriceDropNotification extends Notification implements ShouldQueue
         public string $priceDropEventId,
         ?PriceCheck $triggeringCheck = null,
     ) {
-        $cheapest = $product->cheapestShop;
+        // The shop the drop was measured on, which is the best-value winner
+        // once the product has a comparison unit. Naming the lowest-outlay shop
+        // instead would put a different host and a different price in the alert
+        // from the ones in the `price_drop_events` row behind it.
+        $unit = $outcome->comparisonUnit;
+        $cheapest = $unit === null ? $product->cheapestShop : $product->bestValueShopRelation;
+        $winningPrice = $product->winningPackPrice($unit);
         $useTriggeringCheck = $triggeringCheck !== null
             && $this->checkRepresentsCurrentPricing($triggeringCheck, $product, $cheapest);
-        $this->snapshotPrice = $product->cheapest_price === null ? '0.00' : (string) $product->cheapest_price;
+        $this->snapshotPrice = $winningPrice ?? '0.00';
         $this->snapshotHost = is_string($cheapest?->host) && $cheapest->host !== '' ? $cheapest->host : null;
         $this->snapshotOfferUrl = is_string($cheapest?->url) && $cheapest->url !== '' ? $cheapest->url : null;
         $this->snapshotBundle = $useTriggeringCheck ? $triggeringCheck->bundleOffer() : $cheapest?->liveBundleOffer();
@@ -122,19 +128,32 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             'reference_price' => $this->outcome->referencePrice,
             'reference_kind' => $this->outcome->referenceKind,
             'drop_percent' => $this->outcome->dropPercent,
+            // Null when the reference and the winner sell different amounts.
+            // There is no money figure there — the pack difference would be a
+            // saving nobody made, and on a move to a bigger pack a negative one.
             'drop_absolute' => $this->outcome->dropAbsolute,
+            // Both bases named rather than left to be inferred: the percentage
+            // was computed from these when `comparison_unit` is set.
+            'reference_unit_price' => $this->outcome->referenceUnitPrice,
+            'new_unit_price' => $this->outcome->newUnitPrice,
+            'comparison_unit' => $this->outcome->comparisonUnit,
             'view_url' => route('app.products.show', $this->product),
         ];
     }
 
     private function checkRepresentsCurrentPricing(PriceCheck $check, Product $product, ?Shop $shop): bool
     {
-        if ($shop === null || $check->shop_id !== $shop->id || $check->price === null || $product->cheapest_price === null) {
+        // Against the winning shop's own pack price, not the product's
+        // lowest-outlay one: on a product spanning pack sizes those are two
+        // different numbers, and the check read the winner's.
+        $winningPrice = $product->winningPackPrice($product->best_value_shop_id === null ? null : $product->best_value_pack_unit);
+
+        if ($shop === null || $check->shop_id !== $shop->id || $check->price === null || $winningPrice === null) {
             return false;
         }
 
         $checkPrice = PriceNormalizer::fromMixed($check->price);
-        $currentPrice = PriceNormalizer::fromMixed($product->cheapest_price);
+        $currentPrice = PriceNormalizer::fromMixed($winningPrice);
 
         if ($checkPrice === null || $currentPrice === null
             || bccomp(Numeric::str($checkPrice), Numeric::str($currentPrice), 2) !== 0) {

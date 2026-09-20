@@ -23,7 +23,15 @@ final readonly class ProductPresenter
             'product_id' => self::id($product->getKey()),
             'title' => $product->title,
             'currency' => $product->currency,
+            // The pack price of the shop with the smallest outlay — what the
+            // shopper hands over. `best_value_*` answers the other question:
+            // which shop is cheapest per kilo, litre or piece, which is the
+            // basis a drop alert fires on. They are often different shops.
             'cheapest_price' => self::decimal($product->cheapest_price),
+            'best_value_shop_id' => $product->best_value_shop_id === null ? null : self::id($product->best_value_shop_id),
+            'best_value_price' => self::decimal($product->best_value_price),
+            'best_value_unit_price' => $product->dropBasisPrice($product->best_value_pack_unit),
+            'comparison_unit' => $product->best_value_pack_unit,
             'cheapest_single_item_price' => $cheapest?->singleItemPrice(),
             'cheapest_bundle_quantity' => $bundle?->quantity,
             'cheapest_bundle_total_price' => $bundle?->totalPrice,
@@ -49,8 +57,10 @@ final readonly class ProductPresenter
     private function shops(Product $product): array
     {
         $rows = [];
+        $packs = $product->comparablePacks();
 
         foreach ($product->shops as $shop) {
+            $pack = $packs->for($shop);
             $host = parse_url($shop->url, PHP_URL_HOST);
             $checked = $shop->last_checked_at;
 
@@ -75,7 +85,17 @@ final readonly class ProductPresenter
                 // shop quietly read from the dataset shows a plausible price
                 // with no promotion on it, and nothing about the row says so.
                 'read_by' => $shop->adapter_key,
+                // What this shop's pack resolves to for *this* product, and
+                // where the number came from. `excluded_reason` is the whole
+                // point: a shop with no unit price is never silently absent
+                // from the comparison, it says which fact is missing.
+                'comparable_quantity' => $pack?->size?->quantity,
+                'comparable_unit' => $pack?->size?->unit,
+                'pack_size_provenance' => $pack?->provenance?->value,
+                'unit_price' => $packs->unitPriceOf($shop),
+                'excluded_reason' => $pack?->reason(),
                 'is_cheapest' => $shop->getKey() === $product->cheapest_shop_id,
+                'is_best_value' => $shop->getKey() === $product->best_value_shop_id,
                 'last_checked_at' => $checked instanceof CarbonInterface ? $checked->toIso8601String() : null,
             ];
         }

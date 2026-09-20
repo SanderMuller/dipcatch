@@ -213,3 +213,38 @@ it('filters the product list by tracking state', function (): void {
         ->assertSee('Still watching')
         ->assertSee('On hold');
 });
+
+it('leaves a drop with no honest money figure out of the savings total', function (): void {
+    // A cross-size drop has a real percentage and no saving: the winning pack
+    // is a different amount from the one it is measured against. Counting it as
+    // zero is right; counting the pack difference would be a number nobody saved.
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create();
+
+    PriceDropEvent::factory()->create([
+        'user_id' => $user->id,
+        'product_id' => $product->id,
+        'currency' => 'EUR',
+        'drop_abs' => '2.50',
+        'fired_at' => CarbonImmutable::now()->startOfMonth()->addDays(2),
+    ]);
+
+    PriceDropEvent::factory()->create([
+        'user_id' => $user->id,
+        'product_id' => $product->id,
+        'currency' => 'EUR',
+        'drop_abs' => null,
+        'reference_price' => null,
+        'comparison_unit' => 'g',
+        'fired_at' => CarbonImmutable::now()->startOfMonth()->addDays(3),
+    ]);
+
+    $data = new SavingsByMonthSeries($user)->data();
+    $euro = collect($data['datasets'])->keyBy('currency')->get('EUR', ['data' => []])['data'];
+
+    expect(end($euro))->toBe(2.5);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)->assertSee('€2.50');
+});

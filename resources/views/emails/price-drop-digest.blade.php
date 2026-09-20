@@ -44,7 +44,22 @@ $image = $product->safeImageUrl();
 @if ($bundle !== null && $singleItemPrice !== null)
 <del title="Regular price" style="margin-left: 8px; color: #a1a1aa; font-size: 16px;">{{ \App\Support\MoneyFormatter::format($singleItemPrice, $event->currency) }}</del>
 @endif
-<span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; white-space: nowrap;">↓ {{ number_format((float) $event->drop_pct, 1, '.', '') }}% · {{ \App\Support\MoneyFormatter::format($event->drop_abs, $event->currency) }}</span>
+@php
+    // The alert leads with the pack price and states the change in the unit the
+    // comparison used. Two different pack sizes have no honest money
+    // difference, so the money is shown only when there is one.
+    $unitWord = \App\Support\UnitWord::forCode($event->comparison_unit);
+    $changeLabel = '↓ ' . number_format((float) $event->drop_pct, 1, '.', '') . '%'
+        . ($unitWord === null ? '' : ' ' . $unitWord);
+
+    if ($event->drop_abs !== null) {
+        $changeLabel .= ' · ' . \App\Support\MoneyFormatter::format((string) $event->drop_abs, $event->currency);
+    }
+@endphp
+<span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; white-space: nowrap;">{{ $changeLabel }}</span>
+@if ($event->new_unit_price !== null)
+<div style="margin-top: 4px; color: #71717a; font-size: 13px;">{{ \App\Support\MoneyFormatter::format((string) $event->new_unit_price, $event->currency) }}{{ \App\Support\UnitWord::labelFor($event->comparison_unit) }} · {{ __('was') }} {{ \App\Support\MoneyFormatter::format((string) $event->reference_unit_price, $event->currency) }}{{ \App\Support\UnitWord::labelFor($event->comparison_unit) }}</div>
+@endif
 </td>
 </tr>
 @if ($bundle !== null)

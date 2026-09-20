@@ -10,6 +10,7 @@ use App\Notifications\UnitPriceTargetNotification;
 use App\PriceAdapters\BundleOffer;
 use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
+use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Collection;
@@ -73,6 +74,7 @@ final class StatsPage extends Component
                 $productId = is_string($data['product_id'] ?? null) ? $data['product_id'] : null;
                 $currency = is_string($data['currency'] ?? null) ? $data['currency'] : 'EUR';
                 $rawPercent = $data['drop_percent'] ?? null;
+                $unit = is_string($data['comparison_unit'] ?? null) ? $data['comparison_unit'] : null;
                 $amount = $data['drop_absolute'] ?? null;
 
                 $percent = self::percentage($rawPercent);
@@ -93,7 +95,11 @@ final class StatsPage extends Component
                 return [
                     'title' => is_string($data['title'] ?? null) ? $data['title'] : '—',
                     'url' => $productId === null ? null : route('app.products.show', $productId),
-                    'percent' => $percent,
+                    // Both bases named. The percentage was measured per kilo,
+                    // litre or piece whenever the product has a comparison
+                    // unit, and the money is off the pack — and is absent when
+                    // the two packs differed, because then there is none.
+                    'percent' => $percent === null ? null : trim($percent . ' ' . (UnitWord::forCode($unit) ?? '')),
                     'amount' => is_numeric($amount) ? MoneyFormatter::format((string) $amount, $currency) : null,
                     'bundle' => $bundle,
                     'sentAt' => $notification->created_at?->diffForHumans(),

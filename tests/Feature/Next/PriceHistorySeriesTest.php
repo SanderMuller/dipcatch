@@ -42,12 +42,18 @@ test('renders cheapest segments as a stepped line', function (): void {
 
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $shop->id,
+        'best_value_shop_id' => $shop->id,
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
         'cheapest_price' => '100.00',
         'started_at' => now()->subDays(20),
         'ended_at' => now()->subDays(10),
     ]);
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $shop->id,
+        'best_value_shop_id' => $shop->id,
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
         'cheapest_price' => '85.00',
         'started_at' => now()->subDays(10),
         'ended_at' => null,
@@ -96,12 +102,18 @@ test('respects the range filter', function (): void {
 
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $shop->id,
+        'best_value_shop_id' => $shop->id,
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
         'cheapest_price' => '500.00',
         'started_at' => now()->subDays(120),
         'ended_at' => now()->subDays(115),
     ]);
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $shop->id,
+        'best_value_shop_id' => $shop->id,
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
         'cheapest_price' => '50.00',
         'started_at' => now()->subDays(2),
         'ended_at' => null,
@@ -135,12 +147,18 @@ test('notification markers are scoped to the active range filter', function (): 
     // existing limitation, not what this test asserts about).
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $shop->id,
+        'best_value_shop_id' => $shop->id,
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
         'cheapest_price' => '60.00',
         'started_at' => now()->subDays(120),
         'ended_at' => now()->subDays(90),
     ]);
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $shop->id,
+        'best_value_shop_id' => $shop->id,
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
         'cheapest_price' => '50.00',
         'started_at' => now()->subDays(10),
         'ended_at' => null,
@@ -191,6 +209,9 @@ test('the per-unit series is omitted when the range in view shows no unit data',
     ]);
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $perKilo->id,
+        'best_value_shop_id' => $perKilo->id,
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
         'cheapest_price' => '2.00',
         'started_at' => now()->subDays(400),
         'ended_at' => now()->subDays(300),
@@ -216,6 +237,9 @@ test('the cheapest price is plotted per unit as well, on its own axis', function
 
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $shop->id,
+        'best_value_shop_id' => $shop->id,
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
         'cheapest_price' => '2.19',
         'started_at' => now()->subDays(5),
         'ended_at' => null,
@@ -242,12 +266,18 @@ test('a cheaper total that is worse value shows as two diverging lines', functio
     // The price falls while the value gets worse: a smaller bag, cheaper.
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $large->id,
+        'best_value_shop_id' => $large->id,
+        'pack_quantity' => '370.00',
+        'pack_unit' => 'g',
         'cheapest_price' => '1.99',
         'started_at' => now()->subDays(5),
         'ended_at' => now()->subDay(),
     ]);
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $small->id,
+        'best_value_shop_id' => $small->id,
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
         'cheapest_price' => '1.69',
         'started_at' => now()->subDay(),
         'ended_at' => null,
@@ -258,7 +288,10 @@ test('a cheaper total that is worse value shows as two diverging lines', functio
         ->and(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([5.38, 8.45, 8.45]);
 });
 
-test('shops that state no pack size get no unit line', function (): void {
+test('segments that recorded no pack size get no unit line', function (): void {
+    // Written before unit comparison existed, or while every shop stated
+    // nothing. Explicitly unmeasured: the chart draws no point rather than
+    // borrowing a size from today.
     $product = Product::factory()->create(['currency' => 'EUR']);
     $shop = Shop::factory()->for($product)->create(['pack_quantity' => null, 'pack_unit' => null]);
 
@@ -307,6 +340,9 @@ test('units that cannot share an axis leave gaps rather than wrong numbers', fun
     foreach ([now()->subDays(3), now()->subDay()] as $index => $startedAt) {
         ProductCheapestHistory::factory()->for($product)->create([
             'cheapest_shop_id' => $perKilo->id,
+            'best_value_shop_id' => $perKilo->id,
+            'pack_quantity' => '200.00',
+            'pack_unit' => 'g',
             'cheapest_price' => '2.19',
             'started_at' => $startedAt,
             'ended_at' => $index === 0 ? now()->subDay() : null,
@@ -315,4 +351,25 @@ test('units that cannot share an axis leave gaps rather than wrong numbers', fun
 
     // The per-piece segment is not a EUR/kg number, so it is a gap.
     expect(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([null, 10.95, 10.95, 10.95]);
+});
+
+test('a pack size corrected today does not redraw the past', function (): void {
+    // Foodello reported 55 g for a box of twelve. Correcting the shop to 660 g
+    // must leave the segment written under 55 g reading 55 g — otherwise a data
+    // fix rewrites a month of readings.
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create(['pack_quantity' => '660.00', 'pack_unit' => 'g']);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'best_value_shop_id' => $shop->id,
+        'pack_quantity' => '55.00',
+        'pack_unit' => 'g',
+        'cheapest_price' => '12.00',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    // 12.00 for 55 g is 218.18/kg — what was known then, not 18.18 from today.
+    expect(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([218.18, 218.18]);
 });

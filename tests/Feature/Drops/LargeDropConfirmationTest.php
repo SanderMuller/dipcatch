@@ -275,3 +275,82 @@ test('a merely discounted predecessor does not confirm a large drop', function (
 
     expect(PriceDropEvent::count())->toBe(2);
 });
+
+/**
+ * The same guard on the unit basis, which is where every large drop on a sized
+ * product now goes. The trigger has to belong to the best-value shop, its price
+ * is compared as pack money, and the previous reading is converted with the
+ * winner's size before it is judged a large drop in its own right.
+ */
+function sizedConfirmationShop(string $host = 'shop.example.com'): Shop
+{
+    $user = User::factory()->create(['notify_via_filament' => true]);
+
+    $product = Product::factory()->for($user)->create([
+        'currency' => 'EUR',
+        'drop_threshold_pct' => '5.00',
+        'drop_threshold_abs' => '1000.00',
+    ]);
+
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://' . $host . '/p/' . fake()->unique()->slug(),
+        'host' => $host,
+        'currency' => 'EUR',
+    ]);
+
+    $shop->forceFill([
+        'current_price' => '10.00',
+        'current_in_stock' => true,
+        'pack_quantity' => '500.00',
+        'pack_unit' => 'g',
+    ])->save();
+
+    $product->forceFill([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '10.00',
+        'best_value_shop_id' => $shop->id,
+        'best_value_price' => '10.00',
+        'best_value_pack_quantity' => '500.00',
+        'best_value_pack_unit' => 'g',
+    ])->save();
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '10.00',
+        'best_value_shop_id' => $shop->id,
+        'best_value_price' => '10.00',
+        'pack_quantity' => '500.00',
+        'pack_unit' => 'g',
+        'started_at' => now()->subDays(10),
+        'ended_at' => null,
+    ]);
+
+    return $shop->refresh();
+}
+
+test('a large drop measured per unit still waits for a second reading', function (): void {
+    // 20.00/kg falling to 10.00/kg is 50%, past the 40% ceiling.
+    $shop = sizedConfirmationShop();
+
+    reading($shop, '5.00');
+
+    expect(PriceDropEvent::count())->toBe(0);
+    Notification::assertNothingSent();
+
+    Queue::assertPushed(CheckShopPrice::class);
+});
+
+test('a second reading at the same price confirms a large per-unit drop', function (): void {
+    $shop = sizedConfirmationShop();
+
+    reading($shop, '5.00');
+    reading($shop, '5.00');
+
+    expect(PriceDropEvent::count())->toBe(1);
+
+    $event = PriceDropEvent::query()->sole();
+
+    expect($event->comparison_unit)->toBe('g')
+        ->and((string) $event->new_price)->toBe('5.00')
+        ->and((string) $event->new_unit_price)->toBe('10.00');
+});

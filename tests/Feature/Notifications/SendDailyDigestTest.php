@@ -412,3 +412,35 @@ test('the digest leaves out an image whose stored url is not http(s)', function 
     expect($html)->toContain('Digest product')
         ->and($html)->not->toContain('ftp://example.com/img.png');
 });
+
+test('the digest states the change per unit and omits money it cannot honestly report', function (): void {
+    Mail::swap(app('mail.manager'));
+
+    // A drop measured across two pack sizes. There is no money figure — the
+    // pack difference would be a saving nobody made — so `drop_abs` is null and
+    // the line says what fell and by how much per kilo instead.
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create(['title' => 'Digest product']);
+    $shop = Shop::factory()->for($product)->create();
+    $events = PriceDropEvent::factory()->count(1)->for($user)->create([
+        'product_id' => $product->id,
+        'triggered_by_shop_id' => $shop->id,
+        'currency' => 'EUR',
+        'new_price' => '8.00',
+        'reference_price' => null,
+        'drop_abs' => null,
+        'drop_pct' => '20.0',
+        'reference_unit_price' => '10.00',
+        'new_unit_price' => '8.00',
+        'comparison_unit' => 'g',
+    ]);
+
+    $html = new PriceDropDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render();
+
+    expect($html)->toContain('Digest product')
+        ->and($html)->toContain('20.0% per kilo')
+        ->and($html)->toContain('€8.00/kg')
+        ->and($html)->toContain('€10.00/kg')
+        // The till price of the winning pack still leads the line.
+        ->and($html)->toContain('€8.00');
+});

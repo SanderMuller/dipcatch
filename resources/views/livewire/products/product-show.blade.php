@@ -1,3 +1,9 @@
+@php
+    // Resolved once: every shop row asks the same resolver, so two rows on one
+    // page can never disagree about which shops are comparable.
+    $packs = $product->comparablePacks();
+@endphp
+
 <div>
     <flux:breadcrumbs class="mb-4">
         <flux:breadcrumbs.item :href="route('app.dashboard')" wire:navigate>{{ __('Dashboard') }}</flux:breadcrumbs.item>
@@ -217,7 +223,7 @@
                                         </flux:text>
                                     @endif
                                     <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-zinc-500 sm:text-sm @4xl:hidden dark:text-zinc-400">
-                                        <x-shop-price :shop="$shop" unit />
+                                        <x-shop-unit-price :shop="$shop" :packs="$packs" />
                                         <span aria-hidden="true">·</span>
                                         @if ($shop->current_in_stock === true)
                                             <flux:badge size="sm" color="green">{{ __('In stock') }}</flux:badge>
@@ -231,7 +237,7 @@
                                     </div>
                                 </flux:table.cell>
                                 <flux:table.cell class="hidden tabular-nums @4xl:table-cell">
-                                    <x-shop-price :shop="$shop" unit />
+                                    <x-shop-unit-price :shop="$shop" :packs="$packs" />
                                 </flux:table.cell>
                                 <flux:table.cell class="hidden @4xl:table-cell">
                                     @if ($shop->current_in_stock === true)

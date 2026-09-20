@@ -186,9 +186,18 @@
                                         <img src="{{ Favicon::url($shop->host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
                                         {{ $shop->host }}
                                         @if ($loop->first && $shops->count() > 1)
-                                            <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 inset-ring inset-ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:inset-ring-emerald-500/20">Cheapest</span>
+                                            <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 inset-ring inset-ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:inset-ring-emerald-500/20">Lowest price</span>
+                                        @endif
+                                        @if ($shop->id === $bestValueShopId && $shops->count() > 1)
+                                            <span class="ml-1.5 inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 inset-ring inset-ring-sky-600/20 dark:bg-sky-500/10 dark:text-sky-400 dark:inset-ring-sky-500/20">Best value</span>
                                         @endif
                                     </p>
+                                    @php
+                                        $pack = $packs->for($shop);
+                                    @endphp
+                                    @if ($pack !== null && $pack->isExcluded())
+                                        <p class="mt-0.5 text-xs text-amber-700 dark:text-amber-500">{{ $pack->reason() }}</p>
+                                    @endif
                                     @if ($shop->last_checked_at)
                                         <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                                             Last checked {{ $shop->last_checked_at->diffForHumans() }}

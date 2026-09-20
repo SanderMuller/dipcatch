@@ -134,6 +134,27 @@ test('plakken is excluded from the piece vocabulary entirely', function (): void
     expect(PackSize::parse('Beemster Kaas extra belegen 48+ plakken'))->toBeNull();
 });
 
+test('counts coffee capsules, cups and cleaning pads as pieces', function (): void {
+    expect(PackSize::parse('30 cups')->quantity)->toBe(30.0)
+        ->and(PackSize::parse('30 cups')->unit)->toBe('piece')
+        ->and(PackSize::parse('1 cup')->quantity)->toBe(1.0)
+        ->and(PackSize::parse('30 capsules')->quantity)->toBe(30.0)
+        ->and(PackSize::parse('30 capsules')->unit)->toBe('piece')
+        ->and(PackSize::parse('1 capsule')->quantity)->toBe(1.0)
+        ->and(PackSize::parse('36 pads')->quantity)->toBe(36.0)
+        ->and(PackSize::parse('36 pads')->unit)->toBe('piece')
+        ->and(PackSize::parse('1 pad')->quantity)->toBe(1.0);
+});
+
+test('a weight beside a capsule count still wins', function (): void {
+    // Bucket precedence: the shopper compares grams, and the count is packaging
+    // detail. Same rule the existing mass-over-pieces case proves.
+    $size = PackSize::parse('Nescafé Dolce Gusto Lungo 30 capsules 216 g');
+
+    expect($size->quantity)->toBe(216.0)
+        ->and($size->unit)->toBe('g');
+});
+
 // --- Multipacks: x / × / à --------------------------------------------------
 
 test('an x multipack multiplies volume', function (): void {

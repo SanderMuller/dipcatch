@@ -48,13 +48,18 @@ final readonly class PackSize
     /**
      * Piece vocabulary, singular + plural. `plakken` is deliberately excluded
      * — cheese fat-percentage markers (`"48+ plakken"`) must never become 48
-     * pieces. Ordered longest-alias-first, same constraint as MASS_UNITS.
+     * pieces. Ordered longest-alias-first, same constraint as MASS_UNITS: a
+     * plural always precedes the singular it contains, or the singular wins the
+     * alternation and leaves a stray `s`.
+     *
+     * `capsules`, `cups` and `pads` are how coffee and cleaning products count
+     * themselves. Without them `30 cups` parses to nothing at all.
      *
      * @var list<string>
      */
     private const array PIECE_WORDS = [
-        'tabletten', 'rollen', 'zakjes', 'tablet', 'vellen',
-        'stuks', 'zakje', 'stuk', 'pack', 'rol', 'vel', 'st',
+        'tabletten', 'capsules', 'capsule', 'rollen', 'zakjes', 'tablet', 'vellen',
+        'stuks', 'zakje', 'stuk', 'pack', 'cups', 'pads', 'rol', 'vel', 'cup', 'pad', 'st',
     ];
 
     /**

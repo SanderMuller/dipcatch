@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Support\BundlePriceLabel;
+use App\Support\ComparablePacks;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Contracts\View\View;
@@ -51,11 +52,18 @@ final class PublicProductController extends Controller
 
         $chart = $this->chartPayload($product);
 
+        // The page shows two answers, as the app does. Ordered by outlay — what
+        // leaves the account — and the per-unit winner marked separately, so the
+        // first row is no longer called "Cheapest" without saying on what basis.
+        $packs = ComparablePacks::of($shops, (string) $product->currency);
+
         return response()
             ->view('public.product', [
                 'product' => $product,
                 'shops' => $shops,
                 'chart' => $chart,
+                'packs' => $packs,
+                'bestValueShopId' => $packs->cheapestPerUnit($shops)?->id,
             ])
             ->header('X-Robots-Tag', 'noindex, nofollow');
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\PriceAdapters\BundleOffer;
+use App\Support\PackSize;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProductCheapestHistoryFactory;
 use DateTimeInterface;
@@ -21,6 +22,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $product_id
  * @property string|null $cheapest_shop_id
  * @property string|null $cheapest_price
+ * @property string|null $best_value_shop_id
+ * @property string|null $best_value_price
+ * @property string|null $pack_quantity
+ * @property string|null $pack_unit
  * @property CarbonImmutable $started_at
  * @property CarbonImmutable|null $ended_at
  * @property int|null $triggering_price_check_id
@@ -48,12 +53,38 @@ final class ProductCheapestHistory extends Model
     {
         return [
             'cheapest_price' => 'decimal:2',
+            'best_value_price' => 'decimal:2',
+            'pack_quantity' => 'decimal:2',
             'single_item_price' => 'decimal:2',
             'bundle_quantity' => 'integer',
             'bundle_total_price' => 'decimal:2',
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The pack this segment's best-value winner sold, as it was recorded when
+     * the segment opened. Read rather than derived on purpose: a pack size
+     * corrected later must not rescale a month of past readings. Null on every
+     * segment written before unit comparison existed — explicitly unmeasured,
+     * never a plausible guess.
+     */
+    public function packSize(): ?PackSize
+    {
+        if ($this->pack_quantity === null || ! is_string($this->pack_unit)) {
+            return null;
+        }
+
+        return PackSize::of((float) $this->pack_quantity, $this->pack_unit);
+    }
+
+    /** This segment's winning price expressed per kilo, litre or piece. */
+    public function unitPrice(): ?string
+    {
+        $price = $this->best_value_price ?? $this->cheapest_price;
+
+        return $price === null ? null : $this->packSize()?->unitPriceFor((string) $price);
     }
 
     public function singleItemPrice(): ?string

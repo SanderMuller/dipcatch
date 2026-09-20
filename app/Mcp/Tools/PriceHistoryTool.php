@@ -20,7 +20,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('price_history')]
 #[Title('Price history')]
-#[Description('How the cheapest price of a product has moved, as dated segments. Free plans see a shorter window than Pro.')]
+#[Description('How the cheapest price of a product has moved, as dated segments. Each carries the pack size it was written under, so `unit_price` reflects what was known then rather than the shop\'s size today; a segment recorded before pack sizes existed answers null. Free plans see a shorter window than Pro.')]
 #[IsReadOnly]
 #[IsDestructive(false)]
 #[IsOpenWorld(false)]
@@ -54,6 +54,14 @@ final class PriceHistoryTool extends Tool
 
             $segments[] = [
                 'price' => is_scalar($segment->cheapest_price) ? (string) $segment->cheapest_price : null,
+                // The size this segment was written under, and the unit price
+                // that follows from it — not from the shop's size today. A pack
+                // size corrected later must not rescale a month of readings, so
+                // a segment that recorded none answers null rather than a
+                // plausible number.
+                'pack_quantity' => $segment->packSize()?->quantity,
+                'pack_unit' => $segment->packSize()?->unit,
+                'unit_price' => $segment->unitPrice(),
                 'single_item_price' => $segment->singleItemPrice(),
                 'bundle_quantity' => $segment->bundleOffer()?->quantity,
                 'bundle_total_price' => $segment->bundleOffer()?->totalPrice,

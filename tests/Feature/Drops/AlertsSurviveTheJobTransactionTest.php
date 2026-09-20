@@ -86,9 +86,16 @@ function jobTransactionShop(): Shop
 
     $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '25.00'])->save();
 
+    // The segment carries its own size, which is what the drop reference reads:
+    // a product compared per kilo needs unit-bearing history, and a segment
+    // written before sizes existed stays explicitly unmeasured.
     ProductCheapestHistory::factory()->for($product)->create([
         'cheapest_shop_id' => $shop->id,
         'cheapest_price' => '25.00',
+        'best_value_shop_id' => $shop->id,
+        'best_value_price' => '25.00',
+        'pack_quantity' => '370.00',
+        'pack_unit' => 'g',
         'started_at' => now()->subDays(10),
         'ended_at' => null,
     ]);
@@ -206,7 +213,11 @@ test('a failing alert leaves the committed data alone', function (): void {
     // event row and every latch are committed before any callback runs.
     expect((string) $product->refresh()->cheapest_price)->toBe('17.05')
         ->and(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(1)
-        ->and((string) $product->last_notified_price)->toBe('17.05')
+        // The drop latch holds money in the basis the drop was measured in —
+        // per kilo here, with `last_notified_unit` saying so — while the target
+        // latch stays pack money, because a target is about the till.
+        ->and((string) $product->last_notified_price)->toBe('46.08')
+        ->and($product->last_notified_unit)->toBe('g')
         ->and((string) $product->target_price_notified)->toBe('17.05')
         ->and((string) $product->unit_price_notified)->toBe('46.08');
 });
