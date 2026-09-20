@@ -1,7 +1,6 @@
 <?php declare(strict_types=1);
 
 use App\Models\User;
-use Symfony\Component\DomCrawler\Crawler;
 
 it('offers a guest both a way in and a way to join', function (): void {
     $response = $this->get('/');
@@ -11,16 +10,6 @@ it('offers a guest both a way in and a way to join', function (): void {
         ->assertSee(route('register'))
         ->assertSee('Sign in');
 });
-
-/**
- * @return list<string>
- */
-function hrefsWithin(string $html, string $selector): array
-{
-    return new Crawler($html)->filter($selector)->each(
-        static fn (Crawler $node): string => (string) $node->attr('href'),
-    );
-}
 
 it('links the pricing page from the header of every marketing page', function (): void {
     foreach (['/', '/pricing', '/privacy'] as $url) {

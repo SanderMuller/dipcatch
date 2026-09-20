@@ -3,15 +3,19 @@
 namespace App\Support;
 
 /**
- * Shops with a dedicated adapter or data source, as favicon + host rows for
- * the public pages. Source: `config/site.php`.
+ * Shops with a dedicated adapter or data source: the host, the favicon, the
+ * name people use and the slug its landing page lives at. Source:
+ * `config/site.php`. `ShopPages` adds the copy on top of these.
  */
 final readonly class SupportedShops
 {
     /**
      * Every host with a shop landing page.
      *
-     * @return list<array{host: string, favicon: string, name: string}>
+     * Every list that only links shops reads this rather than `ShopPages`,
+     * which builds each page's copy.
+     *
+     * @return list<array{host: string, favicon: string, name: string, slug: string}>
      */
     public static function rows(): array
     {
@@ -22,7 +26,7 @@ final readonly class SupportedShops
      * The short "Works with" row on the homepage. Hosts missing from
      * `supported_hosts` are skipped, so a shop dropped there disappears here too.
      *
-     * @return list<array{host: string, favicon: string, name: string}>
+     * @return list<array{host: string, favicon: string, name: string, slug: string}>
      */
     public static function homepage(): array
     {
@@ -43,7 +47,7 @@ final readonly class SupportedShops
     }
 
     /**
-     * @return list<array{host: string, favicon: string, name: string}>
+     * @return list<array{host: string, favicon: string, name: string, slug: string}>
      */
     private static function fromHosts(mixed $hosts): array
     {
@@ -57,10 +61,21 @@ final readonly class SupportedShops
                 'host' => $host,
                 'favicon' => Favicon::url($host, 32),
                 'name' => self::name($host),
+                'slug' => self::slug($host),
             ];
         }
 
         return $rows;
+    }
+
+    /**
+     * A host makes a URL-safe slug by swapping its dots: `ah.nl` becomes
+     * `ah-nl`. It keeps the shop recognisable in the URL. Never reversed to
+     * recover the host — a host containing a hyphen would not round-trip.
+     */
+    private static function slug(string $host): string
+    {
+        return str_replace('.', '-', $host);
     }
 
     /**

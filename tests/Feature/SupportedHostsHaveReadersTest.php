@@ -5,6 +5,7 @@ use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\UserSelectorAdapter;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
+use App\Support\SupportedShops;
 use Illuminate\Support\Facades\Config;
 
 /**
@@ -109,4 +110,13 @@ test('every marketed host has a display name', function (): void {
     }
 
     expect(array_diff(siteHosts('site.supported_hosts'), $named))->toBeEmpty();
+});
+
+test('no two marketed hosts claim the same landing page', function (): void {
+    // The slug swaps dots for hyphens, so `a.b.nl` and `a-b.nl` would both
+    // want `/shops/a-b-nl`. `ShopPages::find()` takes the first and the
+    // second shop silently loses its page.
+    $slugs = array_column(SupportedShops::rows(), 'slug');
+
+    expect(array_unique($slugs))->toHaveSameSize($slugs);
 });

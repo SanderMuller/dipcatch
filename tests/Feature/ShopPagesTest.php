@@ -1,6 +1,11 @@
 <?php declare(strict_types=1);
 
+use App\Support\Favicon;
 use App\Support\ShopPages;
+use App\Support\SupportedShops;
+use App\Support\UseCases;
+use Illuminate\Contracts\Translation\Translator;
+use Illuminate\Support\Facades\Lang;
 
 it('serves a page for every supported shop', function (): void {
     foreach (ShopPages::all() as $shop) {
@@ -116,4 +121,166 @@ test('the old poiesz address redirects to the corrected one', function (): void 
 test('the poiesz redirect keeps the language query', function (): void {
     $this->get('/shops/poiesz-nl?lang=nl')
         ->assertRedirect('/shops/poiesz-supermarkten-nl?lang=nl');
+});
+
+/**
+ * A translator that refuses to translate. `__()` goes through
+ * `app('translator')->get()`, so anything that builds page copy throws here
+ * and names itself.
+ */
+function refusingTranslator(): Translator
+{
+    return new class implements Translator {
+        public function get($key, array $replace = [], $locale = null): string
+        {
+            throw new RuntimeException('Built page copy: ' . $key);
+        }
+
+        public function choice($key, $number, array $replace = [], $locale = null): string
+        {
+            throw new RuntimeException('Built page copy: ' . $key);
+        }
+
+        public function getLocale(): string
+        {
+            return 'en';
+        }
+
+        public function setLocale($locale): void {}
+    };
+}
+
+it('matches shop routes without building any page copy', function (): void {
+    // `slugPattern()` runs at route registration, before the locale
+    // middleware has chosen one.
+    $expected = ShopPages::slugPattern();
+
+    Lang::swap(refusingTranslator());
+
+    expect(ShopPages::slugPattern())->toBe($expected)
+        ->and(ShopPages::slugs())->not->toBeEmpty();
+});
+
+it('rejects an unknown slug without building any page copy', function (): void {
+    Lang::swap(refusingTranslator());
+
+    expect(ShopPages::find('not-a-shop'))->toBeNull();
+});
+
+it('carries a slug on the identity row, for a host nobody has named', function (): void {
+    // The slug belongs to the host, not to the copy.
+    config()->set('site.supported_hosts', ['ah.nl', 'unnamed.example']);
+    config()->set('site.shop_names', ['ah.nl' => 'Albert Heijn']);
+
+    Lang::swap(refusingTranslator());
+
+    expect(SupportedShops::rows())->toBe([
+        ['host' => 'ah.nl', 'favicon' => Favicon::url('ah.nl', 32), 'name' => 'Albert Heijn', 'slug' => 'ah-nl'],
+        ['host' => 'unnamed.example', 'favicon' => Favicon::url('unnamed.example', 32), 'name' => 'unnamed.example', 'slug' => 'unnamed-example'],
+    ])
+        ->and(ShopPages::slugs())->toBe(['ah-nl', 'unnamed-example']);
+});
+
+it('links every shop from the footer by its own slug', function (): void {
+    // The href moved from a `ShopPage` object to the identity row. A wrong
+    // but non-empty key renders a 200 page whose every shop link 404s, so
+    // the assertion has to be the href, not the presence of a link.
+    $html = (string) $this->get(route('pricing'))->assertOk()->getContent();
+
+    // Scoped: the shops hub lists the same shops in the page body.
+    $hrefs = hrefsWithin($html, 'nav[aria-label="Price alerts by shop"] a');
+
+    foreach (SupportedShops::rows() as $row) {
+        expect($hrefs)->toContain(route('shop', ['slug' => $row['slug']]));
+    }
+});
+
+it('offers six other shops to compare with, never the shop itself', function (): void {
+    $html = (string) $this->get(route('shop', ['slug' => 'ah-nl']))->assertOk()->getContent();
+
+    $hrefs = hrefsWithin($html, 'section ul[role="list"] a[href*="/shops/"]');
+
+    expect($hrefs)->toHaveCount(6)
+        ->not->toContain(route('shop', ['slug' => 'ah-nl']));
+
+    foreach ($hrefs as $href) {
+        expect(ShopPages::find((string) str($href)->afterLast('/')))->not->toBeNull();
+    }
+});
+
+it('links the homepage and use-case shop rows by slug', function (): void {
+    $home = (string) $this->get(route('home'))->assertOk()->getContent();
+
+    foreach (SupportedShops::homepage() as $row) {
+        expect(hrefsWithin($home, 'a[href*="/shops/"]'))
+            ->toContain(route('shop', ['slug' => $row['slug']]));
+    }
+
+    $case = UseCases::all()[0] ?? null;
+
+    expect($case)->not->toBeNull();
+
+    $useCase = (string) $this->get(route('use-case', ['slug' => $case?->slug]))->assertOk()->getContent();
+    $hrefs = hrefsWithin($useCase, 'a[href*="/shops/"]');
+
+    foreach ($case?->shops() ?? [] as $row) {
+        expect($hrefs)->toContain(route('shop', ['slug' => $row['slug']]));
+    }
+});
+
+it('builds one page, not all of them, when a slug matches', function (): void {
+    // The refusing translator can only pin the miss path — a hit legitimately
+    // builds one page's copy. Counting is what separates "one" from "all 27",
+    // which is the regression the miss path cannot see.
+    $real = app('translator');
+    assert($real instanceof Translator);
+
+    $lookups = 0;
+
+    Lang::swap(new class ($real, $lookups) implements Translator {
+        public function __construct(private readonly Translator $inner, private int &$count) {}
+
+        public function get($key, array $replace = [], $locale = null): mixed
+        {
+            $this->count++;
+
+            return $this->inner->get($key, $replace, $locale);
+        }
+
+        public function choice($key, $number, array $replace = [], $locale = null): string
+        {
+            $this->count++;
+
+            return $this->inner->choice($key, $number, $replace, $locale);
+        }
+
+        public function getLocale(): string
+        {
+            return $this->inner->getLocale();
+        }
+
+        public function setLocale($locale): void
+        {
+            $this->inner->setLocale($locale);
+        }
+    });
+
+    expect(ShopPages::find('ah-nl'))->not->toBeNull()
+        ->and($lookups)->toBeGreaterThan(0)
+        ->and($lookups)->toBeLessThan(count(SupportedShops::rows()) * 5);
+});
+
+it('matches nothing at all when no shop is configured', function (): void {
+    // An empty alternation matches the empty string, which would put every
+    // unmatched URL through the shop route.
+    config()->set('site.supported_hosts', []);
+
+    expect(ShopPages::slugPattern())->toBe('(?!)');
+});
+
+it('resolves a hyphenated host forward, never by reversing its slug', function (): void {
+    config()->set('site.supported_hosts', ['a-b.example']);
+
+    expect(ShopPages::find('a-b-example')?->host)->toBe('a-b.example')
+        ->and(ShopPages::find('a.b.example'))->toBeNull();
 });
