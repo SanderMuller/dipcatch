@@ -27,21 +27,22 @@ final readonly class GenericAdapter implements ShopAdapter
      * Text that marks a number as a rate per unit rather than a price to pay.
      *
      * Dutch first, because these are Dutch shops: hoogvliet.com prints
-     * "Reguliere prijs per liter € 4,79" *above* the 3,59 a bottle actually
+     * "Reguliere prijs per liter € 4,79" beside the 3,59 a bottle actually
      * costs, and this adapter took the first `.price`-ish node it found. The
      * stored number was already a unit price, so it looked expensive on a
      * bottle and would look like a bargain on anything over a litre — and it is
      * the column unit ranking divides.
      *
-     * @var list<string>
+     * A pattern rather than a substring list, because the units are short
+     * enough to appear inside ordinary words: "verzending/levering" contains
+     * "/l", and matching it refused a real price. The slash forms need a digit
+     * in front for the same reason.
      */
-    private const array UNIT_RATE_MARKERS = [
-        'per liter', 'per litre', 'per kilo', 'per kilogram', 'per gram',
-        'per stuk', 'per stuks', 'per st', 'per eenheid', 'per piece', 'per each',
-        'per 100 g', 'per 100g', 'per 100 gram', 'per 100 ml', 'per 100ml',
-        'prijs per', 'price per', 'unit price', 'eenheidsprijs',
-        '/kg', '/ kg', '/l', '/ l', '/ltr', '/stuk',
-    ];
+    private const string UNIT_RATE_PATTERN = '/\bper\s+(?:liter|litre|kilo|kilogram|kg|gram|stuk|stuks|st|eenheid|piece|each|\d+\s*(?:g|gram|ml))\b'
+        . '|\b(?:prijs|price)\s+per\b'
+        . '|\beenheidsprijs\b'
+        . '|\bunit\s+price\b'
+        . '|\d\s*\/\s*(?:kg|ltr|liter|litre|stuk|l)\b/iu';
 
     /** @var array<string, string> */
     private const array CURRENCY_SYMBOLS = [
@@ -70,6 +71,25 @@ final readonly class GenericAdapter implements ShopAdapter
         // in a differently-labelled node can still be recognised as one.
         $rates = self::statedUnitRates($crawler);
 
+        // Twice: once refusing any price that equals a rate the page states,
+        // then once allowing it. A one-litre pack prices its litre at the same
+        // number as its bottle, and refusing outright made every 1 kg and 1 L
+        // product unreadable — milk, juice, oil, the commonest packs there are.
+        // Preferring a different number keeps the rate from winning while a
+        // shelf price exists, and falling back keeps the single-number page.
+        return self::firstPrice($crawler, $rates)
+            ?? self::firstPrice($crawler, [])
+            ?? ExtractionResult::skip();
+    }
+
+    /**
+     * The first node that yields a price, skipping anything labelled as a rate
+     * and anything valued like one of `$refused`.
+     *
+     * @param  list<string>  $refused
+     */
+    private static function firstPrice(Crawler $crawler, array $refused): ?ExtractionResult
+    {
         foreach (self::PRICE_SELECTORS as $selector) {
             // Every matching node, not only the first: a page that prints its
             // per-litre rate above the shelf price used to end the search on
@@ -82,7 +102,7 @@ final readonly class GenericAdapter implements ShopAdapter
                 $candidate = is_string($dataPrice) && $dataPrice !== '' ? $dataPrice : $rawText;
                 $price = $candidate === '' ? null : PriceNormalizer::fromMixed($candidate);
 
-                if ($price === null || self::readsAsUnitRate($rawText) || in_array($price, $rates, strict: true)) {
+                if ($price === null || self::readsAsUnitRate($rawText) || in_array($price, $refused, strict: true)) {
                     continue;
                 }
 
@@ -104,7 +124,7 @@ final readonly class GenericAdapter implements ShopAdapter
             }
         }
 
-        return ExtractionResult::skip();
+        return null;
     }
 
     /**
@@ -116,9 +136,7 @@ final readonly class GenericAdapter implements ShopAdapter
      */
     private static function readsAsUnitRate(string $text): bool
     {
-        $haystack = mb_strtolower($text);
-
-        return array_any(self::UNIT_RATE_MARKERS, fn (string $marker): bool => str_contains($haystack, $marker));
+        return preg_match(self::UNIT_RATE_PATTERN, $text) === 1;
     }
 
     /**

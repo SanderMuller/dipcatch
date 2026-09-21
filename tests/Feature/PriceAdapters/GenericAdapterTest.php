@@ -144,3 +144,29 @@ HTML;
 
     expect($result->snapshot?->price)->toBe('2.49');
 });
+
+test('reads a one-litre pack whose rate is the same number as its price', function (): void {
+    // A litre of mayonnaise prices its litre at what the bottle costs. Refusing
+    // any candidate equal to a stated rate made every 1 kg and 1 L product
+    // unreadable — milk, juice, oil, the commonest packs there are.
+    $html = <<<'HTML'
+<h1>Remia Mayonaise 1 liter</h1>
+<div class="price-per-unit">Prijs per liter € 3,59</div>
+<div class="price">€ 3,59</div>
+HTML;
+
+    $result = $this->adapter->extract('https://shop.test/p/6', $html);
+
+    expect($result->snapshot?->price)->toBe('3.59');
+});
+
+test('does not read a delivery note as a rate per litre', function (): void {
+    // "verzending/levering" contains "/l". Matching unit markers as bare
+    // substrings refused a real price over a word that has nothing to do with
+    // litres.
+    $html = '<h1>Item</h1><div class="price">€ 4,99 verzending/levering</div>';
+
+    $result = $this->adapter->extract('https://shop.test/p/7', $html);
+
+    expect($result->snapshot?->price)->toBe('4.99');
+});
