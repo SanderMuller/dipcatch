@@ -131,7 +131,18 @@ final class UnitRankingDryRunCommand extends Command
             ->filter(static function (Shop $shop): bool {
                 $path = parse_url($shop->url, PHP_URL_PATH);
 
-                return ! is_string($path) || ! preg_match('/\d|-\w{2,}-/', basename($path));
+                if (! is_string($path)) {
+                    return true;
+                }
+
+                // Any segment carrying a number is an identifier, not only the
+                // last one. Reading the basename alone flagged every
+                // `/producten/product/wi156794/fanta-cassis` on the account —
+                // seven rows of noise around the one listing this is for.
+                return ! array_any(
+                    explode('/', $path),
+                    static fn (string $segment): bool => preg_match('/\d/', $segment) === 1,
+                );
             })
             ->map(static fn (Shop $shop): string => $shop->url)
             ->values()

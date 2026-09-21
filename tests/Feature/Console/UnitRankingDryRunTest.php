@@ -62,3 +62,27 @@ it('names an excluded shop and the reason, and lists an inherited size', functio
         ->expectsOutputToContain('barebells.nl inherited 660 g')
         ->assertSuccessful();
 });
+
+it('flags a category listing without flagging ordinary product pages', function (): void {
+    // `bodyandfit.com/en/products/protein-bars` is a category listing carrying
+    // a price and a size from list-page JSON-LD; it was tracked on three
+    // Barebells flavours at once. An AH product URL keeps its identifier in the
+    // second-to-last segment, so reading the last one alone called seven real
+    // product pages suspect and buried the one that mattered.
+    $product = dryRunProduct('URL shapes', []);
+
+    foreach ([
+        'https://www.ah.nl/producten/product/wi156794/fanta-cassis',
+        'https://www.dirk.nl/boodschappen/x/x/x/68302',
+        'https://www.bodyandfit.com/en/products/protein-bars',
+    ] as $url) {
+        Shop::factory()->for($product)->create(['url' => $url])
+            ->forceFill(['currency' => 'EUR', 'current_price' => '10.00', 'current_in_stock' => true])->save();
+    }
+
+    $this->artisan('dipcatch:unit-ranking-dry-run')
+        ->expectsOutputToContain('bodyandfit.com/en/products/protein-bars')
+        ->doesntExpectOutputToContain('wi156794/fanta-cassis')
+        ->doesntExpectOutputToContain('x/x/x/68302')
+        ->assertSuccessful();
+});
