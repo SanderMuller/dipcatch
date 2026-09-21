@@ -234,3 +234,42 @@ HTML;
 
     expect($result->snapshot?->price)->toBe('5.99');
 });
+
+test('refuses a rate whose label sits in the element above it', function (): void {
+    // Found by an independent review. The value test refuses a candidate equal
+    // to a stated rate, but only on the first pass — so on a page carrying no
+    // other number, the second pass admitted it and put the per-litre figure
+    // straight back into the pack-price column. A label is evidence about what
+    // a number means, so it vetoes both passes.
+    $html = <<<'HTML'
+<h1>Olijfolie</h1>
+<div class="unit"><span>Prijs per liter</span><span class="price">€ 4,79</span></div>
+HTML;
+
+    expect($this->adapter->extract('https://shop.test/p/14', $html)->isSkip())->toBeTrue();
+});
+
+test('reads a price a shop labels as its regular one', function (): void {
+    // Also from that review: Magento names the price it is charging
+    // `regular-price`. Reading that as a strike refused an ordinary price on
+    // every shop built that way — as wrong as storing the wrong number, only
+    // quieter.
+    $html = '<h1>Item</h1><span class="price regular-price">€ 5,99</span>';
+
+    expect($this->adapter->extract('https://shop.test/p/15', $html)->snapshot?->price)->toBe('5.99');
+});
+
+test('a wrapper holding both a rate and a shelf price labels neither', function (): void {
+    // The ancestor walk has to stop short of a section. A container around the
+    // rate and the price describes the block, and reading it as a label would
+    // refuse every number on the page.
+    $html = <<<'HTML'
+<div class="product-block">
+  <h1>Olijfolie 500 ml</h1>
+  <div class="unit">Prijs per liter € 11,98</div>
+  <span class="price">€ 5,99</span>
+</div>
+HTML;
+
+    expect($this->adapter->extract('https://shop.test/p/16', $html)->snapshot?->price)->toBe('5.99');
+});

@@ -52,7 +52,14 @@ final readonly class GenericAdapter implements ShopAdapter
      * Matched on token edges rather than as substrings, so `price--old` counts
      * and `gold-edition` does not.
      */
-    private const string STRUCK_CLASS_PATTERN = '/(^|[\s_-])(old|was|strike|struck|through|regular|original|list|rrp|before|previous|oud|normaal|advies)([\s_-]|$)/i';
+    private const string STRUCK_CLASS_PATTERN = '/(^|[\s_-])(old|was|strike|struck|through|original|rrp|before|previous|oud|advies)([\s_-]|$)/i';
+
+    /**
+     * `regular`, `normaal` and `list` are deliberately absent. Magento names the
+     * price it is charging `regular-price`, so reading those as a strike refuses
+     * an ordinary price on every shop built that way — and refusing a price is
+     * as wrong as storing the wrong one, just quieter.
+     */
 
     /** Tags that strike their contents out by definition. */
     private const array STRUCK_TAGS = ['del', 's', 'strike'];
@@ -64,6 +71,12 @@ final readonly class GenericAdapter implements ShopAdapter
      * price.
      */
     private const int STRUCK_ANCESTOR_DEPTH = 3;
+
+    /**
+     * How far above a price its "per litre" words can sit and still be
+     * describing it. One or two wrappers is a label; further up is a section.
+     */
+    private const int RATE_LABEL_ANCESTOR_DEPTH = 2;
 
     /** @var array<string, string> */
     private const array CURRENCY_SYMBOLS = [
@@ -124,7 +137,7 @@ final readonly class GenericAdapter implements ShopAdapter
                 $price = $candidate === '' ? null : PriceNormalizer::fromMixed($candidate);
 
                 if ($price === null
-                    || self::readsAsUnitRate($rawText)
+                    || self::isLabelledRate($element, $rawText)
                     || self::isStruckThrough($element)
                     || in_array($price, $refused, strict: true)) {
                     continue;
@@ -149,6 +162,66 @@ final readonly class GenericAdapter implements ShopAdapter
         }
 
         return null;
+    }
+
+    /**
+     * Whether this node's own text, or the label around it, prices a unit.
+     *
+     * A veto in both passes, unlike the value test. A label is evidence about
+     * what a number *means*; equality is evidence about arithmetic, and on a
+     * one-litre pack the arithmetic is an identity. Only the first kind is safe
+     * to refuse outright.
+     *
+     * The ancestor walk is what closes the shape where the words and the number
+     * are separate elements — `<div>Prijs per liter <span>€ 4,79</span></div>`
+     * — which the value test alone let through on the second pass, putting the
+     * rate back in the pack-price column on any page carrying no other number.
+     *
+     * An ancestor only labels this price when it holds exactly one. A wrapper
+     * around both a rate and a shelf price describes the section, not either
+     * number, and reading it as a label would refuse the whole page.
+     */
+    private static function isLabelledRate(DOMNode $node, string $ownText): bool
+    {
+        if (self::readsAsUnitRate($ownText)) {
+            return true;
+        }
+
+        for ($depth = 0; $depth < self::RATE_LABEL_ANCESTOR_DEPTH; $depth++) {
+            $parent = $node->parentNode;
+
+            if (! $parent instanceof DOMElement) {
+                return false;
+            }
+
+            $node = $parent;
+            $text = trim($node->textContent);
+
+            // Long text is a section, whatever it says. A description that
+            // happens to mention "per stuk" is not labelling the price beside
+            // it, and letting length off when the words match put that back.
+            if (mb_strlen($text) > self::RATE_LABEL_MAX_LENGTH) {
+                return false;
+            }
+
+            if (self::readsAsUnitRate($text) && self::priceTokenCount($text) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * How many currency-shaped numbers this text holds. A malformed pattern
+     * would answer false; there is none here, and counting nothing is the
+     * answer that refuses to treat the text as a label.
+     */
+    private static function priceTokenCount(string $text): int
+    {
+        $count = preg_match_all('/\d+[.,]\d{2}\b/u', $text);
+
+        return $count === false ? 0 : $count;
     }
 
     /**
