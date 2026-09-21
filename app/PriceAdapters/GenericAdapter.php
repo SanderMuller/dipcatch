@@ -2,6 +2,8 @@
 
 namespace App\PriceAdapters;
 
+use DOMElement;
+use DOMNode;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
@@ -43,6 +45,25 @@ final readonly class GenericAdapter implements ShopAdapter
         . '|\beenheidsprijs\b'
         . '|\bunit\s+price\b'
         . '|\d\s*\/\s*(?:kg|ltr|liter|litre|stuk|l)\b/iu';
+
+    /**
+     * Class-name tokens that mark a price as the one no longer being charged.
+     *
+     * Matched on token edges rather than as substrings, so `price--old` counts
+     * and `gold-edition` does not.
+     */
+    private const string STRUCK_CLASS_PATTERN = '/(^|[\s_-])(old|was|strike|struck|through|regular|original|list|rrp|before|previous|oud|normaal|advies)([\s_-]|$)/i';
+
+    /** Tags that strike their contents out by definition. */
+    private const array STRUCK_TAGS = ['del', 's', 'strike'];
+
+    /**
+     * How far up the tree a strike-through can be declared before it stops
+     * describing this price. A struck price is usually wrapped once or twice —
+     * `<del><span class="price">` — and anything further up is a section, not a
+     * price.
+     */
+    private const int STRUCK_ANCESTOR_DEPTH = 3;
 
     /** @var array<string, string> */
     private const array CURRENCY_SYMBOLS = [
@@ -102,7 +123,10 @@ final readonly class GenericAdapter implements ShopAdapter
                 $candidate = is_string($dataPrice) && $dataPrice !== '' ? $dataPrice : $rawText;
                 $price = $candidate === '' ? null : PriceNormalizer::fromMixed($candidate);
 
-                if ($price === null || self::readsAsUnitRate($rawText) || in_array($price, $refused, strict: true)) {
+                if ($price === null
+                    || self::readsAsUnitRate($rawText)
+                    || self::isStruckThrough($element)
+                    || in_array($price, $refused, strict: true)) {
                     continue;
                 }
 
@@ -125,6 +149,47 @@ final readonly class GenericAdapter implements ShopAdapter
         }
 
         return null;
+    }
+
+    /**
+     * Whether this node holds a price the shop has stopped charging.
+     *
+     * A sale page prints the regular price first and strikes it out, and this
+     * reader took the first price-shaped node it found — so it stored the
+     * higher, struck number and the promotion went unseen. The error is in the
+     * merciful direction, which is why it survived: the shop merely looks
+     * dearer than it is, and a drop never arrives rather than a false one
+     * firing.
+     *
+     * Read from the markup, never from the numbers. "The lower of two prices
+     * wins" would be a guess about meaning dressed up as arithmetic, which is
+     * the mistake the rate guard already had to be talked out of.
+     */
+    private static function isStruckThrough(DOMNode $node): bool
+    {
+        for ($depth = 0; $depth <= self::STRUCK_ANCESTOR_DEPTH && $node instanceof DOMElement; $depth++) {
+            if (in_array(mb_strtolower($node->tagName), self::STRUCK_TAGS, strict: true)) {
+                return true;
+            }
+
+            if (preg_match(self::STRUCK_CLASS_PATTERN, $node->getAttribute('class')) === 1) {
+                return true;
+            }
+
+            if (str_contains(str_replace(' ', '', mb_strtolower($node->getAttribute('style'))), 'line-through')) {
+                return true;
+            }
+
+            $parent = $node->parentNode;
+
+            if (! $parent instanceof DOMNode) {
+                return false;
+            }
+
+            $node = $parent;
+        }
+
+        return false;
     }
 
     /**

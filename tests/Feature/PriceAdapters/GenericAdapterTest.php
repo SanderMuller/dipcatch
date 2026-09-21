@@ -170,3 +170,67 @@ test('does not read a delivery note as a rate per litre', function (): void {
 
     expect($result->snapshot?->price)->toBe('4.99');
 });
+
+test('does not store the price a sale page has struck out', function (): void {
+    // A sale page prints the regular price first and strikes it. Taking the
+    // first price-shaped node stored the higher number, so the shop looked
+    // dearer than it was and the promotion went unseen. The error is in the
+    // merciful direction, which is why it survived: a drop never arrives rather
+    // than a false one firing.
+    $html = <<<'HTML'
+<h1>Sap 1 liter</h1>
+<span class="price price--old">€ 7,49</span>
+<span class="price price--sale">€ 5,99</span>
+HTML;
+
+    $result = $this->adapter->extract('https://shop.test/p/8', $html);
+
+    expect($result->snapshot?->price)->toBe('5.99');
+});
+
+test('reads a strike from the wrapper as well as the price node', function (): void {
+    // The node holding the number often says nothing; the `<del>` around it does.
+    $html = '<h1>I</h1><del><span class="price">€ 7,49</span></del><span class="price">€ 5,99</span>';
+
+    expect($this->adapter->extract('https://shop.test/p/9', $html)->snapshot?->price)->toBe('5.99');
+});
+
+test('reads a strike declared in an inline style', function (): void {
+    $html = '<h1>I</h1><span class="price" style="text-decoration: line-through">€ 7,49</span><span class="price">€ 5,99</span>';
+
+    expect($this->adapter->extract('https://shop.test/p/10', $html)->snapshot?->price)->toBe('5.99');
+});
+
+test('refuses rather than storing a price the page has struck out', function (): void {
+    // Nothing is being charged at this number. Storing it would be the same
+    // confidently-wrong reading the rate guard exists to prevent.
+    $html = '<h1>I</h1><del class="price">€ 7,49</del>';
+
+    expect($this->adapter->extract('https://shop.test/p/11', $html)->isSkip())->toBeTrue();
+});
+
+test('does not read a strike out of a word that merely contains one', function (): void {
+    // `gold-edition` contains "old". Class tokens are matched on their edges,
+    // the same lesson the unit markers taught.
+    $html = '<h1>I</h1><span class="price gold-edition">€ 7,49</span>';
+
+    expect($this->adapter->extract('https://shop.test/p/12', $html)->snapshot?->price)->toBe('7.49');
+});
+
+test('takes the sale price when it equals the stated rate and the regular is struck', function (): void {
+    // The shape a reviewing session predicted: a litre on offer, so the sale
+    // price and the per-litre rate are the same number, with the regular price
+    // struck beside them. The first pass refuses the sale for matching the rate
+    // and refuses the regular for being struck; the second pass then admits the
+    // sale. Without the strike guard the first pass returned the regular price.
+    $html = <<<'HTML'
+<h1>Sap 1 liter</h1>
+<div class="price-per-unit">Prijs per liter € 5,99</div>
+<span class="price price--old">€ 7,49</span>
+<span class="price price--sale">€ 5,99</span>
+HTML;
+
+    $result = $this->adapter->extract('https://shop.test/p/13', $html);
+
+    expect($result->snapshot?->price)->toBe('5.99');
+});
