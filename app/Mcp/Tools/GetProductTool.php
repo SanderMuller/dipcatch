@@ -19,7 +19,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('get_product')]
 #[Title('Get product')]
-#[Description('Reads one product: every shop it is tracked at, their prices, and which is cheapest. Each shop says which reader produced its price in `read_by`. "checkjebon" is a daily dataset that carries no promotions, so a shop read that way shows its shelf price and never a multi-buy; "ah-api" and the shop adapters do read promotions.')]
+#[Description('Reads one product: every shop it is tracked at, their prices, and both answers about them — `is_cheapest` is the smallest amount of money at the till, `is_best_value` the lowest price per kilo, litre or piece, and a drop alert fires on best value. They are often different shops. A shop that cannot join the unit comparison carries `excluded_reason` saying which fact is missing; it is never silently absent. Each shop also says which reader produced its price in `read_by`. "checkjebon" is a daily dataset that carries no promotions, so a shop read that way shows its shelf price and never a multi-buy; "ah-api" and the shop adapters do read promotions.')]
 #[IsReadOnly]
 #[IsDestructive(false)]
 #[IsOpenWorld(false)]
