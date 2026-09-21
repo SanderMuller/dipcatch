@@ -207,7 +207,12 @@ test('a page with no readable price is explained, not just refused', function ()
     DipCatchServer::actingAs(User::factory()->create())
         ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
         ->assertHasErrors()
-        ->assertSee('no price could be read');
+        ->assertSee('no price could be read')
+        // Named as a class of cause. Blaming JavaScript alone sent a reader
+        // after the wrong thing on a shop whose price is in the server HTML and
+        // simply split across four elements.
+        ->assertSee('splits it across elements')
+        ->assertDontSee('which DipCatch cannot see');
 });
 
 test('a malformed url is explained in words', function (): void {

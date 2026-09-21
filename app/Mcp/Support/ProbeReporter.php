@@ -90,7 +90,12 @@ final readonly class ProbeReporter
             ProbeFailure::Blocked => self::persistent($context)
                 ? 'That shop has blocked DipCatch on its last ' . self::failures($context) . ' requests. Retrying will not help — the shop refuses automated readers.'
                 : 'That shop blocked the request.' . self::streak($context),
-            ProbeFailure::ExtractionFailed => 'The page loaded but no price could be read from it. Some shops load prices with JavaScript, which DipCatch cannot see.',
+            // Named as a class of cause rather than one cause. Blaming
+            // JavaScript sent a reader after the wrong thing on hoogvliet.com,
+            // where the price is in the server HTML and simply never a
+            // contiguous string: `<span>7</span><span>.</span><sup>29</sup>`,
+            // with no text node anywhere reading 7.29.
+            ProbeFailure::ExtractionFailed => 'The page loaded but no price could be read from it. Either the shop builds the price in the browser, or it splits it across elements in a way DipCatch does not recognise. Another URL from the same shop will read the same way.',
             ProbeFailure::CurrencyMismatch => 'That page prices in a different currency from the product.',
             ProbeFailure::NotInDataset => 'That shop is covered by a price dataset that does not list this product yet.',
             // Without this the default fired, which tells a caller to try a
