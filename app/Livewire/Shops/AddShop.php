@@ -4,6 +4,7 @@ namespace App\Livewire\Shops;
 
 use App\Actions\Shops\AttachShop;
 use App\Actions\Shops\ProbeShopUrl;
+use App\Actions\Shops\TrackedElsewhere;
 use App\Billing\PlanLimitReached;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\Product;
@@ -49,6 +50,23 @@ final class AddShop extends Component
     protected function probeSubject(): Product
     {
         return $this->product;
+    }
+
+    /**
+     * The user's other products already on this page, for the preview.
+     *
+     * A note, not a refusal: the same URL on two products is legitimate when
+     * each tracks its own variant, and the person adding it is the one who
+     * knows which case this is.
+     */
+    public function alreadyTrackedNote(): ?string
+    {
+        return TrackedElsewhere::note(TrackedElsewhere::productTitles(
+            $this->product->user_id,
+            $this->normalizedUrl,
+            $this->chosenVariantKey,
+            excludeProductId: $this->product->getKey(),
+        ));
     }
 
     /**

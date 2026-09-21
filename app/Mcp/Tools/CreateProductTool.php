@@ -7,6 +7,7 @@ use App\Actions\Products\ProductDraft;
 use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\ShopDraft;
+use App\Actions\Shops\TrackedElsewhere;
 use App\Billing\PlanLimitReached;
 use App\Enums\ProductCategory;
 use App\Mcp\Concerns\InteractsWithOwner;
@@ -14,8 +15,6 @@ use App\Mcp\Support\DraftFailure;
 use App\Mcp\Support\DraftToken;
 use App\Mcp\Support\ProbeReporter;
 use App\Mcp\Support\ProductPresenter;
-use App\Models\Product;
-use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Validation\Rule;
@@ -112,7 +111,9 @@ final class CreateProductTool extends Tool
 
         return Response::structured([
             'found' => $this->reporter->preview($snapshot, $outcome),
-            'already_tracked_as' => $this->existingTitle($user->getKey(), $outcome->normalizedUrl),
+            // Every product of this user's already on this page and variant,
+            // not just the first one found: two duplicates read as one.
+            'already_tracked_as' => TrackedElsewhere::productTitles($user->getKey(), $outcome->normalizedUrl, $variantKey),
             'draft' => DraftToken::issue(
                 $user,
                 $snapshot,
@@ -162,20 +163,6 @@ final class CreateProductTool extends Tool
         $given = $validated['title'] ?? null;
 
         return is_string($given) && trim($given) !== '' ? trim($given) : null;
-    }
-
-    private function existingTitle(mixed $userId, ?string $url): ?string
-    {
-        if (! is_string($url)) {
-            return null;
-        }
-
-        $product = Product::query()
-            ->where('user_id', $userId)
-            ->whereHas('shops', fn (Builder $query): Builder => $query->where('url', $url))
-            ->first();
-
-        return $product?->title;
     }
 
     private function runProbe(string $url, Request $request, ?string $variantKey): ProbeOutcome

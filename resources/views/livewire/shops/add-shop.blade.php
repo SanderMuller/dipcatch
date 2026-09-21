@@ -63,6 +63,12 @@
             }
         @endphp
         <flux:card class="space-y-3">
+            @php($alreadyTracked = $this->alreadyTrackedNote())
+            @if ($alreadyTracked !== null)
+                <flux:callout icon="exclamation-triangle" color="amber">
+                    <flux:callout.text>{{ $alreadyTracked }}</flux:callout.text>
+                </flux:callout>
+            @endif
             <div class="flex items-start gap-3">
                 @if (! empty($snapshot['image_url']))
                     <img src="{{ $snapshot['image_url'] }}" alt="" class="h-20 w-20 object-cover rounded" />

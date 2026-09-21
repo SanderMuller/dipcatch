@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Actions\Shops\AttachShop;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\ShopDraft;
+use App\Actions\Shops\TrackedElsewhere;
 use App\Billing\PlanLimitReached;
 use App\Mcp\Concerns\InteractsWithOwner;
 use App\Mcp\Support\DraftFailure;
@@ -116,6 +117,21 @@ final class AddShopTool extends Tool
 
         if ($mismatch !== null) {
             $preview['pack_size_note'] = $mismatch;
+        }
+
+        // Duplicates were only ever checked inside this product. Across
+        // products the same URL is permitted — a variant page serves several —
+        // so an accidental second copy said nothing and both alerted on the
+        // same fall.
+        $elsewhere = TrackedElsewhere::note(TrackedElsewhere::productTitles(
+            $this->user($request)->getKey(),
+            $outcome->normalizedUrl,
+            $variantKey,
+            excludeProductId: $product->getKey(),
+        ));
+
+        if ($elsewhere !== null) {
+            $preview['already_tracked_note'] = $elsewhere;
         }
 
         return Response::structured($preview + [
