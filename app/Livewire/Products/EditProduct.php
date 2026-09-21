@@ -5,6 +5,7 @@ namespace App\Livewire\Products;
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
@@ -244,10 +245,8 @@ final class EditProduct extends Component
             'allowsAutoCategories' => $this->allowsAutoCategories(),
             'suggestedLabel' => ProductCategory::tryFrom((string) $this->suggestedCategory)?->label(),
             'shopImages' => $this->shopImages(),
-            'allowsUnitPriceAlerts' => $this->product->user?->entitlements()->allowsUnitPriceAlerts() === true,
-            'unitWord' => $this->unitWord(),
-            'currentPrice' => $this->currentLowestPrice(),
-            'currentUnitPrice' => $this->currentBestUnitPrice(),
+            'allowsUnitPriceAlerts' => $this->allowsUnitPriceAlerts(),
+            ...$this->alertAnchors(),
         ]);
     }
 
@@ -277,63 +276,91 @@ final class EditProduct extends Component
     }
 
     /**
-     * What the product costs today at the shop with the smallest outlay, and
-     * where — the figure a target price is set against.
+     * The two figures a reader sets an alert against, and the sentence under
+     * the per-unit field.
      *
-     * Null when no shop has a usable price, where a "now" line would be a
-     * number nobody can act on.
+     * Resolved together, from one read of the resolver and the same eligible
+     * set the ranking uses. Asking each question separately let this form name
+     * a dead shop as the best value while every other surface named a live one.
      *
+     * @return array{unitWord: ?string, currentPrice: ?array{amount: string, host: string}, currentUnitPrice: ?array{amount: string, host: string}, unitTargetDescription: string}
+     */
+    private function alertAnchors(): array
+    {
+        $packs = $this->product->comparablePacks();
+        $unitWord = self::unitWord($packs->unit());
+        $bestValue = $this->product->bestValueShop();
+        $unitPrice = $bestValue === null ? null : $packs->unitPriceOf($bestValue);
+
+        return [
+            'unitWord' => $unitWord,
+            'currentPrice' => $this->anchor($this->product->lowestOutlayShop(), fn (Shop $shop): ?string => $shop->current_price === null
+                ? null
+                : (string) $shop->current_price),
+            'currentUnitPrice' => $this->anchor(
+                $bestValue,
+                fn (): ?string => $unitPrice,
+                UnitWord::labelFor($packs->unit()),
+            ),
+            'unitTargetDescription' => $this->unitTargetDescription($unitWord),
+        ];
+    }
+
+    /**
+     * One shop's price and host, formatted — or null when there is no figure a
+     * reader could act on.
+     *
+     * @param  callable(Shop): ?string  $price
      * @return array{amount: string, host: string}|null
      */
-    private function currentLowestPrice(): ?array
+    private function anchor(?Shop $shop, callable $price, string $suffix = ''): ?array
     {
-        $shop = $this->product->cheapestShop;
+        $amount = $shop === null ? null : $price($shop);
 
-        if ($shop === null || $shop->current_price === null) {
+        if ($shop === null || $amount === null) {
             return null;
         }
 
         return [
-            'amount' => MoneyFormatter::format((string) $shop->current_price, (string) $this->product->currency),
+            'amount' => MoneyFormatter::format($amount, (string) $this->product->currency) . $suffix,
             'host' => (string) $shop->host,
         ];
     }
 
     /**
-     * The best price per unit on offer today, and where. The anchor for a
-     * per-unit target, which is a different question and often a different
-     * shop from the one above.
+     * The sentence under the per-unit target field.
      *
-     * @return array{amount: string, host: string}|null
+     * Built here rather than in the template: it is three branches and a
+     * conditional clause, and gluing two translated sentences together is the
+     * part a second locale breaks first.
      */
-    private function currentBestUnitPrice(): ?array
+    private function unitTargetDescription(?string $unitWord): string
     {
-        $packs = $this->product->comparablePacks();
-        $shop = $packs->cheapestPerUnit($this->product->shops);
-        $unitPrice = $shop === null ? null : $packs->unitPriceOf($shop);
-
-        if ($shop === null || $unitPrice === null) {
-            return null;
+        if (! $this->allowsUnitPriceAlerts()) {
+            // The figure still shows on a free account: the number is worth
+            // setting before an upgrade, and it is the one thing that makes it
+            // possible to pick.
+            return __('Pro alerts on this. We keep the number, and it starts working when you upgrade.');
         }
 
-        return [
-            'amount' => MoneyFormatter::format($unitPrice, (string) $this->product->currency)
-                . UnitWord::labelFor($packs->unit()),
-            'host' => (string) $shop->host,
-        ];
+        return $unitWord === null
+            ? __('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.')
+            : __('We tell you when the best value reaches this price per :unit.', ['unit' => $unitWord]);
+    }
+
+    private function allowsUnitPriceAlerts(): bool
+    {
+        return $this->product->user?->entitlements()->allowsUnitPriceAlerts() === true;
     }
 
     /**
      * The unit this product's alert compares in, named rather than listed.
-     * Null while no shop has read a pack size, when the reader really does
-     * not know yet and neither do we.
-     *
-     * Read from the resolver rather than from the majority pack unit, so the
-     * label names the unit the alert actually fires on.
+     * Null while no shop has read a pack size, when the reader really does not
+     * know yet and neither do we.
      */
-    private function unitWord(): ?string
+    private static function unitWord(?string $unit): ?string
     {
-        $word = match ($this->product->comparablePacks()->unit()) {
+        $word = match ($unit) {
             'g' => __('kilo'),
             'ml' => __('litre'),
             'piece' => __('piece'),

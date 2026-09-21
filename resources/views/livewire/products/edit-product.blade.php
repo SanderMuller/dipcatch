@@ -128,17 +128,9 @@
                     :label="$unitWord
                         ? __('Target price per :unit', ['unit' => $unitWord])
                         : __('Target price per kilo, litre or piece')"
-                    {{-- The current figure shows on a free account too: the
-                         number is still worth setting now, and it is the one
-                         thing that makes it possible to pick. --}}
-                    :description="trim((! $allowsUnitPriceAlerts
-                        ? __('Pro alerts on this. We keep the number, and it starts working when you upgrade.')
-                        : ($unitWord
-                            ? __('We tell you when the best value reaches this price per :unit.', ['unit' => $unitWord])
-                            : __('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.')))
-                        . ($currentUnitPrice
-                            ? ' ' . __('Now :amount at :host.', ['amount' => $currentUnitPrice['amount'], 'host' => $currentUnitPrice['host']])
-                            : ''))"
+                    :description="$currentUnitPrice
+                        ? $unitTargetDescription . ' ' . __('Now :amount at :host.', ['amount' => $currentUnitPrice['amount'], 'host' => $currentUnitPrice['host']])
+                        : $unitTargetDescription"
                     type="number"
                     step="0.01"
                     min="0.01"

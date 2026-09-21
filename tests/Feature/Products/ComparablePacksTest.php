@@ -326,3 +326,25 @@ test('two shops tied on unit price resolve to the one added first', function ():
 
     expect($product->refresh()->best_value_shop_id)->toBe($first->id);
 });
+
+test('the two answers are drawn from the same set of buyable shops', function (): void {
+    // `winnable()` filters on provenance and a usable unit price — it knows
+    // nothing about stock or health, because that lives in the eligible set. A
+    // caller that hands it every shop gets a winner no other surface agrees
+    // with, which is the divergence one shared definition exists to prevent.
+    $product = productForPacks([
+        'live.nl' => ['current_price' => '10.00', 'pack_quantity' => '500.00', 'pack_unit' => 'g'],
+        'dead.nl' => ['current_price' => '1.00', 'pack_quantity' => '500.00', 'pack_unit' => 'g', 'health' => 'dead'],
+        'paused.nl' => ['current_price' => '2.00', 'pack_quantity' => '500.00', 'pack_unit' => 'g', 'active' => false],
+        'gone.nl' => ['current_price' => '3.00', 'pack_quantity' => '500.00', 'pack_unit' => 'g', 'current_in_stock' => false],
+    ]);
+
+    expect($product->bestValueShop()?->host)->toBe('live.nl')
+        ->and($product->lowestOutlayShop()?->host)->toBe('live.nl');
+
+    $product->recomputeCheapestShop();
+
+    // And the stored answers agree with the live ones.
+    expect($product->refresh()->best_value_shop_id)->toBe($product->bestValueShop()?->id)
+        ->and($product->cheapest_shop_id)->toBe($product->lowestOutlayShop()?->id);
+});

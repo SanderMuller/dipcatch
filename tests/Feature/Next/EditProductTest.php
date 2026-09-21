@@ -2,6 +2,7 @@
 
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
+use App\Enums\ShopHealth;
 use App\Livewire\Products\EditProduct;
 use App\Livewire\Products\ProductShow;
 use App\Models\Product;
@@ -648,7 +649,86 @@ it('leaves the now-line out when no shop has a usable price', function (): void 
 
     $this->actingAs($user);
 
+    // The whole sentence, not a fragment: "Now " on its own would pass for the
+    // wrong reason the moment any other copy on this page starts with it, and
+    // it proves nothing about which description rendered.
     livewire(EditProduct::class, ['product' => $product])
-        ->assertDontSee('Now ')
-        ->assertSee('We tell you when any shop reaches this price.');
+        ->assertSee('We tell you when any shop reaches this price.')
+        ->assertDontSee('We tell you when any shop reaches this price. Now');
+});
+
+it('anchors to a shop a shopper can actually buy from', function (): void {
+    // A dead shop still states a size, so it can still resolve a unit price —
+    // but it cannot win the ranking, and naming it here would put a figure on
+    // this form that no other surface and no alert agrees with.
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    Shop::factory()->for($product)->create(['url' => 'https://live.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR', 'current_price' => '10.00', 'current_in_stock' => true,
+            'pack_quantity' => '500.00', 'pack_unit' => 'g',
+        ])->save();
+
+    Shop::factory()->for($product)->create(['url' => 'https://dead.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR', 'current_price' => '1.00', 'current_in_stock' => true,
+            'pack_quantity' => '500.00', 'pack_unit' => 'g', 'health' => ShopHealth::Dead,
+        ])->save();
+
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->assertSee('Now €10.00 at live.nl')
+        ->assertSee('Now €20.00/kg at live.nl')
+        ->assertDontSee('dead.nl');
+
+    // And the form agrees with the answer the ranking stored.
+    expect($product->refresh()->bestValueShop()?->host)->toBe('live.nl');
+});
+
+it('anchors to the shop that is cheapest now, not the one a recompute last named', function (): void {
+    // `cheapest_shop_id` only moves on a recompute. Reading it here would name
+    // ah.nl at €5.00 while dirk.nl already sells it for €4.00 — a target set
+    // against a price the reader cannot get.
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $first = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1']);
+    $first->forceFill(['currency' => 'EUR', 'current_price' => '5.00', 'current_in_stock' => true])->save();
+
+    $product->refresh()->recomputeCheapestShop();
+
+    $second = Shop::factory()->for($product)->create(['url' => 'https://dirk.nl/p/1']);
+    $second->forceFill(['currency' => 'EUR', 'current_price' => '4.00', 'current_in_stock' => true])->save();
+
+    $this->actingAs($user);
+
+    // Deliberately not recomputed.
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->assertSee('Now €4.00 at dirk.nl');
+});
+
+it('shows a free account the current figure beside the upgrade line', function (): void {
+    // The number is worth setting before an upgrade, and it is the one thing
+    // that makes it possible to pick.
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR', 'current_price' => '2.00', 'current_in_stock' => true,
+            'pack_quantity' => '500.00', 'pack_unit' => 'g',
+        ])->save();
+
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->assertSee('Pro alerts on this.')
+        ->assertSee('Now €4.00/kg at ah.nl');
 });

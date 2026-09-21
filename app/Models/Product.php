@@ -315,6 +315,20 @@ final class Product extends Model
     }
 
     /**
+     * The shop with the smallest outlay among those a shopper can actually buy
+     * from — the same answer {@see recomputeCheapestShop()} stores, computed
+     * live.
+     *
+     * Beside {@see bestValueShop()} on purpose: a surface that needs one of the
+     * two answers needs the other from the same eligible set, or it shows a
+     * winner nobody else agrees with.
+     */
+    public function lowestOutlayShop(): ?Shop
+    {
+        return self::lowestOutlayAmong($this->eligibleShops());
+    }
+
+    /**
      * Shops allowed to win either answer: active, not dead, priced, in this
      * product's own currency, and in stock or of unknown stock.
      *
