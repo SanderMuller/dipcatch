@@ -38,7 +38,7 @@ final class PublicProductController extends Controller
 
         /** @var EloquentCollection<int, Shop> $shops */
         $shops = $product->shops()
-            ->select(['id', 'product_id', 'host', 'current_price', 'single_item_price', 'bundle_quantity', 'bundle_total_price', 'promotion_starts_at', 'promotion_ends_at', 'promotion_label', 'current_in_stock', 'currency', 'last_checked_at', 'url', 'pack_quantity', 'pack_unit', 'created_at'])
+            ->select(['id', 'product_id', 'host', 'current_price', 'single_item_price', 'bundle_quantity', 'bundle_total_price', 'promotion_starts_at', 'promotion_ends_at', 'promotion_label', 'current_in_stock', 'currency', 'last_checked_at', 'last_success_at', 'consecutive_failures', 'url', 'pack_quantity', 'pack_unit', 'created_at'])
             ->where('active', true)
             ->where(fn (EloquentBuilder $stock): EloquentBuilder => $stock
                 ->where('current_in_stock', true)

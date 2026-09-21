@@ -193,7 +193,7 @@
                         <flux:table.column>{{ __('Price') }}</flux:table.column>
                         <flux:table.column class="hidden @4xl:table-cell">{{ __('Price per kilo or piece') }}</flux:table.column>
                         <flux:table.column class="hidden @4xl:table-cell">{{ __('In stock') }}</flux:table.column>
-                        <flux:table.column class="hidden @4xl:table-cell">{{ __('Last checked') }}</flux:table.column>
+                        <flux:table.column class="hidden @4xl:table-cell">{{ __('Price read') }}</flux:table.column>
                         <flux:table.column align="end">{{ __('Actions') }}</flux:table.column>
                     </flux:table.columns>
                     <flux:table.rows>
@@ -233,7 +233,7 @@
                                             <flux:badge size="sm" color="zinc">{{ __('Stock unknown') }}</flux:badge>
                                         @endif
                                         <span aria-hidden="true">·</span>
-                                        <span>{{ $shop->last_checked_at?->diffForHumans() ?? __('never') }}</span>
+                                        <x-shop-freshness :shop="$shop" />
                                     </div>
                                 </flux:table.cell>
                                 <flux:table.cell class="hidden tabular-nums @4xl:table-cell">
@@ -248,8 +248,8 @@
                                         <flux:badge size="sm" color="zinc">{{ __('Stock unknown') }}</flux:badge>
                                     @endif
                                 </flux:table.cell>
-                                <flux:table.cell class="hidden text-zinc-500 @4xl:table-cell">
-                                    {{ $shop->last_checked_at?->diffForHumans() ?? __('never') }}
+                                <flux:table.cell class="hidden @4xl:table-cell">
+                                    <x-shop-freshness :shop="$shop" />
                                 </flux:table.cell>
                                 <flux:table.cell align="end" class="align-top">
                                     <flux:dropdown>

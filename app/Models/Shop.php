@@ -11,6 +11,7 @@ use App\Support\Favicon;
 use App\Support\ImageUrl;
 use App\Support\PackSize;
 use App\Support\UrlNormalizer;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\ShopFactory;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
@@ -39,6 +40,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $bundle_quantity
  * @property string|null $bundle_total_price
  * @property CarbonInterface|null $repointed_at When this offer was last pointed at a different URL.
+ * @property CarbonInterface|null $last_checked_at Stamped by every attempt, a failed one included.
+ * @property CarbonInterface|null $last_success_at Stamped only when a price was actually read.
+ * @property int $consecutive_failures Reset to zero by any successful read.
  */
 #[Unguarded]
 final class Shop extends Model
@@ -263,6 +267,31 @@ final class Shop extends Model
         $offer = $this->bundleOffer();
 
         return $offer !== null && $offer->isTrackedAt($this->current_price) ? $offer : null;
+    }
+
+    /**
+     * When this shop's stored price was last actually read.
+     *
+     * Not `last_checked_at`, which a failed attempt stamps too. A shop failing
+     * for a week reads as "checked two hours ago" beside a week-old price, and
+     * nothing on the page said otherwise — the price simply stops moving and
+     * looks current while it does.
+     */
+    public function priceReadAt(): ?CarbonImmutable
+    {
+        return $this->last_success_at?->toImmutable();
+    }
+
+    /**
+     * Whether the most recent attempts to read this shop have failed.
+     *
+     * `consecutive_failures` is reset to zero by any successful read, so a
+     * non-zero count means every attempt since the stored price was written has
+     * failed.
+     */
+    public function readsAreFailing(): bool
+    {
+        return $this->consecutive_failures > 0;
     }
 
     public function faviconUrl(): string

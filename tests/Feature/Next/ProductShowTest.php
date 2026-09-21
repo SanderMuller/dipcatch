@@ -553,3 +553,64 @@ it('shows why a shop carries no unit price, and marks an inherited size', functi
         ->assertSee('barebells.nl')
         ->assertSee('estimated');
 });
+
+it('dates the price by when it was last read, not by the last attempt', function (): void {
+    // `last_checked_at` is stamped by every attempt, a failed one included, so a
+    // shop failing for a week showed "2 hours ago" beside a week-old price. The
+    // price simply stopped moving and looked current while it did — the same
+    // silent failure the unit comparison had to have removed from it.
+    $user = User::factory()->create();
+    $product = ownedProduct($user, title: 'Coffee beans');
+
+    Shop::factory()->for($product)->create(['url' => 'https://failing.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR',
+            'current_price' => '12.49',
+            'last_success_at' => now()->subDays(8),
+            'last_checked_at' => now()->subHours(2),
+            'consecutive_failures' => 5,
+        ])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('failing since')
+        ->assertSee('1 week ago')
+        ->assertDontSee('2 hours ago');
+});
+
+it('shows a healthy shop the age of its price', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, title: 'Coffee beans');
+
+    Shop::factory()->for($product)->create(['url' => 'https://healthy.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR',
+            'current_price' => '12.49',
+            'last_success_at' => now()->subHours(3),
+            'last_checked_at' => now()->subHours(3),
+            'consecutive_failures' => 0,
+        ])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('3 hours ago')
+        ->assertDontSee('failing since');
+});
+
+it('says a shop has never been read rather than showing nothing', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, title: 'Coffee beans');
+
+    Shop::factory()->for($product)->create(['url' => 'https://new.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR', 'current_price' => null,
+            'last_success_at' => null, 'last_checked_at' => now(), 'consecutive_failures' => 2,
+        ])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('never read');
+});

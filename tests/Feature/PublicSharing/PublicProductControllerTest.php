@@ -473,3 +473,24 @@ test('the shared page names both answers and says why a shop has no unit price',
         ->assertSeeHtml('Sold by the piece — no item size to compare')
         ->assertDontSeeHtml('>Cheapest<');
 });
+
+test('the shared page dates the price by its last successful read', function (): void {
+    $product = makeSharedProduct(['cheapest_price' => '85.00']);
+
+    Shop::factory()->for($product)->create(['url' => 'https://failing.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR',
+            'current_price' => '85.00',
+            'current_in_stock' => true,
+            'last_success_at' => now()->subDays(8),
+            'last_checked_at' => now()->subHours(2),
+            'consecutive_failures' => 5,
+        ])->save();
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    // A shared link is the surface a reader trusts most and can correct least.
+    $response->assertOk()
+        ->assertSeeHtml('and not read since')
+        ->assertDontSeeHtml('Last checked');
+});

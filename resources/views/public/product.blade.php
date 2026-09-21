@@ -198,9 +198,12 @@
                                     @if ($pack !== null && $pack->isExcluded())
                                         <p class="mt-0.5 text-xs text-amber-700 dark:text-amber-500">{{ $pack->reason() }}</p>
                                     @endif
-                                    @if ($shop->last_checked_at)
-                                        <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                                            Last checked {{ $shop->last_checked_at->diffForHumans() }}
+                                    @if ($shop->priceReadAt())
+                                        <p class="mt-0.5 text-xs {{ $shop->readsAreFailing() ? 'text-amber-700 dark:text-amber-500' : 'text-zinc-500 dark:text-zinc-400' }}">
+                                            {{-- The age of the price, not of the last attempt: a failed
+                                                 read stamps `last_checked_at` too, so a shop that has
+                                                 been failing for a week read as freshly checked. --}}
+                                            Price read {{ $shop->priceReadAt()->diffForHumans() }}{{ $shop->readsAreFailing() ? ', and not read since' : '' }}
                                         </p>
                                     @endif
                                 </div>
