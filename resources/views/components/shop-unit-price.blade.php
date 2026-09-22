@@ -12,7 +12,15 @@
     $unitPrice = $packs?->unitPriceOf($shop);
 @endphp
 
-@if ($packs === null || ! $packs->hasComparisonUnit())
+@php
+    $notAConsumerPrice = $shop->notAConsumerPriceReason();
+@endphp
+
+@if ($notAConsumerPrice !== null)
+    {{-- Ahead of every pack reason: this shop is out of both answers, not
+         only out of the per-unit one. --}}
+    <flux:text size="sm" class="text-amber-600 dark:text-amber-500">{{ $notAConsumerPrice }}</flux:text>
+@elseif ($packs === null || ! $packs->hasComparisonUnit())
     <x-shop-price :shop="$shop" unit />
 @elseif ($pack !== null && $pack->isExcluded())
     <flux:text size="sm" class="text-zinc-500">{{ $pack->reason() }}</flux:text>

@@ -39,7 +39,7 @@ final readonly class AdapterResolver
         // Generic keys (jsonld etc.) never short-circuit — a host that
         // later gained a dedicated adapter must get it on the next check.
         if (! $persisted instanceof HostSpecificAdapter) {
-            return $this->readStock($this->runChain($url, $html, skipKey: null, context: $context), $html);
+            return $this->readPage($this->runChain($url, $html, skipKey: null, context: $context), $html);
         }
 
         $result = $persisted->extract($url, $html, $context);
@@ -53,11 +53,11 @@ final readonly class AdapterResolver
         // present it as this product's price, which is how a wrong price
         // reaches a drop alert. Fail loudly instead.
         if (! $result->isSkip()) {
-            return $this->readStock($result->withAdapterKey($persisted->key()), $html);
+            return $this->readPage($result->withAdapterKey($persisted->key()), $html);
         }
 
         // The hint already ran and skipped — exclude it from the chain.
-        return $this->readStock($this->runChain($url, $html, $persistedKey, $context), $html);
+        return $this->readPage($this->runChain($url, $html, $persistedKey, $context), $html);
     }
 
     private function runChain(string $url, string $html, ?string $skipKey, ?AdapterContext $context): ExtractionResult
@@ -75,6 +75,34 @@ final readonly class AdapterResolver
         }
 
         return ExtractionResult::failed('no_adapter_matched');
+    }
+
+    /**
+     * What the page says in its own words, whichever adapter read the price.
+     */
+    private function readPage(ExtractionResult $result, string $html): ExtractionResult
+    {
+        return $this->readVat($this->readStock($result, $html), $html);
+    }
+
+    /**
+     * Whether the page quotes its price without VAT.
+     *
+     * Read here rather than in an adapter because it is a fact about the shop,
+     * not about the markup the price came from: fivestartrading-holland.eu
+     * publishes ordinary JSON-LD and says "excl. BTW" in the line under the
+     * price, so every adapter would have to know to look.
+     */
+    private function readVat(ExtractionResult $result, string $html): ExtractionResult
+    {
+        $snapshot = $result->snapshot;
+
+        if (! $result->isSuccess() || ! $snapshot instanceof ShopSnapshot) {
+            return $result;
+        }
+
+        return ExtractionResult::success($snapshot->withVatExclusiveNote(VatStatement::exclusivePhrase($html)))
+            ->withAdapterKey((string) $result->adapterKey);
     }
 
     /**

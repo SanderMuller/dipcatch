@@ -72,6 +72,13 @@ final readonly class ShopSnapshot
         public ?BundleOffer $bundleOffer = null,
         /** True when the source exposed its product-bound bundle field. */
         public bool $bundleOfferAuthoritative = false,
+        /**
+         * The words the page uses to say this price leaves VAT out, or null
+         * when it says nothing of the kind. Read from the page as a whole by
+         * {@see VatStatement}, not by any one adapter — a shop states it in
+         * its own copy, and which adapter read the price is beside the point.
+         */
+        public ?string $vatExclusiveNote = null,
     ) {}
 
     public function trackedPrice(): string
@@ -116,6 +123,11 @@ final readonly class ShopSnapshot
     public function withStock(bool $inStock, string $stockSignal): self
     {
         return clone($this, ['inStock' => $inStock, 'stockSignal' => $stockSignal]);
+    }
+
+    public function withVatExclusiveNote(?string $note): self
+    {
+        return clone($this, ['vatExclusiveNote' => $note]);
     }
 
     public function withCurrency(string $currency): self

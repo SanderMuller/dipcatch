@@ -298,3 +298,56 @@ test('the displayed unit price stays at two decimals', function (): void {
 
     expect($product->shops()->first()?->unitPrice())->toBe('0.03');
 });
+
+test('a price quoted without VAT takes neither answer', function (): void {
+    // The fivestartrading case: 90 cups at 21.15 ex-VAT undercuts a real
+    // 22.00 at Amazon by 4%, and took both the lowest price and the best
+    // value on a figure nobody can pay.
+    $product = productWithShops([
+        'amazon.nl' => ['current_price' => '22.00', 'pack_quantity' => '90.00', 'pack_unit' => 'piece'],
+        'fivestartrading-holland.eu' => [
+            'current_price' => '21.15', 'pack_quantity' => '90.00', 'pack_unit' => 'piece',
+            'price_excludes_vat' => true, 'vat_note' => 'excl. btw',
+        ],
+    ]);
+
+    $product->recomputeCheapestShop();
+    $product->refresh();
+
+    expect($product->bestValueShop()?->host)->toBe('amazon.nl')
+        ->and($product->lowestOutlayShop()?->host)->toBe('amazon.nl');
+});
+
+test('a shop out for VAT does not decide the comparison unit', function (): void {
+    // Two ex-VAT rows measured in pieces must not make the one live gram row
+    // "measured in a different unit" and leave the product with no winner.
+    $product = productWithShops([
+        'a.test' => ['current_price' => '1.00', 'pack_quantity' => '10.00', 'pack_unit' => 'piece', 'price_excludes_vat' => true],
+        'b.test' => ['current_price' => '1.00', 'pack_quantity' => '10.00', 'pack_unit' => 'piece', 'price_excludes_vat' => true],
+        'c.test' => ['current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g'],
+    ]);
+
+    expect($product->bestValueShop()?->host)->toBe('c.test');
+});
+
+test('the product page says why a VAT-exclusive shop is out', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    foreach ([
+        ['amazon.nl', '22.00', false],
+        ['fivestartrading-holland.eu', '21.15', true],
+    ] as [$host, $price, $exVat]) {
+        Shop::factory()->for($product)->create(['url' => 'https://' . $host . '/p/1'])
+            ->forceFill([
+                'currency' => 'EUR', 'current_price' => $price,
+                'pack_quantity' => '90.00', 'pack_unit' => 'piece',
+                'price_excludes_vat' => $exVat, 'vat_note' => $exVat ? 'excl. btw' : null,
+            ])->save();
+    }
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeText('Price excludes VAT — not comparable');
+});

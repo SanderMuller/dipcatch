@@ -104,6 +104,10 @@ final readonly class ProductPresenter
                 'pack_size_provenance' => $pack?->provenance?->value,
                 'unit_price' => $packs->unitPriceOf($shop),
                 'excluded_reason' => $pack?->reason(),
+                // Not a pack exclusion: that one keeps a shop competing for
+                // the lowest price. This one bars it from both answers,
+                // because the number is not a price anyone pays.
+                'not_a_consumer_price' => $shop->notAConsumerPriceReason(),
                 'is_cheapest' => $shop->getKey() === $product->cheapest_shop_id,
                 'is_best_value' => $bestValueId !== null && $shop->getKey() === $bestValueId,
                 'last_checked_at' => $checked instanceof CarbonInterface ? $checked->toIso8601String() : null,

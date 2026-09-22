@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PackExclusion;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\PriceAdapters\BundleOffer;
@@ -43,6 +44,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $last_checked_at Stamped by every attempt, a failed one included.
  * @property CarbonInterface|null $last_success_at Stamped only when a price was actually read.
  * @property int $consecutive_failures Reset to zero by any successful read.
+ * @property bool $price_excludes_vat True when the page quotes this price without VAT.
+ * @property string|null $vat_note The words the page used to say so.
  */
 #[Unguarded]
 final class Shop extends Model
@@ -72,6 +75,7 @@ final class Shop extends Model
             'last_success_at' => 'datetime',
             'repointed_at' => 'datetime',
             'current_in_stock' => 'boolean',
+            'price_excludes_vat' => 'boolean',
             'active' => 'boolean',
             'health' => ShopHealth::class,
             'last_status' => ScrapeStatus::class,
@@ -308,6 +312,19 @@ final class Shop extends Model
     public function readsAreFailing(): bool
     {
         return $this->consecutive_failures > 0;
+    }
+
+    /**
+     * One sentence a shopper can act on, or null when this shop's price is a
+     * price they can pay.
+     *
+     * Not a {@see PackExclusion}: that enum's reasons keep a shop
+     * competing for the lowest-price answer, and a price quoted without VAT is
+     * not a lower price — it is an incomplete one.
+     */
+    public function notAConsumerPriceReason(): ?string
+    {
+        return $this->price_excludes_vat ? 'Price excludes VAT — not comparable' : null;
     }
 
     public function faviconUrl(): string

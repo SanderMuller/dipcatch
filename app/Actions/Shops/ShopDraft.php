@@ -47,6 +47,8 @@ final readonly class ShopDraft
          * not a name a person chose.
          */
         public ?string $titleOverride = null,
+        /** The words the page uses to say its price leaves VAT out. */
+        public ?string $vatNote = null,
     ) {}
 
     public function trackedPrice(): string
@@ -95,6 +97,7 @@ final readonly class ShopDraft
             'stock_signal' => $snapshot->stockSignal,
             'pack_size' => $snapshot->packSize,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
+            'vat_note' => $snapshot->vatExclusiveNote,
         ];
     }
 
@@ -161,6 +164,7 @@ final readonly class ShopDraft
             bundleOffer: $bundleOffer,
             promotionWindow: $promotionWindow,
             titleOverride: $titleOverride,
+            vatNote: self::string($snapshot, 'vat_note'),
         );
     }
 

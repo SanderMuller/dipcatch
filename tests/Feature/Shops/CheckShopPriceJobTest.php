@@ -758,3 +758,45 @@ test('an automated recheck lock does not swallow the confirmation re-fetch', fun
 
     expect(DB::table('jobs')->count())->toBe(2);
 });
+
+test('a check records that the page quotes its price without VAT', function (): void {
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => 'Dolce Gusto Lungo XL 90 cups',
+        'offers' => ['@type' => 'Shop', 'price' => '21.15', 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock'],
+    ], JSON_THROW_ON_ERROR);
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response(
+            str_replace('</body>', '<small>excl. BTW en verzendkosten</small></body>', withJsonLd($json)),
+            200,
+            ['Content-Type' => 'text/html'],
+        ),
+    ]);
+
+    $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+    expect($shop->price_excludes_vat)->toBeTrue()
+        ->and($shop->vat_note)->toBe('excl. btw')
+        ->and($shop->notAConsumerPriceReason())->toBe('Price excludes VAT — not comparable');
+});
+
+test('a shop that stops quoting without VAT rejoins the comparison', function (): void {
+    Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '23.05', name: 'Dolce Gusto Lungo XL 90 cups'));
+
+    $shop = Shop::factory()->create([
+        'url' => 'https://shop.test/p/1',
+        'price_excludes_vat' => true,
+        'vat_note' => 'excl. btw',
+    ]);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+    expect($shop->price_excludes_vat)->toBeFalse()
+        ->and($shop->vat_note)->toBeNull();
+});

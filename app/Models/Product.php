@@ -364,7 +364,13 @@ final class Product extends Model
         return $this->shops->filter(fn (Shop $shop): bool => $shop->active
             && $shop->health !== ShopHealth::Dead
             && $shop->currency === $this->currency
-            && $shop->current_price !== null);
+            && $shop->current_price !== null
+            // A price quoted without VAT is not a price anyone pays. It is
+            // lower than every complete price beside it by the rate of the
+            // tax, so left in it takes both answers and fires alerts on a
+            // figure the shopper cannot act on. It is also barred from voting
+            // on the comparison unit: the shop is not in the comparison.
+            && ! $shop->price_excludes_vat);
     }
 
     /**

@@ -72,6 +72,11 @@ final readonly class ProbeReporter
             // instead of trusting a bare flag.
             'stock_signal' => $snapshot['stock_signal'] ?? null,
             'pack_size' => $snapshot['pack_size'] ?? null,
+            // Stated before the caller confirms, because this is the one fact
+            // that makes an otherwise ordinary price unusable: the shop is
+            // added and tracked, but it takes no part in either answer.
+            'price_excludes_vat' => ($snapshot['vat_note'] ?? null) !== null,
+            'vat_note' => $snapshot['vat_note'] ?? null,
             'shop' => $outcome->host,
             'url' => $outcome->normalizedUrl,
         ];

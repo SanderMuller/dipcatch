@@ -301,6 +301,11 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                     // Unknown stays unknown: coercing it to true is what
                     // reported a sold-out product as available.
                     'current_in_stock' => $snapshot->inStock,
+                    // Re-read on every successful check, so a shop that starts
+                    // or stops quoting ex-VAT rejoins or leaves the comparison
+                    // on its own.
+                    'price_excludes_vat' => $snapshot->vatExclusiveNote !== null,
+                    'vat_note' => $snapshot->vatExclusiveNote,
                     // An empty currency is no signal at all — keep the last known one
                     // rather than blanking the column.
                     'currency' => $storedCurrency ?? $locked->currency,

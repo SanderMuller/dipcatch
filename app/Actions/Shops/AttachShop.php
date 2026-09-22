@@ -99,6 +99,8 @@ final readonly class AttachShop
             'promotion_ends_at' => $draft->promotionWindow?->endsAt->utc(),
             'promotion_label' => $draft->promotionWindow?->label,
             'current_in_stock' => $draft->inStock,
+            'price_excludes_vat' => $draft->vatNote !== null,
+            'vat_note' => $draft->vatNote,
             'last_checked_at' => now(),
             'last_success_at' => now(),
             'last_status' => ScrapeStatus::Ok->value,
