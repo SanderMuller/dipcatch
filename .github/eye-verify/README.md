@@ -22,6 +22,17 @@ that file or the script that logs in.
 `users-comp-flow.mjs` also mutates a real account, so point `TARGET_EMAIL` at a
 throwaway one you create for the run and delete afterwards.
 
+### Scripts that need a seeded account
+
+`product-cards.mjs` drives the product cards on the product list and the
+dashboard. Seed its throwaway account first and delete it afterwards:
+
+```bash
+php .github/eye-verify/product-cards-seed.php
+node .github/eye-verify/product-cards.mjs
+php .github/eye-verify/product-cards-seed.php --teardown
+```
+
 Each script prints one PASS/FAIL line per assertion and exits non-zero on any
 failure. They target `https://dipcatch.test` by default; set `BASE` to point
 elsewhere. Every script checks the page title first and exits 2 if it is not a

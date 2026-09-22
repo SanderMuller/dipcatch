@@ -132,7 +132,6 @@ final class ProductList extends Component
                 $categories !== null,
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []),
             )
-            ->withCount('shops')
             ->withMax('priceDropEvents as biggest_drop', 'drop_pct')
             ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
             // A product that never dropped, or has no price yet, sorts last
@@ -143,7 +142,8 @@ final class ProductList extends Component
             // on two pages and another on none. The ids are UUIDv7, so this
             // also reads as newest first.
             ->orderBy('id', 'desc')
-            ->paginate();
+            // 30 fills whole rows at one, two, three and five cards across.
+            ->paginate(30);
     }
 
     /**

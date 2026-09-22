@@ -157,7 +157,7 @@ it('renders an empty state and a no-match state', function (): void {
         ->assertSee('No product matches that search.');
 });
 
-it('shows the cheapest price and the shop count', function (): void {
+it('shows the cheapest price and each shop that sells it', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create([
         'user_id' => $user->id,
@@ -165,13 +165,14 @@ it('shows the cheapest price and the shop count', function (): void {
         'currency' => 'EUR',
         'cheapest_price' => '12.49',
     ]);
-    Shop::factory()->count(2)->for($product)->create();
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/producten/coffee', 'current_price' => '12.49']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/producten/coffee', 'current_price' => '13.99']);
 
     $this->actingAs($user);
 
     livewire(ProductList::class)
         ->assertSee('€12.49')
-        ->assertSee('2');
+        ->assertSeeInOrder(['ah.nl', '€12.49', 'jumbo.com', '€13.99']);
 });
 
 it('discloses bundle quantity beside the effective price', function (): void {
@@ -363,4 +364,57 @@ it('shows how far a product in a drop sits below the price it alerted from', fun
         ->html();
 
     expect(substr_count($html, 'data-test="drop-badge"'))->toBe(1);
+});
+
+it('marks a paused product as paused, with its price as the last one read', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Paused soap', 'active' => false, 'cheapest_price' => '4.79']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Active tea', 'active' => true]);
+
+    $this->actingAs($user);
+
+    $html = livewire(ProductList::class)
+        ->assertSee('Last price read')
+        ->assertSee('€4.79')
+        // Pausing lives on the product page now, not on the card.
+        ->assertDontSee('Pause tracking')
+        ->assertDontSee('Resume tracking')
+        ->html();
+
+    expect(substr_count($html, 'data-test="paused-label"'))->toBe(1);
+});
+
+it('states a per-unit drop in its unit, not beside a pack price it was not measured on', function (): void {
+    $user = User::factory()->create();
+    // The reference is a 500 g pack at €6.25, so €12.50 a kilo; the card's price is a 200 g pack.
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Crisps', 'cheapest_price' => '1.69', 'last_notified_price' => '1.69', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create([
+        'user_id' => $user->id,
+        'product_id' => $product->id,
+        'reference_price' => '6.25',
+        'reference_unit_price' => '12.5000',
+        'comparison_unit' => 'g',
+        'new_price' => '1.69',
+        'drop_pct' => 20.0,
+        'currency' => 'EUR',
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertDontSeeHtml('<del')
+        ->assertSee('Was €12.50/kg')
+        ->assertDontSee('€6.25');
+});
+
+it('lists the shop behind the card price first, even when an out-of-stock shop is lower', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://lidl.nl/p/coffee', 'current_price' => '9.99', 'current_in_stock' => false]);
+    $best = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/producten/coffee', 'current_price' => '12.49']);
+    $product->forceFill(['cheapest_shop_id' => $best->id, 'cheapest_price' => '12.49'])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)->assertSeeInOrder(['ah.nl', '€12.49', 'lidl.nl', '€9.99']);
 });

@@ -69,99 +69,39 @@
                 <flux:link :href="route('app.products.index')" wire:navigate>{{ __('All products') }}</flux:link>
             </div>
 
-            {{-- Cards here, dividers above: each tile navigates on its own, and
-                 a card is the treatment for an independently interactive item. --}}
-            <div class="@container mt-4">
-                <ul role="list" class="grid gap-4 @md:grid-cols-2 @3xl:grid-cols-3">
-                    @foreach ($watching as $product)
-                        {{-- min-w-0: a grid track sizes to its content by default,
-                             so a long title pushed the card past the viewport
-                             on a phone. --}}
-                        <li class="min-w-0" wire:key="watching-{{ $product->id }}">
-                            {{-- An anchor carrying the card styling, not flux:card:
-                                 that component always renders a div, so an href on
-                                 it produces a tile nobody can click. --}}
-                            <a
-                                href="{{ route('app.products.show', $product) }}"
-                                wire:navigate
-                                class="flex h-full items-center gap-4 rounded-2xl bg-white/80 p-4 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:ring-zinc-800 dark:hover:bg-zinc-900"
-                            >
-                                <x-product-thumb :product="$product" size="size-14" />
-                                <div class="min-w-0">
-                                    <flux:text class="truncate font-medium">{{ Str::limit($product->title, 40) }}</flux:text>
-                                    <flux:text size="sm" class="flex flex-wrap items-center gap-x-1 text-zinc-500 tabular-nums">
-                                        <x-drop-badge :product="$product" />
-                                        <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
-                                        @if ($product->cheapestShop)
-                                            · {{ $product->cheapestShop->host }}
-                                        @endif
-                                    </flux:text>
-                                    @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
-                                        <flux:text size="sm" class="truncate text-zinc-500">{{ $bundleLabel }}</flux:text>
-                                    @endif
-                                </div>
-                            </a>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
+            <x-product-card.grid class="mt-4">
+                @foreach ($watching as $product)
+                    <li class="min-w-0" wire:key="watching-{{ $product->id }}">
+                        <x-product-card :product="$product" :compare="false" />
+                    </li>
+                @endforeach
+            </x-product-card.grid>
         </div>
     @endif
 
     <div class="mt-8">
         <flux:heading size="lg" level="2">{{ __('Active drops') }}</flux:heading>
 
-        <flux:table>
-            <flux:table.columns>
-                <flux:table.column>{{ __('Product') }}</flux:table.column>
-                <flux:table.column>{{ __('Now') }}</flux:table.column>
-                <flux:table.column class="hidden sm:table-cell">{{ __('Since') }}</flux:table.column>
-                <flux:table.column class="hidden md:table-cell">{{ __('Shop') }}</flux:table.column>
-            </flux:table.columns>
-            <flux:table.rows>
-                @forelse ($activeDrops as $product)
-                    <flux:table.row :key="'drop-'.$product->id">
-                        <flux:table.cell>
-                            <a href="{{ route('app.products.show', $product) }}" wire:navigate class="flex items-center gap-3">
-                                <x-product-thumb :product="$product" size="size-12" />
-                                <flux:text class="font-medium">{{ Str::limit($product->title, 60) }}</flux:text>
-                            </a>
-                        </flux:table.cell>
-                        <flux:table.cell class="tabular-nums">
-                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <flux:text class="font-medium text-emerald-600 dark:text-emerald-400">
-                                    <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
-                                </flux:text>
-                                <x-drop-badge :product="$product" />
-                            </div>
-                            @if ($drop = $product->activeDrop())
-                                <flux:text size="sm" class="text-zinc-500">{{ $drop->wasLabel() }}</flux:text>
-                            @endif
-                            @if ($product->cheapestShop)
-                                <x-shop-deal :shop="$product->cheapestShop" :show-source="false" class="mt-2 min-w-52 max-w-sm whitespace-normal" />
-                            @endif
-                        </flux:table.cell>
-                        <flux:table.cell class="hidden sm:table-cell">
+        @if ($activeDrops->isEmpty())
+            <div class="mt-4 rounded-2xl border border-dashed border-zinc-300 px-6 py-10 text-center dark:border-white/15">
+                <flux:text class="text-zinc-500">{{ __('No active drops right now.') }}</flux:text>
+                <flux:text size="sm" class="text-zinc-400">{{ __("DipCatch is watching. You hear from us as soon as a price drops far enough.") }}</flux:text>
+            </div>
+        @else
+            <x-product-card.grid class="mt-4">
+                @foreach ($activeDrops as $product)
+                    <li class="min-w-0" wire:key="drop-{{ $product->id }}">
+                        <x-product-card :product="$product" :compare="false">
                             @if ($product->last_notified_at)
-                                <flux:text size="sm" class="text-zinc-500">{{ $product->last_notified_at->diffForHumans() }}</flux:text>
+                                <flux:text size="sm" class="text-zinc-500">
+                                    {{ __('Dropped :ago', ['ago' => $product->last_notified_at->diffForHumans()]) }}
+                                </flux:text>
                             @endif
-                        </flux:table.cell>
-                        <flux:table.cell class="hidden md:table-cell">
-                            @if ($product->cheapestShop)
-                                <x-shop-link :shop="$product->cheapestShop" />
-                            @endif
-                        </flux:table.cell>
-                    </flux:table.row>
-                @empty
-                    <flux:table.row>
-                        <flux:table.cell colspan="4" class="py-10 text-center">
-                            <flux:text class="text-zinc-500">{{ __('No active drops right now.') }}</flux:text>
-                            <flux:text size="sm" class="text-zinc-400">{{ __("DipCatch is watching. You hear from us as soon as a price drops far enough.") }}</flux:text>
-                        </flux:table.cell>
-                    </flux:table.row>
-                @endforelse
-            </flux:table.rows>
-        </flux:table>
+                        </x-product-card>
+                    </li>
+                @endforeach
+            </x-product-card.grid>
+        @endif
     </div>
 
 </div>

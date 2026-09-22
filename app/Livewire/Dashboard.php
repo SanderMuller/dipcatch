@@ -82,7 +82,8 @@ final class Dashboard extends Component
             ->where('user_id', $this->user()->id)
             ->with(['cheapestShop', 'latestPriceDropEvent'])
             ->latest('created_at')
-            ->limit(6)
+            // One row of cards at five across.
+            ->limit(5)
             ->get();
     }
 

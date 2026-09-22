@@ -74,10 +74,21 @@ const checker = createChecker({ page, artifactsDir: ART, label: 'flux-pro-ui' })
 {
     await page.goto(`${BASE}/app`, { waitUntil: 'networkidle' });
     checker.check('dashboard heading is visible', await page.getByRole('heading', { name: 'Dashboard', level: 1 }).isVisible());
-    checker.check('dashboard uses a Flux table', await page.locator('[data-flux-table], table').count().then((n) => n > 0));
-    checker.check('dashboard savings chart is a Flux chart', await page.locator('ui-chart').count().then((n) => n > 0));
-    checker.check('dashboard recent alerts use a Flux timeline', await page.locator('[data-flux-timeline]').count().then((n) => n > 0));
+    checker.check('dashboard shows products as cards', await page.locator('[data-test="product-card"]').count().then((n) => n > 0));
+    checker.check('dashboard has no table left', (await page.locator('[data-flux-table], table').count()) === 0);
+    // The savings chart and the alert history moved to the stats page; the
+    // dashboard links there instead.
+    checker.check('dashboard carries no chart', (await page.locator('ui-chart').count()) === 0);
+    checker.check('dashboard links to the savings by month', await page.locator('[data-test="savings-by-month-link"]').isVisible());
     await shot(page, 'flux-pro-dashboard.png');
+}
+
+{
+    await page.goto(`${BASE}/app/stats`, { waitUntil: 'networkidle' });
+    checker.check('stats heading is visible', await page.getByRole('heading', { name: 'Stats', level: 1 }).isVisible());
+    checker.check('stats savings chart is a Flux chart', await page.locator('ui-chart').count().then((n) => n > 0));
+    checker.check('stats recent alerts use a Flux timeline', await page.locator('[data-flux-timeline]').count().then((n) => n > 0));
+    await shot(page, 'flux-pro-stats.png');
 }
 
 {
@@ -95,7 +106,8 @@ const checker = createChecker({ page, artifactsDir: ART, label: 'flux-pro-ui' })
 
 {
     await page.goto(`${BASE}/app/products`, { waitUntil: 'networkidle' });
-    const list = page.locator('[data-flux-table]');
+    const list = page.locator('[data-test="product-card"]');
+    checker.check('product list shows products as cards, not a table', (await list.count()) > 0 && (await page.locator('[data-flux-table]').count()) === 0);
     checker.check('product list heading is visible', await page.getByRole('heading', { name: 'Products', level: 1 }).isVisible());
     checker.check('status filter is a segmented radio group', await page.getByRole('radio', { name: 'Paused' }).count().then((n) => n > 0));
     checker.check('product list shows the active fixture', await list.getByText('EyeVerify Arabica').first().isVisible());
@@ -114,14 +126,13 @@ const checker = createChecker({ page, artifactsDir: ART, label: 'flux-pro-ui' })
     await page.goto(`${BASE}/app/products/${fixture.productId}`, { waitUntil: 'networkidle' });
     checker.check('product breadcrumbs render', await page.locator('[data-flux-breadcrumbs]').count().then((n) => n > 0));
     checker.check('Active badge is visible', await page.getByText('Active', { exact: true }).count().then((n) => n > 0));
-    checker.check('History tab is present', await page.getByRole('tab', { name: 'History' }).count().then((n) => n > 0));
+    // One page, no tabs: the shops and the price history sit side by side.
+    checker.check('price history heading is visible', await page.getByRole('heading', { name: 'Best price over time' }).isVisible());
     checker.check('product history uses a Flux chart', await page.locator('ui-chart').count().then((n) => n > 0));
     checker.check('product history has no Chart.js canvas', (await page.locator('canvas').count()) === 0);
     await shot(page, 'flux-pro-product-history.png');
 
-    await page.getByRole('tab', { name: 'Shops' }).click();
-    await page.getByRole('heading', { name: 'Tracked shops' }).waitFor({ state: 'visible', timeout: 8000 });
-    checker.check('Shops tab shows tracked shops', await page.getByRole('heading', { name: 'Tracked shops' }).isVisible());
+    checker.check('product page shows its tracked shops', await page.getByRole('heading', { name: 'Tracked shops' }).isVisible());
     await shot(page, 'flux-pro-product-shops.png');
 
     await page.getByText('Add a shop', { exact: true }).click();
@@ -172,13 +183,32 @@ const checker = createChecker({ page, artifactsDir: ART, label: 'flux-pro-ui' })
 {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`${BASE}/app/products/create`, { waitUntil: 'networkidle' });
-    await withFailedRoute(page, '**/livewire/update', async () => {
+    await withFailedRoute(page, '**/livewire*/update', async () => {
         await page.locator('#create-product-url').fill('https://this-is-not-a-real-shop.example/product/1');
-        await page.getByRole('button', { name: 'Fetch product' }).click();
+        await page.getByRole('button', { name: 'Look up this product' }).click();
         const errorShown = await page.getByText('Could not').waitFor({ timeout: 5000 }).then(() => true).catch(() => false)
             || await page.locator('[data-flux-callout]').waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
         checker.check('create-from-url shows a visible error when Livewire update fails', errorShown);
+        checker.check('a failed request shows no raw error modal', (await page.locator('#livewire-error').count()) === 0);
+        checker.check('the form stays usable after the failure', await page.locator('#create-product-url').isEditable());
+        const submit = page.locator('form:has(#create-product-url) button[type="submit"]');
+        const reEnabled = await page.waitForFunction((el) => ! el.disabled, await submit.elementHandle(), { timeout: 5000 }).then(() => true).catch(() => false);
+        checker.check('the lookup button is enabled again after the failure', reEnabled);
     }, { status: 500, contentType: 'text/html', body: 'Injected failure' });
+    await shot(page, 'flux-pro-request-failed.png');
+
+    // A request that never reaches the server gets the same toast.
+    await page.route('**/livewire*/update', (route) => route.abort('internetdisconnected'));
+    await page.getByRole('button', { name: 'Look up this product' }).click();
+    const offlineShown = await page.getByText('could not be reached').waitFor({ timeout: 5000 }).then(() => true).catch(() => false);
+    checker.check('an unreachable server shows a visible error', offlineShown);
+    await page.unroute('**/livewire*/update');
+
+    // Recovery: with the fault gone, the same button reaches the server,
+    // which answers with its own message for a page it cannot open.
+    await page.getByRole('button', { name: 'Look up this product' }).click();
+    const recovered = await page.getByText('We could not open that page').waitFor({ timeout: 30000 }).then(() => true).catch(() => false);
+    checker.check('the lookup works again once the fault clears', recovered);
 }
 
 checker.skip('add-shop probe skeleton', 'needs a live shop URL; the loading skeleton is wire:loading only');
