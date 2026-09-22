@@ -112,8 +112,10 @@ final class DemoSeeder extends Seeder
 
         // Offset past the demo account's slice, so the two do not track the
         // same list of products.
+        $this->seedCatalog($admin, $this->realCatalog());
         $this->seedCatalog($admin, GeneratedCatalog::make(self::ADMIN_GENERATED, offset: self::DEMO_GENERATED));
 
+        $this->seedCatalog($demo, $this->realCatalog());
         $this->seedCatalog($demo, $this->demoCatalog());
         $this->seedCatalog($demo, GeneratedCatalog::make(self::DEMO_GENERATED));
 
@@ -184,6 +186,110 @@ final class DemoSeeder extends Seeder
     // ---------------------------------------------------------------------
     // Catalogs
     // ---------------------------------------------------------------------
+
+    /**
+     * Products that exist, at addresses that answer.
+     *
+     * Every other catalog here is invented: plausible titles on invented
+     * paths, which is enough to fill a list and nothing more. A recheck of one
+     * reads a 404, so no price ever moves, no image ever loads, and the parts
+     * of the app that only work against a real page — the adapter chain, the
+     * unit comparison, the image — cannot be exercised at all without adding a
+     * shop by hand first.
+     *
+     * These seven were read through DipCatch's own probe on 2026-09-22, and
+     * the prices, pack sizes and photos below are what came back. Re-running
+     * a check on a seeded account now does what it does in production.
+     *
+     * Two of them earn their place twice. The Roter pair is the same tablet in
+     * a 400-pack and an 800-pack: 0.0325 against 0.0275 each, an 18% gap that
+     * both rendered as EUR 0.03 until this morning, so it is the per-unit
+     * ranking and the four-decimal display in one product. The AURMOO box is a
+     * title counting two hundred bags of five litres, which is the pack-count
+     * reading that used to price one bag's worth of plastic as the whole box.
+     *
+     * A price here ages. When one drifts far enough to bother a reader, probe
+     * the URL again and paste back what it says rather than guessing.
+     *
+     * @return list<DemoProduct>
+     */
+    private function realCatalog(): array
+    {
+        return [
+            new DemoProduct(
+                title: 'Roter Vitamine C 70 mg citroen kauwtabletten',
+                category: ProductCategory::MedicinesSupplements,
+                unitPriceTarget: 0.0280,
+                offers: [
+                    new DemoOffer(
+                        host: 'ah.nl', path: '', price: 12.99, packQuantity: 400, packUnit: 'piece',
+                        realUrl: 'https://www.ah.nl/producten/product/wi56116/roter-vitamine-c-70-mg-kauwtabletten-citroen',
+                        imageUrl: 'https://static.ah.nl/dam/product/AHI_41565f74504d4f34527a476c66355452435138536541?revLabel=1&rendition=800x800_WEBP&fileType=binary',
+                    ),
+                    new DemoOffer(
+                        host: 'benushop.nl', path: '', price: 21.99, packQuantity: 800, packUnit: 'piece',
+                        realUrl: 'https://www.benushop.nl/apotheek/vitaminen/vitamine-c/roter-voordeelverpakking-vitamine-c-70mg-citroen-kauwtabletten-800-stuks',
+                        imageUrl: 'https://www.benushop.nl/images/productimages/big/8713304941826_1.jpg',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Creapure Creatine 500 g',
+                category: ProductCategory::MedicinesSupplements,
+                offers: [
+                    new DemoOffer(
+                        host: 'bodyandfit.com', path: '', price: 29.99, packQuantity: 500, packUnit: 'g',
+                        realUrl: 'https://www.bodyandfit.com/en/products/creapure-creatine',
+                        imageUrl: 'https://www.bodyandfit.com/cdn/shop/files/01668_Image_01_79c5e785-834b-4215-a613-222613b78856.png?v=1783689694&width=1920',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'AURMOO Vuilniszakken 5 L (200 stuks)',
+                category: ProductCategory::PaperDisposables,
+                offers: [
+                    new DemoOffer(
+                        host: 'amazon.nl', path: '', price: 15.99, packQuantity: 1000000, packUnit: 'ml',
+                        realUrl: 'https://www.amazon.nl/AURMOO-Vuilniszakken-Afbreekbaar-Vuilniszak-M%C3%BCllbeutel/dp/B0BHZJYGY5',
+                        imageUrl: 'https://m.media-amazon.com/images/I/51np1PVT2+L.jpg',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Fanta Cassis 1,5 L',
+                category: ProductCategory::SoftDrinks,
+                offers: [
+                    new DemoOffer(
+                        host: 'spar.nl', path: '', price: 3.19, packQuantity: 1500, packUnit: 'ml',
+                        realUrl: 'https://www.spar.nl/fanta-fanta-cassis-pet-1.5l-9256413/',
+                        imageUrl: 'https://media.spar.nl/productdetail/fanta-fanta-cassis-pet-1.5l-1.5-Liter-9256413-168619.jpg',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Feliway Classic Startpakket verdamper',
+                category: ProductCategory::PetCare,
+                offers: [
+                    new DemoOffer(
+                        host: 'zooplus.nl', path: '', price: 27.99, packQuantity: 1, packUnit: 'piece',
+                        realUrl: 'https://www.zooplus.nl/shop/katten/verzorging/huisapotheek/verdamper/169589?activeVariant=169589.10',
+                        imageUrl: 'https://media.zooplus.com/bilder/9/400/67609_pla_ceva_feliway_classic_hs_01_9.jpg',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Vet-Concept Cat Sana Paard 3 kg',
+                category: ProductCategory::PetFood,
+                offers: [
+                    new DemoOffer(
+                        host: 'dierapotheker.nl', path: '', price: 30.55, packQuantity: 3000, packUnit: 'g',
+                        realUrl: 'https://www.dierapotheker.nl/vet-concept-sana-paard-kattenvoer/9271/',
+                        imageUrl: 'https://www.dierapotheker.nl/media/c1/2d/15/1725524946/Vet-Concept-Sana-Paard-Kattenvoer-10-kg.jpg',
+                    ),
+                ],
+            ),
+        ];
+    }
 
     /**
      * @return list<DemoProduct>
@@ -373,7 +479,12 @@ final class DemoSeeder extends Seeder
         $product = Product::factory()->create([
             'user_id' => $user->id,
             'title' => $spec->title,
-            'image_url' => null,
+            // The photo the first offer that has one serves, exactly as a
+            // real add does: a product page with an empty frame is the first
+            // thing anyone notices about a seeded account, and the factory's
+            // own placeholder points at via.placeholder.com, which no longer
+            // resolves.
+            'image_url' => $spec->image(),
             'currency' => 'EUR',
             'drop_threshold_pct' => 5.00,
             'drop_threshold_abs' => 0.50,
@@ -413,6 +524,7 @@ final class DemoSeeder extends Seeder
         $shop = Shop::factory()->create([
             'product_id' => $product->id,
             'url' => $offer->url(),
+            'image_url' => $offer->imageUrl,
             'adapter_key' => $this->adapterKey($offer->host),
             'currency' => 'EUR',
             'initial_price' => $prices[0],
