@@ -16,6 +16,19 @@ namespace App\Support;
 final readonly class StatedPackSize
 {
     /**
+     * A count written as a multiplier with nothing sized after it — `200x
+     * Vuilniszakken 5L`, where the 5 L is one bag and the 200 is the pack.
+     *
+     * The count carries no unit word, so neither the cross form nor the piece
+     * vocabulary saw it, and the 5 L was read as the whole box: two hundred
+     * bags priced at €3,20 per litre, which is what one bag's worth of plastic
+     * costs. The negative lookahead is what keeps `12 x 55 g` out — a cross
+     * form is a count followed by a size, and this shape is a count followed by
+     * words.
+     */
+    private const string BARE_COUNT_PATTERN = '/(?<![\d.,])(\d+)\s*[x\x{00D7}](?!\s*\d)/iu';
+
+    /**
      * The whole pack, when the stated size is the size of one item out of a
      * multipack the title counts — null when the stated size stands.
      *
@@ -34,7 +47,7 @@ final readonly class StatedPackSize
             return null;
         }
 
-        $count = PackSize::itemCountIn($title) ?? 0.0;
+        $count = PackSize::itemCountIn($title) ?? self::bareCountIn($title) ?? 0.0;
 
         return $count > 1 ? PackSize::of($stated->quantity * $count, $stated->unit) : null;
     }
@@ -78,7 +91,8 @@ final readonly class StatedPackSize
             return null;
         }
 
-        $count = self::firstMatch(PackSize::pieceCountPattern(), $title);
+        $count = self::firstMatch(PackSize::pieceCountPattern(), $title)
+            ?? self::firstMatch(self::BARE_COUNT_PATTERN, $title);
         $size = self::firstMatch(PackSize::sizePattern(), $title);
 
         if ($count === null || $size === null || $count['offset'] >= $size['offset'] || $count['value'] <= 1) {
@@ -86,6 +100,20 @@ final readonly class StatedPackSize
         }
 
         return $count['value'];
+    }
+
+    /**
+     * How many items a bare multiplier counts. Null unless the title writes
+     * exactly one, so a string counting two things states nothing rather than
+     * guessing which count is the pack.
+     */
+    public static function bareCountIn(string $title): ?float
+    {
+        if (preg_match_all(self::BARE_COUNT_PATTERN, $title, $matches, PREG_SET_ORDER) !== 1) {
+            return null;
+        }
+
+        return (float) $matches[0][1];
     }
 
     /** @return array{value: float, offset: int}|null */
