@@ -2,7 +2,6 @@
 
 namespace App\Filament\Admin\Resources\Subscribers\Tables;
 
-use App\Billing\Plan;
 use App\Billing\ProPrice;
 use App\Billing\ProUsers;
 use App\Models\User;
@@ -133,7 +132,9 @@ final class SubscribersTable
             return 'Comped';
         }
 
-        $subscription = $record->subscription(Plan::SUBSCRIPTION_TYPE);
+        // The row that decides what the customer is being sold, which is not
+        // always the newest one — see `User::payingSubscription()`.
+        $subscription = $record->payingSubscription();
 
         return match (true) {
             $subscription === null => 'Free',
@@ -147,7 +148,7 @@ final class SubscribersTable
 
     private static function periodEnd(User $record): ?string
     {
-        $subscription = $record->subscription(Plan::SUBSCRIPTION_TYPE);
+        $subscription = $record->payingSubscription();
 
         if ($subscription === null) {
             return null;

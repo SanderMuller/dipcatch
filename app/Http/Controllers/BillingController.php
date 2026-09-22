@@ -39,8 +39,9 @@ final class BillingController extends Controller
         }
 
         // Anyone Stripe already bills goes to the page that manages it, not
-        // to a second checkout.
-        if ($this->user()->subscription(Plan::SUBSCRIPTION_TYPE)?->valid() === true) {
+        // to a second checkout. Any live row, not the newest one — see
+        // `User::payingSubscription()`.
+        if ($this->user()->payingSubscription()?->valid() === true) {
             return redirect('/app/billing');
         }
 
@@ -59,7 +60,7 @@ final class BillingController extends Controller
         // Not `isPro()`: a lost chargeback deliberately makes that false
         // while Stripe still bills an active subscription. Selling a second
         // one would charge the customer twice.
-        if ($user->subscription(Plan::SUBSCRIPTION_TYPE)?->valid() === true) {
+        if ($user->payingSubscription()?->valid() === true) {
             return redirect('/app/billing');
         }
 

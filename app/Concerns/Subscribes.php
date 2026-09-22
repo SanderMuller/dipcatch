@@ -7,6 +7,8 @@ use App\Billing\Plan;
 use App\Models\StripeDispute;
 use App\Models\StripePayment;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
+use Laravel\Cashier\Subscription;
 
 /**
  * Billing state for a user. `plan()` is the only place that turns Stripe
@@ -39,9 +41,9 @@ trait Subscribes
             return Plan::Pro;
         }
 
-        $subscription = $this->subscription(Plan::SUBSCRIPTION_TYPE);
+        $subscriptions = $this->proSubscriptions();
 
-        if ($subscription === null) {
+        if ($subscriptions->isEmpty()) {
             // A generic trial started before any subscription exists still
             // grants Pro — `onTrial()` with no arguments reads the user's
             // own `trial_ends_at`.
@@ -50,12 +52,50 @@ trait Subscribes
 
         // `active()`, not `valid()`, because `ProUsers` — the scheduler's
         // reader — selects on Cashier's `active()` scope, and the instance
-        // method is that same predicate. It is the predicate that matches,
-        // not the answer: `plan()` reads the newest `pro` row while
-        // `ProUsers` matches any active one, so two rows can still disagree.
+        // method is that same predicate.
+        //
+        // Any row, not the newest one. `subscription()` returns the newest of
+        // a type, so an abandoned checkout writing a later `incomplete` row
+        // hid a live subscription underneath it: `plan()` said Free while
+        // `ProUsers` said Pro and Stripe went on charging. The customer lost
+        // their history window, their unit-price alerts and their recheck
+        // cadence, permanently, because nothing ages an `incomplete` row out.
+        //
         // `keepPastDueSubscriptionsActive()` in AppServiceProvider is what
         // keeps Pro through the dunning retries.
-        return $subscription->active() ? Plan::Pro : Plan::Free;
+        return $subscriptions->contains(static fn (Subscription $subscription): bool => $subscription->active())
+            ? Plan::Pro
+            : Plan::Free;
+    }
+
+    /**
+     * Every `pro` row this account holds, newest first.
+     *
+     * Cashier's `subscription()` answers with one of these, and which one it
+     * picks is an accident of creation order rather than of entitlement.
+     *
+     * @return Collection<int, Subscription>
+     */
+    public function proSubscriptions(): Collection
+    {
+        return collect($this->subscriptions->all())
+            ->filter(static fn (mixed $row): bool => $row instanceof Subscription && $row->type === Plan::SUBSCRIPTION_TYPE)
+            ->values();
+    }
+
+    /**
+     * The `pro` row that decides what the customer is being sold, if any.
+     *
+     * A live row wins over a dead one whatever their order, so a stray
+     * `incomplete` cannot make the billing page offer a second subscription
+     * to somebody Stripe already bills.
+     */
+    public function payingSubscription(): ?Subscription
+    {
+        $rows = $this->proSubscriptions();
+
+        return $rows->first(static fn (Subscription $subscription): bool => $subscription->valid())
+            ?? $rows->first();
     }
 
     public function isPro(): bool

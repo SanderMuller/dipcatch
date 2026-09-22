@@ -149,3 +149,18 @@ test('a blocked account that is also comped reads as blocked everywhere', functi
     expect($content)->not->toContain('Pro is on us')
         ->and($user->isComped())->toBeFalse();
 });
+
+it('reads pro everywhere when a live row sits under a newer incomplete one', function (): void {
+    // Cashier's `subscription()` returns the newest row of a type, so every
+    // reader built on it ignored a live subscription underneath a stray
+    // `incomplete`. `ProUsers` matched the live one all along, which is how
+    // the three answers came apart. Reported 2026-09-22.
+    $user = User::factory()->create();
+
+    subscribeUser($user, 'active')
+        ->forceFill(['created_at' => CarbonImmutable::now()->subMonths(6)])->save();
+    subscribeUser($user, 'incomplete')
+        ->forceFill(['created_at' => CarbonImmutable::now()->subMinutes(5)])->save();
+
+    expect(proAnswers($user))->toBe(['plan' => true, 'sql' => true, 'label' => 'Pro', 'comped' => false]);
+});
