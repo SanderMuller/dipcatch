@@ -16,9 +16,21 @@ final class UrlNormalizer
 
     /**
      * Normalize a URL so two URLs that point at the same resource produce the
-     * same string: lowercase scheme + host, strip default ports, strip the
-     * trailing slash on non-root paths except SPAR, drop `utm_*` query params, sort
-     * remaining params alphabetically.
+     * same string: lowercase scheme + host, strip default ports, keep the path
+     * as the shop wrote it, drop `utm_*` query params, sort remaining params
+     * alphabetically.
+     *
+     * The trailing slash is kept, because it is the shop's own canonical form
+     * and stripping it bought nothing. SPAR answers 404 without it. Shopware
+     * answers 301 — and following that redirect is a second request a
+     * millisecond after the first, which is a burst. dierapotheker.nl rate
+     * limits on exactly that shape, so every probe there was refused while a
+     * direct request to the same page always succeeded: nine failures against
+     * five successes, measured on production 2026-09-22.
+     *
+     * Identity is unaffected. {@see hash()} strips the trailing slash before
+     * hashing, so `/p/1` and `/p/1/` remain one shop and every hash stored
+     * before this still matches.
      *
      * The `www.` prefix is deliberately KEPT here: not every shop serves its
      * apex domain (vomar.nl answers 404 while www.vomar.nl serves the page),
@@ -47,7 +59,7 @@ final class UrlNormalizer
         $port = $parts['port'] ?? null;
         $portSegment = self::normalizePort($scheme, $port);
 
-        $path = self::normalizePath($parts['path'] ?? '', preserveTrailingSlash: self::normalizeHost($host) === 'spar.nl');
+        $path = self::normalizePath($parts['path'] ?? '');
         $query = self::normalizeQuery($parts['query'] ?? '');
 
         return $scheme . '://' . $host . $portSegment . $path . ($query !== '' ? '?' . $query : '');
@@ -97,16 +109,21 @@ final class UrlNormalizer
      * Dedupe key for a normalized URL. `www.` is dropped here rather than in
      * {@see normalize()}, so `www.shop.test/p` and `shop.test/p` are one
      * shop while each keeps the host that actually serves it.
-     * SPAR keeps its trailing slash for fetching, but drops it here to retain
-     * compatibility with hashes stored before that slash was preserved.
+     *
+     * The trailing slash goes the same way, and for the same reason: a URL is
+     * fetched as the shop writes it, and compared as the resource it names.
+     * This is also what keeps the slash free to be preserved — every hash
+     * written while it was being stripped still matches.
      */
     public static function hash(string $normalizedUrl): string
     {
         $comparisonUrl = preg_replace('#^(https?://)www\.#', '$1', $normalizedUrl) ?? $normalizedUrl;
 
-        if (parse_url($comparisonUrl, PHP_URL_HOST) === 'spar.nl' && parse_url($comparisonUrl, PHP_URL_PATH) !== '/') {
+        if (parse_url($comparisonUrl, PHP_URL_PATH) !== '/') {
             $parts = explode('?', $comparisonUrl, 2);
-            $comparisonUrl = rtrim($parts[0], '/') . (isset($parts[1]) ? '?' . $parts[1] : '');
+            $withoutSlash = rtrim($parts[0], '/');
+            $comparisonUrl = ($withoutSlash === '' ? $parts[0] : $withoutSlash)
+                . (isset($parts[1]) ? '?' . $parts[1] : '');
         }
 
         return hash('sha256', $comparisonUrl);
@@ -129,7 +146,7 @@ final class UrlNormalizer
         return ':' . $port;
     }
 
-    private static function normalizePath(string $path, bool $preserveTrailingSlash = false): string
+    private static function normalizePath(string $path): string
     {
         if ($path === '' || $path === '/') {
             return '/';
@@ -143,11 +160,6 @@ final class UrlNormalizer
             $segments,
         );
         $path = implode('/', $segments);
-
-        // SPAR product URLs return 404 when their trailing slash is removed.
-        if (! $preserveTrailingSlash && str_ends_with($path, '/')) {
-            $path = rtrim($path, '/');
-        }
 
         return $path === '' ? '/' : $path;
     }
