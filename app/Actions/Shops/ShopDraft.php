@@ -102,6 +102,8 @@ final readonly class ShopDraft
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
             'consumer_price_issue' => $snapshot->consumerPriceIssue?->value,
             'consumer_price_note' => $snapshot->consumerPriceNote,
+            'variants_on_page' => $snapshot->variantsOnPage,
+            'variant_note' => $snapshot->variantNote(),
         ];
     }
 

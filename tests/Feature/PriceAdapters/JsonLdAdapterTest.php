@@ -1005,3 +1005,103 @@ test('a synthesised key survives the shop changing its price', function (): void
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->price)->toBe('27.89');
 });
+
+/**
+ * Bug 3 from the 2026-09-22 report: a multi-variant page read as a single
+ * price, with nothing in the answer saying variants existed. Confirming it
+ * tracks whichever variant the page defaults to inside a product named after
+ * a different one — silently, until the first flavour-specific promotion.
+ */
+test('a page that sells one variant says so', function (): void {
+    // The Body & Fit Creapure shape: the title carries a variant suffix, so a
+    // caller could not tell one variant from one of several silently picked.
+    // The adapter knew the count all along and threw it away.
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Creapure Creatine',
+        'hasVariant' => [[
+            '@type' => 'Product',
+            'name' => 'Creapure Creatine - Natural (Unflavoured) / 500g',
+            'sku' => '1089215',
+            'offers' => ['@type' => 'Offer', 'price' => '29.99', 'priceCurrency' => 'EUR'],
+        ]],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/creapure', withJsonLd($json));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->variantsOnPage)->toBe(1)
+        ->and($result->snapshot?->variantNote())->toBe('This page sells one variant.');
+});
+
+test('a variant the URL names says how many it was chosen from', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Feliway Family',
+        'hasVariant' => [
+            [
+                '@type' => 'Product', 'name' => 'Feliway 1-pack', 'productID' => '111-1',
+                'url' => 'https://shop.test/p/1pack/',
+                'offers' => ['@type' => 'Offer', 'price' => '23.95', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product', 'name' => 'Feliway 3-pack', 'productID' => '111-3',
+                'url' => 'https://shop.test/p/3pack/',
+                'offers' => ['@type' => 'Offer', 'price' => '52.86', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/3pack/', withJsonLd($json));
+
+    expect($result->snapshot?->price)->toBe('52.86')
+        ->and($result->snapshot?->variantsOnPage)->toBe(2)
+        ->and($result->snapshot?->variantNote())->toBe('This page sells 2 variants; the URL names this one.');
+});
+
+test('a variant a key names says the key chose it', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Feliway Family',
+        'hasVariant' => [
+            [
+                '@type' => 'Product', 'name' => 'Feliway 1-pack', 'productID' => '111-1',
+                'offers' => ['@type' => 'Offer', 'price' => '23.95', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product', 'name' => 'Feliway 3-pack', 'productID' => '111-3',
+                'offers' => ['@type' => 'Offer', 'price' => '52.86', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract(
+        'https://shop.test/canonical',
+        withJsonLd($json),
+        new AdapterContext(variantKey: '111-3'),
+    );
+
+    expect($result->snapshot?->price)->toBe('52.86')
+        ->and($result->snapshot?->variantNote())->toBe('This page sells 2 variants; variant_key names this one.');
+});
+
+test('a page with no variant markup claims nothing about variants', function (): void {
+    // Null is not one. A plain Product entity says nothing about variants, and
+    // answering "one variant" would state a fact this reader did not read —
+    // which is the same error as the silent pick, wearing a confident face.
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Plain Product',
+        'offers' => ['@type' => 'Offer', 'price' => '9.99', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', withJsonLd($json));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->variantsOnPage)->toBeNull()
+        ->and($result->snapshot?->variantNote())->toBeNull();
+});

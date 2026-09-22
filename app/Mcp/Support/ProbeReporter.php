@@ -73,6 +73,14 @@ final readonly class ProbeReporter
             // instead of trusting a bare flag.
             'stock_signal' => $snapshot['stock_signal'] ?? null,
             'pack_size' => $snapshot['pack_size'] ?? null,
+            // How many variants the page sells, and how this one was picked.
+            // Null means this reader cannot see variants at all — not that
+            // the page has one. A bare price from a page whose title looks
+            // like a variant is worse than an error, because it looks like a
+            // success, and a caller had no way to tell the two apart without
+            // fetching the page itself.
+            'variants_on_page' => $snapshot['variants_on_page'] ?? null,
+            'variant_note' => $snapshot['variant_note'] ?? null,
             // Stated before the caller confirms, because this is the one fact
             // that makes an otherwise ordinary price unusable: the shop is
             // added and tracked, but it takes no part in either answer.

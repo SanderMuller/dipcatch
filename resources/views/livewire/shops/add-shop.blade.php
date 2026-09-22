@@ -92,6 +92,13 @@
                             <flux:badge color="zinc" size="sm" class="ms-2">Stock unknown</flux:badge>
                         @endif
                     </div>
+                    @php($variantNote = is_string($snapshot['variant_note'] ?? null) ? $snapshot['variant_note'] : null)
+                    @if ($variantNote !== null)
+                        {{-- Which of the page's variants this price belongs to. A
+                             page selling three flavours used to preview one price
+                             with nothing saying the other two existed. --}}
+                        <flux:text size="sm" class="mt-1 text-zinc-500">{{ $variantNote }}</flux:text>
+                    @endif
                     @if ($bundleLabel)
                         <flux:text size="sm" class="mt-1 text-zinc-500">{{ $bundleLabel }}</flux:text>
                     @endif

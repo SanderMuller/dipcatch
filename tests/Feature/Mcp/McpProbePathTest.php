@@ -535,3 +535,30 @@ test('a 429 that states an interval quotes the shop', function (): void {
         ->assertHasErrors()
         ->assertSee('It asks for 120 seconds.');
 });
+
+test('the preview says how many variants the page sells', function (): void {
+    // The caller could not tell a single-variant page from one of several
+    // silently picked, and fetched the shop's own JSON to find out.
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Creapure Creatine',
+        'hasVariant' => [[
+            '@type' => 'Product',
+            'name' => 'Creapure Creatine - Natural (Unflavoured) / 500g',
+            'sku' => '1089215',
+            'offers' => ['@type' => 'Offer', 'price' => '29.99', 'priceCurrency' => 'EUR'],
+        ]],
+    ], JSON_THROW_ON_ERROR);
+
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $me = User::factory()->create();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
+        ->assertSee('This page sells one variant.');
+});

@@ -27,6 +27,10 @@ final readonly class JsonLdOfferVariants
             return false;
         }
 
+        // Counted before any of them wins, for the same reason the hasVariant
+        // scan counts as it walks — see {@see JsonLdSearchState::$variantsSeen}.
+        $state->variantsSeen += count($offers);
+
         $pinned = self::pinned($offers, $variantKey);
 
         if ($pinned !== null) {

@@ -3,6 +3,7 @@
 namespace App\PriceAdapters;
 
 use App\Enums\ConsumerPriceIssue;
+use App\Enums\VariantResolution;
 
 /**
  * Successful adapter extraction. Prices are decimal strings (compatible with
@@ -83,6 +84,19 @@ final readonly class ShopSnapshot
         public ?ConsumerPriceIssue $consumerPriceIssue = null,
         /** The words the page used, so a surface can show the evidence. */
         public ?string $consumerPriceNote = null,
+        /**
+         * How many variants the page turned out to sell, or null when the
+         * reader has no way to tell.
+         *
+         * Null is not zero, and the difference is the whole point. Only
+         * {@see JsonLdAdapter} reads variants at all; an OpenGraph or
+         * microdata read of a three-flavour page knows nothing about the other
+         * two, and claiming one variant there would be a confident lie. Null
+         * says "this reader cannot see variants", which is what it means.
+         */
+        public ?int $variantsOnPage = null,
+        /** How this variant was picked, when there was a pick to make. */
+        public ?VariantResolution $variantResolution = null,
     ) {}
 
     public function trackedPrice(): string
@@ -127,6 +141,19 @@ final readonly class ShopSnapshot
     public function withStock(bool $inStock, string $stockSignal): self
     {
         return clone($this, ['inStock' => $inStock, 'stockSignal' => $stockSignal]);
+    }
+
+    public function withVariants(int $variantsOnPage, VariantResolution $resolution): self
+    {
+        return clone($this, ['variantsOnPage' => $variantsOnPage, 'variantResolution' => $resolution]);
+    }
+
+    /** The sentence a surface prints, or null when the reader saw no variants. */
+    public function variantNote(): ?string
+    {
+        return $this->variantsOnPage === null
+            ? null
+            : $this->variantResolution?->note($this->variantsOnPage);
     }
 
     public function withConsumerPriceIssue(?ConsumerPriceIssue $issue, ?string $note): self

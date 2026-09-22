@@ -130,6 +130,8 @@ final readonly class JsonLdEntitySearcher
                 continue;
             }
 
+            $state->variantsSeen++;
+
             $evaluation = JsonLdMatch::evaluate($variant, $url, $variantKey);
 
             // A variant answering to the key has answered it, offer or no
