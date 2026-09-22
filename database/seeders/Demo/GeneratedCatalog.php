@@ -6,9 +6,14 @@ use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 
 /**
- * Bulk demo products, so a local checkout shows a populated account rather
- * than a handful of rows: pagination, search, sorting and the plan-limit
- * counters all need more products than a hand-written catalog carries.
+ * Invented bulk demo products, for a checkout with no checkjebon dataset to
+ * draw real ones from. {@see DatasetCatalog} is preferred and this is the
+ * fallback — a seed must still fill an account on a machine that has never
+ * run `dipcatch:refresh-checkjebon`.
+ *
+ * They exist so a local checkout shows a populated account rather than a
+ * handful of rows: pagination, search, sorting and the plan-limit counters all
+ * need more products than a hand-written catalog carries.
  *
  * The curated catalogs in `DemoSeeder` stay the place where an edge state is
  * pinned (dead, failing, sold out, conditional price, promotion, paused).
@@ -28,6 +33,16 @@ final readonly class GeneratedCatalog
      */
     public static function make(int $count, int $offset = 0): array
     {
+        // Real groceries where the machine has the dataset to build them
+        // from — see {@see DatasetCatalog}. The invented pool below is the
+        // fallback for a checkout that has never refreshed it, so a seed
+        // still produces a populated app there.
+        $fromDataset = DatasetCatalog::make($count, $offset);
+
+        if ($fromDataset !== []) {
+            return $fromDataset;
+        }
+
         $pool = self::pool();
         $products = [];
 
