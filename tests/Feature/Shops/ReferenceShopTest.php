@@ -5,10 +5,15 @@ use App\Billing\PlanLimitReached;
 use App\Console\Commands\RecheckActiveShopsCommand;
 use App\Enums\ShopKind;
 use App\Jobs\CheckShopPrice;
+use App\Livewire\Products\ProductShow;
+use App\Livewire\Shops\AddShop;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+
+use function Pest\Livewire\livewire;
 
 /**
  * Finding which shops sell a thing is the slow part. When one refused to be
@@ -96,4 +101,57 @@ test('a kept link counts against the shop limit', function (): void {
 
     expect(fn (): Shop => keptLink($product, 'https://www.etos.nl/p/2'))
         ->toThrow(PlanLimitReached::class);
+});
+
+test('the add form offers to keep a page it could not read', function (): void {
+    // Finding a shop that sells the thing is the slow part, and this is the
+    // moment that work would otherwise be thrown away.
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('nope', 403),
+    ]);
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $this->actingAs($user);
+
+    livewire(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.test/p/1')
+        ->call('probe')
+        ->assertSee('Keep as a link')
+        ->call('keepAsLink');
+
+    $shop = $product->refresh()->shops->sole();
+
+    expect($shop->isReference())->toBeTrue()
+        ->and($shop->unreadable_reason)->toBe('blocked');
+});
+
+test('a wall that clears in seconds is not offered as a link', function (): void {
+    // A rate limit is "wait a moment", not a shop that refuses to be read.
+    // Offering a permanent second-class row there would turn a pause into a
+    // decision.
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    $this->actingAs($user);
+
+    livewire(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.test/p/1')
+        ->set('state', 'error')
+        ->set('errorCode', 'host_rate_limited')
+        ->assertDontSee('Keep as a link');
+});
+
+test('the product page shows a link as a link, not as a missing price', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    keptLink($product, 'https://www.bol.com/nl/nl/p/thing/9200000000000001/');
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('Link only')
+        ->assertSee('DipCatch cannot read this shop');
 });

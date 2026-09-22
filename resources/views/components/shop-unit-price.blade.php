@@ -16,7 +16,11 @@
     $notAConsumerPrice = $shop->notAConsumerPriceReason();
 @endphp
 
-@if ($notAConsumerPrice !== null)
+@if ($shop->isReference())
+    {{-- Ahead of everything: this shop holds no price at all, so every
+         reason below it is about a comparison it was never in. --}}
+    <flux:text size="sm" class="text-zinc-500">{{ $shop->kind->note() }}</flux:text>
+@elseif ($notAConsumerPrice !== null)
     {{-- Ahead of every pack reason: this shop is out of both answers, not
          only out of the per-unit one. --}}
     <flux:text size="sm" class="text-amber-600 dark:text-amber-500">{{ $notAConsumerPrice }}</flux:text>

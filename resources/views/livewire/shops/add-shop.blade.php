@@ -136,7 +136,24 @@
             <flux:callout.text>
                 @include('livewire.shops.partials.probe-error')
             </flux:callout.text>
-            <flux:button type="button" class="mt-2" wire:click="cancel">Try a different URL</flux:button>
+            <div class="mt-2 flex flex-wrap gap-2">
+                <flux:button type="button" wire:click="cancel">{{ __('Try a different URL') }}</flux:button>
+                @if ($this->canKeepAsLink())
+                    {{-- Finding a shop that sells the thing is the slow part, and
+                         this is the moment that work would otherwise be thrown
+                         away. The link holds no price, so it can never decide
+                         either answer. --}}
+                    <flux:button type="button" variant="primary" wire:click="keepAsLink">
+                        <span wire:loading.remove wire:target="keepAsLink">{{ __('Keep as a link') }}</span>
+                        <span wire:loading wire:target="keepAsLink">{{ __('Keeping…') }}</span>
+                    </flux:button>
+                @endif
+            </div>
+            @if ($this->canKeepAsLink())
+                <flux:text size="sm" class="mt-2 text-zinc-500">
+                    {{ __('It is saved without a price, never decides the cheapest or the best value, and is checked again weekly — if the page becomes readable, DipCatch starts tracking it by itself.') }}
+                </flux:text>
+            @endif
         </flux:callout>
     @endif
 </div>

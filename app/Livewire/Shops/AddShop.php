@@ -3,14 +3,17 @@
 namespace App\Livewire\Shops;
 
 use App\Actions\Shops\AttachShop;
+use App\Actions\Shops\KeepShopAsLink;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\TrackedElsewhere;
 use App\Billing\PlanLimitReached;
+use App\Enums\ProbeFailure;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\Product;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
+use InvalidArgumentException;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -111,6 +114,61 @@ final class AddShop extends Component
         }
 
         $this->dispatch('shop-added', offerId: $offerId);
+        $this->resetProbeState();
+    }
+
+    /**
+     * Whether the wall this URL hit is one worth keeping the link behind.
+     *
+     * Read from the failure rather than offered on every error: a rate limit
+     * clears in seconds, and offering a permanent second-class row there would
+     * turn "wait a moment" into a decision.
+     */
+    public function canKeepAsLink(): bool
+    {
+        return $this->state === 'error'
+            && $this->url !== ''
+            && ProbeFailure::tryFrom((string) $this->errorCode)?->isWorthKeepingAsLink() === true;
+    }
+
+    /**
+     * Keep the page as a link: no price, out of both answers, retried weekly.
+     *
+     * Finding a shop that sells the thing is the slow part, and this is the
+     * moment that work would otherwise be thrown away.
+     */
+    public function keepAsLink(KeepShopAsLink $keep): void
+    {
+        Gate::authorize('view', $this->product);
+
+        if (! $this->canKeepAsLink()) {
+            return;
+        }
+
+        try {
+            $shop = $keep($this->product, $this->url, (string) $this->errorCode);
+        } catch (InvalidArgumentException) {
+            $this->failWith(ProbeFailure::InvalidUrl->value, context: null);
+
+            return;
+        } catch (PlanLimitReached $e) {
+            Notification::make()
+                ->warning()
+                ->title('You have used all your shops on this product')
+                ->body($e->getMessage())
+                ->persistent()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->success()
+            ->title('Kept as a link')
+            ->body('DipCatch cannot read ' . $shop->host . ', so it holds no price and never decides the cheapest or the best value. It is checked again once a week, and starts being tracked by itself if the page becomes readable.')
+            ->send();
+
+        $this->dispatch('shop-added', offerId: (string) $shop->id);
         $this->resetProbeState();
     }
 
