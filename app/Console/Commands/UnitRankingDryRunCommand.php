@@ -71,8 +71,8 @@ final class UnitRankingDryRunCommand extends Command
         $this->rows('Products that compare per unit with no winner — these have stopped alerting', $stranded);
         $this->rows('Sizes nobody stated', $suspects);
         $this->rows('Rows whose URL carries no product identifier', self::urlsWithoutAProductPath());
-        $this->rows('The same URL tracked on more than one product', self::urlsOnSeveralProducts());
-        $this->rows('Variant-selector pages tracked without a variant_key', self::variantPagesWithoutAKey());
+        $this->rows('One page, several products, no variant to tell them apart', self::unkeyedSharedPages());
+        $this->rows('One page, several products, each keyed to its own variant — nothing to do', self::keyedSharedPages());
 
         return self::SUCCESS;
     }
@@ -150,37 +150,60 @@ final class UnitRankingDryRunCommand extends Command
     }
 
     /**
+     * Pages serving more than one product where no row names a variant.
+     *
+     * Two things look identical here and the command cannot tell them apart,
+     * so it says so rather than guessing. Either the products are duplicates of
+     * each other — two "Fanta Cassis 1,5 L" on one AH page, both alerting on
+     * the same fall — or the page sells several variants and nobody keyed them,
+     * in which case every product reads whichever variant the page shows by
+     * default. `realsupps.nl/products/barebells-repen-12-x-55g` is the second
+     * kind, on two flavours: the prices are equal today, so nothing looks
+     * wrong, and a single-flavour promotion would land on the wrong bar.
+     *
+     * An earlier version of this listed those two cases as separate tiers. The
+     * second was a strict subset of the first — a `url_hash` is unique per
+     * product, so any group sharing one is already several products — so the
+     * same rows printed twice and neither line said which case it was.
+     *
      * @return list<string>
      */
-    private static function urlsOnSeveralProducts(): array
+    private static function unkeyedSharedPages(): array
+    {
+        return self::sharedPages(
+            static fn (Collection $group): bool => $group->every(
+                static fn (Shop $shop): bool => $shop->variant_key === null,
+            ),
+            ' — %d products, none keyed: duplicates, or one variant page nobody keyed',
+        );
+    }
+
+    /**
+     * The legitimate shape, listed so a reader can see it was considered.
+     *
+     * @return list<string>
+     */
+    private static function keyedSharedPages(): array
+    {
+        return self::sharedPages(
+            static fn (Collection $group): bool => $group->pluck('variant_key')->filter()->unique()->count() === $group->count(),
+            ' — %d products, one variant each',
+        );
+    }
+
+    /**
+     * @param  callable(Collection<int, Shop>): bool  $matching
+     * @return list<string>
+     */
+    private static function sharedPages(callable $matching, string $suffix): array
     {
         return Shop::query()
             ->where('active', true)
             ->get()
             ->groupBy('url_hash')
             ->filter(static fn (Collection $group): bool => $group->pluck('product_id')->unique()->count() > 1)
-            ->map(static fn (Collection $group): string => $group->first()?->url . ' — ' . $group->count() . ' products')
-            ->values()
-            ->all();
-    }
-
-    /**
-     * `realsupps.nl/products/barebells-repen-12-x-55g` is tracked on two
-     * flavours, and both read the page default. The prices are equal today, so
-     * nothing looks wrong — a single-flavour promotion would be attributed to
-     * the wrong bar.
-     *
-     * @return list<string>
-     */
-    private static function variantPagesWithoutAKey(): array
-    {
-        return Shop::query()
-            ->where('active', true)
-            ->whereNull('variant_key')
-            ->get()
-            ->groupBy('url_hash')
-            ->filter(static fn (Collection $group): bool => $group->count() > 1)
-            ->map(static fn (Collection $group): string => (string) $group->first()?->url)
+            ->filter($matching)
+            ->map(static fn (Collection $group): string => $group->first()?->url . sprintf($suffix, $group->count()))
             ->values()
             ->all();
     }
