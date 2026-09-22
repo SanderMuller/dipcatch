@@ -365,12 +365,13 @@ final class Product extends Model
             && $shop->health !== ShopHealth::Dead
             && $shop->currency === $this->currency
             && $shop->current_price !== null
-            // A price quoted without VAT is not a price anyone pays. It is
-            // lower than every complete price beside it by the rate of the
-            // tax, so left in it takes both answers and fires alerts on a
-            // figure the shopper cannot act on. It is also barred from voting
-            // on the comparison unit: the shop is not in the comparison.
-            && ! $shop->price_excludes_vat);
+            // A price quoted without VAT, or shown only to trade accounts,
+            // is not a price anyone here pays. It is lower than every
+            // complete price beside it, so left in it takes both answers and
+            // fires alerts on a figure the shopper cannot act on. Barred from
+            // voting on the comparison unit too: the shop is not in the
+            // comparison. See {@see ConsumerPriceIssue}.
+            && $shop->consumer_price_issue === null);
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Shops;
 
+use App\Enums\ConsumerPriceIssue;
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
@@ -47,8 +48,10 @@ final readonly class ShopDraft
          * not a name a person chose.
          */
         public ?string $titleOverride = null,
-        /** The words the page uses to say its price leaves VAT out. */
-        public ?string $vatNote = null,
+        /** Why this price is not one a shopper can pay, when it is not. */
+        public ?ConsumerPriceIssue $consumerPriceIssue = null,
+        /** The words the page used to say so. */
+        public ?string $consumerPriceNote = null,
     ) {}
 
     public function trackedPrice(): string
@@ -97,7 +100,8 @@ final readonly class ShopDraft
             'stock_signal' => $snapshot->stockSignal,
             'pack_size' => $snapshot->packSize,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
-            'vat_note' => $snapshot->vatExclusiveNote,
+            'consumer_price_issue' => $snapshot->consumerPriceIssue?->value,
+            'consumer_price_note' => $snapshot->consumerPriceNote,
         ];
     }
 
@@ -164,7 +168,8 @@ final readonly class ShopDraft
             bundleOffer: $bundleOffer,
             promotionWindow: $promotionWindow,
             titleOverride: $titleOverride,
-            vatNote: self::string($snapshot, 'vat_note'),
+            consumerPriceIssue: ConsumerPriceIssue::tryFrom(self::string($snapshot, 'consumer_price_issue') ?? ''),
+            consumerPriceNote: self::string($snapshot, 'consumer_price_note'),
         );
     }
 

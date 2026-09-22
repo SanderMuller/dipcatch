@@ -2,6 +2,8 @@
 
 namespace App\PriceAdapters;
 
+use App\Enums\ConsumerPriceIssue;
+
 /**
  * Successful adapter extraction. Prices are decimal strings (compatible with
  * `bccomp` + the existing `PriceCheck.price` decimal(12,2) column) — no cent
@@ -73,12 +75,14 @@ final readonly class ShopSnapshot
         /** True when the source exposed its product-bound bundle field. */
         public bool $bundleOfferAuthoritative = false,
         /**
-         * The words the page uses to say this price leaves VAT out, or null
-         * when it says nothing of the kind. Read from the page as a whole by
-         * {@see VatStatement}, not by any one adapter — a shop states it in
+         * Why this number is not a price a shopper can pay, when it is not.
+         * Read from the page as a whole by {@see VatStatement} and
+         * {@see TradeGate}, not by any one adapter — a shop states these in
          * its own copy, and which adapter read the price is beside the point.
          */
-        public ?string $vatExclusiveNote = null,
+        public ?ConsumerPriceIssue $consumerPriceIssue = null,
+        /** The words the page used, so a surface can show the evidence. */
+        public ?string $consumerPriceNote = null,
     ) {}
 
     public function trackedPrice(): string
@@ -125,9 +129,9 @@ final readonly class ShopSnapshot
         return clone($this, ['inStock' => $inStock, 'stockSignal' => $stockSignal]);
     }
 
-    public function withVatExclusiveNote(?string $note): self
+    public function withConsumerPriceIssue(?ConsumerPriceIssue $issue, ?string $note): self
     {
-        return clone($this, ['vatExclusiveNote' => $note]);
+        return clone($this, ['consumerPriceIssue' => $issue, 'consumerPriceNote' => $note]);
     }
 
     public function withCurrency(string $currency): self

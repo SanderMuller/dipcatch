@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\ConsumerPriceIssue;
 use App\Enums\ShopHealth;
 use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
@@ -307,7 +308,7 @@ test('a price quoted without VAT takes neither answer', function (): void {
         'amazon.nl' => ['current_price' => '22.00', 'pack_quantity' => '90.00', 'pack_unit' => 'piece'],
         'fivestartrading-holland.eu' => [
             'current_price' => '21.15', 'pack_quantity' => '90.00', 'pack_unit' => 'piece',
-            'price_excludes_vat' => true, 'vat_note' => 'excl. btw',
+            'consumer_price_issue' => ConsumerPriceIssue::ExcludesVat, 'consumer_price_note' => 'excl. btw',
         ],
     ]);
 
@@ -322,8 +323,8 @@ test('a shop out for VAT does not decide the comparison unit', function (): void
     // Two ex-VAT rows measured in pieces must not make the one live gram row
     // "measured in a different unit" and leave the product with no winner.
     $product = productWithShops([
-        'a.test' => ['current_price' => '1.00', 'pack_quantity' => '10.00', 'pack_unit' => 'piece', 'price_excludes_vat' => true],
-        'b.test' => ['current_price' => '1.00', 'pack_quantity' => '10.00', 'pack_unit' => 'piece', 'price_excludes_vat' => true],
+        'a.test' => ['current_price' => '1.00', 'pack_quantity' => '10.00', 'pack_unit' => 'piece', 'consumer_price_issue' => ConsumerPriceIssue::ExcludesVat],
+        'b.test' => ['current_price' => '1.00', 'pack_quantity' => '10.00', 'pack_unit' => 'piece', 'consumer_price_issue' => ConsumerPriceIssue::ExcludesVat],
         'c.test' => ['current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g'],
     ]);
 
@@ -342,7 +343,8 @@ test('the product page says why a VAT-exclusive shop is out', function (): void 
             ->forceFill([
                 'currency' => 'EUR', 'current_price' => $price,
                 'pack_quantity' => '90.00', 'pack_unit' => 'piece',
-                'price_excludes_vat' => $exVat, 'vat_note' => $exVat ? 'excl. btw' : null,
+                'consumer_price_issue' => $exVat ? ConsumerPriceIssue::ExcludesVat : null,
+                'consumer_price_note' => $exVat ? 'excl. btw' : null,
             ])->save();
     }
 
@@ -350,4 +352,22 @@ test('the product page says why a VAT-exclusive shop is out', function (): void 
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
         ->assertSeeText('Price excludes VAT — not comparable');
+});
+
+test('a trade-only price takes neither answer either', function (): void {
+    // The Prometeus case: 12.99 undercut two real consumer shops at 14.99.
+    $product = productWithShops([
+        'prometeus.nl' => [
+            'current_price' => '12.99', 'pack_quantity' => '550.00', 'pack_unit' => 'g',
+            'consumer_price_issue' => ConsumerPriceIssue::TradeOnly,
+            'consumer_price_note' => 'sign in to see prices',
+        ],
+        'bodyandfit.com' => ['current_price' => '14.99', 'pack_quantity' => '550.00', 'pack_unit' => 'g'],
+    ]);
+
+    $product->recomputeCheapestShop();
+    $product->refresh();
+
+    expect($product->bestValueShop()?->host)->toBe('bodyandfit.com')
+        ->and($product->lowestOutlayShop()?->host)->toBe('bodyandfit.com');
 });

@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\ConsumerPriceIssue;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Jobs\CheckShopPrice;
@@ -780,23 +781,46 @@ test('a check records that the page quotes its price without VAT', function (): 
     new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
 
     $shop->refresh();
-    expect($shop->price_excludes_vat)->toBeTrue()
-        ->and($shop->vat_note)->toBe('excl. btw')
+    expect($shop->consumer_price_issue)->toBe(ConsumerPriceIssue::ExcludesVat)
+        ->and($shop->consumer_price_note)->toBe('excl. btw')
         ->and($shop->notAConsumerPriceReason())->toBe('Price excludes VAT — not comparable');
 });
 
 test('a shop that stops quoting without VAT rejoins the comparison', function (): void {
     Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '23.05', name: 'Dolce Gusto Lungo XL 90 cups'));
 
-    $shop = Shop::factory()->create([
-        'url' => 'https://shop.test/p/1',
-        'price_excludes_vat' => true,
-        'vat_note' => 'excl. btw',
-    ]);
+    $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
+    $shop->forceFill(['consumer_price_issue' => ConsumerPriceIssue::ExcludesVat, 'consumer_price_note' => 'excl. btw'])->save();
 
     new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
 
     $shop->refresh();
-    expect($shop->price_excludes_vat)->toBeFalse()
-        ->and($shop->vat_note)->toBeNull();
+    expect($shop->consumer_price_issue)->toBeNull()
+        ->and($shop->consumer_price_note)->toBeNull();
+});
+
+test('a check records a page that shows its price only to trade accounts', function (): void {
+    // prometeus.nl: og:price:amount carries 12,99 on a page whose body shows
+    // no price and says "Sign in to see prices". A target of 13.00 was met on
+    // the spot by a price the shopper cannot pay.
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response(
+            '<html><head><meta property="og:title" content="Fit &amp; Co Protein Bar - 10 x 55 g">'
+            . '<meta property="og:price:amount" content="12,99">'
+            . '<meta property="og:price:currency" content="EUR"></head>'
+            . '<body><p>Vendor: Prometeus B2B</p><p>Sign in to see prices</p></body></html>',
+            200,
+            ['Content-Type' => 'text/html'],
+        ),
+    ]);
+
+    $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    $shop->refresh();
+    expect($shop->current_price)->toBe('12.99')
+        ->and($shop->consumer_price_issue)->toBe(ConsumerPriceIssue::TradeOnly)
+        ->and($shop->notAConsumerPriceReason())->toBe('Trade-only — not sold to consumers');
 });

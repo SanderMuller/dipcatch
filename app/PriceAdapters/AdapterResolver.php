@@ -2,6 +2,8 @@
 
 namespace App\PriceAdapters;
 
+use App\Enums\ConsumerPriceIssue;
+
 /**
  * Chain-of-responsibility over registered adapters. Per spec §2:
  *
@@ -82,18 +84,23 @@ final readonly class AdapterResolver
      */
     private function readPage(ExtractionResult $result, string $html): ExtractionResult
     {
-        return $this->readVat($this->readStock($result, $html), $html);
+        return $this->readConsumerPrice($this->readStock($result, $html), $html);
     }
 
     /**
-     * Whether the page quotes its price without VAT.
+     * Whether the number that was read is a price a shopper can pay.
      *
      * Read here rather than in an adapter because it is a fact about the shop,
      * not about the markup the price came from: fivestartrading-holland.eu
      * publishes ordinary JSON-LD and says "excl. BTW" in the line under the
-     * price, so every adapter would have to know to look.
+     * price, and prometeus.nl publishes an ordinary OpenGraph price on a page
+     * that says "Sign in to see prices". Every adapter would otherwise have to
+     * know to look.
+     *
+     * VAT is tested first. A page can be both, and a shopper shown one reason
+     * is told the same thing either way: this row is not their price.
      */
-    private function readVat(ExtractionResult $result, string $html): ExtractionResult
+    private function readConsumerPrice(ExtractionResult $result, string $html): ExtractionResult
     {
         $snapshot = $result->snapshot;
 
@@ -101,7 +108,16 @@ final readonly class AdapterResolver
             return $result;
         }
 
-        return ExtractionResult::success($snapshot->withVatExclusiveNote(VatStatement::exclusivePhrase($html)))
+        $vat = VatStatement::exclusivePhrase($html);
+        $gate = $vat === null ? TradeGate::gatedPhrase($html, $snapshot->price) : null;
+
+        $issue = match (true) {
+            $vat !== null => ConsumerPriceIssue::ExcludesVat,
+            $gate !== null => ConsumerPriceIssue::TradeOnly,
+            default => null,
+        };
+
+        return ExtractionResult::success($snapshot->withConsumerPriceIssue($issue, $vat ?? $gate))
             ->withAdapterKey((string) $result->adapterKey);
     }
 

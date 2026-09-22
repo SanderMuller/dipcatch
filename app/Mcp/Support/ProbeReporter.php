@@ -4,6 +4,7 @@ namespace App\Mcp\Support;
 
 use App\Actions\Shops\ProbeBudget;
 use App\Actions\Shops\ProbeOutcome;
+use App\Enums\ConsumerPriceIssue;
 use App\Enums\ProbeFailure;
 use App\PriceAdapters\VariantCandidate;
 use Laravel\Mcp\Response;
@@ -75,8 +76,10 @@ final readonly class ProbeReporter
             // Stated before the caller confirms, because this is the one fact
             // that makes an otherwise ordinary price unusable: the shop is
             // added and tracked, but it takes no part in either answer.
-            'price_excludes_vat' => ($snapshot['vat_note'] ?? null) !== null,
-            'vat_note' => $snapshot['vat_note'] ?? null,
+            'not_a_consumer_price' => ConsumerPriceIssue::tryFrom(
+                is_string($snapshot['consumer_price_issue'] ?? null) ? $snapshot['consumer_price_issue'] : '',
+            )?->label(),
+            'consumer_price_note' => $snapshot['consumer_price_note'] ?? null,
             'shop' => $outcome->host,
             'url' => $outcome->normalizedUrl,
         ];
@@ -90,7 +93,10 @@ final readonly class ProbeReporter
         return match ($code) {
             ProbeFailure::InvalidUrl => 'That does not look like a URL. Paste the address of a product page.',
             ProbeFailure::ProbeRateLimited => 'DipCatch reads at most ' . ProbeBudget::PER_MINUTE . ' pages a minute for one account. ' . self::waitSentence($context),
-            ProbeFailure::LocalThrottle, ProbeFailure::HostRateLimited => 'That shop asked DipCatch to slow down. ' . self::waitSentence($context),
+            // Split from the host's own 429 on purpose. This one is DipCatch's
+            // per-host throttle, and it knows exactly when it next opens.
+            ProbeFailure::LocalThrottle => 'DipCatch is pacing its own requests to that shop. ' . self::waitSentence($context),
+            ProbeFailure::HostRateLimited => 'That shop asked DipCatch to slow down. ' . self::hostWaitSentence($context),
             ProbeFailure::RobotsDisallowed => 'That shop asks crawlers not to read this page, and DipCatch honours that.',
             ProbeFailure::Blocked => self::persistent($context)
                 ? 'That shop has blocked DipCatch on its last ' . self::failures($context) . ' requests. Retrying will not help — the shop refuses automated readers.'
@@ -154,8 +160,31 @@ final readonly class ProbeReporter
     }
 
     /**
-     * How long to wait, when the failure carries a retry-after. Without one
-     * the caller still gets a bound rather than a guess.
+     * What to tell a caller a shop refused with HTTP 429.
+     *
+     * Only a figure the shop itself stated. DipCatch used to default to sixty
+     * seconds and print it as the shop's own instruction; dierapotheker.nl
+     * sends a bare nginx 429 with no `Retry-After`, so a caller followed that
+     * invented number four times and was refused each time. A retry interval
+     * we made up reads as a promise, and a caller that keeps it hammers a shop
+     * that has asked us to stop.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private static function hostWaitSentence(array $context): string
+    {
+        $seconds = $context['retry_after_seconds'] ?? null;
+
+        if (! is_int($seconds) || $seconds < 1) {
+            return 'It did not say for how long, so DipCatch cannot tell you when to retry. Leave it several minutes. A shop that keeps refusing is limiting DipCatch rather than being briefly busy, and retrying sooner makes that worse.';
+        }
+
+        return 'It asks for ' . $seconds . ' ' . ($seconds === 1 ? 'second' : 'seconds') . '.';
+    }
+
+    /**
+     * How long to wait when DipCatch is the one holding the request back. Its
+     * own limiters always know, so the fallback is a formality.
      *
      * @param  array<string, mixed>  $context
      */
