@@ -29,13 +29,21 @@ use Illuminate\Support\Collection;
 final readonly class ComparablePacks
 {
     /**
-     * How far below the stating shops' median unit price an inferred size may
-     * land before it reads as a wrong size rather than a good offer.
+     * How far from the stating shops' median unit price an inherited size may
+     * land before it reads as a wrong size rather than a real offer.
      *
-     * One-sided on purpose. A row stamped too *expensive* loses nothing a reader
-     * acts on, because an inferred size can neither win nor alert either way.
+     * Tested in both directions. It used to refuse only the implausibly cheap,
+     * reasoning that a row stamped too expensive loses nothing a reader acts on
+     * — an inferred size can neither win nor alert. That was wrong about what a
+     * reader acts on. A 150-tablet pack that inherited a sibling's 75 showed
+     * 0.1265 a tablet against a true 0.0633, so the best deal on the product
+     * was displayed as the worst. It could not win, and nobody needed it to in
+     * order to be misled by it. Reported 2026-09-22.
+     *
+     * One ratio rather than two constants, so the two sides of the band cannot
+     * drift apart.
      */
-    private const float IMPLAUSIBLE_BELOW_MEDIAN = 0.60;
+    private const float IMPLAUSIBLE_RATIO = 0.60;
 
     /**
      * @param  array<string, ComparablePack>  $packs  keyed by shop id
@@ -205,18 +213,24 @@ final readonly class ComparablePacks
     }
 
     /**
-     * An inherited size that makes this shop look far cheaper per unit than
-     * every shop that stated its own is evidence the size is wrong.
+     * An inherited size that puts this shop far from every shop that stated its
+     * own is evidence the size is wrong, whichever way it lands.
+     *
+     * The size is a guess borrowed from the siblings, so a figure far off the
+     * field says the guess does not hold rather than that the shop is unusual.
+     * "Pack size unknown" is the honest answer, and it costs nothing a reader
+     * acts on: the row could not win on an inferred size either way.
      */
     private static function isImplausible(Shop $shop, PackSize $agreed, ?float $median): bool
     {
-        if ($median === null) {
+        if ($median === null || $median <= 0.0) {
             return false;
         }
 
         $implied = $agreed->unitPriceValueFor((string) ($shop->current_price ?? ''));
 
-        return $implied !== null && $implied < $median * self::IMPLAUSIBLE_BELOW_MEDIAN;
+        return $implied !== null
+            && ($implied < $median * self::IMPLAUSIBLE_RATIO || $implied > $median / self::IMPLAUSIBLE_RATIO);
     }
 
     private static function statedSize(Shop $shop): ?PackSize

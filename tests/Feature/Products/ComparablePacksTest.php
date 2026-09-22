@@ -261,14 +261,30 @@ test('an inherited size right on the plausibility boundary is kept', function ()
     expect(packFor($product->refresh(), 'silent.nl')?->exclusion)->toBe(PackExclusion::SizeImplausible);
 });
 
-test('an inherited size far above the field is kept, because it costs nobody anything', function (): void {
-    // The guard is one-sided on purpose. A row stamped too expensive cannot win
-    // and cannot alert either way, so refusing it would remove information
-    // without protecting anyone.
+test('an inherited size far above the field is refused too', function (): void {
+    // The guard used to be one-sided, reasoning that a row stamped too
+    // expensive cannot win and cannot alert, so refusing it would remove
+    // information without protecting anyone. That was wrong about what a
+    // reader acts on: reported 2026-09-22, a 150-tablet pack that inherited a
+    // sibling's 75 was displayed at twice its real price per tablet, so the
+    // best deal on the product read as the worst. It never won, and it did not
+    // need to in order to mislead.
     $product = productForPacks([
         'ah.nl' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
         'jumbo.com' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
         'silent.nl' => ['current_price' => '80.00', 'pack_quantity' => null, 'pack_unit' => null],
+    ]);
+
+    expect(packFor($product, 'silent.nl')?->exclusion)->toBe(PackExclusion::SizeImplausible);
+});
+
+test('an inherited size merely dearer than the field is kept', function (): void {
+    // The band is the same distance either side of the median, so an ordinary
+    // dearer shop keeps its figure. Median is 20.00/kg; 30.00 sits inside.
+    $product = productForPacks([
+        'ah.nl' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'jumbo.com' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'silent.nl' => ['current_price' => '30.00', 'pack_quantity' => null, 'pack_unit' => null],
     ]);
 
     expect(packFor($product, 'silent.nl')?->provenance)->toBe(PackProvenance::Inferred);

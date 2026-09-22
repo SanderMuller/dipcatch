@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Enums\ConsumerPriceIssue;
+use App\Enums\PackProvenance;
 use App\Enums\ShopHealth;
 use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
@@ -377,4 +378,39 @@ test('a trade-only price takes neither answer either', function (): void {
 
     expect($product->bestValueShop()?->host)->toBe('bodyandfit.com')
         ->and($product->lowestOutlayShop()?->host)->toBe('bodyandfit.com');
+});
+
+test('an inherited size that reads far dearer than the field is refused', function (): void {
+    // Reported 2026-09-22. A 150-tablet pack whose own size could not be read
+    // inherited a sibling's 75 and showed 0.1265 a tablet against a true
+    // 0.0633 — the best deal on the product, displayed as the worst. The guard
+    // used to refuse only the implausibly cheap, because an inferred row
+    // cannot win. Nobody needed it to win in order to be misled by it.
+    $product = productWithShops([
+        'internetdrogisterij.nl' => ['current_price' => '4.75', 'pack_quantity' => '75.00', 'pack_unit' => 'piece'],
+        'koopjesdrogisterij.nl' => ['current_price' => '4.75', 'pack_quantity' => '75.00', 'pack_unit' => 'piece'],
+        // States no size of its own, and is really a 150-pack.
+        'deonlinedrogist.nl' => ['current_price' => '9.49'],
+    ]);
+
+    $packs = $product->comparablePacks();
+    $borrowed = $product->shops->where('host', 'deonlinedrogist.nl')->sole();
+
+    expect($packs->for($borrowed)?->reason())->toBe('Pack size looks wrong for this product')
+        ->and($packs->unitPriceOf($borrowed))->toBeNull();
+});
+
+test('an inherited size close to the field is still used', function (): void {
+    // The guard refuses a figure far off the field, not any figure at all.
+    $product = productWithShops([
+        'a.test' => ['current_price' => '4.75', 'pack_quantity' => '75.00', 'pack_unit' => 'piece'],
+        'b.test' => ['current_price' => '4.75', 'pack_quantity' => '75.00', 'pack_unit' => 'piece'],
+        'c.test' => ['current_price' => '5.25'],
+    ]);
+
+    $packs = $product->comparablePacks();
+    $borrowed = $product->shops->where('host', 'c.test')->sole();
+
+    expect($packs->for($borrowed)?->provenance)->toBe(PackProvenance::Inferred)
+        ->and($packs->unitPriceOf($borrowed))->toBe('0.0700');
 });

@@ -59,8 +59,21 @@ final readonly class PackSize
      */
     private const array PIECE_WORDS = [
         'tabletten', 'capsules', 'capsule', 'rollen', 'zakjes', 'tablet', 'vellen',
-        'stuks', 'zakje', 'stuk', 'pack', 'cups', 'pads', 'rol', 'vel', 'cup', 'pad', 'st',
+        'stuks', 'zakje', 'tabl', 'sach', 'caps', 'stuk', 'pack', 'cups', 'pads',
+        'cps', 'stk', 'rol', 'vel', 'cup', 'pad', 'st', 'tb',
     ];
+
+    /**
+     * Words that make a `TB` a terabyte rather than a tablet.
+     *
+     * `75TB` is how a Dutch drugstore writes seventy-five tablets, and it is on
+     * every listing of the shops that use it. It is also how a shop writes the
+     * size of a disk, and reading a 2 TB drive as two tablets would price it
+     * per half-disk. The abbreviation is kept and the one context that steals
+     * it is removed, the same way `vel` is dropped when another piece word is
+     * present.
+     */
+    private const string STORAGE_PATTERN = '/\b(?:ssd|hdd|nvme|harde\s?schijf|micro\s?sd|geheugenkaart)\b/iu';
 
     /**
      * A number token, comma-decimal aware, that never starts a size token
@@ -98,6 +111,12 @@ final readonly class PackSize
         $nonVelPieceAlt = self::alternation(array_values(array_diff(self::PIECE_WORDS, ['vel', 'vellen'])));
         if (preg_match('/' . self::NUMBER . '\s*(?:' . $nonVelPieceAlt . ')\b/iu', $text) === 1) {
             $text = preg_replace('/' . self::NUMBER . '\s*(?:vellen|vel)\b/iu', ' ', $text) ?? $text;
+        }
+
+        // A terabyte is not a tablet. Dropped before any bucket is collected,
+        // so a disk whose title also states grams still reads as grams.
+        if (preg_match(self::STORAGE_PATTERN, $text) === 1) {
+            $text = preg_replace('/' . self::NUMBER . '\s*tb\b/iu', ' ', $text) ?? $text;
         }
 
         // Step 1: whole-string rejects.

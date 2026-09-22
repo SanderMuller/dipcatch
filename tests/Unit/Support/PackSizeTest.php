@@ -390,3 +390,37 @@ test('a bare count multiplies the item size the shop stated', function (): void 
     expect($size?->quantity)->toBe(1000000.0)
         ->and($size?->unit)->toBe('ml');
 });
+
+// --- Dutch drugstore count abbreviations -------------------------------------
+
+test('a count written as a drugstore abbreviation is read', function (string $title, float $expected): void {
+    // deonlinedrogist.nl writes every listing this way, and so do its
+    // neighbours. Unread, the row inherits a sibling's size instead.
+    expect(PackSize::parse($title)?->quantity)->toBe($expected)
+        ->and(PackSize::parse($title)?->unit)->toBe('piece');
+})->with([
+    ['Davitamon Vitamine D3 20mcg Smelttabletten 150TB', 150.0],
+    ['Davitamon Vitamine D3 20mcg Smelttabletten 75TB', 75.0],
+    ['Roter Vitamine C 400 TABL', 400.0],
+    ['Omega 3 visolie 60 caps', 60.0],
+    ['Magnesium 90 CPS', 90.0],
+    ['Thee 20 SACH', 20.0],
+    ['Bouillon 6 STK', 6.0],
+]);
+
+test('a terabyte is not a tablet', function (string $title): void {
+    // `TB` is seventy-five tablets at a drugstore and two thousand gigabytes
+    // at an electronics shop. Reading a disk as two tablets would price it per
+    // half-disk.
+    expect(PackSize::parse($title))->toBeNull();
+})->with([
+    'Samsung 870 EVO 2TB SSD',
+    'Crucial P3 1TB NVMe',
+    'Externe harde schijf 4TB',
+    'SanDisk 512 GB micro SD',
+]);
+
+test('a disk that states a real size still reads it', function (): void {
+    // The terabyte is dropped, not the whole string.
+    expect(PackSize::parse('Samsung 870 EVO 2TB SSD 500 g')?->quantity)->toBe(500.0);
+});
