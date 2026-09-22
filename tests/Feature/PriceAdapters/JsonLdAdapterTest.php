@@ -942,3 +942,66 @@ test('two offers naming the request equally precisely are put to the user', func
     expect($result->isAmbiguous())->toBeTrue()
         ->and($result->variants)->toHaveCount(2);
 });
+
+/**
+ * The fitpiggy.nl shape, reported from production: a Shopify shop publishing
+ * `"sku": null` and no per-variant URL on either variant. The chooser has no
+ * identifier to print, so it synthesises one — and the matcher only ever
+ * tested the four identifier fields and the URL, which are exactly the ones
+ * that were empty. Every synthesised key was refused, and the refusal listed
+ * the same key back as a valid choice.
+ */
+function unidentifiedVariants(): string
+{
+    return json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Double Chocolate',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Double Chocolate - 1 Reep',
+                'offers' => ['@type' => 'Offer', 'price' => '2.99', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Double Chocolate - 12 Repen (11+1 Gratis)',
+                'offers' => ['@type' => 'Offer', 'price' => '32.89', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+}
+
+test('a key the chooser synthesised matches on the next call', function (): void {
+    $url = 'https://fitpiggy.test/products/double-chocolate-2';
+
+    $chooser = new JsonLdAdapter()->extract($url, withJsonLd(unidentifiedVariants()));
+
+    expect($chooser->isAmbiguous())->toBeTrue()
+        ->and($chooser->variants)->toHaveCount(2);
+
+    $key = $chooser->variants[1]->key;
+
+    expect($key)->toStartWith('variant-');
+
+    $result = new JsonLdAdapter()->extract($url, withJsonLd(unidentifiedVariants()), new AdapterContext(variantKey: $key));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('32.89');
+});
+
+test('a synthesised key survives the shop changing its price', function (): void {
+    $url = 'https://fitpiggy.test/products/double-chocolate-2';
+
+    $chooser = new JsonLdAdapter()->extract($url, withJsonLd(unidentifiedVariants()));
+    $key = $chooser->variants[1]->key;
+
+    // The same page a week later, one variant on promotion. A key hashed from
+    // the whole entry moved with the price and named nothing.
+    $cheaper = str_replace('32.89', '27.89', unidentifiedVariants());
+
+    $result = new JsonLdAdapter()->extract($url, withJsonLd($cheaper), new AdapterContext(variantKey: $key));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('27.89');
+});

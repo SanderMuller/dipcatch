@@ -86,6 +86,17 @@ final readonly class JsonLdMatch
             return true;
         }
 
+        // A key this app synthesised. The chooser prints one for every variant
+        // a shop publishes with no identifier of its own — Shopify shops that
+        // set `"sku": null` and no per-variant URL — and without this branch
+        // the matcher had no way to recognise one. It tested these four fields
+        // and the URL, which is exactly the set that was empty when the key was
+        // synthesised, so such a key was refused every time while the error
+        // listed it back as a valid choice.
+        if (str_starts_with($key, JsonLdEntitySearcher::SYNTHESISED_PREFIX)) {
+            return JsonLdEntitySearcher::variantKeyFor($entity) === $key;
+        }
+
         return false;
     }
 }

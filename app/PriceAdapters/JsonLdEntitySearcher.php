@@ -11,6 +11,17 @@ namespace App\PriceAdapters;
  */
 final readonly class JsonLdEntitySearcher
 {
+    /** Marks a key this app made up, rather than one the shop published. */
+    public const string SYNTHESISED_PREFIX = 'variant-';
+
+    /**
+     * What a synthesised key is hashed from. Anything the shop can change
+     * without the variant becoming a different thing to buy stays out.
+     *
+     * @var list<string>
+     */
+    private const array STABLE_KEY_FIELDS = ['name', 'variesBy', 'color', 'size', 'material', 'additionalProperty'];
+
     /**
      * Inspect a single entity, recording what it offers in
      * {@see JsonLdSearchState}. Nothing is returned early: the caller reads
@@ -200,9 +211,14 @@ final readonly class JsonLdEntitySearcher
     }
 
     /**
+     * The key a chooser prints for one variant, and the same key the matcher
+     * recomputes when the caller sends it back. Public because those two are
+     * different code paths, and a key only one of them can produce is a key
+     * that never matches — see {@see JsonLdMatch::keyMatches()}.
+     *
      * @param  array<string, mixed>  $variant
      */
-    private static function variantKeyFor(array $variant): string
+    public static function variantKeyFor(array $variant): string
     {
         foreach (JsonLdMatch::KEY_FIELDS as $field) {
             $value = $variant[$field] ?? null;
@@ -219,6 +235,32 @@ final readonly class JsonLdEntitySearcher
             return $url;
         }
 
-        return 'variant-' . substr(hash('xxh3', (string) json_encode($variant)), 0, 12);
+        return self::SYNTHESISED_PREFIX . substr(hash('xxh3', (string) json_encode(self::stableFields($variant))), 0, 12);
+    }
+
+    /**
+     * The parts of a variant that identify it rather than describe its state.
+     *
+     * Hashing the whole entry made the key move whenever the shop moved its
+     * price or sold out, so a key stored on Monday named nothing on Tuesday.
+     * Name and options are what tells `1 Reep` from `12 Repen`, and they are
+     * what a shopper picked.
+     *
+     * @param  array<string, mixed>  $variant
+     * @return array<string, mixed>
+     */
+    private static function stableFields(array $variant): array
+    {
+        $stable = [];
+
+        foreach (self::STABLE_KEY_FIELDS as $field) {
+            if (array_key_exists($field, $variant)) {
+                $stable[$field] = $variant[$field];
+            }
+        }
+
+        // A variant naming none of them is rare enough to be worth a key that
+        // at least tells two entries apart on the page it was read from.
+        return $stable === [] ? $variant : $stable;
     }
 }
