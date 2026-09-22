@@ -20,7 +20,7 @@
                 placeholder="https://shop.example.com/product/123"
                 required
             />
-            <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
+            <flux:button type="submit" variant="primary">
                 <span wire:loading.remove wire:target="probe">Check price</span>
                 <span wire:loading wire:target="probe">Checking…</span>
             </flux:button>

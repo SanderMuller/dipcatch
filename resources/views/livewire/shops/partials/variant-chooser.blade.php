@@ -14,7 +14,7 @@
         </flux:radio.group>
 
         <div class="flex gap-2">
-            <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
+            <flux:button type="submit" variant="primary">
                 <span wire:loading.remove wire:target="selectVariant">Use this variant</span>
                 <span wire:loading wire:target="selectVariant">Looking it up…</span>
             </flux:button>

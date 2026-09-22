@@ -57,7 +57,7 @@
         @endif
 
         <div class="flex gap-2">
-            <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
+            <flux:button type="submit" variant="primary">
                 <span wire:loading.remove wire:target="probeWithSelectors">Try selector</span>
                 <span wire:loading wire:target="probeWithSelectors">Looking it up…</span>
             </flux:button>

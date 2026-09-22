@@ -17,7 +17,7 @@
                 autofocus
             />
             <div class="flex items-center gap-3">
-                <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
+                <flux:button type="submit" variant="primary">
                     <span wire:loading.remove wire:target="probe">Look up this product</span>
                     <span wire:loading wire:target="probe">Looking it up…</span>
                 </flux:button>
@@ -149,7 +149,7 @@
                 <flux:text size="sm" class="text-zinc-500">We suggest these from the price. You hear from us as soon as the price drops past either one.</flux:text>
 
                 <div class="flex gap-2">
-                    <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
+                    <flux:button type="submit" variant="primary">
                         <span wire:loading.remove wire:target="confirm">Create product</span>
                         <span wire:loading wire:target="confirm">Creating…</span>
                     </flux:button>
