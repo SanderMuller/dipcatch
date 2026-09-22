@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\PriceAdapters\BundleOffer;
+use App\Support\AlsoWorthChecking;
 use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
 use Illuminate\Bus\Queueable;
@@ -84,6 +85,11 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
     {
         return [
             'product_id' => $this->product->id,
+            // The shops this product holds as links. An alert is the moment
+            // the reader opens a tab anyway, and these are the ones DipCatch
+            // cannot read — often the largest retailers, running the biggest
+            // promotions. Hosts, never prices: a link holds no figure.
+            'also_check' => AlsoWorthChecking::of($this->product),
             'title' => $this->product->title,
             'image_url' => $this->product->image_url,
             'currency' => $this->product->currency,

@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\KeepShopAsLink;
 use App\Jobs\SendDailyDigest;
 use App\Mail\PriceDropDigestMail;
 use App\Models\PriceCheck;
@@ -443,4 +444,25 @@ test('the digest states the change per unit and omits money it cannot honestly r
         ->and($html)->toContain('€10.00/kg')
         // The till price of the winning pack still leads the line.
         ->and($html)->toContain('€8.00');
+});
+
+it('names the shops it cannot read beside the drops it can', function (): void {
+    // The digest is the other moment somebody is about to buy.
+    $user = User::factory()->create(['notify_via_email' => true, 'timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create();
+
+    app(KeepShopAsLink::class)($product, 'https://www.koffiehenk.nl/dolce-gusto-lungo-xl');
+
+    PriceDropEvent::factory()
+        ->for($user)
+        ->for($product)
+        ->state(['triggered_by_shop_id' => $shop->id, 'fired_at' => now()->subHours(3)])
+        ->create();
+
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail): bool {
+        return str_contains($mail->render(), 'Also worth checking by hand: koffiehenk.nl');
+    });
 });

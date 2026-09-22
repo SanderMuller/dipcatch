@@ -79,6 +79,19 @@ $image = $product->safeImageUrl();
 </tr>
 </table>
 
+@php
+    // Shops DipCatch cannot read, named at the moment the reader is about to
+    // buy. Hosts only: a link holds no price.
+    $alsoCheck = \App\Support\AlsoWorthChecking::line(\App\Support\AlsoWorthChecking::of($product));
+@endphp
+@if ($alsoCheck !== null)
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; margin: 8px 0 0; border-collapse: collapse;">
+<tr>
+<td style="padding: 0; color: #71717a; font-size: 13px; line-height: 1.5;">{{ $alsoCheck }}</td>
+</tr>
+</table>
+@endif
+
 <x-mail::button :url="route('app.products.show', $product)">
 View {{ $product->title }}
 </x-mail::button>

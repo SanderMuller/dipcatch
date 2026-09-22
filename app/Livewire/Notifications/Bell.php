@@ -3,6 +3,7 @@
 namespace App\Livewire\Notifications;
 
 use App\Models\User;
+use App\Support\AlsoWorthChecking;
 use App\Support\BundlePriceLabel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -72,6 +73,32 @@ final class Bell extends Component
     }
 
     /**
+     * The link shops a payload carried, if any — written by every alert since
+     * the reference-shop change, and absent from anything sent before it.
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<array{host: string, url: string}>
+     */
+    private static function shops(array $data): array
+    {
+        $shops = $data['also_check'] ?? null;
+
+        if (! is_array($shops)) {
+            return [];
+        }
+
+        $rows = [];
+
+        foreach ($shops as $shop) {
+            if (is_array($shop) && is_string($shop['host'] ?? null) && is_string($shop['url'] ?? null)) {
+                $rows[] = ['host' => $shop['host'], 'url' => $shop['url']];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
      * The fields the dropdown renders, defaulting anything a given
      * notification type does not carry.
      *
@@ -94,6 +121,9 @@ final class Bell extends Component
             // cheaper-than test the payload was written under, so a row that
             // fails it renders no bundle line at all.
             'bundleLabel' => BundlePriceLabel::forSnapshot($data),
+            // The shops DipCatch cannot read, named where the reader is about
+            // to open a tab anyway.
+            'alsoCheck' => AlsoWorthChecking::line(self::shops($data)),
         ];
     }
 

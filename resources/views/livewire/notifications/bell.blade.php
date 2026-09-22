@@ -45,6 +45,11 @@
                         <flux:text size="sm" class="text-zinc-500">{{ $item['body'] }}</flux:text>
                     @endif
 
+                    @if ($item['alsoCheck'] !== null)
+                        {{-- Shops DipCatch cannot read. Named, never priced. --}}
+                        <flux:text size="sm" class="text-zinc-400">{{ $item['alsoCheck'] }}</flux:text>
+                    @endif
+
                     <flux:text size="sm" class="text-zinc-400">{{ $item['at']?->diffForHumans() }}</flux:text>
                 </div>
             </flux:menu.item>
