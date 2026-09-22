@@ -2,6 +2,7 @@
 
 namespace App\Actions\Shops;
 
+use App\Actions\Products\BorrowShopImage;
 use App\Billing\PlanLimitReached;
 use App\Billing\PlanLimits;
 use App\Enums\ScrapeStatus;
@@ -18,7 +19,10 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class AttachShop
 {
-    public function __construct(private PlanLimits $limits) {}
+    public function __construct(
+        private PlanLimits $limits,
+        private BorrowShopImage $borrowImage,
+    ) {}
 
     /**
      * @throws PlanLimitReached
@@ -50,6 +54,7 @@ final readonly class AttachShop
     private function record(Product $product, ShopDraft $draft): Shop
     {
         $shop = $this->write($product, $draft);
+        ($this->borrowImage)($product, $shop);
         $trackedPrice = $draft->trackedPrice();
         $appliedBundle = $draft->bundleOffer?->isTrackedAt($trackedPrice) === true
             ? $draft->bundleOffer

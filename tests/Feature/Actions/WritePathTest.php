@@ -212,3 +212,67 @@ it('rolls the whole create back when the product limit is reached', function ():
         ->and($user->products()->count())->toBe($limit)
         ->and(Shop::query()->count())->toBe($shopsBefore);
 });
+
+it('gives a new product without an image the image of its first shop', function (): void {
+    $product = app(CreateProductWithShop::class)(User::factory()->create(), new ProductDraft(title: 'Coffee'), draft());
+
+    expect($product->fresh()?->image_url)->toBe('https://ah.nl/img.png');
+});
+
+it('keeps the image a new product was created with', function (): void {
+    $product = app(CreateProductWithShop::class)(
+        User::factory()->create(),
+        new ProductDraft(title: 'Coffee', imageUrl: 'https://example.com/own.png'),
+        draft(),
+    );
+
+    expect($product->fresh()?->image_url)->toBe('https://example.com/own.png');
+});
+
+it('gives a product without an image the image of a shop added later', function (): void {
+    $product = Product::factory()->create(['image_url' => null]);
+
+    app(AttachShop::class)($product, draft());
+
+    expect($product->fresh()?->image_url)->toBe('https://ah.nl/img.png');
+});
+
+it('leaves the image of a product that has one when a shop is added', function (): void {
+    $product = Product::factory()->create(['image_url' => 'https://example.com/own.png']);
+
+    app(AttachShop::class)($product, draft());
+
+    expect($product->fresh()?->image_url)->toBe('https://example.com/own.png');
+});
+
+it('replaces an unusable product image with the shop image', function (): void {
+    // safeImageUrl() refuses this, so the product has no image it can show.
+    $product = Product::factory()->create(['image_url' => 'javascript:alert(1)']);
+
+    app(AttachShop::class)($product, draft());
+
+    expect($product->fresh()?->image_url)->toBe('https://ah.nl/img.png');
+});
+
+it('leaves a product without an image when the shop has none either', function (): void {
+    $product = Product::factory()->create(['image_url' => null]);
+    $draft = ShopDraft::fromSnapshot(
+        snapshot: ['price' => '1.00', 'currency' => 'EUR', 'in_stock' => true],
+        url: 'https://ah.nl/p/3',
+        adapterKey: 'ah',
+    );
+
+    app(AttachShop::class)($product, $draft);
+
+    expect($product->fresh()?->image_url)->toBeNull();
+});
+
+it('keeps an image another request saved after the product was loaded', function (): void {
+    $product = Product::factory()->create(['image_url' => null]);
+    // The same row, changed through another instance while ours is stale.
+    Product::query()->findOrFail($product->id)->forceFill(['image_url' => 'https://example.com/own.png'])->save();
+
+    app(AttachShop::class)($product, draft());
+
+    expect($product->fresh()?->image_url)->toBe('https://example.com/own.png');
+});
