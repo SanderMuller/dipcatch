@@ -277,3 +277,24 @@ test('a shop with no promotion is named without a deadline', function (): void {
         ->assertSeeText('jumbo.com')
         ->assertDontSeeText('jumbo.com ·');
 });
+
+test('two shops a rounding step apart are ranked on the unrounded figure', function (): void {
+    // The Roter vitamin C case, reported from production: a 400-tablet pack at
+    // 12.99 is 0.032475 a tablet and an 800-tablet pack at 21.99 is 0.0274875.
+    // Both print as 0.03. Ranked on that string the older row kept the crown,
+    // and it is 18% the dearer tablet.
+    $product = productWithShops([
+        'ah.nl' => ['current_price' => '12.99', 'pack_quantity' => '400.00', 'pack_unit' => 'piece'],
+        'benushop.nl' => ['current_price' => '21.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece'],
+    ]);
+
+    expect($product->bestValueShop()?->host)->toBe('benushop.nl');
+});
+
+test('the displayed unit price stays at two decimals', function (): void {
+    $product = productWithShops([
+        'ah.nl' => ['current_price' => '12.99', 'pack_quantity' => '400.00', 'pack_unit' => 'piece'],
+    ]);
+
+    expect($product->shops()->first()?->unitPrice())->toBe('0.03');
+});

@@ -254,3 +254,23 @@ test('the unit-price alert obeys the same hourly ceiling as a drop alert', funct
 
     Notification::assertNothingSent();
 });
+
+test('a value that only rounds onto the target does not fire', function (): void {
+    // 12.99 for 400 tablets is 0.032475 each — above a 0.03 target, and
+    // indistinguishable from it once rounded for display.
+    $user = User::factory()->create(['notify_via_filament' => true]);
+    subscribeUser($user);
+    $product = Product::factory()->for($user)->create([
+        'currency' => 'EUR',
+        'unit_price_target' => '0.03',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://ah.nl/p/1', 'currency' => 'EUR', 'current_price' => '12.99',
+        'pack_quantity' => '400.00', 'pack_unit' => 'piece',
+    ]);
+
+    app(DetectUnitPriceTarget::class)($product->refresh());
+
+    Notification::assertNothingSent();
+    expect($product->refresh()->unit_price_notified)->toBeNull();
+});

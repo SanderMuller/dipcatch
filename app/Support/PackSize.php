@@ -256,8 +256,24 @@ final readonly class PackSize
      * `price / quantity × 1000` for mass/volume, `price / count` for pieces.
      * Returns a plain decimal string (no thousands separator) with two
      * decimals, or null when the price or the quantity is not usable.
+     *
+     * A display figure. Never compare two of these: two decimals is coarser
+     * than the differences between real shops. A 400-tablet pack at €12,99 and
+     * an 800-tablet pack at €21,99 are 18% apart per tablet and both read
+     * `0.03`, so a comparison on this string crowned the dearer pack and
+     * pointed the alerts at it. Rank on {@see unitPriceValueFor()}.
      */
     public function unitPriceFor(string $price): ?string
+    {
+        $value = $this->unitPriceValueFor($price);
+
+        return $value === null ? null : number_format($value, 2, '.', '');
+    }
+
+    /**
+     * The same figure unrounded — what every comparison uses.
+     */
+    public function unitPriceValueFor(string $price): ?float
     {
         if (! is_numeric($price)) {
             return null;
@@ -269,11 +285,9 @@ final readonly class PackSize
             return null;
         }
 
-        $result = $this->unit === 'piece'
+        return $this->unit === 'piece'
             ? $priceValue / $this->quantity
             : $priceValue / $this->quantity * 1000;
-
-        return number_format($result, 2, '.', '');
     }
 
     public function label(): string

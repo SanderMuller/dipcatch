@@ -129,7 +129,7 @@ final readonly class ComparablePacks
         // answers null for a price at or below zero, and a null cast to float
         // is the smallest number there is.
         return $shops->filter(fn (Shop $shop): bool => $this->for($shop)?->canWin() === true
-            && $this->unitPriceOf($shop) !== null);
+            && $this->unitPriceValueOf($shop) !== null);
     }
 
     /**
@@ -139,19 +139,30 @@ final readonly class ComparablePacks
      * the public share page alike — a second one would let two surfaces crown
      * different shops.
      *
+     * Ranked on the unrounded figure. Two decimals is coarser than the field
+     * it sorts: a 400-tablet pack and an 800-tablet pack of the same tablet
+     * both read `0.03` while being 18% apart, and the tie then went to whoever
+     * was added first.
+     *
      * @param  Collection<int, Shop>  $shops
      */
     public function cheapestPerUnit(Collection $shops): ?Shop
     {
         return $this->winnable($shops)
-            ->sort(fn (Shop $a, Shop $b): int => [(float) $this->unitPriceOf($a), $a->created_at, (string) $a->id]
-                <=> [(float) $this->unitPriceOf($b), $b->created_at, (string) $b->id])
+            ->sort(fn (Shop $a, Shop $b): int => [$this->unitPriceValueOf($a), $a->created_at, (string) $a->id]
+                <=> [$this->unitPriceValueOf($b), $b->created_at, (string) $b->id])
             ->first();
     }
 
+    /** The figure a surface prints. {@see unitPriceValueOf()} is what ranks. */
     public function unitPriceOf(Shop $shop): ?string
     {
         return $this->for($shop)?->unitPriceFor($shop->current_price);
+    }
+
+    public function unitPriceValueOf(Shop $shop): ?float
+    {
+        return $this->for($shop)?->unitPriceValueFor($shop->current_price);
     }
 
     private static function resolveOne(
@@ -203,9 +214,9 @@ final readonly class ComparablePacks
             return false;
         }
 
-        $implied = $agreed->unitPriceFor((string) ($shop->current_price ?? ''));
+        $implied = $agreed->unitPriceValueFor((string) ($shop->current_price ?? ''));
 
-        return $implied !== null && (float) $implied < $median * self::IMPLAUSIBLE_BELOW_MEDIAN;
+        return $implied !== null && $implied < $median * self::IMPLAUSIBLE_BELOW_MEDIAN;
     }
 
     private static function statedSize(Shop $shop): ?PackSize
@@ -272,9 +283,8 @@ final readonly class ComparablePacks
     {
         $prices = $shops
             ->filter(fn (Shop $shop, int|string $key): bool => $inUnit->has($key) && $shop->current_price !== null)
-            ->map(fn (Shop $shop, int|string $key): ?string => $inUnit->get($key)?->unitPriceFor((string) $shop->current_price))
+            ->map(fn (Shop $shop, int|string $key): ?float => $inUnit->get($key)?->unitPriceValueFor((string) $shop->current_price))
             ->filter()
-            ->map(fn (string $price): float => (float) $price)
             ->sort()
             ->values();
 

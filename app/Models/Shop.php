@@ -188,6 +188,22 @@ final class Shop extends Model
     }
 
     /**
+     * The current unit price unrounded, for a caller that compares it rather
+     * than prints it. Two decimals cannot separate two shops selling the same
+     * tablet at prices 18% apart.
+     */
+    public function unitPriceValue(): ?float
+    {
+        $price = $this->current_price;
+
+        if (! is_string($price) && ! is_numeric($price)) {
+            return null;
+        }
+
+        return $this->packSize()?->unitPriceValueFor((string) $price);
+    }
+
+    /**
      * `/kg`, `/l` or `/stuk` — null whenever {@see unitPrice()} is null, so
      * no orphan label renders next to a missing price.
      */
