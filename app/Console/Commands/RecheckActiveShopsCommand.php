@@ -58,6 +58,11 @@ final class RecheckActiveShopsCommand extends Command
         $freeCutoff = $this->cutoff(Plan::Free);
 
         return Shop::query()
+            // Never a reference shop: its page is known to refuse us, so a
+            // check spends a fetch to learn nothing and counts the refusal
+            // against the row's health until `dead_after` switches it off.
+            // Asking again is the retry command's job, on its own schedule.
+            ->tracked()
             ->where('active', true)
             ->where('health', '!=', ShopHealth::Dead->value)
             ->whereHas('product', function (EloquentQueryBuilder $q): void {

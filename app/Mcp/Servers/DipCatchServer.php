@@ -32,7 +32,7 @@ use Laravel\Mcp\Server\Tool;
  * gets that its cached copy is stale. Two tools were added without moving it,
  * and a live session kept seeing the nine that came before them.
  */
-#[Version('1.10.0')]
+#[Version('1.11.0')]
 #[Instructions(<<<'TEXT'
 DipCatch tracks the price of things this user buys more than once, across Dutch
 supermarkets and webshops, and tells them when one drops.

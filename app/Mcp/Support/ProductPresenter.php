@@ -108,6 +108,10 @@ final readonly class ProductPresenter
                 // the lowest price. This one bars it from both answers,
                 // because the number is not a price anyone pays.
                 'not_a_consumer_price' => $shop->notAConsumerPriceReason(),
+                // A link rather than a tracked price. Never in either answer,
+                // and retried weekly — see ShopKind.
+                'kind' => $shop->kind->value,
+                'link_note' => $shop->kind->note(),
                 'is_cheapest' => $shop->getKey() === $product->cheapest_shop_id,
                 'is_best_value' => $bestValueId !== null && $shop->getKey() === $bestValueId,
                 'last_checked_at' => $checked instanceof CarbonInterface ? $checked->toIso8601String() : null,

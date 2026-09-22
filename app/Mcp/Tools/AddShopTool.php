@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Actions\Shops\AttachShop;
+use App\Actions\Shops\KeepShopAsLink;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\ShopDraft;
 use App\Actions\Shops\TrackedElsewhere;
@@ -14,10 +15,13 @@ use App\Mcp\Support\ProbeReporter;
 use App\Mcp\Support\ProductPresenter;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Services\ShopFetcher\HostFetchMemory;
 use App\Support\PackSize;
+use App\Support\UrlNormalizer;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -64,6 +68,7 @@ final class AddShopTool extends Tool
             // to confirm.
             'confirm' => ['nullable', 'boolean:strict'],
             'variant_key' => ['nullable', 'string', 'max:255'],
+            'keep_as_link' => ['nullable', 'boolean:strict'],
         ], [
             'url.required' => 'Pass a url to preview a product page.',
             'confirm.boolean' => 'confirm takes a JSON boolean: true or false, not a number and not a string.',
@@ -75,6 +80,10 @@ final class AddShopTool extends Tool
 
         if ($product === null) {
             return Response::error('No such product.');
+        }
+
+        if (($validated['keep_as_link'] ?? null) === true) {
+            return $this->keepAsLink($product, $this->str($validated, 'url'));
         }
 
         if ($confirming) {
@@ -215,6 +224,72 @@ final class AddShopTool extends Tool
     /**
      * @return array<string, Type>
      */
+    /**
+     * Keep the URL without reading it.
+     *
+     * One call rather than two: the two-step confirm exists because a scrape
+     * can read the wrong number, and there is no number here to read wrongly.
+     *
+     * No fetch either, so it costs nothing from the page budget. That makes it
+     * possible to keep a page this tool has just refused to read, which is the
+     * whole point — and if the caller is wrong and the page turns out to be
+     * readable, the weekly retry promotes it without anyone doing anything.
+     */
+    private function keepAsLink(Product $product, string $url): Response|ResponseFactory
+    {
+        try {
+            $normalized = UrlNormalizer::normalize($url);
+        } catch (InvalidArgumentException) {
+            return Response::error('That does not look like a URL. Paste the address of a product page.');
+        }
+
+        $existing = $product->shops()->where('url_hash', UrlNormalizer::hash($normalized))->first();
+
+        if ($existing instanceof Shop) {
+            return Response::error($existing->isReference()
+                ? 'That page is already kept as a link on this product.'
+                : 'That shop is already tracked on this product, and its price is being read.');
+        }
+
+        try {
+            app(KeepShopAsLink::class)($product, $normalized, $this->unreadableReason($normalized));
+        } catch (PlanLimitReached $e) {
+            return Response::error($e->getMessage());
+        }
+
+        $product->refresh()->load('shops');
+
+        return Response::structured($this->presenter->detail($product));
+    }
+
+    /**
+     * How this host last refused DipCatch, when it has refused it recently.
+     *
+     * Read from what the fetcher already remembers rather than by asking the
+     * shop again — the caller is keeping this link precisely because asking
+     * did not work. Null when the memory has nothing, which is honest: the
+     * caller may be recording a shop it never tried.
+     */
+    private function unreadableReason(string $normalized): ?string
+    {
+        $host = UrlNormalizer::normalizeHost((string) parse_url($normalized, PHP_URL_HOST));
+
+        if ($host === '') {
+            return null;
+        }
+
+        $memory = app(HostFetchMemory::class);
+
+        return match (true) {
+            $memory->count($host, HostFetchMemory::KIND_BLOCKED) > 0 => HostFetchMemory::KIND_BLOCKED,
+            $memory->count($host, HostFetchMemory::KIND_SILENT) > 0 => HostFetchMemory::KIND_SILENT,
+            default => null,
+        };
+    }
+
+    /**
+     * @return array<string, Type>
+     */
     public function schema(JsonSchema $schema): array
     {
         return [
@@ -223,6 +298,7 @@ final class AddShopTool extends Tool
             'draft' => $schema->string()->description('The draft token from the previous call. Send it only alongside confirm: true; on its own it is refused.'),
             'confirm' => $schema->boolean()->description('Set true, with a draft, to actually add the shop.'),
             'variant_key' => $schema->string()->description('Which variant to track, when the previous call reported several.'),
+            'keep_as_link' => $schema->boolean()->description('Set true with a url to keep a page DipCatch cannot read — one this tool has already refused, or one a shop blocks. It is saved as a link, never priced, and never counts towards cheapest or best value. No draft and no confirm: there is no price to check. DipCatch retries it weekly and starts tracking it by itself if the page ever becomes readable, so a blocked shop is worth keeping rather than discarding.'),
         ];
     }
 }

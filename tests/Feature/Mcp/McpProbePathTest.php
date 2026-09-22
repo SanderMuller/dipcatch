@@ -562,3 +562,61 @@ test('the preview says how many variants the page sells', function (): void {
         ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
         ->assertSee('This page sells one variant.');
 });
+
+test('a page DipCatch cannot read can be kept as a link', function (): void {
+    // The research that used to be discarded: a URL verified as the right
+    // product at the right size, at a shop that refuses to be read.
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create(['currency' => 'EUR']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, [
+            'product_id' => (string) $product->id,
+            'url' => 'https://www.bol.com/nl/nl/p/thing/9200000000000001/',
+            'keep_as_link' => true,
+        ])
+        ->assertHasNoErrors()
+        ->assertSee('reference');
+
+    $shop = $product->refresh()->shops->sole();
+
+    expect($shop->isReference())->toBeTrue()
+        ->and($shop->current_price)->toBeNull();
+
+    // No fetch, so nothing was spent from the page budget — which is what
+    // makes it possible to keep a page add_shop has just refused to read.
+    Http::assertNothingSent();
+});
+
+test('keeping a link twice says so instead of adding it twice', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create(['currency' => 'EUR']);
+    $url = 'https://www.bol.com/nl/nl/p/thing/9200000000000001/';
+
+    $call = fn (): object => DipCatchServer::actingAs($me)->tool(AddShopTool::class, [
+        'product_id' => (string) $product->id,
+        'url' => $url,
+        'keep_as_link' => true,
+    ]);
+
+    $call()->assertHasNoErrors();
+    $call()->assertHasErrors()->assertSee('already kept as a link');
+
+    expect($product->refresh()->shops)->toHaveCount(1);
+});
+
+test('a url already tracked cannot be downgraded to a link', function (): void {
+    // The price is being read. Keeping it as a link would throw that away.
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://shop.example.com/p/1']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, [
+            'product_id' => (string) $product->id,
+            'url' => 'https://shop.example.com/p/1',
+            'keep_as_link' => true,
+        ])
+        ->assertHasErrors()
+        ->assertSee('already tracked on this product');
+});

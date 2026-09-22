@@ -37,6 +37,7 @@ final class RecheckStaleStockCommand extends Command
         // out of stock or unknown is not the one a fixed mapping changes,
         // and every recheck costs the shop a request.
         $shops = Shop::query()
+            ->tracked()
             ->where('active', true)
             ->where('current_in_stock', true)
             ->where('last_checked_at', '<', $cutoff)

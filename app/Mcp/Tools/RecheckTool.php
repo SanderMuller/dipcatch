@@ -49,7 +49,9 @@ final class RecheckTool extends Tool
 
         $shopId = is_string($validated['shop_id'] ?? null) ? $validated['shop_id'] : null;
 
-        $shopsQuery = $product->shops();
+        // A reference shop has no price to refresh: its page is the reason it
+        // is a link. Asking again is the retry command's job.
+        $shopsQuery = $product->shops()->tracked();
 
         if ($shopId !== null) {
             $shopsQuery->whereKey($shopId);
@@ -60,7 +62,7 @@ final class RecheckTool extends Tool
         if ($shops->isEmpty()) {
             return Response::error($shopId === null
                 ? 'That product has no shops to recheck.'
-                : 'That shop is not on this product.');
+                : 'That shop is not one DipCatch reads. A shop kept as a link has no price to refresh.');
         }
 
         $rechecked = 0;

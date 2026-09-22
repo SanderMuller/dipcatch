@@ -339,7 +339,7 @@ final class Product extends Model
      *
      * @return Collection<int, Shop>
      */
-    private function eligibleShops(): Collection
+    public function eligibleShops(): Collection
     {
         return $this->votingShops()
             ->filter(fn (Shop $shop): bool => $shop->current_in_stock !== false);
@@ -367,6 +367,10 @@ final class Product extends Model
             && $shop->health !== ShopHealth::Dead
             && $shop->currency === $this->currency
             && $shop->current_price !== null
+            // A link is not an offer. It holds no price, so the line above
+            // already bars it; this one says why, and holds if a price ever
+            // lands on a row that should not have one.
+            && ! $shop->isReference()
             // A price quoted without VAT, or shown only to trade accounts,
             // is not a price anyone here pays. It is lower than every
             // complete price beside it, so left in it takes both answers and

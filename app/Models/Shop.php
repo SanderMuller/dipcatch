@@ -6,6 +6,7 @@ use App\Enums\ConsumerPriceIssue;
 use App\Enums\PackExclusion;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
+use App\Enums\ShopKind;
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\ConditionalOffer;
 use App\PriceAdapters\PromotionWindow;
@@ -16,7 +17,9 @@ use App\Support\UrlNormalizer;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\ShopFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -45,6 +48,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $last_checked_at Stamped by every attempt, a failed one included.
  * @property CarbonInterface|null $last_success_at Stamped only when a price was actually read.
  * @property int $consecutive_failures Reset to zero by any successful read.
+ * @property ShopKind $kind Read on a schedule, or kept as a link — see {@see ShopKind}.
+ * @property string|null $unreadable_reason Which wall the page hit when the link was kept.
+ * @property CarbonInterface|null $retried_at When a reference shop was last asked again.
  * @property ConsumerPriceIssue|null $consumer_price_issue Why this is not a price a shopper can pay.
  * @property string|null $consumer_price_note The words the page used to say so.
  */
@@ -77,6 +83,8 @@ final class Shop extends Model
             'repointed_at' => 'datetime',
             'current_in_stock' => 'boolean',
             'consumer_price_issue' => ConsumerPriceIssue::class,
+            'kind' => ShopKind::class,
+            'retried_at' => 'datetime',
             'active' => 'boolean',
             'health' => ShopHealth::class,
             'last_status' => ScrapeStatus::class,
@@ -326,6 +334,37 @@ final class Shop extends Model
     public function notAConsumerPriceReason(): ?string
     {
         return $this->consumer_price_issue?->label();
+    }
+
+    /**
+     * A link, kept because its page could not be read.
+     *
+     * It holds no price, so it cannot reach either answer — {@see
+     * Product::votingShops()} bars it, and would bar it anyway for having no
+     * price. Both guards on purpose: the one that reads the kind says what is
+     * meant, and the one that reads the price is what holds if a price ever
+     * arrives on a row that should not have one.
+     */
+    public function isReference(): bool
+    {
+        return $this->kind === ShopKind::Reference;
+    }
+
+    /**
+     * Shops whose price DipCatch reads.
+     *
+     * A scope rather than a condition repeated at each call site: every query
+     * that dispatches a price check has to exclude the links, and a new one
+     * that forgets would spend a fetch on a page known to refuse it and then
+     * count the refusal against the row's health until it died.
+     *
+     * @param  EloquentQueryBuilder<Shop>  $query
+     * @return EloquentQueryBuilder<Shop>
+     */
+    #[Scope]
+    protected function tracked(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query->where('kind', ShopKind::Tracked->value);
     }
 
     public function faviconUrl(): string
