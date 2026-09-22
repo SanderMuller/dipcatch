@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\ReferenceValue;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Demo\DatasetCatalog;
 use Database\Seeders\Demo\DemoOffer;
 use Database\Seeders\Demo\DemoProduct;
 use Database\Seeders\Demo\GeneratedCatalog;
@@ -82,6 +83,11 @@ final class DemoSeeder extends Seeder
 
     public function run(): void
     {
+        // A fresh walk of the price dataset: the resolver remembers what the
+        // AH API answered so five accounts ask it once, and that memory must
+        // not outlive the seed that filled it.
+        DatasetCatalog::forget();
+
         if (app()->environment('production')) {
             $this->command->warn('DemoSeeder skipped: demo data is never seeded in production.');
 

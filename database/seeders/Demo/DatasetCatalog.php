@@ -3,6 +3,8 @@
 namespace Database\Seeders\Demo;
 
 use App\Models\CheckjebonPrice;
+use App\PriceAdapters\ShopSnapshot;
+use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Support\PackSize;
 use Illuminate\Support\Collection;
@@ -31,14 +33,33 @@ use Illuminate\Support\Collection;
  * quietly poison the per-unit column, which is the thing a demo is supposed to
  * demonstrate.
  *
- * The dataset carries no photographs, so these products show the stand-in
- * {@see DemoProduct::image()} builds until their first real recheck reads one
- * off the shop's own page.
+ * The dataset carries no photograph and no way to tell a product still on the
+ * shelf from one withdrawn years ago — its upstream JSON holds a name, a link,
+ * a price and a size, and nothing else (checked against the published file on
+ * 2026-09-22). Both gaps are closed by asking Albert Heijn's own API about each
+ * candidate: it answers with the live price, the pack size and the product
+ * photo, and answers 404 for anything out of assortment, which is exactly the
+ * filter this needs. Ordering by id walks the oldest products first, so without
+ * that filter most of what surfaced was discontinued.
  */
-final readonly class DatasetCatalog
+final class DatasetCatalog
 {
     /** Shorter than the curated catalog: many products, not many rows each. */
     private const int HISTORY_DAYS = 30;
+
+    /**
+     * Products resolved against the AH API so far, in pool order.
+     *
+     * Held across calls because every account walks the same pool and the
+     * modulus hands them the same products: without this, seeding five
+     * accounts would ask the API the same questions five times.
+     *
+     * @var list<array{name: string, size: PackSize, ahPrice: string, ahLink: string, ahImage: ?string, sparPrice: string, sparLink: string}>
+     */
+    private static array $resolved = [];
+
+    /** How far into the pairs the resolver has walked. */
+    private static int $walked = 0;
 
     /**
      * Products the dataset can furnish, or an empty list when it cannot.
@@ -49,11 +70,11 @@ final readonly class DatasetCatalog
      *
      * @return list<DemoProduct>
      */
-    public static function make(int $count, int $offset = 0): array
+    public static function make(int $count, int $offset = 0, bool $enrich = true): array
     {
-        $pairs = self::pairs();
+        $pool = self::pool($offset + $count, $enrich);
 
-        if ($pairs === []) {
+        if ($pool === []) {
             return [];
         }
 
@@ -65,34 +86,131 @@ final readonly class DatasetCatalog
             // the first row of every account would be paused, dropped and
             // part sold out at the same time.
             $position = $offset + $index + 1;
-            $products[] = self::product($pairs[$position % count($pairs)], $position);
+
+            // Indexed by the absolute position, not the modulus of it: the
+            // pool grows as later accounts ask for more, and a modulus against
+            // a growing list hands two accounts the same product. It only
+            // wraps when the dataset ran out of pairs before the pool was
+            // filled, which is the one case where sharing is unavoidable.
+            $products[] = self::product($pool[($offset + $index) % count($pool)], $position);
         }
 
         return $products;
     }
 
-    /**
-     * @param  array{name: string, size: PackSize, ah: CheckjebonPrice, spar: CheckjebonPrice}  $pair
-     */
-    private static function product(array $pair, int $position): DemoProduct
+    /** Forget what the API answered, so a later seed asks again. */
+    public static function forget(): void
     {
-        $size = $pair['size'];
+        self::$resolved = [];
+        self::$walked = 0;
+    }
+
+    /**
+     * At least `$needed` products the AH API still serves, or everything the
+     * pairs can yield when it runs out first.
+     *
+     * Walks the pairs in order and stops as soon as it has enough, so a seed
+     * spends one request per product it actually uses rather than one per
+     * candidate. `$enrich` false skips the API entirely and trusts the
+     * dataset — for a test that is exercising the pairing rather than the
+     * network.
+     *
+     * @return list<array{name: string, size: PackSize, ahPrice: string, ahLink: string, ahImage: ?string, sparPrice: string, sparLink: string}>
+     */
+    private static function pool(int $needed, bool $enrich): array
+    {
+        $pairs = self::pairs();
+
+        while (count(self::$resolved) < $needed && self::$walked < count($pairs)) {
+            $pair = $pairs[self::$walked];
+            self::$walked++;
+
+            $resolved = $enrich ? self::resolve($pair) : self::unresolved($pair);
+
+            if ($resolved !== null) {
+                self::$resolved[] = $resolved;
+            }
+        }
+
+        return self::$resolved;
+    }
+
+    /**
+     * What Albert Heijn says about this product today, or null when it no
+     * longer sells it.
+     *
+     * The live price rather than the dataset's: a seeded history that ends on
+     * a stale number makes the first real recheck read a fall that never
+     * happened.
+     *
+     * @param  array{name: string, size: PackSize, ah: CheckjebonPrice, spar: CheckjebonPrice}  $pair
+     * @return array{name: string, size: PackSize, ahPrice: string, ahLink: string, ahImage: ?string, sparPrice: string, sparLink: string}|null
+     */
+    private static function resolve(array $pair): ?array
+    {
+        $link = (string) $pair['ah']->link;
+        $result = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/' . ltrim($link, '/'));
+        $snapshot = $result->snapshot;
+
+        if (! $result->isFound() || ! $snapshot instanceof ShopSnapshot) {
+            return null;
+        }
+
+        $size = PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title) ?? $pair['size'];
+
+        return [
+            'name' => $snapshot->title,
+            'size' => $size,
+            'ahPrice' => $snapshot->price,
+            'ahLink' => $link,
+            'ahImage' => $snapshot->imageUrl,
+            'sparPrice' => (string) $pair['spar']->price,
+            'sparLink' => (string) $pair['spar']->link,
+        ];
+    }
+
+    /**
+     * The dataset's own answer, for a caller that asked not to use the API.
+     *
+     * @param  array{name: string, size: PackSize, ah: CheckjebonPrice, spar: CheckjebonPrice}  $pair
+     * @return array{name: string, size: PackSize, ahPrice: string, ahLink: string, ahImage: ?string, sparPrice: string, sparLink: string}
+     */
+    private static function unresolved(array $pair): array
+    {
+        return [
+            'name' => $pair['name'],
+            'size' => $pair['size'],
+            'ahPrice' => (string) $pair['ah']->price,
+            'ahLink' => (string) $pair['ah']->link,
+            'ahImage' => null,
+            'sparPrice' => (string) $pair['spar']->price,
+            'sparLink' => (string) $pair['spar']->link,
+        ];
+    }
+
+    /**
+     * @param  array{name: string, size: PackSize, ahPrice: string, ahLink: string, ahImage: ?string, sparPrice: string, sparLink: string}  $entry
+     */
+    private static function product(array $entry, int $position): DemoProduct
+    {
+        $size = $entry['size'];
 
         return new DemoProduct(
-            title: $pair['name'],
+            title: $entry['name'],
             offers: [
                 new DemoOffer(
                     host: 'ah.nl',
                     path: '',
-                    price: (float) $pair['ah']->price,
+                    price: (float) $entry['ahPrice'],
                     packQuantity: $size->quantity,
                     packUnit: $size->unit,
-                    realUrl: 'https://www.ah.nl/producten/product/' . ltrim((string) $pair['ah']->link, '/'),
+                    realUrl: 'https://www.ah.nl/producten/product/' . ltrim($entry['ahLink'], '/'),
+                    imageUrl: $entry['ahImage'],
                 ),
                 new DemoOffer(
                     host: 'spar.nl',
                     path: '',
-                    price: (float) $pair['spar']->price,
+                    price: (float) $entry['sparPrice'],
                     packQuantity: $size->quantity,
                     packUnit: $size->unit,
                     // Never the first offer: a product whose every offer is
@@ -101,7 +219,7 @@ final readonly class DatasetCatalog
                     state: self::state($position),
                     conditional: $position % 17 === 0,
                     promotion: $position % 13 === 0 ? 'live' : null,
-                    realUrl: 'https://www.spar.nl/' . ltrim((string) $pair['spar']->link, '/'),
+                    realUrl: 'https://www.spar.nl/' . ltrim($entry['sparLink'], '/'),
                 ),
             ],
             active: $position % 19 !== 0,
