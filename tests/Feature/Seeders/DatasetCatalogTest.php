@@ -94,7 +94,7 @@ test('a product Albert Heijn no longer sells is dropped', function (): void {
             return Http::response(['access_token' => 'fake', 'expires_in' => 604798]);
         }
 
-        if (str_ends_with($request->url(), '/wi1')) {
+        if (str_ends_with($request->url(), '/fir/1')) {
             return Http::response([], 404);
         }
 
@@ -113,10 +113,13 @@ test('a product Albert Heijn no longer sells is dropped', function (): void {
     checkjebonRow('ah', 'wi2', 'Nog steeds te koop', '2.29', '300 g', 'wi2/nog-steeds-te-koop');
     checkjebonRow('spar', 'spar-2', 'Nog steeds te koop', '2.79', '300 g', 'nog-steeds-te-koop-2/');
 
+    // wi1 sorts first, so the one product asked for would be wi1 if it had
+    // survived. Getting wi2 is what proves the withdrawn row was skipped.
     $products = DatasetCatalog::make(1);
 
     expect($products)->toHaveCount(1)
         ->and($products[0]->title)->toBe('Nog steeds te koop')
+        ->and($products[0]->offers[0]->realUrl)->toBe('https://www.ah.nl/producten/product/wi2/nog-steeds-te-koop')
         // The live price, not the dataset's: a history ending on a stale
         // number makes the first real recheck read a fall that never happened.
         ->and($products[0]->offers[0]->price)->toBe(2.49)

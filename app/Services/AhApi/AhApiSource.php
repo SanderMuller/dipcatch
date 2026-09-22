@@ -8,6 +8,7 @@ use App\PriceAdapters\ShopSnapshot;
 use App\Services\Checkjebon\CheckjebonResult;
 use App\Support\UrlNormalizer;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -32,9 +33,44 @@ final readonly class AhApiSource
 
     private const string TOKEN_CACHE_KEY = 'dipcatch:ah-api:token';
 
+    private const string APPLICATION = 'AHWEBSHOP';
+
     public function supports(string $host): bool
     {
         return $host === 'ah.nl' || str_ends_with($host, '.ah.nl');
+    }
+
+    /**
+     * Resolve many ah.nl URLs at once, in flight together.
+     *
+     * One product at a time costs a round trip each, which is fine for a
+     * price check and not for a caller that wants dozens — the demo seeder
+     * spent sixteen of its twenty-four seconds waiting on sixty-eight of
+     * them. The answers come back keyed by the URL that was asked, so a
+     * caller can pair them up without relying on order.
+     *
+     * @param  list<string>  $normalizedUrls
+     * @return array<string, CheckjebonResult>
+     */
+    public function resolveMany(array $normalizedUrls): array
+    {
+        $token = $this->token();
+
+        if ($token === null) {
+            return array_map(
+                static fn (): CheckjebonResult => CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR),
+                array_flip($normalizedUrls),
+            );
+        }
+
+        return AhDetailBatch::resolve(
+            $token,
+            $normalizedUrls,
+            self::USER_AGENT,
+            self::APPLICATION,
+            static fn (string $url): ?string => self::productIdFromUrl($url),
+            fn (string $productId, Response $response): CheckjebonResult => $this->readDetail($productId, $response),
+        );
     }
 
     public function resolve(string $normalizedUrl): CheckjebonResult
@@ -51,7 +87,7 @@ final readonly class AhApiSource
 
         try {
             $response = Http::withToken($token)
-                ->withHeaders(['User-Agent' => self::USER_AGENT, 'X-Application' => 'AHWEBSHOP'])
+                ->withHeaders(['User-Agent' => self::USER_AGENT, 'X-Application' => self::APPLICATION])
                 ->timeout(15)
                 ->get(sprintf(self::DETAIL_URL, $productId));
         } catch (ConnectionException $e) {
@@ -60,6 +96,12 @@ final readonly class AhApiSource
             return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
         }
 
+        return $this->readDetail($productId, $response);
+    }
+
+    /** What one detail response says, whether it arrived alone or in a pool. */
+    private function readDetail(string $productId, Response $response): CheckjebonResult
+    {
         if ($response->status() === 401) {
             // Token expired early — drop it so the next check re-authenticates.
             Cache::forget(self::TOKEN_CACHE_KEY);

@@ -62,6 +62,13 @@ final class DatasetCatalog
     private static int $walked = 0;
 
     /**
+     * Extra candidates per batch, to cover the ones Albert Heijn no longer
+     * sells. Asking for a few more costs nothing — they travel together —
+     * while coming up short costs another round of round trips.
+     */
+    private const int BATCH_SLACK = 8;
+
+    /**
      * Products the dataset can furnish, or an empty list when it cannot.
      *
      * A checkout that has never run `dipcatch:refresh-checkjebon` has no rows,
@@ -122,13 +129,15 @@ final class DatasetCatalog
         $pairs = self::pairs();
 
         while (count(self::$resolved) < $needed && self::$walked < count($pairs)) {
-            $pair = $pairs[self::$walked];
-            self::$walked++;
+            // A batch rather than one at a time: sixty-eight products cost one
+            // round trip each, which was most of the seed's running time. The
+            // batch is padded because some will be withdrawn and drop out, and
+            // the loop goes round again if too many did.
+            $batch = array_slice($pairs, self::$walked, max(1, $needed - count(self::$resolved)) + self::BATCH_SLACK);
+            self::$walked += count($batch);
 
-            $resolved = $enrich ? self::resolve($pair) : self::unresolved($pair);
-
-            if ($resolved !== null) {
-                self::$resolved[] = $resolved;
+            foreach ($enrich ? self::resolveBatch($batch) : array_map(self::unresolved(...), $batch) as $entry) {
+                self::$resolved[] = $entry;
             }
         }
 
@@ -136,37 +145,49 @@ final class DatasetCatalog
     }
 
     /**
-     * What Albert Heijn says about this product today, or null when it no
-     * longer sells it.
+     * What Albert Heijn says about these products today, minus the ones it no
+     * longer sells.
      *
      * The live price rather than the dataset's: a seeded history that ends on
      * a stale number makes the first real recheck read a fall that never
      * happened.
      *
-     * @param  array{name: string, size: PackSize, ah: CheckjebonPrice, spar: CheckjebonPrice}  $pair
-     * @return array{name: string, size: PackSize, ahPrice: string, ahLink: string, ahImage: ?string, sparPrice: string, sparLink: string}|null
+     * @param  list<array{name: string, size: PackSize, ah: CheckjebonPrice, spar: CheckjebonPrice}>  $pairs
+     * @return list<array{name: string, size: PackSize, ahPrice: string, ahLink: string, ahImage: ?string, sparPrice: string, sparLink: string}>
      */
-    private static function resolve(array $pair): ?array
+    private static function resolveBatch(array $pairs): array
     {
-        $link = (string) $pair['ah']->link;
-        $result = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/' . ltrim($link, '/'));
-        $snapshot = $result->snapshot;
+        $urls = array_map(static fn (array $pair): string => self::ahUrl($pair), $pairs);
+        $answers = app(AhApiSource::class)->resolveMany($urls);
+        $entries = [];
 
-        if (! $result->isFound() || ! $snapshot instanceof ShopSnapshot) {
-            return null;
+        foreach ($pairs as $pair) {
+            $snapshot = ($answers[self::ahUrl($pair)] ?? null)?->snapshot;
+
+            if (! $snapshot instanceof ShopSnapshot) {
+                continue;
+            }
+
+            $entries[] = [
+                'name' => $snapshot->title,
+                'size' => PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title) ?? $pair['size'],
+                'ahPrice' => $snapshot->price,
+                'ahLink' => (string) $pair['ah']->link,
+                'ahImage' => $snapshot->imageUrl,
+                'sparPrice' => (string) $pair['spar']->price,
+                'sparLink' => (string) $pair['spar']->link,
+            ];
         }
 
-        $size = PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title) ?? $pair['size'];
+        return $entries;
+    }
 
-        return [
-            'name' => $snapshot->title,
-            'size' => $size,
-            'ahPrice' => $snapshot->price,
-            'ahLink' => $link,
-            'ahImage' => $snapshot->imageUrl,
-            'sparPrice' => (string) $pair['spar']->price,
-            'sparLink' => (string) $pair['spar']->link,
-        ];
+    /**
+     * @param  array{name: string, size: PackSize, ah: CheckjebonPrice, spar: CheckjebonPrice}  $pair
+     */
+    private static function ahUrl(array $pair): string
+    {
+        return 'https://www.ah.nl/producten/product/' . ltrim((string) $pair['ah']->link, '/');
     }
 
     /**
