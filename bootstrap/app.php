@@ -5,6 +5,7 @@ use App\Console\Commands\DispatchDailyDigestsCommand;
 use App\Console\Commands\PruneOldChecksCommand;
 use App\Console\Commands\RecheckActiveShopsCommand;
 use App\Console\Commands\RefreshCheckjebonDatasetCommand;
+use App\Console\Commands\RetryReferenceShopsCommand;
 use App\Console\Commands\RunAdapterCanaryCommand;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Console\Scheduling\Schedule;
@@ -62,6 +63,15 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->command(CategoriseProductsCommand::class)
             ->dailyAt('04:30')
+            ->timezone('Europe/Amsterdam')
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        // Weekly, and deliberately slow: a shop that refuses us is not going
+        // to change its mind on a Tuesday afternoon, and every attempt is a
+        // request to a host that already said no.
+        $schedule->command(RetryReferenceShopsCommand::class)
+            ->weeklyOn(1, '04:45')
             ->timezone('Europe/Amsterdam')
             ->withoutOverlapping()
             ->onOneServer();

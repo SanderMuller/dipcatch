@@ -89,6 +89,13 @@ return [
         'dead_5xx_after' => (int) env('DIPCATCH_SHOP_DEAD_5XX_AFTER', 30),
     ],
 
+    'reference' => [
+        // How long a shop kept as a link waits before it is asked again. A
+        // block is a fact about today, not a permanent one — but it changes
+        // on the timescale of a shop replatforming, not of an afternoon.
+        'retry_every_days' => (int) env('DIPCATCH_REFERENCE_RETRY_EVERY_DAYS', 7),
+    ],
+
     'recheck' => [
         'interval_hours' => (int) env('DIPCATCH_RECHECK_INTERVAL_HOURS', 24),
         // Spread each batch of rechecks over this window. Capped at the SQS

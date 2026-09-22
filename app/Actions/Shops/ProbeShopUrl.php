@@ -53,6 +53,16 @@ final readonly class ProbeShopUrl
         array $selectors = [],
         ?string $manualCurrency = null,
         ?string $variantKey = null,
+        /**
+         * False for a probe nobody asked for.
+         *
+         * The budget paces what a caller sets in motion, and the weekly retry
+         * of a shop kept as a link is not that — it runs on a schedule, and
+         * charging it to whoever happens to be working at 04:00 would throttle
+         * them for a request they did not make. The shops are still paced:
+         * `ShopFetcher` holds every host to its own ceiling regardless.
+         */
+        bool $spendBudget = true,
     ): ProbeOutcome {
         try {
             $normalizedUrl = UrlNormalizer::normalize($rawUrl);
@@ -82,10 +92,10 @@ final readonly class ProbeShopUrl
             return $local;
         }
 
-        $probeRetryAfter = $this->budget->spend($actor);
+        $overBudget = $this->overBudget($actor, $spendBudget);
 
-        if ($probeRetryAfter !== null) {
-            return ProbeOutcome::failed(ProbeFailure::ProbeRateLimited, ['retry_after_seconds' => $probeRetryAfter]);
+        if ($overBudget instanceof ProbeOutcome) {
+            return $overBudget;
         }
 
         try {
@@ -167,6 +177,19 @@ final readonly class ProbeShopUrl
             host: $fetch->host,
             adapterKey: $extraction->adapterKey ?? 'generic',
         );
+    }
+
+    /**
+     * The refusal when this account has spent its page budget, or null when
+     * the probe may go ahead.
+     */
+    private function overBudget(User $actor, bool $spendBudget): ?ProbeOutcome
+    {
+        $retryAfter = $spendBudget ? $this->budget->spend($actor) : null;
+
+        return $retryAfter === null
+            ? null
+            : ProbeOutcome::failed(ProbeFailure::ProbeRateLimited, ['retry_after_seconds' => $retryAfter]);
     }
 
     /**
