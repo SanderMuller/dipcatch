@@ -125,28 +125,56 @@
                 <flux:input id="create-product-title" wire:model="title" :label="__('Title')" required />
                 <flux:input id="create-product-image-url" type="url" wire:model="imageUrl" :label="__('Image URL')" />
 
-                <div class="grid grid-cols-2 gap-3">
-                    <flux:input
-                        id="create-product-threshold-pct"
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        max="99.99"
-                        wire:model="thresholdPct"
-                        :label="__('Alert me when it drops by (%)')"
-                        class="tabular-nums"
+                @php($suggested = $this->suggestedThresholds())
+                @php($targetPacks = $this->unitTargetPacks())
+
+                @if ($targetPacks !== [])
+                    {{-- The per-unit target leads: it holds every shop and pack
+                         size added later to the same rate. Optional. --}}
+                    @php($targetUnitWord = \App\Support\UnitWord::noun($this->snapshotPackSize()?->unit) ?? __('unit'))
+                    <x-unit-target
+                        class="pt-2"
+                        model="unitPriceTarget"
+                        :description="auth()->user()?->entitlements()->allowsUnitPriceAlerts()
+                            ? __('Optional.')
+                            : __('Pro alerts on this. We keep the number, and it starts working when you upgrade.')"
+                        :upgrade="! auth()->user()?->entitlements()->allowsUnitPriceAlerts()"
+                        :packs="$targetPacks"
+                        :currency="$snapshot['currency'] ?? 'EUR'"
+                        :unit-word="$targetUnitWord"
                     />
-                    <flux:input
-                        id="create-product-threshold-abs"
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        wire:model="thresholdAbs"
-                        :label="'Alert me when it drops by ('.$snapshot['currency'].')'"
-                        class="tabular-nums"
-                    />
-                </div>
-                <flux:text size="sm" class="text-zinc-500">We suggest these from the price. You hear from us as soon as the price drops past either one.</flux:text>
+                @endif
+
+                <details class="group" wire:ignore.self @if ($targetPacks === []) open @endif>
+                    <summary class="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-zinc-700 select-none dark:text-zinc-300 [&::-webkit-details-marker]:hidden">
+                        <flux:icon.chevron-right variant="micro" class="transition group-open:rotate-90" />
+                        {{ __('Other alerts: a drop in percent or money') }}
+                    </summary>
+                    <div class="mt-3 grid grid-cols-2 gap-3">
+                        <flux:input
+                            id="create-product-threshold-pct"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            max="99.99"
+                            wire:model="thresholdPct"
+                            :placeholder="$suggested['pct']"
+                            :label="__('Alert me when it drops by (%)')"
+                            class="tabular-nums"
+                        />
+                        <flux:input
+                            id="create-product-threshold-abs"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            wire:model="thresholdAbs"
+                            :placeholder="$suggested['abs']"
+                            :label="'Alert me when it drops by ('.$snapshot['currency'].')'"
+                            class="tabular-nums"
+                        />
+                    </div>
+                    <flux:text size="sm" class="mt-2 text-zinc-500">Optional. Leave them empty and we use the suggestion shown, worked out from the price at the time. You hear from us as soon as the price drops past either one.</flux:text>
+                </details>
 
                 <div class="flex gap-2">
                     <flux:button type="submit" variant="primary">

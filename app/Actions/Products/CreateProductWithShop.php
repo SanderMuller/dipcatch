@@ -37,6 +37,7 @@ final readonly class CreateProductWithShop
                 'currency' => $shop->currency,
                 'drop_threshold_pct' => $product->dropThresholdPct,
                 'drop_threshold_abs' => $product->dropThresholdAbs,
+                'unit_price_target' => $product->unitPriceTarget,
                 'active' => true,
                 'category' => $product->category,
                 'category_set_by' => $product->category === null ? null : CategorySource::User,

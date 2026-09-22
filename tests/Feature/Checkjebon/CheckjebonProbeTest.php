@@ -131,8 +131,10 @@ test('create-from-URL flow creates product + shop + check from a seeded dataset 
         ->assertSet('state', 'preview')
         ->assertSet('title', 'AH Kruiden roomkaas')
         ->assertSet('imageUrl', '')
-        // 55.00 sits in the 25-100 tier: 10% / 7.00 absolute.
-        ->assertSet('thresholdPct', '10.00')
+        // The 125 g pack makes the reference €440 per kilo, in the 100-500
+        // tier: 8%. The money amount bands on the €55 pack: 7.00.
+        ->assertSeeHtml('placeholder="8.00"')
+        ->assertSeeHtml('placeholder="7.00"')
         ->call('confirm')
         ->assertHasNoErrors()
         ->assertRedirect();

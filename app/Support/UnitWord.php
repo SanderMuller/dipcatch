@@ -24,6 +24,19 @@ final class UnitWord
         return is_string($word) ? $word : null;
     }
 
+    /** "kilo", "litre", "piece" — the noun on its own, for a label. */
+    public static function noun(?string $unit): ?string
+    {
+        $word = match ($unit) {
+            'g' => __('kilo'),
+            'ml' => __('litre'),
+            'piece' => __('piece'),
+            default => null,
+        };
+
+        return is_string($word) ? $word : null;
+    }
+
     /** "/kg", "/l", "/stuk" — for a figure. */
     public static function labelFor(?string $unit): string
     {

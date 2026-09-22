@@ -247,6 +247,72 @@ const firstParty = () => issues.pageErrors.length === 0
 }
 
 {
+    // Product page: a best price that costs more per unit than the best value
+    // warns, and every alert rule shows.
+    await page.goto(`${BASE}/app/products?sort=created_at`, { waitUntil: 'networkidle' });
+    await card('EV Unit Drop Crisps').locator('a[wire\\:navigate]').first().click();
+    await page.waitForURL((url) => /\/app\/products\/[^/]+$/.test(url.pathname), { timeout: 10000 });
+    await page.waitForLoadState('networkidle');
+    const warning = page.locator('[data-test="unit-price-warning"]');
+    checker.check('a much dearer unit price shows a red warning', await warning.isVisible() && (await warning.getAttribute('data-severity')) === 'high', (await warning.textContent().catch(() => ''))?.trim());
+    const rules = (await page.locator('[data-test="alert-rules"]').locator('..').innerText()).replace(/\s+/g, ' ');
+    checker.check('the alert card lists every alert rule', rules.includes('drop') && ! rules.includes('Any drop'), rules);
+    await page.locator('[data-test="unit-price-warning"]').locator('xpath=ancestor::*[contains(@class, "@container")][1]').screenshot({ path: path.join(ART, 'product-cards-unit-warning.png') });
+}
+
+{
+    // Edit form: the per-unit target is set in pack terms. Pick a pack, pick a
+    // level against the usual price or name a pack price, and both prices show.
+    await page.goto(`${BASE}/app/products?sort=created_at`, { waitUntil: 'networkidle' });
+    await card('EV Unit Drop Crisps').locator('a[wire\\:navigate]').first().click();
+    await page.waitForURL((url) => /\/app\/products\/[^/]+$/.test(url.pathname), { timeout: 10000 });
+    const productUrl = page.url();
+    await page.goto(`${productUrl}/edit`, { waitUntil: 'networkidle' });
+    const target = page.locator('[data-test="unit-target"]');
+    const stored = async () => parseFloat(await page.evaluate(() => Livewire.all().find((x) => x.name === 'products.edit-product')?.$wire.unitPriceTarget ?? 'NaN'));
+    const targetText = async () => (await target.innerText()).replace(/\s+/g, ' ');
+    checker.check('the price alert leads the alerts', await target.isVisible() && (await targetText()).startsWith('Price alert') && (await targetText()).includes('Which pack do you buy?'), await targetText());
+    checker.check('the levels read the low from the price chart', (await targetText()).includes('Lowest on the chart'), await targetText());
+
+    const other = page.locator('[data-test="other-alerts"]');
+    checker.check('other alerts start folded away, with what is set in the summary', (await other.getAttribute('open')) === null && (await other.locator('summary').innerText()).includes('10% drop'), await other.locator('summary').innerText());
+    await target.getByRole('radio', { name: /Back at the low on the chart/ }).click();
+    checker.check('a level sets the lowest per-kilo price', Math.abs(await stored() - 1.89 / 0.37) < 0.01, String(await stored()));
+
+    const levelPrices = await target.locator('[role="radio"] .font-semibold').allTextContents();
+    const levelValues = levelPrices.map((text) => parseFloat(text.replace(/[^0-9.]/g, '')));
+    checker.check('the levels run from easiest to hardest to reach', levelValues.every((value, index) => index === 0 || value < levelValues[index - 1]), JSON.stringify(levelPrices));
+
+    await target.getByRole('button', { name: /^200 g/ }).click();
+    const context = (await target.locator('[data-test="unit-target-context"]').innerText()).replace(/\s+/g, ' ');
+    checker.check('the context names the best rate and what it means for the chosen pack', context.includes('Today’s best: €5.38 per kilo at lidl.nl') && context.includes('€1.08 for your 200 g'), context);
+    const cheaper = target.locator('[data-test="unit-target-cheaper-pack"]');
+    const cheaperShown = await cheaper.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+    checker.check('a dearer pack says the best pack is cheaper per kilo', cheaperShown && (await cheaper.innerText()).includes('36% cheaper per kilo'), await cheaper.innerText().catch(() => ''));
+    await target.locator('[data-test="unit-target-pack-price"]').fill('0.80');
+    checker.check('a price for the 200 g bag becomes a per-kilo target', Math.abs(await stored() - 4) < 0.0001, String(await stored()));
+    const summary = (await target.locator('[data-test="unit-target-summary"]').innerText()).replace(/\s+/g, ' ');
+    checker.check('the summary states the alert in both prices', summary.includes('€0.80 for 200 g') && summary.includes('€4.00 per kilo') && summary.includes('any shop'), summary);
+    checker.check('the summary is announced to screen readers', (await target.locator('[data-test="unit-target-summary"]').getAttribute('aria-live')) === 'polite');
+    await target.screenshot({ path: path.join(ART, 'product-cards-unit-target.png') });
+
+    await cheaper.getByRole('button').click();
+    const cheaperGone = await cheaper.waitFor({ state: 'hidden', timeout: 3000 }).then(() => true).catch(() => false);
+    checker.check('the note switches to the cheaper pack', (await target.getByRole('button', { name: /^370 g/ }).getAttribute('aria-pressed')) === 'true' && cheaperGone);
+
+    await target.getByRole('button', { name: 'Remove' }).click();
+    const cleared = await target.getByText('No price alert set.').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+    checker.check('remove clears the target', Number.isNaN(await stored()) && cleared, String(await stored()));
+    await target.getByRole('button', { name: /^200 g/ }).click();
+    await target.locator('[data-test="unit-target-pack-price"]').fill('0.80');
+
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await page.waitForURL((url) => url.href === productUrl, { timeout: 10000 }).catch(() => {});
+    const rules = (await page.locator('[data-test="alert-rules"]').locator('..').innerText().catch(() => '')).replace(/\s+/g, ' ');
+    checker.check('saving stores the per-kilo target', rules.includes('€4.00/kg'), rules);
+}
+
+{
     // Sort: the URL wins, then the sort this browser last chose, then the
     // biggest drop.
     const sortSelect = page.locator('select[data-test="product-sort"], [data-test="product-sort"] select').first();

@@ -408,9 +408,9 @@ it('names the unit once the shops have read a pack size', function (string $unit
         ->assertSee($expected)
         ->assertDontSee('Target price per kilo, litre or piece');
 })->with([
-    'grams' => ['g', 'Target price per kilo'],
-    'millilitres' => ['ml', 'Target price per litre'],
-    'pieces' => ['piece', 'Target price per piece'],
+    'grams' => ['g', 'same price per kilo'],
+    'millilitres' => ['ml', 'same price per litre'],
+    'pieces' => ['piece', 'same price per piece'],
 ]);
 
 it('names the unit the comparison actually uses when the shops disagree', function (): void {
@@ -425,8 +425,8 @@ it('names the unit the comparison actually uses when the shops disagree', functi
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product])
-        ->assertSee('Target price per kilo')
-        ->assertDontSee('Target price per piece');
+        ->assertSee('same price per kilo')
+        ->assertDontSee('same price per piece');
 });
 
 it('keeps the three-way wording while no shop has read a pack size', function (): void {
@@ -730,5 +730,17 @@ it('shows a free account the current figure beside the upgrade line', function (
 
     livewire(EditProduct::class, ['product' => $product->refresh()])
         ->assertSee('Pro alerts on this.')
-        ->assertSee('Now €4.00/kg at ah.nl');
+        ->assertSee('Now €4.00/kg at ah.nl')
+        // The note says where to upgrade, not only that one is needed.
+        ->assertSeeInOrder(['Pro alerts on this.', 'Get Pro']);
+});
+
+it('shows the unit target without the zeros its column pads it with', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id]);
+    $product->forceFill(['unit_price_target' => '7.0000'])->save();
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product->refresh()])->assertSet('unitPriceTarget', '7');
 });

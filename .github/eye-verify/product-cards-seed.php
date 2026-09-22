@@ -14,6 +14,7 @@ use App\Enums\ProductCategory;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -33,6 +34,7 @@ $purge = function (User $user): void {
     Product::query()->where('user_id', $user->id)->get()->each(function (Product $product): void {
         $shopIds = Shop::query()->where('product_id', $product->id)->pluck('id');
         PriceDropEvent::query()->where('product_id', $product->id)->delete();
+        ProductCheapestHistory::query()->where('product_id', $product->id)->delete();
         PriceCheck::query()->whereIn('shop_id', $shopIds)->delete();
         Shop::query()->whereIn('id', $shopIds)->delete();
         $product->delete();
@@ -111,6 +113,17 @@ $crisps = $make('EV Unit Drop Crisps', [
     ['url' => 'https://ah.nl/producten/crisps', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g'],
     ['url' => 'https://lidl.nl/p/crisps', 'current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g'],
 ], ['image_url' => $image('crisps'), 'last_notified_price' => '1.69', 'last_notified_at' => $now], 2);
+// Two months of the 370 g bag, so the usual and the lowest price per kilo
+// can be read from history.
+$previous = null;
+foreach ([['2.19', 60], ['1.99', 45], ['2.09', 30], ['1.89', 15]] as [$price, $daysAgo]) {
+    $segment = ProductCheapestHistory::query()->create([
+        'product_id' => $crisps->id, 'cheapest_shop_id' => $crisps->cheapest_shop_id, 'cheapest_price' => $price,
+        'pack_quantity' => '370.00', 'pack_unit' => 'g', 'started_at' => $now->subDays($daysAgo), 'ended_at' => null,
+    ]);
+    $previous?->update(['ended_at' => $now->subDays($daysAgo)]);
+    $previous = $segment;
+}
 $drop($crisps, ['reference_price' => null, 'reference_unit_price' => '9.9900', 'comparison_unit' => 'g', 'new_price' => '1.69', 'drop_pct' => 20.0]);
 
 $make('EV Paused Soap', [

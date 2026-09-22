@@ -11,6 +11,8 @@ use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
 use App\Support\Iso4217;
 use App\Support\MoneyFormatter;
+use App\Support\Numeric;
+use App\Support\UnitTargetGuide;
 use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Log;
@@ -78,7 +80,8 @@ final class EditProduct extends Component
         $this->dropThresholdPct = $product->drop_threshold_pct === null ? null : (string) $product->drop_threshold_pct;
         $this->dropThresholdAbs = $product->drop_threshold_abs === null ? null : (string) $product->drop_threshold_abs;
         $this->targetPrice = $product->target_price === null ? null : (string) $product->target_price;
-        $this->unitPriceTarget = $product->unit_price_target === null ? null : (string) $product->unit_price_target;
+        // The column keeps four decimals, which the form would show as 7.0000.
+        $this->unitPriceTarget = $product->unit_price_target === null ? null : Numeric::trimmed((string) $product->unit_price_target);
         $this->active = $product->active;
         $this->category = $product->category->value ?? '';
         $this->loadedCategory = $this->category;
@@ -241,6 +244,8 @@ final class EditProduct extends Component
 
     public function render(): View
     {
+        $guide = new UnitTargetGuide($this->product);
+
         return view('livewire.products.edit-product', [
             'currencies' => Iso4217::options(),
             'categoryGroups' => ProductCategory::grouped(),
@@ -249,6 +254,8 @@ final class EditProduct extends Component
             'suggestedLabel' => ProductCategory::tryFrom((string) $this->suggestedCategory)?->label(),
             'shopImages' => $this->shopImages(),
             'allowsUnitPriceAlerts' => $this->allowsUnitPriceAlerts(),
+            'packChoices' => $guide->packs(),
+            'unitHistory' => $guide->history(),
             ...$this->alertAnchors(),
         ]);
     }
@@ -291,7 +298,7 @@ final class EditProduct extends Component
     private function alertAnchors(): array
     {
         $packs = $this->product->comparablePacks();
-        $unitWord = self::unitWord($packs->unit());
+        $unitWord = UnitWord::noun($packs->unit());
         $bestValue = $this->product->bestValueShop();
         $unitPrice = $bestValue === null ? null : $packs->unitPriceOf($bestValue);
 
@@ -360,25 +367,6 @@ final class EditProduct extends Component
     private function allowsUnitPriceAlerts(): bool
     {
         return $this->product->user?->entitlements()->allowsUnitPriceAlerts() === true;
-    }
-
-    /**
-     * The unit this product's alert compares in, named rather than listed.
-     * Null while no shop has read a pack size, when the reader really does not
-     * know yet and neither do we.
-     */
-    private static function unitWord(?string $unit): ?string
-    {
-        $word = match ($unit) {
-            'g' => __('kilo'),
-            'ml' => __('litre'),
-            'piece' => __('piece'),
-            default => null,
-        };
-
-        // `__()` is typed as array|string: a key that maps to an array is not
-        // a word, and reads here as no unit at all.
-        return is_string($word) ? $word : null;
     }
 
     private function blankToNull(?string $value): ?string

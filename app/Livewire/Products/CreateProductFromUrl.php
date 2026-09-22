@@ -9,7 +9,9 @@ use App\Billing\PlanLimitReached;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\Shop;
 use App\Models\User;
+use App\Services\Drops\ReferenceValue;
 use App\Services\Drops\TierDefaults;
+use App\Support\UnitTargetGuide;
 use App\Support\UrlNormalizer;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
@@ -42,6 +44,8 @@ final class CreateProductFromUrl extends Component
 
     public string $thresholdAbs = '';
 
+    public string $unitPriceTarget = '';
+
     /** @var array{id: string, title: string}|null Another product of this user already tracking the pasted URL. */
     public ?array $existingTrackedProduct = null;
 
@@ -59,10 +63,58 @@ final class CreateProductFromUrl extends Component
         return [
             'title' => FluentRule::string('Title')->required()->max(255),
             'imageUrl' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
+            // Optional: an empty threshold stores nothing, and the drop check
+            // uses the tier default for the price at the time.
             'thresholdPct' => FluentRule::numeric('Alert me when it drops by (%)')
-                ->required()
+                ->nullable()
                 ->between(0.01, 99.98999999999999),
-            'thresholdAbs' => FluentRule::numeric('Alert me when it drops by (amount)')->required()->min(0.01),
+            'thresholdAbs' => FluentRule::numeric('Alert me when it drops by (amount)')->nullable()->min(0.01),
+            'unitPriceTarget' => FluentRule::numeric('Target price per kilo, litre or piece')->nullable()->min(0.0001),
+        ];
+    }
+
+    /**
+     * The probed pack, for the unit-target component. Empty when the page
+     * states no pack size: there is nothing to turn a pack price into a unit
+     * price with.
+     *
+     * @return list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, bestValue: bool}>
+     */
+    public function unitTargetPacks(): array
+    {
+        $draft = $this->shopDraft();
+
+        if ($draft->packSize === null || $this->host === null) {
+            return [];
+        }
+
+        return [UnitTargetGuide::packChoice('new', $this->host, $draft->packSize, $draft->trackedPrice(), bestValue: true)];
+    }
+
+    /**
+     * The thresholds the drop check will use when a field is left empty,
+     * shown as the fields' placeholders. A new product's reference is its
+     * first price: per unit when the page states a pack size, with the pack
+     * price beside it.
+     *
+     * @return array{pct: string, abs: string}
+     */
+    public function suggestedThresholds(): array
+    {
+        $draft = $this->shopDraft();
+        $price = $draft->trackedPrice();
+        $unitPrice = $draft->packSize?->unitPriceFor($price);
+        $defaults = TierDefaults::forReference(new ReferenceValue(
+            value: $unitPrice ?? $price,
+            kind: ReferenceValue::KIND_INITIAL,
+            sampleSize: 0,
+            unit: $unitPrice === null ? null : $draft->packSize?->unit,
+            packValue: $unitPrice === null ? null : $price,
+        ));
+
+        return [
+            'pct' => number_format($defaults['pct'], 2, '.', ''),
+            'abs' => number_format($defaults['abs'] ?? TierDefaults::for($price)['abs'], 2, '.', ''),
         ];
     }
 
@@ -76,10 +128,7 @@ final class CreateProductFromUrl extends Component
         $image = $snapshot['image_url'] ?? '';
         $this->imageUrl = is_string($image) ? $image : '';
 
-        $price = $snapshot['price'] ?? '0';
-        $defaults = TierDefaults::for(is_string($price) ? $price : '0');
-        $this->thresholdPct = number_format($defaults['pct'], 2, '.', '');
-        $this->thresholdAbs = number_format($defaults['abs'], 2, '.', '');
+        $this->reset(['thresholdPct', 'thresholdAbs', 'unitPriceTarget']);
 
         $this->existingTrackedProduct = null;
         if ($this->normalizedUrl !== null) {
@@ -113,8 +162,9 @@ final class CreateProductFromUrl extends Component
         $draft = new ProductDraft(
             title: trim($this->title),
             imageUrl: trim($this->imageUrl) !== '' ? trim($this->imageUrl) : null,
-            dropThresholdPct: $this->thresholdPct,
-            dropThresholdAbs: $this->thresholdAbs,
+            dropThresholdPct: trim($this->thresholdPct) !== '' ? trim($this->thresholdPct) : null,
+            dropThresholdAbs: trim($this->thresholdAbs) !== '' ? trim($this->thresholdAbs) : null,
+            unitPriceTarget: trim($this->unitPriceTarget) !== '' ? trim($this->unitPriceTarget) : null,
         );
 
         try {
