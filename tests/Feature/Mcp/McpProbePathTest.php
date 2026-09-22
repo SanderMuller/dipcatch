@@ -506,3 +506,32 @@ test('a second refusal says how many there have been', function (): void {
         }
     }
 });
+
+test('a 429 with no Retry-After does not invent a retry interval', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response('<html><head><title>429 Too Many Requests</title></head></html>', 429),
+    ]);
+
+    $me = User::factory()->create();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
+        ->assertHasErrors()
+        ->assertSee('It did not say for how long')
+        ->assertDontSee('60 seconds');
+});
+
+test('a 429 that states an interval quotes the shop', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response('slow down', 429, ['Retry-After' => '120']),
+    ]);
+
+    $me = User::factory()->create();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
+        ->assertHasErrors()
+        ->assertSee('It asks for 120 seconds.');
+});

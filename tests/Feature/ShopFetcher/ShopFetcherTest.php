@@ -301,3 +301,20 @@ test('the failure count survives a cleared cache, because it does not live there
 
     expect($memory->isPersistent('blocked.com', HostFetchMemory::KIND_BLOCKED))->toBeTrue();
 });
+
+test('a 429 without a Retry-After states no interval', function (): void {
+    // dierapotheker.nl sends nginx's bare 429. DipCatch used to invent sixty
+    // seconds here and report it as the shop's own figure, and a caller
+    // followed it four times and was refused each time.
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response('<html><head><title>429 Too Many Requests</title></head></html>', 429),
+    ]);
+
+    try {
+        app(ShopFetcher::class)->fetch('https://example.com/p/1');
+        $this->fail('expected RateLimitedByHost');
+    } catch (RateLimitedByHost $e) {
+        expect($e->retryAfterSeconds)->toBe(0);
+    }
+});

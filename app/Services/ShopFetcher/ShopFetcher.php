@@ -302,8 +302,14 @@ final readonly class ShopFetcher
         }
 
         if ($status === 429) {
-            $retryAfter = (int) ($response->header('Retry-After') ?: 60);
-            throw new RateLimitedByHost($retryAfter);
+            // Only when the shop states one. A default here was reported back
+            // as the shop's own instruction — dierapotheker.nl sends a bare
+            // nginx 429 with no header, and a caller told to "try again in 60
+            // seconds" did, four times, and was refused every time. A number
+            // nobody gave us is worse than no number: it reads as a promise.
+            $stated = (int) $response->header('Retry-After');
+
+            throw new RateLimitedByHost(max($stated, 0));
         }
 
         if ($status >= 500 && $status <= 599) {
