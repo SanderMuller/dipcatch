@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\CheckjebonPrice;
 use Database\Seeders\Demo\DatasetCatalog;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Artisan;
 
 class DatabaseSeeder extends Seeder
 {
@@ -49,7 +50,10 @@ class DatabaseSeeder extends Seeder
 
         $this->command?->info('Fetching the checkjebon price dataset, so the demo can track real products…');
 
-        $this->callSilent('dipcatch:refresh-checkjebon');
+        // `Artisan::call()`, not `$this->callSilent()`: a seeder's own call
+        // methods resolve their argument as a seeder class, so an Artisan
+        // signature reaches the container as a class name and fails there.
+        Artisan::call('dipcatch:refresh-checkjebon');
 
         if (CheckjebonPrice::query()->count() === 0) {
             $this->command?->warn('Could not fetch the price dataset. The demo will use invented products instead.');
