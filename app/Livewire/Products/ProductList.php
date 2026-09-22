@@ -25,9 +25,8 @@ use Livewire\WithPagination;
  * those are what a person tracking a few dozen products actually uses.
  *
  * Every query is scoped to the signed-in user — the Filament resource did this
- * in `getEloquentQuery()` and nothing else enforced it — and every mutation
- * goes through `ProductPolicy`, which the resource documented as its second
- * line of defence.
+ * in `getEloquentQuery()` and nothing else enforced it. The list changes
+ * nothing: pausing and resuming live on the product page.
  */
 final class ProductList extends Component
 {
@@ -44,14 +43,18 @@ final class ProductList extends Component
     #[Url(except: '')]
     public string $category = '';
 
+    /** Only products in an active drop, or with a deal at their cheapest shop running now. */
+    #[Url(except: false)]
+    public bool $discounted = false;
+
     #[Url(except: self::DEFAULT_SORT)]
     public string $sort = self::DEFAULT_SORT;
 
-    private const string DEFAULT_SORT = 'created_at';
+    private const string DEFAULT_SORT = 'biggest_drop';
 
     /**
      * The sort options, each with the direction that makes it read the way its
-     * label promises: newest first, but A before Z.
+     * label promises: biggest drop and newest first, but A before Z.
      *
      * Sorting used to live on the table headers, where it asked a person to
      * know that "Best price" was clickable and to guess what a second click
@@ -60,10 +63,10 @@ final class ProductList extends Component
      * @var array<string, 'asc'|'desc'>
      */
     private const array SORTS = [
+        'biggest_drop' => 'desc',
         'created_at' => 'desc',
         'title' => 'asc',
         'cheapest_price' => 'asc',
-        'biggest_drop' => 'desc',
     ];
 
     public function updatedStatus(): void
@@ -81,22 +84,14 @@ final class ProductList extends Component
         $this->resetPage();
     }
 
-    public function updatedSort(): void
+    public function updatedDiscounted(): void
     {
         $this->resetPage();
     }
 
-    /**
-     * Pausing and resuming are mutations, so they authorize rather than trusting
-     * the scoped list the page was rendered from.
-     */
-    public function togglePaused(string $productId): void
+    public function updatedSort(): void
     {
-        $product = Product::query()->findOrFail($productId);
-
-        $this->authorize('update', $product);
-
-        $product->forceFill(['active' => ! $product->active])->save();
+        $this->resetPage();
     }
 
     public function render(): View
@@ -128,6 +123,12 @@ final class ProductList extends Component
                 in_array($this->status, ['active', 'paused'], strict: true),
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', $this->status === 'active'),
             )
+            ->when($this->discounted, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where(
+                fn (EloquentQueryBuilder $discount): EloquentQueryBuilder => $discount
+                    // The latch DetectDrop sets on an alert and clears on recovery.
+                    ->whereNotNull('last_notified_price')
+                    ->orWhereHas('cheapestShop', self::dealRunningNow(...)),
+            ))
             ->when(
                 $categories !== null,
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []),
@@ -142,8 +143,33 @@ final class ProductList extends Component
             // on two pages and another on none. The ids are UUIDv7, so this
             // also reads as newest first.
             ->orderBy('id', 'desc')
-            // 30 fills whole rows at one, two, three and five cards across.
-            ->paginate(30);
+            // 24 fills whole rows at one, two, three and four cards across.
+            ->paginate(24);
+    }
+
+    /**
+     * A deal at the shop running now, in SQL: a promotion window that has
+     * started and not ended, or a bundle offer the price was read at. The
+     * same rules as PromotionWindow::isRunning() and Shop::liveBundleOffer().
+     *
+     * @param  EloquentQueryBuilder<Shop>  $shop
+     * @return EloquentQueryBuilder<Shop>
+     */
+    private static function dealRunningNow(EloquentQueryBuilder $shop): EloquentQueryBuilder
+    {
+        $now = now();
+
+        return $shop->where(fn (EloquentQueryBuilder $deal): EloquentQueryBuilder => $deal
+            ->where(fn (EloquentQueryBuilder $promotion): EloquentQueryBuilder => $promotion
+                ->where('promotion_ends_at', '>=', $now)
+                ->where(fn (EloquentQueryBuilder $started): EloquentQueryBuilder => $started
+                    ->whereNull('promotion_starts_at')
+                    ->orWhere('promotion_starts_at', '<=', $now)))
+            ->orWhere(fn (EloquentQueryBuilder $bundle): EloquentQueryBuilder => $bundle
+                ->where('bundle_quantity', '>=', 2)
+                ->where('bundle_total_price', '>=', 0.01)
+                ->whereRaw('ROUND(bundle_total_price / NULLIF(bundle_quantity, 0), 2) = current_price')
+                ->whereRaw('ROUND(bundle_total_price / NULLIF(bundle_quantity, 0), 2) < COALESCE(single_item_price, current_price)')));
     }
 
     /**
@@ -184,7 +210,12 @@ final class ProductList extends Component
         return $groups;
     }
 
-    /** The sort keys a view offers, in the order they are shown. */
+    /**
+     * The sort keys the view offers. The browser checks a remembered sort
+     * against these before it applies it.
+     *
+     * @return list<string>
+     */
     public static function sortOptions(): array
     {
         return array_keys(self::SORTS);

@@ -47,10 +47,12 @@ const firstParty = () => issues.pageErrors.length === 0
 }
 
 {
-    await page.goto(`${BASE}/app/products`, { waitUntil: 'networkidle' });
+    // Newest first, so the fixture's key products share page one; the default
+    // sort is checked on its own below.
+    await page.goto(`${BASE}/app/products?sort=created_at`, { waitUntil: 'networkidle' });
     checker.check('list boots without first-party failures', firstParty(), [...issues.pageErrors, ...issues.failedRequests].join('; '));
     checker.check('list renders cards, not a table', (await page.locator('[data-flux-table]').count()) === 0);
-    checker.check('page one holds 30 cards', (await page.locator('li[wire\\:key^="product-"]').count()) === 30);
+    checker.check('page one holds 24 cards', (await page.locator('li[wire\\:key^="product-"]').count()) === 24);
 
     const oil = card('EV Drop Olive Oil');
     const oilText = (await oil.innerText()).replace(/\s+/g, ' ');
@@ -159,10 +161,10 @@ const firstParty = () => issues.pageErrors.length === 0
     const emptyShown = await page.getByText('No product matches that search.').waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
     checker.check('a search with no match shows the empty message', emptyShown);
     await page.getByPlaceholder('Search your products').fill('');
-    await page.waitForFunction(() => document.querySelectorAll('li[wire\\:key^="product-"]').length === 30, null, { timeout: 8000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelectorAll('li[wire\\:key^="product-"]').length === 24, null, { timeout: 8000 }).catch(() => {});
 
     await page.goto(`${BASE}/app/products?page=2`, { waitUntil: 'networkidle' });
-    checker.check('page two holds the remaining six cards', (await page.locator('li[wire\\:key^="product-"]').count()) === 6);
+    checker.check('page two holds the remaining twelve cards', (await page.locator('li[wire\\:key^="product-"]').count()) === 12);
 }
 
 {
@@ -184,6 +186,111 @@ const firstParty = () => issues.pageErrors.length === 0
     checker.check('dark mode is applied', await page.evaluate(() => document.documentElement.classList.contains('dark')));
     await page.screenshot({ path: path.join(ART, 'product-cards-dark.png') });
     await page.evaluate(() => localStorage.removeItem('flux.appearance'));
+}
+
+{
+    // Categories: a list beside the products on a wide screen, one
+    // collapsible group per department.
+    await page.goto(`${BASE}/app/products?sort=created_at`, { waitUntil: 'networkidle' });
+    const nav = page.locator('[data-test="product-category-nav"]');
+    const cardCount = () => page.locator('li[wire\\:key^="product-"]').count();
+    checker.check('the category list shows beside the products', await nav.isVisible());
+    checker.check('the category dropdown is hidden on a wide screen', ! await page.locator('[data-test="product-category-filter"]').isVisible());
+    const gridBox = await page.locator('ul[role="list"]').first().boundingBox();
+    const firstCard = await page.locator('li[wire\\:key^="product-"]').first().boundingBox();
+    checker.check('the products show four across', gridBox !== null && firstCard !== null && Math.round(gridBox.width / firstCard.width) === 4, JSON.stringify({ grid: gridBox?.width, card: firstCard?.width }));
+    checker.check('all categories is current at first', (await nav.getByRole('button', { name: 'All categories' }).getAttribute('data-current')) !== null);
+    checker.check('a department starts collapsed', ! await nav.getByRole('button', { name: 'Dairy & eggs' }).isVisible().catch(() => false));
+
+    await nav.getByRole('button', { name: 'Household & cleaning', exact: true }).click();
+    await nav.getByRole('button', { name: 'Laundry' }).click();
+    // The URL changes before the list re-renders, so wait on the cards.
+    await page.waitForFunction(() => document.querySelectorAll('li[wire\\:key^="product-"]').length === 8, null, { timeout: 8000 }).catch(() => {});
+    const laundryCount = await cardCount();
+    checker.check('a category in the list filters the products', laundryCount === 8 && new URL(page.url()).searchParams.get('category') === 'household.laundry', JSON.stringify({ count: laundryCount, url: page.url() }));
+    checker.check('the picked category is current', (await nav.getByRole('button', { name: 'Laundry' }).getAttribute('data-current')) !== null);
+    checker.check('the picked category tells a screen reader it is current', (await nav.getByRole('button', { name: 'Laundry' }).getAttribute('aria-current')) === 'true');
+    checker.check('the group of the picked category stays open', await nav.getByRole('button', { name: 'Laundry' }).isVisible());
+
+    await nav.getByRole('button', { name: 'All household & cleaning' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('li[wire\\:key^="product-"]').length === 16, null, { timeout: 8000 }).catch(() => {});
+    checker.check('a department item filters its whole department', (await cardCount()) === 16, String(await cardCount()));
+    await page.screenshot({ path: path.join(ART, 'product-cards-categories.png') });
+
+    await nav.getByRole('button', { name: 'All categories' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('li[wire\\:key^="product-"]').length === 24, null, { timeout: 8000 }).catch(() => {});
+    checker.check('all categories clears the filter', (await cardCount()) === 24, String(await cardCount()));
+}
+
+{
+    // The controls line up with the columns below them.
+    await page.goto(`${BASE}/app/products?sort=created_at`, { waitUntil: 'networkidle' });
+    const searchBox = await page.getByPlaceholder('Search your products').boundingBox();
+    const gridBox = await page.locator('ul[role="list"]').first().boundingBox();
+    const trackBox = await page.getByRole('link', { name: 'Track a product' }).boundingBox();
+    const navBox = await page.locator('[data-test="product-category-nav"]').boundingBox();
+    const sortBox = await page.locator('[data-test="product-sort"]').first().boundingBox();
+    checker.check('the search starts at the left edge of the products', Math.abs(searchBox.x - gridBox.x) <= 2, `${searchBox.x} vs ${gridBox.x}`);
+    checker.check('the controls end at the right edge of the products', Math.abs((sortBox.x + sortBox.width) - (gridBox.x + gridBox.width)) <= 2, `${sortBox.x + sortBox.width} vs ${gridBox.x + gridBox.width}`);
+    checker.check('the add button sits above the categories', Math.abs(trackBox.x - navBox.x) <= 2, `${trackBox.x} vs ${navBox.x}`);
+
+    // Only discounts: an active drop, or a deal at the cheapest shop.
+    await page.locator('[data-test="product-discount-filter"]').click();
+    await page.waitForFunction(() => document.querySelectorAll('li[wire\\:key^="product-"]').length === 3, null, { timeout: 8000 }).catch(() => {});
+    const discounted = await page.locator('li[wire\\:key^="product-"] a[wire\\:navigate]').allTextContents().then((all) => all.map((t) => t.trim()).filter((t) => t.startsWith('EV ')));
+    checker.check('only discounts keeps the products with a discount', JSON.stringify(discounted.sort()) === JSON.stringify(['EV Drop Olive Oil', 'EV Paused Drop Coffee', 'EV Unit Drop Crisps']), JSON.stringify(discounted));
+    checker.check('only discounts goes into the URL', new URL(page.url()).searchParams.get('discounted') === 'true', page.url());
+    await page.screenshot({ path: path.join(ART, 'product-cards-discounts.png') });
+    await page.locator('[data-test="product-discount-filter"]').click();
+    await page.waitForFunction(() => document.querySelectorAll('li[wire\\:key^="product-"]').length === 24, null, { timeout: 8000 }).catch(() => {});
+    checker.check('turning it off shows every product again', (await page.locator('li[wire\\:key^="product-"]').count()) === 24);
+}
+
+{
+    // Sort: the URL wins, then the sort this browser last chose, then the
+    // biggest drop.
+    const sortSelect = page.locator('select[data-test="product-sort"], [data-test="product-sort"] select').first();
+    const sortParam = () => new URL(page.url()).searchParams.get('sort');
+    const titles = () => page.locator('li[wire\\:key^="product-"] a[wire\\:navigate]').allTextContents().then((all) => all.map((t) => t.trim()));
+    const settle = () => page.waitForLoadState('networkidle');
+
+    await page.evaluate(() => localStorage.removeItem('dipcatch.products.sort'));
+    await page.goto(`${BASE}/app/products`, { waitUntil: 'networkidle' });
+    checker.check('the list sorts by the biggest drop by default', await sortSelect.inputValue() === 'biggest_drop' && sortParam() === null);
+    checker.check('the default puts the biggest drop first', (await titles())[0] === 'EV Unit Drop Crisps', JSON.stringify((await titles()).slice(0, 3)));
+
+    await sortSelect.selectOption('created_at');
+    await page.waitForFunction(() => new URL(location.href).searchParams.get('sort') === 'created_at', null, { timeout: 8000 }).catch(() => {});
+    await settle();
+    checker.check('a chosen sort goes into the URL', sortParam() === 'created_at', page.url());
+    checker.check('a chosen sort is remembered', await page.evaluate(() => localStorage.getItem('dipcatch.products.sort')) === 'created_at');
+
+    await page.goto(`${BASE}/app/products`, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => new URL(location.href).searchParams.get('sort') === 'created_at', null, { timeout: 8000 }).catch(() => {});
+    await settle();
+    checker.check('without a sort in the URL the remembered sort comes back', await sortSelect.inputValue() === 'created_at' && (await titles())[0] === 'EV Drop Olive Oil', JSON.stringify({ value: await sortSelect.inputValue(), first: (await titles())[0] }));
+
+    await page.goto(`${BASE}/app/products?sort=title`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+    checker.check('a sort in the URL wins over the remembered one', await sortSelect.inputValue() === 'title' && sortParam() === 'title');
+
+    await page.evaluate(() => localStorage.setItem('dipcatch.products.sort', 'user_id'));
+    await page.goto(`${BASE}/app/products`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+    checker.check('a remembered sort the list does not offer is ignored', await sortSelect.inputValue() === 'biggest_drop' && sortParam() === null);
+
+    await page.evaluate(() => localStorage.setItem('dipcatch.products.sort', 'created_at'));
+    await page.goto(`${BASE}/app/products`, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => new URL(location.href).searchParams.get('sort') === 'created_at', null, { timeout: 8000 }).catch(() => {});
+    await settle();
+    await sortSelect.selectOption('biggest_drop');
+    await page.waitForFunction(() => ! new URL(location.href).searchParams.has('sort'), null, { timeout: 8000 }).catch(() => {});
+    await settle();
+    checker.check('choosing the default again is remembered too', await page.evaluate(() => localStorage.getItem('dipcatch.products.sort')) === 'biggest_drop');
+    await page.goto(`${BASE}/app/products`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+    checker.check('after choosing the default, a plain visit stays on it', await sortSelect.inputValue() === 'biggest_drop' && sortParam() === null);
+    await page.evaluate(() => localStorage.removeItem('dipcatch.products.sort'));
 }
 
 {

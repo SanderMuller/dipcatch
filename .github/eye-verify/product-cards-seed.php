@@ -125,10 +125,13 @@ $drop($pausedDrop, ['reference_price' => '7.99', 'new_price' => '6.79', 'drop_pc
 
 $make('EV No Price Thing', [], ['image_url' => null], 5);
 
+// Spread over two departments, so the category list has groups to open.
+$fillerCategories = [ProductCategory::DairyEggs, ProductCategory::Laundry, ProductCategory::Cleaning, null];
+
 for ($i = 1; $i <= 31; $i++) {
     $make(sprintf('EV Filler %02d', $i), [
         ['url' => 'https://jumbo.com/producten/filler', 'current_price' => (string) (1 + $i)],
-    ], ['image_url' => $image('filler' . $i)], 10 + $i);
+    ], ['image_url' => $image('filler' . $i), 'category' => $fillerCategories[$i % 4]], 10 + $i);
 }
 
 file_put_contents($fixturePath, json_encode(['email' => $email, 'password' => $password]));

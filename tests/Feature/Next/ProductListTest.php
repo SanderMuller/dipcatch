@@ -23,34 +23,6 @@ it('lists only the signed-in users products', function (): void {
         ->assertDontSee('Somebody elses coffee');
 });
 
-it('refuses to pause a product owned by someone else', function (): void {
-    $mine = User::factory()->create();
-    $theirs = Product::factory()->create(['active' => true]);
-
-    $this->actingAs($mine);
-
-    // A forged id in a Livewire call is not covered by the scoped list the page
-    // was rendered from — the policy is what refuses it.
-    livewire(ProductList::class)
-        ->call('togglePaused', $theirs->id)
-        ->assertForbidden();
-
-    expect($theirs->fresh()?->active)->toBeTrue();
-});
-
-it('pauses and resumes a product it owns', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->create(['user_id' => $user->id, 'active' => true]);
-
-    $this->actingAs($user);
-
-    livewire(ProductList::class)->call('togglePaused', $product->id);
-    expect($product->fresh()?->active)->toBeFalse();
-
-    livewire(ProductList::class)->call('togglePaused', $product->id);
-    expect($product->fresh()?->active)->toBeTrue();
-});
-
 it('searches by title', function (): void {
     $user = User::factory()->create();
     Product::factory()->create(['user_id' => $user->id, 'title' => 'Arabica beans']);
@@ -78,14 +50,15 @@ it('sorts by name, and ignores a sort key it does not offer', function (): void 
         ->assertSeeInOrder(['alpha', 'Beta']);
 
     // `sort` arrives from the URL, so a key the dropdown does not offer must
-    // not reach the query. It falls back to newest first.
+    // not reach the query. It falls back to the default: neither dropped, so
+    // the newest comes first.
     livewire(ProductList::class)
         ->set('sort', 'user_id')
         ->assertOk()
         ->assertSeeInOrder(['alpha', 'Beta']);
 });
 
-it('sorts by the biggest drop, with products that never dropped last', function (): void {
+it('sorts by the biggest drop by default, with products that never dropped last', function (): void {
     $user = User::factory()->create();
     $small = Product::factory()->create(['user_id' => $user->id, 'title' => 'Small drop']);
     $big = Product::factory()->create(['user_id' => $user->id, 'title' => 'Big drop']);
@@ -97,7 +70,7 @@ it('sorts by the biggest drop, with products that never dropped last', function 
     $this->actingAs($user);
 
     livewire(ProductList::class)
-        ->set('sort', 'biggest_drop')
+        ->assertSet('sort', 'biggest_drop')
         ->assertSeeInOrder(['Big drop', 'Small drop', 'Never dropped']);
 });
 
@@ -418,3 +391,105 @@ it('lists the shop behind the card price first, even when an out-of-stock shop i
 
     livewire(ProductList::class)->assertSeeInOrder(['ah.nl', '€12.49', 'lidl.nl', '€9.99']);
 });
+
+it('shows only products with a discount when asked', function (): void {
+    $user = User::factory()->create();
+
+    $dropped = productWithCheapestShop($user, 'In a drop', [], ['last_notified_price' => '2.00', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $dropped->id]);
+    productWithCheapestShop($user, 'Promotion running', ['promotion_ends_at' => now()->addDays(3)]);
+    productWithCheapestShop($user, 'Bundle read', ['current_price' => '2.00', 'single_item_price' => '2.85', 'bundle_quantity' => 2, 'bundle_total_price' => '4.00']);
+    productWithCheapestShop($user, 'Promotion ended', ['promotion_ends_at' => now()->subDay()]);
+    productWithCheapestShop($user, 'Promotion not started', ['promotion_starts_at' => now()->addDay(), 'promotion_ends_at' => now()->addDays(5)]);
+    // A bundle stored beside a price that is not the bundle price is not the deal on offer.
+    productWithCheapestShop($user, 'Bundle not read', ['current_price' => '2.85', 'single_item_price' => '2.85', 'bundle_quantity' => 2, 'bundle_total_price' => '4.00']);
+    productWithCheapestShop($user, 'Full price', []);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('discounted', true)
+        ->assertSee('In a drop')
+        ->assertSee('Promotion running')
+        ->assertSee('Bundle read')
+        ->assertDontSee('Promotion ended')
+        ->assertDontSee('Promotion not started')
+        ->assertDontSee('Bundle not read')
+        ->assertDontSee('Full price')
+        ->set('discounted', false)
+        ->assertSee('Full price');
+});
+
+it('counts a shop deal the same way the shop does', function (Closure $make, bool $counts): void {
+    $user = User::factory()->create();
+    $product = $make($user);
+    $cheapest = $product instanceof Product ? $product->cheapestShop : null;
+
+    // The SQL filter and the PHP rules must agree on every one of these.
+    $php = $cheapest?->liveBundleOffer() !== null || $cheapest?->promotionWindow()?->isRunning() === true;
+    expect($php)->toBe($counts);
+
+    $this->actingAs($user);
+
+    $list = livewire(ProductList::class)->set('discounted', true);
+    $counts ? $list->assertSee('Checked') : $list->assertDontSee('Checked');
+})->with([
+    'bundle that rounds' => [fn (User $user): Product => productWithCheapestShop($user, 'Checked', ['current_price' => '1.67', 'single_item_price' => '1.99', 'bundle_quantity' => 3, 'bundle_total_price' => '5.00']), true],
+    'bundle with no single price stored' => [fn (User $user): Product => productWithCheapestShop($user, 'Checked', ['current_price' => '2.00', 'single_item_price' => null, 'bundle_quantity' => 2, 'bundle_total_price' => '4.00']), false],
+    'bundle no cheaper than one' => [fn (User $user): Product => productWithCheapestShop($user, 'Checked', ['current_price' => '2.00', 'single_item_price' => '2.00', 'bundle_quantity' => 2, 'bundle_total_price' => '4.00']), false],
+    'promotion that started' => [fn (User $user): Product => productWithCheapestShop($user, 'Checked', ['promotion_starts_at' => now()->subDay(), 'promotion_ends_at' => now()->addDay()]), true],
+    'promotion that starts after it ends' => [fn (User $user): Product => productWithCheapestShop($user, 'Checked', ['promotion_starts_at' => now()->addDays(2), 'promotion_ends_at' => now()->addDay()]), false],
+]);
+
+it('ignores a deal at a shop that is not the cheapest', function (): void {
+    $user = User::factory()->create();
+    $product = productWithCheapestShop($user, 'Deal elsewhere', []);
+    Shop::factory()->for($product)->create(['current_price' => '3.00', 'promotion_ends_at' => now()->addDays(3)]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)->set('discounted', true)->assertDontSee('Deal elsewhere');
+});
+
+it('says so when no product has a discount', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Full price']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('discounted', true)
+        ->assertSee('No product has a discount right now.')
+        // With another filter on, the message names the filter, not the whole list.
+        ->set('status', 'paused')
+        ->assertSee('No product in this filter has a discount right now.');
+});
+
+it('names the filter, not only the category, when more than one filter finds nothing', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->categorised(ProductCategory::CoffeeTea)->create(['user_id' => $user->id, 'active' => true]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('category', 'food')
+        ->set('status', 'paused')
+        ->assertSee('No product matches this filter.')
+        ->assertDontSee('No product in that category.');
+});
+
+/**
+ * A product whose cheapest shop carries the given columns.
+ *
+ * @param  array<string, mixed>  $shop
+ * @param  array<string, mixed>  $product
+ */
+function productWithCheapestShop(User $user, string $title, array $shop, array $product = []): Product
+{
+    $made = Product::factory()->create(['user_id' => $user->id, 'title' => $title]);
+    $cheapest = Shop::factory()->for($made)->create(['current_price' => '2.00']);
+    $cheapest->forceFill($shop)->save();
+    $made->forceFill(['cheapest_shop_id' => $cheapest->id, 'cheapest_price' => $cheapest->current_price, ...$product])->save();
+
+    return $made;
+}
