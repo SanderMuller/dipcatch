@@ -70,8 +70,10 @@ final class Product extends Model
             'target_price' => 'decimal:2',
             'target_price_notified' => 'decimal:2',
             'target_price_notified_at' => 'datetime',
-            'unit_price_target' => 'decimal:2',
-            'unit_price_notified' => 'decimal:2',
+            // Four, unlike the pack-money columns above: a price per piece is
+            // often under a cent's worth of resolution. See PackSize.
+            'unit_price_target' => 'decimal:4',
+            'unit_price_notified' => 'decimal:4',
             'unit_price_notified_at' => 'datetime',
             'last_notified_price' => 'decimal:2',
             'last_notified_at' => 'datetime',

@@ -53,12 +53,12 @@
             if ($previewPackSize !== null && is_string($snapshot['price'] ?? null)) {
                 $previewUnitPriceValue = $previewPackSize->unitPriceFor($snapshot['price']);
                 if ($previewUnitPriceValue !== null) {
-                    $previewUnitPrice = \App\Support\MoneyFormatter::format($previewUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
+                    $previewUnitPrice = \App\Support\MoneyFormatter::unitPrice($previewUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
                 }
                 if ($previewRegularPrice !== null) {
                     $previewRegularUnitPriceValue = $previewPackSize->unitPriceFor($previewRegularPrice);
                     if ($previewRegularUnitPriceValue !== null) {
-                        $previewRegularUnitPrice = \App\Support\MoneyFormatter::format($previewRegularUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
+                        $previewRegularUnitPrice = \App\Support\MoneyFormatter::unitPrice($previewRegularUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
                     }
                 }
             }

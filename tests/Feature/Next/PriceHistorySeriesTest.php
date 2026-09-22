@@ -285,7 +285,7 @@ test('a cheaper total that is worse value shows as two diverging lines', functio
 
     expect(chartSeries($product, 'Cheapest (€)')['data'])->toBe([1.99, 1.69, 1.69])
         // Down in euros, up per kilo — the point of the second line.
-        ->and(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([5.38, 8.45, 8.45]);
+        ->and(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([5.3784, 8.45, 8.45]);
 });
 
 test('segments that recorded no pack size get no unit line', function (): void {
@@ -371,5 +371,5 @@ test('a pack size corrected today does not redraw the past', function (): void {
     ]);
 
     // 12.00 for 55 g is 218.18/kg — what was known then, not 18.18 from today.
-    expect(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([218.18, 218.18]);
+    expect(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([218.1818, 218.1818]);
 });

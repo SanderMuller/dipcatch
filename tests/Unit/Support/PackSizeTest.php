@@ -249,13 +249,13 @@ test('two distinct masses outside a multipack parse to null', function (): void 
 test('unit price for a mass pack size', function (): void {
     $size = PackSize::parse('200 g');
 
-    expect($size->unitPriceFor('1.69'))->toBe('8.45');
+    expect($size->unitPriceFor('1.69'))->toBe('8.4500');
 });
 
 test('unit price for a piece pack size', function (): void {
     $size = PackSize::parse('4 rollen');
 
-    expect($size->unitPriceFor('1.80'))->toBe('0.45');
+    expect($size->unitPriceFor('1.80'))->toBe('0.4500');
 });
 
 test('unit price is null for a zero price', function (): void {
@@ -379,7 +379,7 @@ test('the unit price value is not rounded', function (): void {
 
     expect($size->unitPriceValueFor('12.99'))->toBeGreaterThan(0.0324)
         ->and($size->unitPriceValueFor('12.99'))->toBeLessThan(0.0325)
-        ->and($size->unitPriceFor('12.99'))->toBe('0.03');
+        ->and($size->unitPriceFor('12.99'))->toBe('0.0325');
 });
 
 test('a bare count multiplies the item size the shop stated', function (): void {

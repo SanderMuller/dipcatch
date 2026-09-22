@@ -232,6 +232,6 @@ final class ProductList extends Component
             return '—';
         }
 
-        return MoneyFormatter::format($unitPrice, $product->currency) . ' ' . $shop?->unitPriceLabel();
+        return MoneyFormatter::unitPrice($unitPrice, $product->currency) . ' ' . $shop?->unitPriceLabel();
     }
 }

@@ -85,8 +85,33 @@ it('measures a fall per unit rather than across two pack sizes', function (): vo
     expect($event)->not->toBeNull()
         ->and(round((float) $event->drop_pct, 1))->toBe(3.7)
         ->and($event->comparison_unit)->toBe('g')
-        ->and((string) $event->reference_unit_price)->toBe('12.58')
-        ->and((string) $event->new_unit_price)->toBe('12.11');
+        ->and((string) $event->reference_unit_price)->toBe('12.5826')
+        ->and((string) $event->new_unit_price)->toBe('12.1145');
+});
+
+it('measures a fall on a product priced by the piece', function (): void {
+    // The Roter vitamin C shape. 400 tablets at 12.99 is 0.032475 each; the
+    // same pack at 11.50 is 0.028750 — about an 11.5% fall. Both used to be
+    // stored as 0.03, so the reference could not fall far enough to clear any
+    // threshold at all and no per-piece product could ever alert. Four
+    // decimals put the resolution at a tenth of a percent here, which is
+    // finer than any threshold a shopper sets.
+    $product = droppingProduct();
+
+    $ah = sizedShop($product, 'ah.nl', '12.99', ['pack_quantity' => '400.00', 'pack_unit' => 'piece']);
+    readingOn($ah, '12.99');
+    $product->recomputeCheapestShop();
+
+    $trigger = readingOn($ah, '11.50');
+    $product->refresh()->recomputeCheapestShop($trigger->id);
+
+    $event = PriceDropEvent::query()->where('product_id', $product->id)->first();
+
+    expect($event)->not->toBeNull()
+        ->and($event->comparison_unit)->toBe('piece')
+        ->and((string) $event->reference_unit_price)->toBe('0.0325')
+        ->and((string) $event->new_unit_price)->toBe('0.0288')
+        ->and(round((float) $event->drop_pct, 1))->toBe(11.4);
 });
 
 it('detects a drop when the pack price rises and the unit price falls', function (): void {

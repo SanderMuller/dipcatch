@@ -48,7 +48,7 @@ test('reaching the target notifies', function (): void {
     app(DetectUnitPriceTarget::class)($product);
 
     Notification::assertSentTo($product->user, UnitPriceTargetNotification::class);
-    expect($product->refresh()->unit_price_notified)->toBe('5.38');
+    expect($product->refresh()->unit_price_notified)->toBe('5.3784');
 });
 
 test('a value above the target says nothing', function (): void {
@@ -202,7 +202,7 @@ test('the message states the unit price, the pack price and the shop', function 
         ->and($payload['unit_price_label'])->toBe('/kg')
         ->and($payload['new_price'])->toBe('1.99')
         ->and($payload['host'])->toBe('lidl.nl')
-        ->and($payload['unit_price_target'])->toBe('5.50');
+        ->and($payload['unit_price_target'])->toBe('5.5000');
 });
 
 test('a price check on any shop can fire the target, not only the cheapest', function (): void {
@@ -273,4 +273,25 @@ test('a value that only rounds onto the target does not fire', function (): void
 
     Notification::assertNothingSent();
     expect($product->refresh()->unit_price_notified)->toBeNull();
+});
+
+test('a target can be set between two values a cent apart', function (): void {
+    // 0.028 sits between the 400-pack's 0.032475 and the 800-pack's
+    // 0.0274875. At two decimals both were 0.03 and no target could separate
+    // them, so the field could not express what the shopper wanted.
+    $user = User::factory()->create(['notify_via_filament' => true]);
+    subscribeUser($user);
+    $product = Product::factory()->for($user)->create([
+        'currency' => 'EUR',
+        'unit_price_target' => '0.0280',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://benushop.nl/p/1', 'currency' => 'EUR', 'current_price' => '21.99',
+        'pack_quantity' => '800.00', 'pack_unit' => 'piece',
+    ]);
+
+    app(DetectUnitPriceTarget::class)($product->refresh());
+
+    Notification::assertSentTo($product->user, UnitPriceTargetNotification::class);
+    expect($product->refresh()->unit_price_notified)->toBe('0.0275');
 });

@@ -45,7 +45,7 @@ it('saves every field the old Filament form carried', function (): void {
         ->set('dropThresholdPct', '15')
         ->set('dropThresholdAbs', '0.75')
         ->set('targetPrice', '2.49')
-        ->set('unitPriceTarget', '11.00')
+        ->set('unitPriceTarget', '11.0000')
         ->set('active', false)
         ->call('save')
         ->assertRedirect(route('app.products.show', $product));
@@ -56,7 +56,7 @@ it('saves every field the old Filament form carried', function (): void {
         ->and($fresh?->image_url)->toBe('https://example.test/pack.jpg')
         ->and((string) $fresh?->drop_threshold_pct)->toBe('15.00')
         ->and((string) $fresh?->target_price)->toBe('2.49')
-        ->and((string) $fresh?->unit_price_target)->toBe('11.00')
+        ->and((string) $fresh?->unit_price_target)->toBe('11.0000')
         ->and($fresh?->active)->toBeFalse();
 });
 
@@ -182,10 +182,10 @@ it('keeps a unit price target a free account cannot be alerted on', function ():
     expect($user->entitlements()->allowsUnitPriceAlerts())->toBeFalse();
 
     livewire(EditProduct::class, ['product' => $product])
-        ->set('unitPriceTarget', '3.20')
+        ->set('unitPriceTarget', '3.2000')
         ->call('save');
 
-    expect((string) $product->fresh()?->unit_price_target)->toBe('3.20');
+    expect((string) $product->fresh()?->unit_price_target)->toBe('3.2000');
 });
 
 it('offers the images the shops reported', function (): void {

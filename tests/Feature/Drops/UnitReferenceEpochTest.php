@@ -98,7 +98,7 @@ it('starts a new epoch when the same shop corrects its pack size', function (): 
     // 12.00 for 660 g is 18.18/kg. The wrong 55 g segments read 218.18/kg, and
     // one of those in the median would make the next ordinary price move look
     // like a collapse.
-    expect((string) $reference?->value)->toBe('18.18')
+    expect((string) $reference?->value)->toBe('18.1818')
         ->and($reference?->packQuantity)->toBe(660.0);
 });
 

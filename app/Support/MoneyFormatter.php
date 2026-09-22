@@ -23,6 +23,9 @@ final class MoneyFormatter
      */
     private static ?NumberFormatter $symbolFormatter = null;
 
+    /** Third worker-local formatter — see {@see preciseFormatter()}. */
+    private static ?NumberFormatter $preciseFormatter = null;
+
     public static function format(?string $amount, string $currency): string
     {
         if ($amount === null || ! is_numeric($amount)) {
@@ -95,6 +98,44 @@ final class MoneyFormatter
     }
 
     /**
+     * A price per kilo, litre or piece, with enough decimals to tell two
+     * shops apart.
+     *
+     * Two decimals are right for a price per kilo and useless for a price per
+     * tablet: a 400-pack and an 800-pack of the same tablet are 18% apart and
+     * both render `€0.03`. Below one unit of currency the figure is shown at
+     * four decimals, which is also the scale it is stored and compared at.
+     * Above it, two — nobody needs `€5.3784 /kg`.
+     *
+     * The threshold is the magnitude, not the unit. A price per piece can be
+     * eleven euros and a price per kilo can be twenty cents.
+     */
+    public static function unitPrice(?string $amount, string $currency): string
+    {
+        if ($amount === null || ! is_numeric($amount)) {
+            return '—';
+        }
+
+        $value = (float) $amount;
+
+        if (abs($value) >= 1.0) {
+            return self::format($amount, $currency);
+        }
+
+        $code = strtoupper(trim($currency));
+
+        if (! Iso4217::isValid($code)) {
+            return trim($code . ' ' . number_format($value, PackSize::VALUE_DECIMALS, '.', ','));
+        }
+
+        $formatted = self::preciseFormatter()->formatCurrency($value, $code);
+
+        return $formatted === false
+            ? self::fallback($code, $value)
+            : self::normaliseSpaces($formatted);
+    }
+
+    /**
      * Used for codes intl cannot be trusted with (not in `Iso4217::CODES`) and
      * as a last-resort guard for a broken ICU build. Never renders `¤`.
      */
@@ -123,5 +164,22 @@ final class MoneyFormatter
     private static function symbolFormatter(): NumberFormatter
     {
         return self::$symbolFormatter ??= new NumberFormatter('en_US', NumberFormatter::CURRENCY);
+    }
+
+    /**
+     * Its own instance, for the same reason {@see $symbolFormatter} is one:
+     * the fraction-digit attributes are set on it, and sharing the instance
+     * {@see format()} uses would widen every price on every surface.
+     */
+    private static function preciseFormatter(): NumberFormatter
+    {
+        if (self::$preciseFormatter === null) {
+            $formatter = new NumberFormatter('en_US', NumberFormatter::CURRENCY);
+            $formatter->setAttribute(NumberFormatter::MIN_FRACTION_DIGITS, PackSize::VALUE_DECIMALS);
+            $formatter->setAttribute(NumberFormatter::MAX_FRACTION_DIGITS, PackSize::VALUE_DECIMALS);
+            self::$preciseFormatter = $formatter;
+        }
+
+        return self::$preciseFormatter;
     }
 }

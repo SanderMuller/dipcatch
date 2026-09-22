@@ -302,7 +302,7 @@ test('a scraped check parses the pack size from the JSON-LD title', function ():
     $shop->refresh();
     expect((string) $shop->pack_quantity)->toBe('300.00')
         ->and($shop->pack_unit)->toBe('ml')
-        ->and($shop->unitPrice())->toBe('5.97')
+        ->and($shop->unitPrice())->toBe('5.9667')
         ->and($shop->unitPriceLabel())->toBe('/l');
 });
 

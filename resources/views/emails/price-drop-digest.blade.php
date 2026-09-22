@@ -58,7 +58,7 @@ $image = $product->safeImageUrl();
 @endphp
 <span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; white-space: nowrap;">{{ $changeLabel }}</span>
 @if ($event->new_unit_price !== null)
-<div style="margin-top: 4px; color: #71717a; font-size: 13px;">{{ \App\Support\MoneyFormatter::format((string) $event->new_unit_price, $event->currency) }}{{ \App\Support\UnitWord::labelFor($event->comparison_unit) }} · {{ __('was') }} {{ \App\Support\MoneyFormatter::format((string) $event->reference_unit_price, $event->currency) }}{{ \App\Support\UnitWord::labelFor($event->comparison_unit) }}</div>
+<div style="margin-top: 4px; color: #71717a; font-size: 13px;">{{ \App\Support\MoneyFormatter::unitPrice((string) $event->new_unit_price, $event->currency) }}{{ \App\Support\UnitWord::labelFor($event->comparison_unit) }} · {{ __('was') }} {{ \App\Support\MoneyFormatter::unitPrice((string) $event->reference_unit_price, $event->currency) }}{{ \App\Support\UnitWord::labelFor($event->comparison_unit) }}</div>
 @endif
 </td>
 </tr>

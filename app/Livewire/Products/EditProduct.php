@@ -100,7 +100,10 @@ final class EditProduct extends Component
                 ->between(0.01, 99.98999999999999),
             'dropThresholdAbs' => FluentRule::numeric('Alert me when it drops by (amount)')->nullable()->min(0.01),
             'targetPrice' => FluentRule::numeric('Target price')->nullable()->min(0.01),
-            'unitPriceTarget' => FluentRule::numeric('Target price per kilo, litre or piece')->nullable()->min(0.01),
+            // A cent is a floor for money and a ceiling for a rate: a tablet
+            // costs three hundredths of one, and a target above every real
+            // value cannot be set at all.
+            'unitPriceTarget' => FluentRule::numeric('Target price per kilo, litre or piece')->nullable()->min(0.0001),
             'category' => FluentRule::string('Category')->nullable()->in(ProductCategory::values()),
         ];
     }
@@ -321,8 +324,14 @@ final class EditProduct extends Component
             return null;
         }
 
+        $currency = (string) $this->product->currency;
+
         return [
-            'amount' => MoneyFormatter::format($amount, (string) $this->product->currency) . $suffix,
+            // A per-unit anchor is what the reader types into the field beside
+            // it, so it is shown at the precision the field accepts.
+            'amount' => ($suffix === ''
+                ? MoneyFormatter::format($amount, $currency)
+                : MoneyFormatter::unitPrice($amount, $currency)) . $suffix,
             'host' => (string) $shop->host,
         ];
     }

@@ -14,9 +14,9 @@ test('unitPrice renders per kg, per liter and per piece', function (string $quan
     expect($shop->unitPrice())->toBe($expected)
         ->and($shop->unitPriceLabel())->toBe($label);
 })->with([
-    ['200.00', 'g', '1.69', '8.45', '/kg'],
-    ['750.00', 'ml', '2.25', '3.00', '/l'],
-    ['4.00', 'piece', '1.80', '0.45', '/stuk'],
+    ['200.00', 'g', '1.69', '8.4500', '/kg'],
+    ['750.00', 'ml', '2.25', '3.0000', '/l'],
+    ['4.00', 'piece', '1.80', '0.4500', '/stuk'],
 ]);
 
 test('unitPrice is null without a price or without a complete pack size', function (?string $price, ?string $quantity, ?string $unit): void {

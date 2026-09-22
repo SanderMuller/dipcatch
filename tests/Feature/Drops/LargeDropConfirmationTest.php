@@ -299,7 +299,7 @@ function sizedConfirmationShop(string $host = 'shop.example.com'): Shop
     ]);
 
     $shop->forceFill([
-        'current_price' => '10.00',
+        'current_price' => '10.0000',
         'current_in_stock' => true,
         'pack_quantity' => '500.00',
         'pack_unit' => 'g',
@@ -352,5 +352,5 @@ test('a second reading at the same price confirms a large per-unit drop', functi
 
     expect($event->comparison_unit)->toBe('g')
         ->and((string) $event->new_price)->toBe('5.00')
-        ->and((string) $event->new_unit_price)->toBe('10.00');
+        ->and((string) $event->new_unit_price)->toBe('10.0000');
 });

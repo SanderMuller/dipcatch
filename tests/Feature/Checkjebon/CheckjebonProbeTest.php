@@ -180,7 +180,7 @@ test('the AH probe transports salesUnitSize and confirm stores it', function ():
     $shop = Shop::query()->firstOrFail();
     expect((string) $shop->pack_quantity)->toBe('200.00')
         ->and($shop->pack_unit)->toBe('g')
-        ->and($shop->unitPrice())->toBe('8.45')
+        ->and($shop->unitPrice())->toBe('8.4500')
         ->and($shop->unitPriceLabel())->toBe('/kg');
 });
 

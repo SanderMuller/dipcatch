@@ -29,8 +29,10 @@ final class PriceDropEvent extends Model
             'new_price' => 'decimal:2',
             'drop_pct' => 'decimal:4',
             'drop_abs' => 'decimal:2',
-            'reference_unit_price' => 'decimal:2',
-            'new_unit_price' => 'decimal:2',
+            // Four. `reference_price` and `new_price` above stay at two —
+            // they are money a till charges, these are a rate.
+            'reference_unit_price' => 'decimal:4',
+            'new_unit_price' => 'decimal:4',
             'fired_at' => 'datetime',
         ];
     }
@@ -59,7 +61,7 @@ final class PriceDropEvent extends Model
         }
 
         return __('Was :price', [
-            'price' => MoneyFormatter::format((string) $unitPrice, $this->currency)
+            'price' => MoneyFormatter::unitPrice((string) $unitPrice, $this->currency)
                 . UnitWord::labelFor(is_string($this->comparison_unit) ? $this->comparison_unit : null),
         ]);
     }

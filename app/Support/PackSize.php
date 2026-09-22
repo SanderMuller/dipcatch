@@ -68,6 +68,13 @@ final readonly class PackSize
      */
     private const string NUMBER = '(\d+(?:[.,]\d+)?)(?![%+])';
 
+    /**
+     * How many decimals a unit price is carried at. Matches the scale of the
+     * columns that store one and the bcmath scale the drop engine compares at,
+     * so a figure does not lose precision by being written down.
+     */
+    public const int VALUE_DECIMALS = 4;
+
     private function __construct(
         public float $quantity,
         public string $unit,
@@ -254,20 +261,25 @@ final readonly class PackSize
 
     /**
      * `price / quantity × 1000` for mass/volume, `price / count` for pieces.
-     * Returns a plain decimal string (no thousands separator) with two
-     * decimals, or null when the price or the quantity is not usable.
+     * Returns a plain decimal string (no thousands separator), or null when
+     * the price or the quantity is not usable.
      *
-     * A display figure. Never compare two of these: two decimals is coarser
-     * than the differences between real shops. A 400-tablet pack at €12,99 and
-     * an 800-tablet pack at €21,99 are 18% apart per tablet and both read
-     * `0.03`, so a comparison on this string crowned the dearer pack and
-     * pointed the alerts at it. Rank on {@see unitPriceValueFor()}.
+     * The value, not the display: it is what gets stored, compared and sent to
+     * an MCP client. Four decimals because two cannot separate the things
+     * people buy by the piece. A 400-tablet pack at €12,99 and an 800-tablet
+     * pack at €21,99 are 18% apart per tablet and both used to read `0.03` —
+     * indistinguishable in the field a shopper is meant to compare on, and in
+     * the one a target is measured against. Anything under about fifty cents a
+     * unit had the same problem: tablets, capsules, bags, wipes, cups.
+     *
+     * Render it with {@see MoneyFormatter::unitPrice()}, which drops back to
+     * two decimals once the figure is large enough not to need more.
      */
     public function unitPriceFor(string $price): ?string
     {
         $value = $this->unitPriceValueFor($price);
 
-        return $value === null ? null : number_format($value, 2, '.', '');
+        return $value === null ? null : number_format($value, self::VALUE_DECIMALS, '.', '');
     }
 
     /**

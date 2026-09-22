@@ -42,7 +42,7 @@ test('the best value is the lowest price per unit, not the lowest price', functi
     ]);
 
     expect($product->bestValueShop()?->host)->toBe('lidl.nl')
-        ->and($product->bestValueShop()?->unitPrice())->toBe('5.38');
+        ->and($product->bestValueShop()?->unitPrice())->toBe('5.3784');
 });
 
 test('a shop with no pack size cannot be the best value', function (): void {
@@ -292,12 +292,19 @@ test('two shops a rounding step apart are ranked on the unrounded figure', funct
     expect($product->bestValueShop()?->host)->toBe('benushop.nl');
 });
 
-test('the displayed unit price stays at two decimals', function (): void {
+test('the page shows a cheap per-piece price at the precision that separates it', function (): void {
+    // Both packs used to render EUR 0.03 — the field a shopper compares on
+    // could not show an 18% difference.
     $product = productWithShops([
         'ah.nl' => ['current_price' => '12.99', 'pack_quantity' => '400.00', 'pack_unit' => 'piece'],
+        'benushop.nl' => ['current_price' => '21.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece'],
     ]);
 
-    expect($product->shops()->first()?->unitPrice())->toBe('0.03');
+    $this->actingAs($product->user ?? User::factory()->create());
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeText('€0.0325')
+        ->assertSeeText('€0.0275');
 });
 
 test('a price quoted without VAT takes neither answer', function (): void {

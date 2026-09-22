@@ -103,7 +103,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
 
     private function body(): string
     {
-        $unit = MoneyFormatter::format($this->snapshotUnitPrice, $this->product->currency)
+        $unit = MoneyFormatter::unitPrice($this->snapshotUnitPrice, $this->product->currency)
             . ($this->snapshotUnitLabel === null ? '' : ' ' . $this->snapshotUnitLabel);
 
         $price = $this->snapshotPrice === null

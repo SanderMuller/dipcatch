@@ -26,7 +26,7 @@
     <flux:text size="sm" class="text-zinc-500">{{ $pack->reason() }}</flux:text>
 @elseif ($unitPrice !== null)
     <span class="inline-flex flex-wrap items-baseline gap-x-2 tabular-nums">
-        <span>{{ \App\Support\MoneyFormatter::format($unitPrice, $shop->currency) }} {{ $pack?->size?->label() }}</span>
+        <span>{{ \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) }} {{ $pack?->size?->label() }}</span>
         @if ($pack?->provenance === \App\Enums\PackProvenance::Inferred)
             <flux:tooltip content="{{ __('No pack size on this page. Taken from the other shops on this product, which all agree.') }}">
                 <flux:badge size="sm" color="zinc">{{ __('estimated') }}</flux:badge>

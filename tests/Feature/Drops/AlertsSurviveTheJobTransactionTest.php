@@ -219,5 +219,5 @@ test('a failing alert leaves the committed data alone', function (): void {
         ->and((string) $product->last_notified_price)->toBe('46.08')
         ->and($product->last_notified_unit)->toBe('g')
         ->and((string) $product->target_price_notified)->toBe('17.05')
-        ->and((string) $product->unit_price_notified)->toBe('46.08');
+        ->and((string) $product->unit_price_notified)->toBe('46.0811');
 });
