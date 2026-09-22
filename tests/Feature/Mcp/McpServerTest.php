@@ -215,6 +215,6 @@ it('advertises a version that moves with the tool roster', function (): void {
         ->getAttributes(Version::class)[0] ?? null;
 
     expect($version)->not->toBeNull()
-        ->and($version->newInstance()->value)->toBe('1.7.0')
+        ->and($version->newInstance()->value)->toBe('1.8.0')
         ->and($declared)->toHaveCount(13);
 });
