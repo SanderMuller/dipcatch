@@ -33,15 +33,17 @@ final class DropEvaluator
         // identical offers either side of €25 a pack would get 15% and 10% for
         // no reason a shopper would recognise — while a money default banded on
         // a price per kilo sits in a band nobody set it for.
+        $defaults = TierDefaults::forReference($ref);
+
         $thresholdPct = $product->drop_threshold_pct !== null
             ? (string) $product->drop_threshold_pct
-            : (string) TierDefaults::for($ref->value)['pct'];
+            : (string) $defaults['pct'];
 
         $thresholdAbs = $dropAbsolute === null
             ? null
             : ($product->drop_threshold_abs !== null
                 ? (string) $product->drop_threshold_abs
-                : (string) TierDefaults::for($ref->packBasis() ?? $ref->value)['abs']);
+                : (string) ($defaults['abs'] ?? TierDefaults::for($ref->value)['abs']));
 
         $belowThreshold = ($dropAbsolute !== null && $thresholdAbs !== null && $this->meets($dropAbsolute, $thresholdAbs))
             || $this->meets($dropPercent, $thresholdPct);

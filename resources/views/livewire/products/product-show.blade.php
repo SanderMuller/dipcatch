@@ -109,6 +109,7 @@
     @endif
 
     {{-- Three sibling numbers on one surface, divided rather than boxed. --}}
+    @php($bestValueShop = $product->bestValueShop())
     <flux:card class="mt-6 p-0! @container">
         <dl class="grid divide-y divide-zinc-950/5 @3xl:grid-cols-3 @3xl:divide-x @3xl:divide-y-0 dark:divide-white/10">
             <div class="p-5">
@@ -121,12 +122,37 @@
                         <x-shop-link :shop="$product->cheapestShop" />
                     </dd>
                     <dd><x-shop-deal :shop="$product->cheapestShop" :show-source="false" class="mt-3" /></dd>
+
+                    {{-- The lowest price can be a small pack that costs more per
+                         unit. Up to 10% more is a note; more than that is a
+                         warning, because the bigger pack is the better buy. --}}
+                    @php($cheapestUnit = $packs->unitPriceValueOf($product->cheapestShop))
+                    @php($bestUnit = $bestValueShop === null || $bestValueShop->is($product->cheapestShop) ? null : $packs->unitPriceValueOf($bestValueShop))
+                    @if ($cheapestUnit !== null && $bestUnit !== null && $bestUnit > 0 && $cheapestUnit > $bestUnit)
+                        @php($unitGap = max(1, (int) round(($cheapestUnit - $bestUnit) / $bestUnit * 100)))
+                        <dd class="mt-3">
+                            <flux:callout
+                                :variant="$unitGap > 10 ? 'danger' : 'warning'"
+                                icon="exclamation-triangle"
+                                data-test="unit-price-warning"
+                                :data-severity="$unitGap > 10 ? 'high' : 'low'"
+                            >
+                                <flux:callout.text>
+                                    {{ __(':percent% more :unit than the best value: :price at :host.', [
+                                        'percent' => $unitGap,
+                                        'unit' => \App\Support\UnitWord::forCode($packs->unit()) ?? __('per unit'),
+                                        'price' => \App\Support\MoneyFormatter::unitPrice($packs->unitPriceOf($bestValueShop), $bestValueShop->currency) . \App\Support\UnitWord::labelFor($packs->unit()),
+                                        'host' => $bestValueShop->host,
+                                    ]) }}
+                                </flux:callout.text>
+                            </flux:callout>
+                        </dd>
+                    @endif
                 @endif
             </div>
 
             <div class="p-5">
                 <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Best value') }}</dt>
-                @php($bestValueShop = $product->bestValueShop())
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
                     <x-shop-price :shop="$bestValueShop" unit />
                 </dd>
@@ -142,7 +168,7 @@
 
             <div class="p-5">
                 <dt class="flex items-center gap-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
-                    <span class="truncate">{{ __('Alerts below') }}</span>
+                    <span class="truncate">{{ __('Alerts') }}</span>
                     {{-- The threshold is the one figure on this page the user
                          sets, so it carries its own way back to the form. --}}
                     <flux:tooltip :content="__('Edit alert threshold')">
@@ -157,15 +183,24 @@
                         />
                     </flux:tooltip>
                 </dt>
-                <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
-                    @if ($product->target_price !== null)
-                        {{ \App\Support\MoneyFormatter::format((string) $product->target_price, $product->currency) }}
-                    @elseif ($product->drop_threshold_pct !== null)
-                        {{ $product->drop_threshold_pct }}%
-                    @else
-                        {{ __('Any drop') }}
+                <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums" data-test="alert-rules">
+                    {{ $alertRules[0]['value'] ?? __('Any drop') }}
+                    @if ($alertRules[0]['pro'] ?? false)
+                        <flux:badge size="sm" color="zinc" class="align-middle">{{ __('Pro') }}</flux:badge>
                     @endif
                 </dd>
+                @if ($alertRules[0]['below'] ?? false)
+                    <dd class="text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('when a price reaches it') }}</dd>
+                @endif
+                {{-- One line per rule, so every rule set on the form shows. --}}
+                @foreach (array_slice($alertRules, 1) as $rule)
+                    <dd class="mt-1 text-base font-medium tabular-nums text-zinc-600 sm:text-sm dark:text-zinc-300">
+                        {{ $rule['below'] ? __('or :value or less', ['value' => $rule['value']]) : __('or :value', ['value' => $rule['value']]) }}
+                        @if ($rule['pro'] ?? false)
+                            <flux:badge size="sm" color="zinc">{{ __('Pro') }}</flux:badge>
+                        @endif
+                    </dd>
+                @endforeach
             </div>
         </dl>
     </flux:card>

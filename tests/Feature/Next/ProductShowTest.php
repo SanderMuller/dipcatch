@@ -7,7 +7,10 @@ use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
+use App\Services\Drops\DropEvaluator;
+use App\Services\Drops\Reference;
 use App\Support\Favicon;
+use App\Support\Numeric;
 use App\Support\PromotionLabel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
@@ -497,7 +500,7 @@ it('links the alert threshold to the edit form', function (): void {
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product])
-        ->assertSee('Alerts below')
+        ->assertSee('Alerts')
         ->assertSeeHtml('data-test="edit-alert-threshold"')
         ->assertSeeHtml(route('app.products.edit', $product));
 });
@@ -613,4 +616,133 @@ it('says a shop has never been read rather than showing nothing', function (): v
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
         ->assertSee('never read');
+});
+
+/**
+ * A product whose cheapest shop sells a small pack and whose best value
+ * is a bigger pack elsewhere.
+ */
+function smallPackCheapest(User $user, string $bigPackPrice): Product
+{
+    $product = ownedProduct($user);
+    $small = Shop::factory()->for($product)->create([
+        'url' => 'https://dirk.nl/p/sticks', 'currency' => 'EUR', 'current_price' => '2.55',
+        'pack_quantity' => '8.00', 'pack_unit' => 'piece',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/sticks', 'currency' => 'EUR', 'current_price' => $bigPackPrice,
+        'pack_quantity' => '30.00', 'pack_unit' => 'piece',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $small->id, 'cheapest_price' => '2.55'])->save();
+
+    return $product->refresh();
+}
+
+it('warns clearly when the best price costs much more per unit than the best value', function (): void {
+    $user = User::factory()->create();
+    // €0.32 a piece against €0.22 a piece: 45% more.
+    $product = smallPackCheapest($user, '6.60');
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeHtml('data-severity="high"')
+        ->assertSee('45% more per piece than the best value')
+        ->assertSee('jumbo.com');
+});
+
+it('only notes it when the best price costs a little more per unit', function (): void {
+    $user = User::factory()->create();
+    // €0.32 a piece against €0.30 a piece: about 6% more.
+    $product = smallPackCheapest($user, '9.00');
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeHtml('data-severity="low"')
+        ->assertSee('6% more per piece than the best value');
+});
+
+it('does not warn when the best price is also the best value', function (): void {
+    $user = User::factory()->create();
+    // €0.32 a piece against €0.40 a piece: the small pack wins both.
+    $product = smallPackCheapest($user, '12.00');
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])->assertDontSeeHtml('data-test="unit-price-warning"');
+});
+
+it('shows every alert rule the product has', function (): void {
+    $user = User::factory()->create();
+    $product = smallPackCheapest($user, '6.60');
+    $product->forceFill(['target_price' => null, 'drop_threshold_pct' => '10.00', 'drop_threshold_abs' => null, 'unit_price_target' => '0.2000'])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeInOrder(['€0.2000/stuk', 'when a price reaches it', 'or 10% drop'])
+        ->assertDontSee('Any drop');
+});
+
+it('says any drop when the product has no alert rule and no price yet', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $product->forceFill(['target_price' => null, 'drop_threshold_pct' => null, 'drop_threshold_abs' => null, 'unit_price_target' => null])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])->assertSee('Any drop');
+});
+
+it('says below for a second price target too', function (): void {
+    $user = User::factory()->create();
+    $product = smallPackCheapest($user, '6.60');
+    $product->forceFill(['target_price' => '2.00', 'unit_price_target' => '0.2000', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeInOrder(['€2.00', 'when a price reaches it', 'or €0.2000/stuk or less']);
+});
+
+it('names the default drop thresholds when the product has none of its own', function (): void {
+    $user = User::factory()->create();
+    // A €20 reference sits in the <25 tier: 15% or €3.00.
+    $product = ownedProduct($user, cheapestPrice: '20.00');
+    $product->forceFill(['target_price' => null, 'unit_price_target' => null, 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+    ProductCheapestHistory::query()->create(['product_id' => $product->id, 'cheapest_price' => '20.00', 'started_at' => now()->subDays(10)]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeInOrder(['15% drop (default)', 'or €3.00 drop (default)'])
+        ->assertDontSee('Any drop');
+});
+
+it('names the same default drop the drop check uses on a per-unit reference', function (): void {
+    $user = User::factory()->create();
+    // €7 for 250 g: €28 a kilo. The pack price and the kilo price sit in
+    // different tiers, which is where a guess from the pack price goes wrong.
+    $product = ownedProduct($user, cheapestPrice: '7.00');
+    $shop = Shop::factory()->for($product)->create(['currency' => 'EUR', 'current_price' => '7.00', 'pack_quantity' => '250.00', 'pack_unit' => 'g']);
+    $product->forceFill(['cheapest_shop_id' => $shop->id, 'target_price' => null, 'unit_price_target' => null, 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+    ProductCheapestHistory::query()->create([
+        'product_id' => $product->id, 'cheapest_shop_id' => $shop->id, 'cheapest_price' => '7.00',
+        'pack_quantity' => '250.00', 'pack_unit' => 'g', 'started_at' => now()->subDays(10),
+    ]);
+    $product->refresh();
+
+    $reference = app(Reference::class)->compute($product);
+
+    if ($reference === null) {
+        throw new RuntimeException('The product needs a reference for the drop check to compare with.');
+    }
+
+    $outcome = app(DropEvaluator::class)->evaluate($product, '6.00', $reference);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee(Numeric::trimmed($outcome->thresholdPct) . '% drop (default)');
 });
