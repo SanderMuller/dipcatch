@@ -74,15 +74,15 @@ final readonly class UnitTargetGuide
 
         if (is_numeric($percent) && (float) $percent > 0 && (float) $percent < 100) {
             $candidates[] = [
-                'unit' => bcmul($bestUnit, bcsub('1', bcdiv(Numeric::str((string) $percent), '100', 10), 10), 10),
-                'drop' => Numeric::trimmed((string) $percent) . '%',
+                'unit' => bcmul($bestUnit, bcsub('1', bcdiv(Numeric::str($percent), '100', 10), 10), 10),
+                'drop' => Numeric::trimmed($percent) . '%',
             ];
         }
 
         if (is_numeric($amount) && $best['price'] !== null && (float) $amount > 0 && (float) $amount < $best['price']) {
             $candidates[] = [
-                'unit' => bcdiv(bcsub(self::decimal($best['price']), Numeric::str((string) $amount), 10), $perPack, 10),
-                'drop' => MoneyFormatter::format((string) $amount, (string) $this->product->currency),
+                'unit' => bcdiv(bcsub(self::decimal($best['price']), Numeric::str($amount), 10), $perPack, 10),
+                'drop' => MoneyFormatter::format($amount, (string) $this->product->currency),
             ];
         }
 
