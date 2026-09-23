@@ -49,6 +49,71 @@ final readonly class UnitTargetGuide
     }
 
     /**
+     * A drop alert restated as a price per unit, off today's best per-unit
+     * price: a percentage off the unit price, a money amount off the best
+     * pack. With both set the drop check alerts on whichever is met first,
+     * so the easier of the two carries over. Null when there is nothing to
+     * restate, or the saving leaves less than the smallest target.
+     *
+     * @param  list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, bestValue: bool}>|null  $packs  from packs(), when the caller has them
+     * @return array{unit: string, drops: list<string>, percentUnder: int, packPrice: string, pack: string}|null
+     */
+    public function switchFromDrop(?string $percent, ?string $amount, ?array $packs = null): ?array
+    {
+        $best = ($packs ?? $this->packs())[0] ?? null;
+
+        if ($best === null || $best['unitPrice'] === null) {
+            return null;
+        }
+
+        // Decimal strings throughout: a float cut to four decimals turns 4.2
+        // into 4.1999.
+        $bestUnit = self::decimal($best['unitPrice']);
+        $perPack = self::decimal($best['perPack']);
+        $candidates = [];
+
+        if (is_numeric($percent) && (float) $percent > 0 && (float) $percent < 100) {
+            $candidates[] = [
+                'unit' => bcmul($bestUnit, bcsub('1', bcdiv(Numeric::str((string) $percent), '100', 10), 10), 10),
+                'drop' => Numeric::trimmed((string) $percent) . '%',
+            ];
+        }
+
+        if (is_numeric($amount) && $best['price'] !== null && (float) $amount > 0 && (float) $amount < $best['price']) {
+            $candidates[] = [
+                'unit' => bcdiv(bcsub(self::decimal($best['price']), Numeric::str((string) $amount), 10), $perPack, 10),
+                'drop' => MoneyFormatter::format((string) $amount, (string) $this->product->currency),
+            ];
+        }
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        $drops = array_column($candidates, 'drop');
+        usort($candidates, fn (array $a, array $b): int => bccomp($b['unit'], $a['unit'], 10));
+        $unit = bcadd($candidates[0]['unit'], '0', 4);
+
+        if (bccomp($unit, '0.0001', 4) < 0) {
+            return null;
+        }
+
+        return [
+            'unit' => Numeric::trimmed($unit),
+            'drops' => $drops,
+            'percentUnder' => (int) round((1 - (float) $unit / (float) $bestUnit) * 100),
+            'packPrice' => bcadd(bcmul($unit, $perPack, 10), '0', 2),
+            'pack' => $best['pack'],
+        ];
+    }
+
+    /** @return numeric-string */
+    private static function decimal(float $value): string
+    {
+        return Numeric::str(sprintf('%.10F', $value));
+    }
+
+    /**
      * One pack as the unit-target component reads it — also for a shop that
      * is not saved yet, on the create form.
      *

@@ -28,6 +28,20 @@
             this.chosen = best === -1 ? 0 : best;
             this.syncPack();
             this.$watch('chosen', () => this.syncPack());
+            // A target set from elsewhere — the switch from a drop alert, a
+            // level — fills the price box too. One the box itself produced
+            // is left as typed.
+            this.$watch('target', () => {
+                if (document.activeElement === this.$refs.packPrice) {
+                    return;
+                }
+
+                const typed = parseFloat(this.packInput);
+
+                if (isNaN(typed) || this.floor(typed / this.pack().perPack) !== this.unit()) {
+                    this.syncPack();
+                }
+            });
         },
         money(value, perUnit = false) {
             if (value === null || value === undefined || ! isFinite(value)) {
@@ -160,7 +174,15 @@
     <div>
         <p class="text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Alert me when it costs') }}</p>
         <p x-show="levels().length > 0" class="text-base/7 text-zinc-500 sm:text-sm/6 dark:text-zinc-400" data-test="unit-target-context">
-            <span x-text="@js(__('Today’s best:')) + ' ' + money(bestUnit(), true) + ' ' + @js(__('per')) + ' ' + unitWord + ' ' + @js(__('at')) + ' ' + best().host + (packs.length > 1 || chosen !== 0 ? ', ' + @js(__('which is')) + ' ' + money(bestUnit() * pack().perPack) + ' ' + @js(__('for your')) + ' ' + pack().pack : '') + '.'"></span>
+            {{ __('Today’s best:') }}
+            <span class="rounded-md bg-zinc-950/5 px-1.5 py-0.5 font-medium text-zinc-900 tabular-nums dark:bg-white/10 dark:text-white" x-text="money(bestUnit(), true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
+            <span x-text="@js(__('at')) + ' ' + best().host + (packs.length > 1 || chosen !== 0 ? ', ' + @js(__('which is')) : '.')"></span>
+            <template x-if="packs.length > 1 || chosen !== 0">
+                <span>
+                    <span class="rounded-md bg-zinc-950/5 px-1.5 py-0.5 font-medium text-zinc-900 tabular-nums dark:bg-white/10 dark:text-white" x-text="money(bestUnit() * pack().perPack)"></span>
+                    <span x-text="@js(__('for your')) + ' ' + pack().pack + '.'"></span>
+                </span>
+            </template>
             <span x-show="lowest() !== null" x-text="@js(__('Lowest on the chart:')) + ' ' + money(lowest(), true) + ' ' + @js(__('per')) + ' ' + unitWord + '.'"></span>
         </p>
 
@@ -198,6 +220,7 @@
                         name="unit_target_pack_price"
                         step="0.01"
                         min="0.01"
+                        x-ref="packPrice"
                         x-model="packInput"
                         @input="setFromPack($event.target.value)"
                         :aria-label="@js(__('My own price for')) + ' ' + pack().pack"
@@ -211,8 +234,7 @@
     </div>
 
     {{-- What is set, in one line, for eyes and for screen readers alike. --}}
-    <p class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-base/7 text-zinc-600 sm:text-sm/6 dark:text-zinc-300" aria-live="polite" data-test="unit-target-summary">
-        <span x-show="unit() === null" x-cloak class="text-zinc-500 dark:text-zinc-400">{{ __('No price alert set.') }}</span>
+    <p x-show="unit() !== null" x-cloak class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-base/7 text-zinc-600 sm:text-sm/6 dark:text-zinc-300" aria-live="polite" data-test="unit-target-summary">
         <span x-show="unit() !== null" x-cloak>
             {{ __('Your alert:') }}
             <strong class="font-semibold text-zinc-900 tabular-nums dark:text-white" x-text="money(packPrice(pack())) + ' ' + @js(__('for')) + ' ' + pack().pack"></strong>

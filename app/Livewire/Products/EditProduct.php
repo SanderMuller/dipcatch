@@ -111,6 +111,27 @@ final class EditProduct extends Component
         ];
     }
 
+    /**
+     * Replaces the product's own drop alert with a price alert at the same
+     * saving. The drop fields empty, which puts the drop check back on the
+     * default for the price; nothing is written until the form is saved.
+     */
+    public function switchToPriceAlert(): void
+    {
+        $suggestion = new UnitTargetGuide($this->product)->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs);
+
+        // A free account keeps its drop settings: its price alert would be
+        // stored but not checked, so the switch would leave it with no alert
+        // of its own.
+        if ($suggestion === null || $this->blankToNull($this->unitPriceTarget) !== null || ! $this->allowsUnitPriceAlerts()) {
+            return;
+        }
+
+        $this->unitPriceTarget = $suggestion['unit'];
+        $this->dropThresholdPct = null;
+        $this->dropThresholdAbs = null;
+    }
+
     public function save(): void
     {
         $this->authorize('update', $this->product);
@@ -245,6 +266,7 @@ final class EditProduct extends Component
     public function render(): View
     {
         $guide = new UnitTargetGuide($this->product);
+        $packChoices = $guide->packs();
 
         return view('livewire.products.edit-product', [
             'currencies' => Iso4217::options(),
@@ -254,7 +276,10 @@ final class EditProduct extends Component
             'suggestedLabel' => ProductCategory::tryFrom((string) $this->suggestedCategory)?->label(),
             'shopImages' => $this->shopImages(),
             'allowsUnitPriceAlerts' => $this->allowsUnitPriceAlerts(),
-            'packChoices' => $guide->packs(),
+            'packChoices' => $packChoices,
+            'priceAlertSwitch' => $this->blankToNull($this->unitPriceTarget) === null && $this->allowsUnitPriceAlerts()
+                ? $guide->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs, $packChoices)
+                : null,
             'unitHistory' => $guide->history(),
             ...$this->alertAnchors(),
         ]);

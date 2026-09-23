@@ -275,7 +275,21 @@ const firstParty = () => issues.pageErrors.length === 0
     checker.check('the levels read the low from the price chart', (await targetText()).includes('Lowest on the chart'), await targetText());
 
     const other = page.locator('[data-test="other-alerts"]');
-    checker.check('other alerts start folded away, with what is set in the summary', (await other.getAttribute('open')) === null && (await other.locator('summary').innerText()).includes('10% drop'), await other.locator('summary').innerText());
+    checker.check('other alerts open when one is set, and name it', (await other.getAttribute('open')) !== null && (await other.locator('summary').innerText()).includes('10% drop'), await other.locator('summary').innerText());
+
+    // The switch sits with the drop it replaces, and swaps it for a price alert.
+    const switcher = page.locator('[data-test="price-alert-switch"]');
+    const switchText = (await switcher.innerText().catch(() => '')).replace(/\s+/g, ' ');
+    checker.check('the drop alert offers a switch beside it', (await other.locator('[data-test="price-alert-switch"]').count()) === 1 && switchText.includes('Instead of your 10% drop alert') && switchText.includes('€4.84 per kilo'), switchText);
+    await other.screenshot({ path: path.join(ART, 'product-cards-unit-suggestion.png') });
+    await switcher.getByRole('button', { name: 'Switch to a price alert' }).click();
+    await switcher.waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+    const dropsCleared = (await other.getByLabel('Alert me when it drops by (%)').inputValue()) === '' && (await other.getByLabel('Alert me when it drops by (amount)').inputValue()) === '';
+    const ownPrice = await target.locator('[data-test="unit-target-pack-price"]').inputValue();
+    checker.check('the switch fills the own-price box for the chosen pack', ownPrice === (5.3783 * 0.9 * 0.37).toFixed(2) || ownPrice === '1.79', ownPrice);
+    checker.check('the switch sets the price alert and clears the drop', Math.abs(await stored() - 5.38 * 0.9) < 0.01 && dropsCleared && await switcher.count() === 0, String(await stored()));
+    await target.getByRole('button', { name: 'Remove' }).click();
+
     await target.getByRole('radio', { name: /Back at the low on the chart/ }).click();
     checker.check('a level sets the lowest per-kilo price', Math.abs(await stored() - 1.89 / 0.37) < 0.01, String(await stored()));
 
@@ -285,6 +299,7 @@ const firstParty = () => issues.pageErrors.length === 0
 
     await target.getByRole('button', { name: /^200 g/ }).click();
     const context = (await target.locator('[data-test="unit-target-context"]').innerText()).replace(/\s+/g, ' ');
+    checker.check('the two figures in the context line stand out', (await target.locator('[data-test="unit-target-context"] .rounded-md').count()) === 2);
     checker.check('the context names the best rate and what it means for the chosen pack', context.includes('Today’s best: €5.38 per kilo at lidl.nl') && context.includes('€1.08 for your 200 g'), context);
     const cheaper = target.locator('[data-test="unit-target-cheaper-pack"]');
     const cheaperShown = await cheaper.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
@@ -301,7 +316,7 @@ const firstParty = () => issues.pageErrors.length === 0
     checker.check('the note switches to the cheaper pack', (await target.getByRole('button', { name: /^370 g/ }).getAttribute('aria-pressed')) === 'true' && cheaperGone);
 
     await target.getByRole('button', { name: 'Remove' }).click();
-    const cleared = await target.getByText('No price alert set.').waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+    const cleared = await target.locator('[data-test="unit-target-summary"]').waitFor({ state: 'hidden', timeout: 3000 }).then(() => true).catch(() => false);
     checker.check('remove clears the target', Number.isNaN(await stored()) && cleared, String(await stored()));
     await target.getByRole('button', { name: /^200 g/ }).click();
     await target.locator('[data-test="unit-target-pack-price"]').fill('0.80');

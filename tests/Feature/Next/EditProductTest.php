@@ -744,3 +744,126 @@ it('shows the unit target without the zeros its column pads it with', function (
 
     livewire(EditProduct::class, ['product' => $product->refresh()])->assertSet('unitPriceTarget', '7');
 });
+
+it('opens the other alerts when one of them is set, and folds them away when none is', function (): void {
+    $user = User::factory()->create();
+    $set = Product::factory()->create(['user_id' => $user->id, 'drop_threshold_pct' => '25.00', 'drop_threshold_abs' => null, 'target_price' => null]);
+    $empty = Product::factory()->create(['user_id' => $user->id, 'drop_threshold_pct' => null, 'drop_threshold_abs' => null, 'target_price' => null]);
+
+    $this->actingAs($user);
+
+    $open = fn (Product $product): bool => (bool) preg_match('/<details[^>]*\bopen\b[^>]*data-test="other-alerts"/s', livewire(EditProduct::class, ['product' => $product])->html());
+
+    expect($open($set))->toBeTrue()
+        ->and($open($empty))->toBeFalse();
+});
+
+it('switches a drop alert to a price alert at the same saving', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '25.00', 'drop_threshold_abs' => '1.00', 'unit_price_target' => null]);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
+        ->forceFill(['currency' => 'EUR', 'current_price' => '6.15', 'current_in_stock' => true, 'pack_quantity' => '840.00', 'pack_unit' => 'g'])->save();
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    // €6.15 for 840 g is €7.3214 a kilo. 25% off is €5.4910; €1.00 off the
+    // pack is €6.1309. The drop check alerts on whichever is met first, so
+    // the easier one, €6.1309, carries over, and both are named.
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->assertSeeHtml('data-test="price-alert-switch"')
+        ->assertSee('Instead of your 25% or €1.00 drop alert')
+        ->call('switchToPriceAlert')
+        ->assertSet('unitPriceTarget', '6.1309')
+        ->assertSet('dropThresholdPct', null)
+        ->assertSet('dropThresholdAbs', null)
+        ->assertDontSeeHtml('data-test="price-alert-switch"')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $saved = $product->fresh();
+    expect((string) $saved?->unit_price_target)->toBe('6.1309')
+        ->and($saved?->drop_threshold_pct)->toBeNull()
+        ->and($saved?->drop_threshold_abs)->toBeNull();
+});
+
+it('offers no switch once the product has a price alert', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '25.00', 'unit_price_target' => '5.00']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
+        ->forceFill(['currency' => 'EUR', 'current_price' => '6.15', 'current_in_stock' => true, 'pack_quantity' => '840.00', 'pack_unit' => 'g'])->save();
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product->refresh()])->assertDontSeeHtml('data-test="price-alert-switch"');
+});
+
+it('keeps a free account on its drop alert', function (): void {
+    // A free account's price alert is stored but not checked, so switching
+    // would leave it with no alert of its own.
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '25.00', 'unit_price_target' => null]);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
+        ->forceFill(['currency' => 'EUR', 'current_price' => '6.15', 'current_in_stock' => true, 'pack_quantity' => '840.00', 'pack_unit' => 'g'])->save();
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->assertDontSeeHtml('data-test="price-alert-switch"')
+        ->call('switchToPriceAlert')
+        ->assertSet('dropThresholdPct', '25.00')
+        ->assertSet('unitPriceTarget', null);
+});
+
+it('offers no switch when the same saving leaves less than the smallest target', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user);
+    // €1 for 100 pieces is a cent a piece; 99.5% off that is below 0.0001.
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '99.50', 'unit_price_target' => null]);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
+        ->forceFill(['currency' => 'EUR', 'current_price' => '1.00', 'current_in_stock' => true, 'pack_quantity' => '100.00', 'pack_unit' => 'piece'])->save();
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->assertDontSeeHtml('data-test="price-alert-switch"')
+        ->call('switchToPriceAlert')
+        ->assertSet('dropThresholdPct', '99.50');
+});
+
+it('restates a percentage drop without a float cutting 4.2 to 4.1999', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '30.00', 'drop_threshold_abs' => null, 'unit_price_target' => null]);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
+        ->forceFill(['currency' => 'EUR', 'current_price' => '6.00', 'current_in_stock' => true, 'pack_quantity' => '1000.00', 'pack_unit' => 'g'])->save();
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->assertSee('€4.20 per kilo')
+        ->call('switchToPriceAlert')
+        ->assertSet('unitPriceTarget', '4.2');
+});
+
+it('restates a money drop off the best pack', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => null, 'drop_threshold_abs' => '1.00', 'unit_price_target' => null]);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
+        ->forceFill(['currency' => 'EUR', 'current_price' => '5.00', 'current_in_stock' => true, 'pack_quantity' => '500.00', 'pack_unit' => 'g'])->save();
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    // €5.00 for 500 g, €1.00 off: €4.00 for the pack, €8 a kilo.
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->assertSee('Instead of your €1.00 drop alert')
+        ->call('switchToPriceAlert')
+        ->assertSet('unitPriceTarget', '8');
+});

@@ -127,9 +127,8 @@
                 />
             @endif
 
-            {{-- The other alerts start folded away: the price alert leads. The
-                 summary line says what is set inside, so nothing is hidden by
-                 surprise, and an error in one of them opens the section. --}}
+            {{-- Folded away while empty, so the price alert leads; open when
+                 one of them is set or has an error, so nothing active hides. --}}
             @php($otherAlerts = array_values(array_filter([
                 $targetPrice !== null && $targetPrice !== '' ? __(':amount for any pack', ['amount' => \App\Support\MoneyFormatter::format((string) $targetPrice, (string) $currency)]) : null,
                 $dropThresholdPct !== null && $dropThresholdPct !== '' ? __(':percent% drop', ['percent' => \App\Support\Numeric::trimmed((string) $dropThresholdPct)]) : null,
@@ -141,7 +140,7 @@
             <details
                 class="group mt-8 border-t border-zinc-950/5 pt-6 dark:border-white/10"
                 wire:ignore.self
-                @if ($otherAlertErrors) open @endif
+                @if ($otherAlertErrors || $otherAlerts !== []) open @endif
                 data-test="other-alerts"
             >
                 <summary class="flex cursor-pointer list-none items-center gap-2 select-none [&::-webkit-details-marker]:hidden">
@@ -154,10 +153,33 @@
                         <span class="shrink-0 text-base/7 font-medium text-red-600 sm:text-sm/6 dark:text-red-400">{{ __('Check these') }}</span>
                     @endif
                 </summary>
-                <div class="mt-4 grid gap-4 sm:grid-cols-3">
-                    <flux:input wire:model="dropThresholdPct" :label="__('Alert me when it drops by (%)')" type="number" step="0.01" min="0.01" max="99.99" />
+                {{-- Beside the drop it replaces, so it reads as a swap rather
+                     than as one more alert. The drop fields update on blur, so
+                     the figures here follow what was typed. --}}
+                @if ($priceAlertSwitch)
+                    <flux:callout class="mt-4" color="blue" icon="arrows-right-left" data-test="price-alert-switch">
+                        <flux:callout.heading>{{ __('Switch this drop alert to a price alert') }}</flux:callout.heading>
+                        <flux:callout.text>
+                            {{ __('Instead of your :drop drop alert, get an alert once any shop sells it at :unit per :word or less — :pack for your :size, :percent% under today’s best.', [
+                                'drop' => implode(' ' . __('or') . ' ', $priceAlertSwitch['drops']),
+                                'percent' => $priceAlertSwitch['percentUnder'],
+                                'unit' => \App\Support\MoneyFormatter::unitPrice($priceAlertSwitch['unit'], (string) $currency),
+                                'word' => $unitWord ?? __('unit'),
+                                'pack' => \App\Support\MoneyFormatter::format($priceAlertSwitch['packPrice'], (string) $currency),
+                                'size' => $priceAlertSwitch['pack'],
+                            ]) }}
+                            {{ __('Your own drop settings are cleared, so drops go back to the default for the price.') }}
+                        </flux:callout.text>
+                        <x-slot name="actions">
+                            <flux:button size="sm" wire:click="switchToPriceAlert">{{ __('Switch to a price alert') }}</flux:button>
+                        </x-slot>
+                    </flux:callout>
+                @endif
 
-                    <flux:input wire:model="dropThresholdAbs" :label="__('Alert me when it drops by (amount)')" type="number" step="0.01" min="0.01" />
+                <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                    <flux:input wire:model.blur="dropThresholdPct" :label="__('Alert me when it drops by (%)')" type="number" step="0.01" min="0.01" max="99.99" />
+
+                    <flux:input wire:model.blur="dropThresholdAbs" :label="__('Alert me when it drops by (amount)')" type="number" step="0.01" min="0.01" />
 
                     <flux:input wire:model="targetPrice" :label="__('Price for any pack')" type="number" step="0.01" min="0.01" />
                 </div>
