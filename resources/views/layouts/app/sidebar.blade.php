@@ -4,6 +4,15 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
+
+        {{-- Filament's notification toasts. The admin panel boots these for
+             itself; this layout is Flux and had no outlet, so every
+             `Notification::make()->send()` from a Livewire component here was
+             built, queued and never drawn — a shop kept as a link saved
+             correctly and said nothing. Found by driving it in a browser on
+             2026-09-23. --}}
+        @filamentStyles
+        <link rel="stylesheet" href="{{ asset('css/filament/filament/app.css') }}">
     </head>
     {{-- The same warm canvas as the marketing site, so the app a person
          lands in after signing up looks like the page that sold it. --}}
@@ -177,6 +186,12 @@
         --}}
         @include('partials.timezone-autodetect')
 
+        {{-- The outlet itself, and the script that animates it. Last in the
+             body so a toast paints above the page rather than inside the
+             layout's stacking contexts. --}}
+        @livewire('notifications')
+
+        @filamentScripts
         @fluxScripts
     </body>
 </html>
