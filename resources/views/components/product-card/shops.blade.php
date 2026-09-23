@@ -19,14 +19,14 @@
             {{-- Flex, as in x-shop-row-link: inline, the favicon's baseline pushed
                  the deadline below the host. --}}
             <span class="flex min-w-0 items-center gap-x-1 text-zinc-500 dark:text-zinc-400"><a href="{{ $shop->url }}" target="_blank" rel="noopener noreferrer" class="relative z-10 inline-flex shrink-0 items-center hover:underline">{!! \App\Support\Favicon::html($shop->host) !!}</a>@if ($window)<span class="truncate"> · {{ $window }}</span>@endif</span>
-            <span @class(['shrink-0 tabular-nums', 'font-semibold text-zinc-900 dark:text-white' => $isBest, 'text-zinc-500' => ! $isBest])>
+            <span @class(['shrink-0 tabular-nums', 'font-semibold text-zinc-900 dark:text-white' => $isBest, 'text-zinc-500 dark:text-zinc-400' => ! $isBest])>
                 <x-shop-price :shop="$shop" />
             </span>
         </li>
     @endforeach
     @if ($shops->count() > $limit)
         <li>
-            <a href="{{ route('app.products.show', $product) }}" wire:navigate class="text-xs text-zinc-500 hover:underline">
+            <a href="{{ route('app.products.show', $product) }}" wire:navigate class="text-xs text-zinc-500 dark:text-zinc-400 hover:underline">
                 {{ trans_choice('+:count more shop|+:count more shops', $shops->count() - $limit, ['count' => $shops->count() - $limit]) }}
             </a>
         </li>

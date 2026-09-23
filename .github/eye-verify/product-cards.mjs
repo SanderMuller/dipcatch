@@ -185,6 +185,69 @@ const firstParty = () => issues.pageErrors.length === 0
     await page.goto(`${BASE}/app/products`, { waitUntil: 'networkidle' });
     checker.check('dark mode is applied', await page.evaluate(() => document.documentElement.classList.contains('dark')));
     await page.screenshot({ path: path.join(ART, 'product-cards-dark.png') });
+
+    // Secondary text on a dark card must stay readable: WCAG AA, 4.5:1.
+    const lowContrast = await page.evaluate(() => {
+        const luminance = (rgb) => {
+            const [r, g, b] = rgb.map((v) => {
+                const c = v / 255;
+
+                return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+            });
+
+            return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        // Tailwind 4 writes colours as oklch(); a canvas turns any colour into sRGB.
+        const canvas = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+        // A translucent colour is painted over the one beneath it, as the page does.
+        const parse = (color, beneath = 'rgb(0, 0, 0)') => {
+            canvas.clearRect(0, 0, 1, 1);
+            canvas.fillStyle = beneath;
+            canvas.fillRect(0, 0, 1, 1);
+            canvas.fillStyle = color;
+            canvas.fillRect(0, 0, 1, 1);
+
+            return [...canvas.getImageData(0, 0, 1, 1).data].slice(0, 3);
+        };
+        const cardColor = getComputedStyle(document.querySelector('[data-test="product-card"]')).backgroundColor;
+        const cardBackground = parse(cardColor);
+        const failing = [];
+
+        document.querySelectorAll('[data-test="product-card"] :is(p, span, div, del, a)').forEach((element) => {
+            const own = [...element.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim() !== '');
+
+            if (! own || element.closest('[data-test="paused-label"]') || element.closest('.opacity-60')) {
+                return;
+            }
+
+            let host = element;
+            let background = cardBackground;
+
+            while (host && ! host.matches('[data-test="product-card"]')) {
+                const own = getComputedStyle(host).backgroundColor;
+
+                if (own !== 'rgba(0, 0, 0, 0)' && own !== 'transparent') {
+                    background = parse(own, cardColor);
+                    break;
+                }
+
+                host = host.parentElement;
+            }
+
+            const [light, dark] = [luminance(parse(getComputedStyle(element).color)), luminance(background)].sort((a, b) => b - a);
+            const ratio = (light + 0.05) / (dark + 0.05);
+
+            if (ratio < 4.5) {
+                failing.push(`${element.textContent.trim().slice(0, 30)} (${ratio.toFixed(1)})`);
+            }
+        });
+
+        return failing;
+    });
+    checker.check('text on an active dark card meets 4.5:1', lowContrast.length === 0, lowContrast.slice(0, 8).join('; '));
+
+    await page.goto(`${BASE}/app`, { waitUntil: 'networkidle' });
+    await page.screenshot({ path: path.join(ART, 'product-cards-dashboard-dark.png'), fullPage: true });
     await page.evaluate(() => localStorage.removeItem('flux.appearance'));
 }
 

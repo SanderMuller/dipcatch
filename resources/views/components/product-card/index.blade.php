@@ -27,7 +27,7 @@
             {{ $product->title }}
         </a>
         @if ($product->category !== null)
-            <span class="mt-0.5 text-xs text-zinc-500" data-test="product-category-badge">{{ $product->category->label() }}</span>
+            <span class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400" data-test="product-category-badge">{{ $product->category->label() }}</span>
         @endif
 
         <x-product-card.price :product="$product" class="mt-3" />
@@ -35,15 +35,15 @@
         @if ($compare)
             {{-- No line without a pack size: a lone dash here reads as a broken card. --}}
             @if ($product->cheapestShop?->unitPrice() !== null)
-                <flux:text size="sm" class="text-zinc-500"><x-shop-price :shop="$product->cheapestShop" unit /></flux:text>
+                <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400"><x-shop-price :shop="$product->cheapestShop" unit /></flux:text>
             @endif
             @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
-                <flux:text size="sm" class="text-zinc-500">{{ $bundleLabel }}</flux:text>
+                <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">{{ $bundleLabel }}</flux:text>
             @endif
 
             @php($bestValueShop = $product->bestValueShop())
             @if ($bestValueShop !== null && $bestValueShop->isNot($product->cheapestShop))
-                <flux:text size="sm" class="mt-1 text-zinc-500">
+                <flux:text size="sm" class="mt-1 text-zinc-500 dark:text-zinc-400">
                     {{ __('Best value') }}: <x-shop-price :shop="$bestValueShop" unit class="font-medium text-zinc-700 dark:text-zinc-300" /> · {{ $bestValueShop->host }}
                 </flux:text>
             @endif

@@ -84,7 +84,7 @@
 
         @if ($activeDrops->isEmpty())
             <div class="mt-4 rounded-2xl border border-dashed border-zinc-300 px-6 py-10 text-center dark:border-white/15">
-                <flux:text class="text-zinc-500">{{ __('No active drops right now.') }}</flux:text>
+                <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('No active drops right now.') }}</flux:text>
                 <flux:text size="sm" class="text-zinc-400">{{ __("DipCatch is watching. You hear from us as soon as a price drops far enough.") }}</flux:text>
             </div>
         @else
@@ -93,7 +93,7 @@
                     <li class="min-w-0" wire:key="drop-{{ $product->id }}">
                         <x-product-card :product="$product" :compare="false">
                             @if ($product->last_notified_at)
-                                <flux:text size="sm" class="text-zinc-500">
+                                <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">
                                     {{ __('Dropped :ago', ['ago' => $product->last_notified_at->diffForHumans()]) }}
                                 </flux:text>
                             @endif
