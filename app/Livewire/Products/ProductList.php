@@ -5,6 +5,7 @@ namespace App\Livewire\Products;
 use App\Billing\PlanLimits;
 use App\Enums\ProductCategory;
 use App\Enums\ProductDepartment;
+use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -133,9 +134,26 @@ final class ProductList extends Component
                 $categories !== null,
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []),
             )
-            ->withMax('priceDropEvents as biggest_drop', 'drop_pct')
+            // The drop a product is in now: its latest alert while the latch is
+            // set, measured the way the card's badge is. On a pack basis that
+            // is today's price against the alert's reference, and nothing
+            // once the price is back; a per-unit alert keeps its own figure.
+            ->addSelect(['biggest_drop' => PriceDropEvent::query()
+                ->selectRaw(<<<'SQL'
+                    CASE
+                        WHEN comparison_unit IS NULL AND reference_price > 0 AND products.cheapest_price IS NOT NULL
+                            THEN CASE WHEN products.cheapest_price < reference_price
+                                THEN (reference_price - products.cheapest_price) * 100 / reference_price END
+                        ELSE drop_pct
+                    END
+                    SQL)
+                ->whereColumn('price_drop_events.product_id', 'products.id')
+                ->whereNotNull('products.last_notified_price')
+                ->latest('fired_at')
+                ->latest('id')
+                ->limit(1)])
             ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
-            // A product that never dropped, or has no price yet, sorts last
+            // A product not in a drop, or with no price yet, sorts last
             // whichever way the list runs, rather than heading a list of
             // drops with rows that have none.
             ->orderByRaw(self::orderBy($sort))

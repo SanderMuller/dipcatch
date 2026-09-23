@@ -58,10 +58,10 @@ it('sorts by name, and ignores a sort key it does not offer', function (): void 
         ->assertSeeInOrder(['alpha', 'Beta']);
 });
 
-it('sorts by the biggest drop by default, with products that never dropped last', function (): void {
+it('sorts by the biggest drop by default, with products not in a drop last', function (): void {
     $user = User::factory()->create();
-    $small = Product::factory()->create(['user_id' => $user->id, 'title' => 'Small drop']);
-    $big = Product::factory()->create(['user_id' => $user->id, 'title' => 'Big drop']);
+    $small = Product::factory()->create(['user_id' => $user->id, 'title' => 'Small drop', 'last_notified_price' => '9.50', 'last_notified_at' => now()]);
+    $big = Product::factory()->create(['user_id' => $user->id, 'title' => 'Big drop', 'last_notified_price' => '6.00', 'last_notified_at' => now()]);
     Product::factory()->create(['user_id' => $user->id, 'title' => 'Never dropped']);
 
     PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $small->id, 'drop_pct' => 5]);
@@ -72,6 +72,35 @@ it('sorts by the biggest drop by default, with products that never dropped last'
     livewire(ProductList::class)
         ->assertSet('sort', 'biggest_drop')
         ->assertSeeInOrder(['Big drop', 'Small drop', 'Never dropped']);
+});
+
+it('drops a product out of the drop sort once it is no longer in a drop', function (): void {
+    $user = User::factory()->create();
+    $inDrop = Product::factory()->create(['user_id' => $user->id, 'title' => 'Still down 10', 'last_notified_price' => '9.00', 'last_notified_at' => now()->subDays(2)]);
+    // Dropped 60% once, from a shop since removed; the price is back and the
+    // latch is clear.
+    $recovered = Product::factory()->create(['user_id' => $user->id, 'title' => 'Recovered 60', 'last_notified_price' => null, 'created_at' => now()->subDays(5)]);
+
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $inDrop->id, 'drop_pct' => 10]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $recovered->id, 'drop_pct' => 60]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)->assertSeeInOrder(['Still down 10', 'Recovered 60']);
+});
+
+it('ranks a product by its latest drop, not the biggest it ever had', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Down 8 now', 'last_notified_price' => '9.20', 'last_notified_at' => now()]);
+    $other = Product::factory()->create(['user_id' => $user->id, 'title' => 'Down 20 now', 'last_notified_price' => '8.00', 'last_notified_at' => now()]);
+
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'drop_pct' => 50, 'fired_at' => now()->subMonths(2)]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'drop_pct' => 8, 'fired_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $other->id, 'drop_pct' => 20, 'fired_at' => now()]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)->assertSeeInOrder(['Down 20 now', 'Down 8 now']);
 });
 
 it('sorts by the lowest price, with products that have none last', function (): void {
@@ -493,3 +522,30 @@ function productWithCheapestShop(User $user, string $title, array $shop, array $
 
     return $made;
 }
+
+it('shows no drop for a product whose price is back at the alert reference', function (): void {
+    $user = User::factory()->create();
+    // Alerted from 11.95, and the price is back at 11.95: still latched, but 0% down.
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Back at reference', 'cheapest_price' => '11.95', 'last_notified_price' => '10.00', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'reference_price' => '11.95', 'new_price' => '10.00', 'drop_pct' => 16.3, 'currency' => 'EUR']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertSee('Back at reference')
+        ->assertDontSeeHtml('data-test="drop-badge"')
+        ->assertDontSee('−0%');
+});
+
+it('sorts a product back at its alert reference with the ones not in a drop', function (): void {
+    $user = User::factory()->create();
+    // Alerted from 11.95 at 16%, and back at 11.95: latched, but 0% down now.
+    $back = Product::factory()->create(['user_id' => $user->id, 'title' => 'Back at reference', 'cheapest_price' => '11.95', 'last_notified_price' => '10.00', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $back->id, 'reference_price' => '11.95', 'new_price' => '10.00', 'drop_pct' => 16.3, 'currency' => 'EUR']);
+    $down = Product::factory()->create(['user_id' => $user->id, 'title' => 'Down 5 now', 'cheapest_price' => '9.50', 'last_notified_price' => '9.50', 'last_notified_at' => now(), 'created_at' => now()->subDay()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $down->id, 'reference_price' => '10.00', 'new_price' => '9.50', 'drop_pct' => 5, 'currency' => 'EUR']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)->assertSeeInOrder(['Down 5 now', 'Back at reference']);
+});

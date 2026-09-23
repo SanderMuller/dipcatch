@@ -6,7 +6,9 @@
     beside this price it would state a drop the badge does not. It states the
     old unit price instead, the basis the badge uses.
 --}}
-@php($drop = $product->activeDrop())
+{{-- A drop the price has climbed back out of reads as −0%: shown as none. --}}
+@php($dropPercent = $product->activeDropPercent())
+@php($drop = $dropPercent > 0 ? $product->activeDrop() : null)
 
 <div {{ $attributes->class('tabular-nums') }}>
     @if (! $product->active)
@@ -24,15 +26,15 @@
 
         @if ($drop !== null)
             @if ($drop->comparison_unit === null && $drop->reference_price !== null)
-                <del class="text-sm text-zinc-400 decoration-1 dark:text-zinc-500" title="{{ $drop->wasLabel() }}">
+                <del class="text-sm text-zinc-400 decoration-1 dark:text-zinc-400" title="{{ $drop->wasLabel() }}">
                     {{ \App\Support\MoneyFormatter::format((string) $drop->reference_price, $drop->currency) }}
                 </del>
             @elseif ($drop->comparison_unit !== null && $drop->reference_unit_price !== null)
-                <span class="text-sm text-zinc-400 dark:text-zinc-500">
+                <span class="text-sm text-zinc-500 dark:text-zinc-400">
                     {{ __('Was :price', ['price' => \App\Support\MoneyFormatter::unitPrice((string) $drop->reference_unit_price, $drop->currency) . \App\Support\UnitWord::labelFor($drop->comparison_unit)]) }}
                 </span>
             @else
-                <span class="text-sm text-zinc-400 dark:text-zinc-500">{{ $drop->wasLabel() }}</span>
+                <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ $drop->wasLabel() }}</span>
             @endif
 
             <span @class([
@@ -40,7 +42,7 @@
                 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300' => $product->active,
                 'bg-zinc-200 text-zinc-600 dark:bg-white/10 dark:text-zinc-300' => ! $product->active,
             ]) data-test="drop-badge">
-                −{{ $product->activeDropPercent() }}%
+                −{{ $dropPercent }}%
             </span>
         @endif
     </div>
