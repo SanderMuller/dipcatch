@@ -6,6 +6,7 @@ use App\Mcp\Concerns\InteractsWithOwner;
 use App\Mcp\Support\ProductPresenter;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Support\Numeric;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
@@ -38,7 +39,9 @@ final class SetThresholdTool extends Tool
             'percent' => ['nullable', 'numeric', 'min:0.01', 'max:99.99'],
             'amount' => ['nullable', 'numeric', 'min:0.01'],
             'target_price' => ['nullable', 'numeric', 'min:0.01'],
-            'unit_price_target' => ['nullable', 'numeric', 'min:0.01'],
+            // Four decimals, as the column and the web forms keep: a price per
+            // piece is often below a cent.
+            'unit_price_target' => ['nullable', 'numeric', 'min:0.0001', 'max:99999999.9999'],
         ]);
 
         $product = $this->ownedProduct($request, $this->str($validated, 'product_id'));
@@ -69,7 +72,8 @@ final class SetThresholdTool extends Tool
         }
 
         if (is_numeric($unitPriceTarget)) {
-            $product->unit_price_target = round((float) $unitPriceTarget, 2);
+            // The cut decimal string, as the decimal:4 cast stores it.
+            $product->forceFill(['unit_price_target' => self::fourDecimalsDown($unitPriceTarget)]);
         }
 
         $product->save();
@@ -141,6 +145,25 @@ final class SetThresholdTool extends Tool
         );
     }
 
+    /**
+     * Cut to four decimals, never rounded up, so a stored target is never
+     * above the figure the caller asked for — the same as the web forms.
+     *
+     * @param  int|float|numeric-string  $value
+     */
+    private static function fourDecimalsDown(int|float|string $value): string
+    {
+        // PHP writes a float as its shortest exact form, so 0.012599999999
+        // stays itself; a formatted float would round it to 0.0126 first.
+        $decimal = is_string($value) ? $value : (string) $value;
+
+        if (stripos($decimal, 'e') !== false) {
+            $decimal = sprintf('%.20F', (float) $value);
+        }
+
+        return bcadd(Numeric::str($decimal), '0', 4);
+    }
+
     private static function unitPhrase(string $unit): string
     {
         return match ($unit) {
@@ -169,7 +192,7 @@ final class SetThresholdTool extends Tool
             'percent' => $schema->number()->description('Alert when the price falls this many percent, e.g. 10.'),
             'amount' => $schema->number()->description('Alert when the price falls by at least this much money.'),
             'target_price' => $schema->number()->description('Alert when the lowest price per item reaches this amount. If that price requires a multi-buy, the result says how many items to buy. Available on Free and Pro.'),
-            'unit_price_target' => $schema->number()->description('Alert when the best value reaches this price per kg, litre or piece. Pro accounts only — for a pack price on any plan, use target_price.'),
+            'unit_price_target' => $schema->number()->description('Alert when the best value reaches this price per kg, litre or piece, up to four decimals (e.g. 0.0125 per piece). Pro accounts only — for a pack price on any plan, use target_price.'),
         ];
     }
 }

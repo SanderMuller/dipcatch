@@ -302,6 +302,40 @@ it('sets the unit price target, and says when the account is not alerted on it',
     expect((float) $product->fresh()?->unit_price_target)->toBe(6.5);
 });
 
+it('keeps a unit price target to four decimals, cut rather than rounded up', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+
+    // A nappy at a cent and a quarter: two decimals would have stored 0.01.
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 0.01259])
+        ->assertOk();
+
+    expect((string) $product->fresh()?->unit_price_target)->toBe('0.0125');
+});
+
+it('cuts a unit price target without rounding it up first', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 0.012599999999])
+        ->assertOk();
+
+    expect((string) $product->fresh()?->unit_price_target)->toBe('0.0125');
+});
+
+it('refuses a unit price target below the smallest one the column keeps', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 0.00005])
+        ->assertHasErrors();
+
+    expect($product->fresh()?->unit_price_target)->toBeNull();
+});
+
 it('sets the unit price target without a caveat for a Pro account', function (): void {
     $me = User::factory()->create();
     subscribeUser($me);
