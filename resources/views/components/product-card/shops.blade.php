@@ -20,7 +20,7 @@
     ($comparable($shop) ? $packs->unitPriceValueOf($shop) : null) ?? ($shop->current_price === null ? PHP_FLOAT_MAX : (float) $shop->current_price),
 ]))
 
-<ul {{ $attributes->class('space-y-1 text-sm') }}>
+<ul {{ $attributes->class('@container space-y-1 text-sm') }}>
     @foreach ($shops->take($limit) as $shop)
         <li class="flex items-center justify-between gap-3">
             @php($isBest = $shop->is($best))
@@ -28,11 +28,13 @@
             @php($window = $isBest && \App\Support\BundlePriceLabel::forShop($shop) !== null ? null : \App\Support\PromotionLabel::short($shop))
             {{-- Flex, as in x-shop-row-link: inline, the favicon's baseline pushed
                  the deadline below the host. --}}
-            <span class="flex min-w-0 items-center gap-x-1 text-zinc-500 dark:text-zinc-400"><a href="{{ $shop->url }}" target="_blank" rel="noopener noreferrer" class="relative z-10 inline-flex shrink-0 items-center hover:underline">{!! \App\Support\Favicon::html($shop->host) !!}</a>@if ($window)<span class="truncate"> · {{ $window }}</span>@endif</span>
+            {{-- The host gives way before the prices do: it truncates, they never wrap. --}}
+            <span class="flex min-w-0 items-center gap-x-1 text-zinc-500 dark:text-zinc-400"><a href="{{ $shop->url }}" target="_blank" rel="noopener noreferrer" class="relative z-10 inline-flex min-w-0 items-center gap-1.5 hover:underline"><img src="{{ \App\Support\Favicon::url($shop->host) }}" alt="" loading="lazy" class="size-4 flex-none rounded" /><span class="truncate">{{ $shop->host }}</span></a>@if ($window)<span class="truncate"> · {{ $window }}</span>@endif</span>
             <span @class(['flex shrink-0 items-baseline gap-x-1.5 tabular-nums', 'font-semibold text-zinc-900 dark:text-white' => $isBest, 'text-zinc-500 dark:text-zinc-400' => ! $isBest])>
                 @if ($comparable($shop) && ($unitPrice = $packs->unitPriceOf($shop)) !== null)
                     <span>{{ \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) }} {{ \App\Support\UnitWord::labelFor($headline->unit) }}</span>
-                    <span class="text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ \App\Support\MoneyFormatter::format((string) $shop->current_price, $shop->currency) }}</span>
+                    {{-- Only where the row has room: a narrow card keeps the figure it compares on. --}}
+                    <span class="hidden text-xs font-normal text-zinc-500 @[17rem]:inline dark:text-zinc-400">{{ \App\Support\MoneyFormatter::format((string) $shop->current_price, $shop->currency) }}</span>
                 @else
                     <x-shop-price :shop="$shop" />
                 @endif

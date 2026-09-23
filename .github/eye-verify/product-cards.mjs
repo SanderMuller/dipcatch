@@ -67,8 +67,8 @@ const firstParty = () => issues.pageErrors.length === 0
     checker.check('shop with a promotion states its end', oilText.includes('ah.nl · until'), oilText);
 
     const ahRow = oil.locator('ul li').filter({ hasText: 'until' }).first();
-    const hostBox = await ahRow.locator('a span span').first().boundingBox();
-    const dealBox = await ahRow.locator('span.truncate').boundingBox();
+    const hostBox = await ahRow.locator('a span.truncate').boundingBox();
+    const dealBox = await ahRow.locator('span.truncate').last().boundingBox();
     const hostMid = hostBox.y + (hostBox.height / 2);
     const dealMid = dealBox.y + (dealBox.height / 2);
     checker.check('shop host and deal period share a vertical centre', Math.abs(hostMid - dealMid) <= 1.5, `host ${hostMid.toFixed(1)} deal ${dealMid.toFixed(1)}`);
@@ -79,7 +79,7 @@ const firstParty = () => issues.pageErrors.length === 0
     checker.check('a per-unit drop states its "Was" unit price', /Was €9\.99\s*\/\s*kg/i.test(crispsText) || crispsText.includes('Was €9.99'), crispsText);
     checker.check('card leads with the best value per kilo and its pack', crispsText.startsWith('EV Unit Drop Crisps €5.38 /kg') && crispsText.includes('€1.99 for 370 g'), crispsText);
     checker.check('card notes the lowest pack price at the other shop', crispsText.includes('Lowest price €1.69 for 200 g at ah.nl'), crispsText);
-    checker.check('card lists the best-value shop first, by price per kilo', /lidl\.nl €5\.38 \/kg €1\.99 ah\.nl €8\.45 \/kg €1\.69/.test(crispsText), crispsText);
+    checker.check('card lists the best-value shop first, by price per kilo', /lidl\.nl €5\.38 \/kg (€1\.99 )?ah\.nl €8\.45 \/kg/.test(crispsText), crispsText);
 
     const soap = card('EV Paused Soap');
     const soapText = (await soap.innerText()).replace(/\s+/g, ' ');
@@ -318,11 +318,13 @@ const firstParty = () => issues.pageErrors.length === 0
     await card('EV Unit Drop Crisps').locator('a[wire\\:navigate]').first().click();
     await page.waitForURL((url) => /\/app\/products\/[^/]+$/.test(url.pathname), { timeout: 10000 });
     await page.waitForLoadState('networkidle');
-    const warning = page.locator('[data-test="unit-price-warning"]');
-    checker.check('a much dearer unit price shows a red warning', await warning.isVisible() && (await warning.getAttribute('data-severity')) === 'high', (await warning.textContent().catch(() => ''))?.trim());
+    const note = page.locator('[data-test="lowest-price-note"]');
+    checker.check('the lowest pack price is a note, not a warning', await note.isVisible() && (await page.locator('[data-test="unit-price-warning"]').count()) === 0, (await note.textContent().catch(() => ''))?.trim());
+    const rowPrices = (await page.locator('[data-test="shop-price-cell"]').allInnerTexts()).map((text) => text.replace(/\s+/g, ' ').trim());
+    checker.check('the tracked shops are listed cheapest per kilo first', rowPrices[0]?.startsWith('€5.38 /kg') && rowPrices[1]?.startsWith('€8.45 /kg'), rowPrices.join(' | '));
     const rules = (await page.locator('[data-test="alert-rules"]').locator('..').innerText()).replace(/\s+/g, ' ');
     checker.check('the alert card lists every alert rule', rules.includes('drop') && ! rules.includes('Any drop'), rules);
-    await page.locator('[data-test="unit-price-warning"]').locator('xpath=ancestor::*[contains(@class, "@container")][1]').screenshot({ path: path.join(ART, 'product-cards-unit-warning.png') });
+    await note.locator('xpath=ancestor::*[contains(@class, "@container")][1]').screenshot({ path: path.join(ART, 'product-cards-unit-warning.png') });
 }
 
 {

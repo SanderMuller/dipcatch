@@ -95,7 +95,16 @@ final class PublicProductController extends Controller
         $product->setRelation('shops', $tracked);
         $headline = HeadlinePrice::of($product);
 
-        $shops = $tracked->filter(fn (Shop $shop): bool => $shop->current_in_stock !== false)->values();
+        // Cheapest per unit first, as the owner page lists them; the pack price
+        // orders the rest, and every row of a product without a unit.
+        $packs = $headline->packs;
+        $shops = $tracked
+            ->filter(fn (Shop $shop): bool => $shop->current_in_stock !== false)
+            ->sortBy(fn (Shop $shop): array => [
+                $packs->unitPriceValueOf($shop) === null ? 1 : 0,
+                $packs->unitPriceValueOf($shop) ?? (float) $shop->current_price,
+            ])
+            ->values();
 
         return [$product, $shops, $headline];
     }

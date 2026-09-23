@@ -716,7 +716,7 @@ function smallPackCheapest(User $user, string $bigPackPrice): Product
     return $product->refresh();
 }
 
-it('warns clearly when the best price costs much more per unit than the best value', function (): void {
+it('notes how much more per unit the lowest pack price costs', function (): void {
     $user = User::factory()->create();
     // €0.32 a piece against €0.22 a piece: 45% more.
     $product = smallPackCheapest($user, '6.60');
@@ -724,12 +724,14 @@ it('warns clearly when the best price costs much more per unit than the best val
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product])
-        ->assertSeeHtml('data-severity="high"')
+        // A note beside the best value, not a warning: the headline already names it.
+        ->assertSeeHtml('data-test="lowest-price-note"')
+        ->assertDontSeeHtml('data-test="unit-price-warning"')
         ->assertSee('45% more per piece than the best value')
         ->assertSee('jumbo.com');
 });
 
-it('only notes it when the best price costs a little more per unit', function (): void {
+it('notes a small gap the same way', function (): void {
     $user = User::factory()->create();
     // €0.32 a piece against €0.30 a piece: about 6% more.
     $product = smallPackCheapest($user, '9.00');
@@ -737,7 +739,7 @@ it('only notes it when the best price costs a little more per unit', function ()
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product])
-        ->assertSeeHtml('data-severity="low"')
+        ->assertSeeHtml('data-test="lowest-price-note"')
         ->assertSee('6% more per piece than the best value');
 });
 
@@ -748,7 +750,28 @@ it('does not warn when the best price is also the best value', function (): void
 
     $this->actingAs($user);
 
-    livewire(ProductShow::class, ['product' => $product])->assertDontSeeHtml('data-test="unit-price-warning"');
+    livewire(ProductShow::class, ['product' => $product])->assertDontSeeHtml('data-test="lowest-price-note"');
+});
+
+it('lists the tracked shops cheapest per unit first, then the shops outside the comparison', function (): void {
+    // The vissticks shape: dirk has the lowest pack price and the highest price per kilo.
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://dirk.nl/p/1', 'current_price' => '2.55', 'pack_quantity' => '240.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '6.15', 'pack_quantity' => '840.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '6.59', 'pack_quantity' => '30.00', 'pack_unit' => 'piece']);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product->refresh()])->html());
+    preg_match_all('/data-test="shop-price-cell"[^>]*>(.*?)<\/td>/', $html, $cells);
+    $prices = array_map(fn (string $cell): string => trim((string) preg_replace('/\s+/', ' ', strip_tags($cell))), $cells[1]);
+
+    expect($prices)->toHaveCount(3)
+        ->and($prices[0])->toStartWith('€7.32 /kg')
+        ->and($prices[1])->toStartWith('€10.62 /kg')
+        ->and($prices[2])->toContain('€6.59 for 30 pieces');
 });
 
 it('leads with the pack price when no shop states a pack size', function (): void {

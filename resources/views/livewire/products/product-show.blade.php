@@ -138,31 +138,21 @@
                     <dd><x-shop-deal :shop="$headlineShop" :show-source="false" class="mt-3" /></dd>
                 @endif
 
-                {{-- The lowest price can be a small pack that costs more per
-                     unit. Up to 10% more is a note; more than that is a
-                     warning, because the bigger pack is the better buy. --}}
+                {{-- A note, not a warning: the headline already names the
+                     better buy, so the lowest pack price is context. --}}
                 @if ($headline->lowestShop)
                     @php($unitGap = $headline->lowestCostsMorePercent())
-                    <dd class="mt-3">
-                        <flux:callout
-                            :variant="$unitGap !== null && $unitGap > 10 ? 'danger' : 'warning'"
-                            icon="exclamation-triangle"
-                            data-test="unit-price-warning"
-                            :data-severity="$unitGap !== null && $unitGap > 10 ? 'high' : 'low'"
-                        >
-                            <flux:callout.text>
-                                {{ __('Lowest price: :line at', ['line' => $headline->packLine($headline->lowestShop)?->text()]) }}
-                                {{-- Written inline rather than as x-shop-link, whose trailing
-                                     newline would put a space before the period. --}}
-                                <a href="{{ $headline->lowestShop->url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center align-bottom hover:underline underline-offset-4">{!! \App\Support\Favicon::html($headline->lowestShop->host) !!}</a>.
-                                @if ($unitGap !== null)
-                                    {{ __('That is :percent% more :unit than the best value.', [
-                                        'percent' => $unitGap,
-                                        'unit' => \App\Support\UnitWord::forCode($headline->unit) ?? __('per unit'),
-                                    ]) }}
-                                @endif
-                            </flux:callout.text>
-                        </flux:callout>
+                    <dd class="mt-3 text-base text-zinc-500 sm:text-sm dark:text-zinc-400" data-test="lowest-price-note">
+                        {{ __('Lowest price: :line at', ['line' => $headline->packLine($headline->lowestShop)?->text()]) }}
+                        {{-- Written inline rather than as x-shop-link, whose trailing
+                             newline would put a space before the period. --}}
+                        <a href="{{ $headline->lowestShop->url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center align-bottom hover:underline underline-offset-4">{!! \App\Support\Favicon::html($headline->lowestShop->host) !!}</a>.
+                        @if ($unitGap !== null)
+                            {{ __('That is :percent% more :unit than the best value.', [
+                                'percent' => $unitGap,
+                                'unit' => \App\Support\UnitWord::forCode($headline->unit) ?? __('per unit'),
+                            ]) }}
+                        @endif
                     </dd>
                 @endif
             </div>
@@ -232,6 +222,12 @@
                         <flux:table.column align="end">{{ __('Actions') }}</flux:table.column>
                     </flux:table.columns>
                     <flux:table.rows>
+                        {{-- Cheapest per unit first, then the shops outside that
+                             comparison by pack price. --}}
+                        @php($shops = $shops->sortBy(fn ($shop) => [
+                            $packs->unitPriceValueOf($shop) === null ? 1 : 0,
+                            $packs->unitPriceValueOf($shop) ?? ($shop->current_price === null ? PHP_FLOAT_MAX : (float) $shop->current_price),
+                        ])->values())
                         @forelse ($shops as $shop)
                             <flux:table.row :key="'shop-'.$shop->id">
                                 <flux:table.cell class="align-top">

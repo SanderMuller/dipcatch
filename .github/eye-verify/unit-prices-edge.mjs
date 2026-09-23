@@ -40,7 +40,7 @@ await page.waitForURL((url) => url.pathname.startsWith('/app'), { timeout: 15000
     const headline = flat(await page.locator('[data-test="headline-price"]').innerText());
     checker.check('crisps lead per kilo at the best value', headline.startsWith('Best value €5.38 /kg'), headline);
     checker.check('an excluded lowest price is noted without a percentage', /Lowest price: €1\.49 for 12 pieces at fitnesscandy\.nl ?\./.test(headline) && ! headline.includes('% more'), headline);
-    checker.check('an excluded note is a low-severity note', (await page.locator('[data-test="unit-price-warning"]').getAttribute('data-severity')) === 'low');
+    checker.check('the lowest-price note is a note, not a warning', (await page.locator('[data-test="lowest-price-note"]').count()) === 1 && (await page.locator('[data-test="unit-price-warning"]').count()) === 0);
     const rows = await page.locator('[data-test="shop-price-cell"]').allInnerTexts();
     const boxRow = flat(rows.find((row) => row.includes('€1.49')) ?? '');
     checker.check('the excluded shop row gives its reason and pack, no unit figure', boxRow.includes('€1.49 for 12 pieces') && ! boxRow.includes('/piece') && ! boxRow.includes('/kg'), boxRow);
