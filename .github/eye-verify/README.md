@@ -40,3 +40,13 @@ DipCatch page — pointing at the wrong host makes absence-shaped assertions pas
 against nothing, which is how a green run lies.
 
 The `.png` files are the captured evidence, refreshed whenever a script runs.
+
+`product-markdown.mjs` drives the markdown copies of a product page, the
+owner's `/app/products/{id}.md` and the public `/p/{slug}.md`. It needs two
+throwaway accounts:
+
+```bash
+php .github/eye-verify/product-markdown-seed.php
+node .github/eye-verify/product-markdown.mjs
+php .github/eye-verify/product-markdown-seed.php --teardown
+```
