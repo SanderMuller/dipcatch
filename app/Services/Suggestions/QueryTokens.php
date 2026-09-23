@@ -3,6 +3,7 @@
 namespace App\Services\Suggestions;
 
 use App\Support\PackSize;
+use Illuminate\Support\Str;
 
 /**
  * A normalized token set for one side of a suggestion match, plus the
@@ -13,6 +14,31 @@ use App\Support\PackSize;
  */
 final readonly class QueryTokens
 {
+    /**
+     * Words that make a different product of the same name, grouped so the
+     * forms of one word count as one: a row that says "plantaardige" is the
+     * same variant as a product that says "vegan". A variant on one side
+     * only rules a row out, whatever the overlap.
+     *
+     * Organic is not here: shops label the same article bio, biologisch or
+     * not at all, so it says too little to rule a row out.
+     *
+     * @var array<string, string> token => variant
+     */
+    private const array VARIANTS = [
+        'vegan' => 'vegan', 'vegano' => 'vegan', 'vegana' => 'vegan', 'veganistisch' => 'vegan', 'veganistische' => 'vegan',
+        'plantaardig' => 'vegan', 'plantaardige' => 'vegan', 'plantbased' => 'vegan',
+        'vegetarisch' => 'vegetarian', 'vegetarische' => 'vegetarian', 'vegetarian' => 'vegetarian', 'veggie' => 'vegetarian', 'vega' => 'vegetarian',
+        'halal' => 'halal',
+        'light' => 'light', 'licht' => 'light', 'lichte' => 'light', 'zero' => 'light',
+        'suikervrij' => 'sugar-free', 'suikervrije' => 'sugar-free',
+        'glutenvrij' => 'gluten-free', 'glutenvrije' => 'gluten-free',
+        'lactosevrij' => 'lactose-free', 'lactosevrije' => 'lactose-free',
+        'alcoholvrij' => 'alcohol-free', 'alcoholvrije' => 'alcohol-free',
+        'cafeinevrij' => 'decaf', 'cafeinevrije' => 'decaf', 'decaf' => 'decaf',
+        'mini' => 'mini', 'minis' => 'mini', 'piccola' => 'mini', 'piccolissima' => 'mini',
+    ];
+
     /**
      * @param  array<string, true>  $tokens
      */
@@ -44,6 +70,35 @@ final readonly class QueryTokens
         $tokens = [...self::split($name), ...self::split((string) $size)];
 
         return new self(array_fill_keys($tokens, true));
+    }
+
+    /**
+     * Whether both sides name the same variants from {@see VARIANTS}, none
+     * of them on one side only.
+     */
+    public function sameVariantAs(self $other): bool
+    {
+        return $this->variants() == $other->variants();
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function variants(): array
+    {
+        $variants = [];
+
+        foreach (array_keys($this->tokens) as $token) {
+            $variant = self::VARIANTS[(string) $token] ?? null;
+
+            if ($variant !== null) {
+                $variants[$variant] = true;
+            }
+        }
+
+        ksort($variants);
+
+        return $variants;
     }
 
     public function isEmpty(): bool
@@ -97,7 +152,8 @@ final readonly class QueryTokens
      */
     private static function split(string $text): array
     {
-        $normalized = preg_replace('/[^a-z0-9+]+/', ' ', mb_strtolower($text)) ?? '';
+        // To ASCII first, or "cafeïnevrij" splits into "cafe" and "nevrij".
+        $normalized = preg_replace('/[^a-z0-9+]+/', ' ', mb_strtolower(Str::ascii($text))) ?? '';
 
         return array_values(array_filter(
             explode(' ', $normalized),

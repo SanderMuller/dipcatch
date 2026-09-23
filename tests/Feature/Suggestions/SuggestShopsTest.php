@@ -395,3 +395,48 @@ test('a price row whose chain is not recorded yet is not suggested', function ()
     expect(collect($suggestions)->pluck('chain')->all())->not->toContain('ah')
         ->and($suggestions)->not->toBeEmpty();
 });
+
+test('a row of another variant is not offered, however many words match', function (): void {
+    seedChains();
+    // Dirk and Spar rows as the dataset holds them: the plain salame pizza.
+    seedRow('dirk', 'Dr. Oetker Ristorante pizza salame', '320 g', '2.85');
+    seedRow('spar', 'Dr. Oetker ristorante pizza', '320 Gram', '3.49');
+    seedRow('plus', 'Dr. Oetker Ristorante pizza al salame vegano', 'Per 296 g', '4.49');
+
+    $product = Product::factory()->create(['title' => 'Dr. Oetker Ristorante pizza al salame vegano', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://pizzashop.test/p/1', 'pack_quantity' => '296.00', 'pack_unit' => 'g']);
+    // A wrong 320 g shop already on the product made the plain pizza match
+    // on size too.
+    Shop::factory()->for($product)->create(['url' => 'https://othershop.test/p/2', 'pack_quantity' => '320.00', 'pack_unit' => 'g']);
+
+    expect(collect(suggest($product->refresh()))->pluck('chain')->all())->toBe(['plus']);
+});
+
+test('the vegan row is not offered for the plain product either', function (): void {
+    seedChains();
+    seedRow('plus', 'Dr. Oetker Ristorante pizza salame vegano', 'Per 320 g', '4.49');
+
+    $product = Product::factory()->create(['title' => 'Dr. Oetker Ristorante pizza salame', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://pizzashop.test/p/1', 'pack_quantity' => '320.00', 'pack_unit' => 'g']);
+
+    expect(suggest($product->refresh()))->toBe([]);
+});
+
+test('the same variant under another word still matches', function (): void {
+    seedChains();
+    seedRow('plus', 'Alpro Plantaardige drink amandel', 'Per 1 l', '2.49');
+    seedRow('ah', 'Bonduelle Linzen biologisch', '160 g', '1.29');
+    seedRow('dirk', 'Kaffee Cafeïnevrije koffiebonen', '500 g', '6.99');
+
+    $vegan = Product::factory()->create(['title' => 'Alpro vegan drink amandel', 'currency' => 'EUR']);
+    Shop::factory()->for($vegan)->create(['url' => 'https://drinkshop.test/p/1', 'pack_quantity' => '1000.00', 'pack_unit' => 'ml']);
+    // Organic is a label, not a variant: bio and biologisch are one article.
+    $organic = Product::factory()->create(['title' => 'Bonduelle Linzen bio', 'currency' => 'EUR']);
+    Shop::factory()->for($organic)->create(['url' => 'https://blikshop.test/p/1', 'pack_quantity' => '160.00', 'pack_unit' => 'g']);
+    $decaf = Product::factory()->create(['title' => 'Kaffee decaf koffiebonen', 'currency' => 'EUR']);
+    Shop::factory()->for($decaf)->create(['url' => 'https://koffieshop.test/p/1', 'pack_quantity' => '500.00', 'pack_unit' => 'g']);
+
+    expect(collect(suggest($vegan->refresh()))->pluck('chain')->all())->toBe(['plus'])
+        ->and(collect(suggest($organic->refresh()))->pluck('chain')->all())->toBe(['ah'])
+        ->and(collect(suggest($decaf->refresh()))->pluck('chain')->all())->toBe(['dirk']);
+});
