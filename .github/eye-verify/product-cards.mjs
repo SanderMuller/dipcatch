@@ -480,6 +480,67 @@ const firstParty = () => issues.pageErrors.length === 0
     await page.setViewportSize({ width: 1440, height: 1000 });
 }
 
+{
+    // The price chart: best value per unit first, the pack price one switch away.
+    await page.goto(`${BASE}/app/products/${fixture.tabletsId}`, { waitUntil: 'networkidle' });
+    const history = page.locator('[data-test="price-history"]');
+    const unitChart = history.locator('[data-test="price-history-chart-unit"]');
+    const packChart = history.locator('[data-test="price-history-chart-price"]');
+    const basis = history.locator('[data-test="price-history-basis"]');
+    const yTicks = async (chart) => (await chart.locator('svg text').allTextContents()).filter((text) => text.includes('€'));
+
+    await unitChart.locator('svg text').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+    checker.check('the chart opens on best value', await history.getByRole('heading', { name: 'Best value over time' }).isVisible());
+    checker.check('the chart names the unit it plots', await history.getByText('Price per piece, at the shop that is the best value.').isVisible());
+    checker.check('the best value option starts selected', (await basis.getByRole('radio', { name: 'Best value' }).getAttribute('aria-checked')) === 'true');
+    checker.check('only the per-unit chart shows', await unitChart.isVisible() && ! await packChart.isVisible());
+    const unitTicks = await yTicks(unitChart);
+    checker.check('per-tablet ticks are cents, each one distinct', unitTicks.length > 1 && new Set(unitTicks).size === unitTicks.length && unitTicks.every((tick) => /^€0\.\d{2,4}$/.test(tick.trim())), unitTicks.join(' | '));
+
+    await history.locator('[aria-label="About best price"]').hover();
+    const tip = page.getByText('That can be a small pack that costs more per piece than a bigger one.');
+    checker.check('the info button explains what best price can hide', await tip.waitFor({ state: 'visible', timeout: 4000 }).then(() => true).catch(() => false));
+
+    const unitBox = await unitChart.locator('svg').first().boundingBox();
+    await page.mouse.move(unitBox.x + unitBox.width * 0.6, unitBox.y + unitBox.height / 2);
+    await page.mouse.move(unitBox.x + unitBox.width * 0.7, unitBox.y + unitBox.height / 2, { steps: 5 });
+    await page.waitForTimeout(300);
+    const unitTip = (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ').match(/Best value per piece.{0,40}/)?.[0] ?? '';
+    checker.check('the per-unit tooltip leads with the unit price and keeps the pack price', /Best value per piece €0\.02\d{2}/.test(unitTip) && /Best price €1[23]\.\d{2}/.test(unitTip), unitTip);
+    await page.screenshot({ path: path.join(ART, 'price-history-best-value.png') });
+
+    await basis.getByRole('radio', { name: 'Best price' }).click();
+    await packChart.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
+    checker.check('the switch shows the pack price chart', await packChart.isVisible() && ! await unitChart.isVisible());
+    checker.check('the heading follows the switch', await history.getByRole('heading', { name: 'Best price over time' }).isVisible()
+        && ! await history.getByRole('heading', { name: 'Best value over time' }).isVisible());
+    await packChart.locator('svg text').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+    const packTicks = await yTicks(packChart);
+    checker.check('pack ticks are whole-cent prices', packTicks.length > 0 && packTicks.every((tick) => /€\d+\.\d{2}$/.test(tick.trim())), packTicks.join(' | '));
+    await page.screenshot({ path: path.join(ART, 'price-history-best-price.png') });
+
+    // A range change re-renders the card; the chosen basis must survive it.
+    await history.locator('[data-flux-select] button').first().click();
+    await page.getByRole('option', { name: 'Last 30 days' }).click();
+    await page.waitForResponse((response) => response.url().includes('/livewire'), { timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    checker.check('the basis survives a range change', await packChart.isVisible() && ! await unitChart.isVisible());
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${BASE}/app/products/${fixture.tabletsId}`, { waitUntil: 'networkidle' });
+    checker.check('product page at phone width has no sideways scroll', ! await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth));
+    await history.scrollIntoViewIfNeeded();
+    await history.screenshot({ path: path.join(ART, 'price-history-phone.png') });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
+    // Per kilo, prices over one euro: two decimals on the axis.
+    await page.goto(`${BASE}/app/products/${fixture.crispsId}`, { waitUntil: 'networkidle' });
+    await unitChart.locator('svg text').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+    checker.check('a per-kilo chart opens on best value', await history.getByText('Price per kilo, at the shop that is the best value.').isVisible());
+    const kiloTicks = await yTicks(unitChart);
+    checker.check('per-kilo ticks carry two decimals', kiloTicks.length > 0 && kiloTicks.every((tick) => /€\d+\.\d{2}$/.test(tick.trim())), kiloTicks.join(' | '));
+}
+
 checker.check('no first-party failures over the whole run', firstParty(), [...issues.pageErrors, ...issues.failedRequests].join('; '));
 
 await checker.summarize();

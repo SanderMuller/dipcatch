@@ -141,11 +141,30 @@ $make('EV No Price Thing', [], ['image_url' => null], 5);
 // Spread over two departments, so the category list has groups to open.
 $fillerCategories = [ProductCategory::DairyEggs, ProductCategory::Laundry, ProductCategory::Cleaning, null];
 
-for ($i = 1; $i <= 31; $i++) {
+// Tablets sold by the piece: the lowest pack price is the small tub, the best
+// value per tablet is the big one. The price chart reads four decimals.
+$tablets = $make('EV Vitamin Tablets', [
+    ['url' => 'https://ah.nl/producten/tablets', 'current_price' => '12.99', 'pack_quantity' => '400.00', 'pack_unit' => 'piece'],
+    ['url' => 'https://kruidvat.nl/p/tablets', 'current_price' => '21.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece'],
+], ['image_url' => $image('tablets')], 41);
+$bigTub = $tablets->shops()->where('pack_quantity', '800.00')->firstOrFail();
+$previous = null;
+foreach ([['13.49', '22.99', 60], ['12.99', '21.99', 30], ['12.49', '23.49', 10]] as [$cheapest, $bestValue, $daysAgo]) {
+    $segment = ProductCheapestHistory::query()->create([
+        'product_id' => $tablets->id, 'cheapest_shop_id' => $tablets->cheapest_shop_id, 'cheapest_price' => $cheapest,
+        'best_value_shop_id' => $bigTub->id, 'best_value_price' => $bestValue,
+        'pack_quantity' => '800.00', 'pack_unit' => 'piece', 'started_at' => $now->subDays($daysAgo), 'ended_at' => null,
+    ]);
+    $previous?->update(['ended_at' => $now->subDays($daysAgo)]);
+    $previous = $segment;
+}
+
+// One fewer filler than before the tablets, so the list keeps its page sizes.
+for ($i = 1; $i <= 30; $i++) {
     $make(sprintf('EV Filler %02d', $i), [
         ['url' => 'https://jumbo.com/producten/filler', 'current_price' => (string) (1 + $i)],
     ], ['image_url' => $image('filler' . $i), 'category' => $fillerCategories[$i % 4]], 10 + $i);
 }
 
-file_put_contents($fixturePath, json_encode(['email' => $email, 'password' => $password]));
+file_put_contents($fixturePath, json_encode(['email' => $email, 'password' => $password, 'tabletsId' => $tablets->id, 'crispsId' => $crisps->id]));
 echo json_encode(['email' => $email, 'products' => Product::query()->where('user_id', $user->id)->count(), 'fixture' => $fixturePath]) . PHP_EOL;

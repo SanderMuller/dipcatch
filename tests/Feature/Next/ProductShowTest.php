@@ -400,6 +400,82 @@ it('renders a product with no shops and no history', function (): void {
         ->assertSee('No price history yet.');
 });
 
+it('charts the best value per unit first, with the pack price one switch away', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create(['pack_quantity' => '800.00', 'pack_unit' => 'piece']);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'best_value_shop_id' => $shop->id,
+        'cheapest_price' => '21.99',
+        'pack_quantity' => '800.00',
+        'pack_unit' => 'piece',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee("x-data=\"{ basis: 'unit' }\"", escape: false)
+        ->assertSeeInOrder(['Best value over time', 'Best price over time'])
+        ->assertSee('Price per piece, at the shop that is the best value.')
+        ->assertSee('data-test="price-history-basis"', escape: false)
+        ->assertSee('data-test="price-history-chart-unit"', escape: false)
+        ->assertSee('data-test="price-history-chart-price"', escape: false);
+});
+
+it('opens on the pack price when the current price has no pack size', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create();
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '21.99',
+        'pack_quantity' => '800.00',
+        'pack_unit' => 'piece',
+        'started_at' => now()->subDays(10),
+        'ended_at' => now()->subDays(5),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '19.99',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    // The per-unit line would end in a gap today, so the switch starts on the pack price.
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee("x-data=\"{ basis: 'price' }\"", escape: false)
+        ->assertSee('data-test="price-history-basis"', escape: false);
+});
+
+it('charts the pack price alone when no pack size is known', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create(['pack_quantity' => null, 'pack_unit' => null]);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '2.19',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee("x-data=\"{ basis: 'price' }\"", escape: false)
+        ->assertSee('Best price over time')
+        ->assertDontSee('Best value over time')
+        ->assertDontSee('data-test="price-history-basis"', escape: false)
+        ->assertDontSee('data-test="price-history-chart-unit"', escape: false);
+});
+
 it('states the shop limit instead of offering another', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user);

@@ -360,10 +360,20 @@
             </flux:card>
         </section>
         <section class="min-w-0">
-            <flux:card>
+            @php($perUnit = \App\Support\UnitWord::forCode($chart['unit']))
+            {{-- A current price with no pack size has no point on the per-unit line. --}}
+            @php($basis = $perUnit !== null && is_float(array_last($chart['rows'])['unit'] ?? null) ? 'unit' : 'price')
+            <flux:card x-data="{ basis: '{{ $basis }}' }" wire:key="price-history-{{ $perUnit === null ? 'pack' : 'both' }}-{{ $basis }}" data-test="price-history">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <flux:heading size="lg" level="2">{{ __('Best price over time') }}</flux:heading>
+                        @if ($perUnit === null)
+                            <flux:heading size="lg" level="2">{{ __('Best price over time') }}</flux:heading>
+                        @else
+                            <flux:heading size="lg" level="2" x-show="basis === 'unit'" :x-cloak="$basis !== 'unit'">{{ __('Best value over time') }}</flux:heading>
+                            <flux:heading size="lg" level="2" x-show="basis === 'price'" :x-cloak="$basis !== 'price'">{{ __('Best price over time') }}</flux:heading>
+                            <flux:text size="sm" class="mt-1" x-show="basis === 'unit'" :x-cloak="$basis !== 'unit'">{{ __('Price :unit, at the shop that is the best value.', ['unit' => $perUnit]) }}</flux:text>
+                            <flux:text size="sm" class="mt-1" x-show="basis === 'price'" :x-cloak="$basis !== 'price'">{{ __('Price per pack, at the shop with the lowest price.') }}</flux:text>
+                        @endif
                         @if ($historyNotice)
                             <flux:text size="sm" class="mt-1 text-zinc-500">
                                 {{ $historyNotice['reason'] }}
@@ -374,57 +384,86 @@
                         @endif
                     </div>
 
-                    <flux:select wire:model.live="range" variant="listbox" size="sm" class="max-w-44">
-                        @foreach ($ranges as $value => $label)
-                            <flux:select.option value="{{ $value }}">{{ $label }}</flux:select.option>
-                        @endforeach
-                    </flux:select>
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($perUnit !== null)
+                            <flux:radio.group variant="segmented" size="sm" x-model="basis" :aria-label="__('Show')" data-test="price-history-basis">
+                                <flux:radio value="unit">{{ __('Best value') }}</flux:radio>
+                                <flux:radio value="price">{{ __('Best price') }}</flux:radio>
+                            </flux:radio.group>
+                            <flux:tooltip :content="__('Best price follows the lowest pack price. That can be a small pack that costs more :unit than a bigger one.', ['unit' => $perUnit])">
+                                <flux:button icon="information-circle" size="sm" variant="subtle" inset :aria-label="__('About best price')" />
+                            </flux:tooltip>
+                        @endif
+
+                        <div class="w-40">
+                            <flux:select wire:model.live="range" variant="listbox" size="sm">
+                                @foreach ($ranges as $value => $label)
+                                    <flux:select.option value="{{ $value }}">{{ $label }}</flux:select.option>
+                                @endforeach
+                            </flux:select>
+                        </div>
+                    </div>
                 </div>
 
                 @if ($chart['rows'] === [])
                     <flux:text class="mt-4 text-zinc-500">{{ __('No price history yet.') }}</flux:text>
                 @else
-                    <flux:chart :value="$chart['rows']" class="mt-4 h-72 sm:h-80 min-[112.5rem]:h-120">
-                        <flux:chart.svg :gutter="$chart['hasNotified'] ? '52 8 8 8' : '20 8 8 8'">
-                            <flux:chart.line field="price" class="text-amber-500 dark:text-amber-400" curve="none" />
-                            <flux:chart.area field="price" class="text-amber-200/50 dark:text-amber-400/20" curve="none" />
-                            @if ($chart['hasNotified'])
-                                <flux:chart.point field="notified" class="text-rose-600 dark:text-rose-400" r="6" />
-                            @endif
-                            <flux:chart.axis axis="x" field="date" :format="['month' => 'short', 'day' => 'numeric']">
-                                <flux:chart.axis.tick />
-                                <flux:chart.axis.line />
-                            </flux:chart.axis>
-                            <flux:chart.axis axis="y" :format="['style' => 'currency', 'currency' => $chart['currency']]">
-                                <flux:chart.axis.grid />
-                                <flux:chart.axis.tick />
-                            </flux:chart.axis>
-                            <flux:chart.cursor />
-                        </flux:chart.svg>
-                        <flux:chart.tooltip>
-                            <flux:chart.tooltip.heading field="date" :format="['month' => 'short', 'day' => 'numeric', 'hour' => 'numeric', 'minute' => '2-digit']" />
-                            <flux:chart.tooltip.value field="price" :label="__('Best price')" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
-                            @if ($chart['hasBundles'])
-                                <flux:chart.tooltip.value field="bundle" :label="__('Deal')" />
-                            @endif
-                            @if ($chart['unitLabel'] !== null)
-                                <flux:chart.tooltip.value field="unit" :label="$chart['unitLabel']" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
-                            @endif
-                            @if ($chart['hasNotified'])
-                                <flux:chart.tooltip.value field="notified" :label="__('Notified')" :format="['style' => 'currency', 'currency' => $chart['currency']]" />
-                            @endif
-                        </flux:chart.tooltip>
-                        @if ($chart['hasNotified'])
-                            <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-wrap justify-center gap-x-5 gap-y-2">
-                                <flux:chart.legend :label="__('Best price')">
-                                    <flux:chart.legend.indicator class="bg-amber-500" />
-                                </flux:chart.legend>
-                                <flux:chart.legend :label="__('Notified')">
-                                    <flux:chart.legend.indicator class="bg-rose-600" />
-                                </flux:chart.legend>
-                            </div>
-                        @endif
-                    </flux:chart>
+                    @php($currency = ['style' => 'currency', 'currency' => $chart['currency']])
+                    @php($unitCurrency = $chart['unitDecimals'] > 2 ? [...$currency, 'maximumFractionDigits' => $chart['unitDecimals']] : $currency)
+                    @php($packLabel = __('Best price'))
+                    @php($unitLabel = $perUnit === null ? null : __('Best value :unit', ['unit' => $perUnit]))
+                    @foreach ($perUnit === null ? ['price'] : ['unit', 'price'] as $field)
+                        @php($isUnit = $field === 'unit')
+                        @php($notifiedField = $isUnit ? 'notifiedUnit' : 'notified')
+                        <div wire:key="price-history-{{ $field }}" x-show="basis === '{{ $field }}'" @if ($field !== $basis) x-cloak @endif>
+                            <flux:chart :value="$chart['rows']" class="mt-4 h-72 sm:h-80 min-[112.5rem]:h-120" data-test="price-history-chart-{{ $field }}">
+                                <flux:chart.svg :gutter="$chart['hasNotified'] ? '52 8 8 8' : '20 8 8 8'">
+                                    <flux:chart.line :field="$field" class="text-amber-500 dark:text-amber-400" curve="none" />
+                                    <flux:chart.area :field="$field" class="text-amber-200/50 dark:text-amber-400/20" curve="none" />
+                                    @if ($chart['hasNotified'])
+                                        <flux:chart.point :field="$notifiedField" class="text-rose-600 dark:text-rose-400" r="6" />
+                                    @endif
+                                    <flux:chart.axis axis="x" field="date" :format="['month' => 'short', 'day' => 'numeric']">
+                                        <flux:chart.axis.tick />
+                                        <flux:chart.axis.line />
+                                    </flux:chart.axis>
+                                    <flux:chart.axis axis="y" :format="$isUnit ? $unitCurrency : $currency">
+                                        <flux:chart.axis.grid />
+                                        <flux:chart.axis.tick />
+                                    </flux:chart.axis>
+                                    <flux:chart.cursor />
+                                </flux:chart.svg>
+                                <flux:chart.tooltip>
+                                    <flux:chart.tooltip.heading field="date" :format="['month' => 'short', 'day' => 'numeric', 'hour' => 'numeric', 'minute' => '2-digit']" />
+                                    @if ($isUnit)
+                                        <flux:chart.tooltip.value field="unit" :label="$unitLabel" :format="$unitCurrency" />
+                                        <flux:chart.tooltip.value field="price" :label="$packLabel" :format="$currency" />
+                                    @else
+                                        <flux:chart.tooltip.value field="price" :label="$packLabel" :format="$currency" />
+                                        @if ($unitLabel !== null)
+                                            <flux:chart.tooltip.value field="unit" :label="$unitLabel" :format="$unitCurrency" />
+                                        @endif
+                                    @endif
+                                    @if ($chart['hasBundles'])
+                                        <flux:chart.tooltip.value field="bundle" :label="__('Deal')" />
+                                    @endif
+                                    @if ($chart['hasNotified'])
+                                        <flux:chart.tooltip.value field="notified" :label="__('Notified')" :format="$currency" />
+                                    @endif
+                                </flux:chart.tooltip>
+                                @if ($chart['hasNotified'])
+                                    <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-wrap justify-center gap-x-5 gap-y-2">
+                                        <flux:chart.legend :label="$isUnit ? __('Best value') : $packLabel">
+                                            <flux:chart.legend.indicator class="bg-amber-500" />
+                                        </flux:chart.legend>
+                                        <flux:chart.legend :label="__('Notified')">
+                                            <flux:chart.legend.indicator class="bg-rose-600" />
+                                        </flux:chart.legend>
+                                    </div>
+                                @endif
+                            </flux:chart>
+                        </div>
+                    @endforeach
                 @endif
             </flux:card>
         </section>

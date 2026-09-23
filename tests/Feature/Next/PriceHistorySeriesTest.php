@@ -251,7 +251,43 @@ test('the cheapest price is plotted per unit as well, on its own axis', function
     expect($unit)->not->toBeEmpty()
         ->and($unit['data'])->toBe([10.95, 10.95])
         ->and($unit['yAxisID'])->toBe('unit')
-        ->and($flux['unitLabel'])->toBe('Cheapest per kg (€)');
+        ->and($flux['unit'])->toBe('g')
+        ->and($flux['unitDecimals'])->toBe(2);
+});
+
+test('the per-unit line follows the best value, not the lowest pack price', function (): void {
+    // 400 tablets at €12.99 is the lowest price; 800 at €21.99 is the better
+    // value. The unit line reads the bigger pack, to four decimals.
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $small = Shop::factory()->for($product)->create(['url' => 'https://a.test/p/1', 'pack_quantity' => '400.00', 'pack_unit' => 'piece']);
+    $large = Shop::factory()->for($product)->create(['url' => 'https://b.test/p/1', 'pack_quantity' => '800.00', 'pack_unit' => 'piece']);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $small->id,
+        'cheapest_price' => '12.99',
+        'best_value_shop_id' => $large->id,
+        'best_value_price' => '21.99',
+        'pack_quantity' => '800.00',
+        'pack_unit' => 'piece',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    PriceDropEvent::factory()->for($product)->create([
+        'user_id' => $product->user_id,
+        'fired_at' => now()->subDays(2),
+        'new_price' => '12.99',
+    ]);
+
+    $flux = makeChartFor($product)->fluxChart();
+    $notified = collect($flux['rows'])->firstWhere('notified', 12.99);
+
+    expect($flux['unit'])->toBe('piece')
+        ->and($flux['unitDecimals'])->toBe(4)
+        ->and(collect($flux['rows'])->pluck('price')->unique()->values()->all())->toBe([12.99])
+        ->and(collect($flux['rows'])->pluck('unit')->unique()->values()->all())->toBe([0.0275])
+        // The alert names a pack price; on the per-unit line it sits on the unit price.
+        ->and($notified['notifiedUnit'] ?? null)->toBe(0.0275);
 });
 
 test('a cheaper total that is worse value shows as two diverging lines', function (): void {

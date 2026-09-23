@@ -127,7 +127,7 @@ const checker = createChecker({ page, artifactsDir: ART, label: 'flux-pro-ui' })
     checker.check('product breadcrumbs render', await page.locator('[data-flux-breadcrumbs]').count().then((n) => n > 0));
     checker.check('Active badge is visible', await page.getByText('Active', { exact: true }).count().then((n) => n > 0));
     // One page, no tabs: the shops and the price history sit side by side.
-    checker.check('price history heading is visible', await page.getByRole('heading', { name: 'Best price over time' }).isVisible());
+    checker.check('price history heading is visible', await page.getByRole('heading', { name: /Best (value|price) over time/ }).first().isVisible());
     checker.check('product history uses a Flux chart', await page.locator('ui-chart').count().then((n) => n > 0));
     checker.check('product history has no Chart.js canvas', (await page.locator('canvas').count()) === 0);
     await shot(page, 'flux-pro-product-history.png');
