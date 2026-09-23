@@ -8,6 +8,7 @@ use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Support\BundlePriceLabel;
 use App\Support\ComparablePacks;
+use App\Support\ProductMarkdown;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Contracts\View\View;
@@ -15,7 +16,8 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Response;
 
 /**
- * Renders the public product page at GET /p/{slug}. No auth.
+ * Renders the public product page at GET /p/{slug}, and its markdown copy at
+ * GET /p/{slug}.md. No auth.
  *
  * Lookup is independent of `ProductResource::getEloquentQuery()`
  * (which scopes to auth()->id()) and of `ProductPolicy::view()` (which only
@@ -29,6 +31,48 @@ use Illuminate\Http\Response;
 final class PublicProductController extends Controller
 {
     public function __invoke(string $slug): View|Response
+    {
+        [$product, $shops] = $this->load($slug);
+
+        $chart = $this->chartPayload($product);
+
+        // The page shows two answers, as the app does. Ordered by outlay — what
+        // leaves the account — and the per-unit winner marked separately, so the
+        // first row is no longer called "Cheapest" without saying on what basis.
+        $packs = ComparablePacks::of($shops, (string) $product->currency);
+
+        return response()
+            ->view('public.product', [
+                'product' => $product,
+                'shops' => $shops,
+                'chart' => $chart,
+                'packs' => $packs,
+                'bestValueShopId' => $packs->cheapestPerUnit($shops)?->id,
+            ])
+            ->header('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    /**
+     * GET /p/{slug}.md: the same page as markdown, from the same rows. The
+     * allowlist below is what keeps the owner's private fields out of it.
+     */
+    public function markdown(string $slug): Response
+    {
+        [$product, $shops] = $this->load($slug);
+
+        $packs = ComparablePacks::of($shops, (string) $product->currency);
+
+        return response(ProductMarkdown::shared($product, $shops, $packs, $packs->cheapestPerUnit($shops)?->id))
+            ->header('Content-Type', 'text/markdown; charset=utf-8')
+            ->header('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    /**
+     * The shared product and the shops a guest may see, cheapest first.
+     *
+     * @return array{0: Product, 1: EloquentCollection<int, Shop>}
+     */
+    private function load(string $slug): array
     {
         /** @var Product $product */
         $product = Product::query()
@@ -50,22 +94,7 @@ final class PublicProductController extends Controller
             ->orderBy('id')
             ->get();
 
-        $chart = $this->chartPayload($product);
-
-        // The page shows two answers, as the app does. Ordered by outlay — what
-        // leaves the account — and the per-unit winner marked separately, so the
-        // first row is no longer called "Cheapest" without saying on what basis.
-        $packs = ComparablePacks::of($shops, (string) $product->currency);
-
-        return response()
-            ->view('public.product', [
-                'product' => $product,
-                'shops' => $shops,
-                'chart' => $chart,
-                'packs' => $packs,
-                'bestValueShopId' => $packs->cheapestPerUnit($shops)?->id,
-            ])
-            ->header('X-Robots-Tag', 'noindex, nofollow');
+        return [$product, $shops];
     }
 
     /**

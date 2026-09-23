@@ -494,3 +494,52 @@ test('the shared page dates the price by its last successful read', function ():
         ->assertSeeHtml('and not read since')
         ->assertDontSeeHtml('Last checked');
 });
+
+test('markdown copy: the shared page as markdown, with no private field in it', function (): void {
+    $product = makeSharedProduct(['title' => 'Beans & more', 'drop_threshold_pct' => '12.50']);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://bol.com/p/beans',
+        'current_price' => '6.00',
+        'currency' => 'EUR',
+        'pack_quantity' => 500,
+        'pack_unit' => 'g',
+        'notes' => 'coupon SECRET10',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://ah.nl/p/beans',
+        'current_price' => '9.00',
+        'currency' => 'EUR',
+        'pack_quantity' => 1000,
+        'pack_unit' => 'g',
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32) . '.md');
+
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'text/markdown; charset=utf-8')
+        ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+
+    expect($response->getContent())
+        ->toStartWith("# Beans & more\n")
+        ->toContain("## Best price now\n\n€6.00 at [bol.com](<https://bol.com/p/beans>)")
+        ->toContain('Cheapest across 2 shops tracked.')
+        ->toContain("## Best value\n\n€9.00/kg at [ah.nl](<https://ah.nl/p/beans>)")
+        ->toContain('| [bol.com](<https://bol.com/p/beans>) | €6.00 | €12.00/kg |')
+        ->not->toContain('SECRET10')
+        ->not->toContain('drop')
+        ->not->toContain('/app/');
+});
+
+test('markdown copy: a shared product with no live price says so', function (): void {
+    makeSharedProduct();
+
+    expect($this->get('/p/' . str_repeat('a', 32) . '.md')->assertOk()->getContent())
+        ->toContain('No live price available right now.')
+        ->not->toContain('## Shops');
+});
+
+test('markdown copy: an unknown or withdrawn slug is a 404', function (): void {
+    makeSharedProduct(['share_slug' => null]);
+
+    $this->get('/p/' . str_repeat('a', 32) . '.md')->assertNotFound();
+});

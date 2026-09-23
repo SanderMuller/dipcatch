@@ -12,11 +12,7 @@ use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
-use App\Services\Drops\Reference;
-use App\Services\Drops\TierDefaults;
-use App\Support\MoneyFormatter;
-use App\Support\Numeric;
-use App\Support\UnitWord;
+use App\Support\AlertRules;
 use App\Support\UrlNormalizer;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
@@ -288,55 +284,8 @@ final class ProductShow extends Component
             'shareUrl' => $this->product->publicShareUrl(),
             'canAddShop' => app(PlanLimits::class)->canAddShop($this->product),
             'shopLimit' => $this->product->user?->entitlements()->maxShopsPerProduct(),
-            'alertRules' => $this->alertRules(),
+            'alertRules' => AlertRules::of($this->product),
         ]);
-    }
-
-    /**
-     * Every alert rule the product has. A price target carries `below` for
-     * the line under it; a drop names itself.
-     *
-     * @return list<array{value: string, below: bool, pro?: bool}>
-     */
-    private function alertRules(): array
-    {
-        $product = $this->product;
-        $rules = [];
-
-        if ($product->target_price !== null) {
-            $rules[] = ['value' => MoneyFormatter::format((string) $product->target_price, $product->currency), 'below' => true];
-        }
-
-        $unitLabel = UnitWord::labelFor($product->comparablePacks()->unit());
-
-        // Without a unit the figure would read as a pack price, and a free
-        // account's target is kept but not checked.
-        if ($product->unit_price_target !== null && $unitLabel !== '') {
-            $rules[] = [
-                'value' => MoneyFormatter::unitPrice((string) $product->unit_price_target, $product->currency) . $unitLabel,
-                'below' => true,
-                'pro' => $product->user?->entitlements()->allowsUnitPriceAlerts() !== true,
-            ];
-        }
-
-        // An empty drop threshold is not off: the drop check falls back to a
-        // default, read here from the same reference it uses.
-        $reference = app(Reference::class)->compute($product);
-        $defaults = $reference === null ? null : TierDefaults::forReference($reference);
-
-        if ($product->drop_threshold_pct !== null) {
-            $rules[] = ['value' => __(':percent% drop', ['percent' => Numeric::trimmed((string) $product->drop_threshold_pct)]), 'below' => false];
-        } elseif ($defaults !== null) {
-            $rules[] = ['value' => __(':percent% drop (default)', ['percent' => Numeric::trimmed((string) $defaults['pct'])]), 'below' => false];
-        }
-
-        if ($product->drop_threshold_abs !== null) {
-            $rules[] = ['value' => __(':amount drop', ['amount' => MoneyFormatter::format((string) $product->drop_threshold_abs, $product->currency)]), 'below' => false];
-        } elseif ($defaults !== null && $defaults['abs'] !== null) {
-            $rules[] = ['value' => __(':amount drop (default)', ['amount' => MoneyFormatter::format((string) $defaults['abs'], $product->currency)]), 'below' => false];
-        }
-
-        return $rules;
     }
 
     /**

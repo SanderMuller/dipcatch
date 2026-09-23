@@ -6,6 +6,7 @@ use App\Http\Controllers\BillingController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LlmsTxtController;
 use App\Http\Controllers\OpenaiAppsChallengeController;
+use App\Http\Controllers\ProductMarkdownController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ShopPageController;
@@ -141,6 +142,11 @@ Route::get('p/{slug}', PublicProductController::class)
     ->middleware(ThrottleRequestsWithRedis::using('public-product'))
     ->name('product.public');
 
+Route::get('p/{slug}.md', [PublicProductController::class, 'markdown'])
+    ->where('slug', '[A-Za-z0-9]{32}')
+    ->middleware(ThrottleRequestsWithRedis::using('public-product'))
+    ->name('product.public.markdown');
+
 // Public on purpose: the marketing pages point Pro here, and the controller
 // decides between registration, checkout and the billing page. Guarding it
 // with `auth` would only redirect a stranger to login and lose the intent.
@@ -206,8 +212,11 @@ Route::prefix('app')
         Route::livewire('products', ProductList::class)->name('products.index');
         Route::livewire('products/create', CreateProductFromUrl::class)->name('products.create');
         Route::livewire('products/create-manual', CreateProductManual::class)->name('products.create-manual');
-        Route::livewire('products/{product}', ProductShow::class)->name('products.show');
-        Route::livewire('products/{product}/edit', EditProduct::class)->name('products.edit');
+        // Product ids are UUIDs. Without the constraint `products/{product}`
+        // also matches `<uuid>.md`, and the markdown route below is never reached.
+        Route::livewire('products/{product}', ProductShow::class)->whereUuid('product')->name('products.show');
+        Route::get('products/{product}.md', ProductMarkdownController::class)->whereUuid('product')->name('products.markdown');
+        Route::livewire('products/{product}/edit', EditProduct::class)->whereUuid('product')->name('products.edit');
         Route::livewire('billing', BillingPage::class)->name('billing');
         Route::livewire('notifications', NotificationPreferences::class)->name('notifications');
         Route::livewire('connections', ConnectionsPage::class)->name('connections');
