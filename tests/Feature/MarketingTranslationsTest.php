@@ -110,6 +110,9 @@ test('lang/nl.json carries no key the marketing views no longer use', function (
         resource_path('views/components/shop-deal.blade.php'),
         // Mail subjects and bodies for "request a shop".
         app_path('Support/ShopRequestMail.php'),
+        // Unit labels and words, used wherever a price per unit is shown.
+        app_path('Support/PackSize.php'),
+        app_path('Support/UnitWord.php'),
     ];
 
     $sources = array_map(static fn (string $file): string => (string) file_get_contents($file), $files);

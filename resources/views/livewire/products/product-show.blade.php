@@ -108,61 +108,62 @@
         <flux:callout class="mt-6" icon="information-circle">{{ $shopMessage }}</flux:callout>
     @endif
 
-    {{-- Three sibling numbers on one surface, divided rather than boxed. --}}
-    @php($bestValueShop = $product->bestValueShop())
+    {{-- Two sibling figures on one surface, divided rather than boxed. --}}
+    @php($headline = \App\Support\HeadlinePrice::of($product, $packs))
+    @php($headlineShop = $headline->shop)
     <flux:card class="mt-6 p-0! @container">
-        <dl class="grid divide-y divide-zinc-950/5 @3xl:grid-cols-3 @3xl:divide-x @3xl:divide-y-0 dark:divide-white/10">
-            <div class="p-5">
-                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Best price now') }}</dt>
+        <dl class="grid divide-y divide-zinc-950/5 @3xl:grid-cols-2 @3xl:divide-x @3xl:divide-y-0 dark:divide-white/10">
+            <div class="p-5" data-test="headline-price">
+                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ $headline->isPerUnit() ? __('Best value') : __('Best price now') }}</dt>
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
-                    <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
-                </dd>
-                @if ($product->cheapestShop)
-                    <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
-                        <x-shop-link :shop="$product->cheapestShop" />
-                    </dd>
-                    <dd><x-shop-deal :shop="$product->cheapestShop" :show-source="false" class="mt-3" /></dd>
-
-                    {{-- The lowest price can be a small pack that costs more per
-                         unit. Up to 10% more is a note; more than that is a
-                         warning, because the bigger pack is the better buy. --}}
-                    @php($cheapestUnit = $packs->unitPriceValueOf($product->cheapestShop))
-                    @php($bestUnit = $bestValueShop === null || $bestValueShop->is($product->cheapestShop) ? null : $packs->unitPriceValueOf($bestValueShop))
-                    @if ($cheapestUnit !== null && $bestUnit !== null && $bestUnit > 0 && $cheapestUnit > $bestUnit)
-                        @php($unitGap = max(1, (int) round(($cheapestUnit - $bestUnit) / $bestUnit * 100)))
-                        <dd class="mt-3">
-                            <flux:callout
-                                :variant="$unitGap > 10 ? 'danger' : 'warning'"
-                                icon="exclamation-triangle"
-                                data-test="unit-price-warning"
-                                :data-severity="$unitGap > 10 ? 'high' : 'low'"
-                            >
-                                <flux:callout.text>
-                                    {{ __(':percent% more :unit than the best value: :price at :host.', [
-                                        'percent' => $unitGap,
-                                        'unit' => \App\Support\UnitWord::forCode($packs->unit()) ?? __('per unit'),
-                                        'price' => \App\Support\MoneyFormatter::unitPrice($packs->unitPriceOf($bestValueShop), $bestValueShop->currency) . \App\Support\UnitWord::labelFor($packs->unit()),
-                                        'host' => $bestValueShop->host,
-                                    ]) }}
-                                </flux:callout.text>
-                            </flux:callout>
-                        </dd>
+                    @if ($headline->isPerUnit())
+                        <span class="inline-flex flex-wrap items-baseline gap-x-2">
+                            <span>{{ $headline->text() }}</span>
+                            @if ($regularUnit = $headline->regularUnitPrice())
+                                <del title="{{ __('Regular price') }}" class="text-base font-normal text-zinc-400 decoration-1 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::unitPrice($regularUnit, $headline->currency()) }} {{ \App\Support\UnitWord::labelFor($headline->unit) }}</del>
+                            @endif
+                        </span>
+                    @else
+                        <x-shop-price :shop="$headlineShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
                     @endif
+                </dd>
+                @if ($headlineShop)
+                    <dd class="mt-1 flex flex-wrap items-center gap-x-2 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
+                        @if ($headline->isPerUnit())
+                            <x-pack-line :line="$headline->packLine()" :bundle="false" />
+                            <span aria-hidden="true">·</span>
+                        @endif
+                        <x-shop-link :shop="$headlineShop" />
+                    </dd>
+                    <dd><x-shop-deal :shop="$headlineShop" :show-source="false" class="mt-3" /></dd>
                 @endif
-            </div>
 
-            <div class="p-5">
-                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Best value') }}</dt>
-                <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
-                    <x-shop-price :shop="$bestValueShop" unit />
-                </dd>
-                @if ($bestValueShop)
-                    <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
-                        <x-shop-link :shop="$bestValueShop" />
+                {{-- The lowest price can be a small pack that costs more per
+                     unit. Up to 10% more is a note; more than that is a
+                     warning, because the bigger pack is the better buy. --}}
+                @if ($headline->lowestShop)
+                    @php($unitGap = $headline->lowestCostsMorePercent())
+                    <dd class="mt-3">
+                        <flux:callout
+                            :variant="$unitGap !== null && $unitGap > 10 ? 'danger' : 'warning'"
+                            icon="exclamation-triangle"
+                            data-test="unit-price-warning"
+                            :data-severity="$unitGap !== null && $unitGap > 10 ? 'high' : 'low'"
+                        >
+                            <flux:callout.text>
+                                {{ __('Lowest price: :line at', ['line' => $headline->packLine($headline->lowestShop)?->text()]) }}
+                                {{-- Written inline rather than as x-shop-link, whose trailing
+                                     newline would put a space before the period. --}}
+                                <a href="{{ $headline->lowestShop->url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center align-bottom hover:underline underline-offset-4">{!! \App\Support\Favicon::html($headline->lowestShop->host) !!}</a>.
+                                @if ($unitGap !== null)
+                                    {{ __('That is :percent% more :unit than the best value.', [
+                                        'percent' => $unitGap,
+                                        'unit' => \App\Support\UnitWord::forCode($headline->unit) ?? __('per unit'),
+                                    ]) }}
+                                @endif
+                            </flux:callout.text>
+                        </flux:callout>
                     </dd>
-                    @if ($bestValueShop->id !== $product->cheapestShop?->id)
-                        <dd><x-shop-deal :shop="$bestValueShop" :show-source="false" class="mt-3" /></dd>
-                    @endif
                 @endif
             </div>
 
@@ -225,8 +226,7 @@
                 <flux:table class="mt-4">
                     <flux:table.columns>
                         <flux:table.column>{{ __('Shop') }}</flux:table.column>
-                        <flux:table.column>{{ __('Price') }}</flux:table.column>
-                        <flux:table.column class="hidden @4xl:table-cell">{{ __('Price per kilo or piece') }}</flux:table.column>
+                        <flux:table.column>{{ $packs->hasComparisonUnit() ? __('Price :unit', ['unit' => \App\Support\UnitWord::forCode($packs->unit())]) : __('Price') }}</flux:table.column>
                         <flux:table.column class="hidden @4xl:table-cell">{{ __('In stock') }}</flux:table.column>
                         <flux:table.column class="hidden @4xl:table-cell">{{ __('Price read') }}</flux:table.column>
                         <flux:table.column align="end">{{ __('Actions') }}</flux:table.column>
@@ -242,10 +242,27 @@
                                         </flux:tooltip>
                                     @endif
                                 </flux:table.cell>
-                                <flux:table.cell class="align-top tabular-nums">
-                                    <p class="text-base font-medium text-zinc-900 sm:text-sm dark:text-zinc-100">
-                                        <x-shop-price :shop="$shop" />
-                                    </p>
+                                <flux:table.cell class="align-top tabular-nums" data-test="shop-price-cell">
+                                    {{-- Per unit first: the figure the shops are compared on. The
+                                         pack price beneath it is what the shop charges. --}}
+                                    @if ($packs->hasComparisonUnit() && ! $shop->isReference())
+                                        <p class="text-base font-medium text-zinc-900 sm:text-sm dark:text-zinc-100">
+                                            <x-shop-unit-price :shop="$shop" :packs="$packs" />
+                                        </p>
+                                        <p class="mt-0.5 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
+                                            <x-pack-line :line="\App\Support\PackLine::of($shop, $packs)" :bundle="false" :marker="false" />
+                                        </p>
+                                    @else
+                                        <p class="text-base font-medium text-zinc-900 sm:text-sm dark:text-zinc-100">
+                                            <x-shop-price :shop="$shop" />
+                                        </p>
+                                        @if ($shop->isReference() || $shop->notAConsumerPriceReason() !== null)
+                                            {{-- A link's note, or a price nobody here pays. --}}
+                                            <p class="mt-0.5 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
+                                                <x-shop-unit-price :shop="$shop" :packs="$packs" />
+                                            </p>
+                                        @endif
+                                    @endif
                                     {{-- A price that is only good until a date says so, or the
                                          number reads as permanent when it is not. --}}
                                     <x-shop-deal :shop="$shop" class="mt-2 max-w-xl" />
@@ -258,8 +275,6 @@
                                         </flux:text>
                                     @endif
                                     <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-zinc-500 sm:text-sm @4xl:hidden dark:text-zinc-400">
-                                        <x-shop-unit-price :shop="$shop" :packs="$packs" />
-                                        <span aria-hidden="true">·</span>
                                         @if ($shop->current_in_stock === true)
                                             <flux:badge size="sm" color="green">{{ __('In stock') }}</flux:badge>
                                         @elseif ($shop->current_in_stock === false)
@@ -270,9 +285,6 @@
                                         <span aria-hidden="true">·</span>
                                         <x-shop-freshness :shop="$shop" />
                                     </div>
-                                </flux:table.cell>
-                                <flux:table.cell class="hidden tabular-nums @4xl:table-cell">
-                                    <x-shop-unit-price :shop="$shop" :packs="$packs" />
                                 </flux:table.cell>
                                 <flux:table.cell class="hidden @4xl:table-cell">
                                     @if ($shop->current_in_stock === true)
@@ -367,10 +379,10 @@
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         @if ($perUnit === null)
-                            <flux:heading size="lg" level="2">{{ __('Best price over time') }}</flux:heading>
+                            <flux:heading size="lg" level="2">{{ __('Lowest price over time') }}</flux:heading>
                         @else
                             <flux:heading size="lg" level="2" x-show="basis === 'unit'" :x-cloak="$basis !== 'unit'">{{ __('Best value over time') }}</flux:heading>
-                            <flux:heading size="lg" level="2" x-show="basis === 'price'" :x-cloak="$basis !== 'price'">{{ __('Best price over time') }}</flux:heading>
+                            <flux:heading size="lg" level="2" x-show="basis === 'price'" :x-cloak="$basis !== 'price'">{{ __('Lowest price over time') }}</flux:heading>
                             <flux:text size="sm" class="mt-1" x-show="basis === 'unit'" :x-cloak="$basis !== 'unit'">{{ __('Price :unit, at the shop that is the best value.', ['unit' => $perUnit]) }}</flux:text>
                             <flux:text size="sm" class="mt-1" x-show="basis === 'price'" :x-cloak="$basis !== 'price'">{{ __('Price per pack, at the shop with the lowest price.') }}</flux:text>
                         @endif
@@ -388,10 +400,10 @@
                         @if ($perUnit !== null)
                             <flux:radio.group variant="segmented" size="sm" x-model="basis" :aria-label="__('Show')" data-test="price-history-basis">
                                 <flux:radio value="unit">{{ __('Best value') }}</flux:radio>
-                                <flux:radio value="price">{{ __('Best price') }}</flux:radio>
+                                <flux:radio value="price">{{ __('Lowest price') }}</flux:radio>
                             </flux:radio.group>
-                            <flux:tooltip :content="__('Best price follows the lowest pack price. That can be a small pack that costs more :unit than a bigger one.', ['unit' => $perUnit])">
-                                <flux:button icon="information-circle" size="sm" variant="subtle" inset :aria-label="__('About best price')" />
+                            <flux:tooltip :content="__('Lowest price follows the lowest pack price. That can be a small pack that costs more :unit than a bigger one.', ['unit' => $perUnit])">
+                                <flux:button icon="information-circle" size="sm" variant="subtle" inset :aria-label="__('About lowest price')" />
                             </flux:tooltip>
                         @endif
 
@@ -410,7 +422,7 @@
                 @else
                     @php($currency = ['style' => 'currency', 'currency' => $chart['currency']])
                     @php($unitCurrency = $chart['unitDecimals'] > 2 ? [...$currency, 'maximumFractionDigits' => $chart['unitDecimals']] : $currency)
-                    @php($packLabel = __('Best price'))
+                    @php($packLabel = __('Lowest price'))
                     @php($unitLabel = $perUnit === null ? null : __('Best value :unit', ['unit' => $perUnit]))
                     @foreach ($perUnit === null ? ['price'] : ['unit', 'price'] as $field)
                         @php($isUnit = $field === 'unit')

@@ -390,6 +390,7 @@ it('states a per-unit drop in its unit, not beside a pack price it was not measu
     $user = User::factory()->create();
     // The reference is a 500 g pack at €6.25, so €12.50 a kilo; the card's price is a 200 g pack.
     $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Crisps', 'cheapest_price' => '1.69', 'last_notified_price' => '1.69', 'last_notified_at' => now()]);
+    Shop::factory()->for($product)->create(['current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
     PriceDropEvent::factory()->create([
         'user_id' => $user->id,
         'product_id' => $product->id,
@@ -405,8 +406,56 @@ it('states a per-unit drop in its unit, not beside a pack price it was not measu
 
     livewire(ProductList::class)
         ->assertDontSeeHtml('<del')
-        ->assertSee('Was €12.50/kg')
+        ->assertSeeInOrder(['€8.45 /kg', 'Was €12.50 /kg'])
         ->assertDontSee('€6.25');
+});
+
+it('shows no old figure for a drop measured in another basis than the card', function (): void {
+    $user = User::factory()->create();
+    // Alerted on the pack price before the product had a pack size; now it
+    // leads per kilo, and "Was €2.19" beside "€8.45 /kg" would compare two things.
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Crisps', 'cheapest_price' => '1.69', 'last_notified_price' => '1.69', 'last_notified_at' => now()]);
+    Shop::factory()->for($product)->create(['current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    PriceDropEvent::factory()->create([
+        'user_id' => $user->id,
+        'product_id' => $product->id,
+        'reference_price' => '2.19',
+        'comparison_unit' => null,
+        'new_price' => '1.69',
+        'drop_pct' => 22.8,
+        'currency' => 'EUR',
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertSee('€8.45 /kg')
+        ->assertDontSeeHtml('<del')
+        ->assertDontSee('Was ')
+        ->assertDontSee('€2.19')
+        ->assertSeeHtml('title="Measured per pack"');
+});
+
+it('leads the card with the best value and notes the lowest pack price', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'title' => 'Tablets']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '12.99', 'pack_quantity' => '400.00', 'pack_unit' => 'piece']);
+    Shop::factory()->for($product)->create(['url' => 'https://kruidvat.nl/p/1', 'current_price' => '21.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece']);
+    Shop::factory()->for($product)->create(['url' => 'https://etos.nl/p/1', 'current_price' => '26.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece']);
+    Shop::factory()->for($product)->create(['url' => 'https://bol.com/p/1', 'current_price' => '13.49', 'pack_quantity' => '400.00', 'pack_unit' => 'piece']);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    $html = livewire(ProductList::class)->html();
+
+    // The winner is the first shop row even with four shops and a cheaper pack
+    // two rows down; the rest follow by price per tablet.
+    expect(preg_replace('/\s+/', ' ', strip_tags($html)))
+        ->toContain('€0.0275 /piece')
+        ->toContain('€21.99 for 800 pieces')
+        ->toContain('Lowest price €12.99 for 400 pieces at ah.nl')
+        ->toMatch('/kruidvat\.nl.*€0\.0275 \/piece.*€21\.99.*ah\.nl.*€0\.0325 \/piece.*bol\.com.*€0\.0337 \/piece/s');
 });
 
 it('lists the shop behind the card price first, even when an out-of-stock shop is lower', function (): void {
@@ -548,4 +597,21 @@ it('sorts a product back at its alert reference with the ones not in a drop', fu
     $this->actingAs($user);
 
     livewire(ProductList::class)->assertSeeInOrder(['Down 5 now', 'Back at reference']);
+});
+
+it('never lists a sold-out shop ahead of one that can be bought from', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'title' => 'Tablets']);
+    Shop::factory()->for($product)->create(['url' => 'https://kruidvat.nl/p/1', 'current_price' => '21.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece']);
+    Shop::factory()->for($product)->create(['url' => 'https://etos.nl/p/1', 'current_price' => '9.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece', 'current_in_stock' => false]);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '12.99', 'pack_quantity' => '400.00', 'pack_unit' => 'piece']);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    // Etos is cheapest per tablet but sold out: it follows the live shops, on
+    // its pack price, with no figure per tablet.
+    expect(preg_replace('/\s+/', ' ', strip_tags(livewire(ProductList::class)->html())))
+        ->toMatch('/kruidvat\.nl €0\.0275 \/piece.*ah\.nl €0\.0325 \/piece.*etos\.nl[^€]*€9\.99/s')
+        ->not->toContain('€0.0125');
 });

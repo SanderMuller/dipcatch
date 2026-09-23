@@ -89,6 +89,49 @@ it('measures a fall per unit rather than across two pack sizes', function (): vo
         ->and((string) $event->new_unit_price)->toBe('12.1145');
 });
 
+it('stores the pack the drop was measured on and leads the alert with the unit price', function (): void {
+    $product = droppingProduct();
+
+    $jumbo = sizedShop($product, 'jumbo.com', '4.19', ['pack_quantity' => '333.00', 'pack_unit' => 'g']);
+    readingOn($jumbo, '4.19');
+    $product->recomputeCheapestShop();
+    $dirk = sizedShop($product, 'dirk.nl', '5.00', ['pack_quantity' => '227.00', 'pack_unit' => 'g']);
+    $product->refresh()->recomputeCheapestShop(readingOn($dirk, '5.00')->id);
+    $product->refresh()->recomputeCheapestShop(readingOn($dirk, '2.75')->id);
+
+    $event = PriceDropEvent::query()->where('product_id', $product->id)->sole();
+
+    expect((string) $event->pack_quantity)->toBe('227.00')
+        ->and($event->pack_unit)->toBe('g');
+
+    Notification::assertSentTo($product->user, PriceDropNotification::class, function (PriceDropNotification $notification) use ($product): bool {
+        $user = $product->user;
+        assert($user instanceof User);
+        $payload = $notification->toDatabase($user);
+
+        $body = $notification->toWebPush($user)->toArray()['body'] ?? null;
+
+        return $payload['pack_quantity'] === '227'
+            && $payload['pack_unit'] === 'g'
+            && is_string($body) && str_contains($body, 'is now €12.11 /kg (€2.75 for 227 g) at dirk.nl');
+    });
+});
+
+it('stores no pack size on a drop measured on pack prices', function (): void {
+    $product = droppingProduct();
+
+    $shop = sizedShop($product, 'bol.com', '349.00');
+    readingOn($shop, '349.00');
+    $product->recomputeCheapestShop();
+    $product->refresh()->recomputeCheapestShop(readingOn($shop, '299.00')->id);
+
+    $event = PriceDropEvent::query()->where('product_id', $product->id)->sole();
+
+    expect($event->comparison_unit)->toBeNull();
+    expect($event->pack_quantity)->toBeNull();
+    expect($event->pack_unit)->toBeNull();
+});
+
 it('measures a fall on a product priced by the piece', function (): void {
     // The Roter vitamin C shape. 400 tablets at 12.99 is 0.032475 each; the
     // same pack at 11.50 is 0.028750 — about an 11.5% fall. Both used to be

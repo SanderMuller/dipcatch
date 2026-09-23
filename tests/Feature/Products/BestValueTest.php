@@ -105,7 +105,7 @@ test('a product whose shops state no size has no best value', function (): void 
     expect($product->bestValueShop())->toBeNull();
 });
 
-test('the product page shows the best value beside the cheapest price', function (): void {
+test('the product page leads with the best value and notes the lowest price', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
 
@@ -122,13 +122,13 @@ test('the product page shows the best value beside the cheapest price', function
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
-        ->assertSeeText('Best price now')
-        ->assertSeeText('€1.69')
-        // Both stated per kilo, so the gap between them can be read off.
-        ->assertSeeText('€8.45 /kg')
-        ->assertSeeText('Best value')
-        ->assertSeeText('€5.38 /kg')
-        ->assertSeeText('lidl.nl');
+        ->assertDontSeeText('Best price now')
+        ->assertSeeTextInOrder(['Best value', '€5.38 /kg', '€1.99 for 370 g', 'lidl.nl'])
+        // The lowest pack price is a note under it, with the gap per kilo.
+        ->assertSeeText('Lowest price: €1.69 for 200 g at')
+        ->assertSeeText('That is 57% more per kilo than the best value.')
+        // Both stated per kilo in the shops table, so the gap can be read off.
+        ->assertSeeText('€8.45 /kg');
 });
 
 test('the products list shows the best value beside the cheapest price', function (): void {
@@ -208,7 +208,7 @@ test('the dashboard says how long the drop price lasts', function (): void {
         ->assertSeeText('until 6 Sep');
 });
 
-test('the dashboard leaves the best value to the product page', function (): void {
+test('the dashboard card leads with the best value and links its shop', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([
         'currency' => 'EUR',
@@ -229,13 +229,15 @@ test('the dashboard leaves the best value to the product page', function (): voi
 
     $this->actingAs($user);
 
+    // The figure is the best value, and the shop link beneath it names the
+    // shop that sells it. The comparison with the lowest pack price stays on
+    // the product list and the product page.
     livewire(Dashboard::class)
-        ->assertSeeText('€1.69')
-        ->assertSeeText('ah.nl')
-        // Best value is a comparison across shops, so it reads where the shops
-        // are listed. The dashboard answers what is cheap now, and where.
-        ->assertDontSeeText('€5.38 /kg')
-        ->assertDontSeeText('lidl.nl');
+        ->assertSeeTextInOrder(['€5.38 /kg', '€1.99 for 370 g', 'lidl.nl'])
+        ->assertDontSeeText('Lowest price')
+        ->assertDontSeeText('ah.nl')
+        ->assertSeeHtml('href="https://lidl.nl/p/lay-s/p7"')
+        ->assertDontSeeHtml('href="https://ah.nl/producten/product/wi7/x"');
 });
 
 test('the list says how long a quoted price lasts', function (): void {

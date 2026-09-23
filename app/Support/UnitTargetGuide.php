@@ -126,7 +126,7 @@ final readonly class UnitTargetGuide
         return [
             'shopId' => $shopId,
             'host' => $host,
-            'pack' => self::packLabel($size),
+            'pack' => UnitWord::pack($size),
             'perPack' => $size->unit === 'piece' ? $size->quantity : $size->quantity / 1000,
             'price' => $price === null ? null : (float) $price,
             'unitPrice' => $price === null ? null : $size->unitPriceValueFor($price),
@@ -137,20 +137,19 @@ final readonly class UnitTargetGuide
     /**
      * The lowest price per unit on the product's price chart, in the history
      * the account may read: the chart's per-unit line, which follows the
-     * cheapest shop. Null with fewer than two points.
+     * best value. Null with fewer than two points.
      *
      * @return array{lowest: float}|null
      */
     public function history(): ?array
     {
-        $suffix = ltrim(UnitWord::labelFor($this->product->comparablePacks()->unit()), '/');
+        $comparisonUnit = $this->product->comparablePacks()->unit();
         $datasets = new PriceHistorySeries($this->product)->data()['datasets'];
         $unit = array_find($datasets, fn (array $dataset): bool => ($dataset['yAxisID'] ?? null) === 'unit');
-        $label = is_string($unit['label'] ?? null) ? $unit['label'] : '';
 
         // A history kept in another unit than the alert compares in says
         // nothing about this target.
-        if ($unit === null || $suffix === '' || ! str_contains($label, 'per ' . $suffix)) {
+        if ($unit === null || $comparisonUnit === null || ($unit['unit'] ?? null) !== $comparisonUnit) {
             return null;
         }
 
@@ -162,17 +161,5 @@ final readonly class UnitTargetGuide
         }
 
         return ['lowest' => min($points)];
-    }
-
-    /** `500 g`, `1.5 kg`, `330 ml`, `1.5 L`, `8 pieces`. */
-    private static function packLabel(PackSize $size): string
-    {
-        $number = fn (float $value): string => Numeric::trimmed(number_format($value, 2, '.', ''));
-
-        return match ($size->unit) {
-            'g' => $size->quantity >= 1000 ? $number($size->quantity / 1000) . ' kg' : $number($size->quantity) . ' g',
-            'ml' => $size->quantity >= 1000 ? $number($size->quantity / 1000) . ' L' : $number($size->quantity) . ' ml',
-            default => trans_choice(':count piece|:count pieces', (int) $size->quantity, ['count' => $number($size->quantity)]),
-        };
     }
 }

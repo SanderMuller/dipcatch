@@ -3,18 +3,24 @@
     use App\Support\MoneyFormatter;
 
     $image = $product->safeImageUrl();
-    // Use the first visible shop so the headline and its bundle terms describe
-    // the same live row, even while the denormalized product price is stale.
-    $headlineShop = $shops->first();
-    $priceLine = $headlineShop?->current_price !== null
-        ? MoneyFormatter::format((string) $headlineShop->current_price, $product->currency)
-        : null;
+    // The live shop behind the figure the page leads with: the best value per
+    // unit, or the lowest price when the product compares no unit.
+    // Never a listed shop the owner page would not crown, such as a trade-only price.
+    $headlineShop = $headline->shop !== null && $shops->contains($headline->shop) ? $headline->shop : null;
+    $perUnit = $headline->isPerUnit() && $headlineShop !== null && $headlineShop->is($headline->shop);
+    $priceLine = match (true) {
+        $headlineShop?->current_price === null => null,
+        $perUnit => $headline->text() . ' at ' . $headlineShop->host . ' (' . $headline->packLine()?->text() . ')',
+        default => MoneyFormatter::format((string) $headlineShop->current_price, $product->currency),
+    };
     $headlineBundleLabel = \App\Support\BundlePriceLabel::forShop($headlineShop);
-    $ogDescription = $priceLine !== null
-        ? "Tracked on DipCatch: cheapest at {$priceLine}" . ($headlineBundleLabel === null ? '' : " · {$headlineBundleLabel}")
-        : 'Tracked on DipCatch.';
+    $ogDescription = match (true) {
+        $priceLine === null => 'Tracked on DipCatch.',
+        $perUnit => "Tracked on DipCatch: best value {$priceLine}",
+        default => "Tracked on DipCatch: cheapest at {$priceLine}" . ($headlineBundleLabel === null ? '' : " · {$headlineBundleLabel}"),
+    };
     $canonicalUrl = $product->publicShareUrl() ?? url('/');
-    $hasChart = ! empty($chart);
+    $hasChart = ! empty($chart['points']);
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -91,7 +97,26 @@
                     {{ $product->title }}
                 </h1>
 
-                @if ($priceLine !== null)
+                @if ($priceLine !== null && $perUnit)
+                    <p class="mt-3 text-3xl font-bold tabular-nums" data-test="public-headline">
+                        {{ $headline->text() }}
+                        @if ($regularUnit = $headline->regularUnitPrice())
+                            <del title="Regular price" class="ms-2 text-lg font-normal text-zinc-400 decoration-1 dark:text-zinc-500">{{ MoneyFormatter::unitPrice($regularUnit, $headline->currency()) }} {{ \App\Support\UnitWord::labelFor($headline->unit) }}</del>
+                        @endif
+                    </p>
+                    <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                        {{-- Plain text: this page loads no Flux script to open a tooltip. --}}
+                        Best value: {{ $headline->packLine()?->text() }} at {{ $headlineShop->host }}
+                    </p>
+                    @if ($headline->lowestShop && $shops->contains($headline->lowestShop))
+                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400" data-test="lowest-price-note">
+                            Lowest price: {{ $headline->packLine($headline->lowestShop)?->text() }} at {{ $headline->lowestShop->host }}.@if ($gap = $headline->lowestCostsMorePercent()) That is {{ $gap }}% more {{ \App\Support\UnitWord::forCode($headline->unit) }}.@endif
+                        </p>
+                    @endif
+                    <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                        Compared across {{ $shops->count() }} {{ $shops->count() === 1 ? 'shop' : 'shops' }} tracked.
+                    </p>
+                @elseif ($priceLine !== null)
                     <p class="mt-3 text-3xl font-bold tabular-nums"><x-shop-price :shop="$headlineShop" /></p>
                     @if ($headlineBundleLabel !== null)
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $headlineBundleLabel }}</p>
@@ -111,12 +136,12 @@
         @if ($hasChart)
             <section class="mt-8">
                 <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                    Price (last 90 days)
+                    {{ $chart['unit'] === null ? 'Price' : 'Price ' . \App\Support\UnitWord::forCode($chart['unit']) }} (last 90 days)
                 </h2>
                 <div class="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
                     <canvas id="price-history-chart" height="180"></canvas>
                 </div>
-                <script id="price-history-data" type="application/json">@json($chart)</script>
+                <script id="price-history-data" type="application/json">@json($chart['points'])</script>
                 <script>
                     document.addEventListener('DOMContentLoaded', function () {
                         const init = function () {
@@ -185,7 +210,7 @@
                                     <p class="flex items-center gap-1.5 truncate text-sm font-medium">
                                         <img src="{{ Favicon::url($shop->host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
                                         {{ $shop->host }}
-                                        @if ($loop->first && $shops->count() > 1)
+                                        @if ($shop->id === $lowestShopId && $shops->count() > 1)
                                             <span class="ml-1.5 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 inset-ring inset-ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:inset-ring-emerald-500/20">Lowest price</span>
                                         @endif
                                         @if ($shop->id === $bestValueShopId && $shops->count() > 1)
@@ -208,24 +233,27 @@
                                     @endif
                                 </div>
                                 <div class="w-full text-left sm:w-auto sm:text-right">
+                                    @php($shopUnitPrice = $packs->hasComparisonUnit() && $shop->notAConsumerPriceReason() === null ? $packs->unitPriceOf($shop) : null)
                                     <div class="flex items-center justify-start gap-1 sm:justify-end">
                                         <p class="text-sm font-semibold tabular-nums">
-                                            <x-shop-price :shop="$shop" />
+                                            {{-- Per unit first: the figure the shops compare on. --}}
+                                            @if ($shopUnitPrice !== null)
+                                                {{ MoneyFormatter::unitPrice($shopUnitPrice, $shop->currency) }} {{ \App\Support\UnitWord::labelFor($packs->unit()) }}
+                                            @else
+                                                <x-shop-price :shop="$shop" />
+                                            @endif
                                         </p>
                                         <svg viewBox="0 0 16 16" fill="none" class="size-4 text-zinc-400" aria-hidden="true">
                                             <path d="M6 12l4-4-4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                         </svg>
                                     </div>
-                                    @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($shop))
+                                    @if ($shopUnitPrice !== null)
+                                        <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ \App\Support\PackLine::of($shop, $packs)->text() }}</p>
+                                    @elseif ($bundleLabel = \App\Support\BundlePriceLabel::forShop($shop))
                                         <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $bundleLabel }}</p>
                                     @endif
-                                    @php
-                                        $shopUnitPrice = $shop->unitPrice();
-                                    @endphp
-                                    @if ($shopUnitPrice !== null)
-                                        <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
-                                            <x-shop-price :shop="$shop" unit />
-                                        </p>
+                                    @if ($reason = $shop->notAConsumerPriceReason())
+                                        <p class="mt-0.5 text-xs text-amber-700 dark:text-amber-500">{{ $reason }}</p>
                                     @endif
                                 </div>
                             </a>

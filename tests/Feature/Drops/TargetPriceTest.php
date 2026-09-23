@@ -267,3 +267,85 @@ test('a target fires from the smallest outlay even when another shop is better v
     Notification::assertSentTo($product->user, TargetPriceNotification::class);
     expect((string) $product->refresh()->target_price_notified)->toBe('2.19');
 });
+
+test('the alert leads with the pack price that fired and names a better buy per unit', function (): void {
+    // The target is a pack amount, reached by the small pack. Per kilo the big
+    // pack elsewhere is the better buy, and the alert says so.
+    $user = User::factory()->create(['notify_via_filament' => true]);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Crisps', 'target_price' => '1.75']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://lidl.nl/p/1', 'current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g']);
+    $product->recomputeCheapestShop();
+
+    app(DetectTargetPrice::class)($product->refresh());
+
+    Notification::assertSentTo($user, TargetPriceNotification::class, function (TargetPriceNotification $notification) use ($user): bool {
+        $payload = $notification->toDatabase($user);
+
+        return $notification->toWebPush($user)->toArray()['body']
+                === 'Crisps is €1.69 for 200 g at ah.nl · your target €1.75 · €8.45 /kg · better value €5.38 /kg at lidl.nl'
+            && $payload['unit_price'] === '8.4500'
+            && $payload['unit'] === 'g'
+            && $payload['better_value_host'] === 'lidl.nl';
+    });
+});
+
+test('the alert names no better buy when the shop that fired is also the best value', function (): void {
+    $product = targetPriceProduct('18.00');
+
+    app(DetectTargetPrice::class)($product);
+
+    Notification::assertSentTo($product->user, TargetPriceNotification::class, function (TargetPriceNotification $notification) use ($product): bool {
+        $user = $product->user;
+        assert($user instanceof User);
+
+        $body = $notification->toWebPush($user)->toArray()['body'] ?? null;
+
+        return $notification->toDatabase($user)['better_value_host'] === null
+            && is_string($body) && ! str_contains($body, 'better value');
+    });
+});
+
+test('the alert states the target it reached, even when the target changes before delivery', function (): void {
+    $product = targetPriceProduct('18.00');
+    $user = $product->user;
+    assert($user instanceof User);
+
+    $notification = new TargetPriceNotification($product, $product->cheapestShop()->firstOrFail(), '17.05');
+    $product->forceFill(['target_price' => '12.00'])->save();
+
+    $revived = unserialize(serialize($notification));
+    assert($revived instanceof TargetPriceNotification);
+
+    expect($revived->toWebPush($user)->toArray()['body'])->toContain('your target €18.00')
+        ->and($revived->toDatabase($user)['target_price'])->toBe('18.00');
+});
+
+test('the alert states no unit price for a shop whose size is only estimated', function (): void {
+    // The sized shop is sold out, so nothing can win per unit; the shop that
+    // reached the target states no size of its own.
+    $user = User::factory()->create(['notify_via_filament' => true]);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Crisps', 'target_price' => '2.00']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'current_in_stock' => false]);
+    $silent = Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '1.79', 'pack_quantity' => null, 'pack_unit' => null]);
+    $product->recomputeCheapestShop();
+
+    $notification = new TargetPriceNotification($product->refresh(), $silent, '1.79');
+
+    expect($notification->toDatabase($user)['unit_price'])->toBeNull()
+        ->and($notification->toWebPush($user)->toArray()['body'])->not->toContain('/kg');
+});
+
+test('the better-buy note keeps its unit when the shop that fired has no size of its own', function (): void {
+    $user = User::factory()->create(['notify_via_filament' => true]);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Crisps', 'target_price' => '1.75']);
+    Shop::factory()->for($product)->create(['url' => 'https://lidl.nl/p/1', 'current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    $silent = Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '1.49', 'pack_quantity' => null, 'pack_unit' => null]);
+    $product->recomputeCheapestShop();
+
+    $body = new TargetPriceNotification($product->refresh(), $silent, '1.49')->toWebPush($user)->toArray()['body'];
+
+    expect($body)->toContain('better value €5.38 /kg at lidl.nl')
+        ->not->toContain('· €7.45');
+});

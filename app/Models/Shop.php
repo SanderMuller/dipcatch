@@ -217,7 +217,7 @@ final class Shop extends Model
     }
 
     /**
-     * `/kg`, `/l` or `/stuk` — null whenever {@see unitPrice()} is null, so
+     * `/kg`, `/l` or `/piece` — null whenever {@see unitPrice()} is null, so
      * no orphan label renders next to a missing price.
      */
     public function unitPriceLabel(): ?string
@@ -225,7 +225,7 @@ final class Shop extends Model
         return $this->unitPrice() === null ? null : $this->packSize()?->label();
     }
 
-    /** `/kg`, `/l` or `/stuk` for this shop's pack, whatever its price. */
+    /** `/kg`, `/l` or `/piece` for this shop's pack, whatever its price. */
     public function packUnitLabel(): ?string
     {
         return $this->packSize()?->label();
@@ -372,7 +372,8 @@ final class Shop extends Model
         return Favicon::url($this->host);
     }
 
-    private function packSize(): ?PackSize
+    /** The size this shop's own page states, before any comparison with its siblings. */
+    public function packSize(): ?PackSize
     {
         if ($this->pack_quantity === null || $this->pack_unit === null) {
             return null;

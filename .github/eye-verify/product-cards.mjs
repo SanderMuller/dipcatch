@@ -77,7 +77,9 @@ const firstParty = () => issues.pageErrors.length === 0
     const crisps = card('EV Unit Drop Crisps');
     const crispsText = (await crisps.innerText()).replace(/\s+/g, ' ');
     checker.check('a per-unit drop states its "Was" unit price', /Was €9\.99\s*\/\s*kg/i.test(crispsText) || crispsText.includes('Was €9.99'), crispsText);
-    checker.check('best value names the other shop', crispsText.includes('Best value') && crispsText.includes('lidl.nl') && crispsText.includes('€5.38'), crispsText);
+    checker.check('card leads with the best value per kilo and its pack', crispsText.startsWith('EV Unit Drop Crisps €5.38 /kg') && crispsText.includes('€1.99 for 370 g'), crispsText);
+    checker.check('card notes the lowest pack price at the other shop', crispsText.includes('Lowest price €1.69 for 200 g at ah.nl'), crispsText);
+    checker.check('card lists the best-value shop first, by price per kilo', /lidl\.nl €5\.38 \/kg €1\.99 ah\.nl €8\.45 \/kg €1\.69/.test(crispsText), crispsText);
 
     const soap = card('EV Paused Soap');
     const soapText = (await soap.innerText()).replace(/\s+/g, ' ');
@@ -455,7 +457,8 @@ const firstParty = () => issues.pageErrors.length === 0
 
     const crisps = drops.locator('article').filter({ hasText: 'EV Unit Drop Crisps' });
     const crispsText = (await crisps.innerText()).replace(/\s+/g, ' ');
-    checker.check('dashboard card leaves out unit price and best value', ! crispsText.includes('/kg Best value') && ! crispsText.includes('lidl.nl') && ! crispsText.includes('€8.45'), crispsText);
+    checker.check('dashboard card leads with the best value and links its shop', crispsText.includes('€5.38 /kg') && crispsText.includes('€1.99 for 370 g') && crispsText.includes('lidl.nl'), crispsText);
+    checker.check('dashboard card leaves the lowest-price comparison to the list', ! crispsText.includes('Lowest price') && ! crispsText.includes('€8.45'), crispsText);
 
     const paused = recent.locator('article').filter({ hasText: 'EV Paused Soap' });
     checker.check('dashboard shows a paused product as paused', await paused.locator('[data-test="paused-label"]').isVisible());
@@ -497,27 +500,40 @@ const firstParty = () => issues.pageErrors.length === 0
     const unitTicks = await yTicks(unitChart);
     checker.check('per-tablet ticks are cents, each one distinct', unitTicks.length > 1 && new Set(unitTicks).size === unitTicks.length && unitTicks.every((tick) => /^€0\.\d{2,4}$/.test(tick.trim())), unitTicks.join(' | '));
 
-    await history.locator('[aria-label="About best price"]').hover();
+    await history.locator('[aria-label="About lowest price"]').hover();
     const tip = page.getByText('That can be a small pack that costs more per piece than a bigger one.');
     checker.check('the info button explains what best price can hide', await tip.waitFor({ state: 'visible', timeout: 4000 }).then(() => true).catch(() => false));
 
+    await unitChart.scrollIntoViewIfNeeded();
     const unitBox = await unitChart.locator('svg').first().boundingBox();
     await page.mouse.move(unitBox.x + unitBox.width * 0.6, unitBox.y + unitBox.height / 2);
     await page.mouse.move(unitBox.x + unitBox.width * 0.7, unitBox.y + unitBox.height / 2, { steps: 5 });
-    await page.waitForTimeout(300);
+    await page.waitForFunction(() => /Best value per piece\s*€/.test(document.body.innerText), null, { timeout: 4000 }).catch(() => {});
     const unitTip = (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ').match(/Best value per piece.{0,40}/)?.[0] ?? '';
-    checker.check('the per-unit tooltip leads with the unit price and keeps the pack price', /Best value per piece €0\.02\d{2}/.test(unitTip) && /Best price €1[23]\.\d{2}/.test(unitTip), unitTip);
+    checker.check('the per-unit tooltip leads with the unit price and keeps the pack price', /Best value per piece €0\.02\d{2}/.test(unitTip) && /Lowest price €1[23]\.\d{2}/.test(unitTip), unitTip);
     await page.screenshot({ path: path.join(ART, 'price-history-best-value.png') });
 
-    await basis.getByRole('radio', { name: 'Best price' }).click();
+    await basis.getByRole('radio', { name: 'Lowest price' }).click();
     await packChart.waitFor({ state: 'visible', timeout: 4000 }).catch(() => {});
     checker.check('the switch shows the pack price chart', await packChart.isVisible() && ! await unitChart.isVisible());
-    checker.check('the heading follows the switch', await history.getByRole('heading', { name: 'Best price over time' }).isVisible()
+    checker.check('the heading follows the switch', await history.getByRole('heading', { name: 'Lowest price over time' }).isVisible()
         && ! await history.getByRole('heading', { name: 'Best value over time' }).isVisible());
     await packChart.locator('svg text').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
     const packTicks = await yTicks(packChart);
     checker.check('pack ticks are whole-cent prices', packTicks.length > 0 && packTicks.every((tick) => /€\d+\.\d{2}$/.test(tick.trim())), packTicks.join(' | '));
     await page.screenshot({ path: path.join(ART, 'price-history-best-price.png') });
+
+    // The figures above the chart: best value per tablet, its pack, and the
+    // lowest pack price as a note with the gap per tablet.
+    const headline = page.locator('[data-test="headline-price"]');
+    const headlineText = (await headline.innerText()).replace(/\s+/g, ' ');
+    checker.check('the page leads with the best value per piece', headlineText.startsWith('Best value €0.0275 /piece'), headlineText);
+    checker.check('the headline names the pack and the shop', headlineText.includes('€21.99 for 800 pieces') && headlineText.includes('kruidvat.nl'), headlineText);
+    checker.check('the lowest pack price is a note with the gap per piece', /Lowest price: €12\.99 for 400 pieces at ah\.nl ?\. That is 18% more per piece than the best value\./.test(headlineText), headlineText);
+    checker.check('the top row has two tiles, not three', (await page.locator('dl > div').count()) === 2);
+    const firstCell = (await page.locator('[data-test="shop-price-cell"]').first().innerText()).replace(/\s+/g, ' ');
+    checker.check('each shop row leads with its price per piece', /^€0\.0\d{3} \/piece €\d+\.\d{2} for \d+ pieces/.test(firstCell), firstCell);
+    await headline.screenshot({ path: path.join(ART, 'product-page-best-value.png') });
 
     // A range change re-renders the card; the chosen basis must survive it.
     await history.locator('[data-flux-select] button').first().click();
@@ -539,6 +555,32 @@ const firstParty = () => issues.pageErrors.length === 0
     checker.check('a per-kilo chart opens on best value', await history.getByText('Price per kilo, at the shop that is the best value.').isVisible());
     const kiloTicks = await yTicks(unitChart);
     checker.check('per-kilo ticks carry two decimals', kiloTicks.length > 0 && kiloTicks.every((tick) => /€\d+\.\d{2}$/.test(tick.trim())), kiloTicks.join(' | '));
+}
+
+{
+    // The bell leads a per-unit alert with its unit price, then the pack.
+    await page.goto(`${BASE}/app`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Notifications' }).first().click();
+    const bellFigure = page.locator('[data-test="bell-unit-figure"]').first();
+    const bellShown = await bellFigure.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+    const bellText = bellShown ? (await bellFigure.locator('xpath=..').innerText()).replace(/\s+/g, ' ') : '';
+    checker.check('the bell leads with the unit price and names the pack', bellText.includes('€0.0275 /piece · kruidvat.nl') && bellText.includes('€21.99 for 800 pieces'), bellText);
+    await page.screenshot({ path: path.join(ART, 'bell-unit-first.png') });
+    await page.keyboard.press('Escape');
+}
+
+{
+    // The public page follows the owner page's rules and leads per unit.
+    const publicPage = await ctx.newPage();
+    await publicPage.goto(`${BASE}/p/${fixture.tabletsSlug}`, { waitUntil: 'networkidle' });
+    const publicText = (await publicPage.locator('header').innerText()).replace(/\s+/g, ' ');
+    checker.check('the public page leads with the best value per piece', publicText.includes('€0.0275 /piece') && publicText.includes('Best value: €21.99 for 800 pieces at kruidvat.nl'), publicText);
+    checker.check('the public page notes the lowest pack price', publicText.includes('Lowest price: €12.99 for 400 pieces at ah.nl. That is 18% more per piece.'), publicText);
+    const og = await publicPage.locator('meta[property="og:description"]').getAttribute('content');
+    checker.check('the public meta description states the unit price', og === 'Tracked on DipCatch: best value €0.0275 /piece at kruidvat.nl (€21.99 for 800 pieces)', og ?? '');
+    checker.check('the public chart is per piece', await publicPage.getByText('Price per piece (last 90 days)').isVisible());
+    await publicPage.screenshot({ path: path.join(ART, 'public-page-best-value.png'), fullPage: true });
+    await publicPage.close();
 }
 
 checker.check('no first-party failures over the whole run', firstParty(), [...issues.pageErrors, ...issues.failedRequests].join('; '));

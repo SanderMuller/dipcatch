@@ -9,6 +9,9 @@ use App\PriceAdapters\BundleOffer;
 use App\Support\AlsoWorthChecking;
 use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
+use App\Support\PackLine;
+use App\Support\PackSize;
+use App\Support\UnitWord;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -37,6 +40,13 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
 
     public readonly ?BundleOffer $snapshotBundle;
 
+    /** The unit code, so the label follows the reader's language. */
+    public readonly ?string $snapshotUnit;
+
+    public readonly ?string $snapshotPackQuantity;
+
+    public readonly ?string $snapshotPackUnit;
+
     public function __construct(
         public Product $product,
         Shop $shop,
@@ -45,6 +55,10 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
         $this->snapshotHost = $shop->host;
         $this->snapshotPrice = $shop->current_price === null ? null : (string) $shop->current_price;
         $this->snapshotUnitLabel = $shop->unitPriceLabel();
+        $packSize = $shop->packSize();
+        $this->snapshotUnit = $packSize?->unit;
+        $this->snapshotPackQuantity = $packSize === null ? null : (string) $packSize->quantity;
+        $this->snapshotPackUnit = $packSize?->unit;
         $this->snapshotBundle = $shop->liveBundleOffer();
         $this->snapshotSingleItemPrice = $this->snapshotBundle === null ? null : $shop->singleItemPrice();
 
@@ -95,6 +109,9 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
             'currency' => $this->product->currency,
             'unit_price' => $this->snapshotUnitPrice,
             'unit_price_label' => $this->snapshotUnitLabel,
+            'unit' => $this->snapshotUnit,
+            'pack_quantity' => $this->snapshotPackQuantity,
+            'pack_unit' => $this->snapshotPackUnit,
             'unit_price_target' => $this->product->unit_price_target === null
                 ? null
                 : (string) $this->product->unit_price_target,
@@ -109,15 +126,18 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
 
     private function body(): string
     {
+        $label = $this->snapshotUnit === null ? $this->snapshotUnitLabel : UnitWord::labelFor($this->snapshotUnit);
         $unit = MoneyFormatter::unitPrice($this->snapshotUnitPrice, $this->product->currency)
-            . ($this->snapshotUnitLabel === null ? '' : ' ' . $this->snapshotUnitLabel);
-
-        $price = $this->snapshotPrice === null
-            ? ''
-            : ' (' . MoneyFormatter::format($this->snapshotPrice, $this->product->currency) . ')';
+            . ($label === null ? '' : ' ' . $label);
+        $packSize = $this->snapshotPackQuantity === null || $this->snapshotPackUnit === null
+            ? null
+            : PackSize::of((float) $this->snapshotPackQuantity, $this->snapshotPackUnit);
 
         $bundle = BundlePriceLabel::suffix($this->snapshotBundle, $this->product->currency);
+        $price = $this->snapshotPrice === null
+            ? ''
+            : ' (' . PackLine::format($this->snapshotPrice, $this->product->currency, $packSize) . $bundle . ')';
 
-        return $this->product->title . ' is ' . $unit . $price . $bundle . ' at ' . $this->snapshotHost;
+        return $this->product->title . ' is ' . $unit . $price . ' at ' . $this->snapshotHost;
     }
 }

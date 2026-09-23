@@ -37,9 +37,21 @@ final class UnitWord
         return is_string($word) ? $word : null;
     }
 
-    /** "/kg", "/l", "/stuk" — for a figure. */
+    /** "/kg", "/l", "/piece" — for a figure. */
     public static function labelFor(?string $unit): string
     {
         return PackSize::of(1.0, $unit ?? '')?->label() ?? '';
+    }
+
+    /** `500 g`, `1.5 kg`, `330 ml`, `1.5 L`, `8 pieces` — a pack as a shopper names it. */
+    public static function pack(PackSize $size): string
+    {
+        $number = fn (float $value): string => Numeric::trimmed(number_format($value, 2, '.', ''));
+
+        return match ($size->unit) {
+            'g' => $size->quantity >= 1000 ? $number($size->quantity / 1000) . ' kg' : $number($size->quantity) . ' g',
+            'ml' => $size->quantity >= 1000 ? $number($size->quantity / 1000) . ' L' : $number($size->quantity) . ' ml',
+            default => trans_choice(':count piece|:count pieces', (int) $size->quantity, ['count' => $number($size->quantity)]),
+        };
     }
 }

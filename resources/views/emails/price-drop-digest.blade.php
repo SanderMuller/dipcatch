@@ -40,15 +40,14 @@ $image = $product->safeImageUrl();
 </tr>
 <tr>
 <td style="padding: 0 0 12px; color: #18181b; line-height: 1.2;">
-<span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::format($event->new_price, $event->currency) }}</span>
-@if ($bundle !== null && $singleItemPrice !== null)
-<del title="Regular price" style="margin-left: 8px; color: #a1a1aa; font-size: 16px;">{{ \App\Support\MoneyFormatter::format($singleItemPrice, $event->currency) }}</del>
-@endif
 @php
-    // The alert leads with the pack price and states the change in the unit the
-    // comparison used. Two different pack sizes have no honest money
-    // difference, so the money is shown only when there is one.
+    // Per unit first when the drop was measured per unit: that is the figure
+    // that fell. The pack price follows as what the shop charges. Two
+    // different pack sizes have no honest money difference, so the money is
+    // shown only when there is one.
     $unitWord = \App\Support\UnitWord::forCode($event->comparison_unit);
+    $perUnit = $event->comparison_unit !== null && $event->new_unit_price !== null;
+    $unitLabel = \App\Support\UnitWord::labelFor($event->comparison_unit);
     $changeLabel = '↓ ' . number_format((float) $event->drop_pct, 1, '.', '') . '%'
         . ($unitWord === null ? '' : ' ' . $unitWord);
 
@@ -56,9 +55,17 @@ $image = $product->safeImageUrl();
         $changeLabel .= ' · ' . \App\Support\MoneyFormatter::format((string) $event->drop_abs, $event->currency);
     }
 @endphp
+@if ($perUnit)
+<span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::unitPrice((string) $event->new_unit_price, $event->currency) }} {{ $unitLabel }}</span>
+@else
+<span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::format($event->new_price, $event->currency) }}</span>
+@if ($bundle !== null && $singleItemPrice !== null)
+<del title="Regular price" style="margin-left: 8px; color: #a1a1aa; font-size: 16px;">{{ \App\Support\MoneyFormatter::format($singleItemPrice, $event->currency) }}</del>
+@endif
+@endif
 <span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; white-space: nowrap;">{{ $changeLabel }}</span>
-@if ($event->new_unit_price !== null)
-<div style="margin-top: 4px; color: #71717a; font-size: 13px;">{{ \App\Support\MoneyFormatter::unitPrice((string) $event->new_unit_price, $event->currency) }}{{ \App\Support\UnitWord::labelFor($event->comparison_unit) }} · {{ __('was') }} {{ \App\Support\MoneyFormatter::unitPrice((string) $event->reference_unit_price, $event->currency) }}{{ \App\Support\UnitWord::labelFor($event->comparison_unit) }}</div>
+@if ($perUnit)
+<div style="margin-top: 4px; color: #71717a; font-size: 13px;">{{ \App\Support\PackLine::format((string) $event->new_price, $event->currency, $event->packSize()) }}@if ($bundle !== null && $singleItemPrice !== null) <del title="Regular price" style="color: #a1a1aa;">{{ \App\Support\MoneyFormatter::format($singleItemPrice, $event->currency) }}</del>@endif @if ($event->reference_unit_price !== null)· {{ __('was') }} {{ \App\Support\MoneyFormatter::unitPrice((string) $event->reference_unit_price, $event->currency) }} {{ $unitLabel }}@endif</div>
 @endif
 </td>
 </tr>

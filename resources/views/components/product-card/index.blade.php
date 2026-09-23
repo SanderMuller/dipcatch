@@ -1,9 +1,9 @@
 @props(['product', 'compare' => true])
 
 {{--
-    `compare` lists every shop with the unit price and the best value. The
-    dashboard turns it off: it answers what is cheap now and where, and
-    leaves the comparison to the product list and the product page.
+    `compare` lists the shops and notes the lowest pack price. The dashboard
+    turns it off: it answers what is cheap now and where, and leaves the
+    comparison to the product list and the product page.
 --}}
 <article data-test="product-card" {{ $attributes->class([
     'group relative flex h-full flex-col overflow-hidden rounded-2xl transition',
@@ -30,36 +30,33 @@
             <span class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400" data-test="product-category-badge">{{ $product->category->label() }}</span>
         @endif
 
-        <x-product-card.price :product="$product" class="mt-3" />
+        @php($headline = \App\Support\HeadlinePrice::of($product))
+        <x-product-card.price :product="$product" :headline="$headline" class="mt-3" />
 
-        @if ($compare)
-            {{-- No line without a pack size: a lone dash here reads as a broken card. --}}
-            @if ($product->cheapestShop?->unitPrice() !== null)
-                <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400"><x-shop-price :shop="$product->cheapestShop" unit /></flux:text>
-            @endif
-            @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
-                <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">{{ $bundleLabel }}</flux:text>
-            @endif
+        {{-- The pack behind a per-unit figure, and the deal that sets its price. --}}
+        @if ($headline->isPerUnit() && ($packLine = $headline->packLine()))
+            <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400"><x-pack-line :line="$packLine" :bundle="$compare" /></flux:text>
+        @elseif ($compare && ($bundleLabel = \App\Support\BundlePriceLabel::forShop($headline->shop)))
+            <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">{{ $bundleLabel }}</flux:text>
+        @endif
 
-            @php($bestValueShop = $product->bestValueShop())
-            @if ($bestValueShop !== null && $bestValueShop->isNot($product->cheapestShop))
-                <flux:text size="sm" class="mt-1 text-zinc-500 dark:text-zinc-400">
-                    {{ __('Best value') }}: <x-shop-price :shop="$bestValueShop" unit class="font-medium text-zinc-700 dark:text-zinc-300" /> · {{ $bestValueShop->host }}
-                </flux:text>
-            @endif
+        @if ($compare && $headline->lowestShop)
+            <flux:text size="sm" class="mt-1 text-zinc-500 dark:text-zinc-400" data-test="lowest-price-note">
+                {{ __('Lowest price :line at :host', ['line' => $headline->packLine($headline->lowestShop)?->text(), 'host' => $headline->lowestShop->host]) }}
+            </flux:text>
         @endif
 
         {{ $slot }}
 
         @if ($compare)
-            <x-product-card.shops :product="$product" class="mt-auto pt-4" />
-        @elseif ($product->cheapestShop)
+            <x-product-card.shops :product="$product" :headline="$headline" class="mt-auto pt-4" />
+        @elseif ($headline->shop)
             <div class="mt-auto space-y-2 pt-4">
-                <x-shop-deal :shop="$product->cheapestShop" :show-source="false" />
+                <x-shop-deal :shop="$headline->shop" :show-source="false" />
                 {{-- The deal box above already states the deadline. --}}
-                @php($hasDeal = $product->cheapestShop->liveBundleOffer() !== null || $product->cheapestShop->promotionWindow() !== null)
+                @php($hasDeal = $headline->shop->liveBundleOffer() !== null || $headline->shop->promotionWindow() !== null)
                 <div class="relative z-10 w-fit">
-                    <x-shop-row-link :shop="$product->cheapestShop" :deadline="! $hasDeal" />
+                    <x-shop-row-link :shop="$headline->shop" :deadline="! $hasDeal" />
                 </div>
             </div>
         @endif

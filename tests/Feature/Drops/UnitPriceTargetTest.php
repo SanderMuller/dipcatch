@@ -295,3 +295,21 @@ test('a target can be set between two values a cent apart', function (): void {
     Notification::assertSentTo($product->user, UnitPriceTargetNotification::class);
     expect($product->refresh()->unit_price_notified)->toBe('0.0275');
 });
+
+test('the alert leads with the unit price, stores its unit code and names the pack', function (): void {
+    $product = targetProduct('5.50');
+
+    app(DetectUnitPriceTarget::class)($product);
+
+    Notification::assertSentTo($product->user, UnitPriceTargetNotification::class, function (UnitPriceTargetNotification $notification) use ($product): bool {
+        $user = $product->user;
+        assert($user instanceof User);
+        $payload = $notification->toDatabase($user);
+
+        $body = $notification->toWebPush($user)->toArray()['body'] ?? null;
+
+        return $payload['unit'] === 'g'
+            && $payload['pack_unit'] === 'g'
+            && is_string($body) && str_contains($body, 'is €5.38 /kg (€1.99 for 370 g) at lidl.nl');
+    });
+});

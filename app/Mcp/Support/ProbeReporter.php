@@ -7,6 +7,7 @@ use App\Actions\Shops\ProbeOutcome;
 use App\Enums\ConsumerPriceIssue;
 use App\Enums\ProbeFailure;
 use App\PriceAdapters\VariantCandidate;
+use App\Support\PackSize;
 use Laravel\Mcp\Response;
 
 /**
@@ -73,6 +74,9 @@ final readonly class ProbeReporter
             // instead of trusting a bare flag.
             'stock_signal' => $snapshot['stock_signal'] ?? null,
             'pack_size' => $snapshot['pack_size'] ?? null,
+            // The price per kilo, litre or piece the page works out to, when it
+            // states a pack size — the figure shops are compared on.
+            ...self::unitPrice($snapshot),
             // How many variants the page sells, and how this one was picked.
             // Null means this reader cannot see variants at all — not that
             // the page has one. A bare price from a page whose title looks
@@ -205,5 +209,21 @@ final readonly class ProbeReporter
         }
 
         return 'Try again in ' . $seconds . ' ' . ($seconds === 1 ? 'second' : 'seconds') . '.';
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return array{unit_price: ?string, comparison_unit: ?string}
+     */
+    private static function unitPrice(array $snapshot): array
+    {
+        $text = static fn (string $key): ?string => is_string($snapshot[$key] ?? null) ? $snapshot[$key] : null;
+        $size = PackSize::resolve($text('pack_size'), (bool) ($snapshot['pack_size_authoritative'] ?? false), $text('title'));
+        $price = $snapshot['price'] ?? null;
+
+        return [
+            'unit_price' => $size === null || ! is_numeric($price) ? null : $size->unitPriceFor((string) $price),
+            'comparison_unit' => $size?->unit,
+        ];
     }
 }

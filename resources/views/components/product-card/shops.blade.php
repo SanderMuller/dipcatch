@@ -1,14 +1,24 @@
-@props(['product', 'limit' => 3])
+@props(['product', 'headline', 'limit' => 3])
 
 {{--
-    The card's best price comes first and alone in bold. The rest follow by
-    price: an out-of-stock or paused shop can be lower, but it is not the
-    price the card states.
+    The shop behind the card's figure comes first and alone in bold. The shops
+    that can be bought from follow by price per unit, then everything else by
+    pack price, so the best value never falls off the short list and a sold-out
+    or trade-only row never outranks a live one. A row states a price per unit
+    only on a size its own page states.
 
     z-10 lifts each shop link above the card's stretched link.
 --}}
-@php($best = $product->cheapestShop)
-@php($shops = $product->shops->sortBy(fn ($shop) => [$shop->is($best) ? 0 : 1, $shop->current_price === null ? PHP_FLOAT_MAX : (float) $shop->current_price]))
+@php($best = $headline->shop)
+@php($packs = $headline->packs)
+@php($perUnit = $headline->isPerUnit())
+@php($eligible = $product->eligibleShops())
+@php($comparable = fn ($shop): bool => $perUnit && $eligible->contains($shop) && $packs->for($shop)?->canWin() === true && $packs->unitPriceValueOf($shop) !== null)
+@php($shops = $product->shops->sortBy(fn ($shop) => [
+    $shop->is($best) ? 0 : 1,
+    $comparable($shop) ? 0 : 1,
+    ($comparable($shop) ? $packs->unitPriceValueOf($shop) : null) ?? ($shop->current_price === null ? PHP_FLOAT_MAX : (float) $shop->current_price),
+]))
 
 <ul {{ $attributes->class('space-y-1 text-sm') }}>
     @foreach ($shops->take($limit) as $shop)
@@ -19,8 +29,13 @@
             {{-- Flex, as in x-shop-row-link: inline, the favicon's baseline pushed
                  the deadline below the host. --}}
             <span class="flex min-w-0 items-center gap-x-1 text-zinc-500 dark:text-zinc-400"><a href="{{ $shop->url }}" target="_blank" rel="noopener noreferrer" class="relative z-10 inline-flex shrink-0 items-center hover:underline">{!! \App\Support\Favicon::html($shop->host) !!}</a>@if ($window)<span class="truncate"> · {{ $window }}</span>@endif</span>
-            <span @class(['shrink-0 tabular-nums', 'font-semibold text-zinc-900 dark:text-white' => $isBest, 'text-zinc-500 dark:text-zinc-400' => ! $isBest])>
-                <x-shop-price :shop="$shop" />
+            <span @class(['flex shrink-0 items-baseline gap-x-1.5 tabular-nums', 'font-semibold text-zinc-900 dark:text-white' => $isBest, 'text-zinc-500 dark:text-zinc-400' => ! $isBest])>
+                @if ($comparable($shop) && ($unitPrice = $packs->unitPriceOf($shop)) !== null)
+                    <span>{{ \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) }} {{ \App\Support\UnitWord::labelFor($headline->unit) }}</span>
+                    <span class="text-xs font-normal text-zinc-500 dark:text-zinc-400">{{ \App\Support\MoneyFormatter::format((string) $shop->current_price, $shop->currency) }}</span>
+                @else
+                    <x-shop-price :shop="$shop" />
+                @endif
             </span>
         </li>
     @endforeach

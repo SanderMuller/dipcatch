@@ -279,3 +279,33 @@ test('a push icon falls back to the favicon when the stored image url is not htt
         ->and($target->toWebPush($user)->toArray()['icon'])->toBe('/favicon.svg')
         ->and($unitTarget->toWebPush($user)->toArray()['icon'])->toBe('/favicon.svg');
 });
+
+/**
+ * A payload in the current shape, minus every snapshot the unit-price change added.
+ *
+ * @return array<string, mixed>
+ */
+function payloadBeforeUnitSnapshots(Product $product, string $kind): array
+{
+    $common = ['product' => $product, 'snapshotHost' => 'jumbo.com', 'snapshotSingleItemPrice' => null, 'snapshotBundle' => null, 'snapshotPrice' => '2.00'];
+
+    return $kind === 'drop'
+        ? [...$common, 'outcome' => new DropOutcome(belowThreshold: true, needsConfirmation: false, referencePrice: '2.20', referenceKind: 'median', dropAbsolute: '0.20', dropPercent: '10.00', thresholdAbs: null, thresholdPct: '5.00'), 'priceDropEventId' => 'event', 'snapshotOfferUrl' => null]
+        : [...$common, 'snapshotUnitPrice' => '1.3333', 'snapshotUnitLabel' => '/stuk'];
+}
+
+test('a drop or unit-target alert queued before the unit snapshots existed still renders', function (string $kind, string $expected): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Fanta']);
+
+    $revived = $kind === 'drop'
+        ? new ReflectionClass(PriceDropNotification::class)->newInstanceWithoutConstructor()
+        : new ReflectionClass(UnitPriceTargetNotification::class)->newInstanceWithoutConstructor();
+    $revived->__unserialize(payloadBeforeUnitSnapshots($product, $kind));
+
+    expect($revived->toWebPush($user)->toArray()['body'])->toContain($expected)
+        ->and($revived->toDatabase($user)['pack_quantity'])->toBeNull();
+})->with([
+    'drop' => ['drop', 'Fanta is now €2.00 at jumbo.com'],
+    'unit target' => ['unit target', 'Fanta is €1.33 /stuk (€2.00) at jumbo.com'],
+]);

@@ -31,6 +31,7 @@ $fixturePath = getenv('FIXTURE_PATH') ?: '/tmp/tiles-eye-verify.json';
 $now = CarbonImmutable::now();
 
 $purge = function (User $user): void {
+    $user->notifications()->delete();
     Product::query()->where('user_id', $user->id)->get()->each(function (Product $product): void {
         $shopIds = Shop::query()->where('product_id', $product->id)->pluck('id');
         PriceDropEvent::query()->where('product_id', $product->id)->delete();
@@ -146,7 +147,7 @@ $fillerCategories = [ProductCategory::DairyEggs, ProductCategory::Laundry, Produ
 $tablets = $make('EV Vitamin Tablets', [
     ['url' => 'https://ah.nl/producten/tablets', 'current_price' => '12.99', 'pack_quantity' => '400.00', 'pack_unit' => 'piece'],
     ['url' => 'https://kruidvat.nl/p/tablets', 'current_price' => '21.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece'],
-], ['image_url' => $image('tablets')], 41);
+], ['image_url' => $image('tablets'), 'share_slug' => Illuminate\Support\Str::random(32)], 41);
 $bigTub = $tablets->shops()->where('pack_quantity', '800.00')->firstOrFail();
 $previous = null;
 foreach ([['13.49', '22.99', 60], ['12.99', '21.99', 30], ['12.49', '23.49', 10]] as [$cheapest, $bestValue, $daysAgo]) {
@@ -166,5 +167,17 @@ for ($i = 1; $i <= 30; $i++) {
     ], ['image_url' => $image('filler' . $i), 'category' => $fillerCategories[$i % 4]], 10 + $i);
 }
 
-file_put_contents($fixturePath, json_encode(['email' => $email, 'password' => $password, 'tabletsId' => $tablets->id, 'crispsId' => $crisps->id]));
+// One alert in the bell, measured per piece, as the drop notification stores it.
+$user->notifications()->create([
+    'id' => (string) Illuminate\Support\Str::uuid(),
+    'type' => App\Notifications\PriceDropNotification::class,
+    'data' => [
+        'title' => 'EV Vitamin Tablets', 'currency' => 'EUR', 'host' => 'kruidvat.nl',
+        'new_price' => '21.99', 'new_unit_price' => '0.0275', 'comparison_unit' => 'piece',
+        'pack_quantity' => '800', 'pack_unit' => 'piece', 'drop_percent' => 8.3,
+        'view_url' => route('app.products.show', $tablets),
+    ],
+]);
+
+file_put_contents($fixturePath, json_encode(['email' => $email, 'password' => $password, 'tabletsId' => $tablets->id, 'crispsId' => $crisps->id, 'tabletsSlug' => $tablets->share_slug]));
 echo json_encode(['email' => $email, 'products' => Product::query()->where('user_id', $user->id)->count(), 'fixture' => $fixturePath]) . PHP_EOL;

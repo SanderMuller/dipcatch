@@ -80,7 +80,9 @@ final class Dashboard extends Component
     {
         return Product::query()
             ->where('user_id', $this->user()->id)
-            ->with(['cheapestShop', 'latestPriceDropEvent'])
+            // The card's figure is resolved across the shops, so they load
+            // with the list rather than once per card.
+            ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
             ->latest('created_at')
             // One row of cards at five across.
             ->limit(5)

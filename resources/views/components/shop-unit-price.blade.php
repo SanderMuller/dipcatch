@@ -25,7 +25,7 @@
          only out of the per-unit one. --}}
     <flux:text size="sm" class="text-amber-600 dark:text-amber-500">{{ $notAConsumerPrice }}</flux:text>
 @elseif ($packs === null || ! $packs->hasComparisonUnit())
-    <x-shop-price :shop="$shop" unit />
+    {{-- Nothing to compare in: no unit figure, from the shop's own size or otherwise. --}}
 @elseif ($pack !== null && $pack->isExcluded())
     <flux:text size="sm" class="text-zinc-500">{{ $pack->reason() }}</flux:text>
 @elseif ($unitPrice !== null)

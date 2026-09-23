@@ -68,6 +68,12 @@ function tripwireAllowlist(): array
                 'reason' => 'percentage, not money',
             ],
         ],
+        'Bell.php' => [
+            [
+                'fragment' => 'number_format((float) $percent, 1',
+                'reason' => 'percentage, not money',
+            ],
+        ],
         'price-drop-digest.blade.php' => [
             [
                 'fragment' => 'number_format((float) $event->drop_pct',

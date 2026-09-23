@@ -41,10 +41,11 @@ it('names the best value apart from the lowest price, with the warning the page 
     $markdown = $this->actingAs($user)->get(route('app.products.markdown', $product))->getContent();
 
     expect($markdown)
-        ->toContain("## Best price now\n\n€2.00 at [jumbo.com]")
-        ->toContain('> 33% more per kilo than the best value: €3.00/kg at ah.nl.')
-        ->toContain("## Best value\n\n€3.00/kg at [ah.nl]")
-        ->toContain('| [jumbo.com](<https://jumbo.com/p/1>) | €2.00 | €4.00/kg |');
+        ->not->toContain('## Best price now')
+        ->toContain("## Best value\n\n€3.00 /kg at [ah.nl](<https://ah.nl/p/2>)\n\n€3.00 for 1 kg")
+        ->toContain('> Lowest price: €2.00 for 500 g at jumbo.com. That is 33% more per kilo than the best value.')
+        ->toContain('| Shop | Price per kilo | Pack price | In stock | Price read |')
+        ->toContain('| [jumbo.com](<https://jumbo.com/p/1>) | €4.00 /kg | €2.00 for 500 g |');
 });
 
 it('lists the alert rules and marks a shop kept as a link', function (): void {

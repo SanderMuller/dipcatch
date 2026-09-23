@@ -9,7 +9,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
-use App\Support\MoneyFormatter;
+use App\Services\TypeSafe\TypeSafeClient;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
@@ -40,7 +40,7 @@ final class ProductList extends Component
     #[Url(except: 'all')]
     public string $status = 'all';
 
-    /** A department key, a category key, or empty for all. Anything else reads as all. */
+    /** A department key, a category key, NO_CATEGORY, or empty for all. Anything else reads as all. */
     #[Url(except: '')]
     public string $category = '';
 
@@ -52,6 +52,9 @@ final class ProductList extends Component
     public string $sort = self::DEFAULT_SORT;
 
     private const string DEFAULT_SORT = 'biggest_drop';
+
+    /** The filter for products without a category. No category or department uses this key. */
+    public const string NO_CATEGORY = 'none';
 
     /**
      * The sort options, each with the direction that makes it read the way its
@@ -101,6 +104,9 @@ final class ProductList extends Component
             'products' => $this->products(),
             'canAddProduct' => $this->canAddProduct(),
             'categoryGroups' => $this->categoryGroups(),
+            // Kept while selected, for the same reason as categoryGroups().
+            'hasUncategorised' => $this->category === self::NO_CATEGORY || $this->uncategorised()->exists(),
+            'showAutoCategoriesPromo' => $this->category === self::NO_CATEGORY && $this->canBuyAutoCategories(),
         ]);
     }
 
@@ -134,6 +140,7 @@ final class ProductList extends Component
                 $categories !== null,
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []),
             )
+            ->when($this->category === self::NO_CATEGORY, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('category'))
             // The drop a product is in now: its latest alert while the latch is
             // set, measured the way the card's badge is. On a pack basis that
             // is today's price against the alert's reference, and nothing
@@ -188,6 +195,28 @@ final class ProductList extends Component
                 ->where('bundle_total_price', '>=', 0.01)
                 ->whereRaw('ROUND(bundle_total_price / NULLIF(bundle_quantity, 0), 2) = current_price')
                 ->whereRaw('ROUND(bundle_total_price / NULLIF(bundle_quantity, 0), 2) < COALESCE(single_item_price, current_price)')));
+    }
+
+    /**
+     * @return EloquentQueryBuilder<Product>
+     */
+    private function uncategorised(): EloquentQueryBuilder
+    {
+        return Product::query()->where('user_id', auth()->id())->whereNull('category');
+    }
+
+    /**
+     * Whether Pro would sort these products: the feature is switched on here,
+     * and this account does not have it yet. A Pro account is not sold what it
+     * already pays for.
+     */
+    private function canBuyAutoCategories(): bool
+    {
+        $user = auth()->user();
+
+        return TypeSafeClient::configured()
+            && $user instanceof User
+            && ! $user->entitlements()->allowsAutoCategories();
     }
 
     /**
@@ -267,20 +296,5 @@ final class ProductList extends Component
         $user = auth()->user();
 
         return ! $user instanceof User || app(PlanLimits::class)->canAddProduct($user);
-    }
-
-    /**
-     * The same string the Filament table rendered: a unit price with its label,
-     * or an em dash when no shop in view states a pack size.
-     */
-    public static function unitPriceState(?Shop $shop, Product $product): string
-    {
-        $unitPrice = $shop?->unitPrice();
-
-        if ($unitPrice === null) {
-            return '—';
-        }
-
-        return MoneyFormatter::unitPrice($unitPrice, $product->currency) . ' ' . $shop?->unitPriceLabel();
     }
 }

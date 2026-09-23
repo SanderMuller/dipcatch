@@ -440,10 +440,59 @@ test('the digest states the change per unit and omits money it cannot honestly r
 
     expect($html)->toContain('Digest product')
         ->and($html)->toContain('20.0% per kilo')
-        ->and($html)->toContain('€8.00/kg')
-        ->and($html)->toContain('€10.00/kg')
-        // The till price of the winning pack still leads the line.
-        ->and($html)->toContain('€8.00');
+        ->and($html)->toContain('€8.00 /kg')
+        ->and($html)->toContain('was €10.00 /kg')
+        // The till price of the winning pack follows on the second line; this
+        // event was written before the pack size was stored, so it has none.
+        ->and($html)->not->toContain('€8.00 for');
+});
+
+test('the digest leads with the unit price and names the pack it was measured on', function (): void {
+    Mail::swap(app('mail.manager'));
+
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create(['title' => 'Tablets']);
+    $shop = Shop::factory()->for($product)->create();
+    $events = PriceDropEvent::factory()->count(1)->for($user)->create([
+        'product_id' => $product->id,
+        'triggered_by_shop_id' => $shop->id,
+        'currency' => 'EUR',
+        'new_price' => '21.99',
+        'reference_price' => '25.99',
+        'drop_abs' => '4.00',
+        'drop_pct' => '15.4',
+        'reference_unit_price' => '0.0325',
+        'new_unit_price' => '0.0275',
+        'comparison_unit' => 'piece',
+        'pack_quantity' => '800.00',
+        'pack_unit' => 'piece',
+    ]);
+
+    $html = (string) preg_replace('/\s+/', ' ', strip_tags(new PriceDropDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render()));
+
+    expect($html)->toMatch('/€0\.0275 \/piece ↓ 15\.4% per piece · €4\.00 €21\.99 for 800 pieces · was €0\.0325 \/piece/');
+});
+
+test('a pack-basis drop keeps the pack price as the lead', function (): void {
+    Mail::swap(app('mail.manager'));
+
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create(['title' => 'Camera']);
+    $shop = Shop::factory()->for($product)->create();
+    $events = PriceDropEvent::factory()->count(1)->for($user)->create([
+        'product_id' => $product->id,
+        'triggered_by_shop_id' => $shop->id,
+        'currency' => 'EUR',
+        'new_price' => '299.00',
+        'reference_price' => '349.00',
+        'drop_abs' => '50.00',
+        'drop_pct' => '14.3',
+        'comparison_unit' => null,
+    ]);
+
+    $html = (string) preg_replace('/\s+/', ' ', strip_tags(new PriceDropDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render()));
+
+    expect($html)->toContain('€299.00 ↓ 14.3% · €50.00')->not->toContain('/kg');
 });
 
 it('names the shops it cannot read beside the drops it can', function (): void {

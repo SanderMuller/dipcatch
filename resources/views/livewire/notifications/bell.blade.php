@@ -31,13 +31,32 @@
                     </div>
 
                     @if ($item['price'] !== null)
+                        {{-- Per unit first when the alert was measured per unit; a
+                             target-price alert leads with the pack price that fired. --}}
+                        @if ($item['leadsWithUnit'])
+                            <flux:text size="sm" class="font-medium text-zinc-700 dark:text-zinc-300" data-test="bell-unit-figure">
+                                {{ $item['unitFigure'] }}@if ($item['host'] !== null) · {{ $item['host'] }} @endif
+                            </flux:text>
+                        @endif
                         <flux:text size="sm" class="text-zinc-500">
-                            {{ \App\Support\MoneyFormatter::format($item['price'], $item['currency'] ?? 'EUR') }}
+                            {{ $item['pack'] }}
                             @if ($item['bundleLabel'] !== null)
                                 <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($item['singleItemPrice'], $item['currency'] ?? 'EUR') }}</del>
                             @endif
-                            @if ($item['host'] !== null) · {{ $item['host'] }} @endif
+                            @if (! $item['leadsWithUnit'])
+                                @if ($item['host'] !== null) · {{ $item['host'] }} @endif
+                                @if ($item['unitFigure'] !== null) · {{ $item['unitFigure'] }} @endif
+                            @endif
                         </flux:text>
+                        @if ($item['change'] !== null)
+                            <flux:text size="sm" class="text-zinc-500" data-test="bell-change">{{ $item['change'] }}</flux:text>
+                        @endif
+                        @if ($item['target'] !== null)
+                            <flux:text size="sm" class="text-zinc-500" data-test="bell-target">{{ $item['target'] }}</flux:text>
+                        @endif
+                        @if ($item['betterValue'] !== null)
+                            <flux:text size="sm" class="text-zinc-500" data-test="bell-better-value">{{ $item['betterValue'] }}</flux:text>
+                        @endif
                         @if ($item['bundleLabel'] !== null)
                             <flux:text size="sm" class="text-zinc-500">{{ $item['bundleLabel'] }}</flux:text>
                         @endif

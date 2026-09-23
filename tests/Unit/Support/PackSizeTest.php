@@ -280,10 +280,6 @@ test('label for volume is per liter', function (): void {
     expect(PackSize::parse('1 l')->label())->toBe('/l');
 });
 
-test('label for pieces is per stuk', function (): void {
-    expect(PackSize::parse('4 rollen')->label())->toBe('/stuk');
-});
-
 test('additive piece sizes parse to null', function (): void {
     expect(PackSize::parse('2 stuks + 2 stuks'))->toBeNull()
         ->and(PackSize::parse('4 rollen + 2 rollen'))->toBeNull();

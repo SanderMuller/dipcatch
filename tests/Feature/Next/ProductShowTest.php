@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\PackExclusion;
 use App\Enums\ProductCategory;
 use App\Livewire\Products\ProductShow;
 use App\Models\PriceDropEvent;
@@ -11,6 +12,7 @@ use App\Services\Drops\DropEvaluator;
 use App\Services\Drops\Reference;
 use App\Support\Favicon;
 use App\Support\Numeric;
+use App\Support\ProductMarkdown;
 use App\Support\PromotionLabel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
@@ -419,7 +421,7 @@ it('charts the best value per unit first, with the pack price one switch away', 
 
     livewire(ProductShow::class, ['product' => $product])
         ->assertSee("x-data=\"{ basis: 'unit' }\"", escape: false)
-        ->assertSeeInOrder(['Best value over time', 'Best price over time'])
+        ->assertSeeInOrder(['Best value over time', 'Lowest price over time'])
         ->assertSee('Price per piece, at the shop that is the best value.')
         ->assertSee('data-test="price-history-basis"', escape: false)
         ->assertSee('data-test="price-history-chart-unit"', escape: false)
@@ -470,7 +472,7 @@ it('charts the pack price alone when no pack size is known', function (): void {
 
     livewire(ProductShow::class, ['product' => $product])
         ->assertSee("x-data=\"{ basis: 'price' }\"", escape: false)
-        ->assertSee('Best price over time')
+        ->assertSee('Lowest price over time')
         ->assertDontSee('Best value over time')
         ->assertDontSee('data-test="price-history-basis"', escape: false)
         ->assertDontSee('data-test="price-history-chart-unit"', escape: false);
@@ -749,6 +751,45 @@ it('does not warn when the best price is also the best value', function (): void
     livewire(ProductShow::class, ['product' => $product])->assertDontSeeHtml('data-test="unit-price-warning"');
 });
 
+it('leads with the pack price when no shop states a pack size', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '11.95');
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://bol.com/p/1', 'current_price' => '11.95', 'pack_quantity' => null, 'pack_unit' => null]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
+
+    $this->actingAs($user);
+
+    $tiles = summaryTiles(livewire(ProductShow::class, ['product' => $product->refresh()])->html());
+
+    expect($tiles)->toContain('Best price now')
+        ->toContain('€11.95')
+        ->not->toContain('Best value')
+        ->not->toContain('data-test="pack-line"');
+});
+
+it('leads each shop row with its price per unit, and an excluded shop with its reason', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '5.49', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://fitnesscandy.nl/p/1', 'current_price' => '3.00', 'pack_quantity' => '12.00', 'pack_unit' => 'piece']);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product->refresh()])->html());
+    preg_match_all('/data-test="shop-price-cell"[^>]*>(.*?)<\/td>/', $html, $cells);
+    $text = array_map(fn (string $cell): string => trim((string) preg_replace('/\s+/', ' ', strip_tags($cell))), $cells[1]);
+
+    expect($html)->toContain('Price per kilo')
+        ->and(collect($text)->first(fn (string $cell): bool => str_contains($cell, '€4.99')))->toStartWith('€7.56 /kg €4.99 for 660 g')
+        // Excluded from the per-kilo comparison: its reason, then its own pack.
+        ->and(collect($text)->first(fn (string $cell): bool => str_contains($cell, '€3.00')))
+        ->toContain(PackExclusion::SoldByThePiece->label())
+        ->toContain('€3.00 for 12 pieces')
+        ->not->toContain('/piece');
+});
+
 it('shows every alert rule the product has', function (): void {
     $user = User::factory()->create();
     $product = smallPackCheapest($user, '6.60');
@@ -757,7 +798,7 @@ it('shows every alert rule the product has', function (): void {
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
-        ->assertSeeInOrder(['€0.2000/stuk', 'when a price reaches it', 'or 10% drop'])
+        ->assertSeeInOrder(['€0.2000/piece', 'when a price reaches it', 'or 10% drop'])
         ->assertDontSee('Any drop');
 });
 
@@ -779,7 +820,7 @@ it('says below for a second price target too', function (): void {
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
-        ->assertSeeInOrder(['€2.00', 'when a price reaches it', 'or €0.2000/stuk or less']);
+        ->assertSeeInOrder(['€2.00', 'when a price reaches it', 'or €0.2000/piece or less']);
 });
 
 it('names the default drop thresholds when the product has none of its own', function (): void {
@@ -821,4 +862,21 @@ it('names the same default drop the drop check uses on a per-unit reference', fu
 
     livewire(ProductShow::class, ['product' => $product])
         ->assertSee(Numeric::trimmed($outcome->thresholdPct) . '% drop (default)');
+});
+
+it('shows no unit figure from a shop\'s own size when the product compares none', function (): void {
+    // The sized shop is paused, so it does not vote, and nothing resolves a unit.
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://bol.com/p/1', 'current_price' => '11.95', 'pack_quantity' => null, 'pack_unit' => null]);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '12.49', 'pack_quantity' => '500.00', 'pack_unit' => 'g', 'active' => false]);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('€12.49')
+        ->assertDontSee('/kg');
+
+    expect(ProductMarkdown::of($product->refresh()))->not->toContain('/kg');
 });

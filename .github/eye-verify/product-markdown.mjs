@@ -79,9 +79,10 @@ const publicMd = `${BASE}/p/${fixture.slug}.md`;
 
     const text = shared.text;
     checker.check('public .md: raw ampersand in the title', text.startsWith('# Beans & more'), text.slice(0, 40));
-    checker.check('public .md: best price line', text.includes('€6.00 at [jumbo.com]'), text);
-    checker.check('public .md: best value per kilo', text.includes('€9.00/kg at [ah.nl]'), text);
-    checker.check('public .md: shop count', text.includes('Cheapest across 3 shops tracked.'), text);
+    checker.check('public .md: leads with the best value per kilo', text.includes('## Best value') && text.includes('€9.00 /kg at [ah.nl]') && text.includes('€9.00 for 1 kg'), text);
+    checker.check('public .md: lowest-price note', text.includes('> Lowest price: €6.00 for 500 g at jumbo.com. That is 33% more per kilo than the best value.'), text);
+    checker.check('public .md: shop count', text.includes('Compared across 3 shops tracked.'), text);
+    checker.check('public .md: shops table per kilo first', text.includes('| Shop | Price per kilo | Pack price | Price read |'), text);
     checker.check('public .md: pipe in a URL is escaped', text.includes('variant=a\\|b'), text);
     checker.check('public .md: no shop note', ! text.includes('EVSECRET10'));
     checker.check('public .md: no alert rule', ! text.includes('drop') && ! text.includes('Alerts'));
@@ -90,7 +91,7 @@ const publicMd = `${BASE}/p/${fixture.slug}.md`;
 
     await page.goto(`${BASE}/p/${fixture.slug}`, { waitUntil: 'load' });
     const html = await page.locator('main').innerText();
-    checker.check('public HTML page shows the same best price', html.includes('€6.00'), html.slice(0, 200));
+    checker.check('public HTML page shows the same figures', html.includes('€9.00 /kg') && html.includes('€6.00 for 500 g'), html.slice(0, 300));
 }
 
 {
@@ -119,18 +120,17 @@ const publicMd = `${BASE}/p/${fixture.slug}.md`;
 
     const text = owned.text;
     checker.check('owner .md: raw ampersand in the title', text.startsWith('# Beans & more'), text.slice(0, 40));
-    checker.check('owner .md: best price line', text.includes('€6.00 at [jumbo.com]'), text);
-    checker.check('owner .md: unit-price warning', text.includes('more per kilo than the best value: €9.00/kg at ah.nl'), text);
-    checker.check('owner .md: best value line', text.includes('€9.00/kg at [ah.nl]'), text);
+    checker.check('owner .md: leads with the best value per kilo', text.includes('## Best value') && text.includes('€9.00 /kg at [ah.nl]'), text);
+    checker.check('owner .md: lowest-price note with the gap', /> Lowest price: €6\.00 for [^\n]* at jumbo\.com\. That is \d+% more per kilo than the best value\./.test(text), text);
     checker.check('owner .md: alerts', text.includes('- €5.00 or less') && text.includes('- 15% drop'), text);
-    checker.check('owner .md: shops table header', text.includes('| Shop | Price | Price per kilo or piece | In stock | Price read |'), text);
+    checker.check('owner .md: shops table header', text.includes('| Shop | Price per kilo | Pack price | In stock | Price read |'), text);
     checker.check('owner .md: pipe in a URL is escaped', text.includes('variant=a\\|b'), text);
     checker.check('owner .md: link back to the page', text.includes(`/app/products/${fixture.productId}`), text);
     await page.screenshot({ path: path.join(ART, 'product-markdown-owner.png'), fullPage: true });
 
     await page.goto(`${BASE}/app/products/${fixture.productId}`, { waitUntil: 'networkidle' });
     const html = await page.locator('body').innerText();
-    checker.check('owner HTML page still loads', html.includes('Beans & more') && html.includes('Best price now'), page.url());
+    checker.check('owner HTML page still loads', html.includes('Beans & more') && html.includes('Best value'), page.url());
     checker.check('owner HTML page shows the same alert rules', html.includes('€5.00') && html.includes('15% drop'));
 }
 

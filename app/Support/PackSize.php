@@ -321,12 +321,13 @@ final readonly class PackSize
             : $priceValue / $this->quantity * 1000;
     }
 
+    /** `/kg`, `/l`, or `/piece` in the reader's language. */
     public function label(): string
     {
         return match ($this->unit) {
             'g' => '/kg',
             'ml' => '/l',
-            default => '/stuk',
+            default => (string) __('/piece'),
         };
     }
 

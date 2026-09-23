@@ -6,6 +6,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
@@ -126,9 +127,9 @@ it('discloses bundle terms beside dashboard effective prices', function (): void
         ->assertSee('2 for €4.00')
         ->assertSeeText('Normal price: €2.85 each')
         ->assertSee('title="Regular price"', escape: false)
-        // The unit price belongs to the product page now: the dashboard table
-        // carries the product, the price now and the shop, nothing else.
-        ->assertDontSeeText('€1.90 /l')
+        // The card leads per litre, with the regular price per litre struck
+        // beside the deal's.
+        ->assertSeeTextInOrder(['€1.33 /l', '€1.90 /l'])
         ->assertSeeHtml('href="https://jumbo.com/producten/fanta-cassis"')
         ->assertSeeHtml('target="_blank"');
 });
@@ -152,4 +153,28 @@ it('shows the size of each active drop, what it fell from, and how long ago', fu
         ->assertSee('−20%')
         ->assertSee('Was €9.99')
         ->assertSee('3 hours ago');
+});
+
+it('resolves the card figures without a query per card', function (): void {
+    $queriesFor = function (int $products): int {
+        $user = User::factory()->create();
+
+        foreach (range(1, $products) as $index) {
+            $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'last_notified_price' => '1.00', 'last_notified_at' => now()]);
+            Shop::factory()->for($product)->create(['url' => "https://ah.nl/p/{$index}", 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+            Shop::factory()->for($product)->create(['url' => "https://lidl.nl/p/{$index}", 'current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g']);
+            $product->refresh()->recomputeCheapestShop();
+        }
+
+        $this->actingAs($user);
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        livewire(Dashboard::class)->assertSee('€5.38 /kg');
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
+    };
+
+    expect($queriesFor(5))->toBe($queriesFor(1));
 });

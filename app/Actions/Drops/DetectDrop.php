@@ -353,6 +353,9 @@ final readonly class DetectDrop
                 'reference_unit_price' => $outcome->referenceUnitPrice,
                 'new_unit_price' => $outcome->newUnitPrice,
                 'comparison_unit' => $outcome->comparisonUnit,
+                // The size the unit price was measured on, for "€2.75 for 227 g".
+                'pack_quantity' => $unit === null ? null : $locked->bestValuePackSize()?->quantity,
+                'pack_unit' => $unit === null ? null : $locked->bestValuePackSize()?->unit,
                 'fired_at' => now(),
             ]);
 

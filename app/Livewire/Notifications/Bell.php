@@ -3,8 +3,14 @@
 namespace App\Livewire\Notifications;
 
 use App\Models\User;
+use App\Notifications\TargetPriceNotification;
 use App\Support\AlsoWorthChecking;
 use App\Support\BundlePriceLabel;
+use App\Support\MoneyFormatter;
+use App\Support\Numeric;
+use App\Support\PackLine;
+use App\Support\PackSize;
+use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Notifications\DatabaseNotification;
@@ -115,6 +121,7 @@ final class Bell extends Component
             'url' => $this->text($data, 'view_url'),
             'host' => $this->text($data, 'host'),
             'price' => $this->text($data, 'new_price'),
+            ...self::unitFigures($data, leadsWithPack: $notification->type === TargetPriceNotification::class),
             'currency' => $this->text($data, 'currency'),
             'singleItemPrice' => $this->text($data, 'single_item_price'),
             // One label for the whole bundle line. This applies the same
@@ -124,6 +131,54 @@ final class Bell extends Component
             // The shops DipCatch cannot read, named where the reader is about
             // to open a tab anyway.
             'alsoCheck' => AlsoWorthChecking::line(self::shops($data)),
+        ];
+    }
+
+    /**
+     * The per-unit side of an alert, from whatever the payload stored.
+     *
+     * A drop names its unit price as `new_unit_price` beside `comparison_unit`;
+     * a unit-target alert as `unit_price` beside `unit`, or beside the label it
+     * stored before it stored the code. A target-price alert fired on a pack
+     * amount, so it leads with the pack price and puts the unit price beside it.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{unitFigure: ?string, leadsWithUnit: bool, pack: ?string, betterValue: ?string, change: ?string, target: ?string}
+     */
+    private static function unitFigures(array $data, bool $leadsWithPack): array
+    {
+        $text = static fn (string $key): ?string => is_scalar($data[$key] ?? null) && (string) $data[$key] !== '' ? (string) $data[$key] : null;
+        $currency = $text('currency') ?? 'EUR';
+        $unitCode = $text('comparison_unit') ?? $text('unit');
+        $unitPrice = $text('new_unit_price') ?? $text('unit_price');
+        $label = $unitCode === null ? $text('unit_price_label') : UnitWord::labelFor($unitCode);
+        $unitFigure = $unitPrice === null || $label === null ? null : MoneyFormatter::unitPrice($unitPrice, $currency) . ' ' . $label;
+        $quantity = $text('pack_quantity');
+        $packUnit = $text('pack_unit');
+        $size = $quantity === null || $packUnit === null ? null : PackSize::of((float) $quantity, $packUnit);
+        $betterHost = $text('better_value_host');
+        $betterPrice = $text('better_value_unit_price');
+        $betterValue = $betterHost === null || $betterPrice === null || $label === null
+            ? null
+            : __('Better value: :price at :host', ['price' => MoneyFormatter::unitPrice($betterPrice, $currency) . ' ' . $label, 'host' => $betterHost]);
+
+        $percent = $text('drop_percent');
+        $referenceUnit = $text('reference_unit_price');
+        $unitWord = UnitWord::forCode($unitCode);
+        $change = $percent === null || ! is_numeric($percent) ? null : '↓ ' . Numeric::trimmed(number_format((float) $percent, 1, '.', '')) . '%'
+            . ($unitWord === null ? '' : ' ' . $unitWord)
+            . ($referenceUnit === null || $label === null ? '' : ' · ' . __('was') . ' ' . MoneyFormatter::unitPrice($referenceUnit, $currency) . ' ' . $label);
+        $target = $leadsWithPack && $text('target_price') !== null
+            ? __('Your target: :price', ['price' => MoneyFormatter::format($text('target_price'), $currency)])
+            : null;
+
+        return [
+            'change' => $change,
+            'target' => is_string($target) ? $target : null,
+            'unitFigure' => $unitFigure,
+            'leadsWithUnit' => $unitFigure !== null && ! $leadsWithPack,
+            'pack' => $text('new_price') === null ? null : PackLine::format($text('new_price'), $currency, $size),
+            'betterValue' => is_string($betterValue) ? $betterValue : null,
         ];
     }
 

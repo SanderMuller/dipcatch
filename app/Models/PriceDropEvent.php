@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\MoneyFormatter;
+use App\Support\PackSize;
 use App\Support\UnitWord;
 use Database\Factories\PriceDropEventFactory;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
@@ -33,8 +34,19 @@ final class PriceDropEvent extends Model
             // they are money a till charges, these are a rate.
             'reference_unit_price' => 'decimal:4',
             'new_unit_price' => 'decimal:4',
+            'pack_quantity' => 'decimal:2',
             'fired_at' => 'datetime',
         ];
+    }
+
+    /** The pack the drop was measured on; null on a pack-basis event or one written before it was stored. */
+    public function packSize(): ?PackSize
+    {
+        if ($this->pack_quantity === null || ! is_string($this->pack_unit)) {
+            return null;
+        }
+
+        return PackSize::of((float) $this->pack_quantity, $this->pack_unit);
     }
 
     /**
