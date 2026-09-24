@@ -164,6 +164,8 @@ const phone = await signIn(fixture.freeEmail, { width: 390, height: 844 });
     checker.check('narrow page: the badge fits the screen', box !== null && box.x >= 0 && box.x + box.width <= 390, JSON.stringify(box));
     const heading = await phone.locator('h1').boundingBox();
     checker.check('narrow page: the badge sits below the title, not inside it', box !== null && heading !== null && box.y >= heading.y + heading.height - 1, JSON.stringify({ box, heading }));
+    const meta = await phone.locator('[data-test="product-meta"]').innerText();
+    checker.check('narrow page: no separator dangles at a line end', ! meta.includes('·'), JSON.stringify(meta));
     checker.check('narrow page: the page does not scroll sideways', ! (await phone.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)));
     await phone.locator('h1').locator('xpath=ancestor::div[2]').screenshot({ path: path.join(ART, 'product-categories-badge-narrow.png') });
 

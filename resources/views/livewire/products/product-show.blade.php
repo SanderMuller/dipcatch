@@ -16,19 +16,21 @@
             <x-product-thumb :product="$product" size="size-16 sm:size-20" />
             <div class="min-w-0">
                 <flux:heading size="xl" level="1" class="tracking-tight">{{ $product->title }}</flux:heading>
-                <flux:text class="mt-1 text-zinc-500">
-                    {{ trans_choice(':count shop|:count shops', $shops->count(), ['count' => $shops->count()]) }}
-                    ·
+                {{-- A wrapping row with gaps rather than "·" separators: on a
+                     narrow screen a separator is left dangling at a line end.
+                     A div, not flux:text: a badge is a div, and a div inside
+                     a <p> closes the paragraph before it. --}}
+                <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-500 dark:text-zinc-400" data-test="product-meta">
+                    <span>{{ trans_choice(':count shop|:count shops', $shops->count(), ['count' => $shops->count()]) }}</span>
                     <flux:badge size="sm" :color="$product->active ? 'green' : 'zinc'">
                         {{ $product->active ? __('Active') : __('Paused') }}
                     </flux:badge>
                     @if ($product->category !== null)
-                        ·
                         <a href="{{ route('app.products.index', ['category' => $product->category->value]) }}" wire:navigate data-test="product-category-badge">
                             <flux:badge size="sm" color="zinc">{{ $product->category->label() }}</flux:badge>
                         </a>
                     @endif
-                </flux:text>
+                </div>
             </div>
         </div>
 
