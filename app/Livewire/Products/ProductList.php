@@ -16,6 +16,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -148,8 +149,12 @@ final class ProductList extends Component
             )
             ->when($this->discounted, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where(
                 fn (EloquentQueryBuilder $discount): EloquentQueryBuilder => $discount
-                    // The latch DetectDrop sets on an alert and clears on recovery.
-                    ->whereNotNull('last_notified_price')
+                    // A drop the card shows a badge for: the latch alone also
+                    // holds a price that has climbed back to where it was.
+                    // A literal, not a binding: SQLite (the local database)
+                    // receives a bound float as text, and there no number
+                    // compares >= a text value.
+                    ->where(self::liveDropPercent(), '>=', DB::raw('0.5'))
                     ->orWhereHas('cheapestShop', self::dealRunningNow(...)),
             ))
             ->when(
@@ -161,24 +166,7 @@ final class ProductList extends Component
                 'shops',
                 fn (EloquentQueryBuilder $shops): EloquentQueryBuilder => $shops->where('host', $this->shop)->where('active', true),
             ))
-            // The drop a product is in now: its latest alert while the latch is
-            // set, measured the way the card's badge is. On a pack basis that
-            // is today's price against the alert's reference, and nothing
-            // once the price is back; a per-unit alert keeps its own figure.
-            ->addSelect(['biggest_drop' => PriceDropEvent::query()
-                ->selectRaw(<<<'SQL'
-                    CASE
-                        WHEN comparison_unit IS NULL AND reference_price > 0 AND products.cheapest_price IS NOT NULL
-                            THEN CASE WHEN products.cheapest_price < reference_price
-                                THEN (reference_price - products.cheapest_price) * 100 / reference_price END
-                        ELSE drop_pct
-                    END
-                    SQL)
-                ->whereColumn('price_drop_events.product_id', 'products.id')
-                ->whereNotNull('products.last_notified_price')
-                ->latest('fired_at')
-                ->latest('id')
-                ->limit(1)])
+            ->addSelect(['biggest_drop' => self::liveDropPercent()])
             ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
             // A product not in a drop, or with no price yet, sorts last
             // whichever way the list runs, rather than heading a list of
@@ -190,6 +178,43 @@ final class ProductList extends Component
             ->orderBy('id', 'desc')
             // 24 fills whole rows at one, two, three and four cards across.
             ->paginate(24);
+    }
+
+    /**
+     * The drop a product is in now, in SQL: its latest alert while the latch
+     * is set, measured the way the card's badge is
+     * ({@see Product::activeDropPercent()}). Today's price against the alert's
+     * reference, in the basis the alert fired on, and nothing once the price is
+     * back; the alert's own figure only when no price is known.
+     *
+     * @return EloquentQueryBuilder<PriceDropEvent>
+     */
+    private static function liveDropPercent(): EloquentQueryBuilder
+    {
+        return PriceDropEvent::query()
+            // Real division throughout (`* 1.0`, `100.0`): SQLite stores a
+            // whole decimal as an integer and would divide integers. The unit
+            // price is rounded to four decimals, as dropBasisPrice() stores it.
+            ->selectRaw(<<<'SQL'
+                CASE
+                    WHEN comparison_unit IS NULL AND reference_price > 0 AND products.cheapest_price IS NOT NULL
+                        THEN CASE WHEN products.cheapest_price < reference_price
+                            THEN (reference_price - products.cheapest_price) * 100.0 / reference_price END
+                    WHEN comparison_unit IS NOT NULL AND reference_unit_price > 0
+                        AND products.best_value_price > 0 AND products.best_value_pack_quantity > 0
+                        AND products.best_value_pack_unit = comparison_unit
+                        THEN CASE WHEN ROUND(products.best_value_price * 1.0 / products.best_value_pack_quantity
+                                * (CASE comparison_unit WHEN 'piece' THEN 1 ELSE 1000 END), 4) < reference_unit_price
+                            THEN (reference_unit_price - ROUND(products.best_value_price * 1.0 / products.best_value_pack_quantity
+                                * (CASE comparison_unit WHEN 'piece' THEN 1 ELSE 1000 END), 4)) * 100.0 / reference_unit_price END
+                    ELSE drop_pct
+                END
+                SQL)
+            ->whereColumn('price_drop_events.product_id', 'products.id')
+            ->whereNotNull('products.last_notified_price')
+            ->latest('fired_at')
+            ->latest('id')
+            ->limit(1);
     }
 
     /**
@@ -213,8 +238,9 @@ final class ProductList extends Component
             ->orWhere(fn (EloquentQueryBuilder $bundle): EloquentQueryBuilder => $bundle
                 ->where('bundle_quantity', '>=', 2)
                 ->where('bundle_total_price', '>=', 0.01)
-                ->whereRaw('ROUND(bundle_total_price / NULLIF(bundle_quantity, 0), 2) = current_price')
-                ->whereRaw('ROUND(bundle_total_price / NULLIF(bundle_quantity, 0), 2) < COALESCE(single_item_price, current_price)')));
+                // `* 1.0`: SQLite divides two whole numbers as integers.
+                ->whereRaw('ROUND(bundle_total_price * 1.0 / NULLIF(bundle_quantity, 0), 2) = current_price')
+                ->whereRaw('ROUND(bundle_total_price * 1.0 / NULLIF(bundle_quantity, 0), 2) < COALESCE(single_item_price, current_price)')));
     }
 
     /**

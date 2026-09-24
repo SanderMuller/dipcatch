@@ -232,10 +232,12 @@ test('the dashboard card leads with the best value and links its shop', function
     // The figure is the best value, and the shop link beneath it names the
     // shop that sells it. The comparison with the lowest pack price stays on
     // the product list and the product page.
+    $card = strip_tags(withoutCardDetails(livewire(Dashboard::class)->html()));
+
+    expect($card)->not->toContain('Lowest price')->not->toContain('ah.nl');
+
     livewire(Dashboard::class)
         ->assertSeeTextInOrder(['€5.38 /kg', '€1.99 for 370 g', 'lidl.nl'])
-        ->assertDontSeeText('Lowest price')
-        ->assertDontSeeText('ah.nl')
         ->assertSeeHtml('href="https://lidl.nl/p/lay-s/p7"')
         ->assertDontSeeHtml('href="https://ah.nl/producten/product/wi7/x"');
 });

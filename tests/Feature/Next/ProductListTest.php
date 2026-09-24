@@ -2,11 +2,13 @@
 
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
+use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 use function Pest\Livewire\livewire;
@@ -404,10 +406,11 @@ it('states a per-unit drop in its unit, not beside a pack price it was not measu
 
     $this->actingAs($user);
 
-    livewire(ProductList::class)
-        ->assertDontSeeHtml('<del')
-        ->assertSeeInOrder(['€8.45 /kg', 'Was €12.50 /kg'])
-        ->assertDontSee('€6.25');
+    $card = withoutCardDetails(livewire(ProductList::class)->html());
+
+    expect($card)->not->toContain('<del')
+        ->toMatch('/€8\.45 \/kg.*Was €12\.50 \/kg/s')
+        ->not->toContain('€6.25');
 });
 
 it('shows no old figure for a drop measured in another basis than the card', function (): void {
@@ -428,12 +431,16 @@ it('shows no old figure for a drop measured in another basis than the card', fun
 
     $this->actingAs($user);
 
-    livewire(ProductList::class)
-        ->assertSee('€8.45 /kg')
-        ->assertDontSeeHtml('<del')
-        ->assertDontSee('Was ')
-        ->assertDontSee('€2.19')
-        ->assertSeeHtml('title="Measured per pack"');
+    $html = livewire(ProductList::class)->html();
+    $card = withoutCardDetails($html);
+
+    expect($card)->toContain('€8.45 /kg')
+        ->not->toContain('<del')
+        ->not->toContain('Was ')
+        ->not->toContain('€2.19')
+        ->toContain('title="Measured per pack"')
+        // The hover states the old figure with its basis, so it cannot be misread.
+        ->and($html)->toContain('Was €2.19 a pack, now €1.69');
 });
 
 it('leads the card with the best value and notes the lowest pack price', function (): void {
@@ -611,7 +618,159 @@ it('never lists a sold-out shop ahead of one that can be bought from', function 
 
     // Etos is cheapest per tablet but sold out: it follows the live shops, on
     // its pack price, with no figure per tablet.
-    expect(preg_replace('/\s+/', ' ', strip_tags(livewire(ProductList::class)->html())))
+    expect(preg_replace('/\s+/', ' ', strip_tags(withoutCardDetails(livewire(ProductList::class)->html()))))
         ->toMatch('/kruidvat\.nl €0\.0275 \/piece.*ah\.nl €0\.0325 \/piece.*etos\.nl[^€]*€9\.99/s')
         ->not->toContain('€0.0125');
+});
+
+it('leaves a drop the price has climbed back out of off "Only discounts"', function (): void {
+    $user = User::factory()->create();
+    // Latched, but the price is back at the reference: nothing to show, so not a discount.
+    $back = Product::factory()->create(['user_id' => $user->id, 'title' => 'Back at reference', 'cheapest_price' => '11.95', 'last_notified_price' => '10.00', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $back->id, 'reference_price' => '11.95', 'new_price' => '10.00', 'drop_pct' => 16.3, 'currency' => 'EUR']);
+    // A per-unit alert whose best value is back above the reference per kilo.
+    $unitBack = Product::factory()->create(['user_id' => $user->id, 'title' => 'Back per kilo', 'cheapest_price' => '2.20', 'best_value_price' => '2.20', 'best_value_pack_quantity' => '200.00', 'best_value_pack_unit' => 'g', 'last_notified_price' => '10.00', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $unitBack->id, 'reference_price' => null, 'reference_unit_price' => '10.9500', 'new_unit_price' => '10.0000', 'comparison_unit' => 'g', 'new_price' => '2.00', 'drop_pct' => 8.7, 'currency' => 'EUR']);
+    // Still down per kilo: 8.45 against 10.95.
+    $unitDown = Product::factory()->create(['user_id' => $user->id, 'title' => 'Down per kilo', 'cheapest_price' => '1.69', 'best_value_price' => '1.69', 'best_value_pack_quantity' => '200.00', 'best_value_pack_unit' => 'g', 'last_notified_price' => '8.45', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $unitDown->id, 'reference_price' => null, 'reference_unit_price' => '10.9500', 'new_unit_price' => '8.4500', 'comparison_unit' => 'g', 'new_price' => '1.69', 'drop_pct' => 22.8, 'currency' => 'EUR']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('discounted', true)
+        ->assertSee('Down per kilo')
+        ->assertDontSee('Back at reference')
+        ->assertDontSee('Back per kilo');
+});
+
+it('states a promotion the card is listed under "Only discounts" for', function (): void {
+    $user = User::factory()->create();
+    productWithCheapestShop($user, 'Remia Friteslijn', ['host' => 'ah.nl', 'current_price' => '1.69', 'promotion_label' => '25% korting', 'promotion_ends_at' => now()->addDays(4)]);
+
+    $this->actingAs($user);
+
+    $card = preg_replace('/\s+/', ' ', strip_tags(withoutCardDetails(livewire(ProductList::class)->set('discounted', true)->html())));
+
+    expect($card)->toContain('Remia Friteslijn')
+        ->toContain('Deal 25% korting until');
+});
+
+it('names the deal of the lowest-price shop in its note', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'title' => 'Crisps']);
+    Shop::factory()->for($product)->create(['url' => 'https://lidl.nl/p/1', 'current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'promotion_label' => 'Bonus', 'promotion_ends_at' => now()->addDays(4)]);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    $card = preg_replace('/\s+/', ' ', strip_tags(withoutCardDetails(livewire(ProductList::class)->set('discounted', true)->html())));
+
+    expect($card)->toContain('Lowest price €1.69 for 200 g at ah.nl · Bonus until')
+        ->not->toContain('Deal Bonus');
+});
+
+it('shows the full discount and every shop on hover', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'title' => 'Crisps', 'last_notified_price' => '8.45', 'last_notified_at' => now()]);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '2.00', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'single_item_price' => '2.85', 'bundle_quantity' => 2, 'bundle_total_price' => '4.00']);
+    Shop::factory()->for($product)->create(['url' => 'https://plus.nl/p/1', 'current_price' => '2.29', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'current_in_stock' => false]);
+    Shop::factory()->for($product)->create(['url' => 'https://dirk.nl/p/1', 'current_price' => '2.49', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    $product->refresh()->recomputeCheapestShop();
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'reference_price' => null, 'reference_unit_price' => '10.9500', 'new_unit_price' => '8.4500', 'comparison_unit' => 'g', 'new_price' => '1.69', 'drop_pct' => 22.8, 'currency' => 'EUR', 'fired_at' => now()]);
+
+    $this->actingAs($user);
+
+    preg_match('#data-test="product-card-details".*?</ui-tooltip>#s', livewire(ProductList::class)->html(), $match);
+    $details = preg_replace('/\s+/', ' ', strip_tags($match[0] ?? ''));
+
+    expect($details)->toContain('−23% Down per kilo · since')
+        ->toContain('€10.95 /kg → €8.45 /kg')
+        ->toContain('Deal jumbo.com · 2 for €4.00 · or €2.85 each')
+        // Every shop, the fourth one too, which the card has no room for.
+        ->toMatch('/\d shops/')
+        ->toMatch('/ah\.nl Best value In stock.*€8\.45 \/kg €1\.69 for 200 g/')
+        ->toContain('dirk.nl')
+        ->toContain('Out of stock');
+});
+
+it('resolves the hover details without a query per card', function (): void {
+    $queriesFor = function (int $count): int {
+        $user = User::factory()->create();
+
+        foreach (range(1, $count) as $index) {
+            $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'title' => "Crisps {$index}"]);
+            Shop::factory()->for($product)->create(['url' => "https://ah.nl/p/{$index}", 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'promotion_ends_at' => now()->addDays(3)]);
+            Shop::factory()->for($product)->create(['url' => "https://lidl.nl/p/{$index}", 'current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g']);
+            $product->refresh()->recomputeCheapestShop();
+        }
+
+        $this->actingAs($user);
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        livewire(ProductList::class)->assertSeeHtml('data-test="product-card-details"');
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $queries;
+    };
+
+    expect($queriesFor(4))->toBe($queriesFor(1));
+});
+
+it('lists a drop from half a percent, as the badge rounds it', function (): void {
+    $user = User::factory()->create();
+    // 1 off 200 is 0.5%: the badge reads −1%. 1 off 250 is 0.4%: no badge.
+    foreach ([['Half a percent', '199.00', '200.00'], ['Under half', '249.00', '250.00']] as [$title, $now, $was]) {
+        $product = Product::factory()->create(['user_id' => $user->id, 'title' => $title, 'cheapest_price' => $now, 'last_notified_price' => $now, 'last_notified_at' => now()]);
+        PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'reference_price' => $was, 'new_price' => $now, 'drop_pct' => 1.0, 'currency' => 'EUR']);
+    }
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('discounted', true)
+        ->assertSee('Half a percent')
+        ->assertDontSee('Under half');
+});
+
+it('states a bundle as today\'s deal without a promotion window that has ended', function (): void {
+    $user = User::factory()->create();
+    productWithCheapestShop($user, 'Fanta', [
+        'host' => 'jumbo.com', 'current_price' => '2.00', 'single_item_price' => '2.85', 'bundle_quantity' => 2, 'bundle_total_price' => '4.00',
+        'promotion_label' => '2 voor 4,00', 'promotion_ends_at' => now()->subDay(),
+    ]);
+
+    $this->actingAs($user);
+
+    $card = preg_replace('/\s+/', ' ', strip_tags(withoutCardDetails(livewire(ProductList::class)->set('discounted', true)->html())));
+
+    expect($card)->toContain('Deal 2 for €4.00 · or €2.85 each')->not->toContain('ended');
+});
+
+it('states a running promotion on a dashboard card too', function (): void {
+    $user = User::factory()->create();
+    productWithCheapestShop($user, 'Remia Friteslijn', ['host' => 'ah.nl', 'current_price' => '1.69', 'promotion_label' => '25% korting', 'promotion_ends_at' => now()->addDays(4)]);
+
+    $this->actingAs($user);
+
+    $card = preg_replace('/\s+/', ' ', strip_tags(withoutCardDetails(livewire(Dashboard::class)->html())));
+
+    expect($card)->toContain('Deal 25% korting until');
+});
+
+it('lists a paused shop in the hover, marked as paused', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'title' => 'Crisps']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69']);
+    Shop::factory()->for($product)->create(['url' => 'https://dirk.nl/p/1', 'current_price' => '1.49', 'active' => false]);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    preg_match('#data-test="product-card-details".*?</ui-tooltip>#s', livewire(ProductList::class)->html(), $match);
+
+    expect(preg_replace('/\s+/', ' ', strip_tags($match[0] ?? '')))->toContain('2 shops')->toMatch('/dirk\.nl Paused/');
 });

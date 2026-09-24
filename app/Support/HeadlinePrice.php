@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Product;
 use App\Models\Shop;
+use Illuminate\Support\Collection;
 
 /**
  * The figure a surface leads with for one product, and the shop behind it.
@@ -27,6 +28,8 @@ final readonly class HeadlinePrice
         public ?Shop $lowestShop,
         private ?string $fallbackPrice,
         private string $currency,
+        /** @var Collection<int, Shop> The shops that can be bought from now. */
+        private Collection $eligible,
     ) {}
 
     public static function of(Product $product, ?ComparablePacks $packs = null): self
@@ -43,7 +46,7 @@ final readonly class HeadlinePrice
             // or sold-out product keeps the last lowest price it recorded.
             $shop = $lowest ?? ($product->cheapest_shop_id === null ? null : $product->cheapestShop);
 
-            return new self($packs, unit: null, shop: $shop, lowestShop: null, fallbackPrice: $fallbackPrice, currency: $currency);
+            return new self($packs, unit: null, shop: $shop, lowestShop: null, fallbackPrice: $fallbackPrice, currency: $currency, eligible: $eligible);
         }
 
         return new self(
@@ -53,6 +56,7 @@ final readonly class HeadlinePrice
             lowestShop: $lowest instanceof Shop && $lowest->isNot($bestValue) ? $lowest : null,
             fallbackPrice: $fallbackPrice,
             currency: $currency,
+            eligible: $eligible,
         );
     }
 
@@ -120,6 +124,19 @@ final readonly class HeadlinePrice
         }
 
         return max(1, (int) round(($lowestUnit - $bestUnit) / $bestUnit * 100));
+    }
+
+    /**
+     * Whether a shop's price per unit may be set beside the headline's: one
+     * that can be bought now, on a size its own page states. A sold-out shop or
+     * an estimated size can be lower per unit and still not be a better buy.
+     */
+    public function isComparable(Shop $shop): bool
+    {
+        return $this->isPerUnit()
+            && $this->eligible->contains($shop)
+            && $this->packs->for($shop)?->canWin() === true
+            && $this->packs->unitPriceValueOf($shop) !== null;
     }
 
     public function packLine(?Shop $shop = null): ?PackLine

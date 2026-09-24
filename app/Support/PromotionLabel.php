@@ -51,6 +51,31 @@ final readonly class PromotionLabel
         return implode(' · ', array_filter([$shop->host, self::short($shop)]));
     }
 
+    /**
+     * The deal a shop runs now, in the shop's words: "2 for €4.00 · or €2.85
+     * each", "Bonus until 27 Sep". Null when nothing is running — an announced
+     * or ended window is not a discount anyone can have today.
+     */
+    public static function runningDeal(?Shop $shop): ?string
+    {
+        $window = $shop?->promotionWindow();
+        $running = $window !== null && $window->isRunning() ? self::forWindow($window) : null;
+        $offer = $shop?->liveBundleOffer();
+        $single = $shop?->singleItemPrice();
+
+        if ($shop === null || $offer === null || $single === null || ! $offer->isCheaperThan($single)) {
+            return $running;
+        }
+
+        // The bundle terms, with the window only while it runs: a bundle read
+        // beside a window that has ended must not say "ended" as today's deal.
+        return implode(' · ', array_filter([
+            $running,
+            BundlePriceLabel::condition($offer, $shop->currency),
+            __('or :price each', ['price' => MoneyFormatter::format($single, $shop->currency)]),
+        ]));
+    }
+
     /** The deadline alone: "until 6 Sep", "from 8 Sep", "ended 6 Sep". */
     public static function short(?Shop $shop): ?string
     {

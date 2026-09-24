@@ -766,3 +766,12 @@ function typesafeAnswer(array $departments, array $leaves = []): array
 
     return ['model' => 'jev-latest', 'answers' => $answers, 'usage' => ['input_tokens' => 1200, 'output_tokens' => 90]];
 }
+
+/**
+ * A page's HTML without the product cards' hover details, which repeat every
+ * shop and the full discount in a popover the card itself does not show.
+ */
+function withoutCardDetails(string $html): string
+{
+    return (string) preg_replace('#<div popover="manual"[^>]*data-flux-tooltip-content[^>]*>\s*<div[^>]*data-test="product-card-details".*?</ui-tooltip>#s', '</ui-tooltip>', $html);
+}

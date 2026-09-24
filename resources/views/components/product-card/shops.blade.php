@@ -12,8 +12,7 @@
 @php($best = $headline->shop)
 @php($packs = $headline->packs)
 @php($perUnit = $headline->isPerUnit())
-@php($eligible = $product->eligibleShops())
-@php($comparable = fn ($shop): bool => $perUnit && $eligible->contains($shop) && $packs->for($shop)?->canWin() === true && $packs->unitPriceValueOf($shop) !== null)
+@php($comparable = $headline->isComparable(...))
 @php($shops = $product->shops->sortBy(fn ($shop) => [
     $shop->is($best) ? 0 : 1,
     $comparable($shop) ? 0 : 1,

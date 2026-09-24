@@ -62,9 +62,18 @@ const firstParty = () => issues.pageErrors.length === 0
     checker.check('drop card shows the drop percent', /−1[45]%/.test(await oil.locator('[data-test="drop-badge"]').innerText()));
     checker.check('drop price is orange while active', (await oil.locator('.text-orange-600').count()) > 0);
     checker.check('card shows its category', await oil.locator('[data-test="product-category-badge"]').isVisible());
-    checker.check('card lists three shops and a more-link', (await oil.locator('ul li').count()) === 4 && oilText.includes('+1 more shop'), oilText);
+    checker.check('card lists three shops and a more-link', (await oil.locator('article ul li').count()) === 4 && oilText.includes('+1 more shop'), oilText);
     checker.check('cheapest shop is listed first', (await oil.locator('ul li').first().innerText()).includes('bol.com'));
     checker.check('shop with a promotion states its end', oilText.includes('ah.nl · until'), oilText);
+
+    // Hover shows the fuller story: the discount in full and every shop.
+    await oil.locator('article').hover();
+    const details = page.locator('[data-test="product-card-details"]').filter({ hasText: 'EV Drop Olive Oil' });
+    const detailsOpen = await details.waitFor({ state: 'visible', timeout: 4000 }).then(() => true).catch(() => false);
+    const detailsText = detailsOpen ? (await details.innerText()).replace(/\s+/g, ' ') : '';
+    checker.check('hovering a card shows its discount and every shop', detailsText.includes('−15%') && detailsText.includes('Deal ah.nl') && detailsText.includes('dirk.nl'), detailsText);
+    await page.mouse.move(5, 5);
+    await details.waitFor({ state: 'hidden', timeout: 4000 }).catch(() => {});
 
     const ahRow = oil.locator('ul li').filter({ hasText: 'until' }).first();
     const hostBox = await ahRow.locator('a span.truncate').boundingBox();
@@ -139,7 +148,7 @@ const firstParty = () => issues.pageErrors.length === 0
     // ring is drawn inside the card, where overflow-hidden cannot clip it.
     await page.locator('[data-test="product-sort"]').focus();
     let onCard = false;
-    for (let i = 0; i < 10 && ! onCard; i++) {
+    for (let i = 0; i < 30 && ! onCard; i++) {
         await page.keyboard.press('Tab');
         onCard = await page.evaluate(() => document.activeElement?.closest('[data-test="product-card"]') !== null);
     }
@@ -306,6 +315,11 @@ const firstParty = () => issues.pageErrors.length === 0
     checker.check('only discounts keeps the products with a discount', JSON.stringify(discounted.sort()) === JSON.stringify(['EV Drop Olive Oil', 'EV Paused Drop Coffee', 'EV Unit Drop Crisps']), JSON.stringify(discounted));
     checker.check('only discounts goes into the URL', new URL(page.url()).searchParams.get('discounted') === 'true', page.url());
     await page.screenshot({ path: path.join(ART, 'product-cards-discounts.png') });
+    // The hover still opens on a card Livewire has just re-rendered.
+    await card('EV Drop Olive Oil').locator('article').hover();
+    checker.check('the hover opens after a filter update', await page.locator('[data-test="product-card-details"]').filter({ hasText: 'EV Drop Olive Oil' }).waitFor({ state: 'visible', timeout: 4000 }).then(() => true).catch(() => false));
+    await page.mouse.move(5, 5);
+
     await page.locator('[data-test="product-discount-filter"]').click();
     await page.waitForFunction(() => document.querySelectorAll('li[wire\\:key^="product-"]').length === 24, null, { timeout: 8000 }).catch(() => {});
     checker.check('turning it off shows every product again', (await page.locator('li[wire\\:key^="product-"]').count()) === 24);
