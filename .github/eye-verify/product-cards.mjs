@@ -308,7 +308,7 @@ const firstParty = () => issues.pageErrors.length === 0
     checker.check('the controls end at the right edge of the products', Math.abs((sortBox.x + sortBox.width) - (gridBox.x + gridBox.width)) <= 2, `${sortBox.x + sortBox.width} vs ${gridBox.x + gridBox.width}`);
     checker.check('the add button sits above the categories', Math.abs(trackBox.x - navBox.x) <= 2, `${trackBox.x} vs ${navBox.x}`);
 
-    // Only discounts: an active drop, or a deal at the cheapest shop.
+    // Only discounts: an active drop, or a deal at the cheapest or best-value shop.
     await page.locator('[data-test="product-discount-filter"]').click();
     await page.waitForFunction(() => document.querySelectorAll('li[wire\\:key^="product-"]').length === 3, null, { timeout: 8000 }).catch(() => {});
     const discounted = await page.locator('li[wire\\:key^="product-"] a[wire\\:navigate]').allTextContents().then((all) => all.map((t) => t.trim()).filter((t) => t.startsWith('EV ')));

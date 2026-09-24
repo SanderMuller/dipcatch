@@ -736,6 +736,20 @@ it('lists a drop from half a percent, as the badge rounds it', function (): void
         ->assertDontSee('Under half');
 });
 
+it('lists a deal at the best-value shop, which the card leads with', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'title' => 'Crisps']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://lidl.nl/p/1', 'current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g', 'promotion_label' => 'Actie', 'promotion_ends_at' => now()->addDays(3)]);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    $card = preg_replace('/\s+/', ' ', strip_tags(withoutCardDetails(livewire(ProductList::class)->set('discounted', true)->html())));
+
+    expect($card)->toContain('Crisps')->toContain('Deal Actie until');
+});
+
 it('states a bundle as today\'s deal without a promotion window that has ended', function (): void {
     $user = User::factory()->create();
     productWithCheapestShop($user, 'Fanta', [

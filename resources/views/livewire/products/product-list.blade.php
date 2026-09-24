@@ -71,7 +71,7 @@
                 <flux:radio value="paused">{{ __('Paused') }}</flux:radio>
             </flux:radio.group>
 
-            {{-- An active drop, or a deal at the cheapest shop running now. --}}
+            {{-- An active drop, or a deal running now at the cheapest or best-value shop. --}}
             <flux:switch wire:model.live="discounted" :label="__('Only discounts')" data-test="product-discount-filter" />
 
             {{-- An optgroup label cannot be picked, so each department opens with

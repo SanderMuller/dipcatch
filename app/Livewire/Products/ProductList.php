@@ -51,7 +51,7 @@ final class ProductList extends Component
     #[Url(except: '')]
     public string $shop = '';
 
-    /** Only products in an active drop, or with a deal at their cheapest shop running now. */
+    /** Only products in an active drop, or with a deal running now at their cheapest or best-value shop. */
     #[Url(except: false)]
     public bool $discounted = false;
 
@@ -155,7 +155,13 @@ final class ProductList extends Component
                     // receives a bound float as text, and there no number
                     // compares >= a text value.
                     ->where(self::liveDropPercent(), '>=', DB::raw('0.5'))
-                    ->orWhereHas('cheapestShop', self::dealRunningNow(...)),
+                    // A deal at either shop a card names: the lowest price, or
+                    // the best value it leads with.
+                    ->orWhereHas('cheapestShop', self::dealRunningNow(...))
+                    // A string column beside a uuid key: cast for PostgreSQL.
+                    ->orWhereExists(self::dealRunningNow(
+                        Shop::query()->select(DB::raw(1))->whereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id'),
+                    )),
             ))
             ->when(
                 $categories !== null,
