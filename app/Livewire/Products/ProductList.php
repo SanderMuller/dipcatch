@@ -7,7 +7,6 @@ use App\Billing\PlanLimits;
 use App\Billing\ProPrice;
 use App\Enums\ProductCategory;
 use App\Enums\ProductDepartment;
-use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -149,12 +148,7 @@ final class ProductList extends Component
             )
             ->when($this->discounted, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where(
                 fn (EloquentQueryBuilder $discount): EloquentQueryBuilder => $discount
-                    // A drop the card shows a badge for: the latch alone also
-                    // holds a price that has climbed back to where it was.
-                    // A literal, not a binding: SQLite (the local database)
-                    // receives a bound float as text, and there no number
-                    // compares >= a text value.
-                    ->where(self::liveDropPercent(), '>=', DB::raw('0.5'))
+                    ->inVisibleDrop()
                     // A deal at either shop a card names: the lowest price, or
                     // the best value it leads with.
                     ->orWhereHas('cheapestShop', self::dealRunningNow(...))
@@ -172,7 +166,7 @@ final class ProductList extends Component
                 'shops',
                 fn (EloquentQueryBuilder $shops): EloquentQueryBuilder => $shops->where('host', $this->shop)->where('active', true),
             ))
-            ->addSelect(['biggest_drop' => self::liveDropPercent()])
+            ->addSelect(['biggest_drop' => Product::liveDropPercentQuery()])
             ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
             // A product not in a drop, or with no price yet, sorts last
             // whichever way the list runs, rather than heading a list of
@@ -184,43 +178,6 @@ final class ProductList extends Component
             ->orderBy('id', 'desc')
             // 24 fills whole rows at one, two, three and four cards across.
             ->paginate(24);
-    }
-
-    /**
-     * The drop a product is in now, in SQL: its latest alert while the latch
-     * is set, measured the way the card's badge is
-     * ({@see Product::activeDropPercent()}). Today's price against the alert's
-     * reference, in the basis the alert fired on, and nothing once the price is
-     * back; the alert's own figure only when no price is known.
-     *
-     * @return EloquentQueryBuilder<PriceDropEvent>
-     */
-    private static function liveDropPercent(): EloquentQueryBuilder
-    {
-        return PriceDropEvent::query()
-            // Real division throughout (`* 1.0`, `100.0`): SQLite stores a
-            // whole decimal as an integer and would divide integers. The unit
-            // price is rounded to four decimals, as dropBasisPrice() stores it.
-            ->selectRaw(<<<'SQL'
-                CASE
-                    WHEN comparison_unit IS NULL AND reference_price > 0 AND products.cheapest_price IS NOT NULL
-                        THEN CASE WHEN products.cheapest_price < reference_price
-                            THEN (reference_price - products.cheapest_price) * 100.0 / reference_price END
-                    WHEN comparison_unit IS NOT NULL AND reference_unit_price > 0
-                        AND products.best_value_price > 0 AND products.best_value_pack_quantity > 0
-                        AND products.best_value_pack_unit = comparison_unit
-                        THEN CASE WHEN ROUND(products.best_value_price * 1.0 / products.best_value_pack_quantity
-                                * (CASE comparison_unit WHEN 'piece' THEN 1 ELSE 1000 END), 4) < reference_unit_price
-                            THEN (reference_unit_price - ROUND(products.best_value_price * 1.0 / products.best_value_pack_quantity
-                                * (CASE comparison_unit WHEN 'piece' THEN 1 ELSE 1000 END), 4)) * 100.0 / reference_unit_price END
-                    ELSE drop_pct
-                END
-                SQL)
-            ->whereColumn('price_drop_events.product_id', 'products.id')
-            ->whereNotNull('products.last_notified_price')
-            ->latest('fired_at')
-            ->latest('id')
-            ->limit(1);
     }
 
     /**

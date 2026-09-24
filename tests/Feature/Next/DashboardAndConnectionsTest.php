@@ -178,3 +178,19 @@ it('resolves the card figures without a query per card', function (): void {
 
     expect($queriesFor(5))->toBe($queriesFor(1));
 });
+
+it('counts a drop only while the card shows one', function (): void {
+    $user = User::factory()->create();
+    // Still down: 11.95 against 14.10.
+    $down = Product::factory()->for($user)->create(['title' => 'Still down', 'cheapest_price' => '11.95', 'last_notified_price' => '11.95', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $down->id, 'reference_price' => '14.10', 'new_price' => '11.95', 'drop_pct' => 15.2, 'currency' => 'EUR']);
+    // Latched, but back at the reference.
+    $back = Product::factory()->for($user)->create(['title' => 'Back at reference', 'cheapest_price' => '14.10', 'last_notified_price' => '11.95', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $back->id, 'reference_price' => '14.10', 'new_price' => '11.95', 'drop_pct' => 15.2, 'currency' => 'EUR']);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertViewHas('activeDropCount', 1)
+        ->assertViewHas('activeDrops', fn ($drops): bool => $drops->pluck('title')->all() === ['Still down']);
+});

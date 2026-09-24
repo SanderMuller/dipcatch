@@ -61,7 +61,9 @@ final class Dashboard extends Component
     {
         return Product::query()
             ->where('user_id', $this->user()->id)
-            ->whereNotNull('last_notified_price')
+            // As "Only discounts" on the product list: a drop the card shows a
+            // badge for, not a price that has climbed back to its reference.
+            ->inVisibleDrop()
             // One query each for the whole list rather than one per row.
             ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
             ->latest('last_notified_at')

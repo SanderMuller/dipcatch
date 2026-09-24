@@ -13,7 +13,9 @@ use App\Support\Numeric;
 use App\Support\PackSize;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProductFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -144,6 +146,58 @@ final class Product extends Model
     {
         // Not ofMany(): that aggregates MAX over the uuid key, which Postgres refuses.
         return $this->hasOne(PriceDropEvent::class)->latest('fired_at')->latest('id');
+    }
+
+    /**
+     * The drop a product is in now, in SQL: its latest alert while the latch
+     * is set, measured the way the card's badge is
+     * ({@see activeDropPercent()}). Today's price against the alert's
+     * reference, in the basis the alert fired on, and nothing once the price is
+     * back; the alert's own figure only when no price is known.
+     *
+     * @return EloquentBuilder<PriceDropEvent>
+     */
+    public static function liveDropPercentQuery(): EloquentBuilder
+    {
+        return PriceDropEvent::query()
+            // Real division throughout (`* 1.0`, `100.0`): SQLite stores a
+            // whole decimal as an integer and would divide integers. The unit
+            // price is rounded to four decimals, as dropBasisPrice() stores it.
+            ->selectRaw(<<<'SQL'
+                CASE
+                    WHEN comparison_unit IS NULL AND reference_price > 0 AND products.cheapest_price IS NOT NULL
+                        THEN CASE WHEN products.cheapest_price < reference_price
+                            THEN (reference_price - products.cheapest_price) * 100.0 / reference_price END
+                    WHEN comparison_unit IS NOT NULL AND reference_unit_price > 0
+                        AND products.best_value_price > 0 AND products.best_value_pack_quantity > 0
+                        AND products.best_value_pack_unit = comparison_unit
+                        THEN CASE WHEN ROUND(products.best_value_price * 1.0 / products.best_value_pack_quantity
+                                * (CASE comparison_unit WHEN 'piece' THEN 1 ELSE 1000 END), 4) < reference_unit_price
+                            THEN (reference_unit_price - ROUND(products.best_value_price * 1.0 / products.best_value_pack_quantity
+                                * (CASE comparison_unit WHEN 'piece' THEN 1 ELSE 1000 END), 4)) * 100.0 / reference_unit_price END
+                    ELSE drop_pct
+                END
+                SQL)
+            ->whereColumn('price_drop_events.product_id', 'products.id')
+            ->whereNotNull('products.last_notified_price')
+            ->latest('fired_at')
+            ->latest('id')
+            ->limit(1);
+    }
+
+    /**
+     * Products whose card shows a drop badge: a drop measured live, from half
+     * a percent, as the badge rounds it. The latch alone also holds a price
+     * that has climbed back to where it was.
+     *
+     * @param  EloquentBuilder<$this>  $query
+     */
+    #[Scope]
+    protected function inVisibleDrop(EloquentBuilder $query): void
+    {
+        // A literal, not a binding: SQLite (the local database) receives a
+        // bound float as text, and there no number compares >= a text value.
+        $query->where(self::liveDropPercentQuery(), '>=', DB::raw('0.5'));
     }
 
     /**
