@@ -73,7 +73,7 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
                 $prices[$candidate] = true;
                 // Only the offer branch has a window: the shelf price is not
                 // a promotion, and last week's dates would label it as one.
-                $windows[] = self::offerIsRunning($data, $record) ? self::window($data, $record) : null;
+                $windows[] = self::offerApplies($data, $record) ? self::window($data, $record) : null;
             }
         }
 
@@ -84,7 +84,9 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
             return ExtractionResult::failed('dekamarkt_ambiguous_price');
         }
 
-        $price = array_key_first($prices);
+        // Keys come back as int for a whole-euro price: PHP stores "16" as 16.
+        $first = array_key_first($prices);
+        $price = $first === null ? null : (string) $first;
 
         if ($price === null) {
             return ExtractionResult::failed('dekamarkt_no_price');
@@ -119,14 +121,24 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
      */
     private static function currentPrice(array $data, array $record): mixed
     {
-        $normal = NuxtData::value($data, $record, 'normalPrice');
-        $offer = NuxtData::value($data, $record, 'offerPrice');
+        return self::offerApplies($data, $record)
+            ? NuxtData::value($data, $record, 'offerPrice')
+            : NuxtData::value($data, $record, 'normalPrice');
+    }
 
-        if ($offer === null || ! self::offerIsRunning($data, $record)) {
-            return $normal;
-        }
+    /**
+     * An offer price while its window is open. A price of 0 is the payload's
+     * "no offer": it sits inside the week's window on every article that has
+     * none (seen on 2026-09-24).
+     *
+     * @param  list<mixed>  $data
+     * @param  array<string, mixed>  $record
+     */
+    private static function offerApplies(array $data, array $record): bool
+    {
+        $offer = PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'offerPrice'));
 
-        return $offer;
+        return $offer !== null && (float) $offer > 0 && self::offerIsRunning($data, $record);
     }
 
     /**

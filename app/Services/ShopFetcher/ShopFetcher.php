@@ -95,7 +95,8 @@ final readonly class ShopFetcher
         // Remember how this host answers: a caller told "try again shortly"
         // for the tenth deterministic refusal in a row is being sent back to
         // do the same thing again.
-        $response = $this->sendAndRemember($url, $host, $rememberHost);
+        $redirects = [];
+        $response = $this->sendAndRemember($url, $host, $rememberHost, $redirects);
 
         $html = $this->prepareBody($response);
 
@@ -126,6 +127,10 @@ final readonly class ShopFetcher
             host: $finalHost,
             html: $html,
             statusCode: $response->status(),
+            // Only when every hop said "moved for good". A 302 or 307 is the
+            // shop's answer for today — a sale page, a geo split — and the
+            // address it left from is still the right one to keep.
+            movedPermanently: $redirects !== [] && array_all($redirects, static fn (int $status): bool => in_array($status, [301, 308], true)),
         );
     }
 
@@ -158,7 +163,10 @@ final readonly class ShopFetcher
         }
     }
 
-    private function sendRequest(string $url): Response
+    /**
+     * @param  list<int>  $redirects  filled with the status of each redirect hop
+     */
+    private function sendRequest(string $url, array &$redirects): Response
     {
         $ua = DipConfig::string('dipcatch.fetcher.user_agent', self::DEFAULT_USER_AGENT);
         $timeout = DipConfig::int('dipcatch.fetcher.timeout_seconds', self::DEFAULT_TIMEOUT);
@@ -182,9 +190,10 @@ final readonly class ShopFetcher
                         // and against the target's own robots.txt — the rules
                         // checked before the request belong to the host that was
                         // asked, not to the host the redirect points at.
-                        'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $uri) use ($safety): void {
+                        'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $uri) use ($safety, &$redirects): void {
                             $safety->assertSafe((string) $uri);
                             $this->assertRobotsAllows((string) $uri);
+                            $redirects[] = $response->getStatusCode();
                         },
                     ],
                 ])
@@ -205,10 +214,13 @@ final readonly class ShopFetcher
      * asked not to — the adapter canary fetches pages no user tracks, so its
      * result must not rewrite what a real probe learned about the host.
      */
-    private function sendAndRemember(string $url, string $host, bool $rememberHost): Response
+    /**
+     * @param  list<int>  $redirects  see {@see self::sendRequest()}
+     */
+    private function sendAndRemember(string $url, string $host, bool $rememberHost, array &$redirects): Response
     {
         try {
-            $response = $this->sendRequest($url);
+            $response = $this->sendRequest($url, $redirects);
 
             $this->classify($response);
         } catch (Blocked|TemporaryFailure $e) {

@@ -21,6 +21,7 @@ use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Config as DipConfig;
 use App\Support\ImageUrl;
 use App\Support\Iso4217;
+use App\Support\MovedShopUrl;
 use App\Support\PackSize;
 use App\Support\RecheckJitter;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -250,6 +251,8 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $snapshot,
             $extraction->adapterKey,
             ImageUrl::absolute($snapshot->imageUrl, $fetch->finalUrl),
+            movedTo: $fetch->movedPermanently ? $fetch->finalUrl : null,
+            movedFrom: $shop->url,
         );
     }
 
@@ -324,6 +327,10 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 if ($outcome->adapterKey !== null) {
                     $updates['adapter_key'] = $outcome->adapterKey;
                 }
+
+                // Store where the page moved for good, so the next check
+                // asks once instead of following the redirect every time.
+                $updates += MovedShopUrl::updates($locked, $outcome->movedFrom, $outcome->movedTo);
 
                 // Keep the last known image when an extraction returns none —
                 // an empty picker is worse than a slightly stale thumbnail.

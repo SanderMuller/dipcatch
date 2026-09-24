@@ -11,6 +11,13 @@ return [
     | asserts that the adapter still claims the page, still reads a price, and
     | reads a price that has not moved implausibly since the last good run.
     |
+    | Each default was fetched and read on 2026-09-24. An env value replaces
+    | it; an empty one keeps it. amazon, bol, etos and walmart have none: they
+    | refuse DipCatch's fetcher (503, 403, no answer, a bot page), so a URL
+    | would only report "unreachable". welkoop has none because its product
+    | pages exceed the fetcher's body cap. The health check names all five
+    | as uncovered, which is true.
+    |
     | Keyed on the adapter rather than the host on purpose: an adapter is not a
     | host. AmazonAdapter declares 21 country domains and ZooplusAdapter 18, so
     | one URL per host would be a list of sixty. One URL per adapter proves the
@@ -19,27 +26,32 @@ return [
     */
 
     'adapters' => [
-        'aldi' => env('CANARY_URL_ALDI'),
+        'aldi' => env('CANARY_URL_ALDI') ?: 'https://www.aldi.nl/product/pure-chocolade-1243874.html',
         'amazon' => env('CANARY_URL_AMAZON'),
         'bol' => env('CANARY_URL_BOL'),
-        'dekamarkt' => env('CANARY_URL_DEKAMARKT'),
-        'dierapotheker' => env('CANARY_URL_DIERAPOTHEKER'),
-        'dirk' => env('CANARY_URL_DIRK'),
+        'dekamarkt' => env('CANARY_URL_DEKAMARKT') ?: 'https://www.dekamarkt.nl/producten/dranken-sap-koffie-thee/bier/heineken%20pilsener%20krat/6',
+        'dierapotheker' => env('CANARY_URL_DIERAPOTHEKER') ?: 'https://www.dierapotheker.nl/flexadin-advanced-hond/6953/',
+        'dirk' => env('CANARY_URL_DIRK') ?: 'https://www.dirk.nl/boodschappen/x/x/x/84109',
         'etos' => env('CANARY_URL_ETOS'),
-        'jumbo' => env('CANARY_URL_JUMBO'),
-        'lidl' => env('CANARY_URL_LIDL'),
-        'lookfantastic' => env('CANARY_URL_LOOKFANTASTIC'),
-        'medpets' => env('CANARY_URL_MEDPETS'),
-        'ordinary' => env('CANARY_URL_ORDINARY'),
-        'petsathome' => env('CANARY_URL_PETSATHOME'),
-        'petsplace' => env('CANARY_URL_PETSPLACE'),
-        'poiesz' => env('CANARY_URL_POIESZ'),
-        'spar' => env('CANARY_URL_SPAR'),
-        'ulta' => env('CANARY_URL_ULTA'),
-        'vomar' => env('CANARY_URL_VOMAR'),
+        'jumbo' => env('CANARY_URL_JUMBO') ?: 'https://www.jumbo.com/producten/hipro-protein-drink-mango-300ml-494984DSL',
+        'lidl' => env('CANARY_URL_LIDL') ?: 'https://www.lidl.nl/p/badenia-trendline-koudschuim-matras-bt155-pro/p100153019',
+        'lookfantastic' => env('CANARY_URL_LOOKFANTASTIC') ?: 'https://www.cultbeauty.com/p/cerave-moisturising-cream-pot-with-ceramides-for-dry-to-very-dry-skin-454g/11798691/',
+        'medpets' => env('CANARY_URL_MEDPETS') ?: 'https://www.medpets.nl/4lazylegs-hondendraagzak?sku=MP9563',
+        'ordinary' => env('CANARY_URL_ORDINARY') ?: 'https://theordinary.com/en-nl/niacinamide-10-zinc-1-serum-100436.html',
+        'petsathome' => env('CANARY_URL_PETSATHOME') ?: 'https://www.petsathome.com/product/P3333',
+        'petsplace' => env('CANARY_URL_PETSPLACE') ?: 'https://www.petsplace.nl/natural-health-dog-adult-hondenbrokken-kip-rijst-12-5-kg-08715207706250',
+        'poiesz' => env('CANARY_URL_POIESZ') ?: 'https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/900127',
+        'spar' => env('CANARY_URL_SPAR') ?: 'https://www.spar.nl/lay\'s-chips-naturel-9183397/',
+        'ulta' => env('CANARY_URL_ULTA') ?: 'https://www.ulta.com/p/moisturizing-cream-body-face-moisturizer-xlsImpprod3530069?sku=2234849',
+        'vomar' => env('CANARY_URL_VOMAR') ?: 'https://www.vomar.nl/producten/voorraadkast/x/x/106908',
         'walmart' => env('CANARY_URL_WALMART'),
         'welkoop' => env('CANARY_URL_WELKOOP'),
-        'zooplus' => env('CANARY_URL_ZOOPLUS'),
+        'zooplus' => env('CANARY_URL_ZOOPLUS') ?: 'https://www.zooplus.nl/shop/katten/verzorging/huisapotheek/verdamper/169589?activeVariant=169589.19',
+
+        // Not a host adapter, so the health check does not ask for it, but
+        // it is the one reader for a whole shop platform. A named variant:
+        // an unnamed one on a three-flavour page is a chooser, not a price.
+        'shopify' => env('CANARY_URL_SHOPIFY') ?: 'https://www.prometeus.nl/products/fit-co-protein-bar-10-x-55-g?variant=56124322185598',
     ],
 
     /*

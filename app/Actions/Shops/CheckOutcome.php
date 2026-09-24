@@ -22,6 +22,10 @@ final readonly class CheckOutcome
         public ?string $adapterKey,
         public ?string $imageUrl,
         public ?string $error,
+        /** Where the page moved permanently, for `persist()` to consider storing. */
+        public ?string $movedTo = null,
+        /** The URL that was fetched, so a move is not stored over a URL changed since. */
+        public ?string $movedFrom = null,
     ) {}
 
     /**
@@ -29,9 +33,9 @@ final readonly class CheckOutcome
      * without naming the adapter that won. `persist()` leaves the stored key
      * alone in that case rather than blanking it.
      */
-    public static function success(ShopSnapshot $snapshot, ?string $adapterKey, ?string $imageUrl): self
+    public static function success(ShopSnapshot $snapshot, ?string $adapterKey, ?string $imageUrl, ?string $movedTo = null, ?string $movedFrom = null): self
     {
-        return new self(ScrapeStatus::Ok, $snapshot, $adapterKey, $imageUrl, error: null);
+        return new self(ScrapeStatus::Ok, $snapshot, $adapterKey, $imageUrl, error: null, movedTo: $movedTo, movedFrom: $movedFrom);
     }
 
     public static function failure(ScrapeStatus $status, ?string $error): self
