@@ -1,9 +1,11 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\User;
 use App\PriceAdapters\AdapterResolver;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
@@ -133,4 +135,50 @@ it('keeps the stored address when the move drops one of two repeated parameters'
     $shop = Shop::factory()->create(['url' => 'https://shop.test/p?variant=1&variant=2', 'currency' => 'EUR']);
 
     expect(MovedShopUrl::updates($shop, $shop->url, 'https://shop.test/q?variant=2'))->toBe([]);
+});
+
+it('adds a shop at the address its page moved to for good', function (): void {
+    fakeShop([
+        'https://shop.test/p/beans' => Http::response('', 301, ['Location' => 'https://shop.test/p/beans/']),
+        'https://shop.test/p/beans/' => Http::response(jsonLdPage('4.99'), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $outcome = app(ProbeShopUrl::class)(Product::factory()->create(['currency' => 'EUR']), 'https://shop.test/p/beans', User::factory()->create());
+
+    expect($outcome->isSuccess())->toBeTrue()
+        ->and($outcome->normalizedUrl)->toBe('https://shop.test/p/beans/');
+});
+
+it('adds a shop at the pasted address after a temporary redirect', function (): void {
+    fakeShop([
+        'https://shop.test/p/beans' => Http::response('', 302, ['Location' => 'https://shop.test/sale/beans']),
+        'https://shop.test/sale/beans' => Http::response(jsonLdPage('4.99'), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $outcome = app(ProbeShopUrl::class)(null, 'https://shop.test/p/beans', User::factory()->create());
+
+    expect($outcome->normalizedUrl)->toBe('https://shop.test/p/beans');
+});
+
+it('reports a duplicate when the page moved to an address the product already tracks', function (): void {
+    fakeShop([
+        'https://shop.test/old' => Http::response('', 301, ['Location' => 'https://shop.test/new']),
+        'https://shop.test/new' => Http::response(jsonLdPage('4.99'), 200, ['Content-Type' => 'text/html']),
+    ]);
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://shop.test/new', 'currency' => 'EUR']);
+
+    expect(app(ProbeShopUrl::class)($product, 'https://shop.test/old', User::factory()->create())->isDuplicate())->toBeTrue();
+});
+
+it('never stores a move that adds a parameter, which may pick a variant of its own', function (): void {
+    // /whey moving to /whey?variant=1 would link the default variant, while a
+    // shop added with another variant's SKU was priced at that variant.
+    fakeShop([
+        'https://shop.test/whey' => Http::response('', 301, ['Location' => 'https://shop.test/whey?variant=1']),
+        'https://shop.test/whey?variant=1' => Http::response(jsonLdPage('4.99'), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    expect(app(ProbeShopUrl::class)(null, 'https://shop.test/whey', User::factory()->create())->normalizedUrl)->toBe('https://shop.test/whey')
+        ->and(checkShopAt('https://shop.test/whey')->url)->toBe('https://shop.test/whey');
 });

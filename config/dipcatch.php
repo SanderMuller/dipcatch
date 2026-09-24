@@ -73,7 +73,9 @@ return [
          */
         'user_agent' => (string) env('DIPCATCH_FETCHER_USER_AGENT', 'DipCatchBot/1.0 (+https://dipcatch.eu/bot)'),
         'timeout_seconds' => (int) env('DIPCATCH_FETCHER_TIMEOUT', 10),
-        'body_cap_bytes' => (int) env('DIPCATCH_FETCHER_BODY_CAP_BYTES', 2_000_000),
+        // Welkoop's product pages run to 2.05 MB, over the old 2 MB cap. One
+        // read in 32 MB and 0.6 s (measured 2026-09-24).
+        'body_cap_bytes' => (int) env('DIPCATCH_FETCHER_BODY_CAP_BYTES', 5_000_000),
         'rate_limit_per_minute' => (int) env('DIPCATCH_FETCHER_RATE_LIMIT_PER_MINUTE', 30),
         'robots_cache_seconds' => (int) env('DIPCATCH_FETCHER_ROBOTS_CACHE_SECONDS', 86_400),
         // SSRF guard toggles. Never enable in production.

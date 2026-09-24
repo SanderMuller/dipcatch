@@ -44,7 +44,7 @@ final readonly class ShopFetcher
 
     private const int DEFAULT_TIMEOUT = 10;
 
-    private const int DEFAULT_BODY_CAP_BYTES = 2_000_000;
+    private const int DEFAULT_BODY_CAP_BYTES = 5_000_000;
 
     private const int DEFAULT_RATE_LIMIT_PER_MINUTE = 12;
 

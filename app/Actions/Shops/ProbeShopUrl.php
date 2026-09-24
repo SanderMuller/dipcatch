@@ -17,9 +17,11 @@ use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
+use App\Services\ShopFetcher\FetchResult;
 use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Iso4217;
+use App\Support\MovedShopUrl;
 use App\Support\UnservableShops;
 use App\Support\UrlNormalizer;
 use InvalidArgumentException;
@@ -159,13 +161,16 @@ final readonly class ProbeShopUrl
         }
 
         $snapshot = $checked;
+        $pasted = $normalizedUrl;
+
+        $normalizedUrl = self::storedAddress($normalizedUrl, $fetch);
 
         // The link must point at what the price refers to. A caller that
         // pastes a product page and pins a variant would otherwise store the
         // page, and the shopper who clicks it lands on the default pack at a
         // different price than the one they were quoted.
         $target = self::variantTarget($normalizedUrl, $variantKey);
-        $duplicate = $target === $normalizedUrl ? null : $this->existingShopFor($product, $target);
+        $duplicate = $target === $pasted ? null : $this->existingShopFor($product, $target);
 
         if ($duplicate instanceof ProbeOutcome) {
             return $duplicate;
@@ -237,6 +242,17 @@ final readonly class ProbeShopUrl
         $existing = $product->shops()->where('url_hash', UrlNormalizer::hash($target))->first();
 
         return $existing instanceof Shop ? ProbeOutcome::duplicate($existing) : null;
+    }
+
+    /**
+     * The address the page moved to for good, when it did, so the first check
+     * does not pay the redirect the paste did. See {@see MovedShopUrl}.
+     */
+    private static function storedAddress(string $normalizedUrl, FetchResult $fetch): string
+    {
+        return $fetch->movedPermanently
+            ? MovedShopUrl::target($normalizedUrl, $fetch->finalUrl) ?? $normalizedUrl
+            : $normalizedUrl;
     }
 
     /**

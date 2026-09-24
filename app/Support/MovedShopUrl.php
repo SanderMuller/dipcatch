@@ -11,9 +11,8 @@ use InvalidArgumentException;
  *
  * A stored URL that redirects costs a second request on every check, a
  * millisecond after the first — the burst dierapotheker.nl answered with 429.
- * New shops are saved in the form the shop canonicalises to, but a shop saved
- * before that fix, or one whose shop moved its page since, paid for the
- * redirect on every check until someone added it again.
+ * A shop is saved where its page moved to when it is added, and a shop whose
+ * page moves later is repointed on its next successful check.
  *
  * Only what the shop itself says is permanent, and only within the same
  * shop: a redirect to another host is a shop closing or merging, which a
@@ -36,8 +35,12 @@ final readonly class MovedShopUrl
         return $moved === null ? [] : ['url' => $moved, 'url_hash' => UrlNormalizer::hash($moved)];
     }
 
-    /** The normalized URL to store, or null to keep the one stored. */
-    private static function for(Shop $shop, string $finalUrl): ?string
+    /**
+     * Where a fetch of `$fetched` that moved permanently to `$finalUrl` should
+     * be stored instead, or null to keep `$fetched`. Checks the move only;
+     * whether another shop already tracks the address is the caller's to ask.
+     */
+    public static function target(string $fetched, string $finalUrl): ?string
     {
         try {
             $moved = UrlNormalizer::normalize($finalUrl);
@@ -45,7 +48,19 @@ final readonly class MovedShopUrl
             return null;
         }
 
-        if ($moved === $shop->url || ! self::sameHost($moved, $shop->url) || ! self::keepsQuery($moved, $shop->url)) {
+        if ($moved === $fetched || ! self::sameHost($moved, $fetched) || ! self::keepsQuery($moved, $fetched)) {
+            return null;
+        }
+
+        return $moved;
+    }
+
+    /** The normalized URL to store, or null to keep the one stored. */
+    private static function for(Shop $shop, string $finalUrl): ?string
+    {
+        $moved = self::target($shop->url, $finalUrl);
+
+        if ($moved === null) {
             return null;
         }
 
@@ -66,26 +81,19 @@ final readonly class MovedShopUrl
     }
 
     /**
-     * Every parameter of the stored URL, with its value. A redirect that drops
-     * `?variant=` lands on the page default, and storing that would lose which
-     * variant the shop was tracking.
+     * The same parameters, repeated keys included, and no others. A move that
+     * drops `?variant=` lands on the page default, and one that adds it picks
+     * a variant of its own; storing either would link a variant other than
+     * the one priced.
      */
     private static function keepsQuery(string $moved, string $stored): bool
     {
-        // Pairs as written, so a repeated key is not collapsed into one.
         $now = self::pairs($moved);
+        $was = self::pairs($stored);
+        sort($now);
+        sort($was);
 
-        foreach (self::pairs($stored) as $pair) {
-            $at = array_search($pair, $now, true);
-
-            if ($at === false) {
-                return false;
-            }
-
-            unset($now[$at]);
-        }
-
-        return true;
+        return $now === $was;
     }
 
     /** @return list<string> */

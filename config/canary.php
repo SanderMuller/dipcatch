@@ -14,9 +14,8 @@ return [
     | Each default was fetched and read on 2026-09-24. An env value replaces
     | it; an empty one keeps it. amazon, bol, etos and walmart have none: they
     | refuse DipCatch's fetcher (503, 403, no answer, a bot page), so a URL
-    | would only report "unreachable". welkoop has none because its product
-    | pages exceed the fetcher's body cap. The health check names all five
-    | as uncovered, which is true.
+    | would only report "unreachable". The health check names all four as
+    | uncovered, which is true.
     |
     | Keyed on the adapter rather than the host on purpose: an adapter is not a
     | host. AmazonAdapter declares 21 country domains and ZooplusAdapter 18, so
@@ -45,7 +44,7 @@ return [
         'ulta' => env('CANARY_URL_ULTA') ?: 'https://www.ulta.com/p/moisturizing-cream-body-face-moisturizer-xlsImpprod3530069?sku=2234849',
         'vomar' => env('CANARY_URL_VOMAR') ?: 'https://www.vomar.nl/producten/voorraadkast/x/x/106908',
         'walmart' => env('CANARY_URL_WALMART'),
-        'welkoop' => env('CANARY_URL_WELKOOP'),
+        'welkoop' => env('CANARY_URL_WELKOOP') ?: 'https://www.welkoop.nl/agri-select-houtpellets-100-naaldhout-10kg_1340325',
         'zooplus' => env('CANARY_URL_ZOOPLUS') ?: 'https://www.zooplus.nl/shop/katten/verzorging/huisapotheek/verdamper/169589?activeVariant=169589.19',
 
         // Not a host adapter, so the health check does not ask for it, but
