@@ -25,6 +25,7 @@ use App\PriceAdapters\Hosts\ZooplusAdapter;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\MicrodataAdapter;
 use App\PriceAdapters\OpenGraphAdapter;
+use App\PriceAdapters\ShopifyAdapter;
 use App\PriceAdapters\UserSelectorAdapter;
 
 return [
@@ -168,6 +169,7 @@ return [
         WelkoopAdapter::class,
         ZooplusAdapter::class,
         JsonLdAdapter::class,
+        ShopifyAdapter::class,
         MicrodataAdapter::class,
         OpenGraphAdapter::class,
         GenericAdapter::class,

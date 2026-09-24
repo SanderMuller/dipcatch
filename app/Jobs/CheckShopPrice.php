@@ -227,6 +227,9 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             ],
             fallbackCurrency: $shop->currency,
             variantKey: $shop->variant_key,
+            // A shop saved without a variant keeps reading the page's default
+            // rather than start failing: see ShopifyAdapter.
+            acceptPageDefault: true,
         );
 
         $extraction = $resolver->resolve(

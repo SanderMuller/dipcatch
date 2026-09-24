@@ -27,11 +27,12 @@ enum VariantResolution: string
     case OnlyVariant = 'only_variant';
 
     /**
-     * There is deliberately no "page default" case. A page listing several
-     * variants with nothing naming which is answered with a chooser rather
-     * than a price, so a snapshot that reaches a caller was always either
-     * named or alone. The JSON-LD reader enforces that before it builds one.
+     * Several variants and nothing named one, so the page's default was read.
+     * Never on a probe: a caller adding a shop gets the chooser instead. Only
+     * a recheck of a shop saved before its reader could see variants reads
+     * this, so the shop keeps the price it always had instead of failing.
      */
+    case PageDefault = 'page_default';
 
     /** One sentence a caller can act on. */
     public function note(int $variants): string
@@ -40,6 +41,7 @@ enum VariantResolution: string
             self::OnlyVariant => 'This page sells one variant.',
             self::Url => 'This page sells ' . $variants . ' variants; the URL names this one.',
             self::VariantKey => 'This page sells ' . $variants . ' variants; variant_key names this one.',
+            self::PageDefault => 'This page sells ' . $variants . ' variants; none was named, so this is the page default.',
         };
     }
 }

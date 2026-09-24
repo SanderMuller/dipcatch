@@ -13,11 +13,16 @@ final readonly class AdapterContext
      * @param  ?string  $variantKey  Identifier (productID / sku / variant URL)
      *                               of a previously-chosen variant inside a
      *                               ProductGroup. See {@see JsonLdAdapter}.
+     * @param  bool  $acceptPageDefault  A recheck of a shop saved before its
+     *                                   reader could see variants: read the
+     *                                   variant the page defaults to, as it
+     *                                   always has, rather than fail the check.
      */
     public function __construct(
         public array $selectors = [],
         public ?string $fallbackCurrency = null,
         public ?string $variantKey = null,
+        public bool $acceptPageDefault = false,
     ) {}
 
     public function hasPriceSelector(): bool
@@ -33,6 +38,7 @@ final readonly class AdapterContext
             selectors: $this->selectors,
             fallbackCurrency: $this->fallbackCurrency,
             variantKey: $variantKey,
+            acceptPageDefault: $this->acceptPageDefault,
         );
     }
 }

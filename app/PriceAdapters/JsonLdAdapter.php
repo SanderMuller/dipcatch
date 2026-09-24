@@ -30,6 +30,15 @@ final readonly class JsonLdAdapter implements ShopAdapter
         $state = new JsonLdSearchState();
         [$product, $shop] = $this->findProductAndOffer($scripts, $url, $context, $state);
 
+        // Some Shopify themes put only the selected variant in their JSON-LD.
+        // Read from here, a three-flavour page would say it sells one. The
+        // page's own variant list is the fuller account, so defer to it.
+        $shopifyVariants = ShopifyProduct::variantCount($html);
+
+        if ($shopifyVariants !== null && $shopifyVariants > 1 && $state->variantsSeen < $shopifyVariants) {
+            return ExtractionResult::skip();
+        }
+
         // Variant ambiguity wins over a weak fallback: when the page lists
         // multiple variants and the caller didn't pin one via context, ask
         // the user instead of silently guessing. A variant the URL itself
