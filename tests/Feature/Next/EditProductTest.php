@@ -640,7 +640,7 @@ it('shows what the product costs now beside each target field', function (): voi
         ->assertSee('Now €2.19 at ah.nl')
         // The per-unit target is anchored to the best value, which here is the
         // other shop.
-        ->assertSee('Now €8.17/kg at dirk.nl');
+        ->assertSee('Now €8.17 /kg at dirk.nl');
 });
 
 it('leaves the now-line out when no shop has a usable price', function (): void {
@@ -683,7 +683,7 @@ it('anchors to a shop a shopper can actually buy from', function (): void {
 
     livewire(EditProduct::class, ['product' => $product->refresh()])
         ->assertSee('Now €10.00 at live.nl')
-        ->assertSee('Now €20.00/kg at live.nl')
+        ->assertSee('Now €20.00 /kg at live.nl')
         ->assertDontSee('dead.nl');
 
     // And the form agrees with the answer the ranking stored.
@@ -730,7 +730,7 @@ it('shows a free account the current figure beside the upgrade line', function (
 
     livewire(EditProduct::class, ['product' => $product->refresh()])
         ->assertSee('Pro alerts on this.')
-        ->assertSee('Now €4.00/kg at ah.nl')
+        ->assertSee('Now €4.00 /kg at ah.nl')
         // The note says where to upgrade, not only that one is needed.
         ->assertSeeInOrder(['Pro alerts on this.', 'Get Pro']);
 });

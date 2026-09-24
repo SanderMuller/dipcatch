@@ -563,3 +563,28 @@ test('a grant from a revoked client does not count as connected', function (): v
 
     Livewire::test(CreateProductFromUrl::class)->assertSee('Connect Claude once');
 });
+
+test('the preview leads with the price per unit when the page states a pack size', function (): void {
+    Http::fake(fakeCreateFlowOffer(price: '1.99', title: 'Chips naturel 370 g'));
+    $this->actingAs(User::factory()->create());
+
+    $text = (string) preg_replace('/\s+/', ' ', strip_tags(Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'preview')
+        ->html()));
+
+    expect($text)->toContain('shop.example.com €5.38 /kg €1.99 for 370 g');
+});
+
+test('the preview leads with the pack price when the page states no size', function (): void {
+    Http::fake(fakeCreateFlowOffer(price: '299.00', title: 'Camera'));
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSeeHtml('data-test="preview-price"')
+        ->assertSee('€299.00')
+        ->assertDontSeeHtml('data-test="preview-pack"');
+});

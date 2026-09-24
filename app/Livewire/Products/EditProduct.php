@@ -363,7 +363,7 @@ final class EditProduct extends Component
             // it, so it is shown at the precision the field accepts.
             'amount' => ($suffix === ''
                 ? MoneyFormatter::format($amount, $currency)
-                : MoneyFormatter::unitPrice($amount, $currency)) . $suffix,
+                : MoneyFormatter::unitPrice($amount, $currency) . ' ' . $suffix),
             'host' => (string) $shop->host,
         ];
     }

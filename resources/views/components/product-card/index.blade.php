@@ -40,9 +40,13 @@
 
         <x-product-card.price :product="$product" :headline="$headline" class="mt-3" />
 
-        {{-- The pack behind a per-unit figure. --}}
+        {{-- The pack behind a per-unit figure, and during a bundle the regular
+             price per unit — named, on this line rather than beside the drop
+             badge, where a struck figure reads as the price before the drop. --}}
         @if ($headline->isPerUnit() && ($packLine = $headline->packLine()))
-            <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400"><x-pack-line :line="$packLine" :bundle="false" /></flux:text>
+            <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">
+                <x-pack-line :line="$packLine" :bundle="false" />@if ($regularUnit = $headline->regularUnitPrice()) · {{ __('regular') }} <del title="{{ __('Regular price') }}" class="decoration-1">{{ \App\Support\MoneyFormatter::unitPrice($regularUnit, $headline->currency()) }} {{ \App\Support\UnitWord::labelFor($headline->unit) }}</del>@endif
+            </flux:text>
         @endif
 
         {{-- The deal behind the figure, in the shop's words: a bundle, or a

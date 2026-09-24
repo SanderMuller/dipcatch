@@ -74,7 +74,7 @@ final class PriceDropEvent extends Model
 
         return __('Was :price', [
             'price' => MoneyFormatter::unitPrice((string) $unitPrice, $this->currency)
-                . UnitWord::labelFor(is_string($this->comparison_unit) ? $this->comparison_unit : null),
+                . ' ' . UnitWord::labelFor(is_string($this->comparison_unit) ? $this->comparison_unit : null),
         ]);
     }
 

@@ -65,10 +65,6 @@
                             ]) }}
                         @endif
                     </p>
-                    @if ($dropUnit === null && $headline->isPerUnit())
-                        {{-- The card leads per unit; this alert compared packs, which can be different sizes. --}}
-                        <p class="text-xs text-pretty text-zinc-500 dark:text-zinc-400">{{ __('Measured before this product compared per unit, so the packs may differ in size.') }}</p>
-                    @endif
                 </div>
             </div>
         @endif

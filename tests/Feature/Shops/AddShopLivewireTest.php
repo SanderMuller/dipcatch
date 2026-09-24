@@ -398,3 +398,44 @@ test('the preview strikes through the regular price when the bundle total does n
         ->assertSee('€1.79')
         ->assertSee('Regular price');
 });
+
+test('the add-shop preview leads with the price per unit when the page states a pack size', function (): void {
+    Http::fake(fakeJsonLdOffer(price: '1.99', name: 'Chips naturel 370 g'));
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs($product->user()->sole());
+
+    $text = (string) preg_replace('/\s+/', ' ', strip_tags(Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'preview')
+        ->html()));
+
+    expect($text)->toContain('€5.38 /kg €1.99 for 370 g');
+});
+
+test('the variant chooser states a price per unit for a variant whose name gives its size', function (): void {
+    $variantJson = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Cola',
+        'hasVariant' => [
+            ['@type' => 'Product', 'name' => 'Cola 330 ml', 'productID' => 'can', 'url' => 'https://shop.example.com/p/can/', 'offers' => ['@type' => 'Offer', 'price' => '0.99', 'priceCurrency' => 'EUR']],
+            ['@type' => 'Product', 'name' => 'Cola 1.5 l', 'productID' => 'bottle', 'url' => 'https://shop.example.com/p/bottle/', 'offers' => ['@type' => 'Offer', 'price' => '2.29', 'priceCurrency' => 'EUR']],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd($variantJson), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'variant_chooser')
+        ->assertSee('€3.00 /l · €0.99 for 330 ml · can')
+        ->assertSee('€1.53 /l · €2.29 for 1.5 L · bottle');
+});

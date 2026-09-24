@@ -821,7 +821,7 @@ it('shows every alert rule the product has', function (): void {
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
-        ->assertSeeInOrder(['€0.2000/piece', 'when a price reaches it', 'or 10% drop'])
+        ->assertSeeInOrder(['€0.2000 /piece', 'when a price reaches it', 'or 10% drop'])
         ->assertDontSee('Any drop');
 });
 
@@ -843,7 +843,7 @@ it('says below for a second price target too', function (): void {
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
-        ->assertSeeInOrder(['€2.00', 'when a price reaches it', 'or €0.2000/piece or less']);
+        ->assertSeeInOrder(['€2.00', 'when a price reaches it', 'or €0.2000 /piece or less']);
 });
 
 it('names the default drop thresholds when the product has none of its own', function (): void {

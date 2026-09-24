@@ -23,9 +23,6 @@
         ])>
             {{ $headline->text() }}
         </span>
-        @if ($regularUnit = $headline->regularUnitPrice())
-            <del title="{{ __('Regular price') }}" class="text-sm text-zinc-400 decoration-1 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::unitPrice($regularUnit, $headline->currency()) }} {{ \App\Support\UnitWord::labelFor($headline->unit) }}</del>
-        @endif
 
         @if ($drop !== null)
             @if ($drop->comparison_unit === $headline->unit && $drop->comparison_unit === null && $drop->reference_price !== null)

@@ -413,12 +413,13 @@ it('states a per-unit drop in its unit, not beside a pack price it was not measu
         ->not->toContain('€6.25');
 });
 
-it('shows no old figure for a drop measured in another basis than the card', function (): void {
+it('shows no drop for a pack-price alert on a product that now compares per unit', function (): void {
     $user = User::factory()->create();
     // Alerted on the pack price before the product had a pack size; now it
     // leads per kilo, and "Was €2.19" beside "€8.45 /kg" would compare two things.
     $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Crisps', 'cheapest_price' => '1.69', 'last_notified_price' => '1.69', 'last_notified_at' => now()]);
     Shop::factory()->for($product)->create(['current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    $product->forceFill(['best_value_price' => '1.69', 'best_value_pack_quantity' => '200.00', 'best_value_pack_unit' => 'g'])->save();
     PriceDropEvent::factory()->create([
         'user_id' => $user->id,
         'product_id' => $product->id,
@@ -431,16 +432,12 @@ it('shows no old figure for a drop measured in another basis than the card', fun
 
     $this->actingAs($user);
 
-    $html = livewire(ProductList::class)->html();
-    $card = withoutCardDetails($html);
-
-    expect($card)->toContain('€8.45 /kg')
-        ->not->toContain('<del')
-        ->not->toContain('Was ')
-        ->not->toContain('€2.19')
-        ->toContain('title="Measured per pack"')
-        // The hover states the old figure with its basis, so it cannot be misread.
-        ->and($html)->toContain('Was €2.19 a pack, now €1.69');
+    livewire(ProductList::class)
+        ->assertSee('€8.45 /kg')
+        ->assertDontSeeHtml('data-test="drop-badge"')
+        ->assertDontSee('€2.19')
+        ->set('discounted', true)
+        ->assertDontSee('Crisps');
 });
 
 it('leads the card with the best value and notes the lowest pack price', function (): void {

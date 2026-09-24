@@ -405,7 +405,7 @@ const firstParty = () => issues.pageErrors.length === 0
     await page.getByRole('button', { name: 'Save changes' }).click();
     await page.waitForURL((url) => url.href === productUrl, { timeout: 10000 }).catch(() => {});
     const rules = (await page.locator('[data-test="alert-rules"]').locator('..').innerText().catch(() => '')).replace(/\s+/g, ' ');
-    checker.check('saving stores the per-kilo target', rules.includes('€4.00/kg'), rules);
+    checker.check('saving stores the per-kilo target', rules.includes('€4.00 /kg'), rules);
 }
 
 {

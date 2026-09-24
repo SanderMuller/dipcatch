@@ -91,7 +91,10 @@ await page.waitForURL((url) => url.pathname.startsWith('/app'), { timeout: 15000
     const card = page.locator('li[wire\\:key^="product-"]').filter({ hasText: 'EV Vitamin Tablets' });
     const text = flat(await card.innerText());
     checker.check('a pack-basis drop shows no old figure beside a unit headline', text.includes('€0.0275 /piece') && ! text.includes('Was '), text);
-    checker.check('the badge says which basis the drop was measured in', (await card.locator('[data-test="drop-badge"]').getAttribute('title')) === 'Measured per pack');
+    // An alert on pack prices on a product that now compares per piece is no
+    // drop the card can show: packs of different sizes were compared.
+    checker.check('a pack-price alert on a per-piece product shows no badge', (await card.locator('[data-test="drop-badge"]').count()) === 0);
+    checker.check('the regular price per piece sits on the pack line, not beside a badge', /€21\.99 for 800 pieces · regular €0\.0300 \/piece/.test(text), text);
     checker.check('the trade-only shop is not first among the card rows', ! /wholesale\.test[^€]*€0\.0125/.test(text), text);
     // The host and the two prices share one row; they must not overlap.
     const overlaps = await card.locator('ul li').evaluateAll((rows) => rows.map((row) => {

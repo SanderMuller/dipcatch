@@ -99,10 +99,17 @@
                         <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
                         {{ $host }}
                     </div>
-                    <div class="mt-1 text-lg font-semibold tabular-nums">
-                        {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
-                        @if ($hasLivePreviewBundle)
-                            @if ($previewRegularPrice !== null)
+                    {{-- Per unit first when the page states a pack size: the figure
+                         shops are compared on. The pack price follows beneath. --}}
+                    <div class="mt-1 text-lg font-semibold tabular-nums" data-test="preview-price">
+                        @if ($previewUnitPrice !== null)
+                            {{ $previewUnitPrice }}
+                            @if ($hasLivePreviewBundle && $previewRegularUnitPrice !== null)
+                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ $previewRegularUnitPrice }}</del>
+                            @endif
+                        @else
+                            {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
+                            @if ($hasLivePreviewBundle && $previewRegularPrice !== null)
                                 <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
                             @endif
                         @endif
@@ -123,10 +130,10 @@
                         <flux:text size="sm" class="mt-1 text-zinc-500">{{ $bundleLabel }}</flux:text>
                     @endif
                     @if ($previewUnitPrice !== null)
-                        <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500">
-                            {{ $previewUnitPrice }}
-                            @if ($hasLivePreviewBundle && $previewRegularUnitPrice !== null)
-                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ $previewRegularUnitPrice }}</del>
+                        <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500" data-test="preview-pack">
+                            {{ \App\Support\PackLine::format($snapshot['price'], $snapshot['currency'], $previewPackSize) }}
+                            @if ($hasLivePreviewBundle && $previewRegularPrice !== null)
+                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
                             @endif
                         </flux:text>
                     @endif

@@ -32,7 +32,7 @@ final readonly class AlertRules
         // account's target is kept but not checked.
         if ($product->unit_price_target !== null && $unitLabel !== '') {
             $rules[] = [
-                'value' => MoneyFormatter::unitPrice((string) $product->unit_price_target, $product->currency) . $unitLabel,
+                'value' => MoneyFormatter::unitPrice((string) $product->unit_price_target, $product->currency) . ' ' . $unitLabel,
                 'below' => true,
                 'pro' => $product->user?->entitlements()->allowsUnitPriceAlerts() !== true,
             ];

@@ -42,6 +42,7 @@ function prohibitedMoneyPatterns(): array
         '->currency }} {{',
         "->currency . ' '",
         "['currency'] . ' '",
+        '€ {{',
     ];
 }
 

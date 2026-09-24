@@ -153,7 +153,8 @@ final class Product extends Model
      * is set, measured the way the card's badge is
      * ({@see activeDropPercent()}). Today's price against the alert's
      * reference, in the basis the alert fired on, and nothing once the price is
-     * back; the alert's own figure only when no price is known.
+     * back; the alert's own figure only when no price is known. Nothing for an
+     * alert on pack prices once the product compares per unit.
      *
      * @return EloquentBuilder<PriceDropEvent>
      */
@@ -165,6 +166,8 @@ final class Product extends Model
             // price is rounded to four decimals, as dropBasisPrice() stores it.
             ->selectRaw(<<<'SQL'
                 CASE
+                    WHEN comparison_unit IS NULL AND products.best_value_pack_unit IS NOT NULL
+                        THEN NULL
                     WHEN comparison_unit IS NULL AND reference_price > 0 AND products.cheapest_price IS NOT NULL
                         THEN CASE WHEN products.cheapest_price < reference_price
                             THEN (reference_price - products.cheapest_price) * 100.0 / reference_price END
@@ -233,6 +236,13 @@ final class Product extends Model
         // reference with today's pack price answers a question nobody asked and
         // gets the badge wrong by whatever the pack size is.
         $unit = is_string($drop->comparison_unit) ? $drop->comparison_unit : null;
+
+        // An alert on pack prices, on a product that now compares per unit: it
+        // compared packs that can differ in size — a 240 g box against an
+        // 840 g one read as 61% off — so it is not a drop anyone can trust.
+        if ($unit === null && $this->best_value_pack_unit !== null) {
+            return null;
+        }
         $referenceValue = $unit === null ? $drop->reference_price : $drop->reference_unit_price;
         $current = $this->dropBasisPrice($unit);
 
