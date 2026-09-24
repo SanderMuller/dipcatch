@@ -37,6 +37,7 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 - ~~`history-depth.md`~~ — ✅ shipped (free accounts read 90 days of history, Pro 365 days and All time and is never pruned; the window rule lives in `App\Billing\HistoryWindow`).
 - ~~`promotion-window.md`~~ — ✅ shipped (the running promotion window is stored on the shop and shown under the price, from AH, Dirk, DekaMarkt, Aldi and schema.org).
 - ~~`flux-user-app-migration.md`~~ — ✅ shipped (the user-facing app moved from the Filament `app` panel to Flux Pro; the admin panel stays Filament. Product edit and the savings-by-month chart landed after the spec was last updated).
+- ~~`product-categories.md`~~ — ✅ shipped (a fixed two-level taxonomy on every product, set on the edit form and filtered on the list; Pro sorts new products automatically through TypeSafe; a backfill command for existing products. Browser checks done 2026-09-24 with `.github/eye-verify/product-categories.mjs`).
 
 - ~~`mcp-server.md`~~ — ✅ shipped 2026-09-07 (`laravel/mcp` server behind Passport OAuth with the `mcp:use` scope; list, create and inspect products, attach shops, read prices and history; add-product and add-shop logic shared with the web through `ShopDraft`).
 
