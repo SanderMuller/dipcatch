@@ -19,11 +19,11 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 
 - **[landing-pages-and-marketing-polish.md](landing-pages-and-marketing-polish.md)** — use-case landing pages (`/price-alerts/{slug}`), branded 404/500 views, and marketing markup cleanup judged against the Markdown twin. Laravel Cloud's Markdown for Agents is already enabled at the edge, so no application code renders Markdown. Follows the spec above. Shipped 2026-09-06; the 503 was dropped because nothing invokes `errors::503`. Two ops tasks stay open in the Laravel Cloud dashboard.
 
-- **[unit-aware-drops.md](unit-aware-drops.md)** — decide a drop on a comparable figure. Drops compare the pack price of the cheapest shop, so a smaller pack reads as a fall: a 240 g box of vissticks alerted as 61% off an 840 g box, and a 227 g bag of Twix as 34% off a 333 g one, both on 2026-09-20. Best value already groups by unit and the drop engine does not. Written after the alerts reached a user; the separate bug that fired them the moment a shop was added is fixed. Not started — it opens with a decision between comparing per unit, comparing inside the unit group, or holding the alert back.
+- ~~`unit-aware-drops.md`~~ — ✅ shipped (a drop is decided on the comparable figure: per unit once a product compares per unit, on pack prices otherwise. Drop events store the comparison unit and both unit prices; a shop joining a product is never a drop; the latch remembers which basis it was armed in).
 
 - ~~`unit-prices-everywhere.md`~~ — ✅ shipped 2026-09-24 (the per-unit price leads wherever a product price is shown: product page, cards, dashboard, alerts, digest, bell, push, public share page, markdown copies and MCP, with the pack price and size beneath. `HeadlinePrice` and `PackLine` on the resolved pack size; drop events store the pack they fired on; target-price alerts lead with the pack price; the public page resolves on the owner page's rules; the piece label is translated. Follow-ups shipped the same week: the hover details panel, unit-first previews, variant chooser and suggestions).
 
-- **[unit-pricing.md](unit-pricing.md)** — normalized unit price (€/kg, €/l, €/stuk) per shop, parsed from source size data with title fallback; shown on shops table, previews, public page, products list.
+- ~~`unit-pricing.md`~~ — ✅ shipped (normalized unit price per shop from source size data with title fallback; superseded in presentation by `unit-prices-everywhere.md`).
 
 - ~~`multi-webshop-price-tracking.md`~~ — ✅ shipped (Product/Shop split, adapter chain, per-shop checks, ProductCheapestHistory timeline).
 - ~~`test-helper-hoist.md`~~ — ✅ shipped (`withJsonLd` + `jsonLdPage` consolidated in `tests/Pest.php`; `phpstan.neon` `scanFiles` added).
@@ -33,16 +33,20 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 - ~~`timezone-autodetect.md`~~ — ✅ shipped (`users.timezone_detected_at` + browser `Intl` detection on first authenticated page load; atomic conditional UPDATE so explicit save in NotificationSettings can't be clobbered).
 - ~~`url-first-product-creation.md`~~ — ✅ shipped (paste-URL-first create flow: probe fills title/image, tier-default thresholds, one Confirm creates product + first shop; manual form kept at `/create-manual`).
 - ~~`public-product-sharing.md`~~ — ✅ shipped (per-product `share_slug` + public `/p/{slug}` route, Chart.js price-history + OG/Twitter meta, atomic conditional UPDATE on share/rotate/stop to refuse last-writer-wins between owner tabs, SRI-pinned CDN scripts).
+- ~~`bundle-prices.md`~~ — ✅ shipped (single-item price and bundle terms stored beside `current_price` for Jumbo and Albert Heijn; the required quantity is always shown; Dirk stays on scalar prices).
+- ~~`history-depth.md`~~ — ✅ shipped (free accounts read 90 days of history, Pro 365 days and All time and is never pruned; the window rule lives in `App\Billing\HistoryWindow`).
+- ~~`promotion-window.md`~~ — ✅ shipped (the running promotion window is stored on the shop and shown under the price, from AH, Dirk, DekaMarkt, Aldi and schema.org).
+- ~~`flux-user-app-migration.md`~~ — ✅ shipped (the user-facing app moved from the Filament `app` panel to Flux Pro; the admin panel stays Filament. Product edit and the savings-by-month chart landed after the spec was last updated).
 
-- **[mcp-server.md](mcp-server.md)** — an MCP server so a user can drive their own account from an assistant: list and create products, attach shops, read prices and history. `laravel/mcp` with Passport OAuth, copied from the sibling `macrocrumb` app. No admin tools. Most of the work is extracting the add-product and add-shop logic out of two Livewire components so a tool and a web request run the same code.
+- ~~`mcp-server.md`~~ — ✅ shipped 2026-09-07 (`laravel/mcp` server behind Passport OAuth with the `mcp:use` scope; list, create and inspect products, attach shops, read prices and history; add-product and add-shop logic shared with the web through `ShopDraft`).
 
 - **[chatgpt-plugin-directory.md](chatgpt-plugin-directory.md)** — list DipCatch in the ChatGPT Plugins Directory: MCP tool annotations, OpenAI domain-challenge endpoint, Connections Connect/Install buttons and copy, privacy text for connected assistants. Claude gets an install link; ChatGPT Free cannot paste `/mcp`.
 
-- **[adapter-canary.md](adapter-canary.md)** — one known product URL per host adapter, fetched daily in production, asserting the adapter still claims the page, still reads a price, and reads one that has not moved implausibly since the last run. Catches the adapter that breaks on a host nobody tracks, and the one that still returns a number after a redesign but reads the wrong element. Also fixes health mail, which currently reaches `your@example.com` and is never scheduled.
+- ~~`adapter-canary.md`~~ — ✅ shipped 2026-09-18 (one known URL per host adapter, fetched daily; the canary command and its health check share `CanaryEntries`).
 
-- **[confirm-large-drops-before-alerting.md](confirm-large-drops-before-alerting.md)** — a drop of 40% or more below the reference notifies only when the shop's previous successful reading also qualified; a re-fetch is dispatched at once so the second reading lands in minutes. Closes the gap where one mis-extraction (unit price, "from" price, wrong variant) mails the user a drop that never happened. Stateless — no migration. Checkjebon and AH shops are exempt because they read a structured field, not a page.
+- ~~`confirm-large-drops-before-alerting.md`~~ — ✅ shipped (a drop of 40% or more alerts only when the shop's previous eligible reading also qualified, with a re-fetch 10 minutes later; dataset and API shops exempt. Phase 2 shipped 2026-09-24: the product page says "Confirming a large drop" while one reading waits for its second, from `LargeDropConfirmation::isAwaited()`).
 
-- **[superadmin-and-comped-accounts.md](superadmin-and-comped-accounts.md)** — a Users screen in the existing admin panel showing every account and its plan, plus comped Pro accounts via a `comped_until` column taught to both `Subscribes::plan()` and `ProUsers::ids()`.
+- ~~`superadmin-and-comped-accounts.md`~~ — ✅ shipped 2026-09-07 (Users screen in the admin panel with each account's plan; comped Pro through `users.comped_until`, read by `Subscribes::plan()` and `ProUsers::ids()`).
 
 ## Decisions (locked)
 
