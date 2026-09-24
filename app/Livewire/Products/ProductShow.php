@@ -12,6 +12,7 @@ use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Services\Drops\LargeDropConfirmation;
 use App\Support\AlertRules;
 use App\Support\UrlNormalizer;
 use Illuminate\Contracts\View\View;
@@ -285,6 +286,9 @@ final class ProductShow extends Component
             'canAddShop' => app(PlanLimits::class)->canAddShop($this->product),
             'shopLimit' => $this->product->user?->entitlements()->maxShopsPerProduct(),
             'alertRules' => AlertRules::of($this->product),
+            // The chart shows a large drop the moment it is read; the alert
+            // waits for a second reading. Say so, or the silence reads as a bug.
+            'awaitsConfirmation' => app(LargeDropConfirmation::class)->isAwaited($this->product),
         ]);
     }
 

@@ -6,14 +6,12 @@ use App\Jobs\CheckShopPrice;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
-use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
-use App\Services\AhApi\AhApiSource;
-use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\Drops\DropEvaluator;
 use App\Services\Drops\DropLatch;
 use App\Services\Drops\DropOutcome;
+use App\Services\Drops\LargeDropConfirmation;
 use App\Services\Drops\NotificationBudget;
 use App\Services\Drops\Reference;
 use App\Services\Drops\ReferenceValue;
@@ -31,6 +29,7 @@ final readonly class DetectDrop
         private Reference $reference,
         private DropEvaluator $evaluator,
         private DropLatch $latch,
+        private LargeDropConfirmation $confirmation,
     ) {}
 
     /**
@@ -188,27 +187,15 @@ final readonly class DetectDrop
             return;
         }
 
-        // A dataset or API shop reads a structured field and never fetches a
-        // page, so a second reading is the same row again and confirms
-        // nothing. Those shops alert on one reading, as they always have.
-        if ($this->readsWithoutFetching($trigger->shop)) {
+        // A dataset or API shop never fetches a page, so it alerts on one
+        // reading, as it always has.
+        if ($this->confirmation->isExempt($trigger->shop)) {
             $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit);
 
             return;
         }
 
-        $previous = PriceCheck::query()
-            ->where('shop_id', $trigger->shop_id)
-            ->where('id', '<', $trigger->id)
-            ->eligible()
-            ->latest('id')
-            ->first();
-
-        // The predecessor has to be a large drop in its own right. A merely
-        // discounted one — below the notify threshold but above the
-        // confirmation ceiling — would let a single anomalous reading through
-        // on its coat-tails, which is the whole failure this guard exists for.
-        if ($previous !== null && $this->qualifiesAsLargeDrop($product, (string) $previous->price, $reference)) {
+        if ($this->confirmation->isConfirmedByPrevious($product, $trigger, $reference)) {
             $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit);
 
             return;
@@ -245,33 +232,6 @@ final readonly class DetectDrop
                 ]);
             }
         });
-    }
-
-    /**
-     * `$packPrice` is what the shop charged at that earlier reading. It is
-     * converted with the winner's current size before it is compared: the
-     * reference is a unit figure, and handing it a pack price would compare two
-     * scales.
-     */
-    private function qualifiesAsLargeDrop(Product $product, string $packPrice, ReferenceValue $reference): bool
-    {
-        $price = $reference->isUnitBasis()
-            ? $product->bestValuePackSize()?->unitPriceFor($packPrice)
-            : $packPrice;
-
-        if ($price === null) {
-            return false;
-        }
-
-        $outcome = $this->evaluator->evaluate($product, $price, $reference, $packPrice);
-
-        return $outcome->belowThreshold && $outcome->needsConfirmation;
-    }
-
-    private function readsWithoutFetching(Shop $shop): bool
-    {
-        return app(AhApiSource::class)->supports($shop->host)
-            || app(CheckjebonSource::class)->supports($shop->host);
     }
 
     /** @see DropLatch::clearIfRecovered() — kept here as the caller's entry point. */

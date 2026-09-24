@@ -192,6 +192,12 @@
                         @endif
                     </dd>
                 @endforeach
+                @if ($awaitsConfirmation)
+                    <dd class="mt-3 flex items-start gap-1.5 text-base text-zinc-500 sm:text-sm dark:text-zinc-400" data-test="confirming-drop">
+                        <flux:icon.clock variant="micro" class="mt-1 size-4 shrink-0 sm:mt-0.5" />
+                        <span>{{ __('Confirming a large drop. The alert follows once a second reading agrees.') }}</span>
+                    </dd>
+                @endif
             </div>
         </dl>
     </flux:card>

@@ -2,6 +2,7 @@
 
 use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
+use App\Livewire\Products\ProductShow;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
@@ -354,3 +355,62 @@ test('a second reading at the same price confirms a large per-unit drop', functi
         ->and((string) $event->new_price)->toBe('5.00')
         ->and((string) $event->new_unit_price)->toBe('10.0000');
 });
+
+/** The product page's "confirming" note, rendered for the shop's owner. */
+function confirmingNote(Shop $shop): bool
+{
+    $product = $shop->product->refresh();
+
+    Livewire\Livewire::actingAs($product->user);
+
+    return str_contains(Livewire\Livewire::test(ProductShow::class, ['product' => $product])->html(), 'data-test="confirming-drop"');
+}
+
+test('the product page says a large drop is waiting for its second reading', function (): void {
+    $shop = confirmationProduct();
+
+    expect(confirmingNote($shop))->toBeFalse();
+
+    reading($shop, '40.00');
+
+    expect(confirmingNote($shop))->toBeTrue();
+});
+
+test('the confirming note goes once a second reading confirms the drop', function (): void {
+    $shop = confirmationProduct();
+
+    reading($shop, '40.00');
+    reading($shop, '40.00');
+
+    expect(PriceDropEvent::count())->toBe(1)
+        ->and(confirmingNote($shop))->toBeFalse();
+});
+
+test('the confirming note goes once a second reading clears the drop', function (): void {
+    $shop = confirmationProduct();
+
+    reading($shop, '40.00');
+    reading($shop, '100.00');
+
+    expect(confirmingNote($shop))->toBeFalse();
+});
+
+test('a failed second check keeps the confirming note', function (): void {
+    $shop = confirmationProduct();
+
+    reading($shop, '40.00');
+    reading($shop, null, ['status' => ScrapeStatus::HttpError, 'in_stock' => null]);
+
+    expect(confirmingNote($shop))->toBeTrue();
+});
+
+test('a small drop or a dataset shop shows no confirming note', function (string $host, string $price): void {
+    $shop = confirmationProduct($host);
+
+    reading($shop, $price);
+
+    expect(confirmingNote($shop))->toBeFalse();
+})->with([
+    'small drop' => ['shop.example.com', '90.00'],
+    'dataset shop' => ['boodschaapje.nl', '40.00'],
+]);
