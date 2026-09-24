@@ -61,6 +61,19 @@ it('lists the alert rules and marks a shop kept as a link', function (): void {
         ->toContain('| [bol.com](<https://bol.com/p/1>) | Link only | ' . ShopKind::Reference->note() . ' |');
 });
 
+it('lists no default drop once a price target is set', function (): void {
+    $user = User::factory()->create();
+    $product = markdownProduct($user);
+    $product->update(['target_price' => '10.00', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null]);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '12.00']);
+    $product->recomputeCheapestShop();
+
+    $markdown = $this->actingAs($user)->get(route('app.products.markdown', $product))->getContent();
+
+    expect($markdown)->toContain("## Alerts\n\n- €10.00 or less\n\n")
+        ->not->toContain('(default)');
+});
+
 it('keeps a pipe in a shop URL from breaking the table row', function (): void {
     $user = User::factory()->create();
     $product = markdownProduct($user);

@@ -39,8 +39,9 @@ final readonly class AlertRules
         }
 
         // An empty drop threshold is not off: the drop check falls back to a
-        // default, read here from the same reference it uses.
-        $reference = app(Reference::class)->compute($product);
+        // default, read here from the same reference it uses. With a target
+        // set it is off, as in DropEvaluator.
+        $reference = $product->hasActiveTarget() ? null : app(Reference::class)->compute($product);
         $defaults = $reference === null ? null : TierDefaults::forReference($reference);
 
         if ($product->drop_threshold_pct !== null) {

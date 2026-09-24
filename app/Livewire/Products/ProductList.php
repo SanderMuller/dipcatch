@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Products;
 
+use App\Billing\BillingGate;
 use App\Billing\PlanLimits;
+use App\Billing\ProPrice;
 use App\Enums\ProductCategory;
 use App\Enums\ProductDepartment;
 use App\Models\PriceDropEvent;
@@ -43,6 +45,10 @@ final class ProductList extends Component
     /** A department key, a category key, NO_CATEGORY, or empty for all. Anything else reads as all. */
     #[Url(except: '')]
     public string $category = '';
+
+    /** A shop host, or empty for all. Products tracked at that shop. */
+    #[Url(except: '')]
+    public string $shop = '';
 
     /** Only products in an active drop, or with a deal at their cheapest shop running now. */
     #[Url(except: false)]
@@ -88,6 +94,11 @@ final class ProductList extends Component
         $this->resetPage();
     }
 
+    public function updatedShop(): void
+    {
+        $this->resetPage();
+    }
+
     public function updatedDiscounted(): void
     {
         $this->resetPage();
@@ -100,13 +111,18 @@ final class ProductList extends Component
 
     public function render(): View
     {
+        $showAutoCategoriesPromo = $this->category === self::NO_CATEGORY && $this->canBuyAutoCategories();
+
         return view('livewire.products.product-list', [
             'products' => $this->products(),
             'canAddProduct' => $this->canAddProduct(),
             'categoryGroups' => $this->categoryGroups(),
+            'shopHosts' => $this->shopHosts(),
             // Kept while selected, for the same reason as categoryGroups().
             'hasUncategorised' => $this->category === self::NO_CATEGORY || $this->uncategorised()->exists(),
-            'showAutoCategoriesPromo' => $this->category === self::NO_CATEGORY && $this->canBuyAutoCategories(),
+            'showAutoCategoriesPromo' => $showAutoCategoriesPromo,
+            // "Try" only when checkout starts a free trial for this account.
+            'promoOffersTrial' => $showAutoCategoriesPromo && ProPrice::trialDays() > 0 && auth()->user()?->qualifiesForTrial() === true,
         ]);
     }
 
@@ -141,6 +157,10 @@ final class ProductList extends Component
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []),
             )
             ->when($this->category === self::NO_CATEGORY, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('category'))
+            ->when($this->shop !== '', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereHas(
+                'shops',
+                fn (EloquentQueryBuilder $shops): EloquentQueryBuilder => $shops->where('host', $this->shop)->where('active', true),
+            ))
             // The drop a product is in now: its latest alert while the latch is
             // set, measured the way the card's badge is. On a pack basis that
             // is today's price against the alert's reference, and nothing
@@ -198,6 +218,38 @@ final class ProductList extends Component
     }
 
     /**
+     * The shops the account tracks a product at, within the category filter:
+     * on "Food & drinks", only the shops that carry one of its food products.
+     * The selected shop stays offered when the category leaves it out, or
+     * the select would show a blank value.
+     *
+     * @return list<string>
+     */
+    private function shopHosts(): array
+    {
+        $categories = ProductCategory::leavesFor($this->category);
+
+        $hosts = Shop::query()
+            ->where('active', true)
+            ->whereHas('product', fn (EloquentQueryBuilder $product): EloquentQueryBuilder => $product
+                ->where('user_id', auth()->id())
+                ->when($categories !== null, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []))
+                ->when($this->category === self::NO_CATEGORY, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('category')))
+            ->distinct()
+            ->orderBy('host')
+            ->pluck('host')
+            ->filter(fn (mixed $host): bool => is_string($host) && $host !== '')
+            ->values()
+            ->all();
+
+        if ($this->shop !== '' && ! in_array($this->shop, $hosts, true)) {
+            $hosts[] = $this->shop;
+        }
+
+        return $hosts;
+    }
+
+    /**
      * @return EloquentQueryBuilder<Product>
      */
     private function uncategorised(): EloquentQueryBuilder
@@ -207,15 +259,17 @@ final class ProductList extends Component
 
     /**
      * Whether Pro would sort these products: the feature is switched on here,
-     * and this account does not have it yet. A Pro account is not sold what it
-     * already pays for.
+     * this account can buy Pro (the billing page's own rule), and does not
+     * have it yet. A Pro account is not sold what it already pays for.
      */
     private function canBuyAutoCategories(): bool
     {
         $user = auth()->user();
 
         return TypeSafeClient::configured()
+            && BillingGate::isOpen()
             && $user instanceof User
+            && $user->billing_blocked_at === null
             && ! $user->entitlements()->allowsAutoCategories();
     }
 

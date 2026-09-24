@@ -24,7 +24,7 @@
             </div>
 
             <div class="p-5">
-                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Saved so far') }}</dt>
+                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Potential savings so far') }}</dt>
                 <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{{ $lifetimeSavings }}</dd>
                 <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Compared with the price we alerted you from.') }}</dd>
                 <dd class="mt-1">

@@ -35,18 +35,27 @@ final class DropEvaluator
         // a price per kilo sits in a band nobody set it for.
         $defaults = TierDefaults::forReference($ref);
 
-        $thresholdPct = $product->drop_threshold_pct !== null
-            ? (string) $product->drop_threshold_pct
-            : (string) $defaults['pct'];
+        // A product with a target alerts only on what its owner set: an empty
+        // drop threshold is off there, not the default. Asked only when one is
+        // empty, because it reads the plan and the shops inside the row lock.
+        $useDefaults = ($product->drop_threshold_pct !== null && $product->drop_threshold_abs !== null)
+            || ! $product->hasActiveTarget();
 
-        $thresholdAbs = $dropAbsolute === null
-            ? null
-            : ($product->drop_threshold_abs !== null
-                ? (string) $product->drop_threshold_abs
-                : (string) ($defaults['abs'] ?? TierDefaults::for($ref->value)['abs']));
+        $thresholdPct = match (true) {
+            $product->drop_threshold_pct !== null => (string) $product->drop_threshold_pct,
+            $useDefaults => (string) $defaults['pct'],
+            default => null,
+        };
+
+        $thresholdAbs = match (true) {
+            $dropAbsolute === null => null,
+            $product->drop_threshold_abs !== null => (string) $product->drop_threshold_abs,
+            $useDefaults => (string) ($defaults['abs'] ?? TierDefaults::for($ref->value)['abs']),
+            default => null,
+        };
 
         $belowThreshold = ($dropAbsolute !== null && $thresholdAbs !== null && $this->meets($dropAbsolute, $thresholdAbs))
-            || $this->meets($dropPercent, $thresholdPct);
+            || ($thresholdPct !== null && $this->meets($dropPercent, $thresholdPct));
 
         return new DropOutcome(
             belowThreshold: $belowThreshold,

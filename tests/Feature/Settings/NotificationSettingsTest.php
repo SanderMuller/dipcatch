@@ -84,7 +84,8 @@ test('a free account sees the automatic categories switch disabled with the upgr
         ->assertSee('Pro sorts products for you. Your choice is kept, and it starts working when you upgrade.')
         ->html();
 
-    expect($html)->toMatch('/disabled="disabled"[^>]*data-test="auto-categories"/');
+    expect($html)->toMatch('/disabled="disabled"[^>]*data-test="auto-categories"/')
+        ->toMatch('/data-test="auto-categories-pro"[^>]*>\s*Pro\s*</');
 });
 
 test('a Pro account sees the automatic categories switch enabled', function (): void {
@@ -99,7 +100,9 @@ test('a Pro account sees the automatic categories switch enabled', function (): 
         ->html();
 
     expect($html)->toMatch('/data-test="auto-categories"/')
-        ->not->toMatch('/disabled="disabled"[^>]*data-test="auto-categories"/');
+        ->not->toMatch('/disabled="disabled"[^>]*data-test="auto-categories"/')
+        // Marked Pro on a Pro account too, so a subscriber sees what the plan pays for.
+        ->toMatch('/data-test="auto-categories-pro"[^>]*>\s*Pro\s*</');
 });
 
 test('save persists the automatic categories choice', function (): void {

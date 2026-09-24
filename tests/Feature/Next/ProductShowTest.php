@@ -884,7 +884,7 @@ it('names the same default drop the drop check uses on a per-unit reference', fu
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product])
-        ->assertSee(Numeric::trimmed($outcome->thresholdPct) . '% drop (default)');
+        ->assertSee(Numeric::trimmed((string) $outcome->thresholdPct) . '% drop (default)');
 });
 
 it('shows no unit figure from a shop\'s own size when the product compares none', function (): void {

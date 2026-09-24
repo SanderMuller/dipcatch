@@ -168,7 +168,7 @@
                                 'pack' => \App\Support\MoneyFormatter::format($priceAlertSwitch['packPrice'], (string) $currency),
                                 'size' => $priceAlertSwitch['pack'],
                             ]) }}
-                            {{ __('Your own drop settings are cleared, so drops go back to the default for the price.') }}
+                            {{ __('Your drop settings are cleared, so the price alert is the only alert left.') }}
                         </flux:callout.text>
                         <x-slot name="actions">
                             <flux:button size="sm" wire:click="switchToPriceAlert">{{ __('Switch to a price alert') }}</flux:button>
@@ -187,7 +187,7 @@
                     {{ $currentPrice
                         ? __('We tell you when any shop reaches this price. Now :amount at :host.', ['amount' => $currentPrice['amount'], 'host' => $currentPrice['host']])
                         : __('We tell you when any shop reaches this price.') }}
-                    {{ __('Leave a target empty to switch it off. Leave a drop empty to use the default for the price.') }}
+                    {{ __('Leave a target empty to switch it off. Leave a drop empty to use the default for the price, or, with a target set, to get no drop alert.') }}
                 </p>
             </details>
 

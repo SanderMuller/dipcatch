@@ -197,6 +197,22 @@ final class Product extends Model
         return max(0, (int) round((float) $fraction * 100));
     }
 
+    /**
+     * Whether the owner set a price to reach that is checked. Such a product
+     * alerts on what the owner configured and nothing else: no default drop
+     * thresholds. A unit-price target only counts when it can fire now: on
+     * an account that is alerted on it, with a best-value shop that has a unit
+     * price — what `DetectUnitPriceTarget` checks. Otherwise the product would
+     * be left with no working alert at all.
+     */
+    public function hasActiveTarget(): bool
+    {
+        return $this->target_price !== null
+            || ($this->unit_price_target !== null
+                && $this->user?->entitlements()->allowsUnitPriceAlerts() === true
+                && $this->bestValueShop()?->unitPrice() !== null);
+    }
+
     public function isPubliclyShared(): bool
     {
         return is_string($this->share_slug) && $this->share_slug !== '';
