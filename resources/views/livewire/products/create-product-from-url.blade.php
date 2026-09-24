@@ -31,6 +31,24 @@
             <flux:skeleton animate="pulse" class="h-4 w-2/3" />
             <flux:skeleton animate="pulse" class="h-20 w-full" />
         </div>
+
+        {{-- Another way in, for someone adding many products: the assistant
+             runs the same lookup and shows what it found before it saves. --}}
+        <flux:callout icon="sparkles" color="zinc" class="mt-6" data-test="assistant-hint">
+            <flux:callout.heading>{{ __('Add products and shops from :assistant', ['assistant' => $connectedAssistant ?? 'Claude']) }}</flux:callout.heading>
+            @if ($connectedAssistant !== null)
+                <flux:callout.text>
+                    {{ __(':assistant is connected. Paste a product link and ask it to track it, or ask it to add a shop to a product you follow. It shows the name and the price it found before it saves anything.', ['assistant' => $connectedAssistant]) }}
+                </flux:callout.text>
+            @else
+                <flux:callout.text>
+                    {{ __('Connect Claude once, then paste a product link and ask it to track it, or ask it to add a shop to a product you follow. It shows the name and the price it found before it saves anything.') }}
+                </flux:callout.text>
+                <x-slot name="actions">
+                    <flux:button size="sm" :href="route('app.connections')" wire:navigate>{{ __('Connect Claude') }}</flux:button>
+                </x-slot>
+            @endif
+        </flux:callout>
     @endif
 
     @if ($state === 'manual_selector')

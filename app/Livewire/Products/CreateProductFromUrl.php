@@ -16,6 +16,7 @@ use App\Support\UrlNormalizer;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\View\View;
+use Laravel\Passport\Token;
 use Livewire\Component;
 use RuntimeException;
 use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
@@ -210,8 +211,35 @@ final class CreateProductFromUrl extends Component
         $this->reset(['title', 'imageUrl', 'thresholdPct', 'thresholdAbs', 'existingTrackedProduct']);
     }
 
+    /**
+     * The name of an assistant that can use the DipCatch tools on this
+     * account now — a live grant with the MCP scope — so the hint says "ask
+     * it" rather than "connect it". Null when none can.
+     */
+    private function connectedAssistant(): ?string
+    {
+        $token = Token::query()
+            ->with('client')
+            ->where('user_id', auth()->id())
+            ->where('revoked', false)
+            ->where(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->whereHas('client', fn (EloquentQueryBuilder $client): EloquentQueryBuilder => $client->where('revoked', false))
+            ->latest('created_at')
+            ->get()
+            ->first(fn (Token $token): bool => $token->can('mcp:use'));
+
+        if (! $token instanceof Token) {
+            return null;
+        }
+
+        return is_string($token->client?->name) && $token->client->name !== '' ? $token->client->name : __('Your assistant');
+    }
+
     public function render(): View
     {
-        return view('livewire.products.create-product-from-url');
+        return view('livewire.products.create-product-from-url', [
+            // Only before a lookup: once a preview is on screen, the hint is noise.
+            'connectedAssistant' => in_array($this->state, ['idle', 'error'], strict: true) ? $this->connectedAssistant() : null,
+        ]);
     }
 }

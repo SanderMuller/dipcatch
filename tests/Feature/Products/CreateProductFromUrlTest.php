@@ -13,6 +13,9 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+use Laravel\Passport\Client;
+use Laravel\Passport\Token;
 use Livewire\Livewire;
 
 function fakeCreateFlowOffer(string $url = 'https://shop.example.com/p/1', string $price = '50.00', string $currency = 'EUR', string $title = 'Demo Item'): array
@@ -464,4 +467,99 @@ test('offers no price per unit when the page states no pack size', function (): 
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertDontSeeHtml('data-test="unit-target"');
+});
+
+function connectAssistantFor(User $user, bool $revoked = false): void
+{
+    $client = new Client();
+    $client->forceFill([
+        'id' => (string) Str::uuid(),
+        'name' => 'Claude',
+        'redirect_uris' => ['https://example.test/callback'],
+        'grant_types' => ['authorization_code'],
+        'revoked' => false,
+    ])->save();
+
+    Token::query()->forceCreate([
+        'id' => (string) Str::uuid(),
+        'user_id' => $user->getKey(),
+        'client_id' => $client->getKey(),
+        'scopes' => ['mcp:use'],
+        'revoked' => $revoked,
+        'expires_at' => now()->addDay(),
+    ]);
+}
+
+test('the page offers Claude as another way to add products and shops', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->assertSeeHtml('data-test="assistant-hint"')
+        ->assertSee('Add products and shops from Claude')
+        ->assertSee('Connect Claude once')
+        ->assertSeeHtml('href="' . route('app.connections') . '"');
+});
+
+test('with Claude connected, the hint says to ask it rather than to connect it', function (): void {
+    $user = User::factory()->create();
+    connectAssistantFor($user);
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->assertSee('Claude is connected.')
+        ->assertDontSee('Connect Claude once');
+});
+
+test('a disconnected Claude counts as not connected', function (): void {
+    $user = User::factory()->create();
+    connectAssistantFor($user, revoked: true);
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->assertSee('Connect Claude once')
+        ->assertDontSee('Claude is connected.');
+});
+
+test('the hint leaves once a product is looked up', function (): void {
+    Http::fake(fakeCreateFlowOffer());
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'preview')
+        ->assertDontSeeHtml('data-test="assistant-hint"');
+});
+
+test('a grant without the DipCatch tools scope, or an expired one, does not count as connected', function (): void {
+    $user = User::factory()->create();
+    connectAssistantFor($user);
+    Token::query()->where('user_id', $user->getKey())->update(['scopes' => json_encode(['profile'])]);
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)->assertSee('Connect Claude once');
+
+    Token::query()->where('user_id', $user->getKey())->update(['scopes' => json_encode(['mcp:use']), 'expires_at' => now()->subMinute()]);
+
+    Livewire::test(CreateProductFromUrl::class)->assertSee('Connect Claude once');
+});
+
+test('the hint names the assistant that is connected', function (): void {
+    $user = User::factory()->create();
+    connectAssistantFor($user);
+    Client::query()->update(['name' => 'ChatGPT']);
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->assertSee('Add products and shops from ChatGPT')
+        ->assertSee('ChatGPT is connected.');
+});
+
+test('a grant from a revoked client does not count as connected', function (): void {
+    $user = User::factory()->create();
+    connectAssistantFor($user);
+    Client::query()->update(['revoked' => true]);
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)->assertSee('Connect Claude once');
 });
