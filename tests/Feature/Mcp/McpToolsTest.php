@@ -26,7 +26,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Mcp\Server\Attributes\Description;
-use ReflectionClass;
 
 it('lists only the products of the token owner', function (): void {
     $me = User::factory()->create();
