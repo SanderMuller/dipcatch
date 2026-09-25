@@ -21,21 +21,21 @@ final readonly class SavingsByMonthSeries
 
     /** @var list<string> */
     private const array SERIES_COLORS = [
-        'text-blue-500 dark:text-blue-400',
-        'text-emerald-500 dark:text-emerald-400',
-        'text-amber-500 dark:text-amber-400',
+        'text-brand',
+        'text-savings-strong',
+        'text-chart-line',
         'text-violet-500 dark:text-violet-400',
-        'text-rose-500 dark:text-rose-400',
+        'text-alert',
         'text-cyan-500 dark:text-cyan-400',
     ];
 
     /** @var list<string> */
     private const array LEGEND_COLORS = [
-        'bg-blue-500',
-        'bg-emerald-500',
-        'bg-amber-500',
+        'bg-brand',
+        'bg-savings-strong',
+        'bg-chart-line',
         'bg-violet-500',
-        'bg-rose-500',
+        'bg-alert',
         'bg-cyan-500',
     ];
 
