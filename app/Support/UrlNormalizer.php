@@ -6,9 +6,28 @@ use InvalidArgumentException;
 
 final class UrlNormalizer
 {
-    /** @var list<string> */
+    /**
+     * Click and campaign ids that never change what a page sells. Adding one
+     * here changes the hash of every stored URL that carries it, so a row
+     * saved before the change no longer matches its own page pasted again —
+     * run `dipcatch:renormalize-shop-urls` after extending this list.
+     *
+     * Never a parameter that picks what is sold: `variant`, `sku`,
+     * `activeVariant`, `id`, `color`, `size` — and Amazon's `th` and `psc`,
+     * which look like tracking and select a variant.
+     *
+     * @var list<string>
+     */
     private const array TRACKING_PARAM_EXACT = [
         'gclid', 'fbclid', 'mc_eid', 'mc_cid', 'ref', 'ref_src', '_ga',
+        // Google: Shopping's link id, and the ads ids that replaced gclid.
+        'srsltid', 'gbraid', 'wbraid', 'gad_source', 'gad_campaignid', '_gl',
+        // Other ad networks and social apps.
+        'msclkid', 'dclid', 'yclid', 'igshid', 'ttclid', 'twclid', 'li_fat_id',
+        // Mail and marketing automation.
+        '_hsenc', '_hsmi', 'mkt_tok',
+        // Affiliate networks: Awin, Commission Junction, Impact.
+        'awc', 'cjevent', 'irclickid',
     ];
 
     /** @var list<string> */
@@ -17,7 +36,7 @@ final class UrlNormalizer
     /**
      * Normalize a URL so two URLs that point at the same resource produce the
      * same string: lowercase scheme + host, strip default ports, keep the path
-     * as the shop wrote it, drop `utm_*` query params, sort remaining params
+     * as the shop wrote it, drop tracking query params, sort remaining params
      * alphabetically.
      *
      * The trailing slash is kept, because it is the shop's own canonical form
@@ -211,6 +230,10 @@ final class UrlNormalizer
 
     private static function isTrackingParam(string $key): bool
     {
+        // Links are written by hand as often as by tools: `UTM_Source` is the
+        // same campaign tag.
+        $key = strtolower($key);
+
         if (in_array($key, self::TRACKING_PARAM_EXACT, strict: true)) {
             return true;
         }

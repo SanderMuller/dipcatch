@@ -158,3 +158,15 @@ test('hash returns 64-char sha256 hex', function (): void {
         ->toHaveLength(64)
         ->toMatch('/^[a-f0-9]{64}$/');
 });
+
+test('strips the click and campaign ids shops and ad networks add', function (string $param): void {
+    expect(UrlNormalizer::normalize("https://shop.test/p/1?{$param}=abc123&size=xl"))->toBe('https://shop.test/p/1?size=xl');
+})->with(['srsltid', 'gbraid', 'wbraid', 'gad_source', 'gad_campaignid', '_gl', 'msclkid', 'igshid', 'ttclid', 'awc', 'cjevent', 'irclickid', '_hsenc', 'mkt_tok']);
+
+test('strips a tracking parameter whatever its case', function (): void {
+    expect(UrlNormalizer::normalize('https://shop.test/p/1?UTM_Source=mail&SrsltId=x'))->toBe('https://shop.test/p/1');
+});
+
+test('keeps the parameters that choose what is sold', function (string $query): void {
+    expect(UrlNormalizer::normalize("https://shop.test/p/1?{$query}"))->toBe("https://shop.test/p/1?{$query}");
+})->with(['variant=123', 'sku=MP4838', 'activeVariant=169589.19', 'th=1', 'psc=1']);
