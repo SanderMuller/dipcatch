@@ -274,6 +274,17 @@ test('the two Roter packs are the per-unit comparison, live in the demo', functi
     expect($roter->bestValueShop()?->host)->toBe('benushop.nl');
 });
 
+test('the seeded history carries the best value from its first day', function (): void {
+    // Without it the per-unit chart line began at the first live check, and
+    // the chart opened on one dot at its right edge.
+    $roter = Product::query()->where('title', 'Roter Vitamine C 70 mg citroen kauwtabletten')->firstOrFail();
+    $first = $roter->cheapestHistory()->oldest('started_at')->firstOrFail();
+
+    expect($first->best_value_shop_id)->not->toBeNull()
+        ->and($first->best_value_price)->not->toBeNull()
+        ->and($first->pack_unit)->toBe('piece');
+});
+
 test('a product with no photo of its own names itself in the stand-in', function (): void {
     // Better than an empty frame, and better than showing some other
     // product's picture.

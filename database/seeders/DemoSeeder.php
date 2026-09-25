@@ -20,6 +20,7 @@ use App\Notifications\PriceDropNotification;
 use App\Services\Drops\ReferenceValue;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\DatasetCatalog;
+use Database\Seeders\Demo\DemoBestValue;
 use Database\Seeders\Demo\DemoOffer;
 use Database\Seeders\Demo\DemoProduct;
 use Database\Seeders\Demo\GeneratedCatalog;
@@ -686,9 +687,16 @@ final class DemoSeeder extends Seeder
             return;
         }
 
+        // The best value per day too, as recomputeCheapestShop() writes it, so
+        // the per-unit chart line spans the history. Only the segments get it:
+        // the seeded drops are pack-price drops, and a best value on the
+        // product row would move them to the unit basis and hide them.
+        $packs = $product->load('shops')->comparablePacks();
+
         $segments = [];
         $openPrice = null;
         $openShopId = null;
+        $openBestValue = null;
         $openStart = null;
 
         for ($day = 0; $day < $historyDays; $day++) {
@@ -702,9 +710,10 @@ final class DemoSeeder extends Seeder
                 }
             }
 
+            $bestValue = DemoBestValue::on($eligible, $packs, $day);
             $startedAt = now()->subDays($historyDays - 1 - $day)->setTime(6, 5);
 
-            if ($openPrice !== null && abs($best - $openPrice) < 0.005 && $openShopId === $bestShopId) {
+            if ($openPrice !== null && abs($best - $openPrice) < 0.005 && $openShopId === $bestShopId && DemoBestValue::same($bestValue, $openBestValue)) {
                 continue;
             }
 
@@ -716,6 +725,10 @@ final class DemoSeeder extends Seeder
                 'product_id' => $product->id,
                 'cheapest_shop_id' => $bestShopId,
                 'cheapest_price' => $best,
+                'best_value_shop_id' => $bestValue?->shop->id,
+                'best_value_price' => $bestValue?->price,
+                'pack_quantity' => $bestValue?->size->quantity,
+                'pack_unit' => $bestValue?->size->unit,
                 'started_at' => $startedAt,
                 'ended_at' => null,
                 'triggering_price_check_id' => null,
@@ -723,6 +736,7 @@ final class DemoSeeder extends Seeder
 
             $openPrice = $best;
             $openShopId = $bestShopId;
+            $openBestValue = $bestValue;
             $openStart = $startedAt;
         }
 
