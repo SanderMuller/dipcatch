@@ -15,8 +15,8 @@
     "
 >
     <div>
-        <flux:heading size="xl" level="1" class="tracking-tight">{{ __('Products') }}</flux:heading>
-        <flux:text class="mt-1 text-zinc-600 dark:text-zinc-400">
+        <flux:heading size="xl" level="1" class="text-2xl! font-semibold! tracking-tight sm:text-3xl!">{{ __('Products') }}</flux:heading>
+        <flux:text class="mt-1 text-zinc-500 dark:text-zinc-400">
             {{ __('Everything you follow. Biggest drops first, until you sort them another way.') }}
         </flux:text>
     </div>
@@ -116,10 +116,10 @@
         <aside class="hidden lg:block" data-test="product-category-nav">
             <flux:heading level="2" class="px-3 pb-2 text-zinc-500">{{ __('Categories') }}</flux:heading>
             {{-- Flux sets the item and group labels in small type; these lift
-                 them a size, and make the current item bold on a white chip. --}}
+                 them a size, and make the current item bold on a paper chip. --}}
             <flux:navlist
                 variant="outline"
-                class="[&_[data-content]]:text-base [&_[data-flux-navlist-group]>button>span]:text-base lg:[&_[data-flux-navlist-item]]:h-9 lg:[&_[data-flux-navlist-group]>button]:h-9 [&_[data-flux-navlist-item][data-current]]:shadow-xs [&_[data-flux-navlist-item][data-current]_[data-content]]:font-semibold"
+                class="[&_[data-content]]:text-base [&_[data-flux-navlist-group]>button>span]:text-base lg:[&_[data-flux-navlist-item]]:h-9 lg:[&_[data-flux-navlist-group]>button]:h-9 [&_[data-flux-navlist-item][data-current]]:bg-paper [&_[data-flux-navlist-item][data-current]]:shadow-none [&_[data-flux-navlist-item][data-current]]:ring-1 [&_[data-flux-navlist-item][data-current]]:ring-line [&_[data-flux-navlist-item][data-current]_[data-content]]:font-semibold"
             >
                 <flux:navlist.item icon="squares-2x2" wire:click="$set('category', '')" :current="$category === ''" :aria-current="$category === '' ? 'true' : 'false'">
                     {{ __('All categories') }}
@@ -154,7 +154,7 @@
                     <flux:heading level="2" class="mt-6 px-3 pb-2 text-zinc-500">{{ __('Shops') }}</flux:heading>
                     <flux:navlist
                         variant="outline"
-                        class="[&_[data-content]]:text-base lg:[&_[data-flux-navlist-item]]:h-9 [&_[data-flux-navlist-item][data-current]]:shadow-xs [&_[data-flux-navlist-item][data-current]_[data-content]]:font-semibold"
+                        class="[&_[data-content]]:text-base lg:[&_[data-flux-navlist-item]]:h-9 [&_[data-flux-navlist-item][data-current]]:bg-paper [&_[data-flux-navlist-item][data-current]]:shadow-none [&_[data-flux-navlist-item][data-current]]:ring-1 [&_[data-flux-navlist-item][data-current]]:ring-line [&_[data-flux-navlist-item][data-current]_[data-content]]:font-semibold"
                     >
                         <flux:navlist.item icon="building-storefront" wire:click="$set('shop', '')" :current="$shop === ''" :aria-current="$shop === '' ? 'true' : 'false'">
                             {{ __('All shops') }}
