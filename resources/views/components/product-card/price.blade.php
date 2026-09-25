@@ -17,9 +17,9 @@
     @endif
     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span @class([
-            'text-2xl font-bold tracking-tight',
-            'text-orange-600 dark:text-orange-400' => $drop !== null && $product->active,
-            'text-zinc-900 dark:text-white' => $drop === null || ! $product->active,
+            'text-2xl font-semibold tracking-tight',
+            'text-brand' => $product->active,
+            'text-zinc-900 dark:text-white' => ! $product->active,
         ])>
             {{ $headline->text() }}
         </span>
@@ -38,8 +38,8 @@
             @endif
 
             <span @class([
-                'rounded-md px-1.5 py-0.5 text-xs font-bold',
-                'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300' => $product->active,
+                'rounded-full px-2 py-0.5 text-xs font-semibold',
+                'bg-savings/10 text-savings-strong' => $product->active,
                 'bg-zinc-200 text-zinc-600 dark:bg-white/10 dark:text-zinc-300' => ! $product->active,
             ]) data-test="drop-badge" title="{{ __('Measured :unit', ['unit' => \App\Support\UnitWord::forCode($drop->comparison_unit) ?? __('per pack')]) }}">
                 −{{ $dropPercent }}%

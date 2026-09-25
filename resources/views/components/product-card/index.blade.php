@@ -15,7 +15,7 @@
 <flux:tooltip position="right" align="start" class="contents">
 <article data-test="product-card" {{ $attributes->class([
     'group relative flex h-full flex-col overflow-hidden rounded-2xl transition',
-    'bg-white shadow-xs ring-1 ring-black/5 hover:shadow-md dark:bg-zinc-900 dark:ring-white/10' => $product->active,
+    'bg-paper shadow-xs ring-1 ring-line hover:shadow-md dark:shadow-none' => $product->active,
     'border border-dashed border-zinc-300 bg-zinc-100/70 dark:border-white/15 dark:bg-zinc-900/40' => ! $product->active,
 ]) }}>
     <div class="relative p-3 pb-0">
