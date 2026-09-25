@@ -113,18 +113,18 @@ test('the coffee and filters pages list Amazon in the UK and the US', function (
         ->toContain('amazon.co.uk');
 });
 
-test('the beauty page lists Etos, Lookfantastic, Ulta, Walmart and Amazon', function (): void {
+test('the beauty page lists Lookfantastic, Ulta and Amazon, and not the shops that block us', function (): void {
     $case = UseCases::find('beauty');
 
     expect($case)->not->toBeNull();
     assert($case !== null);
 
-    expect(array_column($case->shops(), 'host'))->toContain('etos.nl')
+    expect(array_column($case->shops(), 'host'))->not->toContain('etos.nl')
+        ->not->toContain('walmart.com')
         ->toContain('theordinary.com')
         ->toContain('lookfantastic.com')
         ->toContain('cultbeauty.com')
         ->toContain('ulta.com')
-        ->toContain('walmart.com')
         ->toContain('bol.com')
         ->toContain('amazon.nl')
         ->toContain('ah.nl')

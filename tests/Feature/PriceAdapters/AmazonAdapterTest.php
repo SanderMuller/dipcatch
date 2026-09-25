@@ -218,3 +218,30 @@ HTML;
     expect($result->isFailed())->toBeTrue()
         ->and($result->failureReason)->toBe('amazon_extraction_failed');
 });
+
+test('names a page without a featured offer apart from a layout it cannot read', function (string $marker): void {
+    // Seen on 2026-09-25: amazon.nl showing only "See All Buying Options",
+    // and amazon.com shipping nothing to the visitor's address.
+    $html = <<<HTML
+<html><body>
+  <span id="productTitle">CeraVe Moisturising Cream</span>
+  <div id="desktop_buybox">{$marker}</div>
+  <div class="a-carousel-card"><span class="a-price"><span class="a-offscreen">€1492</span></span></div>
+</body></html>
+HTML;
+
+    $result = $this->adapter->extract('https://www.amazon.nl/dp/B0923725WZ', $html);
+
+    expect($result->isFailed())->toBeTrue()
+        ->and($result->failureReason)->toBe('amazon_no_featured_offer');
+})->with([
+    'no buy box' => ['<div id="unqualifiedBuyBox"></div>'],
+    'all buying options' => ['<span id="buybox-see-all-buying-choices">See All Buying Options</span>'],
+    'nothing ships here' => ['<span>No featured offers available</span>'],
+]);
+
+test('keeps the generic failure for a page it simply cannot read', function (): void {
+    $result = $this->adapter->extract('https://www.amazon.nl/dp/B000', '<html><body><span id="productTitle">Demo</span></body></html>');
+
+    expect($result->failureReason)->toBe('amazon_extraction_failed');
+});

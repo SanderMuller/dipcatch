@@ -197,16 +197,16 @@ final class UseCases
             'beauty' => [
                 'heading' => __('Price alerts for skincare and makeup'),
                 'label' => __('skincare and makeup'),
-                'description' => __('CeraVe, La Roche-Posay, Cetaphil, The Ordinary and the rest of the cabinet. Watched at Etos, Lookfantastic, Cult Beauty, Ulta, Walmart, bol.com, Amazon, Albert Heijn and Jumbo. DipCatch compares them per kilo or litre and tells you when a tub drops.'),
+                'description' => __('CeraVe, La Roche-Posay, Cetaphil, The Ordinary and the rest of the cabinet. Watched at Lookfantastic, Cult Beauty, Ulta, bol.com, Amazon, Albert Heijn and Jumbo. DipCatch compares them per kilo or litre and tells you when a tub drops.'),
                 'intro' => __('A serum and a moisturiser run out on a schedule, which is exactly where a shelf price starts to lie. A 454 g tub is not simply cheaper than a 340 g tub, and the ranking changes whenever one shop runs an offer. DipCatch does that sum so you reorder the size that actually costs less.'),
-                'example' => __('A 454 g tub of CeraVe moisturising cream is €23.15 at etos.nl. Per kilo that is €50.99. The 340 g tub at €18.85 is €55.44 per kilo, so the larger tub wins until the small one goes on offer. Pick your price and you hear about it when either one gets there.'),
+                'example' => __('A 454 g tub of CeraVe moisturising cream is €23.00 at bol.com. Per kilo that is €50.66. The 340 g tub at €18.85 is €55.44 per kilo, so the larger tub wins until the small one goes on offer. Pick your price and you hear about it when either one gets there.'),
                 'tips' => [
                     __('Track the tub or bottle you actually finish, not the range. "CeraVe moisturising cream 454 g" is a price; "moisturiser" is not.'),
                     __('On Pro, pick your price per kilo or litre when the packs differ per shop.'),
                     __('Add the drogist and the brand site for the same product. They rarely run offers in the same week.'),
                 ],
                 'faq' => [
-                    ['q' => __('Which beauty shops work?'), 'a' => __('Paste a product link. Most shops work. We set up Etos, Lookfantastic, Cult Beauty, Ulta, Walmart, The Ordinary, bol.com, Amazon, Albert Heijn and Jumbo ourselves. Kruidvat, Boots, Superdrug, Target, Notino and many brand shops do not let us read their price, so those are not in the list. Other webshops often work as well, and you see what we found before you save it.')],
+                    ['q' => __('Which beauty shops work?'), 'a' => __('Paste a product link. Most shops work. We set up Lookfantastic, Cult Beauty, Ulta, The Ordinary, bol.com, Amazon, Albert Heijn and Jumbo ourselves. Etos, Kruidvat, Boots, Superdrug, Notino, Walmart, Target and many brand shops do not let us read their price, so those are not in the list. Other webshops often work as well, and you see what we found before you save it.')],
                     ['q' => __('Does it compare different tub sizes?'), 'a' => __('Yes. DipCatch reads how much is in the pack and shows the price per kilo, litre or piece. A 340 g tub and a 454 g tub then line up honestly.')],
                     ['q' => __('Does makeup count, or only skincare?'), 'a' => __('Anything with a product page and a price. A mascara you repurchase, a serum, a moisturiser and a cleanser are all worth tracking if you buy them more than once.')],
                     ['q' => __('Can I track The Ordinary on the brand site?'), 'a' => __('Yes. Paste the theordinary.com product link. DipCatch reads the price on that page, including the Dutch and other country paths.')],

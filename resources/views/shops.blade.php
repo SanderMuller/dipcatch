@@ -47,6 +47,23 @@
                     @endforeach
                 </ul>
 
+                @php($unsupported = \App\Support\SupportedShops::unsupported())
+                @if ($unsupported !== [])
+                    <section class="mt-16" data-test="unsupported-shops">
+                        <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Shops that block us') }}</h2>
+                        <p class="mt-3 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('These shops refuse the requests DipCatch makes, so it cannot read their prices. You can still keep a link to one of them on a product, and DipCatch keeps trying that page.') }}</p>
+                        <ul role="list" class="mt-5 flex flex-wrap gap-2">
+                            @foreach ($unsupported as $shop)
+                                <li class="inline-flex items-center gap-2 rounded-full bg-paper/60 py-1.5 pr-3 pl-1.5 text-sm text-zinc-600 ring-1 ring-line dark:text-zinc-300">
+                                    <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat grayscale"></span>
+                                    <span>{{ $shop['name'] }}</span>
+                                    <span class="text-zinc-400 dark:text-zinc-500">{{ $shop['host'] }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </section>
+                @endif
+
                 <section class="mt-16 flex flex-col gap-6 rounded-2xl bg-soft-yellow/70 p-8 ring-1 ring-line backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:p-10 dark:bg-paper">
                     <h2 class="max-w-[30ch] text-2xl font-semibold tracking-tight text-balance">{{ __('Stop checking prices by hand.') }}</h2>
                     <a href="{{ route('register') }}" class="inline-flex shrink-0 items-center self-start sm:self-auto rounded-full bg-ink px-5 py-3 text-base font-medium text-paper shadow-md hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:text-sm dark:shadow-none">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>

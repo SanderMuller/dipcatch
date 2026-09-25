@@ -38,8 +38,24 @@ return [
         'amazon.nl', 'amazon.com', 'amazon.co.uk',
         'zooplus.nl', 'zooplus.co.uk', 'bitiba.nl',
         'dierapotheker.nl', 'petsplace.nl', 'medpets.nl', 'welkoop.nl',
-        'petsathome.com', 'etos.nl', 'theordinary.com',
-        'lookfantastic.com', 'cultbeauty.com', 'ulta.com', 'walmart.com',
+        'petsathome.com', 'theordinary.com',
+        'lookfantastic.com', 'cultbeauty.com', 'ulta.com',
+    ],
+
+    /**
+     * Shops people ask about that refuse DipCatch's requests: a bot check, a
+     * challenge page or a blanket error, seen on the dates below. Listed on
+     * the shops page so a visitor knows before pasting a link. A shop leaves
+     * this list when a live check reads its product pages again.
+     */
+    'unsupported_hosts' => [
+        // Challenge page and HTTP 403, 2026-09-25.
+        'kruidvat.nl', 'boots.com', 'superdrug.com', 'notino.nl',
+        // Drops the connection for DipCatch's fetcher while a browser gets a
+        // page, 2026-09-25.
+        'etos.nl',
+        // "Robot or human?" check on product pages, 2026-09-25.
+        'walmart.com',
     ],
 
     /**
@@ -49,7 +65,6 @@ return [
     'homepage_hosts' => [
         'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl',
         'dekamarkt.nl', 'poiesz-supermarkten.nl', 'vomar.nl', 'bol.com', 'amazon.nl', 'zooplus.nl',
-        'etos.nl',
     ],
 
     /**
@@ -86,6 +101,10 @@ return [
         'cultbeauty.com' => 'Cult Beauty',
         'ulta.com' => 'Ulta',
         'walmart.com' => 'Walmart',
+        'kruidvat.nl' => 'Kruidvat',
+        'boots.com' => 'Boots',
+        'superdrug.com' => 'Superdrug',
+        'notino.nl' => 'Notino',
     ],
 
     /**
@@ -123,9 +142,9 @@ return [
         // page. This one is a way of working, not a thing people track.
         'ask-your-assistant' => [],
         'beauty' => [
-            'etos.nl', 'theordinary.com',
+            'theordinary.com',
             'lookfantastic.com', 'cultbeauty.com',
-            'ulta.com', 'walmart.com',
+            'ulta.com',
             'bol.com', 'amazon.nl',
             'ah.nl', 'jumbo.com',
         ],

@@ -2,6 +2,8 @@
 
 namespace App\PriceAdapters\Hosts;
 
+use App\PriceAdapters\AdapterContext;
+use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopSnapshot;
@@ -43,6 +45,23 @@ final readonly class AmazonAdapter extends HostAdapter
     public function key(): string
     {
         return 'amazon';
+    }
+
+    /**
+     * A page with no featured offer has no price to read: Amazon shows only
+     * "See All Buying Options", or ships nothing to the visitor's address.
+     * Saying so apart from a layout the selectors no longer match keeps a
+     * product-level gap from reading as a broken reader.
+     */
+    public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
+    {
+        $result = parent::extract($url, $html, $context);
+
+        if ($result->isFailed() && self::hasNoFeaturedOffer($html)) {
+            return ExtractionResult::failed('amazon_no_featured_offer');
+        }
+
+        return $result;
     }
 
     /**
@@ -165,6 +184,13 @@ final readonly class AmazonAdapter extends HostAdapter
         $text = strtolower(trim($availability->text('')));
 
         return array_all(['currently unavailable', 'niet beschikbaar', 'derzeit nicht verfügbar', 'non disponible', 'no disponible', 'attualmente non disponibile'], fn (string $needle): bool => ! str_contains($text, $needle));
+    }
+
+    private static function hasNoFeaturedOffer(string $html): bool
+    {
+        return str_contains($html, 'id="unqualifiedBuyBox"')
+            || str_contains($html, 'id="buybox-see-all-buying-choices"')
+            || str_contains($html, 'No featured offers available');
     }
 
     private static function firstUrlFromDynamicImage(string $json): ?string

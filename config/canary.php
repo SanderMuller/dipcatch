@@ -11,11 +11,11 @@ return [
     | asserts that the adapter still claims the page, still reads a price, and
     | reads a price that has not moved implausibly since the last good run.
     |
-    | Each default was fetched and read on 2026-09-24. An env value replaces
-    | it; an empty one keeps it. amazon, bol, etos and walmart have none: they
-    | refuse DipCatch's fetcher (503, 403, no answer, a bot page), so a URL
-    | would only report "unreachable". The health check names all four as
-    | uncovered, which is true.
+    | Each default was fetched and read on 2026-09-24, amazon and bol on
+    | 2026-09-25. An env value replaces it; an empty one keeps it. etos and
+    | walmart have none: they refuse DipCatch's fetcher (no answer, a bot
+    | page), so a URL would only report "unreachable". The health check names
+    | both as uncovered, which is true.
     |
     | Keyed on the adapter rather than the host on purpose: an adapter is not a
     | host. AmazonAdapter declares 21 country domains and ZooplusAdapter 18, so
@@ -26,8 +26,8 @@ return [
 
     'adapters' => [
         'aldi' => env('CANARY_URL_ALDI') ?: 'https://www.aldi.nl/product/pure-chocolade-1243874.html',
-        'amazon' => env('CANARY_URL_AMAZON'),
-        'bol' => env('CANARY_URL_BOL'),
+        'amazon' => env('CANARY_URL_AMAZON') ?: 'https://www.amazon.nl/dp/B07C5XYT19',
+        'bol' => env('CANARY_URL_BOL') ?: 'https://www.bol.com/nl/nl/p/cerave-moisturizing-cream-bodycreme-droge-tot-zeer-droge-huid-454-g/9300000008803366/',
         'dekamarkt' => env('CANARY_URL_DEKAMARKT') ?: 'https://www.dekamarkt.nl/producten/dranken-sap-koffie-thee/bier/heineken%20pilsener%20krat/6',
         'dierapotheker' => env('CANARY_URL_DIERAPOTHEKER') ?: 'https://www.dierapotheker.nl/flexadin-advanced-hond/6953/',
         'dirk' => env('CANARY_URL_DIRK') ?: 'https://www.dirk.nl/boodschappen/x/x/x/84109',

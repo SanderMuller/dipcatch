@@ -133,7 +133,7 @@ test('the shop list names the homepage hosts without contradicting itself', func
     // Country TLDs of the same brand stay off this row; the shops hub lists them.
     expect($content)->not->toContain('petsplace.nl')
         ->and($content)->not->toContain('amazon.com')
-        ->and($content)->toContain('etos.nl')
+        ->and($content)->not->toContain('etos.nl')
         ->and($content)->not->toContain(' more<')
         ->and($content)->toContain(__('and many other webshops'))
         ->and($content)->toMatch('/<a href="' . preg_quote(e(route('shops')), '/') . '"[^>]*>' . preg_quote(__('and many other webshops'), '/') . '<\/a>/');
@@ -148,7 +148,8 @@ test('the FAQ section shows every question the page defines', function (): void 
 
     $response->assertSee('Which shops work?')
         ->assertSee('What if my shop is not listed?')
-        ->assertSee('Etos, The Ordinary, Lookfantastic')
+        ->assertSee('Pets at Home, The Ordinary, Lookfantastic')
+        ->assertSee('such as Etos, Walmart and Kruidvat')
         ->assertSee('Pets Place, Medpets, Welkoop')
         ->assertSee('How often are prices checked?')
         ->assertSee('Is it free?')

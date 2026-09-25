@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Support\Favicon;
+use App\Support\ShopPage;
 use App\Support\ShopPages;
 use App\Support\SupportedShops;
 use App\Support\UseCases;
@@ -62,13 +63,13 @@ it('links Amazon.nl to groceries, pet food, coffee, filters and beauty', functio
     expect($slugs)->toBe(['groceries', 'pet-food', 'coffee', 'filters', 'beauty']);
 });
 
-it('links Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart to the beauty category only', function (string $slug): void {
+it('links The Ordinary, Lookfantastic, Cult Beauty and Ulta to the beauty category only', function (string $slug): void {
     $shop = ShopPages::find($slug);
 
     $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
 
     expect($slugs)->toBe(['beauty']);
-})->with(['etos-nl', 'theordinary-com', 'lookfantastic-com', 'cultbeauty-com', 'ulta-com', 'walmart-com']);
+})->with(['theordinary-com', 'lookfantastic-com', 'cultbeauty-com', 'ulta-com']);
 
 it('states that Dierapotheker reads the article number', function (): void {
     $this->get(route('shop', ['slug' => 'dierapotheker-nl']))->assertOk()->assertSeeHtml('article number');
@@ -283,4 +284,29 @@ it('resolves a hyphenated host forward, never by reversing its slug', function (
 
     expect(ShopPages::find('a-b-example')?->host)->toBe('a-b.example')
         ->and(ShopPages::find('a.b.example'))->toBeNull();
+});
+
+it('gives every supported shop a line of its own on the overview', function (): void {
+    $lines = array_map(static fn (ShopPage $shop): string => $shop->facts[0], ShopPages::all());
+
+    expect($lines)->toBe(array_values(array_unique($lines)))
+        ->and(implode("\n", $lines))->not->toContain('We know');
+
+    $this->get(route('shops'))->assertOk()->assertSeeHtml('Medpets lists a price for every size on one page.');
+});
+
+it('lists the shops that block us below the supported ones, without a page of their own', function (): void {
+    $response = $this->get(route('shops'))->assertOk()->assertSeeHtml('data-test="unsupported-shops"');
+
+    foreach (['etos.nl', 'walmart.com', 'kruidvat.nl'] as $host) {
+        $response->assertSeeHtml($host);
+    }
+
+    $this->get('/shops/etos-nl')->assertRedirect(route('shops'))->assertStatus(301);
+    $this->get('/shops/walmart-com?lang=nl')->assertRedirect(route('shops', ['lang' => 'nl']));
+    expect(array_column(SupportedShops::rows(), 'host'))->not->toContain('etos.nl')->not->toContain('walmart.com');
+});
+
+it('never lists a shop as both supported and blocking us', function (): void {
+    expect(array_intersect(array_column(SupportedShops::rows(), 'host'), array_column(SupportedShops::unsupported(), 'host')))->toBe([]);
 });

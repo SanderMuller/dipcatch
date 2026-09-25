@@ -93,6 +93,14 @@ Route::get('shops/poiesz-nl', fn (): RedirectResponse => redirect()->route(
     301,
 ))->name('shop.poiesz-legacy');
 
+// Etos and Walmart had pages until they started blocking DipCatch. Those
+// addresses were in the sitemap, so they point at the shops page, which now
+// lists both under the shops that block us.
+foreach (['etos-nl', 'walmart-com'] as $blockedSlug) {
+    Route::get("shops/{$blockedSlug}", fn (): RedirectResponse => redirect()->route('shops', request()->query(), 301))
+        ->name("shop.blocked-legacy.{$blockedSlug}");
+}
+
 Route::get('price-alerts/{slug}', UseCasePageController::class)
     ->where('slug', UseCases::slugPattern())
     ->middleware(MarketingLocale::class)

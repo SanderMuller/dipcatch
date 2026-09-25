@@ -110,7 +110,7 @@ final class ShopPages
         $hours = Config::get('dipcatch.recheck.interval_hours', 24);
 
         $facts = [
-            __('We know :shop well, so the price comes straight off the product page, including its offers.', ['shop' => $name]),
+            self::summary($host, $name),
             __('We look at every page you follow about every :hours hours, without you opening anything. Pro looks four times as often.', ['hours' => is_numeric($hours) ? (int) $hours : 24]),
         ];
 
@@ -127,6 +127,43 @@ final class ShopPages
         $facts[] = __('Where the page says how much is in the pack, DipCatch compares per kilo, litre or piece. A 200 g bag and a 370 g bag can then be judged against each other.');
 
         return $facts;
+    }
+
+    /**
+     * What is particular about reading this shop, and so the line the shops
+     * overview shows under its name. Written per host from what its adapter
+     * does, so no two cards say the same thing.
+     */
+    private static function summary(string $host, string $name): string
+    {
+        return match ($host) {
+            'ah.nl' => __('DipCatch reads Albert Heijn from AH’s own product data, not from the web page, so a new page layout does not stop the price coming in.'),
+            'jumbo.com' => __('Jumbo’s price comes from the product data on the page, and from the price Jumbo shows on screen when that data is missing.'),
+            'dirk.nl' => __('The Dirk offer price is read together with the pack size, so a Dirk deal lines up per kilo against the other supermarkets.'),
+            'lidl.nl' => __('Lidl keeps the pack size apart from the price on its pages. DipCatch reads both, so a Lidl deal compares per kilo like any other.'),
+            'aldi.nl' => __('Aldi’s product pages show no price in the page itself. DipCatch reads it from the data the page loads, so Aldi works all the same.'),
+            'spar.nl' => __('DipCatch reads the SPAR price and the pack size off the product page, so SPAR can be compared per kilo with the big chains.'),
+            'dekamarkt.nl' => __('DekaMarkt prices per store. DipCatch reads the price the site shows a visitor who has not picked a store.'),
+            'poiesz-supermarkten.nl' => __('The Poiesz webshop is read from the data behind the page. DipCatch picks the product by the number in your link, not a recommended one beside it.'),
+            'vomar.nl' => __('Vomar’s webshop is read from the page’s own data, pack size included, so Vomar compares per kilo with the other chains.'),
+            'bol.com' => __('DipCatch reads the price bol.com shows on the product page, whichever seller is behind it.'),
+            'amazon.nl' => __('Amazon lays out its pages differently per category. DipCatch looks for the price in each of those layouts, in euros on Amazon.nl.'),
+            'amazon.com' => __('Amazon.com is read the same way as Amazon.nl, in US dollars, at the price the product page shows.'),
+            'amazon.co.uk' => __('Amazon.co.uk is read the same way as Amazon.nl, in pounds, at the price the product page shows.'),
+            'zooplus.nl' => __('A Zooplus page often holds several sizes of one food. DipCatch follows the size you picked, so a 2 kg bag and a 12 kg sack stay apart.'),
+            'zooplus.co.uk' => __('Zooplus.co.uk is read in pounds. As on Zooplus.nl, DipCatch follows the size you picked on the page.'),
+            'bitiba.nl' => __('Bitiba is the budget shop of Zooplus and uses the same pages, so DipCatch reads it the same way, size by size.'),
+            'dierapotheker.nl' => __('Dierapotheker shows a lower price when you buy two or more. DipCatch tracks the price of one, for the pack size on the page.'),
+            'petsplace.nl' => __('Pets Place often shows an old price struck through beside the real one. DipCatch reads the price you pay.'),
+            'medpets.nl' => __('Medpets lists a price for every size on one page. DipCatch tracks the size in your link.'),
+            'welkoop.nl' => __('The product data on a Welkoop page holds the list price. DipCatch reads the price the page shows you instead, offers included.'),
+            'petsathome.com' => __('Pets at Home shows an Easy Repeat subscription price beside the normal one. DipCatch tracks the normal price, in pounds.'),
+            'theordinary.com' => __('The Ordinary’s own shop is read at the price on the product page, including the Dutch and other country versions of the site.'),
+            'lookfantastic.com' => __('Lookfantastic puts every size of a product on one page. DipCatch reads the size that is in your link.'),
+            'cultbeauty.com' => __('Cult Beauty sets prices per country. DipCatch reads the currency the page shows, pounds, euros or dollars, for the size in your link.'),
+            'ulta.com' => __('Ulta is read in US dollars, at the price on the product page for the size in your link.'),
+            default => __('We know :shop well, so the price comes straight off the product page, including its offers.', ['shop' => $name]),
+        };
     }
 
     /**

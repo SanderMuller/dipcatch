@@ -23,6 +23,17 @@ final readonly class SupportedShops
     }
 
     /**
+     * Shops that refuse DipCatch's requests, for the list under the supported
+     * ones. They have no landing page, so their slug links nowhere.
+     *
+     * @return list<array{host: string, favicon: string, name: string, slug: string}>
+     */
+    public static function unsupported(): array
+    {
+        return self::fromHosts(config('site.unsupported_hosts'));
+    }
+
+    /**
      * The short "Works with" row on the homepage. Hosts missing from
      * `supported_hosts` are skipped, so a shop dropped there disappears here too.
      *
