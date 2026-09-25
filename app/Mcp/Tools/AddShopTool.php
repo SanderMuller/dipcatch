@@ -58,22 +58,24 @@ final class AddShopTool extends Tool
         $arguments = $request->all();
         $confirming = ($arguments['confirm'] ?? null) === true;
         $draftSent = ($arguments['draft'] ?? '') !== '';
+        $keepingAsLink = ($arguments['keep_as_link'] ?? null) === true;
 
         $validated = $request->validate([
             'product_id' => ['required', 'uuid'],
             'url' => [Rule::requiredIf(! $confirming && ! $draftSent), 'nullable', 'string', 'max:2048'],
-            'draft' => ['required_if:confirm,true', 'prohibited_unless:confirm,true', 'nullable', 'string'],
+            'draft' => [Rule::requiredIf($confirming && ! $keepingAsLink), 'prohibited_unless:confirm,true', 'nullable', 'string'],
             // `strict`, because 1 and "1" pass a plain `boolean` and then fail
             // the `=== true` below — the preview branch, on a call that meant
             // to confirm.
             'confirm' => ['nullable', 'boolean:strict'],
             'variant_key' => ['nullable', 'string', 'max:255'],
-            'keep_as_link' => ['nullable', 'boolean:strict'],
+            'keep_as_link' => ['nullable', 'boolean:strict', Rule::prohibitedIf($keepingAsLink && $confirming)],
         ], [
             'url.required' => 'Pass a url to preview a product page.',
             'confirm.boolean' => 'confirm takes a JSON boolean: true or false, not a number and not a string.',
             'draft.prohibited_unless' => 'A draft adds the shop only with confirm: true. Send the draft again with confirm: true once the user has agreed to the preview, or drop the draft to preview a url instead.',
-            'draft.required_if' => 'Pass the draft from the preview call alongside confirm: true.',
+            'draft.required' => 'Pass the draft from the preview call alongside confirm: true.',
+            'keep_as_link.prohibited' => 'keep_as_link cannot be combined with confirm: true. To add the shop you previewed, send the draft with confirm: true and without keep_as_link. To keep a page DipCatch cannot read, send its url with keep_as_link: true and no draft or confirm.',
         ]);
 
         $product = $this->ownedProduct($request, $this->str($validated, 'product_id'));

@@ -620,3 +620,49 @@ test('a url already tracked cannot be downgraded to a link', function (): void {
         ->assertHasErrors()
         ->assertSee('already tracked on this product');
 });
+
+test('keep_as_link alongside a confirmed draft is refused rather than saving the url as a link', function (): void {
+    // A confirmed draft must never be dropped while the url is kept as a link.
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create(['currency' => 'EUR']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, [
+            'product_id' => (string) $product->id,
+            'url' => 'https://shop.example.com/p/1',
+            'draft' => 'a-token',
+            'confirm' => true,
+            'keep_as_link' => true,
+        ])
+        ->assertHasErrors();
+
+    expect($product->refresh()->shops)->toBeEmpty();
+});
+
+test('keep_as_link with confirm gets only the message that names the conflict', function (?string $url, ?string $draft): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create(['currency' => 'EUR']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, array_filter([
+            'product_id' => (string) $product->id,
+            'url' => $url,
+            'draft' => $draft,
+            'confirm' => true,
+            'keep_as_link' => true,
+        ], fn (mixed $value): bool => $value !== null))
+        ->assertHasErrors()
+        ->assertSee('keep_as_link cannot be combined with confirm')
+        ->assertDontSee('does not look like a URL')
+        ->assertDontSee('Pass a url')
+        ->assertDontSee('Pass the draft')
+        ->assertDontSee('adds the shop only with confirm')
+        ->assertDontSee('confirm takes a JSON boolean')
+        // Laravel's own messages all name "the … field".
+        ->assertDontSee('field');
+})->with([
+    'url and draft' => ['https://shop.example.com/p/1', 'a-token'],
+    'draft only' => [null, 'a-token'],
+    'url only' => ['https://shop.example.com/p/1', null],
+    'neither' => [null, null],
+]);
