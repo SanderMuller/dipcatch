@@ -2,6 +2,7 @@
 
 namespace App\Actions\Auth;
 
+use App\Actions\Users\RevokeCredentials;
 use App\Enums\SocialProvider;
 use App\Models\SocialAccount;
 use App\Models\User;
@@ -20,6 +21,8 @@ use Laravel\Socialite\AbstractUser as SocialiteUser;
  */
 final class ResolveSocialUser
 {
+    public function __construct(private readonly RevokeCredentials $revokeCredentials) {}
+
     public function __invoke(SocialProvider $provider, SocialiteUser $socialiteUser, ?string $acceptLanguage = null): User
     {
         $providerId = trim((string) $socialiteUser->getId());
@@ -119,14 +122,14 @@ final class ResolveSocialUser
             throw SocialLoginFailed::unverifiedEmail($provider);
         }
 
-        if ($user->socialAccounts()->where('provider', $provider)->exists()) {
-            // A different account at the same provider. The unique index on
-            // (user_id, provider) would reject the insert with a 500; refuse
-            // it here with something the user can act on.
-            throw SocialLoginFailed::alreadyLinked($provider);
-        }
-
         if ($user->hasVerifiedEmail()) {
+            if ($user->socialAccounts()->where('provider', $provider)->exists()) {
+                // A different account at the same provider. The unique index on
+                // (user_id, provider) would reject the insert with a 500; refuse
+                // it here with something the user can act on.
+                throw SocialLoginFailed::alreadyLinked($provider);
+            }
+
             return;
         }
 
@@ -151,12 +154,10 @@ final class ResolveSocialUser
             'two_factor_confirmed_at' => null,
         ])->save();
 
-        $user->passkeys()->delete();
-
-        // A password change does not end a live session on its own: the app
-        // does not use `AuthenticateSession`, and the session driver is the
-        // database. Same table `DeleteUser` clears.
-        DB::table('sessions')->where('user_id', $user->getKey())->delete();
+        // A password change ends none of these on its own: provider links,
+        // passkeys, stored sessions, and the MCP access the squatter approved
+        // while unverified.
+        ($this->revokeCredentials)($user);
     }
 
     private function createUser(SocialiteUser $socialiteUser, string $email, ?string $acceptLanguage): User
