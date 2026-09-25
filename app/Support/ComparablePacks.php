@@ -175,6 +175,46 @@ final readonly class ComparablePacks
             ->values();
     }
 
+    /**
+     * The order the product page, its Markdown copy and the public page list
+     * shops in, led by the shop the headline names:
+     *
+     *  1. the shops that may win per unit, in the ranking's own order;
+     *  2. the other eligible shops by pack price, as the pack-price headline
+     *     picks among them;
+     *  3. every other row by price per unit, then pack price, unpriced last.
+     *
+     * A cheaper row that cannot be bought from — sold out, a size it did not
+     * state, a trade-only price — never sits above the headline's shop.
+     * Returns the `$shops` instances; `$eligible` is only read for which rows
+     * qualify.
+     *
+     * @param  Collection<int, Shop>  $shops  the rows to order
+     * @param  Collection<int, Shop>  $eligible  the shops allowed to win
+     * @return Collection<int, Shop>
+     */
+    public function tableOrder(Collection $shops, Collection $eligible): Collection
+    {
+        $eligibleKeys = $eligible->map(fn (Shop $shop): string => $shop->id)->all();
+        $isEligible = fn (Shop $shop): bool => in_array($shop->id, $eligibleKeys, strict: true);
+
+        $ranked = $this->rankedPerUnit($shops->filter($isEligible));
+        $rankedKeys = $ranked->map(fn (Shop $shop): string => $shop->id)->all();
+        $unranked = $shops->reject(fn (Shop $shop): bool => in_array($shop->id, $rankedKeys, strict: true));
+
+        $otherEligible = $unranked->filter($isEligible)
+            ->sort(fn (Shop $a, Shop $b): int => [(float) $a->current_price, $a->created_at, (string) $a->id]
+                <=> [(float) $b->current_price, $b->created_at, (string) $b->id]);
+
+        $rest = $unranked->reject($isEligible)
+            ->sortBy(fn (Shop $shop): array => [
+                $this->unitPriceValueOf($shop) === null ? 1 : 0,
+                $this->unitPriceValueOf($shop) ?? ($shop->current_price === null ? PHP_FLOAT_MAX : (float) $shop->current_price),
+            ]);
+
+        return $ranked->concat($otherEligible)->concat($rest)->values();
+    }
+
     /** The figure a surface prints. {@see unitPriceValueOf()} is what ranks. */
     public function unitPriceOf(Shop $shop): ?string
     {

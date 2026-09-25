@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Enums\ShopKind;
+use App\Livewire\Products\ProductShow;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -107,4 +108,52 @@ it('keeps the page itself on the uuid and answers 404 for anything else', functi
 
     $this->actingAs($user)->get(route('app.products.show', $product))->assertOk();
     $this->actingAs($user)->get('/app/products/not-a-uuid.md')->assertNotFound();
+});
+
+/**
+ * Where two hosts sit in a text, both required to be there.
+ *
+ * @return array{int, int}
+ */
+function positionsOf(string $text, string $first, string $second): array
+{
+    $a = strpos($text, $first);
+    $b = strpos($text, $second);
+
+    expect($a)->toBeInt()->and($b)->toBeInt();
+
+    return [(int) $a, (int) $b];
+}
+
+it('lists the best value first, above a cheaper shop that cannot win', function (): void {
+    // Sold out at 1.00 a kilo, so the best value is the in-stock shop at 3.00.
+    $user = User::factory()->create();
+    $product = markdownProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/2', 'current_price' => '3.00', 'pack_quantity' => 1000, 'pack_unit' => 'g', 'current_in_stock' => true]);
+    Shop::factory()->for($product)->create(['url' => 'https://soldout.nl/p/1', 'current_price' => '1.00', 'pack_quantity' => 1000, 'pack_unit' => 'g', 'current_in_stock' => false]);
+    $product->recomputeCheapestShop();
+
+    $markdown = (string) $this->actingAs($user)->get(route('app.products.markdown', $product))->getContent();
+    [$best, $soldOut] = positionsOf(substr($markdown, (int) strpos($markdown, '## Tracked shops')), 'ah.nl', 'soldout.nl');
+
+    expect($best)->toBeLessThan($soldOut);
+
+    Livewire\Livewire::actingAs($user);
+    $page = Livewire\Livewire::test(ProductShow::class, ['product' => $product])->html();
+    [$best, $soldOut] = positionsOf(substr($page, (int) strpos($page, 'Price read')), 'ah.nl', 'soldout.nl');
+
+    expect($best)->toBeLessThan($soldOut);
+});
+
+it('lists the lowest price first, above a cheaper shop that cannot be bought from, when there is no unit', function (): void {
+    $user = User::factory()->create();
+    $product = markdownProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/2', 'current_price' => '10.00', 'current_in_stock' => true]);
+    Shop::factory()->for($product)->create(['url' => 'https://soldout.nl/p/1', 'current_price' => '8.00', 'current_in_stock' => false]);
+    $product->recomputeCheapestShop();
+
+    $markdown = (string) $this->actingAs($user)->get(route('app.products.markdown', $product))->getContent();
+    [$lowest, $soldOut] = positionsOf(substr($markdown, (int) strpos($markdown, '## Tracked shops')), 'ah.nl', 'soldout.nl');
+
+    expect($lowest)->toBeLessThan($soldOut);
 });

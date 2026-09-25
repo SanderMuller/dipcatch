@@ -22,11 +22,7 @@ final readonly class ProductMarkdown
     {
         $packs = $product->comparablePacks();
         $headline = HeadlinePrice::of($product, $packs);
-        // Cheapest per unit first, as the page lists them.
-        $shops = $product->shops()->orderBy('current_price')->get()->sortBy(fn (Shop $shop): array => [
-            $packs->unitPriceValueOf($shop) === null ? 1 : 0,
-            $packs->unitPriceValueOf($shop) ?? ($shop->current_price === null ? PHP_FLOAT_MAX : (float) $shop->current_price),
-        ])->values();
+        $shops = $packs->tableOrder($product->shops()->orderBy('current_price')->get(), $product->eligibleShops());
 
         $lines = ['# ' . self::inline($product->title), ''];
         $lines[] = '- ' . __('Status') . ': ' . ($product->active ? __('Active') : __('Paused'));

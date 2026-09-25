@@ -14,6 +14,7 @@ use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 
 /**
  * Renders the public product page at GET /p/{slug}, and its markdown copy at
@@ -63,7 +64,7 @@ final class PublicProductController extends Controller
     }
 
     /**
-     * The shared product, the shops a guest may see, cheapest first, and the
+     * The shared product, the shops a guest may see, headline shop first, and the
      * figure the page leads with.
      *
      * The figure is resolved on the owner page's rules: an out-of-stock shop
@@ -71,7 +72,7 @@ final class PublicProductController extends Controller
      * ex-VAT price wins neither answer. So the query loads those shops too,
      * and the listed rows are filtered after.
      *
-     * @return array{0: Product, 1: EloquentCollection<int, Shop>, 2: HeadlinePrice}
+     * @return array{0: Product, 1: Collection<int, Shop>, 2: HeadlinePrice}
      */
     private function load(string $slug): array
     {
@@ -95,16 +96,11 @@ final class PublicProductController extends Controller
         $product->setRelation('shops', $tracked);
         $headline = HeadlinePrice::of($product);
 
-        // Cheapest per unit first, as the owner page lists them; the pack price
-        // orders the rest, and every row of a product without a unit.
-        $packs = $headline->packs;
-        $shops = $tracked
-            ->filter(fn (Shop $shop): bool => $shop->current_in_stock !== false)
-            ->sortBy(fn (Shop $shop): array => [
-                $packs->unitPriceValueOf($shop) === null ? 1 : 0,
-                $packs->unitPriceValueOf($shop) ?? (float) $shop->current_price,
-            ])
-            ->values();
+        // In the owner page's order: the best value first.
+        $shops = $headline->packs->tableOrder(
+            $tracked->filter(fn (Shop $shop): bool => $shop->current_in_stock !== false),
+            $product->eligibleShops(),
+        );
 
         return [$product, $shops, $headline];
     }

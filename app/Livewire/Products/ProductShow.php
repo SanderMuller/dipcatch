@@ -281,7 +281,10 @@ final class ProductShow extends Component
             'chart' => new PriceHistorySeries($this->product, $this->range)->fluxChart(),
             'ranges' => HistoryWindow::filters($this->historyDays()),
             'historyNotice' => $this->historyNotice(),
-            'shops' => $this->product->shops()->orderBy('current_price')->get(),
+            'shops' => $this->product->comparablePacks()->tableOrder(
+                $this->product->shops()->orderBy('current_price')->get(),
+                $this->product->eligibleShops(),
+            ),
             'shareUrl' => $this->product->publicShareUrl(),
             'canAddShop' => app(PlanLimits::class)->canAddShop($this->product),
             'shopLimit' => $this->product->user?->entitlements()->maxShopsPerProduct(),

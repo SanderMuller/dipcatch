@@ -223,12 +223,6 @@
                         <flux:table.column align="end">{{ __('Actions') }}</flux:table.column>
                     </flux:table.columns>
                     <flux:table.rows>
-                        {{-- Cheapest per unit first, then the shops outside that
-                             comparison by pack price. --}}
-                        @php($shops = $shops->sortBy(fn ($shop) => [
-                            $packs->unitPriceValueOf($shop) === null ? 1 : 0,
-                            $packs->unitPriceValueOf($shop) ?? ($shop->current_price === null ? PHP_FLOAT_MAX : (float) $shop->current_price),
-                        ])->values())
                         @forelse ($shops as $shop)
                             <flux:table.row :key="'shop-'.$shop->id">
                                 <flux:table.cell class="align-top">
