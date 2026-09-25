@@ -4,6 +4,7 @@ namespace App\Actions\Shops;
 
 use App\Enums\ScrapeStatus;
 use App\PriceAdapters\ShopSnapshot;
+use Carbon\CarbonImmutable;
 
 /**
  * What one price check read, in the shape `CheckShopPrice::persist()` needs.
@@ -26,6 +27,8 @@ final readonly class CheckOutcome
         public ?string $movedTo = null,
         /** The URL that was fetched, so a move is not stored over a URL changed since. */
         public ?string $movedFrom = null,
+        /** When the page was read, for a reading shared from another row; now when null. */
+        public ?CarbonImmutable $readAt = null,
     ) {}
 
     /**
@@ -33,9 +36,15 @@ final readonly class CheckOutcome
      * without naming the adapter that won. `persist()` leaves the stored key
      * alone in that case rather than blanking it.
      */
-    public static function success(ShopSnapshot $snapshot, ?string $adapterKey, ?string $imageUrl, ?string $movedTo = null, ?string $movedFrom = null): self
+    public static function success(ShopSnapshot $snapshot, ?string $adapterKey, ?string $imageUrl, ?string $movedTo = null, ?string $movedFrom = null, ?CarbonImmutable $readAt = null): self
     {
-        return new self(ScrapeStatus::Ok, $snapshot, $adapterKey, $imageUrl, error: null, movedTo: $movedTo, movedFrom: $movedFrom);
+        return new self(ScrapeStatus::Ok, $snapshot, $adapterKey, $imageUrl, error: null, movedTo: $movedTo, movedFrom: $movedFrom, readAt: $readAt);
+    }
+
+    /** A reading another row of the same page took, dated when it was taken. */
+    public static function shared(PageReading $reading): self
+    {
+        return self::success($reading->snapshot, $reading->adapterKey, $reading->imageUrl, readAt: $reading->readAt);
     }
 
     public static function failure(ScrapeStatus $status, ?string $error): self

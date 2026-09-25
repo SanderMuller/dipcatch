@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Drops\DetectTargetPrice;
 use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Actions\Shops\CheckOutcome;
+use App\Actions\Shops\PageReadings;
 use App\Actions\Shops\ResolvedBundlePricing;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
@@ -147,8 +148,14 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        $readings = app(PageReadings::class);
+
         try {
-            $outcome = $this->fetchAndExtract($shop, $fetcher, $resolver);
+            // Another row read this page within this row's interval: take that
+            // reading instead of fetching again. A person asking for a check,
+            // and the second reading a large drop needs, always fetch.
+            $outcome = $readings->sharedOutcome($shop, mustFetch: $this->manual || $this->confirmation)
+                ?? $readings->remember($shop, $this->fetchAndExtract($shop, $fetcher, $resolver));
         } catch (RateLimitedByHost $e) {
             // Per-host budget exhausted (probe path or another worker drained
             // it). Wait for the bucket to refill rather than charging the
@@ -262,7 +269,9 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      */
     private function persist(Shop $shop, CheckOutcome $outcome): void
     {
-        $now = now();
+        // A shared reading dates the row at the read, so it comes due again
+        // when the reading is one interval old — see PageReadings.
+        $now = $outcome->readAt ?? now();
 
         // One transaction spanning the price_check insert, offer state update,
         // AND the product recompute (offer → product lock order). If any step
