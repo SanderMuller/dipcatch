@@ -56,7 +56,7 @@ final class OperationsOverviewWidget extends BaseWidget
     private function trackingStat(): Stat
     {
         $products = Product::query()->where('active', true)->count();
-        $offers = $this->watchedShops()->count();
+        $offers = Shop::query()->scheduled()->count();
 
         return Stat::make('Active products', $products)
             ->description($offers . ' offers watched')
@@ -89,24 +89,10 @@ final class OperationsOverviewWidget extends BaseWidget
 
     private function activeShopsWith(ShopHealth $health): int
     {
-        return $this->watchedShops()
+        return Shop::query()
+            ->onActiveProducts()
             ->where('health', $health->value)
             ->count();
-    }
-
-    /**
-     * Offers the scheduler would actually check: an active offer whose
-     * product is also active. Pausing a product stops its offers being
-     * rechecked, so counting them here would report work nobody is doing —
-     * and let a paused, dead offer drag the health figure down.
-     *
-     * @return EloquentQueryBuilder<Shop>
-     */
-    private function watchedShops(): EloquentQueryBuilder
-    {
-        return Shop::query()
-            ->where('active', true)
-            ->whereHas('product', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', true));
     }
 
     private function alertsStat(): Stat

@@ -367,6 +367,39 @@ final class Shop extends Model
         return $query->where('kind', ShopKind::Tracked->value);
     }
 
+    /**
+     * Tracked shops on a product that is not paused, whatever their health.
+     *
+     * Not filtered on the shop's own `active` flag: the job clears it in the
+     * same write that marks a shop dead, so a filter on it hides every shop
+     * the job killed.
+     *
+     * @param  EloquentQueryBuilder<Shop>  $query
+     * @return EloquentQueryBuilder<Shop>
+     */
+    #[Scope]
+    protected function onActiveProducts(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query
+            ->tracked()
+            ->whereHas('product', fn (EloquentQueryBuilder $product): EloquentQueryBuilder => $product->where('active', true));
+    }
+
+    /**
+     * Shops the scheduler rechecks. Use this rather than a copy of the chain.
+     *
+     * @param  EloquentQueryBuilder<Shop>  $query
+     * @return EloquentQueryBuilder<Shop>
+     */
+    #[Scope]
+    protected function scheduled(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query
+            ->onActiveProducts()
+            ->where('active', true)
+            ->where('health', '!=', ShopHealth::Dead->value);
+    }
+
     public function faviconUrl(): string
     {
         return Favicon::url($this->host);

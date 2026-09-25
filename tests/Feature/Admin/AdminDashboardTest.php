@@ -3,6 +3,7 @@
 use App\Billing\Plan;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
+use App\Enums\ShopKind;
 use App\Filament\Admin\Widgets\OperationsOverviewWidget;
 use App\Filament\Admin\Widgets\ShopsNeedingAttentionWidget;
 use App\Filament\Admin\Widgets\SubscriptionOverviewWidget;
@@ -53,27 +54,27 @@ it('reports the share of offers the scraper can still read', function (): void {
         ->assertSee('0 failing, 1 dead');
 });
 
-it('lists only the active offers the scraper cannot read', function (): void {
+it('lists only the tracked offers the scraper cannot read', function (): void {
     $admin = adminUser();
     $product = Product::factory()->create(['user_id' => $admin->id]);
 
     $broken = Shop::factory()->for($product)->create([
         'url' => 'https://broken.test/p/1',
         'active' => true,
-        'health' => ShopHealth::Dead,
+        'health' => ShopHealth::Failing,
         'last_status' => ScrapeStatus::HttpError,
-        'consecutive_failures' => 9,
+        'consecutive_failures' => 4,
     ]);
     $healthy = Shop::factory()->for($product)->create([
         'url' => 'https://healthy.test/p/1',
         'active' => true,
         'health' => ShopHealth::Ok,
     ]);
-    // An offer the owner paused is not something to fix.
-    $paused = Shop::factory()->for($product)->create([
-        'url' => 'https://paused.test/p/1',
-        'active' => false,
-        'health' => ShopHealth::Dead,
+    // A kept link is never read, so it has nothing for anyone to fix.
+    $link = Shop::factory()->for($product)->create([
+        'url' => 'https://link.test/p/1',
+        'kind' => ShopKind::Reference,
+        'health' => ShopHealth::Failing,
     ]);
 
     $this->actingAs($admin);
@@ -81,7 +82,34 @@ it('lists only the active offers the scraper cannot read', function (): void {
 
     livewire(ShopsNeedingAttentionWidget::class)
         ->assertCanSeeTableRecords([$broken])
-        ->assertCanNotSeeTableRecords([$healthy, $paused]);
+        ->assertCanNotSeeTableRecords([$healthy, $link]);
+});
+
+it('shows an offer the job killed in both widgets', function (): void {
+    $admin = adminUser();
+    $product = Product::factory()->create(['user_id' => $admin->id]);
+    Shop::factory()->for($product)->create(['active' => true, 'health' => ShopHealth::Ok]);
+
+    // What `CheckShopPrice` writes on the last failure: dead, and switched
+    // off in the same write. Filtering on `active` hid exactly these.
+    $killed = Shop::factory()->for($product)->dead()->create(['url' => 'https://killed.test/p/1']);
+    // A kept link has no scrape health to report, whatever its row says.
+    Shop::factory()->for($product)->create([
+        'url' => 'https://link.test/p/1',
+        'kind' => ShopKind::Reference,
+        'health' => ShopHealth::Failing,
+    ]);
+
+    $this->actingAs($admin);
+    Filament::setCurrentPanel('admin');
+
+    livewire(ShopsNeedingAttentionWidget::class)
+        ->assertCanSeeTableRecords([$killed]);
+
+    livewire(OperationsOverviewWidget::class)
+        ->assertSee('1 offers watched')
+        ->assertSee('50%')
+        ->assertSee('0 failing, 1 dead');
 });
 
 it('separates the 24-hour alert count from the 7-day one', function (): void {

@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Billing\Entitlements;
 use App\Billing\Plan;
 use App\Billing\ProUsers;
-use App\Enums\ShopHealth;
 use App\Jobs\CheckShopPrice;
 use App\Models\Shop;
 use App\Support\Config as DipConfig;
@@ -62,12 +61,7 @@ final class RecheckActiveShopsCommand extends Command
             // check spends a fetch to learn nothing and counts the refusal
             // against the row's health until `dead_after` switches it off.
             // Asking again is the retry command's job, on its own schedule.
-            ->tracked()
-            ->where('active', true)
-            ->where('health', '!=', ShopHealth::Dead->value)
-            ->whereHas('product', function (EloquentQueryBuilder $q): void {
-                $q->where('active', true);
-            })
+            ->scheduled()
             ->where(function (EloquentQueryBuilder $q) use ($proCutoff, $freeCutoff): void {
                 $q->whereNull('last_checked_at')
                     ->orWhere(fn (EloquentQueryBuilder $due): EloquentQueryBuilder => $this->duePerPlan($due, Plan::Pro, $proCutoff))

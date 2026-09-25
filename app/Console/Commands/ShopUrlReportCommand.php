@@ -5,12 +5,10 @@ namespace App\Console\Commands;
 use App\Billing\Entitlements;
 use App\Billing\Plan;
 use App\Billing\ProUsers;
-use App\Enums\ShopHealth;
 use App\Models\Shop;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 
 /**
  * How much tracking rows overlap, and which query parameters stored URLs
@@ -46,10 +44,7 @@ final class ShopUrlReportCommand extends Command
         // The rows the scheduler checks: RecheckActiveShopsCommand leaves out
         // reference shops, paused rows and products, and dead rows.
         Shop::query()
-            ->tracked()
-            ->where('active', true)
-            ->where('health', '!=', ShopHealth::Dead->value)
-            ->whereHas('product', fn (EloquentQueryBuilder $product): EloquentQueryBuilder => $product->where('active', true))
+            ->scheduled()
             ->with('product:id,user_id')
             ->each(function (Shop $shop) use ($pro, $hours, &$groups, &$params, &$rows, &$ownReading): void {
                 $rows++;
