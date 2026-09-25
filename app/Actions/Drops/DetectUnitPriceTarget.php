@@ -4,6 +4,7 @@ namespace App\Actions\Drops;
 
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\TargetPriceEvent;
 use App\Notifications\UnitPriceTargetNotification;
 use App\Services\Drops\NotificationBudget;
 use App\Support\Numeric;
@@ -136,6 +137,16 @@ final readonly class DetectUnitPriceTarget
         }
 
         $product->refresh();
+
+        // Before the budget: an alert the hourly ceiling holds back still
+        // reaches the daily email.
+        TargetPriceEvent::record(
+            $product,
+            $shop,
+            (string) $product->unit_price_target,
+            price: $shop->current_price === null ? null : (string) $shop->current_price,
+            unitPrice: $unitPrice,
+        );
 
         // Asked here and nowhere earlier: asking spends a slot of the hourly
         // ceiling, the limiter is cache-backed and does not roll back, and

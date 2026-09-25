@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Mail\PriceDropDigestMail;
 use App\Models\PriceDropEvent;
+use App\Models\TargetPriceEvent;
 use App\Models\User;
 use App\Support\Config as DipConfig;
 use Carbon\CarbonImmutable;
@@ -15,8 +16,9 @@ use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * Build + send the daily price-drop digest for a single user. Replaces the
- * per-drop email path (Filament bell + web push remain real-time).
+ * Build + send the daily digest of drops and reached targets for a single
+ * user. Replaces the per-alert email path (Filament bell + web push remain
+ * real-time).
  *
  * Dispatched once per user per local day by DispatchDailyDigestsCommand. The
  * dispatcher passes the local digest-date string so the uniqueness key is
@@ -76,7 +78,15 @@ final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
             ->oldest('fired_at')
             ->get();
 
-        if ($events->isEmpty()) {
+        $reached = TargetPriceEvent::query()
+            ->where('user_id', $this->user->id)
+            ->where('fired_at', '>', $since)
+            ->where('fired_at', '<=', $now)
+            ->with(['product', 'shop'])
+            ->oldest('fired_at')
+            ->get();
+
+        if ($events->isEmpty() && $reached->isEmpty()) {
             // Don't send empty digests; don't bump last_digest_sent_at so
             // the next non-empty window will still pick up these events.
             return;
@@ -89,6 +99,6 @@ final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
         // delivered live via the Filament bell + web push channels.
         $this->user->forceFill(['last_digest_sent_at' => $now])->save();
 
-        Mail::to($this->user->email)->send(new PriceDropDigestMail($this->user, $events));
+        Mail::to($this->user->email)->send(new PriceDropDigestMail($this->user, $events, $reached));
     }
 }

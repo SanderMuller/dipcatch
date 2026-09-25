@@ -4,6 +4,7 @@ use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\TargetPriceEvent;
 use App\Models\User;
 use App\Notifications\UnitPriceTargetNotification;
 use App\Services\Drops\NotificationBudget;
@@ -49,6 +50,15 @@ test('reaching the target notifies', function (): void {
 
     Notification::assertSentTo($product->user, UnitPriceTargetNotification::class);
     expect($product->refresh()->unit_price_notified)->toBe('5.3784');
+
+    // The daily email reads this row, not the notification.
+    $event = TargetPriceEvent::query()->sole();
+    expect($event->isPerUnit())->toBeTrue()
+        ->and((string) $event->unit_price)->toBe('5.3784')
+        ->and($event->comparison_unit)->toBe('g')
+        ->and((string) $event->price)->toBe('1.99')
+        ->and($event->packSize()?->quantity)->toBe(370.0)
+        ->and((string) $event->target)->toBe('5.5000');
 });
 
 test('a value above the target says nothing', function (): void {

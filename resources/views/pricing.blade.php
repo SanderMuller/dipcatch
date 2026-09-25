@@ -87,7 +87,7 @@
                             <li>{{ __('Unlimited products') }}</li>
                             <li>{{ __('Unlimited shops per product') }}</li>
                             <li>{{ __('Prices checked every :hours hours', ['hours' => $pro->recheckIntervalHours()]) }}</li>
-                            <li>{{ __('Alerts on the price per kilo, litre or piece') }}</li>
+                            <li>{{ __('A target price per kilo, litre or piece') }}</li>
                             <li>{{ __('More alerts per hour') }}</li>
                             <li>{{ __('Full price history, kept for as long as you subscribe') }}</li>
                         </ul>

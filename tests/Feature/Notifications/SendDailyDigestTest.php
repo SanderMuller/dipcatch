@@ -7,8 +7,10 @@ use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\TargetPriceEvent;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Mail\Markdown;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Mail;
@@ -300,9 +302,11 @@ test('the digest table renders money as symbol-first, not the ISO code', functio
     // what registers the `x-mail::` component namespace.
     $html = (string) app(Markdown::class)->render('emails.price-drop-digest', [
         'grouped' => collect([
-            $product->id => ['product' => $product, 'events' => collect([$event])],
+            $product->id => ['product' => $product, 'events' => collect([$event]), 'reached' => collect()],
         ]),
+        'heading' => '1 price drop today',
         'totalDrops' => 1,
+        'totalReached' => 0,
         'user' => $user,
     ]);
 
@@ -331,9 +335,11 @@ test('digest reads bundle terms from protected triggering check', function (): v
 
     $html = (string) app(Markdown::class)->render('emails.price-drop-digest', [
         'grouped' => collect([
-            $product->id => ['product' => $product, 'events' => collect([$event])],
+            $product->id => ['product' => $product, 'events' => collect([$event]), 'reached' => collect()],
         ]),
+        'heading' => '1 price drop today',
         'totalDrops' => 1,
+        'totalReached' => 0,
         'user' => $user,
     ]);
 
@@ -513,5 +519,73 @@ it('names the shops it cannot read beside the drops it can', function (): void {
 
     Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail): bool {
         return str_contains($mail->render(), 'Also worth checking by hand: koffiehenk.nl');
+    });
+});
+
+test('a reached target alone sends the digest, with the price, the target and the deal', function (): void {
+    $user = User::factory()->create(['notify_via_email' => true, 'timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create(['title' => 'Sanimed Skin Sensitive']);
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://www.dierenapotheek.nl/p/1']);
+    TargetPriceEvent::factory()->for($user)->for($product)->create([
+        'shop_id' => $shop->id,
+        'price' => '17.05',
+        'target' => '18.00',
+        'deal' => '2 for €34.10',
+        'fired_at' => now()->subHours(2),
+    ]);
+
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail): bool {
+        $text = (string) preg_replace('/\s+/', ' ', strip_tags($mail->render()));
+
+        return $mail->envelope()->subject === '1 price alert today'
+            && $mail->totalDrops === 0
+            && str_contains($text, 'Sanimed Skin Sensitive')
+            && str_contains($text, 'dierenapotheek.nl')
+            && str_contains($text, '€17.05 Reached your price')
+            && str_contains($text, 'your price €18.00')
+            && str_contains($text, '2 for €34.10');
+    });
+    expect($user->fresh()->last_digest_sent_at)->not->toBeNull();
+});
+
+test('a reached unit-price target leads with the price per unit and names the pack', function (): void {
+    Mail::swap(app('mail.manager'));
+
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create(['title' => 'Lay’s Naturel']);
+    $reached = TargetPriceEvent::factory()->unitPrice()->count(1)->for($user)->for($product)->create();
+
+    $text = (string) preg_replace('/\s+/', ' ', strip_tags(new PriceDropDigestMail($user, new EloquentCollection(), TargetPriceEvent::query()->whereKey($reached->modelKeys())->get())->render()));
+
+    expect($text)->toContain('€5.38 /kg Reached your price')
+        ->and($text)->toContain('€1.29 for 240 g')
+        ->and($text)->toContain('your price €6.00 /kg');
+});
+
+test('drops and reached targets share one mail, grouped per product, counted together', function (): void {
+    $user = User::factory()->create(['notify_via_email' => true, 'last_digest_sent_at' => null]);
+    $both = Product::factory()->for($user)->create();
+    $dropOnly = Product::factory()->for($user)->create();
+
+    PriceDropEvent::factory()->for($user)->for($both)->state(['fired_at' => now()->subHours(3)])->create();
+    PriceDropEvent::factory()->for($user)->for($dropOnly)->state(['fired_at' => now()->subHours(2)])->create();
+    TargetPriceEvent::factory()->for($user)->for($both)->create(['fired_at' => now()->subHour()]);
+    // Before the window: sent in an earlier digest.
+    TargetPriceEvent::factory()->for($user)->for($dropOnly)->create(['fired_at' => now()->subDays(2)]);
+
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail) use ($both, $dropOnly): bool {
+        $bothGroup = $mail->grouped->get($both->id);
+        $dropOnlyGroup = $mail->grouped->get($dropOnly->id);
+
+        return $mail->envelope()->subject === '3 price alerts today'
+            && $mail->grouped->count() === 2
+            && $bothGroup !== null && $dropOnlyGroup !== null
+            && $bothGroup['events']->count() === 1
+            && $bothGroup['reached']->count() === 1
+            && $dropOnlyGroup['reached']->isEmpty();
     });
 });

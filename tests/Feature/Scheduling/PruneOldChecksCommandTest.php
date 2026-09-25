@@ -5,6 +5,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
+use App\Models\TargetPriceEvent;
 
 test('prunes price_checks per offer older than retention when more than 50 rows exist', function (): void {
     $product = Product::factory()->create();
@@ -124,4 +125,15 @@ test('does not delete recent checks for an offer with few rows', function (): vo
     $this->artisan('dipcatch:prune-checks')->assertSuccessful();
 
     expect(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(3);
+});
+
+test('prunes reached-target rows older than retention and keeps recent ones', function (): void {
+    $product = Product::factory()->create();
+    $old = TargetPriceEvent::factory()->for($product)->create(['fired_at' => now()->subDays(400)]);
+    $recent = TargetPriceEvent::factory()->for($product)->create(['fired_at' => now()->subDays(10)]);
+
+    $this->artisan('dipcatch:prune-checks')->assertSuccessful();
+
+    expect(TargetPriceEvent::query()->whereKey($old->id)->exists())->toBeFalse()
+        ->and(TargetPriceEvent::query()->whereKey($recent->id)->exists())->toBeTrue();
 });

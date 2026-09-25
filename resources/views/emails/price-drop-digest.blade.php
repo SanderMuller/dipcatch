@@ -1,7 +1,7 @@
 <x-mail::message>
-# {{ $totalDrops === 1 ? '1 price drop today' : $totalDrops . ' price drops today' }}
+# {{ $heading }}
 
-Prices dropped on what you follow:
+{{ $totalReached === 0 ? 'Prices dropped on what you follow:' : 'What changed on what you follow:' }}
 
 @foreach ($grouped as $group)
 @php
@@ -9,6 +9,8 @@ Prices dropped on what you follow:
     $product = $group['product'];
     /** @var \Illuminate\Support\Collection<int, \App\Models\PriceDropEvent> $events */
     $events = $group['events'];
+    /** @var \Illuminate\Support\Collection<int, \App\Models\TargetPriceEvent> $reached */
+    $reached = $group['reached'];
 @endphp
 
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; margin: 24px 0 8px; border: 1px solid #e4e4e7; border-radius: 8px; border-collapse: separate; overflow: hidden;">
@@ -27,6 +29,41 @@ $image = $product->safeImageUrl();
 </td>
 @endif
 <td valign="top" style="padding: 20px; vertical-align: top;">
+@foreach ($reached as $hit)
+@php
+    $perUnit = $hit->isPerUnit();
+    $unitLabel = \App\Support\UnitWord::labelFor($hit->comparison_unit);
+    $yourPrice = $perUnit
+        ? \App\Support\MoneyFormatter::unitPrice((string) $hit->target, $hit->currency) . ' ' . $unitLabel
+        : \App\Support\MoneyFormatter::format((string) $hit->target, $hit->currency);
+@endphp
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; margin: 0 0 {{ $loop->last && $events->isEmpty() ? '0' : '16px' }}; border-collapse: collapse;">
+<tr>
+<td style="padding: 0 0 8px; color: #71717a; font-size: 13px; line-height: 1.4;">
+{{ $hit->shop?->host ?? 'Shop unknown' }} · {{ $hit->fired_at->setTimezone($user->timezone)->format('H:i') }}
+</td>
+</tr>
+<tr>
+<td style="padding: 0 0 12px; color: #18181b; line-height: 1.2;">
+@if ($perUnit)
+<span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::unitPrice((string) $hit->unit_price, $hit->currency) }} {{ $unitLabel }}</span>
+@else
+<span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::format($hit->price === null ? null : (string) $hit->price, $hit->currency) }}</span>
+@endif
+<span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dbeafe; color: #1e40af; font-size: 12px; font-weight: 700; white-space: nowrap;">Reached your price</span>
+<div style="margin-top: 4px; color: #71717a; font-size: 13px;">@if ($perUnit && $hit->price !== null){{ \App\Support\PackLine::format((string) $hit->price, $hit->currency, $hit->packSize()) }} · @endif your price {{ $yourPrice }}</div>
+</td>
+</tr>
+@if ($hit->deal !== null)
+<tr>
+<td style="padding: 12px 14px; border: 1px solid #fde68a; border-radius: 6px; background: #fffbeb; color: #18181b; font-size: 14px; line-height: 1.5;">
+<span style="display: inline-block; margin-right: 7px; padding: 2px 7px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;">Deal</span>
+<strong>{{ $hit->deal }}</strong>
+</td>
+</tr>
+@endif
+</table>
+@endforeach
 @foreach ($events as $event)
 @php
     $bundle = $event->priceCheck?->bundleOffer();

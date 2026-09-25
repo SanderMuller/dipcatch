@@ -8,6 +8,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
+use App\Models\TargetPriceEvent;
 use DateTimeInterface;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 #[Signature('dipcatch:prune-checks')]
-#[Description('Prune price_checks / price_drop_events / cheapest_history older than 365 days, keeping at least 50 most-recent rows per offer/product.')]
+#[Description('Prune price_checks / price_drop_events / cheapest_history older than 365 days, keeping at least 50 most-recent rows per offer/product, and target_price_events older than 365 days.')]
 final class PruneOldChecksCommand extends Command
 {
     private const int RETAIN_DAYS = 365;
@@ -52,7 +53,11 @@ final class PruneOldChecksCommand extends Command
                 $checksDeleted += $this->pruneChecks($shop->id, $cutoff);
             });
 
-        $this->info("Pruned {$checksDeleted} price_checks, {$eventsDeleted} price_drop_events, {$segmentsDeleted} cheapest_history segments.");
+        // Only the daily digest reads these, so no plan keeps them longer.
+        $deleted = TargetPriceEvent::query()->where('fired_at', '<', $cutoff)->delete();
+        $reachedDeleted = is_int($deleted) ? $deleted : 0;
+
+        $this->info("Pruned {$checksDeleted} price_checks, {$eventsDeleted} price_drop_events, {$reachedDeleted} target_price_events, {$segmentsDeleted} cheapest_history segments.");
 
         return self::SUCCESS;
     }

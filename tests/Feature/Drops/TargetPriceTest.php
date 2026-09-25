@@ -5,6 +5,7 @@ use App\Mcp\Servers\DipCatchServer;
 use App\Mcp\Tools\SetThresholdTool;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\TargetPriceEvent;
 use App\Models\User;
 use App\Notifications\TargetPriceNotification;
 use App\Services\Drops\NotificationBudget;
@@ -48,6 +49,23 @@ test('the alert fires when the cheapest price reaches the target', function (): 
     Notification::assertSentTo($product->user, TargetPriceNotification::class);
 
     expect((string) $product->refresh()->target_price_notified)->toBe('17.05');
+
+    // The daily email reads this row, not the notification.
+    $event = TargetPriceEvent::query()->sole();
+    expect($event->isPerUnit())->toBeFalse()
+        ->and($event->user_id)->toBe($product->user_id)
+        ->and($event->shop_id)->toBe($product->cheapest_shop_id)
+        ->and((string) $event->price)->toBe('17.05')
+        ->and((string) $event->target)->toBe('18.0000');
+});
+
+test('the row keeps the multi-buy the price takes, for the daily email', function (): void {
+    $product = targetPriceProduct('2.10', '2.00');
+    $product->shops()->first()?->update(['single_item_price' => '2.85', 'bundle_quantity' => 2, 'bundle_total_price' => '4.00']);
+
+    app(DetectTargetPrice::class)($product->refresh());
+
+    expect(TargetPriceEvent::query()->sole()->deal)->toBe('2 for €4.00');
 });
 
 test('the alert stays quiet above the target', function (): void {
@@ -56,6 +74,7 @@ test('the alert stays quiet above the target', function (): void {
     app(DetectTargetPrice::class)($product);
 
     Notification::assertNothingSent();
+    expect(TargetPriceEvent::query()->count())->toBe(0);
 });
 
 test('the same news is not sent twice, and a lower price is news again', function (): void {
@@ -65,6 +84,7 @@ test('the same news is not sent twice, and a lower price is news again', functio
     app(DetectTargetPrice::class)($product->refresh());
 
     Notification::assertSentToTimes($product->user, TargetPriceNotification::class);
+    expect(TargetPriceEvent::query()->count())->toBe(1);
 
     $product->shops()->first()?->update(['current_price' => '15.00']);
     $product->recomputeCheapestShop();
@@ -72,6 +92,8 @@ test('the same news is not sent twice, and a lower price is news again', functio
     app(DetectTargetPrice::class)($product->refresh());
 
     Notification::assertSentToTimes($product->user, TargetPriceNotification::class, 2);
+    expect(TargetPriceEvent::query()->get()->map(fn (TargetPriceEvent $event): string => (string) $event->price)->sort()->values()->all())
+        ->toBe(['15.00', '17.05']);
 });
 
 test('a price back above the target clears the latch', function (): void {
@@ -232,6 +254,8 @@ test('the notification budget still caps a target alert', function (): void {
     app(DetectTargetPrice::class)($product);
 
     Notification::assertNothingSent();
+    // The push is held back; the daily email still carries it.
+    expect(TargetPriceEvent::query()->count())->toBe(1);
 });
 
 test('a target fires from the smallest outlay even when another shop is better value', function (): void {
