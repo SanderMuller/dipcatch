@@ -13,6 +13,26 @@ final readonly class JsonLdMatch
     public const array KEY_FIELDS = ['productID', 'sku', 'gtin13', 'gtin'];
 
     /**
+     * How a variant or offer names itself: its first identifier, else its
+     * URL, else null. The one derivation both choosers print, so a key the
+     * caller sends back is always one {@see keyMatches()} can recognise.
+     *
+     * @param  array<string, mixed>  $node
+     */
+    public static function publishedKey(array $node): ?string
+    {
+        foreach (self::KEY_FIELDS as $field) {
+            $value = $node[$field] ?? null;
+
+            if (is_scalar($value) && (string) $value !== '') {
+                return (string) $value;
+            }
+        }
+
+        return JsonLdEntities::nonEmptyString($node['url'] ?? null);
+    }
+
+    /**
      * Decide what one entity answers, in a single pass.
      *
      * The key test feeds all three answers, so it runs once. Precision

@@ -197,8 +197,8 @@ final readonly class JsonLdEntitySearcher
             return null;
         }
 
-        $price = PriceNormalizer::fromMixed($offer['price'] ?? null);
-        $currency = JsonLdEntities::nonEmptyString($offer['priceCurrency'] ?? null);
+        $price = JsonLdOfferPrice::price($offer);
+        $currency = JsonLdOfferPrice::currency($offer);
 
         if ($price === null || $currency === null) {
             return null;
@@ -222,22 +222,8 @@ final readonly class JsonLdEntitySearcher
      */
     public static function variantKeyFor(array $variant): string
     {
-        foreach (JsonLdMatch::KEY_FIELDS as $field) {
-            $value = $variant[$field] ?? null;
-            if (is_scalar($value)) {
-                $str = (string) $value;
-                if ($str !== '') {
-                    return $str;
-                }
-            }
-        }
-
-        $url = JsonLdEntities::nonEmptyString($variant['url'] ?? null);
-        if ($url !== null) {
-            return $url;
-        }
-
-        return self::SYNTHESISED_PREFIX . substr(hash('xxh3', (string) json_encode(self::stableFields($variant))), 0, 12);
+        return JsonLdMatch::publishedKey($variant)
+            ?? self::SYNTHESISED_PREFIX . substr(hash('xxh3', (string) json_encode(self::stableFields($variant))), 0, 12);
     }
 
     /**

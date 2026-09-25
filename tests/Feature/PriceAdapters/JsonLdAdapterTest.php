@@ -831,6 +831,45 @@ test('offers pricing themselves through a priceSpecification still become choice
         ->and(array_map(fn (VariantCandidate $variant): string => $variant->price, $result->variants))->toBe(['10.00', '20.00']);
 });
 
+test('hasVariant entries priced outside the direct price field still become choices', function (array $small, array $large): void {
+    $variant = fn (string $name, string $id, array $offer): array => [
+        '@type' => 'Product',
+        'name' => $name,
+        'productID' => $id,
+        'url' => 'https://shop.test/p/' . $id . '/',
+        'offers' => $offer,
+    ];
+
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Feliway Family',
+        'hasVariant' => [
+            $variant('Feliway 1-pack', '111-1', $small),
+            $variant('Feliway 3-pack', '111-3', $large),
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/canonical', withJsonLd($json));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and(array_map(fn (VariantCandidate $variant): string => $variant->key, $result->variants))->toBe(['111-1', '111-3'])
+        ->and(array_map(fn (VariantCandidate $variant): string => $variant->price, $result->variants))->toBe(['23.95', '52.86']);
+})->with([
+    'priceSpecification' => [
+        ['@type' => 'Offer', 'priceSpecification' => ['@type' => 'UnitPriceSpecification', 'price' => '23.95', 'priceCurrency' => 'EUR']],
+        ['@type' => 'Offer', 'priceSpecification' => ['@type' => 'UnitPriceSpecification', 'price' => '52.86', 'priceCurrency' => 'EUR']],
+    ],
+    'AggregateOffer lowPrice' => [
+        ['@type' => 'AggregateOffer', 'lowPrice' => '23.95', 'highPrice' => '25.00', 'priceCurrency' => 'EUR'],
+        ['@type' => 'AggregateOffer', 'lowPrice' => '52.86', 'highPrice' => '55.00', 'priceCurrency' => 'EUR'],
+    ],
+    'capitalised Price' => [
+        ['@type' => 'Offer', 'Price' => '23.95', 'priceCurrency' => 'EUR'],
+        ['@type' => 'Offer', 'Price' => '52.86', 'priceCurrency' => 'EUR'],
+    ],
+]);
+
 test('two offers that repeat the product name are still told apart', function (): void {
     $json = json_encode([
         '@context' => 'https://schema.org',
@@ -988,6 +1027,26 @@ test('a key the chooser synthesised matches on the next call', function (): void
 
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->price)->toBe('32.89');
+});
+
+test('the keys a chooser prints stay exactly what shops already store', function (): void {
+    // `variant_key` is persisted on the shop row. A round trip would still
+    // pass if the chooser and the matcher changed a key together, and every
+    // stored key would then match nothing.
+    $synthesised = new JsonLdAdapter()->extract('https://fitpiggy.test/products/double-chocolate-2', withJsonLd(unidentifiedVariants()));
+
+    $byUrl = new JsonLdAdapter()->extract('https://shop.test/canonical', withJsonLd((string) json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Shirt',
+        'hasVariant' => [
+            ['@type' => 'Product', 'name' => 'Small', 'url' => 'https://shop.test/p/small', 'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR']],
+            ['@type' => 'Product', 'name' => 'Large', 'url' => 'https://shop.test/p/large', 'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR']],
+        ],
+    ])));
+
+    expect(array_map(fn (VariantCandidate $variant): string => $variant->key, $synthesised->variants))->toBe(['variant-322f821ec80d', 'variant-0cabc509745f'])
+        ->and(array_map(fn (VariantCandidate $variant): string => $variant->key, $byUrl->variants))->toBe(['https://shop.test/p/small', 'https://shop.test/p/large']);
 });
 
 test('a synthesised key survives the shop changing its price', function (): void {
