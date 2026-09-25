@@ -807,9 +807,27 @@ it('states a running promotion on a dashboard card too', function (): void {
 
     $this->actingAs($user);
 
-    $card = preg_replace('/\s+/', ' ', strip_tags(withoutCardDetails(livewire(Dashboard::class)->html())));
+    $html = withoutCardDetails(livewire(Dashboard::class)->html());
+    $card = preg_replace('/\s+/', ' ', strip_tags($html));
 
     expect($card)->toContain('Deal 25% korting until');
+
+    preg_match_all('#<article\b.*?</article>#s', $html, $cards);
+
+    expect($cards[0])->not->toBeEmpty();
+
+    foreach ($cards[0] as $article) {
+        expect(substr_count(strip_tags($article), 'until'))->toBe(1);
+    }
+});
+
+it('keeps an announced deal on a dashboard card', function (): void {
+    $user = User::factory()->create();
+    productWithCheapestShop($user, 'Remia Friteslijn', ['host' => 'ah.nl', 'current_price' => '1.69', 'promotion_label' => '25% korting', 'promotion_starts_at' => now()->addDays(2), 'promotion_ends_at' => now()->addDays(8)]);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)->assertSee('Upcoming deal');
 });
 
 it('lists a paused shop in the hover, marked as paused', function (): void {

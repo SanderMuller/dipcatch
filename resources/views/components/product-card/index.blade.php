@@ -52,7 +52,8 @@
         {{-- The deal behind the figure, in the shop's words: a bundle, or a
              promotion window such as "Bonus until 27 Sep". The dashboard's deal
              box below states a bundle itself, so there the line covers the rest. --}}
-        @if (($compare || $headline->shop?->liveBundleOffer() === null) && ($deal = \App\Support\PromotionLabel::runningDeal($headline->shop)))
+        @php($deal = ($compare || $headline->shop?->liveBundleOffer() === null) ? \App\Support\PromotionLabel::runningDeal($headline->shop) : null)
+        @if ($deal)
             <flux:text size="sm" class="mt-1 text-zinc-600 dark:text-zinc-300" data-test="card-deal">
                 <flux:badge size="sm" color="amber" class="me-1">{{ __('Deal') }}</flux:badge>{{ $deal }}
             </flux:text>
@@ -71,8 +72,12 @@
             <x-product-card.shops :product="$product" :headline="$headline" class="mt-auto pt-4" />
         @elseif ($headline->shop)
             <div class="mt-auto space-y-2 pt-4">
-                <x-shop-deal :shop="$headline->shop" :show-source="false" />
-                {{-- The deal box above already states the deadline. --}}
+                {{-- The deal line or the deal box states any deadline, once: with
+                     a running deal on the line the box would only repeat the
+                     date, and the row link leaves it out either way. --}}
+                @unless ($deal)
+                    <x-shop-deal :shop="$headline->shop" :show-source="false" />
+                @endunless
                 @php($hasDeal = $headline->shop->liveBundleOffer() !== null || $headline->shop->promotionWindow() !== null)
                 <div class="relative z-10 w-fit">
                     <x-shop-row-link :shop="$headline->shop" :deadline="! $hasDeal" />
