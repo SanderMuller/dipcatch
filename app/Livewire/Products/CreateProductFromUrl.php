@@ -79,7 +79,7 @@ final class CreateProductFromUrl extends Component
      * states no pack size: there is nothing to turn a pack price into a unit
      * price with.
      *
-     * @return list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, bestValue: bool}>
+     * @return list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>
      */
     public function unitTargetPacks(): array
     {
@@ -89,7 +89,7 @@ final class CreateProductFromUrl extends Component
             return [];
         }
 
-        return [UnitTargetGuide::packChoice('new', $this->host, $draft->packSize, $draft->trackedPrice(), bestValue: true)];
+        return [UnitTargetGuide::packChoice('new', $this->host, $draft->packSize, $draft->trackedPrice())];
     }
 
     /**

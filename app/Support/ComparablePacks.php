@@ -156,10 +156,23 @@ final readonly class ComparablePacks
      */
     public function cheapestPerUnit(Collection $shops): ?Shop
     {
+        return $this->rankedPerUnit($shops)->first();
+    }
+
+    /**
+     * The shops that may win, cheapest per unit first, in the order
+     * {@see cheapestPerUnit()} crowns them: a list that leads with any other
+     * shop disagrees with the headline on a tie.
+     *
+     * @param  Collection<int, Shop>  $shops
+     * @return Collection<int, Shop>
+     */
+    public function rankedPerUnit(Collection $shops): Collection
+    {
         return $this->winnable($shops)
             ->sort(fn (Shop $a, Shop $b): int => [$this->unitPriceValueOf($a), $a->created_at, (string) $a->id]
                 <=> [$this->unitPriceValueOf($b), $b->created_at, (string) $b->id])
-            ->first();
+            ->values();
     }
 
     /** The figure a surface prints. {@see unitPriceValueOf()} is what ranks. */

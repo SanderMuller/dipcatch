@@ -29,8 +29,32 @@ it('lists the packs the alert compares, cheapest per unit first', function (): v
     expect(array_column($packs, 'host'))->toBe(['jumbo.com', 'lidl.nl', 'ah.nl'])
         ->and(array_column($packs, 'pack'))->toBe(['1.5 kg', '370 g', '200 g'])
         // How many kilos one pack holds: the pack price divided by it is the kilo price.
-        ->and(array_column($packs, 'perPack'))->toBe([1.5, 0.37, 0.2])
-        ->and($packs[0]['bestValue'])->toBeTrue();
+        ->and(array_column($packs, 'perPack'))->toBe([1.5, 0.37, 0.2]);
+});
+
+it('leaves out a pack priced at nothing, as the ranking does', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    guideShop($product, 'ah.nl', '1.69', '200.00', 'g');
+    guideShop($product, 'free.nl', '0.00', '200.00', 'g');
+    $product->refresh()->recomputeCheapestShop();
+
+    expect(array_column(new UnitTargetGuide($product->refresh())->packs(), 'host'))->toBe(['ah.nl']);
+});
+
+it('leads with the best-value shop when two packs tie per unit', function (): void {
+    // 1 L at 2.00 and 2 L at 4.00 are both 2.00 a litre. The best-value
+    // ranking gives the tie to the older shop; the pack list must lead with
+    // the same one, whatever order the database returns the rows in.
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    guideShop($product, 'newer.nl', '2.00', '1000.00', 'ml', ['created_at' => now()]);
+    guideShop($product, 'older.nl', '4.00', '2000.00', 'ml', ['created_at' => now()->subDay()]);
+    $product->refresh()->recomputeCheapestShop();
+
+    $product->refresh();
+    $packs = new UnitTargetGuide($product)->packs();
+
+    expect($product->bestValueShop()?->host)->toBe('older.nl')
+        ->and($packs[0]['host'])->toBe('older.nl');
 });
 
 it('leaves out a shop the alert cannot use', function (): void {

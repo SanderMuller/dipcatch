@@ -10,8 +10,9 @@
 
 {{--
     Set in pack prices, stored as one price per unit that every shop and pack
-    size is held to. `packs` comes from UnitTargetGuide::packs(), cheapest per
-    unit first, and must not be empty.
+    size is held to. `packs` comes from UnitTargetGuide::packs(), in the
+    best-value ranking's order so the first is the best value, and must not
+    be empty.
 --}}
 <div
     {{ $attributes->class('space-y-6') }}
@@ -24,8 +25,6 @@
         chosen: 0,
         packInput: '',
         init() {
-            const best = this.packs.findIndex((pack) => pack.bestValue);
-            this.chosen = best === -1 ? 0 : best;
             this.syncPack();
             this.$watch('chosen', () => this.syncPack());
             // A target set from elsewhere — the switch from a drop alert, a

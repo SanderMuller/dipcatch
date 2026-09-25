@@ -16,34 +16,28 @@ final readonly class UnitTargetGuide
     /**
      * The packs the shops sell, so the per-unit target can be set in the
      * terms a shopper thinks in: a price for this bottle, this bag, this box.
-     * Only packs that take part in the per-unit comparison, cheapest per unit
-     * first.
+     * Only packs that take part in the per-unit comparison, in the best-value
+     * ranking's own order, so the first is the best value.
      *
      * `perPack` is how many comparison units one pack holds: 1.5 for a 1.5 L
      * bottle compared per litre, 8 for a box of 8 compared per piece.
      *
-     * @return list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, bestValue: bool}>
+     * @return list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>
      */
     public function packs(): array
     {
         $packs = $this->product->comparablePacks();
-        $bestValueId = $this->product->bestValueShop()?->id;
         $choices = [];
 
         // The shops the ranking and the alert use: a dead or sold-out shop's
         // pack is not a price anyone can act on.
-        foreach ($this->product->eligibleShops() as $shop) {
-            $pack = $packs->for($shop);
-            $size = $pack?->size;
+        foreach ($packs->rankedPerUnit($this->product->eligibleShops()) as $shop) {
+            $size = $packs->for($shop)?->size;
 
-            if ($pack === null || $size === null || ! $pack->canWin()) {
-                continue;
+            if ($size !== null) {
+                $choices[] = self::packChoice((string) $shop->id, (string) $shop->host, $size, $shop->current_price);
             }
-
-            $choices[] = self::packChoice((string) $shop->id, (string) $shop->host, $size, $shop->current_price, $shop->id === $bestValueId);
         }
-
-        usort($choices, fn (array $a, array $b): int => ($a['unitPrice'] ?? PHP_FLOAT_MAX) <=> ($b['unitPrice'] ?? PHP_FLOAT_MAX));
 
         return $choices;
     }
@@ -55,7 +49,7 @@ final readonly class UnitTargetGuide
      * so the easier of the two carries over. Null when there is nothing to
      * restate, or the saving leaves less than the smallest target.
      *
-     * @param  list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, bestValue: bool}>|null  $packs  from packs(), when the caller has them
+     * @param  list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>|null  $packs  from packs(), when the caller has them
      * @return array{unit: string, drops: list<string>, percentUnder: int, packPrice: string, pack: string}|null
      */
     public function switchFromDrop(?string $percent, ?string $amount, ?array $packs = null): ?array
@@ -117,9 +111,9 @@ final readonly class UnitTargetGuide
      * One pack as the unit-target component reads it — also for a shop that
      * is not saved yet, on the create form.
      *
-     * @return array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, bestValue: bool}
+     * @return array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}
      */
-    public static function packChoice(string $shopId, string $host, PackSize $size, mixed $price, bool $bestValue): array
+    public static function packChoice(string $shopId, string $host, PackSize $size, mixed $price): array
     {
         $price = is_numeric($price) ? (string) $price : null;
 
@@ -130,7 +124,6 @@ final readonly class UnitTargetGuide
             'perPack' => $size->unit === 'piece' ? $size->quantity : $size->quantity / 1000,
             'price' => $price === null ? null : (float) $price,
             'unitPrice' => $price === null ? null : $size->unitPriceValueFor($price),
-            'bestValue' => $bestValue,
         ];
     }
 
