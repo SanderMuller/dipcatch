@@ -6,6 +6,7 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\UrlNormalizer;
@@ -16,7 +17,7 @@ use App\Support\UrlNormalizer;
  * unknown host, delegate to JSON-LD on the happy path, fall back to CSS, and
  * surface a host-specific failure code when both fail.
  */
-abstract readonly class HostAdapter implements HostSpecificAdapter, ShopAdapter
+abstract readonly class HostAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
     /**
      * Normalized host (no `www.`) → ISO 4217 currency code.
@@ -30,6 +31,11 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, ShopAdapter
      * subclass doesn't need to redo the host lookup.
      */
     abstract protected function extractFromHtml(string $html, string $currency): ?ShopSnapshot;
+
+    public function ownedHosts(): array
+    {
+        return array_keys($this->hosts());
+    }
 
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {

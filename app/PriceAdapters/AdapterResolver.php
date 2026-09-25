@@ -3,6 +3,7 @@
 namespace App\PriceAdapters;
 
 use App\Enums\ConsumerPriceIssue;
+use App\PriceAdapters\Hosts\HostUrl;
 
 /**
  * Chain-of-responsibility over registered adapters. Per spec §2:
@@ -44,7 +45,7 @@ final readonly class AdapterResolver
             return $this->readPage($this->runChain($url, $html, skipKey: null, context: $context), $html);
         }
 
-        $result = $persisted->extract($url, $html, $context);
+        $result = $this->extractWith($persisted, $url, $html, $context);
 
         // Only `skip` falls through: the adapter said the URL is not its
         // host. Anything else is that host's own verdict.
@@ -69,7 +70,7 @@ final readonly class AdapterResolver
                 continue;
             }
 
-            $result = $adapter->extract($url, $html, $context);
+            $result = $this->extractWith($adapter, $url, $html, $context);
 
             if ($result->isSuccess() || $result->isFailed() || $result->isAmbiguous()) {
                 return $result->withAdapterKey($adapter->key());
@@ -77,6 +78,22 @@ final readonly class AdapterResolver
         }
 
         return ExtractionResult::failed('no_adapter_matched');
+    }
+
+    /**
+     * An adapter's verdict, with one rule enforced for every host adapter: on
+     * a host it owns, `skip` is not an answer. It would hand the page to a
+     * weaker reader that prices whatever number it finds.
+     */
+    private function extractWith(ShopAdapter $adapter, string $url, string $html, ?AdapterContext $context): ExtractionResult
+    {
+        $result = $adapter->extract($url, $html, $context);
+
+        if ($result->isSkip() && $adapter instanceof OwnsHosts && HostUrl::matchesAny($url, $adapter->ownedHosts())) {
+            return ExtractionResult::failed($adapter->key() . '_extraction_failed');
+        }
+
+        return $result;
     }
 
     /**

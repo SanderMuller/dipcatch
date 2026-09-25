@@ -5,6 +5,7 @@ namespace App\PriceAdapters\Hosts;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
+use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopAdapter;
@@ -29,7 +30,7 @@ use Throwable;
  * payload holds whichever store an anonymous visitor gets. That is the price
  * the site itself shows for such a visitor, so it is the one to track.
  */
-final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapter
+final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
     private const string IMAGE_BASE = 'https://web-fileserver.dekamarkt.nl/';
 
@@ -38,9 +39,14 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, ShopAdapte
         return 'dekamarkt';
     }
 
+    public function ownedHosts(): array
+    {
+        return ['dekamarkt.nl'];
+    }
+
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        if (! HostUrl::matches($url, 'dekamarkt.nl')) {
+        if (! HostUrl::matchesAny($url, $this->ownedHosts())) {
             return ExtractionResult::skip();
         }
 
