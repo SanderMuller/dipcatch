@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources\Users\Tables;
 
 use App\Actions\Users\DeleteUser;
 use App\Billing\Plan;
+use App\Billing\PlanSource;
 use App\Billing\ProUsers;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -224,24 +225,15 @@ final class UsersTable
         $record->forceFill(['comped_until' => null, 'comped_reason' => null])->save();
     }
 
-    /**
-     * Which branch of `Subscribes::plan()` granted this account its plan.
-     */
     private static function reason(User $record): string
     {
-        if ($record->billing_blocked_at !== null) {
-            return 'Blocked';
-        }
-
-        if ($record->isComped()) {
-            return 'Comp';
-        }
-
-        if ($record->subscription(Plan::SUBSCRIPTION_TYPE) !== null) {
-            return 'Subscription';
-        }
-
-        return $record->onTrial() ? 'Trial' : '—';
+        return match ($record->planSource()) {
+            PlanSource::Blocked => 'Blocked',
+            PlanSource::Comp => 'Comp',
+            PlanSource::Subscription => 'Subscription',
+            PlanSource::AccountTrial => 'Trial',
+            PlanSource::None => '—',
+        };
     }
 
     private static function compLabel(User $record): ?string

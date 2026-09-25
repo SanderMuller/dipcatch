@@ -164,3 +164,35 @@ it('reads pro everywhere when a live row sits under a newer incomplete one', fun
 
     expect(proAnswers($user))->toBe(['plan' => true, 'sql' => true, 'label' => 'Pro', 'comped' => false]);
 });
+
+it('labels each account by the branch that decided its plan', function (Closure $setUp, array $answers): void {
+    $user = User::factory()->create();
+    $setUp($user);
+
+    expect(proAnswers($user))->toBe($answers);
+})->with([
+    'account trial, no subscription' => [
+        fn (User $user) => $user->forceFill(['trial_ends_at' => CarbonImmutable::now()->addDays(10)])->save(),
+        ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
+    ],
+    'canceled row whose own trial still runs' => [
+        fn (User $user) => subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subDay(), trialEndsAt: CarbonImmutable::now()->addDays(10)),
+        ['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false],
+    ],
+    'live trialing row' => [
+        fn (User $user) => subscribeUser($user, 'trialing', trialEndsAt: CarbonImmutable::now()->addDays(5)),
+        ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
+    ],
+    'live row cancelling at period end' => [
+        fn (User $user) => subscribeUser($user, 'active', endsAt: CarbonImmutable::now()->addDays(5)),
+        ['plan' => true, 'sql' => true, 'label' => 'Cancelling', 'comped' => false],
+    ],
+    'past due row in dunning' => [
+        fn (User $user) => subscribeUser($user, 'past_due'),
+        ['plan' => true, 'sql' => true, 'label' => 'Past due', 'comped' => false],
+    ],
+    'incomplete row inside its trial' => [
+        fn (User $user) => subscribeUser($user, 'incomplete', trialEndsAt: CarbonImmutable::now()->addDays(10)),
+        ['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false],
+    ],
+]);

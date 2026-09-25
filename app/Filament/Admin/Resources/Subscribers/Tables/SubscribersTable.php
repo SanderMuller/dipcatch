@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Subscribers\Tables;
 
+use App\Billing\PlanSource;
 use App\Billing\ProPrice;
 use App\Billing\ProUsers;
 use App\Models\User;
@@ -116,33 +117,34 @@ final class SubscribersTable
     }
 
     /**
-     * One of the three places that decide whether an account reads as Pro —
-     * see `ProUsers`. Public so a test can assert it agrees with the other
-     * two, rather than only through a rendered table.
+     * The label for `User::planSource()`. Public so a test can assert it
+     * against `plan()` and `ProUsers`, rather than only through a rendered
+     * table.
      */
     public static function status(User $record): string
     {
-        if ($record->billing_blocked_at !== null) {
-            return 'Blocked';
-        }
+        return match ($record->planSource()) {
+            PlanSource::Blocked => 'Blocked',
+            PlanSource::Comp => 'Comped',
+            PlanSource::AccountTrial => 'Trial',
+            PlanSource::None => 'Free',
+            PlanSource::Subscription => self::subscriptionStatus($record),
+        };
+    }
 
-        // Without this a comped account reads Free here while the Pro filter
-        // above counts it as Pro.
-        if ($record->isComped()) {
-            return 'Comped';
-        }
-
-        // The row that decides what the customer is being sold, which is not
-        // always the newest one — see `User::payingSubscription()`.
+    /**
+     * Only reached when a subscription grants Pro, so the row read here is
+     * that one — see `User::payingSubscription()`.
+     */
+    private static function subscriptionStatus(User $record): string
+    {
         $subscription = $record->payingSubscription();
 
         return match (true) {
-            $subscription === null => 'Free',
-            $subscription->onTrial() => 'Trial',
-            $subscription->onGracePeriod() => 'Cancelling',
-            $subscription->pastDue() => 'Past due',
-            $subscription->valid() => 'Pro',
-            default => 'Free',
+            $subscription?->onTrial() === true => 'Trial',
+            $subscription?->onGracePeriod() === true => 'Cancelling',
+            $subscription?->pastDue() === true => 'Past due',
+            default => 'Pro',
         };
     }
 

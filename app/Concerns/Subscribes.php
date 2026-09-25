@@ -4,6 +4,7 @@ namespace App\Concerns;
 
 use App\Billing\Entitlements;
 use App\Billing\Plan;
+use App\Billing\PlanSource;
 use App\Models\StripeDispute;
 use App\Models\StripePayment;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -33,12 +34,17 @@ trait Subscribes
 
     public function plan(): Plan
     {
+        return $this->planSource()->plan();
+    }
+
+    public function planSource(): PlanSource
+    {
         if ($this->billing_blocked_at !== null) {
-            return Plan::Free;
+            return PlanSource::Blocked;
         }
 
         if ($this->isComped()) {
-            return Plan::Pro;
+            return PlanSource::Comp;
         }
 
         $subscriptions = $this->proSubscriptions();
@@ -47,7 +53,7 @@ trait Subscribes
             // A generic trial started before any subscription exists still
             // grants Pro — `onTrial()` with no arguments reads the user's
             // own `trial_ends_at`.
-            return $this->onTrial() ? Plan::Pro : Plan::Free;
+            return $this->onTrial() ? PlanSource::AccountTrial : PlanSource::None;
         }
 
         // `active()`, not `valid()`, because `ProUsers` — the scheduler's
@@ -64,8 +70,8 @@ trait Subscribes
         // `keepPastDueSubscriptionsActive()` in AppServiceProvider is what
         // keeps Pro through the dunning retries.
         return $subscriptions->contains(static fn (Subscription $subscription): bool => $subscription->active())
-            ? Plan::Pro
-            : Plan::Free;
+            ? PlanSource::Subscription
+            : PlanSource::None;
     }
 
     /**

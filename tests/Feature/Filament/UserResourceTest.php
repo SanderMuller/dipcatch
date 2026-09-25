@@ -361,3 +361,19 @@ test('a Stripe failure keeps the account instead of deleting it', function (): v
     expect(User::query()->find($target->id))->not->toBeNull()
         ->and(Product::query()->find($product->id))->not->toBeNull();
 });
+
+test('the Why column names the branch that decided the plan', function (Closure $setUp, string $why): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    $user = User::factory()->create();
+    $setUp($user);
+
+    livewire(ListUsers::class)->assertTableColumnStateSet('entitlement', $why, $user);
+})->with([
+    'free' => [fn (User $user) => null, '—'],
+    'comped' => [fn (User $user) => $user->forceFill(['comped_until' => CarbonImmutable::now()->addMonth()])->save(), 'Comp'],
+    'blocked' => [fn (User $user) => $user->forceFill(['billing_blocked_at' => now()])->save(), 'Blocked'],
+    'subscription' => [fn (User $user) => subscribeUser($user), 'Subscription'],
+    'account trial' => [fn (User $user) => $user->forceFill(['trial_ends_at' => CarbonImmutable::now()->addDays(10)])->save(), 'Trial'],
+    'canceled row whose own trial still runs' => [fn (User $user) => subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subDay(), trialEndsAt: CarbonImmutable::now()->addDays(10)), '—'],
+]);

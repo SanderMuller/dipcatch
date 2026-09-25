@@ -124,14 +124,8 @@ function inProUsers(User $user): bool
  * on Cashier's `active()` scope, which asks neither question — so one account
  * was Pro on the billing page and Free to the scheduler at the same instant.
  *
- * Asserted against both readers rather than the `proAnswers()` harness in
- * CompedAccountsTest: that harness also asserts `SubscribersTable::status()`,
- * which derives its own label and answers "Trial" for these. Its divergence
- * on `unpaid` and `incomplete_expired` predates this change; for the rows
- * below it is this change that makes it disagree, and the same is true of
- * `UsersTable`'s "Trial" reason. Both are admin-facing labels that read the
- * subscription directly. The billing page had the same shape and is fixed
- * here, because a shopper reads that one.
+ * The admin labels for these rows are asserted in CompedAccountsTest, through
+ * the `proAnswers()` harness.
  */
 it('ends pro on an expired subscription whose own trial is still running', function (): void {
     $user = User::factory()->create();
