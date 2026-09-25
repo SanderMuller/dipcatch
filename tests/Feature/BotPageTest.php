@@ -67,9 +67,9 @@ test('the crawler sends the name it publishes, and obeys robots.txt under that n
 
 test('no configuration or example env still names the old domain', function (string $path): void {
     expect((string) file_get_contents(base_path($path)))->not->toContain('dipcatch.app');
-})->with([
-    'scraper config' => 'config/scraper.php',
-    'env example' => '.env.example',
+})->with(fn (): array => [
+    ...array_map(fn (string $file): string => 'config/' . $file, firstPartyConfigFiles()),
+    '.env.example',
 ]);
 
 test('the advertised bot URL resolves to a real page', function (): void {

@@ -83,6 +83,29 @@ expect()->extend('toBeSameTimestampAs', function (DateTimeInterface $expected): 
 */
 
 /**
+ * The config files DipCatch authors, read off disk so a new one is covered
+ * without being added anywhere. Files a package or the framework skeleton
+ * ships are left out: they carry knobs for drivers this app does not use.
+ *
+ * @return list<string> file names under `config/`
+ */
+function firstPartyConfigFiles(): array
+{
+    $shipped = [
+        'app.php', 'auth.php', 'cache.php', 'cashier.php', 'database.php',
+        'failed-job-monitor.php', 'filesystems.php', 'fortify.php', 'health.php',
+        'logging.php', 'mail.php', 'octane.php', 'queue-insights.php', 'queue.php',
+        'richter.php', 'sentry.php', 'services.php', 'session.php', 'webpush.php',
+    ];
+
+    // Off `__DIR__`, not `config_path()`: a dataset reads this before the
+    // app boots.
+    $files = array_map(basename(...), glob(dirname(__DIR__) . '/config/*.php') ?: []);
+
+    return array_values(array_diff($files, $shipped));
+}
+
+/**
  * Every `href` under one selector. Scoped rather than page-wide: a marketing
  * page links the same routes from its header, its body and its footer, so a
  * whole-page assertion passes on the wrong one.

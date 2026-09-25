@@ -6,27 +6,18 @@
  * mail both fail that way — no health check covers either — so the app reports
  * healthy while two features are dead.
  *
- * The guard covers the config files DipCatch itself authors. Add a new one to
- * `$firstPartyConfig` below, or the guard silently stops covering it. Package
- * config is out of scope: those files carry dozens of knobs for drivers this
- * app does not use, and documenting them would bury the handful that matter.
+ * The guard covers the config files DipCatch itself authors. Package config
+ * is out of scope: documenting its knobs would bury the handful that matter.
  * App-specific names that live in package config are documented but unguarded.
  */
 test('every environment variable the app reads from its own config is documented in .env.example', function (): void {
-    $firstPartyConfig = [
-        'config/dipcatch.php',
-        'config/hsts.php',
-        'config/plans.php',
-        'config/scraper.php',
-        'config/site.php',
-    ];
-
     // Keyed by name so the failure can say which file reads it. The pattern
     // takes any identifier rather than uppercase-only, so a name that breaks
     // the SCREAMING_CASE convention is still guarded.
     $read = [];
 
-    foreach ($firstPartyConfig as $relativePath) {
+    foreach (firstPartyConfigFiles() as $file) {
+        $relativePath = 'config/' . $file;
         $contents = (string) file_get_contents(base_path($relativePath));
 
         preg_match_all('/env\(\s*[\'"]([A-Za-z_][A-Za-z0-9_]*)[\'"]/', $contents, $matches);
