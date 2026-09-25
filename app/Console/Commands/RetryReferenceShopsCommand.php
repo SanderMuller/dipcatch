@@ -7,11 +7,11 @@ use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\ShopDraft;
 use App\Enums\ShopKind;
 use App\Models\Shop;
-use App\Support\Config as DipConfig;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -34,9 +34,6 @@ use Throwable;
 #[Description('Retry the shops kept as links, and start tracking any whose page has become readable.')]
 final class RetryReferenceShopsCommand extends Command
 {
-    /** How long a link waits between attempts. */
-    private const int EVERY_DAYS = 7;
-
     public function handle(ProbeShopUrl $probe, AttachShop $attach): int
     {
         $dryRun = (bool) $this->option('dry-run');
@@ -124,7 +121,7 @@ final class RetryReferenceShopsCommand extends Command
      */
     private function dueQuery(): EloquentQueryBuilder
     {
-        $cutoff = now()->subDays(DipConfig::int('dipcatch.reference.retry_every_days', self::EVERY_DAYS));
+        $cutoff = now()->subDays(Config::integer('dipcatch.reference.retry_every_days'));
 
         return Shop::query()
             ->where('kind', ShopKind::Reference->value)

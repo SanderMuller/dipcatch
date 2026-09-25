@@ -9,11 +9,11 @@ use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
-use App\Support\Config as DipConfig;
 use App\Support\UnservableShops;
 use App\Support\UrlNormalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use InvalidArgumentException;
@@ -31,23 +31,10 @@ use Throwable;
  *  - 401 → Blocked; 429 → RateLimitedByHost; 5xx → TemporaryFailure.
  *  - Per-host rate limit enforced INSIDE the fetcher (probe path can't
  *    bypass), keyed on normalized host.
- *  - Body cap 2 MB; charset → UTF-8.
+ *  - Body cap from `dipcatch.fetcher.body_cap_bytes`; charset → UTF-8.
  */
 final readonly class ShopFetcher
 {
-    // Cloudflare / Akamai blanket-block anything that admits to being a bot,
-    // even when robots.txt would allow us. We still honor robots.txt, throttle
-    // per host, and respect Retry-After — we just don't announce as a bot.
-    // Override via DIPCATCH_FETCHER_USER_AGENT when a shop demands a real
-    // bot UA in robots.txt.
-    private const string DEFAULT_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15';
-
-    private const int DEFAULT_TIMEOUT = 10;
-
-    private const int DEFAULT_BODY_CAP_BYTES = 5_000_000;
-
-    private const int DEFAULT_RATE_LIMIT_PER_MINUTE = 12;
-
     /** @var list<string> Lowercased substrings that indicate WAF challenge pages. */
     private const array BLOCK_MARKERS = [
         'cf-mitigated',
@@ -145,7 +132,7 @@ final readonly class ShopFetcher
 
     private function throttle(string $host): void
     {
-        $limit = DipConfig::int('dipcatch.fetcher.rate_limit_per_minute', self::DEFAULT_RATE_LIMIT_PER_MINUTE);
+        $limit = Config::integer('dipcatch.fetcher.rate_limit_per_minute');
         $key = self::throttleKey($host);
 
         // Use attempt() so the check + hit happen as a single atomic operation
@@ -168,8 +155,8 @@ final readonly class ShopFetcher
      */
     private function sendRequest(string $url, array &$redirects): Response
     {
-        $ua = DipConfig::string('dipcatch.fetcher.user_agent', self::DEFAULT_USER_AGENT);
-        $timeout = DipConfig::int('dipcatch.fetcher.timeout_seconds', self::DEFAULT_TIMEOUT);
+        $ua = Config::string('dipcatch.fetcher.user_agent');
+        $timeout = Config::integer('dipcatch.fetcher.timeout_seconds');
 
         try {
             $safety = $this->safety;
@@ -347,7 +334,7 @@ final readonly class ShopFetcher
     private function prepareBody(Response $response): string
     {
         $body = $response->body();
-        $cap = DipConfig::int('dipcatch.fetcher.body_cap_bytes', self::DEFAULT_BODY_CAP_BYTES);
+        $cap = Config::integer('dipcatch.fetcher.body_cap_bytes');
 
         if (strlen($body) > $cap) {
             // Truncating produced false `no_adapter_matched` failures and

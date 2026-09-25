@@ -53,7 +53,7 @@ return [
     // hides the feature: the settings switch is not rendered and nothing is
     // sent. Never commit a real key.
     'typesafe' => [
-        'key' => env('TYPESAFE_API_KEY'),
+        'key' => (string) env('TYPESAFE_API_KEY', ''),
     ],
 
     'slack' => [

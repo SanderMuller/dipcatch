@@ -4,7 +4,7 @@ namespace App\Services\TypeSafe;
 
 use App\Enums\ProductCategory;
 use App\Enums\ProductDepartment;
-use App\Support\Config as DipConfig;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -85,8 +85,8 @@ final class CategoryScorer
 
         $stored = $winner !== null
             && ! $otherOnTop
-            && $pathScore >= DipConfig::float('dipcatch.categories.min_path_score', 0.5)
-            && $separation >= DipConfig::float('dipcatch.categories.min_separation', 1.5);
+            && $pathScore >= Config::float('dipcatch.categories.min_path_score')
+            && $separation >= Config::float('dipcatch.categories.min_separation');
 
         return new CategoryVerdict(
             category: $stored ? $winner : null,

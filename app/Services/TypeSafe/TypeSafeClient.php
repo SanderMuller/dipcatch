@@ -5,10 +5,10 @@ namespace App\Services\TypeSafe;
 use App\Enums\ProductDepartment;
 use App\Models\Product;
 use App\Models\Shop;
-use App\Support\Config as DipConfig;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -81,7 +81,7 @@ final readonly class TypeSafeClient
     {
         return Http::withToken(self::key())
             ->acceptJson()
-            ->timeout(DipConfig::int('dipcatch.categories.timeout_seconds', 20))
+            ->timeout(Config::integer('dipcatch.categories.timeout_seconds'))
             // One retry, and only where a second try can change the answer:
             // a dropped connection (a timeout is one), a rate limit, or a
             // server error. A 401 for a bad key is final and must not be
@@ -200,6 +200,6 @@ final readonly class TypeSafeClient
 
     private static function key(): string
     {
-        return trim(DipConfig::string('services.typesafe.key'));
+        return trim(Config::string('services.typesafe.key'));
     }
 }

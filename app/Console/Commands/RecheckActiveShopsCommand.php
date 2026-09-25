@@ -7,13 +7,13 @@ use App\Billing\Plan;
 use App\Billing\ProUsers;
 use App\Jobs\CheckShopPrice;
 use App\Models\Shop;
-use App\Support\Config as DipConfig;
 use App\Support\RecheckJitter;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Support\Facades\Config;
 
 #[Signature('dipcatch:recheck-offers')]
 #[Description('Dispatch CheckShopPrice jobs for offers that are due for a recheck.')]
@@ -28,7 +28,7 @@ final class RecheckActiveShopsCommand extends Command
         $dispatched = 0;
 
         $this->dueQuery()
-            ->limit(DipConfig::int('dipcatch.scheduler.batch_size', 200))
+            ->limit(Config::integer('dipcatch.scheduler.batch_size'))
             ->each(function (Shop $shop) use ($jitterSeconds, &$dispatched): void {
                 $delay = random_int(0, $jitterSeconds);
                 dispatch(new CheckShopPrice($shop))

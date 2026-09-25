@@ -2,9 +2,9 @@
 
 namespace App\Services\ShopFetcher;
 
-use App\Support\Config as DipConfig;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -22,12 +22,10 @@ use Throwable;
  */
 final readonly class RobotsTxtPolicy
 {
-    private const string DEFAULT_USER_AGENT = 'DipcatchBot';
-
     public function isAllowed(string $host, string $path, string $scheme = 'https'): bool
     {
         $cacheKey = "dipcatch:robots:{$host}";
-        $ttl = DipConfig::int('dipcatch.fetcher.robots_cache_seconds', 86400);
+        $ttl = Config::integer('dipcatch.fetcher.robots_cache_seconds');
 
         /** @var list<array{type: string, pattern: string}>|null $cached */
         $cached = Cache::get($cacheKey);
@@ -55,7 +53,7 @@ final readonly class RobotsTxtPolicy
      */
     private function fetchAndParse(string $url, string $host): array
     {
-        $userAgent = DipConfig::string('dipcatch.fetcher.user_agent', self::DEFAULT_USER_AGENT);
+        $userAgent = Config::string('dipcatch.fetcher.user_agent');
 
         try {
             $response = Http::withHeaders(['User-Agent' => $userAgent])
@@ -115,7 +113,7 @@ final readonly class RobotsTxtPolicy
      */
     private function parse(string $body): array
     {
-        $ourUa = DipConfig::string('dipcatch.fetcher.user_agent', self::DEFAULT_USER_AGENT);
+        $ourUa = Config::string('dipcatch.fetcher.user_agent');
         $ourUaLower = strtolower(self::nameFromUa($ourUa));
 
         $rules = [];
@@ -213,7 +211,7 @@ final readonly class RobotsTxtPolicy
 
     private static function nameFromUa(string $ua): string
     {
-        // "DipcatchBot/1.0 (+https://…)" → "DipcatchBot"
+        // "DipCatchBot/1.0 (+https://…)" → "DipCatchBot"
         $first = explode('/', $ua, 2)[0] ?? $ua;
 
         return trim($first);

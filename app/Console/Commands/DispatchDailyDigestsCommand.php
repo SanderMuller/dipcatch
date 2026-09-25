@@ -4,12 +4,12 @@ namespace App\Console\Commands;
 
 use App\Jobs\SendDailyDigest;
 use App\Models\User;
-use App\Support\Config as DipConfig;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Support\Facades\Config;
 
 /**
  * Dispatches SendDailyDigest jobs for users whose local clock has reached the
@@ -25,8 +25,8 @@ final class DispatchDailyDigestsCommand extends Command
 {
     public function handle(): int
     {
-        $sendHour = DipConfig::int('dipcatch.digest.send_hour', 8);
-        $batchSize = DipConfig::int('dipcatch.digest.batch_size', 500);
+        $sendHour = Config::integer('dipcatch.digest.send_hour');
+        $batchSize = Config::integer('dipcatch.digest.batch_size');
         $nowUtc = CarbonImmutable::now('UTC');
 
         // Per-timezone dispatch: each timezone has its own "is it 09:00 here

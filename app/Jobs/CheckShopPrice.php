@@ -18,7 +18,6 @@ use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\Exceptions\FetchException;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\ShopFetcher;
-use App\Support\Config as DipConfig;
 use App\Support\ImageUrl;
 use App\Support\Iso4217;
 use App\Support\MovedShopUrl;
@@ -30,6 +29,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -452,10 +452,10 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
      */
     private function healthTransitionsFor(array $counters): array
     {
-        $failingAfter = DipConfig::int('dipcatch.shop.failing_after', 3);
-        $deadAfter = DipConfig::int('dipcatch.shop.dead_after', 10);
-        $failing5xx = DipConfig::int('dipcatch.shop.failing_5xx_after', 10);
-        $dead5xx = DipConfig::int('dipcatch.shop.dead_5xx_after', 30);
+        $failingAfter = Config::integer('dipcatch.shop.failing_after');
+        $deadAfter = Config::integer('dipcatch.shop.dead_after');
+        $failing5xx = Config::integer('dipcatch.shop.failing_5xx_after');
+        $dead5xx = Config::integer('dipcatch.shop.dead_5xx_after');
 
         $main = $counters['consecutive_failures'] ?? null;
         $five = $counters['consecutive_5xx_failures'] ?? null;

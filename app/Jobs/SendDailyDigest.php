@@ -6,13 +6,13 @@ use App\Mail\PriceDropDigestMail;
 use App\Models\PriceDropEvent;
 use App\Models\TargetPriceEvent;
 use App\Models\User;
-use App\Support\Config as DipConfig;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
 
 /**
@@ -55,7 +55,7 @@ final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
         // negative value collapses the window to `fired_at > $now AND
         // fired_at <= $now` — empty on every run, for every user, with no
         // mail, no cursor movement and no error to say why.
-        $lookbackDays = max(1, DipConfig::int('dipcatch.digest.lookback_days', 7));
+        $lookbackDays = max(1, Config::integer('dipcatch.digest.lookback_days'));
         // One clock read for the window's end and for the cursor, so the two
         // cannot drift apart. Both columns hold whole seconds, so an event
         // stamped inside this same second is still lost; the bound only

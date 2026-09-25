@@ -9,7 +9,9 @@ use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
 use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\ShopFetcher\ShopFetcher;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -317,4 +319,25 @@ test('a 429 without a Retry-After states no interval', function (): void {
     } catch (RateLimitedByHost $e) {
         expect($e->retryAfterSeconds)->toBe(0);
     }
+});
+
+test('the page request sends the configured user agent', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response('<html>ok</html>', 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    app(ShopFetcher::class)->fetch('https://example.com/p/1');
+
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://example.com/p/1'
+        && $request->hasHeader('User-Agent', Config::string('dipcatch.fetcher.user_agent')));
+});
+
+test('a missing user agent fails loudly rather than falling back to another', function (): void {
+    config()->set('dipcatch.fetcher.user_agent', null);
+
+    Http::fake();
+
+    expect(fn () => app(ShopFetcher::class)->fetch('https://example.com/p/1'))
+        ->toThrow(InvalidArgumentException::class);
 });
