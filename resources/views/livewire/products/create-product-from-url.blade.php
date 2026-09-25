@@ -65,9 +65,8 @@
             $previewUnitPrice = null;
             $previewRegularPrice = is_string($snapshot['single_item_price'] ?? null) ? $snapshot['single_item_price'] : null;
             $previewRegularUnitPrice = null;
-            $bundleLabel = \App\Support\BundlePriceLabel::forSnapshot($snapshot);
-            $hasLivePreviewBundle = $bundleLabel !== null
-                && \App\Support\BundlePriceLabel::snapshotPriceIsBundleUnit($snapshot);
+            $bundleLabel = $this->previewBundleLabel();
+            $hasLivePreviewBundle = $bundleLabel !== null && $this->previewBundleIsLive();
             if ($previewPackSize !== null && is_string($snapshot['price'] ?? null)) {
                 $previewUnitPriceValue = $previewPackSize->unitPriceFor($snapshot['price']);
                 if ($previewUnitPriceValue !== null) {

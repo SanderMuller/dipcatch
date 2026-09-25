@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\PriceAdapters\ShopSnapshot;
 use App\PriceAdapters\VariantCandidate;
+use App\Support\BundlePriceLabel;
 use App\Support\PackSize;
 
 /**
@@ -198,6 +199,30 @@ trait DrivesShopProbe
     public function snapshotPackSize(): ?PackSize
     {
         return $this->shopDraft()->packSize;
+    }
+
+    /**
+     * The previewed bundle in the shop's words, on the same terms the draft
+     * will be written under — a promotion date that does not parse drops it.
+     */
+    public function previewBundleLabel(): ?string
+    {
+        $draft = $this->shopDraft();
+
+        return $draft->bundleOffer === null
+            ? null
+            : BundlePriceLabel::forTerms($draft->bundleOffer, $draft->currency, $draft->singleItemPrice ?? $draft->price, $draft->promotionWindow);
+    }
+
+    /**
+     * True when the previewed price is the bundle's unit price, so the
+     * single-item price beside it is the regular one worth striking through.
+     */
+    public function previewBundleIsLive(): bool
+    {
+        $draft = $this->shopDraft();
+
+        return $draft->bundleOffer?->isTrackedAt($draft->price) === true;
     }
 
     /**

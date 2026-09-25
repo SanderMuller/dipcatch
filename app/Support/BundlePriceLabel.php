@@ -6,8 +6,6 @@ use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PromotionWindow;
-use Carbon\CarbonImmutable;
-use Throwable;
 
 final readonly class BundlePriceLabel
 {
@@ -37,7 +35,7 @@ final readonly class BundlePriceLabel
             return null;
         }
 
-        return self::withPromotion($offer, $shop->currency, $singleItemPrice, $shop->promotionWindow());
+        return self::forTerms($offer, $shop->currency, $singleItemPrice, $shop->promotionWindow());
     }
 
     public static function forHistory(ProductCheapestHistory $segment, string $currency): ?string
@@ -49,60 +47,31 @@ final readonly class BundlePriceLabel
             return null;
         }
 
-        return self::withPromotion($offer, $currency, $singleItemPrice);
+        return self::forTerms($offer, $currency, $singleItemPrice);
     }
 
     /**
-     * @param  array<string, mixed>  $snapshot
+     * The bundle line of a stored alert. An alert payload carries the bundle
+     * and the single-item price it was written under, never a promotion
+     * window.
+     *
+     * @param  array<string, mixed>  $data
      */
-    public static function forSnapshot(array $snapshot): ?string
+    public static function forAlert(array $data): ?string
     {
-        $quantity = $snapshot['bundle_quantity'] ?? null;
-        $total = $snapshot['bundle_total_price'] ?? null;
-        $single = $snapshot['single_item_price'] ?? null;
-        $currency = $snapshot['currency'] ?? null;
+        $single = $data['single_item_price'] ?? null;
+        $currency = $data['currency'] ?? null;
 
         if (! is_string($single) || ! is_string($currency)) {
             return null;
         }
 
-        $offer = BundleOffer::stored($quantity, $total, $single);
-        $window = self::promotionWindow($snapshot);
-        $hasPromotionDate = isset($snapshot['promotion_starts_at']) || isset($snapshot['promotion_ends_at']);
+        $offer = BundleOffer::stored($data['bundle_quantity'] ?? null, $data['bundle_total_price'] ?? null, $single);
 
-        if ($offer === null || ($hasPromotionDate && $window === null)) {
-            return null;
-        }
-
-        return self::withPromotion($offer, $currency, $single, $window);
+        return $offer === null ? null : self::forTerms($offer, $currency, $single);
     }
 
-    /**
-     * True when the preview price is the bundle's unit price, so the single
-     * item price beside it is the regular one worth striking through.
-     *
-     * The blades used to divide the total themselves at scale 2, which
-     * truncates where {@see BundleOffer::effectiveUnitPrice()} rounds: a
-     * "2 for 2.99" preview reads 1.49 that way and 1.50 here, so the
-     * comparison failed and the regular price disappeared.
-     *
-     * @param  array<string, mixed>  $snapshot
-     */
-    public static function snapshotPriceIsBundleUnit(array $snapshot): bool
-    {
-        $price = $snapshot['price'] ?? null;
-        $single = $snapshot['single_item_price'] ?? null;
-
-        if (! is_string($price) || ! is_string($single)) {
-            return false;
-        }
-
-        $offer = BundleOffer::stored($snapshot['bundle_quantity'] ?? null, $snapshot['bundle_total_price'] ?? null, $single);
-
-        return $offer?->isTrackedAt($price) === true;
-    }
-
-    private static function withPromotion(
+    public static function forTerms(
         BundleOffer $offer,
         string $currency,
         string $singleItemPrice,
@@ -113,30 +82,5 @@ final readonly class BundlePriceLabel
             self::condition($offer, $currency),
             __('or :price each', ['price' => MoneyFormatter::format($singleItemPrice, $currency)]),
         ]));
-    }
-
-    /**
-     * @param  array<string, mixed>  $snapshot
-     */
-    private static function promotionWindow(array $snapshot): ?PromotionWindow
-    {
-        $endsAt = $snapshot['promotion_ends_at'] ?? null;
-
-        if (! is_string($endsAt) || $endsAt === '') {
-            return null;
-        }
-
-        $startsAt = $snapshot['promotion_starts_at'] ?? null;
-        $label = $snapshot['promotion_label'] ?? null;
-
-        try {
-            return PromotionWindow::make(
-                endsAt: CarbonImmutable::parse($endsAt),
-                startsAt: is_string($startsAt) && $startsAt !== '' ? CarbonImmutable::parse($startsAt) : null,
-                label: is_string($label) ? $label : null,
-            );
-        } catch (Throwable) {
-            return null;
-        }
     }
 }

@@ -399,6 +399,52 @@ test('the preview strikes through the regular price when the bundle total does n
         ->assertSee('Regular price');
 });
 
+test('the preview offers no bundle the draft would drop', function (): void {
+    // A promotion date that does not parse drops the bundle from what is
+    // written, so the preview must not promise it either.
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('state', 'preview')
+        ->set('host', 'shop.example.com')
+        ->set('snapshot', [
+            'title' => 'Fizzy water',
+            'price' => '1.50',
+            'single_item_price' => '1.79',
+            'bundle_quantity' => 2,
+            'bundle_total_price' => '2.99',
+            'currency' => 'EUR',
+            'in_stock' => true,
+            'promotion_ends_at' => 'not-a-date',
+        ])
+        ->assertDontSee('2 for €2.99')
+        ->assertDontSee('Regular price');
+});
+
+test('the preview states a running bundle in the shop\'s words, with its deadline', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('state', 'preview')
+        ->set('host', 'shop.example.com')
+        ->set('snapshot', [
+            'title' => 'Fizzy water',
+            'price' => '1.50',
+            'single_item_price' => '1.79',
+            'bundle_quantity' => 2,
+            'bundle_total_price' => '2.99',
+            'currency' => 'EUR',
+            'in_stock' => true,
+            'promotion_starts_at' => now()->subDay()->toIso8601String(),
+            'promotion_ends_at' => now()->addDays(3)->toIso8601String(),
+            'promotion_label' => '2 VOOR 2.99',
+        ])
+        ->assertSee('2 VOOR 2.99 until')
+        ->assertSee('Regular price');
+});
+
 test('the add-shop preview leads with the price per unit when the page states a pack size', function (): void {
     Http::fake(fakeJsonLdOffer(price: '1.99', name: 'Chips naturel 370 g'));
     $product = Product::factory()->create(['currency' => 'EUR']);

@@ -127,7 +127,7 @@ final class Bell extends Component
             // One label for the whole bundle line. This applies the same
             // cheaper-than test the payload was written under, so a row that
             // fails it renders no bundle line at all.
-            'bundleLabel' => BundlePriceLabel::forSnapshot($data),
+            'bundleLabel' => BundlePriceLabel::forAlert($data),
             // The shops DipCatch cannot read, named where the reader is about
             // to open a tab anyway.
             'alsoCheck' => AlsoWorthChecking::line(self::shops($data)),

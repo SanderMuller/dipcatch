@@ -96,8 +96,8 @@ final class RetryReferenceShopsCommand extends Command
             // there is nothing to preserve and one fewer path to maintain.
             $shop->delete();
 
-            $attach->firstShopOf($product, ShopDraft::fromSnapshot(
-                ShopDraft::flatten($outcome),
+            $attach->firstShopOf($product, ShopDraft::fromOutcome(
+                $outcome,
                 $outcome->normalizedUrl ?? $shop->url,
                 (string) $outcome->adapterKey,
             ));

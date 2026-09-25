@@ -113,6 +113,14 @@ final readonly class ShopDraft
     }
 
     /**
+     * The draft a probe produced, without the form state a preview adds.
+     */
+    public static function fromOutcome(ProbeOutcome $outcome, string $url, string $adapterKey): self
+    {
+        return self::fromSnapshot(self::flatten($outcome), $url, $adapterKey);
+    }
+
+    /**
      * Builds a draft from a flattened preview snapshot plus the form state
      * around it.
      *

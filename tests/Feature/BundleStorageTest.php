@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\ShopDraft;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
@@ -101,7 +102,12 @@ test('expired stored bundle stays disclosed until tracked price is restored', fu
 });
 
 test('bundle labels retain source wording and deadline from preview snapshots', function (): void {
-    $label = BundlePriceLabel::forSnapshot([
+    $label = fn (ShopDraft $draft): ?string => $draft->bundleOffer === null
+        ? null
+        : BundlePriceLabel::forTerms($draft->bundleOffer, $draft->currency, (string) $draft->singleItemPrice, $draft->promotionWindow);
+
+    $running = ShopDraft::fromSnapshot([
+        'price' => '2.00',
         'bundle_quantity' => 2,
         'bundle_total_price' => '4.00',
         'single_item_price' => '2.85',
@@ -109,16 +115,21 @@ test('bundle labels retain source wording and deadline from preview snapshots', 
         'promotion_starts_at' => now()->subDay()->toIso8601String(),
         'promotion_ends_at' => now()->addDay()->toIso8601String(),
         'promotion_label' => '2 VOOR 4.00',
-    ]);
+    ], 'https://shop.example.com/p/1', 'jsonld');
 
-    expect($label)->toContain('2 VOOR 4.00 until')
+    // A promotion date the draft cannot parse drops the bundle, so the
+    // preview promises nothing the write would not keep.
+    $unparseable = ShopDraft::fromSnapshot([
+        'price' => '2.00',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'single_item_price' => '2.85',
+        'currency' => 'EUR',
+        'promotion_ends_at' => 'not-a-date',
+    ], 'https://shop.example.com/p/1', 'jsonld');
+
+    expect($label($running))->toContain('2 VOOR 4.00 until')
         ->toContain('2 for €4.00')
         ->toContain('or €2.85 each')
-        ->and(BundlePriceLabel::forSnapshot([
-            'bundle_quantity' => 2,
-            'bundle_total_price' => '4.00',
-            'single_item_price' => '2.85',
-            'currency' => 'EUR',
-            'promotion_ends_at' => 'not-a-date',
-        ]))->toBeNull();
+        ->and($label($unparseable))->toBeNull();
 });
