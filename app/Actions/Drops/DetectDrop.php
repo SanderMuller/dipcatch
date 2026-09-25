@@ -6,12 +6,14 @@ use App\Jobs\CheckShopPrice;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\DropEvaluator;
 use App\Services\Drops\DropLatch;
 use App\Services\Drops\DropOutcome;
 use App\Services\Drops\LargeDropConfirmation;
+use App\Services\Drops\LargeDropVerdict;
 use App\Services\Drops\NotificationBudget;
 use App\Services\Drops\Reference;
 use App\Services\Drops\ReferenceValue;
@@ -155,56 +157,25 @@ final readonly class DetectDrop
 
         $trigger = PriceCheck::query()->find($triggeringPriceCheckId);
 
-        // `CheckShopPrice::persist()` recomputes on every outcome, a failure
-        // included, and a failed check leaves the shop's price cached. Without
-        // this the failure would re-evaluate that cached drop and notify,
-        // anchored to a check that read nothing.
-        if ($trigger === null || ! $trigger->isEligible()) {
+        if ($trigger === null) {
             return;
         }
 
-        // A shop joining a product watched elsewhere is not a fall: see
-        // triggerStartsAShop().
-        if ($trigger->joinsAProductAlreadyWatchedElsewhere()) {
-            return;
-        }
+        // Exhaustive on purpose: a verdict nobody handled must not fall
+        // through to an alert on one reading.
+        match ($this->confirmation->verdictFor($product, $trigger, $reference)) {
+            LargeDropVerdict::NotThisReading => null,
+            LargeDropVerdict::Exempt, LargeDropVerdict::Confirmed => $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit),
+            LargeDropVerdict::Awaiting => $this->askForSecondReading($trigger->shop),
+        };
+    }
 
-        // The drop must belong to the shop this check read — the one the basis
-        // is measured on, which is the best-value winner once the product has a
-        // comparison unit.
-        $basisShopId = $reference->isUnitBasis() ? $product->best_value_shop_id : $product->cheapest_shop_id;
-
-        if ($trigger->shop_id !== $basisShopId) {
-            return;
-        }
-
-        // Both sides pack money: a price check records what the page charged,
-        // never a price per kilo.
-        $winningPack = $product->winningPackPrice($reference->unit);
-
-        if ($winningPack === null
-            || bccomp(Numeric::str((string) $trigger->price), Numeric::str($winningPack), self::BC_SCALE) !== 0) {
-            return;
-        }
-
-        // A dataset or API shop never fetches a page, so it alerts on one
-        // reading, as it always has.
-        if ($this->confirmation->isExempt($trigger->shop)) {
-            $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit);
-
-            return;
-        }
-
-        if ($this->confirmation->isConfirmedByPrevious($product, $trigger, $reference)) {
-            $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit);
-
-            return;
-        }
-
-        // This reading is the transition. Ask for a second one now rather than
-        // waiting for the shop's next scheduled check.
-        $shop = $trigger->shop;
-
+    /**
+     * This reading is the transition. Ask for a second one now rather than
+     * waiting for the shop's next scheduled check.
+     */
+    private function askForSecondReading(Shop $shop): void
+    {
         DB::afterCommit(function () use ($shop): void {
             try {
                 dispatch(new CheckShopPrice($shop, confirmation: true))
@@ -367,12 +338,12 @@ final readonly class DetectDrop
      * every `ok` row has been pruned.
      *
      * The fallback answers "which check read this price on this shop", so it
-     * applies the same three guards {@see confirmLargeDrop()} applies to an
-     * explicit id: the right shop, an eligible reading, and the drop's own
-     * price. The explicit branch needs none of them here — the direct path
-     * reaches this only through the recompute's `$changed` gate, so the id is
-     * the check that moved the price. `confirmLargeDrop()` runs before that
-     * gate, which is why it guards its own.
+     * applies three of the guards {@see LargeDropConfirmation::verdictFor()}
+     * applies to an explicit id: the right shop, an eligible reading, and the
+     * drop's own price. The explicit branch needs none of them here — the
+     * direct path reaches this only through the recompute's `$changed` gate,
+     * so the id is the check that moved the price. `confirmLargeDrop()` runs
+     * before that gate, which is why it runs the verdict's guards.
      *
      * Without the eligibility filter the latest row on a revived shop is
      * typically the failure that killed it, and the event would anchor to a

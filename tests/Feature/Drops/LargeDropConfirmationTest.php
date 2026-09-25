@@ -404,6 +404,25 @@ test('a failed second check keeps the confirming note', function (): void {
     expect(confirmingNote($shop))->toBeTrue();
 });
 
+test('a shop joining at a large drop shows no confirming note and asks for nothing', function (): void {
+    $shop = confirmationProduct();
+    reading($shop, '100.00');
+
+    $joiner = Shop::factory()->for($shop->product()->sole())->create([
+        'url' => 'https://joiner.example.com/p/' . fake()->unique()->slug(),
+        'host' => 'joiner.example.com',
+        'currency' => 'EUR',
+        'current_price' => null,
+    ]);
+
+    reading($joiner, '40.00');
+
+    expect(confirmingNote($shop))->toBeFalse()
+        ->and(PriceDropEvent::count())->toBe(0);
+
+    Queue::assertNotPushed(CheckShopPrice::class);
+});
+
 test('a small drop or a dataset shop shows no confirming note', function (string $host, string $price): void {
     $shop = confirmationProduct($host);
 

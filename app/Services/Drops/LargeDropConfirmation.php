@@ -29,12 +29,54 @@ final readonly class LargeDropConfirmation
     ) {}
 
     /**
+     * What `$reading` means for a drop already known to be large. Every guard
+     * lives here once, so the detector and the product page apply the same
+     * list in the same way.
+     */
+    public function verdictFor(Product $product, PriceCheck $reading, ReferenceValue $reference): LargeDropVerdict
+    {
+        // `CheckShopPrice::persist()` recomputes on every outcome, a failure
+        // included, and a failed check leaves the shop's price cached. A
+        // reading that read nothing cannot anchor a drop.
+        if (! $reading->isEligible()) {
+            return LargeDropVerdict::NotThisReading;
+        }
+
+        if ($reading->shop_id !== self::basisShopId($product, $reference)) {
+            return LargeDropVerdict::NotThisReading;
+        }
+
+        // Both sides pack money: a price check records what the page charged,
+        // never a price per kilo.
+        $winningPack = $product->winningPackPrice($reference->unit);
+
+        if ($winningPack === null
+            || bccomp(Numeric::str((string) $reading->price), Numeric::str($winningPack), self::BC_SCALE) !== 0) {
+            return LargeDropVerdict::NotThisReading;
+        }
+
+        // A shop joining a product watched elsewhere is not a fall. Last of
+        // the reading guards because it is the one that queries.
+        if ($reading->joinsAProductAlreadyWatchedElsewhere()) {
+            return LargeDropVerdict::NotThisReading;
+        }
+
+        if ($this->isExempt($reading->shop)) {
+            return LargeDropVerdict::Exempt;
+        }
+
+        return $this->isConfirmedByPrevious($product, $reading, $reference)
+            ? LargeDropVerdict::Confirmed
+            : LargeDropVerdict::Awaiting;
+    }
+
+    /**
      * True when the shop's eligible reading before `$reading` was a large drop
      * in its own right. A merely discounted one — past the notify threshold
      * but short of the confirmation ceiling — would let a single anomalous
      * reading through on its coat-tails.
      */
-    public function isConfirmedByPrevious(Product $product, PriceCheck $reading, ReferenceValue $reference): bool
+    private function isConfirmedByPrevious(Product $product, PriceCheck $reading, ReferenceValue $reference): bool
     {
         $previous = PriceCheck::query()
             ->where('shop_id', $reading->shop_id)
@@ -51,7 +93,7 @@ final readonly class LargeDropConfirmation
      * so a second reading is the same row again and confirms nothing. Those
      * shops alert on one reading.
      */
-    public function isExempt(Shop $shop): bool
+    private function isExempt(Shop $shop): bool
     {
         return app(AhApiSource::class)->supports($shop->host)
             || app(CheckjebonSource::class)->supports($shop->host);
@@ -84,19 +126,21 @@ final readonly class LargeDropConfirmation
         }
 
         $latest = PriceCheck::query()
-            ->where('shop_id', $reference->isUnitBasis() ? $product->best_value_shop_id : $product->cheapest_shop_id)
+            ->where('shop_id', self::basisShopId($product, $reference))
             ->eligible()
             ->latest('id')
             ->first();
 
-        // The newest reading has to be the one showing this price, from a shop
-        // that is confirmed at all. A shop joining the product never asks for
-        // a second reading, so nothing is on its way.
-        return $latest !== null
-            && bccomp(Numeric::str((string) $latest->price), Numeric::str($winningPack), self::BC_SCALE) === 0
-            && ! $this->isExempt($latest->shop)
-            && ! $latest->joinsAProductAlreadyWatchedElsewhere()
-            && ! $this->isConfirmedByPrevious($product, $latest, $reference);
+        return $latest !== null && $this->verdictFor($product, $latest, $reference) === LargeDropVerdict::Awaiting;
+    }
+
+    /**
+     * The shop the basis is measured on: the best-value winner once the
+     * product has a comparison unit, the cheapest pack otherwise.
+     */
+    private static function basisShopId(Product $product, ReferenceValue $reference): ?string
+    {
+        return $reference->isUnitBasis() ? $product->best_value_shop_id : $product->cheapest_shop_id;
     }
 
     /**
