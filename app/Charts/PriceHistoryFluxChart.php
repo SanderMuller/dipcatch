@@ -15,7 +15,7 @@ final class PriceHistoryFluxChart
 {
     /**
      * @param  array{datasets: list<array<string, mixed>>, labels: list<string>, bundleConditions?: list<?string>}  $data
-     * @return array{rows: list<array<string, mixed>>, currency: string, unit: ?string, unitDecimals: int, hasNotified: bool, hasBundles: bool}
+     * @return array{rows: list<array<string, mixed>>, currency: string, unit: ?string, unitDecimals: int, hasNotified: bool, hasBundles: bool, unitCoverage: float}
      */
     public static function fromData(array $data, string $currency): array
     {
@@ -35,6 +35,7 @@ final class PriceHistoryFluxChart
             'unitDecimals' => self::unitDecimals($rows),
             'hasNotified' => array_any($rows, fn (array $row): bool => isset($row['notified'])),
             'hasBundles' => array_any($rows, fn (array $row): bool => isset($row['bundle'])),
+            'unitCoverage' => UnitLineCoverage::of($rows),
         ];
     }
 

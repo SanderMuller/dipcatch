@@ -127,6 +127,27 @@ final readonly class HeadlinePrice
     }
 
     /**
+     * How far the running bundle puts the best value below its price per unit
+     * at the regular single-item price, in whole percent. Null without a live
+     * bundle on a per-unit headline.
+     */
+    public function belowRegularPercent(): ?int
+    {
+        if ($this->unit === null || $this->shop?->liveBundleOffer() === null) {
+            return null;
+        }
+
+        $dealUnit = $this->packs->unitPriceValueOf($this->shop);
+        $regularUnit = $this->packs->for($this->shop)?->unitPriceValueFor($this->shop->singleItemPrice());
+
+        if ($dealUnit === null || $regularUnit === null || $regularUnit <= $dealUnit) {
+            return null;
+        }
+
+        return max(1, (int) round(($regularUnit - $dealUnit) / $regularUnit * 100));
+    }
+
+    /**
      * Whether a shop's price per unit may be set beside the headline's: one
      * that can be bought now, on a size its own page states. A sold-out shop or
      * an estimated size can be lower per unit and still not be a better buy.

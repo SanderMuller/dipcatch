@@ -6,6 +6,8 @@
     $openAddShop = $openAddShop ?? false;
     /** @var string|null $heading Rendered beside the add button, on one row. */
     $heading = $heading ?? null;
+    /** @var string|null $subheading One line under the heading, as the brand kit's card titles carry. */
+    $subheading = $subheading ?? null;
     $shopCount = $product->shops->count();
 @endphp
 
@@ -24,7 +26,12 @@
         <div class="grid grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_auto] [&>details[open]]:col-span-full">
         <div class="min-w-0">
             @if ($heading !== null)
-                <flux:heading size="lg" level="2" class="min-h-9 content-center">{{ $heading }}</flux:heading>
+                <div @class(['min-h-9 content-center' => $subheading === null])>
+                    <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ $heading }}</flux:heading>
+                    @if ($subheading !== null)
+                        <flux:text size="sm" class="mt-0.5 text-zinc-500">{{ $subheading }}</flux:text>
+                    @endif
+                </div>
             @endif
 
             <div class="pt-2" x-show="! addOpen" x-cloak>
@@ -73,7 +80,12 @@
         </div>
     @else
         @if ($heading !== null)
-            <flux:heading size="lg" level="2">{{ $heading }}</flux:heading>
+            <div>
+                <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ $heading }}</flux:heading>
+                @if ($subheading !== null)
+                    <flux:text size="sm" class="mt-0.5 text-zinc-500">{{ $subheading }}</flux:text>
+                @endif
+            </div>
         @endif
 
         {{-- No Add button and no suggestions: every one of them would end at

@@ -20,5 +20,9 @@
         </flux:tooltip>
     </span>
 @else
-    <span {{ $attributes->merge(['class' => 'text-zinc-500']) }}>{{ $readAt->diffForHumans() }}</span>
+    <span {{ $attributes->merge(['class' => 'text-zinc-500']) }}>
+        <flux:tooltip :content="__('Price last read :date.', ['date' => $readAt->setTimezone(auth()->user()?->timezone ?? config('app.timezone'))->format('j M Y, H:i')])">
+            <span tabindex="0" class="cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" data-test="freshness-hint">{{ $readAt->diffForHumans() }}</span>
+        </flux:tooltip>
+    </span>
 @endif
