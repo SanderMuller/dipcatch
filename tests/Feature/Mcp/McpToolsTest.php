@@ -665,6 +665,17 @@ it('files a product under a category, and records that a person chose it', funct
         ->and($product->shops()->pluck('id')->all())->toBe([$shop->id]);
 });
 
+it('drops a pending suggestion when a category is chosen or cleared', function (?string $category): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['suggested_category' => ProductCategory::SnacksSweets]);
+
+    DipCatchServer::actingAs($user)
+        ->tool(SetCategoryTool::class, ['product_id' => (string) $product->id, 'category' => $category])
+        ->assertOk();
+
+    expect($product->refresh()->suggested_category)->toBeNull();
+})->with(['chosen' => ['food.snacks_sweets'], 'cleared' => [null]]);
+
 it('clears a category, and a clear is a choice too', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([

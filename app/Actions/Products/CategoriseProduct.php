@@ -3,6 +3,7 @@
 namespace App\Actions\Products;
 
 use App\Enums\CategorySource;
+use App\Enums\ProductCategory;
 use App\Models\Product;
 use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\CategoryVerdict;
@@ -86,6 +87,22 @@ final class CategoriseProduct
                 'product_id' => $product->id,
             ]);
         }
+    }
+
+    /**
+     * A person's choice, a clear included. Final: automatic categorisation
+     * only writes where the source is still null. Clears any pending
+     * suggestion, since the edit form offers a stored one whenever the
+     * category is empty. Filled, not saved, so a caller can write it with
+     * its other changes.
+     */
+    public static function chooseByUser(Product $product, ?ProductCategory $category): void
+    {
+        $product->forceFill([
+            'category' => $category,
+            'category_set_by' => CategorySource::User,
+            'suggested_category' => null,
+        ]);
     }
 
     /**

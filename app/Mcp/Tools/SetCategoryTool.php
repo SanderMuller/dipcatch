@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Enums\CategorySource;
+use App\Actions\Products\CategoriseProduct;
 use App\Enums\ProductCategory;
 use App\Mcp\Concerns\InteractsWithOwner;
 use App\Mcp\Support\ProductPresenter;
@@ -60,13 +60,8 @@ final class SetCategoryTool extends Tool
             return Response::error('No such product.');
         }
 
-        // `category_set_by` records that a person chose this, the same way the
-        // web form does. Automatic categorisation only ever writes where that
-        // is still null, so a choice made here — a clear included — is final.
-        $product->forceFill([
-            'category' => ProductCategory::tryFrom($this->str($validated, 'category')),
-            'category_set_by' => CategorySource::User,
-        ])->save();
+        CategoriseProduct::chooseByUser($product, ProductCategory::tryFrom($this->str($validated, 'category')));
+        $product->save();
 
         return Response::structured($this->presenter->summary($product));
     }

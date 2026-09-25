@@ -333,7 +333,7 @@ it('marks a cleared category as the users choice so nothing fills it again', fun
     $user = User::factory()->create();
     $product = Product::factory()
         ->categorised(ProductCategory::CoffeeTea, CategorySource::Auto)
-        ->create(['user_id' => $user->id]);
+        ->create(['user_id' => $user->id, 'suggested_category' => ProductCategory::SnacksSweets]);
 
     $this->actingAs($user);
 
@@ -346,7 +346,10 @@ it('marks a cleared category as the users choice so nothing fills it again', fun
     $fresh = $product->fresh();
 
     expect($fresh?->category)->toBeNull()
-        ->and($fresh?->category_set_by)->toBe(CategorySource::User);
+        ->and($fresh?->category_set_by)->toBe(CategorySource::User)
+        // A stored suggestion is offered whenever the category is empty, so
+        // one left from before would come straight back.
+        ->and($fresh?->suggested_category)->toBeNull();
 });
 
 it('keeps an automatic category as automatic when the form is saved without touching it', function (): void {

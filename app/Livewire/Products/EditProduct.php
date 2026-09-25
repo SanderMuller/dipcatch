@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Products;
 
+use App\Actions\Products\CategoriseProduct;
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Models\Product;
@@ -138,14 +139,13 @@ final class EditProduct extends Component
 
         $this->validate();
 
-        // A choice, a clear included, is final; an untouched field is not a choice.
+        // An untouched field is not a choice.
         if ($this->category !== $this->loadedCategory) {
-            $this->product->forceFill([
-                'category' => ProductCategory::tryFrom($this->category),
-                'category_set_by' => CategorySource::User,
-            ]);
+            CategoriseProduct::chooseByUser($this->product, ProductCategory::tryFrom($this->category));
         }
 
+        // A placed product carries no suggestion; this also clears one left
+        // beside a category by an older write.
         if ($this->category !== '') {
             $this->product->forceFill(['suggested_category' => null]);
         }
