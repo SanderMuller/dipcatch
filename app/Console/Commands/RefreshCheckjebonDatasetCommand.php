@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Checkjebon\DatasetKey;
 use DateTimeInterface;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -144,7 +145,7 @@ final class RefreshCheckjebonDatasetCommand extends Command
                 continue;
             }
 
-            $externalId = $this->externalIdFromLink($supermarket, $link);
+            $externalId = DatasetKey::fromLink($supermarket, $link);
             if ($externalId === null) {
                 continue;
             }
@@ -163,26 +164,6 @@ final class RefreshCheckjebonDatasetCommand extends Command
         }
 
         return array_values($rows);
-    }
-
-    /**
-     * AH links look like `wi257/ah-kruiden-roomkaas` — the `wi` id is the
-     * match key CheckjebonSource looks up from an ah.nl URL. Lidl links are
-     * the bare numeric boodschaapje product id, looked up the same way.
-     * Every other chain is match-only: the link itself is the id, whether
-     * that is a slug (`beemster-…-729228ZK`) or a number (`115217`).
-     */
-    private function externalIdFromLink(string $supermarket, string $link): ?string
-    {
-        if ($supermarket === 'ah') {
-            return preg_match('/^(wi\d+)\//i', $link, $m) === 1 ? strtolower($m[1]) : null;
-        }
-
-        if ($supermarket === 'lidl') {
-            return ctype_digit($link) ? $link : null;
-        }
-
-        return mb_substr($link, 0, 255);
     }
 
     /**

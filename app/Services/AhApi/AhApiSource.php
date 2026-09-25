@@ -6,7 +6,6 @@ use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\Checkjebon\CheckjebonResult;
-use App\Support\UrlNormalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -309,12 +308,5 @@ final readonly class AhApiSource
         }
 
         return null;
-    }
-
-    public static function hostOf(string $url): ?string
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-
-        return is_string($host) && $host !== '' ? UrlNormalizer::normalizeHost($host) : null;
     }
 }
