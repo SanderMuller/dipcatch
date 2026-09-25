@@ -16,7 +16,7 @@
     $contactEmail = config('site.contact_email');
     $steps = [
         ['n' => '01', 'icon' => 'link', 'title' => __('Paste a product link'), 'body' => __('DipCatch picks up the name, the photo, the price and the pack size by itself. You install nothing.')],
-        ['n' => '02', 'icon' => 'magnifying-glass', 'title' => __('Add it from other shops'), 'body' => __('Add the same thing at other shops. DipCatch shows which one is cheapest and works out the price per kilo or per litre. So you can see whether the big pack really is the better deal.')],
+        ['n' => '02', 'icon' => 'magnifying-glass', 'title' => __('Add more shops to track'), 'body' => __('Add the same thing at other shops. DipCatch shows which one is cheapest and works out the price per kilo or per litre. So you can see whether the big pack really is the better deal.')],
         ['n' => '03', 'icon' => 'bell', 'title' => __('You hear about it'), 'body' => __('Say what a good price is for you. We check the shops and let you know the moment one of them goes below it. One email a day, a note in the app, or a message in your browser.')],
     ];
     $supportedShops = \App\Support\SupportedShops::homepage();

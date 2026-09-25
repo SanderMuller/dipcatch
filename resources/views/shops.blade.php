@@ -50,8 +50,8 @@
                 @php($unsupported = \App\Support\SupportedShops::unsupported())
                 @if ($unsupported !== [])
                     <section class="mt-16" data-test="unsupported-shops">
-                        <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Shops that block us') }}</h2>
-                        <p class="mt-3 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('These shops refuse the requests DipCatch makes, so it cannot read their prices. You can still keep a link to one of them on a product, and DipCatch keeps trying that page.') }}</p>
+                        <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('Shops we cannot read') }}</h2>
+                        <p class="mt-3 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('Some of these shops refuse the requests DipCatch makes. Others only load their price with a script after the page opens. Either way, DipCatch cannot read their prices. You can still keep a link to one of them on a product, and DipCatch keeps trying that page.') }}</p>
                         <ul role="list" class="mt-5 flex flex-wrap gap-2">
                             @foreach ($unsupported as $shop)
                                 <li class="inline-flex items-center gap-2 rounded-full bg-paper/60 py-1.5 pr-3 pl-1.5 text-sm text-zinc-600 ring-1 ring-line dark:text-zinc-300">

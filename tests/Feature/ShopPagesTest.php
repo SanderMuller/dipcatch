@@ -295,10 +295,10 @@ it('gives every supported shop a line of its own on the overview', function (): 
     $this->get(route('shops'))->assertOk()->assertSeeHtml('Medpets lists a price for every size on one page.');
 });
 
-it('lists the shops that block us below the supported ones, without a page of their own', function (): void {
+it('lists the shops it cannot read below the supported ones, without a page of their own', function (): void {
     $response = $this->get(route('shops'))->assertOk()->assertSeeHtml('data-test="unsupported-shops"');
 
-    foreach (['etos.nl', 'walmart.com', 'kruidvat.nl'] as $host) {
+    foreach (['etos.nl', 'walmart.com', 'kruidvat.nl', 'target.com'] as $host) {
         $response->assertSeeHtml($host);
     }
 
@@ -307,6 +307,6 @@ it('lists the shops that block us below the supported ones, without a page of th
     expect(array_column(SupportedShops::rows(), 'host'))->not->toContain('etos.nl')->not->toContain('walmart.com');
 });
 
-it('never lists a shop as both supported and blocking us', function (): void {
-    expect(array_intersect(array_column(SupportedShops::rows(), 'host'), array_column(SupportedShops::unsupported(), 'host')))->toBe([]);
+it('never lists a shop as both supported and unreadable', function (): void {
+    expect(array_intersect(array_column(SupportedShops::rows(), 'host'), array_column(SupportedShops::unsupported(), 'host')))->toBeEmpty();
 });

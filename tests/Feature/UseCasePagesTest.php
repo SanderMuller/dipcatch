@@ -113,7 +113,7 @@ test('the coffee and filters pages list Amazon in the UK and the US', function (
         ->toContain('amazon.co.uk');
 });
 
-test('the beauty page lists Lookfantastic, Ulta and Amazon, and not the shops that block us', function (): void {
+test('the beauty page lists Lookfantastic, Ulta and Amazon, and not the shops it cannot read', function (): void {
     $case = UseCases::find('beauty');
 
     expect($case)->not->toBeNull();

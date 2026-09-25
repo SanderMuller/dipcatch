@@ -43,10 +43,11 @@ return [
     ],
 
     /**
-     * Shops people ask about that refuse DipCatch's requests: a bot check, a
-     * challenge page or a blanket error, seen on the dates below. Listed on
-     * the shops page so a visitor knows before pasting a link. A shop leaves
-     * this list when a live check reads its product pages again.
+     * Shops people ask about whose prices DipCatch cannot read: they refuse
+     * its requests, or load the price with a script after the page opens.
+     * Seen on the dates below. Listed on the shops page so a visitor knows
+     * before pasting a link. A shop leaves this list when a live check reads
+     * its product pages again.
      */
     'unsupported_hosts' => [
         // Challenge page and HTTP 403, 2026-09-25.
@@ -56,6 +57,9 @@ return [
         'etos.nl',
         // "Robot or human?" check on product pages, 2026-09-25.
         'walmart.com',
+        // The page loads, but the price comes from a separate API after it
+        // opens; the served HTML holds none, 2026-09-25.
+        'target.com',
     ],
 
     /**
@@ -105,6 +109,7 @@ return [
         'boots.com' => 'Boots',
         'superdrug.com' => 'Superdrug',
         'notino.nl' => 'Notino',
+        'target.com' => 'Target',
     ],
 
     /**

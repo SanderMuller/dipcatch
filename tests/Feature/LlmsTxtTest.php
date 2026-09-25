@@ -29,7 +29,7 @@ test('llms.txt describes the product as more than groceries', function (): void 
     expect($content)->toContain('pet food')
         ->and($content)->toContain('filters')
         ->and($content)->toContain('skincare')
-        ->and($content)->toContain('Etos, Walmart, Kruidvat, Boots, Superdrug and Notino block DipCatch today')
+        ->and($content)->toContain('Etos, Walmart, Kruidvat, Boots, Superdrug and Notino block DipCatch today, and Target loads its price with a script')
         ->and($content)->toContain('Pets Place')
         ->and($content)->toContain('Paste a product URL from almost any webshop')
         ->and($content)->toContain('have a reader of their own');
