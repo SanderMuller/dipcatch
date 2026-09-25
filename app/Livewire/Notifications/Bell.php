@@ -162,10 +162,10 @@ final class Bell extends Component
             ? null
             : __('Better value: :price at :host', ['price' => MoneyFormatter::unitPrice($betterPrice, $currency) . ' ' . $label, 'host' => $betterHost]);
 
-        $percent = $text('drop_percent');
+        $percent = Numeric::percent($data['drop_percent'] ?? null);
         $referenceUnit = $text('reference_unit_price');
         $unitWord = UnitWord::forCode($unitCode);
-        $change = $percent === null || ! is_numeric($percent) ? null : '↓ ' . Numeric::trimmed(number_format((float) $percent, 1, '.', '')) . '%'
+        $change = $percent === null ? null : '↓ ' . $percent
             . ($unitWord === null ? '' : ' ' . $unitWord)
             . ($referenceUnit === null || $label === null ? '' : ' · ' . __('was') . ' ' . MoneyFormatter::unitPrice($referenceUnit, $currency) . ' ' . $label);
         $target = $leadsWithPack && $text('target_price') !== null

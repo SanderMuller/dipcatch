@@ -34,4 +34,15 @@ final class Numeric
 
         return rtrim(rtrim($value, '0'), '.');
     }
+
+    /**
+     * A drop percentage with one decimal at most: `12.3` reads as `12.3%`
+     * and `12.0` as `12%`.
+     */
+    public static function percent(mixed $value): ?string
+    {
+        return is_numeric($value)
+            ? self::trimmed(number_format((float) $value, 1, '.', '')) . '%'
+            : null;
+    }
 }
