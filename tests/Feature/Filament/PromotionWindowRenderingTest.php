@@ -43,7 +43,7 @@ test('a promotion with no label of its own shows its offer period', function ():
         ->assertSeeText('until');
 });
 
-test('a promotion that has not started says from when, never ended', function (): void {
+test('a promotion that has not started says what it gives, where and when, never ended', function (): void {
     [$user, $product] = seedShopWith([
         'promotion_starts_at' => now()->addDays(3),
         'promotion_ends_at' => now()->addDays(9),
@@ -58,8 +58,10 @@ test('a promotion that has not started says from when, never ended', function ()
     mountShopsRelationManager($product)
         ->assertSeeText('Upcoming deal')
         ->assertSeeText('2 for €4.00')
-        ->assertSeeText('Normal price: €2.69 each')
-        ->assertSeeText('from ' . now()->addDays(3)->setTimezone('Europe/Amsterdam')->format('j M'))
+        ->assertSeeText('Until then: €2.69 each')
+        ->assertDontSeeHtml('<del')
+        ->assertSeeText('at ' . $product->shops()->firstOrFail()->host)
+        ->assertSeeText(now()->addDays(3)->setTimezone('Europe/Amsterdam')->format('j M') . ' – ' . now()->addDays(9)->setTimezone('Europe/Amsterdam')->format('j M'))
         ->assertDontSeeText('ended');
 });
 
@@ -74,7 +76,7 @@ test('a promotion that has passed says so, so the price reads as suspect', funct
 
 test('a date-only window renders its own day, not the day before', function (): void {
     // 8 September in Amsterdam is stored as 7 September 22:00 UTC. Printed
-    // without converting back, it would read "from 7 Sep".
+    // without converting back, it would read "7 Sep".
     [$user, $product] = seedShopWith([
         'promotion_starts_at' => '2036-09-07 22:00:00',
         'promotion_ends_at' => '2036-09-13 21:59:59',
@@ -82,9 +84,8 @@ test('a date-only window renders its own day, not the day before', function (): 
     $this->actingAs($user);
 
     mountShopsRelationManager($product)
-        ->assertSeeText('Offer period:')
-        ->assertSeeText('from 8 Sep')
-        ->assertDontSeeText('from 7 Sep');
+        ->assertSeeText('8 Sep – 13 Sep')
+        ->assertDontSeeText('7 Sep');
 });
 
 test('a shop with no promotion shows none', function (): void {

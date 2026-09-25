@@ -76,6 +76,43 @@ final readonly class PromotionLabel
         ]));
     }
 
+    /**
+     * The deal a shop has announced but not started, in its terms and with
+     * its period: "25% korting · 28 Sep – 4 Oct", "2 for €5.00 · 28 Sep –
+     * 4 Oct". Null when nothing is announced.
+     */
+    public static function upcomingDeal(?Shop $shop): ?string
+    {
+        $terms = self::upcomingTerms($shop);
+        $window = $shop?->promotionWindow();
+
+        return $terms === null || $window === null ? null : $terms . ' · ' . self::period($window);
+    }
+
+    /** What an announced deal gives: its bundle, or the shop's own wording. */
+    public static function upcomingTerms(?Shop $shop): ?string
+    {
+        $window = $shop?->promotionWindow();
+
+        if ($shop === null || $window === null || ! $window->hasNotStarted()) {
+            return null;
+        }
+
+        $bundle = $shop->bundleOffer();
+
+        return $bundle !== null
+            ? BundlePriceLabel::condition($bundle, $shop->currency)
+            : $window->label ?? __('Bonus');
+    }
+
+    /** When a window runs: "28 Sep – 4 Oct", or "until 4 Oct" with no stated start. */
+    public static function period(PromotionWindow $window): string
+    {
+        return $window->startsAt === null
+            ? 'until ' . self::shortDate($window->endsAt)
+            : self::shortDate($window->startsAt) . ' – ' . self::shortDate($window->endsAt);
+    }
+
     /** The deadline alone: "until 6 Sep", "from 8 Sep", "ended 6 Sep". */
     public static function short(?Shop $shop): ?string
     {

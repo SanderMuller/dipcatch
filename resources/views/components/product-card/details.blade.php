@@ -13,6 +13,12 @@
     $dropUnit = $drop?->comparison_unit;
     // The figure the percentage was measured against; none when it is unknown.
     $dropNow = $dropUnit === null ? null : $product->dropBasisPrice($dropUnit);
+    // Announced but not started: never today's price, so not a discount now.
+    $upcoming = $product->shops
+        ->filter(fn ($shop) => $shop->active)
+        ->map(fn ($shop) => ['shop' => $shop, 'deal' => \App\Support\PromotionLabel::upcomingDeal($shop)])
+        ->filter(fn (array $row) => $row['deal'] !== null)
+        ->sortBy(fn (array $row) => $row['shop']->is($headline->shop) ? 0 : 1);
     $deals = $product->shops
         ->filter(fn ($shop) => $shop->active)
         ->map(fn ($shop) => ['shop' => $shop, 'deal' => \App\Support\PromotionLabel::runningDeal($shop)])
@@ -85,6 +91,25 @@
             <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('No discount right now.') }}</p>
         @endif
     </div>
+
+    {{-- What is announced. Its own section: "Discount now" is what a shopper
+         can have today. --}}
+    @if ($upcoming->isNotEmpty())
+        <div class="space-y-2 py-3" data-test="details-upcoming">
+            <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Upcoming') }}</p>
+            @foreach ($upcoming as ['shop' => $dealShop, 'deal' => $dealText])
+                <div class="flex items-start gap-2.5 text-sm">
+                    <span class="flex shrink-0 items-center gap-1 rounded-md bg-blue-100 py-0.5 pr-1.5 pl-1 text-xs font-medium text-blue-800 dark:bg-blue-400/15 dark:text-blue-300">
+                        <flux:icon.calendar-days variant="micro" class="size-3.5 shrink-0" />{{ __('Soon') }}
+                    </span>
+                    <p class="min-w-0 text-pretty">
+                        <span class="font-medium text-zinc-950 dark:text-white">{{ $dealShop->host }}</span>
+                        <span class="text-zinc-500 dark:text-zinc-400">· {{ $dealText }}</span>
+                    </p>
+                </div>
+            @endforeach
+        </div>
+    @endif
 
     {{-- Every shop, cheapest per unit first. --}}
     @if ($shops->isNotEmpty())

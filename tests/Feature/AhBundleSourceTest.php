@@ -31,6 +31,23 @@ test('captured AH bundle contracts produce tracked effective prices', function (
     ['ah-one-plus-one.json', 'https://www.ah.nl/producten/product/wi233499', '17.99', '9.00'],
 ]);
 
+test('an announced AH multi-buy is tracked at the single price until it starts', function (): void {
+    fakeAhBundleApi('ah-fixed-total.json');
+    CarbonImmutable::setTestNow('2026-09-05 12:00:00 Europe/Amsterdam');
+
+    $before = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi597752')->snapshot;
+
+    // Read now: trackedPrice() judges the window against the current time.
+    expect($before?->price)->toBe('6.49')
+        ->and($before?->trackedPrice())->toBe('6.49')
+        ->and($before?->bundleOffer?->quantity)->toBe(2);
+
+    CarbonImmutable::setTestNow('2026-09-08 12:00:00 Europe/Amsterdam');
+    $during = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi597752')->snapshot;
+
+    expect($during?->trackedPrice())->toBe('6.00');
+});
+
 test('a 1 + 1 is read as a bundle, not as its pre-bonus price', function (): void {
     // AH codes it DISCOUNT_X_PLUS_Y_FREE with count 1 — one item paid for —
     // and the gate demanded two, so the commonest Dutch promotion there is

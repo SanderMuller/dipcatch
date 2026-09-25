@@ -231,6 +231,54 @@ test('an AH bonus stores the period it runs for', function (): void {
         ->and($window?->endsAt?->setTimezone('Europe/Amsterdam')->format('H:i:s'))->toBe('23:59:59');
 });
 
+test('an announced AH bonus is priced at the price before it until it starts', function (): void {
+    // AH's currentPrice carries the bonus price as soon as next week's bonus
+    // is announced; tracking it early alerted a drop nobody could have yet.
+    $this->travelTo('2026-09-25 12:00:00');
+    Http::fake(ahApiProductFakes(currentPrice: '2.17', priceBeforeBonus: '2.89', bonusStart: '2026-09-28', bonusEnd: '2026-10-04', bonusMechanism: '25% korting'));
+
+    $upcoming = app(AhApiSource::class)->resolve('https://ah.nl/producten/product/wi183521/aviko-aardappelkroketjes')->snapshot;
+
+    $this->travelTo('2026-09-28 09:00:00');
+    $running = app(AhApiSource::class)->resolve('https://ah.nl/producten/product/wi183521/aviko-aardappelkroketjes')->snapshot;
+
+    expect($upcoming?->price)->toBe('2.89')
+        ->and($upcoming?->promotionWindow?->label)->toBe('25% korting')
+        ->and($running?->price)->toBe('2.17');
+});
+
+test('an announced AH bonus without a price before it is no price, so the dataset answers', function (): void {
+    $this->travelTo('2026-09-25 12:00:00');
+    Http::fake([
+        'https://api.ah.nl/mobile-auth/v1/auth/token/anonymous' => Http::response(['access_token' => 'fake-token', 'expires_in' => 604798]),
+        'https://api.ah.nl/mobile-services/product/detail/v4/fir/*' => Http::response(['productId' => 183521, 'productCard' => [
+            'webshopId' => 183521,
+            'title' => 'Aviko Aardappelkroketjes',
+            'currentPrice' => 2.17,
+            'isBonus' => true,
+            'bonusStartDate' => '2026-09-28',
+            'bonusEndDate' => '2026-10-04',
+            'bonusMechanism' => '25% korting',
+            'orderAvailabilityStatus' => 'IN_ASSORTMENT',
+        ]]),
+    ]);
+
+    expect(app(AhApiSource::class)->resolve('https://ah.nl/producten/product/wi183521/aviko-aardappelkroketjes')->snapshot)->toBeNull();
+});
+
+test('a recheck stores the price before an announced AH bonus, not the bonus price', function (): void {
+    $this->travelTo('2026-09-25 12:00:00');
+    Http::fake(ahApiProductFakes(currentPrice: '2.17', priceBeforeBonus: '2.89', bonusStart: '2026-09-28', bonusEnd: '2026-10-04', bonusMechanism: '25% korting'));
+
+    $shop = checkjebonShop('https://ah.nl/producten/product/wi183521/aviko-aardappelkroketjes');
+    runCheck($shop);
+
+    $shop->refresh();
+    expect((string) $shop->current_price)->toBe('2.89')
+        ->and($shop->promotion_label)->toBe('25% korting')
+        ->and($shop->promotionWindow()?->hasNotStarted())->toBeTrue();
+});
+
 test('a product with no bonus clears a stored period', function (): void {
     // The live API omits the date keys entirely on a non-bonus product, so
     // authority has to come from `isBonus` being present at all.

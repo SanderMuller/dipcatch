@@ -72,7 +72,8 @@ final class RecheckActiveShopsCommand extends Command
                 $q->whereNull('last_checked_at')
                     ->orWhere(fn (EloquentQueryBuilder $due): EloquentQueryBuilder => $this->duePerPlan($due, Plan::Pro, $proCutoff))
                     ->orWhere(fn (EloquentQueryBuilder $due): EloquentQueryBuilder => $this->duePerPlan($due, Plan::Free, $freeCutoff))
-                    ->orWhere(fn (EloquentQueryBuilder $boundary): EloquentQueryBuilder => $this->dueBundleBoundary($boundary));
+                    ->orWhere(fn (EloquentQueryBuilder $boundary): EloquentQueryBuilder => $this->dueBundleBoundary($boundary))
+                    ->orWhere(fn (EloquentQueryBuilder $boundary): EloquentQueryBuilder => $this->dueDealStart($boundary));
             })
             ->orderByRaw('last_checked_at IS NULL DESC')
             ->oldest('last_checked_at');
@@ -102,6 +103,28 @@ final class RecheckActiveShopsCommand extends Command
                         ->where('promotion_ends_at', '<', now())
                         ->whereColumn('current_price', '!=', 'single_item_price');
                 });
+            });
+    }
+
+    /**
+     * A deal without bundle terms that started since the row was last read.
+     * An announced deal is tracked at the price before it (see AhApiSource),
+     * so without this the row shows the deal as running beside that price
+     * until its normal recheck — up to a day on a free account. Bundles have
+     * their own rule above.
+     *
+     * @param  EloquentQueryBuilder<Shop>  $query
+     * @return EloquentQueryBuilder<Shop>
+     */
+    private function dueDealStart(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query
+            ->whereNull('bundle_quantity')
+            ->whereNotNull('promotion_starts_at')
+            ->where('promotion_starts_at', '<=', now())
+            ->whereColumn('last_checked_at', '<', 'promotion_starts_at')
+            ->where(function (EloquentQueryBuilder $end): void {
+                $end->whereNull('promotion_ends_at')->orWhere('promotion_ends_at', '>=', now());
             });
     }
 

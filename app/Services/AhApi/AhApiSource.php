@@ -180,7 +180,20 @@ final readonly class AhApiSource
         $priceBeforeBonus = PriceNormalizer::fromMixed(data_get($card, 'priceBeforeBonus'));
         $mechanism = data_get($card, 'bonusMechanism');
         $bundleEligible = self::hasSupportedBundleContract($card);
-        $price = $bundleEligible ? $priceBeforeBonus : ($currentPrice ?? $priceBeforeBonus);
+        $promotionWindow = AhPromotionWindow::fromCard($card);
+        // AH announces next week's bonus days ahead, and `currentPrice`
+        // carries the bonus price from the moment it is announced — measured
+        // on 2026-09-25: Aviko Aardappelkroketjes at 2.17 with 25% korting
+        // starting 28 Sep and a price before it of 2.89. Tracking it then
+        // alerted a drop no shopper could have yet. Until the bonus starts
+        // the price is the one before it; without one there is no price to
+        // read here, and the check falls back to the dataset.
+        $upcoming = $promotionWindow?->hasNotStarted() === true;
+        $price = match (true) {
+            $upcoming => $priceBeforeBonus,
+            $bundleEligible => $priceBeforeBonus ?? $currentPrice,
+            default => $currentPrice ?? $priceBeforeBonus,
+        };
 
         if ($price === null) {
             return null;
@@ -195,7 +208,6 @@ final readonly class AhApiSource
         // pack data (spec Section 4).
         $hasSalesUnitSize = array_key_exists('salesUnitSize', $card);
         $salesUnitSize = $hasSalesUnitSize && is_string($card['salesUnitSize']) ? $card['salesUnitSize'] : null;
-        $promotionWindow = AhPromotionWindow::fromCard($card);
         $hasPromotionDate = array_key_exists('bonusStartDate', $card) || array_key_exists('bonusEndDate', $card);
         $invalidPromotionWindow = $bundleEligible && $hasPromotionDate && $promotionWindow === null;
         $bundleOffer = $bundleEligible && ! $invalidPromotionWindow && is_string($mechanism)
