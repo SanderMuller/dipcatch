@@ -137,17 +137,15 @@ final readonly class UnitTargetGuide
     public function history(): ?array
     {
         $comparisonUnit = $this->product->comparablePacks()->unit();
-        $datasets = new PriceHistorySeries($this->product)->data()['datasets'];
-        $unit = array_find($datasets, fn (array $dataset): bool => ($dataset['yAxisID'] ?? null) === 'unit');
+        $unit = new PriceHistorySeries($this->product)->data()['unit'];
 
         // A history kept in another unit than the alert compares in says
         // nothing about this target.
-        if ($unit === null || $comparisonUnit === null || ($unit['unit'] ?? null) !== $comparisonUnit) {
+        if ($unit === null || $comparisonUnit === null || $unit['unit'] !== $comparisonUnit) {
             return null;
         }
 
-        $data = is_array($unit['data'] ?? null) ? $unit['data'] : [];
-        $points = array_values(array_filter($data, fn (mixed $point): bool => is_float($point) && $point > 0));
+        $points = array_values(array_filter($unit['points'], fn (?float $point): bool => $point !== null && $point > 0));
 
         if (count($points) < 2) {
             return null;

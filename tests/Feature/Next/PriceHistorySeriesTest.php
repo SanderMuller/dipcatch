@@ -8,19 +8,13 @@ use App\Models\Shop;
 use Carbon\CarbonImmutable;
 
 /**
- * The dataset a chart plots under a given legend label.
+ * The per-unit points the chart plots, or null without a unit line.
  *
- * @return array<string, mixed>
+ * @return list<float|null>|null
  */
-function chartSeries(Product $product, string $label, string $range = '90'): array
+function unitPoints(Product $product, string $range = '90'): ?array
 {
-    foreach (makeChartFor($product, $range)->data()['datasets'] as $dataset) {
-        if (($dataset['label'] ?? null) === $label) {
-            return $dataset;
-        }
-    }
-
-    return [];
+    return makeChartFor($product, $range)->data()['unit']['points'] ?? null;
 }
 
 function makeChartFor(Product $product, string $range = '90'): PriceHistorySeries
@@ -61,14 +55,8 @@ test('renders cheapest segments as a stepped line', function (): void {
 
     $data = makeChartFor($product)->data();
 
-    /** @var list<array<string, mixed>> $datasets */
-    $datasets = $data['datasets'];
-    $cheapest = collect($datasets)->firstWhere('label', 'Cheapest (€)');
-    assert(is_array($cheapest));
-
-    expect($cheapest['data'])->toContain(100.0)
-        ->and($cheapest['data'])->toContain(85.0)
-        ->and($cheapest['stepped'])->toBeTrue();
+    expect($data['price'])->toContain(100.0)
+        ->and($data['price'])->toContain(85.0);
 
     $flux = makeChartFor($product)->fluxChart();
 
@@ -120,17 +108,9 @@ test('respects the range filter', function (): void {
     ]);
 
     $thirtyDay = makeChartFor($product, '30')->data();
-    /** @var list<array<string, mixed>> $datasets */
-    $datasets = $thirtyDay['datasets'];
-    $cheapest = collect($datasets)->first(static function (array $set): bool {
-        $label = $set['label'] ?? null;
 
-        return is_string($label) && str_starts_with($label, 'Cheapest');
-    });
-    assert(is_array($cheapest));
-
-    expect($cheapest['data'])->not->toContain(500.0)
-        ->and($cheapest['data'])->toContain(50.0);
+    expect($thirtyDay['price'])->not->toContain(500.0)
+        ->and($thirtyDay['price'])->toContain(50.0);
 });
 
 test('notification markers are scoped to the active range filter', function (): void {
@@ -178,25 +158,18 @@ test('notification markers are scoped to the active range filter', function (): 
         'new_price' => '50.00',
     ]);
 
-    $thirtyDay = makeChartFor($product, '30')->data();
-    /** @var list<array<string, mixed>> $datasets */
-    $datasets = $thirtyDay['datasets'];
-    $notified = collect($datasets)->firstWhere('label', 'Notified');
-    assert(is_array($notified));
+    $notified = makeChartFor($product, '30')->data()['notified'];
 
     // Only the recent (50.00) marker should be present; the old 60.00 must
     // not leak in even though the segment it sits on extends back 120 days.
-    expect($notified['data'])->toContain(50.0)
-        ->and($notified['data'])->not->toContain(60.0);
+    expect($notified)->toContain(50.0)
+        ->and($notified)->not->toContain(60.0);
 
     // Sanity: "All time" still includes both.
-    $allTime = makeChartFor($product, 'all')->data();
-    /** @var list<array<string, mixed>> $datasetsAll */
-    $datasetsAll = $allTime['datasets'];
-    $notifiedAll = collect($datasetsAll)->firstWhere('label', 'Notified');
-    assert(is_array($notifiedAll));
-    expect($notifiedAll['data'])->toContain(50.0)
-        ->and($notifiedAll['data'])->toContain(60.0);
+    $notifiedAll = makeChartFor($product, 'all')->data()['notified'];
+
+    expect($notifiedAll)->toContain(50.0)
+        ->and($notifiedAll)->toContain(60.0);
 });
 
 test('the per-unit series is omitted when the range in view shows no unit data', function (): void {
@@ -223,12 +196,7 @@ test('the per-unit series is omitted when the range in view shows no unit data',
         'ended_at' => null,
     ]);
 
-    $unitSeries = array_filter(
-        makeChartFor($product, '30')->data()['datasets'],
-        fn (array $dataset): bool => ($dataset['yAxisID'] ?? null) === 'unit',
-    );
-
-    expect($unitSeries)->toBeEmpty();
+    expect(unitPoints($product, '30'))->toBeNull();
 });
 
 test('the cheapest price is plotted per unit as well, on its own axis', function (): void {
@@ -245,12 +213,11 @@ test('the cheapest price is plotted per unit as well, on its own axis', function
         'ended_at' => null,
     ]);
 
-    $unit = chartSeries($product, 'Cheapest per kg (€)');
+    $unit = makeChartFor($product)->data()['unit'];
     $flux = makeChartFor($product)->fluxChart();
 
-    expect($unit)->not->toBeEmpty()
-        ->and($unit['data'])->toBe([10.95, 10.95])
-        ->and($unit['yAxisID'])->toBe('unit')
+    expect($unit['points'] ?? null)->toBe([10.95, 10.95])
+        ->and($unit['unit'] ?? null)->toBe('g')
         ->and($flux['unit'])->toBe('g')
         ->and($flux['unitDecimals'])->toBe(2);
 });
@@ -319,9 +286,9 @@ test('a cheaper total that is worse value shows as two diverging lines', functio
         'ended_at' => null,
     ]);
 
-    expect(chartSeries($product, 'Cheapest (€)')['data'])->toBe([1.99, 1.69, 1.69])
+    expect(makeChartFor($product)->data()['price'])->toBe([1.99, 1.69, 1.69])
         // Down in euros, up per kilo — the point of the second line.
-        ->and(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([5.3784, 8.45, 8.45]);
+        ->and(unitPoints($product))->toBe([5.3784, 8.45, 8.45]);
 });
 
 test('segments that recorded no pack size get no unit line', function (): void {
@@ -338,7 +305,7 @@ test('segments that recorded no pack size get no unit line', function (): void {
         'ended_at' => null,
     ]);
 
-    expect(chartSeries($product, 'Cheapest per kg (€)'))->toBeEmpty();
+    expect(unitPoints($product))->toBeNull();
 });
 
 test('bundle history rows carry purchase condition into chart tooltip data', function (): void {
@@ -386,7 +353,7 @@ test('units that cannot share an axis leave gaps rather than wrong numbers', fun
     }
 
     // The per-piece segment is not a EUR/kg number, so it is a gap.
-    expect(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([null, 10.95, 10.95, 10.95]);
+    expect(unitPoints($product))->toBe([null, 10.95, 10.95, 10.95]);
 });
 
 test('a pack size corrected today does not redraw the past', function (): void {
@@ -407,5 +374,5 @@ test('a pack size corrected today does not redraw the past', function (): void {
     ]);
 
     // 12.00 for 55 g is 218.18/kg — what was known then, not 18.18 from today.
-    expect(chartSeries($product, 'Cheapest per kg (€)')['data'])->toBe([218.1818, 218.1818]);
+    expect(unitPoints($product))->toBe([218.1818, 218.1818]);
 });

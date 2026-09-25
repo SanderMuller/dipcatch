@@ -9,8 +9,6 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Support\BundlePriceLabel;
-use App\Support\MoneyFormatter;
-use App\Support\UnitWord;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
@@ -59,7 +57,11 @@ final readonly class PriceHistorySeries
     }
 
     /**
-     * @return array{datasets: list<array<string, mixed>>, labels: list<string>, bundleConditions: list<?string>}
+     * One entry per stamp in every list. `unit` is null when no segment in view
+     * states a pack size; `notified` holds the alerted price at the stamp an
+     * alert fired on, null elsewhere.
+     *
+     * @return array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>}
      */
     public function data(): array
     {
@@ -99,48 +101,11 @@ final readonly class PriceHistorySeries
 
         $markers = $this->notificationMarkers($product, $segments, $labels);
 
-        $datasets = [
-            [
-                'label' => 'Cheapest (' . MoneyFormatter::symbol($product->currency) . ')',
-                'currency' => strtoupper($product->currency),
-                'data' => $points,
-                'borderColor' => '#6366f1',
-                'stepped' => true,
-                'tension' => 0,
-            ],
-        ];
-
-        // A second line, on its own axis: the best value stated per unit. It
-        // parts from the pack price where a cheaper pack is worse value.
-        if ($unit !== null) {
-            $datasets[] = [
-                'label' => 'Cheapest per ' . ltrim($unit['label'], '/') . ' (' . MoneyFormatter::symbol($product->currency) . ')',
-                'unit' => $unit['unit'],
-                'currency' => strtoupper($product->currency),
-                'data' => $unit['points'],
-                'borderColor' => '#0ea5e9',
-                'borderDash' => [6, 4],
-                'stepped' => true,
-                'tension' => 0,
-                'yAxisID' => 'unit',
-            ];
-        }
-
-        if ($markers !== []) {
-            $datasets[] = [
-                'label' => 'Notified',
-                'currency' => strtoupper($product->currency),
-                'data' => $markers,
-                'borderColor' => '#dc2626',
-                'backgroundColor' => '#dc2626',
-                'pointRadius' => 6,
-                'showLine' => false,
-            ];
-        }
-
         return [
-            'datasets' => $datasets,
             'labels' => $labels,
+            'price' => $points,
+            'unit' => $unit,
+            'notified' => $markers,
             'bundleConditions' => $bundleConditions,
         ];
     }
@@ -153,7 +118,7 @@ final readonly class PriceHistorySeries
      * measure, so the unit most segments use wins and the rest read as gaps.
      *
      * @param  EloquentCollection<int, ProductCheapestHistory>  $segments
-     * @return array{label: string, unit: string, points: list<float|null>}|null
+     * @return array{unit: string, points: list<float|null>}|null
      */
     private function unitSeries(EloquentCollection $segments, bool $repeatCurrent): ?array
     {
@@ -187,7 +152,7 @@ final readonly class PriceHistorySeries
 
         return array_filter($points, static fn (?float $point): bool => $point !== null) === []
             ? null
-            : ['label' => UnitWord::labelFor($unit), 'unit' => $unit, 'points' => $points];
+            : ['unit' => $unit, 'points' => $points];
     }
 
     /**
@@ -215,22 +180,10 @@ final readonly class PriceHistorySeries
      */
     private function segmentsFor(Product $product): EloquentCollection
     {
-        $query = $product->cheapestHistory()
-            ->inOrder();
-
-        $windowStart = $this->windowStart();
-        if ($windowStart !== null) {
-            // Include any segment that overlaps the window — `started_at < window`
-            // but still active (`ended_at IS NULL` or `ended_at >= window`).
-            // Otherwise long-lived current prices disappear from the left edge.
-            $query->where(function (EloquentBuilder $q) use ($windowStart): void {
-                $q->where('started_at', '>=', $windowStart)
-                    ->orWhereNull('ended_at')
-                    ->orWhere('ended_at', '>=', $windowStart);
-            });
-        }
-
-        return $query->get();
+        return $product->cheapestHistory()
+            ->inOrder()
+            ->overlapping($this->windowStart())
+            ->get();
     }
 
     /**
@@ -251,8 +204,7 @@ final readonly class PriceHistorySeries
     /**
      * Map each price_drop_event onto the chart segment whose [started_at, ended_at)
      * interval contains the event's `fired_at`. Events outside any segment are
-     * skipped. Returns one float|null per label so it aligns with the cheapest
-     * dataset.
+     * skipped. Returns one float|null per label so it aligns with the price list.
      *
      * @param  EloquentCollection<int, ProductCheapestHistory>  $segments
      * @param  list<string>  $labels

@@ -52,7 +52,7 @@ function chartFor(Product $product, string $filter): PriceHistorySeries
 function plotsTheOldSegment(PriceHistorySeries $chart): bool
 {
     $data = $chart->data();
-    $prices = $data['datasets'][0]['data'] ?? [];
+    $prices = $data['price'];
 
     return array_any((array) $prices, fn ($price): bool => is_numeric($price) && abs((float) $price - 9.99) < 0.001);
 }
@@ -114,7 +114,7 @@ it('plots a segment older than a year only under all time', function (): void {
     $this->actingAs($user);
 
     $plotsTheAncientSegment = function (string $filter) use ($product): bool {
-        $prices = chartFor($product, $filter)->data()['datasets'][0]['data'] ?? [];
+        $prices = chartFor($product, $filter)->data()['price'];
 
         return array_any((array) $prices, fn ($price): bool => is_numeric($price) && abs((float) $price - 42.42) < 0.001);
     };
@@ -137,20 +137,33 @@ it('reveals stored history the moment an account upgrades', function (): void {
 });
 
 it('clamps the notification markers to the same window as the line', function (): void {
+    // One price, unchanged for 200 days: a single open segment the free
+    // window still shows. The alert fired 180 days ago sits on that visible
+    // segment but outside the window, so only the clamp keeps it off.
     $user = User::factory()->create();
-    $product = productWithOldHistory($user);
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR']);
+    $shop = Shop::factory()->create(['product_id' => $product->id, 'current_price' => '1.99']);
+    ProductCheapestHistory::create([
+        'product_id' => $product->id,
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '1.99',
+        'started_at' => CarbonImmutable::now()->subDays(200),
+        'ended_at' => null,
+    ]);
 
     PriceDropEvent::factory()->create([
         'product_id' => $product->id,
         'user_id' => $user->id,
+        'new_price' => '1.99',
         'fired_at' => CarbonImmutable::now()->subDays(180),
     ]);
 
     $this->actingAs($user);
 
-    $markers = chartFor($product, 'all')->data()['datasets'][2]['data'] ?? [];
+    $data = chartFor($product->refresh(), 'all')->data();
 
-    expect(array_filter((array) $markers, static fn (mixed $m): bool => $m !== null))->toBeEmpty();
+    expect($data['price'])->toContain(1.99)
+        ->and(array_filter($data['notified'], static fn (?float $m): bool => $m !== null))->toBeEmpty();
 });
 
 it('tells a free account why the long ranges are missing', function (): void {
@@ -228,5 +241,5 @@ it('renders an empty history on a long range without failing', function (): void
     $data = chartFor($product, 'all')->data();
 
     expect($data['labels'])->toBeEmpty()
-        ->and($data['datasets'][0]['data'])->toBe([]);
+        ->and($data['price'])->toBe([]);
 });

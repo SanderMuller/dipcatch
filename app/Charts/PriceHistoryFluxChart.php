@@ -14,24 +14,23 @@ use Carbon\CarbonImmutable;
 final class PriceHistoryFluxChart
 {
     /**
-     * @param  array{datasets: list<array<string, mixed>>, labels: list<string>, bundleConditions?: list<?string>}  $data
+     * @param  array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>}  $data
      * @return array{rows: list<array<string, mixed>>, currency: string, unit: ?string, unitDecimals: int, hasNotified: bool, hasBundles: bool, unitCoverage: float}
      */
     public static function fromData(array $data, string $currency): array
     {
-        $unit = self::seriesStartingWith($data['datasets'], 'Cheapest per ');
         $rows = self::holdingUntilNextChange(self::rows(
             $data['labels'],
-            self::valuesAt($data['datasets'], 0),
-            $unit['values'],
-            self::valuesForLabel($data['datasets'], 'Notified'),
-            $data['bundleConditions'] ?? [],
+            $data['price'],
+            $data['unit']['points'] ?? null,
+            $data['notified'],
+            $data['bundleConditions'],
         ));
 
         return [
             'rows' => $rows,
             'currency' => $currency,
-            'unit' => $unit['unit'],
+            'unit' => $data['unit']['unit'] ?? null,
             'unitDecimals' => self::unitDecimals($rows),
             'hasNotified' => array_any($rows, fn (array $row): bool => isset($row['notified'])),
             'hasBundles' => array_any($rows, fn (array $row): bool => isset($row['bundle'])),
@@ -41,13 +40,13 @@ final class PriceHistoryFluxChart
 
     /**
      * @param  list<string>  $labels
-     * @param  list<mixed>  $price
-     * @param  list<mixed>|null  $unit
-     * @param  list<mixed>|null  $notified
+     * @param  list<float|null>  $price
+     * @param  list<float|null>|null  $unit
+     * @param  list<float|null>  $notified
      * @param  list<?string>  $bundleConditions
      * @return list<array<string, mixed>>
      */
-    private static function rows(array $labels, array $price, ?array $unit, ?array $notified, array $bundleConditions): array
+    private static function rows(array $labels, array $price, ?array $unit, array $notified, array $bundleConditions): array
     {
         $rows = [];
 
@@ -133,40 +132,6 @@ final class PriceHistoryFluxChart
     }
 
     /**
-     * @param  list<array<string, mixed>>  $datasets
-     * @return list<mixed>
-     */
-    private static function valuesAt(array $datasets, int $index): array
-    {
-        $dataset = $datasets[$index] ?? [];
-        $data = $dataset['data'] ?? null;
-
-        return is_array($data) ? array_values($data) : [];
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $datasets
-     * @return array{unit: ?string, values: ?list<mixed>}
-     */
-    private static function seriesStartingWith(array $datasets, string $prefix): array
-    {
-        foreach ($datasets as $dataset) {
-            $label = is_string($dataset['label'] ?? null) ? $dataset['label'] : '';
-
-            if (str_starts_with($label, $prefix)) {
-                $data = $dataset['data'] ?? null;
-
-                return [
-                    'unit' => is_string($dataset['unit'] ?? null) ? $dataset['unit'] : null,
-                    'values' => is_array($data) ? array_values($data) : [],
-                ];
-            }
-        }
-
-        return ['unit' => null, 'values' => null];
-    }
-
-    /**
      * Four decimals while every unit price is under 1, as
      * {@see MoneyFormatter::unitPrice()} writes them: two
      * cannot tell €0.0283 from €0.0249 a tablet.
@@ -178,23 +143,6 @@ final class PriceHistoryFluxChart
         $units = array_filter(array_column($rows, 'unit'), is_float(...));
 
         return $units !== [] && max($units) < 1 ? 4 : 2;
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $datasets
-     * @return list<mixed>|null
-     */
-    private static function valuesForLabel(array $datasets, string $label): ?array
-    {
-        foreach ($datasets as $dataset) {
-            if (($dataset['label'] ?? null) === $label) {
-                $data = $dataset['data'] ?? null;
-
-                return is_array($data) ? array_values($data) : [];
-            }
-        }
-
-        return null;
     }
 
     private static function date(string $stamp): string
