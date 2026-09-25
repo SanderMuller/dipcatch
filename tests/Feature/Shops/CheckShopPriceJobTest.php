@@ -197,6 +197,43 @@ test('main counter reaching dead_after flips health to dead + active=false', fun
         ->and($shop->active)->toBeFalse();
 });
 
+test('a counter reaching its threshold moves health', function (int $status, array $counters, ShopHealth $health, bool $active): void {
+    config()->set('dipcatch.shop.failing_after', 3);
+    config()->set('dipcatch.shop.failing_5xx_after', 5);
+    config()->set('dipcatch.shop.dead_5xx_after', 8);
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('no metadata', $status),
+    ]);
+
+    $shop = Shop::factory()->create([
+        'url' => 'https://shop.test/p/1',
+        'active' => true,
+        'health' => 'ok',
+        ...$counters,
+    ]);
+
+    new CheckShopPrice($shop)->handle(
+        app(ShopFetcher::class),
+        app(AdapterResolver::class),
+        app(CheckjebonSource::class),
+        app(AhApiSource::class),
+    );
+
+    $shop->refresh();
+    expect($shop->health)->toBe($health)
+        ->and($shop->active)->toBe($active);
+})->with([
+    'failing_after' => [200, ['consecutive_failures' => 2], ShopHealth::Failing, true],
+    'failing_5xx_after' => [503, ['consecutive_5xx_failures' => 4], ShopHealth::Failing, true],
+    'dead_5xx_after' => [503, ['consecutive_5xx_failures' => 7], ShopHealth::Dead, false],
+    'below 5xx threshold' => [503, ['consecutive_5xx_failures' => 3], ShopHealth::Ok, true],
+    // Each counter is judged by its own thresholds: a 5xx does not revisit a
+    // main count already past failing_after.
+    '5xx beside a high main count' => [503, ['consecutive_failures' => 9], ShopHealth::Ok, true],
+]);
+
 test('robots disallow flips offer to dead immediately', function (): void {
     Http::fake([
         'https://shop.test/robots.txt' => Http::response("User-agent: *\nDisallow: /", 200),
@@ -207,6 +244,8 @@ test('robots disallow flips offer to dead immediately', function (): void {
         'url' => 'https://shop.test/p/1',
         'health' => 'ok',
         'active' => true,
+        'consecutive_failures' => 2,
+        'consecutive_5xx_failures' => 4,
     ]);
 
     new CheckShopPrice($shop)->handle(
@@ -219,7 +258,9 @@ test('robots disallow flips offer to dead immediately', function (): void {
     $shop->refresh();
     expect($shop->health)->toBe(ShopHealth::Dead)
         ->and($shop->active)->toBeFalse()
-        ->and($shop->last_status)->toBe(ScrapeStatus::RobotsDisallowed);
+        ->and($shop->last_status)->toBe(ScrapeStatus::RobotsDisallowed)
+        ->and($shop->consecutive_failures)->toBe(2)
+        ->and($shop->consecutive_5xx_failures)->toBe(4);
 });
 
 test('inactive or dead offer is skipped', function (): void {

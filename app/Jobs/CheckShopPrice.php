@@ -374,10 +374,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 $updates['last_error'] = $outcome->error;
                 $updates += ResolvedBundlePricing::expiredFailureUpdates($locked);
 
-                $counters = $this->incrementCountersFor($locked, $status);
-                $updates += $counters;
-
-                $updates += $this->healthTransitionsFor($counters);
+                $updates += self::failureUpdatesFor($locked, $status);
             }
 
             $check = PriceCheck::create($pricing->priceCheckAttributes(
@@ -429,61 +426,45 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * @return array{consecutive_failures?: int, consecutive_5xx_failures?: int}
+     * @return array{consecutive_failures?: int, consecutive_5xx_failures?: int, health?: string, active?: bool}
      */
-    private function incrementCountersFor(Shop $shop, ScrapeStatus $status): array
+    private static function failureUpdatesFor(Shop $shop, ScrapeStatus $status): array
     {
-        return match ($status) {
-            ScrapeStatus::TransientServerError => [
-                'consecutive_5xx_failures' => $shop->consecutive_5xx_failures + 1,
-            ],
-            ScrapeStatus::RobotsDisallowed => [
-                // Permanent — both counters preserved but health flips to dead below.
-            ],
-            default => [
-                'consecutive_failures' => $shop->consecutive_failures + 1,
-            ],
-        };
+        // Permanent: both counters are kept, the offer dies now.
+        if ($status === ScrapeStatus::RobotsDisallowed) {
+            return ['health' => ShopHealth::Dead->value, 'active' => false];
+        }
+
+        if ($status === ScrapeStatus::TransientServerError) {
+            $failures = $shop->consecutive_5xx_failures + 1;
+
+            return ['consecutive_5xx_failures' => $failures] + self::healthAt(
+                $failures,
+                Config::integer('dipcatch.shop.failing_5xx_after'),
+                Config::integer('dipcatch.shop.dead_5xx_after'),
+            );
+        }
+
+        $failures = $shop->consecutive_failures + 1;
+
+        return ['consecutive_failures' => $failures] + self::healthAt(
+            $failures,
+            Config::integer('dipcatch.shop.failing_after'),
+            Config::integer('dipcatch.shop.dead_after'),
+        );
     }
 
     /**
-     * @param  array<string, mixed>  $counters
      * @return array{health?: string, active?: bool}
      */
-    private function healthTransitionsFor(array $counters): array
+    private static function healthAt(int $failures, int $failingAfter, int $deadAfter): array
     {
-        $failingAfter = Config::integer('dipcatch.shop.failing_after');
-        $deadAfter = Config::integer('dipcatch.shop.dead_after');
-        $failing5xx = Config::integer('dipcatch.shop.failing_5xx_after');
-        $dead5xx = Config::integer('dipcatch.shop.dead_5xx_after');
-
-        $main = $counters['consecutive_failures'] ?? null;
-        $five = $counters['consecutive_5xx_failures'] ?? null;
-
-        $dead = ['health' => ShopHealth::Dead->value, 'active' => false];
-        $failing = ['health' => ShopHealth::Failing->value];
-
-        // robots_disallowed: hard fail.
-        if ($main === null && $five === null) {
-            return $dead;
+        if ($failures >= $deadAfter) {
+            return ['health' => ShopHealth::Dead->value, 'active' => false];
         }
 
-        if ($main !== null) {
-            if ($main >= $deadAfter) {
-                return $dead;
-            }
-            if ($main >= $failingAfter) {
-                return $failing;
-            }
-        }
-
-        if ($five !== null) {
-            if ($five >= $dead5xx) {
-                return $dead;
-            }
-            if ($five >= $failing5xx) {
-                return $failing;
-            }
+        if ($failures >= $failingAfter) {
+            return ['health' => ShopHealth::Failing->value];
         }
 
         return [];
