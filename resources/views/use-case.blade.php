@@ -27,8 +27,7 @@
             <x-marketing-header />
 
             <main class="mx-auto w-full max-w-app flex-1 px-6 pt-12 pb-20 lg:px-8">
-                {{-- The screenshot's chat is in English, so it only joins the English page. --}}
-                @php($illustration = $locale !== 'nl' && $useCase->slug === 'ask-your-assistant' ? 'images/use-cases/ask-your-assistant-chat.webp' : null)
+                @php($illustration = $useCase->slug === 'ask-your-assistant' ? 'images/use-cases/ask-your-assistant-chat.webp' : null)
 
                 <div @class(['grid grid-cols-1 items-center gap-12 lg:grid-cols-2' => $illustration !== null])>
                     <div>

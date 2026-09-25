@@ -513,7 +513,7 @@
                             <flux:chart :value="$chart['rows']" class="mt-4 h-72 sm:h-80 min-[112.5rem]:h-120" data-test="price-history-chart-{{ $field }}">
                                 <flux:chart.svg :gutter="$chart['hasNotified'] ? '52 8 8 8' : '20 8 8 8'">
                                     <flux:chart.area :field="$field" class="text-chart/15 dark:text-chart/20" curve="none" />
-                                    <flux:chart.line :field="$field" class="text-chart" stroke-width="2" curve="none" />
+                                    <flux:chart.line :field="$field" class="text-chart-line" stroke-width="2" curve="none" />
                                     @if ($chart['hasNotified'])
                                         <flux:chart.point :field="$notifiedField" class="text-alert" r="5" stroke-width="3" />
                                     @endif
@@ -601,7 +601,7 @@
                                 @if ($chart['hasNotified'])
                                     <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-wrap justify-center gap-x-5 gap-y-2">
                                         <flux:chart.legend :label="$isUnit ? __('Best value') : $packLabel">
-                                            <flux:chart.legend.indicator class="bg-chart" />
+                                            <flux:chart.legend.indicator class="bg-chart-line" />
                                         </flux:chart.legend>
                                         <flux:chart.legend :label="__('Notified')">
                                             <flux:chart.legend.indicator class="bg-alert" />

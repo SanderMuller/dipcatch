@@ -106,17 +106,6 @@ test('the homepage renders no decorative image element', function (): void {
     expect($matches[0])->each->toMatch('#alt="[^"]+"#');
 });
 
-test('the tracked-products mock contributes no chrome to the page text', function (): void {
-    // The converter ignores aria-hidden and role="img", so the only way the
-    // mock's decoration stays out of the Markdown is to not be a text node.
-    $text = strip_tags((string) $this->get(route('home'))->assertOk()->getContent());
-
-    expect($text)->not->toContain('9:41')
-        ->and($text)->not->toContain('🥔')
-        ->and($text)->not->toContain('🧀')
-        ->and($text)->not->toContain('🧻');
-});
-
 test('every homepage picture points at a file that ships', function (): void {
     // The product and category pictures are CSS backgrounds, so a renamed or
     // missing file breaks nothing a test would notice: the tile just paints

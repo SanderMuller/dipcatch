@@ -38,6 +38,8 @@
     /* The savings green for small text and icons: #13a970 is 3:1 on paper, short of AA. */
     --color-savings-strong: #0b7a52;
     --color-chart: #f6a900;
+    /* The chart line: #f6a900 is under 2:1 on paper, short of 3:1 for a graphic. */
+    --color-chart-line: #c27c00;
     --color-alert: #ec145a;
     --color-soft-yellow: #fff0b8;
     --color-soft-blush: #fde7e0;
@@ -56,6 +58,7 @@
         --color-brand: #8a9bff;
         --color-savings: #34d399;
         --color-savings-strong: #34d399;
+        --color-chart-line: #f6a900;
         --color-soft-yellow: #3a2f0b;
         --color-soft-blush: var(--color-zinc-950);
     }

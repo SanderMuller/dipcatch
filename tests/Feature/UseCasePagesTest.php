@@ -183,6 +183,19 @@ test('an unknown slug is a 404', function (): void {
     $this->get('/price-alerts/nonsense')->assertNotFound();
 });
 
+test('the ask-your-assistant page shows the chat screenshot in both languages', function (?string $locale, string $alt): void {
+    $case = UseCases::find('ask-your-assistant');
+    assert($case !== null);
+
+    $content = (string) $this->get($case->url($locale))->assertOk()->getContent();
+
+    expect($content)->toContain('images/use-cases/ask-your-assistant-chat.webp" alt="' . $alt)
+        ->and(public_path('images/use-cases/ask-your-assistant-chat.webp'))->toBeFile();
+})->with([
+    'English' => [null, 'A chat with an assistant.'],
+    'Dutch' => ['nl', 'Een chat met een assistent.'],
+]);
+
 test('the Dutch variant is canonical to itself and reciprocal with the English one', function (): void {
     $case = UseCases::find('coffee');
     assert($case !== null);
