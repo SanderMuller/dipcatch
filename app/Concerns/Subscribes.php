@@ -88,13 +88,16 @@ trait Subscribes
      *
      * A live row wins over a dead one whatever their order, so a stray
      * `incomplete` cannot make the billing page offer a second subscription
-     * to somebody Stripe already bills.
+     * to somebody Stripe already bills. The row that grants Pro comes first:
+     * `valid()` also holds for an `incomplete` row inside its trial or grace
+     * dates, which grants nothing.
      */
     public function payingSubscription(): ?Subscription
     {
         $rows = $this->proSubscriptions();
 
-        return $rows->first(static fn (Subscription $subscription): bool => $subscription->valid())
+        return $rows->first(static fn (Subscription $subscription): bool => $subscription->active())
+            ?? $rows->first(static fn (Subscription $subscription): bool => $subscription->valid())
             ?? $rows->first();
     }
 
@@ -121,7 +124,7 @@ trait Subscribes
 
     public function isPastDue(): bool
     {
-        return $this->subscription(Plan::SUBSCRIPTION_TYPE)?->pastDue() === true;
+        return $this->payingSubscription()?->pastDue() === true;
     }
 
     /**

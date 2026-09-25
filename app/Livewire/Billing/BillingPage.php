@@ -4,7 +4,6 @@ namespace App\Livewire\Billing;
 
 use App\Billing\BillingGate;
 use App\Billing\Entitlements;
-use App\Billing\Plan;
 use App\Billing\PlanLimits;
 use App\Billing\ProPrice;
 use App\Models\Product;
@@ -69,7 +68,7 @@ final class BillingPage extends Component
      */
     private function periodEndsAt(): ?string
     {
-        $subscription = $this->user()->subscription(Plan::SUBSCRIPTION_TYPE);
+        $subscription = $this->user()->payingSubscription();
 
         if ($subscription === null) {
             return null;
@@ -90,13 +89,13 @@ final class BillingPage extends Component
     private function isCancelling(): bool
     {
         return $this->user()->isPro()
-            && $this->user()->subscription(Plan::SUBSCRIPTION_TYPE)?->onGracePeriod() === true;
+            && $this->user()->payingSubscription()?->onGracePeriod() === true;
     }
 
     private function isOnTrial(): bool
     {
         return $this->user()->isPro()
-            && $this->user()->subscription(Plan::SUBSCRIPTION_TYPE)?->onTrial() === true;
+            && $this->user()->payingSubscription()?->onTrial() === true;
     }
 
     private function isBlocked(): bool
