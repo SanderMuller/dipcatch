@@ -101,13 +101,9 @@ final readonly class ShopSnapshot
 
     public function trackedPrice(): string
     {
-        if ($this->bundleOffer === null || ($this->promotionWindow !== null && ! $this->promotionWindow->isRunning())) {
-            return $this->price;
-        }
-
-        $bundlePrice = $this->bundleOffer->effectiveUnitPrice();
-
-        return $this->bundleOffer->isCheaperThan($this->price) ? $bundlePrice : $this->price;
+        return $this->bundleOffer?->appliesTo($this->price, $this->promotionWindow) === true
+            ? $this->bundleOffer->effectiveUnitPrice()
+            : $this->price;
     }
 
     public function withPackSize(string $packSize): self

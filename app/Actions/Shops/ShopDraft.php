@@ -58,13 +58,9 @@ final readonly class ShopDraft
     {
         $singleItemPrice = $this->singleItemPrice ?? $this->price;
 
-        if ($this->bundleOffer === null
-            || ! $this->bundleOffer->isCheaperThan($singleItemPrice)
-            || ($this->promotionWindow !== null && ! $this->promotionWindow->isRunning())) {
-            return $singleItemPrice;
-        }
-
-        return $this->bundleOffer->effectiveUnitPrice();
+        return $this->bundleOffer?->appliesTo($singleItemPrice, $this->promotionWindow) === true
+            ? $this->bundleOffer->effectiveUnitPrice()
+            : $singleItemPrice;
     }
 
     /**
