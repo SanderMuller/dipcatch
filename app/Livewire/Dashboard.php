@@ -6,6 +6,7 @@ use App\Billing\PlanLimits;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\DashboardDigest;
 use App\Support\MoneyFormatter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -33,6 +34,7 @@ final class Dashboard extends Component
             'needsSecondShop' => $this->needsSecondShop($watching),
             'canAddProduct' => app(PlanLimits::class)->canAddProduct($this->user()),
             'hasAnyProduct' => $watching->isNotEmpty(),
+            'digest' => DashboardDigest::of($this->activeProducts(), $this->productsInDrop()),
         ]);
     }
 
@@ -66,9 +68,43 @@ final class Dashboard extends Component
             ->inVisibleDrop()
             // One query each for the whole list rather than one per row.
             ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
+            // Biggest first: the drop worth acting on leads, not the newest.
+            ->orderByDesc(Product::liveDropPercentQuery())
             ->latest('last_notified_at')
             ->limit(10)
             ->get();
+    }
+
+    /**
+     * Every product still being followed, for the digest's shopping trips,
+     * ending deals and broken shops. Without the alert history: loading the
+     * latest event eagerly reads every event of every product.
+     *
+     * @return EloquentCollection<int, Product>
+     */
+    private function activeProducts(): EloquentCollection
+    {
+        return Product::query()
+            ->where('user_id', $this->user()->id)
+            ->where('active', true)
+            ->with(['cheapestShop', 'shops'])
+            ->get();
+    }
+
+    /**
+     * Every product in a visible drop, not only the ten the drop cards show.
+     *
+     * @return list<string>
+     */
+    private function productsInDrop(): array
+    {
+        $ids = Product::query()
+            ->where('user_id', $this->user()->id)
+            ->inVisibleDrop()
+            ->pluck('id')
+            ->all();
+
+        return array_values(array_filter($ids, is_string(...)));
     }
 
     /**
