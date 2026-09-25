@@ -29,7 +29,7 @@
         : __('DipCatch is free for :count products. Pro removes the limits and checks prices more often.', ['count' => $freeProducts]);
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-canvas">
     <head>
         @include('partials.head', [
             'title' => __('Pricing'),
@@ -41,19 +41,19 @@
         <link rel="alternate" hreflang="x-default" href="{{ route('pricing') }}">
         {{ \App\Support\JsonLd::script(\App\Support\StructuredData::pricing($description)) }}
     </head>
-    <body class="min-h-dvh bg-linear-to-br from-amber-50 to-rose-50 bg-fixed text-zinc-900 antialiased dark:from-zinc-950 dark:to-zinc-950 dark:text-zinc-50">
+    <body class="min-h-dvh bg-linear-to-br from-canvas via-canvas to-soft-blush bg-fixed text-ink antialiased">
         <div class="flex min-h-dvh flex-col">
-            <x-marketing-header width="max-w-4xl" />
+            <x-marketing-header />
 
 
-            <main class="mx-auto w-full max-w-4xl flex-1 px-6 pt-8 pb-20 lg:px-8">
+            <main class="mx-auto w-full max-w-app flex-1 px-6 pt-8 pb-20 lg:px-8">
                 <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{{ __('Pricing') }}</h1>
                 <p class="mt-2 max-w-2xl text-base text-zinc-600 dark:text-zinc-300">
                     {{ __('Track your first :count products for nothing. Pro removes the limits and looks more often.', ['count' => $free->maxProducts()]) }}
                 </p>
 
-                <div class="mt-10 grid gap-6 sm:grid-cols-2">
-                    <section class="rounded-2xl bg-white/70 p-6 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/70 dark:ring-zinc-800">
+                <div class="mt-10 grid max-w-4xl gap-6 sm:grid-cols-2">
+                    <section class="rounded-2xl bg-paper/80 p-6 ring-1 ring-line backdrop-blur-sm">
                         <h2 class="text-lg font-semibold">{{ __('Free') }}</h2>
                         <p class="mt-1 text-3xl font-semibold tracking-tight">{{ \App\Support\MoneyFormatter::symbol(\App\Billing\ProPrice::currency()) }}0</p>
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ __('No card, no expiry.') }}</p>
@@ -66,14 +66,14 @@
                             <li>{{ __(':days days of price history', ['days' => $free->historyDays()]) }}</li>
                         </ul>
 
-                        <a href="{{ $ctaHref }}" class="mt-8 inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200">
+                        <a href="{{ $ctaHref }}" class="mt-8 inline-flex items-center rounded-full bg-paper px-5 py-3 text-base font-medium text-ink ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:text-sm">
                             {{ $authed ? __('Your plan') : __('Create a free account') }}
                         </a>
                     </section>
 
-                    <section class="rounded-2xl bg-white p-6 ring-2 ring-zinc-900 dark:bg-zinc-900 dark:ring-white">
+                    <section class="rounded-2xl bg-paper p-6 shadow-xl shadow-ink/5 ring-2 ring-ink dark:shadow-none">
                         <h2 class="text-lg font-semibold">{{ __('Pro') }}</h2>
-                        <p class="mt-1 text-3xl font-semibold tracking-tight">{{ $price }}<span class="text-base font-normal text-zinc-500 dark:text-zinc-400"> / {{ __('month') }}</span></p>
+                        <p class="mt-1 text-3xl font-semibold tracking-tight text-brand tabular-nums">{{ $price }}<span class="text-base font-normal text-zinc-500 dark:text-zinc-400"> / {{ __('month') }}</span></p>
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ __('VAT included.') }}</p>
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                             @if ($onSale)
@@ -93,23 +93,23 @@
                         </ul>
 
                         @if ($onSale)
-                            <a href="{{ $proCtaHref }}" class="mt-8 inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200">
+                            <a href="{{ $proCtaHref }}" class="mt-8 inline-flex items-center rounded-full bg-ink px-5 py-3 text-base font-medium text-paper shadow-md hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:text-sm dark:shadow-none">
                                 {{ $proCtaLabel }}
                             </a>
                         @else
-                            <p class="mt-8 inline-flex items-center rounded-full bg-zinc-900/5 px-5 py-2.5 text-sm font-medium text-zinc-500 ring-1 ring-zinc-200 dark:bg-white/5 dark:text-zinc-400 dark:ring-zinc-800">
+                            <p class="mt-8 inline-flex items-center rounded-full bg-ink/5 px-5 py-3 text-base font-medium text-zinc-500 ring-1 ring-line sm:text-sm dark:text-zinc-400">
                                 {{ __('Coming soon') }}
                             </p>
                         @endif
                     </section>
                 </div>
 
-                <p class="mt-8 text-sm text-zinc-500 dark:text-zinc-400">
+                <p class="mt-8 max-w-[64ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
                     {{ __('If you go back to Free, nothing you follow is deleted or stopped. You keep everything you added. You just cannot add more until you are under the free limit again.') }}
                 </p>
             </main>
 
-            <footer class="mx-auto w-full max-w-4xl px-6 pb-10 lg:px-8">
+            <footer class="mx-auto w-full max-w-app px-6 pb-10 lg:px-8">
                 <x-marketing-footer-links :lang-query="$langQuery" :contact-email="config('site.contact_email')" :home="true" />
             </footer>
         </div>

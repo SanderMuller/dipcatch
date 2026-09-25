@@ -34,7 +34,7 @@
      colour keyed on the OS preference painted the wrong browser chrome for an
      OS-dark visitor who never chose dark. The script below keeps it in step
      with an explicit choice. --}}
-<meta name="theme-color" content="#fffbeb">
+<meta name="theme-color" content="#fff9e8">
 
 @if (filled($canonical ?? null))
     @php($socialImage = $ogImage ?? asset('images/og-default.png'))
@@ -55,7 +55,7 @@
 @endif
 
 <link rel="preconnect" href="https://fonts.bunny.net">
-<link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600&display=swap" rel="stylesheet" />
+<link href="https://fonts.bunny.net/css?family=geist:400,500,600&display=swap" rel="stylesheet" />
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @fluxAppearance
@@ -66,5 +66,5 @@
 <script>
     window.Flux.applyAppearance(window.localStorage.getItem('flux.appearance') || 'light');
     document.querySelector('meta[name="theme-color"]')
-        ?.setAttribute('content', document.documentElement.classList.contains('dark') ? '#09090b' : '#fffbeb');
+        ?.setAttribute('content', document.documentElement.classList.contains('dark') ? '#09090b' : '#fff9e8');
 </script>

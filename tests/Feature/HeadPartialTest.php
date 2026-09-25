@@ -96,7 +96,7 @@ test('pages declare the light theme colour, because light is the default mode', 
     // One colour, not one per OS scheme: the appearance script defaults to
     // light whatever the OS says, so a dark colour keyed on the OS painted
     // the wrong browser chrome. The script rewrites it when dark is chosen.
-    $this->get('/')->assertOk()->assertSeeHtml('<meta name="theme-color" content="#fffbeb">')->assertDontSeeHtml('media="(prefers-color-scheme');
+    $this->get('/')->assertOk()->assertSeeHtml('<meta name="theme-color" content="#fff9e8">')->assertDontSeeHtml('media="(prefers-color-scheme');
 });
 
 test('nothing stored means light, not the operating system preference', function (): void {

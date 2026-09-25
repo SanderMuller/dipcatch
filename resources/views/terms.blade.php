@@ -10,7 +10,7 @@
     $description = __('The agreement between you and DipCatch: what the service does, what it costs, and what neither side promises.');
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-canvas">
     <head>
         @include('partials.head', [
             'title' => __('Terms of service'),
@@ -22,17 +22,17 @@
         <link rel="alternate" hreflang="x-default" href="{{ route('terms') }}">
         {{ \App\Support\JsonLd::script(\App\Support\StructuredData::terms($canonical, $description)) }}
     </head>
-    <body class="min-h-dvh bg-linear-to-br from-amber-50 to-rose-50 bg-fixed text-zinc-900 antialiased dark:from-zinc-950 dark:to-zinc-950 dark:text-zinc-50">
+    <body class="min-h-dvh bg-linear-to-br from-canvas via-canvas to-soft-blush bg-fixed text-ink antialiased">
         <div class="flex min-h-dvh flex-col">
-            <x-marketing-header width="max-w-3xl" />
+            <x-marketing-header />
 
-            <main class="mx-auto w-full max-w-3xl flex-1 px-6 pt-8 pb-20 lg:px-8">
+            <main class="mx-auto w-full max-w-app flex-1 px-6 pt-8 pb-20 lg:px-8">
                 <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{{ __('Terms of service') }}</h1>
                 @if (filled($updated))
                     <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{{ __('Last updated :date', ['date' => $updated]) }}</p>
                 @endif
 
-                <div class="mt-8 space-y-8 text-base text-zinc-700 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-zinc-900 [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-5 dark:text-zinc-300 dark:[&_h2]:text-zinc-50">
+                <div class="mt-8 max-w-3xl space-y-8 text-base text-zinc-700 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-ink [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-5 dark:text-zinc-300">
                     <section>
                         <p>{{ __('DipCatch is run from the Netherlands. Using the service means you agree to what is on this page. It is written to be read, not to be impressive.') }}</p>
                     </section>
@@ -95,15 +95,15 @@
                         <h2>{{ __('Data and questions') }}</h2>
                         <p class="mt-2">
                             {{ __('What we store about you is on the privacy page, and how to reach us is on the support page.') }}
-                            <a href="{{ route('privacy', $langQuery) }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ __('Privacy') }}</a>
+                            <a href="{{ route('privacy', $langQuery) }}" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('Privacy') }}</a>
                             ·
-                            <a href="{{ route('support', $langQuery) }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ __('Support') }}</a>
+                            <a href="{{ route('support', $langQuery) }}" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('Support') }}</a>
                         </p>
                     </section>
                 </div>
             </main>
 
-            <footer class="mx-auto w-full max-w-3xl px-6 pb-10 lg:px-8">
+            <footer class="mx-auto w-full max-w-app px-6 pb-10 lg:px-8">
                 <x-marketing-footer-links :lang-query="$langQuery" :contact-email="$contactEmail" :home="true" />
             </footer>
         </div>

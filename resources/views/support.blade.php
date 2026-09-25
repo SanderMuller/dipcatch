@@ -9,7 +9,7 @@
     $description = __('How to reach DipCatch, what to send with a question, and where to change or cancel a subscription.');
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-canvas">
     <head>
         @include('partials.head', [
             'title' => __('Support'),
@@ -21,15 +21,15 @@
         <link rel="alternate" hreflang="x-default" href="{{ route('support') }}">
         {{ \App\Support\JsonLd::script(\App\Support\StructuredData::support($canonical, $description)) }}
     </head>
-    <body class="min-h-dvh bg-linear-to-br from-amber-50 to-rose-50 bg-fixed text-zinc-900 antialiased dark:from-zinc-950 dark:to-zinc-950 dark:text-zinc-50">
+    <body class="min-h-dvh bg-linear-to-br from-canvas via-canvas to-soft-blush bg-fixed text-ink antialiased">
         <div class="flex min-h-dvh flex-col">
-            <x-marketing-header width="max-w-3xl" />
+            <x-marketing-header />
 
-            <main class="mx-auto w-full max-w-3xl flex-1 px-6 pt-8 pb-20 lg:px-8">
+            <main class="mx-auto w-full max-w-app flex-1 px-6 pt-8 pb-20 lg:px-8">
                 <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{{ __('Support') }}</h1>
                 <p class="mt-3 max-w-[60ch] text-lg text-pretty text-zinc-600 dark:text-zinc-300">{{ $description }}</p>
 
-                <div class="mt-8 space-y-8 text-base text-zinc-700 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-zinc-900 [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-5 dark:text-zinc-300 dark:[&_h2]:text-zinc-50">
+                <div class="mt-8 max-w-3xl space-y-8 text-base text-zinc-700 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-ink [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-5 dark:text-zinc-300">
                     <section>
                         <h2>{{ __('Getting in touch') }}</h2>
                         {{-- The form is the real channel: it asks what kind of
@@ -38,12 +38,12 @@
                              the login wall without warning. --}}
                         <p class="mt-2">
                             {{ __('The contact form in the app is the quickest way to reach us. It asks what kind of question you have, so it lands in the right place.') }}
-                            <a href="{{ route('app.support') }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ __('Open the contact form') }}</a>{{ __(' (sign in first).') }}
+                            <a href="{{ route('app.support') }}" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('Open the contact form') }}</a>{{ __(' (sign in first).') }}
                         </p>
                         @if (filled($contactEmail))
                             <p class="mt-2">
                                 {{ __('No account? Email us instead:') }}
-                                <a href="mailto:{{ $contactEmail }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ $contactEmail }}</a>
+                                <a href="mailto:{{ $contactEmail }}" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ $contactEmail }}</a>
                             </p>
                         @endif
                         <p class="mt-2">{{ __('A question about one product is easiest to answer with the link to that product page and the shop it is at. Say what you expected to see and what you saw instead.') }}</p>
@@ -59,7 +59,7 @@
                         </ul>
                         <p class="mt-2">
                             {{ __('Send us a product link if pasting one does not pick up the price. We set a shop up ourselves when its pages are too tricky to read. Those shops are listed on the supported shops page.') }}
-                            <x-shop-request-link class="font-medium text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300" />
+                            <x-shop-request-link class="font-medium text-ink hover:text-brand" />
                         </p>
                     </section>
 
@@ -82,13 +82,13 @@
                         <p class="mt-2">{{ __('You can change your notification settings, your timezone and your password in the app, and delete the account there as well. Deleting it removes the products, the price history and the alerts with it.') }}</p>
                         <p class="mt-2">
                             {{ __('What we store and why is set out on the privacy page.') }}
-                            <a href="{{ route('privacy', $langQuery) }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ __('Privacy') }}</a>
+                            <a href="{{ route('privacy', $langQuery) }}" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('Privacy') }}</a>
                         </p>
                     </section>
                 </div>
             </main>
 
-            <footer class="mx-auto w-full max-w-3xl px-6 pb-10 lg:px-8">
+            <footer class="mx-auto w-full max-w-app px-6 pb-10 lg:px-8">
                 <x-marketing-footer-links :lang-query="$langQuery" :contact-email="$contactEmail" :home="true" />
             </footer>
         </div>

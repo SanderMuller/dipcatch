@@ -9,7 +9,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
     --color-zinc-50: #fafafa;
     --color-zinc-100: #f5f5f5;
@@ -26,6 +26,21 @@
     --color-accent: var(--color-neutral-800);
     --color-accent-content: var(--color-neutral-800);
     --color-accent-foreground: var(--color-white);
+
+    /* The brand kit: a warm canvas, ink for the one solid button, blue for
+       prices, and a signal colour per kind of price news. */
+    --color-canvas: #fff9e8;
+    --color-paper: #fffdfc;
+    --color-ink: #1d1d1b;
+    --color-line: #dedad2;
+    --color-brand: #3554ff;
+    --color-savings: #13a970;
+    /* The savings green for small text and icons: #13a970 is 3:1 on paper, short of AA. */
+    --color-savings-strong: #0b7a52;
+    --color-chart: #f6a900;
+    --color-alert: #ec145a;
+    --color-soft-yellow: #fff0b8;
+    --color-soft-blush: #fde7e0;
 }
 
 @layer theme {
@@ -33,6 +48,16 @@
         --color-accent: var(--color-white);
         --color-accent-content: var(--color-white);
         --color-accent-foreground: var(--color-neutral-800);
+
+        --color-canvas: var(--color-zinc-950);
+        --color-paper: var(--color-zinc-900);
+        --color-ink: var(--color-zinc-50);
+        --color-line: var(--color-zinc-800);
+        --color-brand: #8a9bff;
+        --color-savings: #34d399;
+        --color-savings-strong: #34d399;
+        --color-soft-yellow: #3a2f0b;
+        --color-soft-blush: var(--color-zinc-950);
     }
 }
 

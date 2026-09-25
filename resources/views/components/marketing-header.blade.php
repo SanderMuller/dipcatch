@@ -1,5 +1,3 @@
-@props(['width' => 'max-w-app'])
-
 @php
     // The language links must return to the page the reader is on, so the
     // header works on every marketing page without being told which.
@@ -33,9 +31,9 @@
     {{-- A permanent hairline rather than one that appears on scroll: the
          blur already separates the bar, and a scroll-driven border would
          depend on a scroll event this page cannot be shown to receive. --}}
-    class="sticky top-0 z-50 border-b border-zinc-900/5 bg-amber-50/80 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/80"
+    class="sticky top-0 z-50 border-b border-zinc-900/5 bg-canvas/80 backdrop-blur-md dark:border-white/10"
 >
-    <div class="mx-auto flex w-full {{ $width }} items-center justify-between gap-3 px-6 py-4 lg:px-8">
+    <div class="mx-auto flex w-full max-w-app items-center justify-between gap-3 px-6 py-4 lg:px-8">
         <div class="flex items-center gap-6">
             <a href="{{ route('home', $langQuery) }}" aria-label="{{ __('Homepage') }}" class="flex shrink-0 items-center gap-2 font-semibold">
                 <span class="flex aspect-square size-8 items-center justify-center rounded-xl bg-white p-0.5 dark:bg-white">
@@ -71,7 +69,7 @@
 
             <a
                 href="{{ $authed ? url('/app') : route('register') }}"
-                class="whitespace-nowrap rounded-full bg-white/80 px-3 py-1.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white sm:px-4 dark:bg-zinc-900/80 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900"
+                class="whitespace-nowrap rounded-full bg-ink px-3 py-1.5 text-sm font-medium text-paper hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:px-4"
             >{{ $authed ? __('Open app') : __('Create account') }}</a>
 
             <button
@@ -99,7 +97,7 @@
         x-collapse
         class="md:hidden"
     >
-        <div class="mx-auto flex w-full {{ $width }} flex-col gap-1 px-6 py-4 lg:px-8">
+        <div class="mx-auto flex w-full max-w-app flex-col gap-1 px-6 py-4 lg:px-8">
             @foreach ($links as $link)
                 <a href="{{ $link['href'] }}" @if ($link['current']) aria-current="page" @endif class="rounded-xl px-3 py-2.5 text-base font-medium text-zinc-700 hover:bg-white/70 dark:text-zinc-300 dark:hover:bg-zinc-900/70">{{ $link['label'] }}</a>
             @endforeach

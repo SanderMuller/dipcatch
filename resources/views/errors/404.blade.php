@@ -4,7 +4,7 @@
      everyone. No marketing header — an error page is not the place to
      discover a second failure. --}}
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
+<html lang="en" class="scroll-smooth bg-canvas">
     <head>
         @include('partials.head', [
             'title' => __('Page not found'),
@@ -12,7 +12,7 @@
             'robots' => 'noindex',
         ])
     </head>
-    <body class="min-h-dvh bg-linear-to-br from-amber-50 to-rose-50 bg-fixed text-zinc-900 antialiased dark:from-zinc-950 dark:to-zinc-950 dark:text-zinc-50">
+    <body class="min-h-dvh bg-linear-to-br from-canvas via-canvas to-soft-blush bg-fixed text-ink antialiased">
         <x-error-page
             :code="404"
             :heading="__('This page does not exist')"

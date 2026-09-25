@@ -15,36 +15,43 @@
     $headerLabelShort = $authed ? __('Open app') : __('Sign up');
     $contactEmail = config('site.contact_email');
     $steps = [
-        ['n' => '01', 'title' => __('Paste a product link'), 'body' => __('DipCatch picks up the name, the photo, the price and the pack size by itself. You install nothing.')],
-        ['n' => '02', 'title' => __('Add it from other shops'), 'body' => __('Add the same thing at other shops. DipCatch shows which one is cheapest and works out the price per kilo or per litre. So you can see whether the big pack really is the better deal.')],
-        ['n' => '03', 'title' => __('You hear about it'), 'body' => __('Say what a good price is for you. We check the shops and let you know the moment one of them goes below it. One email a day, a note in the app, or a message in your browser.')],
+        ['n' => '01', 'icon' => 'link', 'title' => __('Paste a product link'), 'body' => __('DipCatch picks up the name, the photo, the price and the pack size by itself. You install nothing.')],
+        ['n' => '02', 'icon' => 'magnifying-glass', 'title' => __('Add it from other shops'), 'body' => __('Add the same thing at other shops. DipCatch shows which one is cheapest and works out the price per kilo or per litre. So you can see whether the big pack really is the better deal.')],
+        ['n' => '03', 'icon' => 'bell', 'title' => __('You hear about it'), 'body' => __('Say what a good price is for you. We check the shops and let you know the moment one of them goes below it. One email a day, a note in the app, or a message in your browser.')],
     ];
     $supportedShops = \App\Support\SupportedShops::homepage();
     $money = static fn (string $amount): string => \App\Support\MoneyFormatter::format($amount, 'EUR');
+    $drop = static fn (string $old, string $new): int => (int) round((1 - (float) $new / (float) $old) * 100);
     $tracked = [
         [
-            'icon' => '🥔',
+            'image' => 'product-chips.webp',
             'name' => 'Lay’s Naturel 200 g',
             'shop' => 'ah.nl',
             'old' => $money('2.19'),
             'new' => __(':price (bonus)', ['price' => $money('1.69')]),
             'unit' => __(':price /kg · cheapest of :count shops', ['price' => $money('8.45'), 'count' => 4]),
+            'drop' => $drop('2.19', '1.69'),
+            'spark' => ['line' => 'stroke-savings', 'area' => 'fill-savings/10', 'points' => '0,6 18,8 34,5 52,9 70,8 86,22 100,24'],
         ],
         [
-            'icon' => '🧀',
+            'image' => 'product-cheese.webp',
             'name' => 'Beemster Extra Belegen 48+ 150 g',
             'shop' => 'dirk.nl',
             'old' => $money('3.49'),
             'new' => $money('1.69'),
             'unit' => __(':price /kg · cheapest of :count shops', ['price' => $money('11.27'), 'count' => 3]),
+            'drop' => $drop('3.49', '1.69'),
+            'spark' => ['line' => 'stroke-chart', 'area' => 'fill-chart/10', 'points' => '0,4 16,6 32,5 48,10 64,14 82,20 100,26'],
         ],
         [
-            'icon' => '🧻',
+            'image' => 'product-toilet-paper.webp',
             'name' => 'Page toiletpapier 24 rollen',
             'shop' => 'jumbo.com',
             'old' => $money('12.99'),
             'new' => $money('9.99'),
             'unit' => __(':price /stuk', ['price' => $money('0.42')]),
+            'drop' => $drop('12.99', '9.99'),
+            'spark' => ['line' => 'stroke-brand', 'area' => 'fill-brand/10', 'points' => '0,8 20,7 36,10 54,8 72,12 88,18 100,20'],
         ],
     ];
     $freeProducts = \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->maxProducts();
@@ -75,7 +82,7 @@
     ]);
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-amber-50 dark:bg-zinc-950">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-canvas">
     <head>
         @include('partials.head', [
             'title' => __('Price alerts for the things you buy anyway'),
@@ -88,51 +95,52 @@
         <link rel="alternate" hreflang="x-default" href="{{ route('home') }}">
         {{ \App\Support\JsonLd::script(\App\Support\StructuredData::home($faq, $canonical, $description)) }}
     </head>
-    <body class="min-h-dvh bg-linear-to-br from-amber-50 to-rose-50 bg-fixed text-zinc-900 antialiased dark:from-zinc-950 dark:to-zinc-950 dark:text-zinc-50">
+    <body class="min-h-dvh bg-linear-to-br from-canvas via-canvas to-soft-blush bg-fixed text-ink antialiased">
         <div class="isolate flex min-h-dvh flex-col">
             {{-- Outside the overflow-hidden wrapper below: an ancestor that
                  hides overflow turns off `position: sticky`. --}}
             <x-marketing-header />
 
             <div class="relative flex flex-1 flex-col overflow-hidden">
-                <div aria-hidden="true" class="pointer-events-none absolute -top-40 -left-40 size-[28rem] rounded-full bg-amber-200/40 blur-3xl dark:hidden"></div>
-                <div aria-hidden="true" class="pointer-events-none absolute right-0 -bottom-32 size-[28rem] rounded-full bg-rose-200/40 blur-3xl dark:hidden"></div>
+                <div aria-hidden="true" class="pointer-events-none absolute -top-40 -left-40 size-[28rem] rounded-full bg-soft-yellow/60 blur-3xl dark:hidden"></div>
+                <div aria-hidden="true" class="pointer-events-none absolute top-24 right-0 size-[32rem] rounded-full bg-soft-yellow/50 blur-3xl dark:hidden"></div>
+                <div aria-hidden="true" class="pointer-events-none absolute right-0 -bottom-32 size-[28rem] rounded-full bg-soft-blush/70 blur-3xl dark:hidden"></div>
 
 
                 <main class="relative mx-auto w-full max-w-app px-6 lg:px-8">
-                    <section class="grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-12 lg:gap-12">
+                    <section class="grid grid-cols-1 items-center gap-12 py-16 sm:py-24 lg:grid-cols-12">
                         <div class="lg:col-span-7">
-                            <span class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:text-zinc-300 dark:ring-zinc-800">
-                                <span class="size-1.5 rounded-full bg-emerald-500"></span>
+                            <span class="inline-flex items-center gap-2 rounded-full bg-paper/80 px-3 py-1 text-xs font-medium text-zinc-700 ring-1 ring-line backdrop-blur-sm dark:text-zinc-300">
+                                <span class="size-1.5 rounded-full bg-savings"></span>
                                 {{ __('Open beta') }}
                             </span>
-                            <h1 class="mt-6 max-w-[24ch] text-4xl font-semibold tracking-tight text-balance sm:text-6xl">{{ $h1 }}</h1>
-                            <p class="mt-6 max-w-[48ch] text-lg text-pretty text-zinc-600 sm:text-xl dark:text-zinc-400">{{ $sub }}</p>
+                            <h1 class="mt-6 max-w-[20ch] text-5xl font-semibold tracking-tighter text-balance sm:text-7xl">{{ $h1 }}</h1>
+                            <p class="mt-6 max-w-[48ch] text-lg text-pretty text-zinc-600 dark:text-zinc-400">{{ $sub }}</p>
                             @auth
                                 <div class="mt-10 flex flex-wrap items-center gap-3">
-                                    <a href="{{ url('/app') }}" class="inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-white dark:text-zinc-900 dark:shadow-none dark:hover:bg-zinc-200">{{ __('Open dashboard') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
+                                    <a href="{{ url('/app') }}" class="inline-flex items-center rounded-full bg-ink px-5 py-3 text-base font-medium text-paper shadow-md hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:text-sm dark:shadow-none">{{ __('Open dashboard') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
                                 </div>
                             @else
                                 <div class="mt-10">
                                     <div class="flex flex-wrap items-center gap-3">
-                                        <a href="{{ route('register') }}" class="inline-flex items-center rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-white dark:text-zinc-900 dark:shadow-none dark:hover:bg-zinc-200">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
+                                        <a href="{{ route('register') }}" class="inline-flex items-center rounded-full bg-ink px-5 py-3 text-base font-medium text-paper shadow-md hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:text-sm dark:shadow-none">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
                                     </div>
                                     <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
                                         {{ __('Free while we are in beta. We send one email first, to check the address is yours.') }}
                                         {{ __('Already have an account?') }}
-                                        <a href="{{ route('login') }}" class="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">{{ __('Sign in') }}</a>
+                                        <a href="{{ route('login') }}" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('Sign in') }}</a>
                                     </p>
                                 </div>
                             @endauth
 
                             <div class="mt-12">
-                                <p class="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{{ __('Works with') }}</p>
+                                <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Works with') }}</p>
                                 <ul class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($supportedShops as $shop)
                                         <li @class(['items-center', 'inline-flex' => $loop->index < 8, 'hidden sm:inline-flex' => $loop->index >= 8])>
                                             {{-- Linked, not decorative: each shop has a page of its own, and
                                                  this row is where a reader looks for it. --}}
-                                            <a href="{{ route('shop', [...$langQuery, 'slug' => $shop['slug']]) }}" class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-sm text-zinc-700 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-900">
+                                            <a href="{{ route('shop', [...$langQuery, 'slug' => $shop['slug']]) }}" class="inline-flex items-center gap-2 rounded-full bg-paper/80 py-1.5 pr-3 pl-1.5 text-sm text-zinc-700 shadow-xs ring-1 ring-line backdrop-blur-sm hover:bg-paper dark:text-zinc-200 dark:shadow-none">
                                                 {{-- Background image, not an <img>: the edge Markdown twin emits an
                                                      image reference even for an empty alt. --}}
                                                 <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
@@ -144,62 +152,53 @@
                                         </li>
                                     @endforeach
                                     <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-                                        <a href="{{ route('shops', $langQuery) }}" class="underline underline-offset-4 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('and many other webshops') }}</a>
+                                        <a href="{{ route('shops', $langQuery) }}" class="underline underline-offset-4 hover:text-brand">{{ __('and many other webshops') }}</a>
                                     </li>
                                 </ul>
                                 <p class="mt-3 max-w-[48ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
                                     {{ __('Paste a link from almost any webshop and it works. These are the ones we check most often.') }}
                                     <x-shop-request-link class="hover:text-zinc-700 dark:hover:text-zinc-300" />
                                 </p>
-
-                                @php($useCases = \App\Support\UseCases::all())
-
-                                @if ($useCases !== [])
-                                    <nav class="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400" aria-label="{{ __('Price alerts by category') }}">
-                                        <span class="font-medium text-zinc-700 dark:text-zinc-300">{{ __('Price alerts for') }}</span>
-                                        @foreach ($useCases as $useCase)
-                                            <a href="{{ route('use-case', [...$langQuery, 'slug' => $useCase->slug]) }}" class="underline underline-offset-4 hover:text-zinc-900 dark:hover:text-zinc-100">{{ $useCase->label }}</a>
-                                        @endforeach
-                                    </nav>
-                                @endif
                             </div>
                         </div>
 
                         <div class="lg:col-span-5">
-                            <div class="relative mx-auto w-64 lg:w-72 lg:rotate-3" role="img" aria-label="{{ $mockLabel }}">
-                                <div aria-hidden="true" class="rounded-[2.5rem] bg-zinc-900 p-3 shadow-2xl ring-1 ring-zinc-800 dark:shadow-none">
-                                    <div class="rounded-[2rem] bg-linear-to-br from-amber-100 via-rose-100 to-violet-100 p-4 pt-12 dark:from-zinc-800 dark:via-zinc-800 dark:to-zinc-900">
-                                        <div class="absolute top-5 right-0 left-0 flex items-center justify-between px-8 font-semibold text-zinc-900 tabular-nums dark:text-zinc-100">
-                                            {{-- Painted with CSS so the phone chrome is not text in the Markdown
-                                                 twin, which converts regardless of aria-hidden. The value must be a
-                                                 CSS-safe literal: the browser decodes Blade's escaping before CSS
-                                                 parses the attribute, so an apostrophe would break the declaration. --}}
-                                            <span style="--label: '9:41'" class="text-xs before:content-[var(--label)]"></span>
-                                            <span class="size-3 rounded-full bg-zinc-900 dark:bg-zinc-100"></span>
-                                            <span style="--label: 'DipCatch'" class="text-xs before:content-[var(--label)]"></span>
-                                        </div>
-                                        <div class="space-y-2.5">
-                                            @foreach ($tracked as $i => $p)
-                                                <div class="rounded-2xl bg-white/95 p-3 shadow-sm ring-1 ring-zinc-200 backdrop-blur-sm @if ($i === 0) ring-emerald-300 dark:ring-emerald-800 @endif dark:bg-zinc-900/95 dark:shadow-none dark:ring-zinc-800">
-                                                    <div class="flex items-start gap-2.5">
-                                                        <span style="--icon: '{{ $p['icon'] }}'" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-lg before:content-[var(--icon)] dark:bg-emerald-950/60"></span>
-                                                        <div class="min-w-0 flex-1">
-                                                            <div class="flex items-center gap-1.5">
-                                                                <span style="background-image: url('{{ \App\Support\Favicon::url($p['shop'], 32) }}')" class="size-3.5 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
-                                                                <p class="text-[0.625rem] font-semibold text-zinc-500 dark:text-zinc-400">{{ $p['shop'] }}</p>
-                                                            </div>
-                                                            <p class="mt-0.5 text-xs">{{ $p['name'] }}</p>
-                                                            <p class="text-xs text-emerald-600 tabular-nums dark:text-emerald-400">{{ __(':old → :new', ['old' => $p['old'], 'new' => $p['new']]) }}</p>
-                                                            <p class="text-[0.625rem] text-zinc-500 tabular-nums dark:text-zinc-400">{{ $p['unit'] }}</p>
-                                                        </div>
+                            {{-- The annotation is English handwriting, so it only joins the English page. --}}
+                            <div @class(['relative mx-auto max-w-md', 'sm:mt-20' => $locale !== 'nl']) role="img" aria-label="{{ $mockLabel }}">
+                                @if ($locale !== 'nl')
+                                    {{-- Background image, not an <img>: the Markdown twin emits a
+                                         reference for every image, decorative or not. --}}
+                                    <span aria-hidden="true" style="background-image: url('{{ asset('images/home/track-it-save-on-it.webp') }}')" class="absolute -top-24 right-4 aspect-[440/289] w-44 bg-contain bg-no-repeat max-sm:hidden dark:hidden"></span>
+                                @endif
+                                <div aria-hidden="true" class="rounded-3xl bg-paper p-4 shadow-xl shadow-ink/5 ring-1 ring-ink/10 sm:p-5 dark:shadow-none">
+                                    <p class="text-base font-semibold">{{ __('Tracked products') }}</p>
+                                    <div class="mt-4 space-y-2.5">
+                                        @foreach ($tracked as $p)
+                                            <div class="flex items-center gap-3 rounded-2xl p-2.5 ring-1 ring-line">
+                                                <span style="background-image: url('{{ asset('images/home/' . $p['image']) }}')" class="size-12 shrink-0 rounded-xl bg-canvas bg-size-[80%] bg-center bg-no-repeat ring-1 ring-line sm:size-14"></span>
+                                                <div class="min-w-0 flex-1">
+                                                    <p class="text-sm font-medium text-pretty">{{ $p['name'] }}</p>
+                                                    <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                        <p class="text-lg font-semibold text-brand tabular-nums">{{ $p['new'] }}</p>
+                                                        <p class="inline-flex items-center gap-0.5 rounded-full bg-savings/10 py-0.5 pr-2 pl-1.5 text-xs font-medium text-savings-strong tabular-nums">
+                                                            <flux:icon.arrow-down variant="micro" class="size-3.5 shrink-0" />
+                                                            {{ $p['drop'] }}%
+                                                        </p>
                                                     </div>
+                                                    <div class="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
+                                                        <span style="background-image: url('{{ \App\Support\Favicon::url($p['shop'], 32) }}')" class="size-3.5 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
+                                                        <p class="truncate">{{ $p['shop'] }} · <s>{{ $p['old'] }}</s></p>
+                                                    </div>
+                                                    <p class="text-xs text-zinc-500 tabular-nums dark:text-zinc-400">{{ $p['unit'] }}</p>
                                                 </div>
-                                            @endforeach
-                                        </div>
+                                                <svg viewBox="0 0 100 32" preserveAspectRatio="none" class="h-10 w-20 shrink-0 overflow-visible max-sm:hidden">
+                                                    <polygon points="{{ $p['spark']['points'] }} 100,32 0,32" class="{{ $p['spark']['area'] }} stroke-none" />
+                                                    <polyline points="{{ $p['spark']['points'] }}" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" class="{{ $p['spark']['line'] }}" />
+                                                </svg>
+                                            </div>
+                                        @endforeach
                                     </div>
                                 </div>
-                                <div aria-hidden="true" class="absolute -top-6 -left-8 size-3 rounded-full bg-amber-400"></div>
-                                <div aria-hidden="true" class="absolute -right-6 bottom-12 size-2 rounded-full bg-rose-400"></div>
                             </div>
                         </div>
                     </section>
@@ -209,14 +208,35 @@
                         <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('Add a product and say what you want to pay. DipCatch does the checking, so you need nothing extra in your browser.') }}</p>
                         <ol class="mt-10 grid list-none gap-6 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach ($steps as $step)
-                                <li class="rounded-2xl bg-white/80 p-6 ring-1 ring-zinc-200 backdrop-blur-sm dark:bg-zinc-900/60 dark:ring-zinc-800">
-                                    <span aria-hidden="true" class="inline-flex size-9 items-center justify-center rounded-full bg-amber-100 font-mono text-sm font-semibold text-amber-800 tabular-nums dark:bg-amber-950/60 dark:text-amber-300">{{ $step['n'] }}</span>
-                                    <h3 class="mt-4 text-base font-semibold">{{ $step['title'] }}</h3>
-                                    <p class="mt-2 text-sm text-pretty text-zinc-600 dark:text-zinc-400">{{ $step['body'] }}</p>
+                                <li class="rounded-2xl bg-paper/80 p-6 ring-1 ring-line backdrop-blur-sm">
+                                    <div aria-hidden="true" class="flex items-center gap-4">
+                                        <span class="rounded-lg bg-soft-yellow px-2 py-1 text-sm font-semibold tabular-nums">{{ $step['n'] }}</span>
+                                        <flux:icon :icon="$step['icon']" class="size-6 shrink-0" />
+                                    </div>
+                                    <h3 class="mt-4 text-lg font-semibold sm:text-base">{{ $step['title'] }}</h3>
+                                    <p class="mt-2 text-base text-pretty text-zinc-600 sm:text-sm dark:text-zinc-400">{{ $step['body'] }}</p>
                                 </li>
                             @endforeach
                         </ol>
                     </section>
+
+                    @php($useCases = \App\Support\UseCases::all())
+
+                    @if ($useCases !== [])
+                        @php($useCaseImages = ['groceries' => 'category-groceries.webp', 'pet-food' => 'category-pet-food.webp', 'coffee' => 'category-coffee.webp', 'beauty' => 'category-beauty.webp', 'filters' => 'category-filters.webp', 'ask-your-assistant' => 'category-ask-your-assistant.webp'])
+                        <section id="categories">
+                            <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Price alerts for') }}</h2>
+                            <nav class="mt-10" aria-label="{{ __('Price alerts by category') }}">
+                                <ul role="list" class="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
+                                    @foreach ($useCases as $useCase)
+                                        <li>
+                                            <a href="{{ route('use-case', [...$langQuery, 'slug' => $useCase->slug]) }}" class="flex h-full flex-col items-center gap-3 rounded-2xl bg-paper/80 p-4 text-center text-base font-medium text-balance ring-1 ring-line backdrop-blur-sm hover:bg-paper hover:ring-zinc-300 sm:text-sm dark:hover:ring-zinc-700">@isset($useCaseImages[$useCase->slug])<span style="background-image: url('{{ asset('images/home/' . $useCaseImages[$useCase->slug]) }}')" class="aspect-square w-full bg-contain bg-center bg-no-repeat"></span>@else<span class="flex aspect-square w-full items-center justify-center"><span style="background-image: url('{{ asset('images/dipcatch-logo.png') }}')" class="size-16 rounded-2xl bg-white bg-size-[80%] bg-center bg-no-repeat"></span></span>@endisset{{ $useCase->label }}</a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </nav>
+                        </section>
+                    @endif
 
                     <section id="faq" class="py-20">
                         <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Common questions') }}</h2>
@@ -236,15 +256,15 @@
                     @guest
                         <section class="pb-20">
                             {{-- The page is built from translucent cards over the
-                                 gradient, headed left, with amber as its accent.
+                                 gradient, headed left, with soft yellow as its accent.
                                  A solid dark slab with centred text was none of
                                  those things, so it read as a foreign block. --}}
-                            <div class="flex flex-col gap-6 rounded-2xl bg-amber-100/70 p-8 ring-1 ring-amber-200 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:p-10 dark:bg-amber-950/30 dark:ring-amber-900/50">
+                            <div class="flex flex-col gap-6 rounded-2xl bg-soft-yellow/70 p-8 ring-1 ring-line backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:p-10 dark:bg-paper">
                                 <div>
                                     <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Stop checking prices by hand.') }}</h2>
                                     <p class="mt-3 max-w-[48ch] text-pretty text-zinc-600 dark:text-zinc-300">{{ __('Add the products you buy anyway and let DipCatch tell you where they are cheapest this week.') }}</p>
                                 </div>
-                                <a href="{{ route('register') }}" class="inline-flex shrink-0 items-center self-start rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 sm:self-auto dark:bg-white dark:text-zinc-900 dark:shadow-none dark:hover:bg-zinc-200">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
+                                <a href="{{ route('register') }}" class="inline-flex shrink-0 items-center self-start rounded-full bg-ink px-5 py-3 text-base font-medium text-paper shadow-md hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:self-auto sm:text-sm dark:shadow-none">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
                             </div>
                         </section>
                     @endguest
