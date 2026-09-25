@@ -2,7 +2,7 @@
 
 use App\Actions\Shops\KeepShopAsLink;
 use App\Jobs\SendDailyDigest;
-use App\Mail\PriceDropDigestMail;
+use App\Mail\DailyDigestMail;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
@@ -59,7 +59,7 @@ test('sends one mail grouping drops by product and updates last_digest_sent_at',
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail) use ($user): bool {
+    Mail::assertSent(DailyDigestMail::class, function (DailyDigestMail $mail) use ($user): bool {
         return $mail->hasTo($user->email)
             && $mail->grouped->count() === 2
             && $mail->totalDrops === 3;
@@ -89,7 +89,7 @@ test('only includes events since last_digest_sent_at', function (): void {
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 1);
+    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => $mail->totalDrops === 1);
 });
 
 test('caps the lookback at configured days even with stale last_digest_sent_at', function (): void {
@@ -116,7 +116,7 @@ test('caps the lookback at configured days even with stale last_digest_sent_at',
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 1);
+    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => $mail->totalDrops === 1);
 });
 
 test('claims the cursor before sending so a mail failure does not double-send on retry', function (): void {
@@ -160,7 +160,7 @@ test('second run within the same digest window sends no new mail', function (): 
     new SendDailyDigest($user, '2026-01-15')->handle();
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, 1);
+    Mail::assertSent(DailyDigestMail::class, 1);
 });
 
 test('a zero lookback still sends a digest rather than going silent forever', function (): void {
@@ -180,7 +180,7 @@ test('a zero lookback still sends a digest rather than going silent forever', fu
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 1);
+    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => $mail->totalDrops === 1);
 });
 
 test('the cursor is the instant the window ended, not a later clock read', function (): void {
@@ -237,7 +237,7 @@ test('an event fired in the same second as the window end is still mailed', func
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 2);
+    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => $mail->totalDrops === 2);
 });
 
 test('an event fired after the window stays above the cursor and arrives next run', function (): void {
@@ -261,17 +261,17 @@ test('an event fired after the window stays above the cursor and arrives next ru
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 1);
+    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => $mail->totalDrops === 1);
 
     Date::setTestNow(CarbonImmutable::create(2026, 1, 15, 10, 30, 0, 'UTC'));
     $user->refresh();
     new SendDailyDigest($user, '2026-01-15')->handle();
 
     // Exactly the held-back event, not a re-send of the first one.
-    Mail::assertSent(PriceDropDigestMail::class, 2);
+    Mail::assertSent(DailyDigestMail::class, 2);
     Mail::assertSent(
-        PriceDropDigestMail::class,
-        fn (PriceDropDigestMail $mail): bool => $mail->totalDrops === 1
+        DailyDigestMail::class,
+        fn (DailyDigestMail $mail): bool => $mail->totalDrops === 1
             && $mail->grouped->flatMap(fn (array $group): mixed => $group['events'])
                 ->every(fn (PriceDropEvent $event): bool => $event->fired_at?->second === 30),
     );
@@ -300,7 +300,7 @@ test('the digest table renders money as symbol-first, not the ISO code', functio
 
     // The digest template is rendered through the markdown renderer, which is
     // what registers the `x-mail::` component namespace.
-    $html = (string) app(Markdown::class)->render('emails.price-drop-digest', [
+    $html = (string) app(Markdown::class)->render('emails.daily-digest', [
         'grouped' => collect([
             $product->id => ['product' => $product, 'events' => collect([$event]), 'reached' => collect()],
         ]),
@@ -333,7 +333,7 @@ test('digest reads bundle terms from protected triggering check', function (): v
         'new_price' => '2.00',
     ]);
 
-    $html = (string) app(Markdown::class)->render('emails.price-drop-digest', [
+    $html = (string) app(Markdown::class)->render('emails.daily-digest', [
         'grouped' => collect([
             $product->id => ['product' => $product, 'events' => collect([$event]), 'reached' => collect()],
         ]),
@@ -366,7 +366,7 @@ test('digest eager loads every triggering price check', function (): void {
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail): bool {
+    Mail::assertSent(DailyDigestMail::class, function (DailyDigestMail $mail): bool {
         return $mail->grouped
             ->flatMap(fn (array $group): mixed => $group['events'])
             ->every(fn (PriceDropEvent $event): bool => $event->relationLoaded('priceCheck'));
@@ -391,7 +391,7 @@ test('the digest mailable renders end to end without the mail fake', function ()
     // Regression: `Content(view:)` rendered the <x-mail::message> template
     // outside the Markdown renderer, which throws "No hint path defined
     // for [mail]" — invisible under Mail::fake().
-    $html = new PriceDropDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render();
+    $html = new DailyDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render();
 
     expect($html)->toContain('Digest product')->toContain('€1.69');
 });
@@ -414,7 +414,7 @@ test('the digest leaves out an image whose stored url is not http(s)', function 
         'drop_pct' => '22.8',
     ]);
 
-    $html = new PriceDropDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render();
+    $html = new DailyDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render();
 
     expect($html)->toContain('Digest product')
         ->and($html)->not->toContain('ftp://example.com/img.png');
@@ -442,7 +442,7 @@ test('the digest states the change per unit and omits money it cannot honestly r
         'comparison_unit' => 'g',
     ]);
 
-    $html = new PriceDropDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render();
+    $html = new DailyDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render();
 
     expect($html)->toContain('Digest product')
         ->and($html)->toContain('20.0% per kilo')
@@ -474,7 +474,7 @@ test('the digest leads with the unit price and names the pack it was measured on
         'pack_unit' => 'piece',
     ]);
 
-    $html = (string) preg_replace('/\s+/', ' ', strip_tags(new PriceDropDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render()));
+    $html = (string) preg_replace('/\s+/', ' ', strip_tags(new DailyDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render()));
 
     expect($html)->toMatch('/€0\.0275 \/piece ↓ 15\.4% per piece · €4\.00 €21\.99 for 800 pieces · was €0\.0325 \/piece/');
 });
@@ -496,7 +496,7 @@ test('a pack-basis drop keeps the pack price as the lead', function (): void {
         'comparison_unit' => null,
     ]);
 
-    $html = (string) preg_replace('/\s+/', ' ', strip_tags(new PriceDropDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render()));
+    $html = (string) preg_replace('/\s+/', ' ', strip_tags(new DailyDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render()));
 
     expect($html)->toContain('€299.00 ↓ 14.3% · €50.00')->not->toContain('/kg');
 });
@@ -517,7 +517,7 @@ it('names the shops it cannot read beside the drops it can', function (): void {
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail): bool {
+    Mail::assertSent(DailyDigestMail::class, function (DailyDigestMail $mail): bool {
         return str_contains($mail->render(), 'Also worth checking by hand: koffiehenk.nl');
     });
 });
@@ -536,7 +536,7 @@ test('a reached target alone sends the digest, with the price, the target and th
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail): bool {
+    Mail::assertSent(DailyDigestMail::class, function (DailyDigestMail $mail): bool {
         $text = (string) preg_replace('/\s+/', ' ', strip_tags($mail->render()));
 
         return $mail->envelope()->subject === '1 price alert today'
@@ -557,7 +557,7 @@ test('a reached unit-price target leads with the price per unit and names the pa
     $product = Product::factory()->for($user)->create(['title' => 'Lay’s Naturel']);
     $reached = TargetPriceEvent::factory()->unitPrice()->count(1)->for($user)->for($product)->create();
 
-    $text = (string) preg_replace('/\s+/', ' ', strip_tags(new PriceDropDigestMail($user, new EloquentCollection(), TargetPriceEvent::query()->whereKey($reached->modelKeys())->get())->render()));
+    $text = (string) preg_replace('/\s+/', ' ', strip_tags(new DailyDigestMail($user, new EloquentCollection(), TargetPriceEvent::query()->whereKey($reached->modelKeys())->get())->render()));
 
     expect($text)->toContain('€5.38 /kg Reached your price')
         ->and($text)->toContain('€1.29 for 240 g')
@@ -577,7 +577,7 @@ test('drops and reached targets share one mail, grouped per product, counted tog
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(PriceDropDigestMail::class, function (PriceDropDigestMail $mail) use ($both, $dropOnly): bool {
+    Mail::assertSent(DailyDigestMail::class, function (DailyDigestMail $mail) use ($both, $dropOnly): bool {
         $bothGroup = $mail->grouped->get($both->id);
         $dropOnlyGroup = $mail->grouped->get($dropOnly->id);
 

@@ -42,6 +42,10 @@ final readonly class ProbeReporter
             );
         }
 
+        if ($outcome->extractionReason === 'amazon_no_featured_offer') {
+            return Response::error('Amazon shows no main offer for this product right now: only "See All Buying Options", or nothing it ships to the address it assumes for DipCatch. The page carries no price to read. Try again later, or offer the user keep_as_link.');
+        }
+
         if ($outcome->extractionReason === 'variant_key_no_match') {
             return Response::error('That page lists no variant matching the variant_key that was sent. Call again without variant_key to see what the page offers.');
         }

@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Mail\PriceDropDigestMail;
+use App\Mail\DailyDigestMail;
 use App\Models\PriceDropEvent;
 use App\Models\TargetPriceEvent;
 use App\Models\User;
@@ -99,6 +99,6 @@ final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
         // delivered live via the Filament bell + web push channels.
         $this->user->forceFill(['last_digest_sent_at' => $now])->save();
 
-        Mail::to($this->user->email)->send(new PriceDropDigestMail($this->user, $events, $reached));
+        Mail::to($this->user->email)->send(new DailyDigestMail($this->user, $events, $reached));
     }
 }

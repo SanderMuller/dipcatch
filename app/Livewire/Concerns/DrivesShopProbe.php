@@ -290,7 +290,14 @@ trait DrivesShopProbe
         }
 
         assert($outcome->errorCode !== null);
-        $this->failWith($outcome->errorCode->value, $outcome->context);
+
+        // The adapter's reason rides along, so the message can name a cause
+        // the shop itself is behind rather than a page DipCatch cannot read.
+        $context = $outcome->extractionReason === null
+            ? $outcome->context
+            : [...$outcome->context ?? [], 'reason' => $outcome->extractionReason];
+
+        $this->failWith($outcome->errorCode->value, $context);
     }
 
     /**

@@ -257,7 +257,7 @@ final class ProductList extends Component
             ->values()
             ->all();
 
-        if ($this->shop !== '' && ! in_array($this->shop, $hosts, true)) {
+        if ($this->shop !== '' && ! in_array($this->shop, $hosts, strict: true)) {
             $hosts[] = $this->shop;
         }
 

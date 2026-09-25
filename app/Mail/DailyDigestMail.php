@@ -21,7 +21,7 @@ use Illuminate\Support\Collection;
  * Takes flat collections of events (caller filters + orders); groups
  * internally and exposes `$grouped` to the Blade view.
  */
-final class PriceDropDigestMail extends Mailable
+final class DailyDigestMail extends Mailable
 {
     use Queueable, SerializesModels;
 
@@ -92,6 +92,6 @@ final class PriceDropDigestMail extends Mailable
 
     public function content(): Content
     {
-        return new Content(markdown: 'emails.price-drop-digest');
+        return new Content(markdown: 'emails.daily-digest');
     }
 }

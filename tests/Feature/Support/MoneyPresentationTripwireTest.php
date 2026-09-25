@@ -75,7 +75,7 @@ function tripwireAllowlist(): array
                 'reason' => 'percentage, not money',
             ],
         ],
-        'price-drop-digest.blade.php' => [
+        'daily-digest.blade.php' => [
             [
                 'fragment' => 'number_format((float) $event->drop_pct',
                 'reason' => 'percentage, not money',

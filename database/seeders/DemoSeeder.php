@@ -204,9 +204,10 @@ final class DemoSeeder extends Seeder
      * unit comparison, the image — cannot be exercised at all without adding a
      * shop by hand first.
      *
-     * These seven were read through DipCatch's own probe on 2026-09-22, and
-     * the prices, pack sizes and photos below are what came back. Re-running
-     * a check on a seeded account now does what it does in production.
+     * These were read through DipCatch's own probe on 2026-09-22, the pizza
+     * and the toothpaste on 2026-09-26, and the prices, pack sizes and photos
+     * below are what came back. Re-running a check on a seeded account now
+     * does what it does in production.
      *
      * Two of them earn their place twice. The Roter pair is the same tablet in
      * a 400-pack and an 800-pack: 0.0325 against 0.0275 each, an 18% gap that
@@ -292,6 +293,39 @@ final class DemoSeeder extends Seeder
                         host: 'dierapotheker.nl', path: '', price: 30.55, packQuantity: 3000, packUnit: 'g',
                         realUrl: 'https://www.dierapotheker.nl/vet-concept-sana-paard-kattenvoer/9271/',
                         imageUrl: 'https://www.dierapotheker.nl/media/c1/2d/15/1725524946/Vet-Concept-Sana-Paard-Kattenvoer-10-kg.jpg',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Dr. Oetker Big Americans Pizza Texas 435 g',
+                category: ProductCategory::Frozen,
+                offers: [
+                    // Dirk's offer price, 23 to 29 September 2026. The normal price is 4.65.
+                    new DemoOffer(
+                        host: 'dirk.nl', path: '', price: 1.89, packQuantity: 435, packUnit: 'g',
+                        realUrl: 'https://www.dirk.nl/boodschappen/diepvries/diepvries-pizzas-maaltijden/dr-oetker-big-americans-pizza-texas/68429',
+                        imageUrl: 'https://web-fileserver.dirk.nl/artikelen/219747_1_421876_638771973556937168.png?width=500&height=500&mode=crop',
+                    ),
+                    new DemoOffer(
+                        host: 'jumbo.com', path: '', price: 4.95, packQuantity: 435, packUnit: 'g',
+                        realUrl: 'https://www.jumbo.com/producten/dr-oetker-big-americans-pizza-texas-435-g-184179DS',
+                        imageUrl: 'https://www.jumbo.com/dam-images/fit-in/360x360/Products/17042025_1744858686454_1744858693343_184179_DS_04001724023906_C1N1_s02.png',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Sensodyne Rapid Relief Mint tandpasta 75 ml',
+                category: ProductCategory::Oral,
+                offers: [
+                    new DemoOffer(
+                        host: 'jumbo.com', path: '', price: 7.29, packQuantity: 75, packUnit: 'ml',
+                        realUrl: 'https://www.jumbo.com/producten/sensodyne-rapid-relief-mint-tandpasta-75-ml-705075DS',
+                        imageUrl: 'https://www.jumbo.com/dam-images/fit-in/360x360/Products/5054563235404_1788998419372_fmd1ih0j2knryphuqmte.png',
+                    ),
+                    new DemoOffer(
+                        host: 'deonlinedrogist.nl', path: '', price: 7.14, packQuantity: 75, packUnit: 'ml',
+                        realUrl: 'https://www.deonlinedrogist.nl/drogist/sensodyne-rapid-relief-tandpasta-75ml.htm',
+                        imageUrl: 'https://img.deonlinedrogist.nl/wjGOPaliQKXMLdrbhUuqk_GUxeaiBiLhhaXcxesUGI4/dpr:1/bg:FFFFFF/fn:sensodyne-rapid-relief-tandpasta-75ml/plain/s3://dod-storage/media/40/18/81f3945ad31198780d5398bd6c395755.png',
                     ),
                 ],
             ),
