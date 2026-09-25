@@ -1,19 +1,4 @@
-{{-- The sort in the URL wins, then the one this browser last chose, then the
-     default. The URL drops the default, so an address without a sort does
-     not tell a chosen default from none. --}}
-<div
-    x-data
-    x-init="
-        const key = 'dipcatch.products.sort';
-        const remembered = localStorage.getItem(key);
-
-        if (! new URLSearchParams(location.search).has('sort') && @js(\App\Livewire\Products\ProductList::sortOptions()).includes(remembered) && remembered !== $wire.sort) {
-            $wire.$set('sort', remembered);
-        }
-
-        $wire.$watch('sort', (sort) => localStorage.setItem(key, sort));
-    "
->
+<div>
     <div>
         <flux:heading size="xl" level="1" class="text-2xl! font-semibold! tracking-tight sm:text-3xl!">{{ __('Products') }}</flux:heading>
         <flux:text class="mt-1 text-zinc-500 dark:text-zinc-400">

@@ -15,6 +15,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -59,6 +60,9 @@ final class ProductList extends Component
 
     private const string DEFAULT_SORT = 'biggest_drop';
 
+    /** The sort this browser last chose, read before the first render. */
+    private const string SORT_COOKIE = 'products_sort';
+
     /** The filter for products without a category. No category or department uses this key. */
     public const string NO_CATEGORY = 'none';
 
@@ -78,6 +82,24 @@ final class ProductList extends Component
         'title' => 'asc',
         'cheapest_price' => 'asc',
     ];
+
+    /**
+     * A sort in the URL wins; otherwise the one this browser last chose.
+     * Read here, on the server, so the first render is already in that
+     * order — restoring it in the browser re-sorted the list after it drew.
+     */
+    public function mount(): void
+    {
+        if ($this->sort !== self::DEFAULT_SORT) {
+            return;
+        }
+
+        $remembered = request()->cookie(self::SORT_COOKIE);
+
+        if (is_string($remembered) && array_key_exists($remembered, self::SORTS)) {
+            $this->sort = $remembered;
+        }
+    }
 
     public function updatedStatus(): void
     {
@@ -107,6 +129,10 @@ final class ProductList extends Component
     public function updatedSort(): void
     {
         $this->resetPage();
+
+        if (array_key_exists($this->sort, self::SORTS)) {
+            Cookie::queue(self::SORT_COOKIE, $this->sort, 60 * 24 * 365);
+        }
     }
 
     public function render(): View

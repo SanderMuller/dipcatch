@@ -8,6 +8,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -58,6 +59,45 @@ it('sorts by name, and ignores a sort key it does not offer', function (): void 
         ->set('sort', 'user_id')
         ->assertOk()
         ->assertSeeInOrder(['alpha', 'Beta']);
+});
+
+it('draws the first page in the sort this browser last chose', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'alpha', 'created_at' => now()->subDay()]);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Beta', 'created_at' => now()]);
+
+    $this->actingAs($user);
+
+    // Restoring the sort in the browser re-sorted the list after it drew.
+    // The server reads it, so the first response is already in that order.
+    $this->withCookie('products_sort', 'title')->get(route('app.products.index'))
+        ->assertOk()
+        ->assertSeeInOrder(['alpha', 'Beta']);
+
+    // A sort in the URL wins over the remembered one.
+    $this->withCookie('products_sort', 'title')->get(route('app.products.index', ['sort' => 'created_at']))
+        ->assertOk()
+        ->assertSeeInOrder(['Beta', 'alpha']);
+
+    // A cookie holding a key the list does not offer is ignored.
+    $this->withCookie('products_sort', 'user_id')->get(route('app.products.index'))
+        ->assertOk()
+        ->assertSeeInOrder(['Beta', 'alpha']);
+});
+
+it('remembers a chosen sort for the next visit, and only a sort it offers', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    livewire(ProductList::class)->set('sort', 'title');
+
+    expect(Cookie::hasQueued('products_sort'))->toBeTrue()
+        ->and(Cookie::queued('products_sort')?->getValue())->toBe('title');
+
+    Cookie::unqueue('products_sort');
+
+    livewire(ProductList::class)->set('sort', 'user_id');
+
+    expect(Cookie::hasQueued('products_sort'))->toBeFalse();
 });
 
 it('sorts by the biggest drop by default, with products not in a drop last', function (): void {
