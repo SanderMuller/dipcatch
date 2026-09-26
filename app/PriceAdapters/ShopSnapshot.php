@@ -50,17 +50,6 @@ final readonly class ShopSnapshot
          * warning; a source with no GTIN concept leaves it untouched.
          */
         public bool $gtinAuthoritative = false,
-        /**
-         * A price only some shoppers can pay — see {@see ConditionalOffer}.
-         * Never the tracked price.
-         */
-        public ?ConditionalOffer $conditionalOffer = null,
-        /**
-         * True when the source reads conditional offers at all. An
-         * authoritative snapshot without one clears the stored offer, so an
-         * expired campaign stops being shown.
-         */
-        public bool $conditionalOfferAuthoritative = false,
         /** How long the shop says this price runs — see {@see PromotionWindow}. */
         public ?PromotionWindow $promotionWindow = null,
         /**

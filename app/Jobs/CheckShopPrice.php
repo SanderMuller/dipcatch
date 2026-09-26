@@ -358,18 +358,6 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 }
 
                 $updates += $pricing->promotionUpdates;
-
-                // Same rule as the GTIN: a source that reads conditional
-                // offers and finds none clears the stored one, so a campaign
-                // that ended stops being shown. A source with no such concept
-                // leaves it alone.
-                $offer = $snapshot->conditionalOffer;
-                if ($offer !== null || $snapshot->conditionalOfferAuthoritative) {
-                    $updates['conditional_price'] = $offer?->price;
-                    $updates['conditional_label'] = $offer?->label;
-                    $updates['conditional_starts_at'] = $offer?->startsAt?->utc();
-                    $updates['conditional_ends_at'] = $offer?->endsAt?->utc();
-                }
             } else {
                 $updates['last_error'] = $outcome->error;
                 $updates += ResolvedBundlePricing::expiredFailureUpdates($locked);
