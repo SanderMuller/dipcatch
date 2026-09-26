@@ -5,7 +5,6 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Support\DashboardDigest;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 
 use function Pest\Livewire\livewire;
@@ -23,21 +22,13 @@ function digestProduct(User $user, string $title, string $cheapHost, string $dea
     return $product->refresh();
 }
 
-/**
- * @return Collection<int, Product>
- */
-function digestProducts(User $user): Collection
-{
-    return Product::query()->where('user_id', $user->id)->where('active', true)->with(['cheapestShop', 'shops'])->get();
-}
-
 it('groups each product under the shop where it is the best buy, biggest trip first', function (): void {
     $user = User::factory()->create();
     digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com');
     digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com');
     digestProduct($user, 'Milk', 'jumbo.com', 'ah.nl');
 
-    $trips = DashboardDigest::of(digestProducts($user))->trips;
+    $trips = DashboardDigest::forUser($user)->trips;
 
     expect(array_column($trips, 'host'))->toBe(['ah.nl', 'jumbo.com'])
         ->and(array_column($trips, 'count'))->toBe([2, 1])
@@ -51,7 +42,7 @@ it('leaves out a product whose cheapest shop no longer sells it', function (): v
     $product->refresh()->recomputeCheapestShop();
     $product->shops()->update(['current_in_stock' => false]);
 
-    expect(DashboardDigest::of(digestProducts($user))->trips)->toBe([]);
+    expect(DashboardDigest::forUser($user)->trips)->toBe([]);
 });
 
 it('lists a deal that ends within a week, and not one that ends later or cannot be bought', function (): void {
@@ -63,19 +54,35 @@ it('lists a deal that ends within a week, and not one that ends later or cannot 
     $soldOut = digestProduct($user, 'Sold out', 'ah.nl', 'jumbo.com');
     $soldOut->shops->firstWhere('host', 'ah.nl')?->forceFill(['promotion_ends_at' => now()->addDays(2), 'current_in_stock' => false])->save();
 
-    $ending = DashboardDigest::of(digestProducts($user))->endingSoon;
+    $ending = DashboardDigest::forUser($user)->endingSoon;
 
     expect(array_map(fn (array $row): string => $row['product']->title, $ending))->toBe(['Soon']);
 });
 
-it('names the shops that fail to read and the products at one shop only', function (): void {
+it('still finds a buyable deal behind many earlier ones that cannot be bought', function (): void {
+    $user = User::factory()->create();
+
+    foreach (range(1, 13) as $day) {
+        $soldOut = digestProduct($user, "Sold out {$day}", 'ah.nl', 'jumbo.com');
+        $soldOut->shops->firstWhere('host', 'ah.nl')?->forceFill(['promotion_ends_at' => now()->addHours($day), 'current_in_stock' => false])->save();
+    }
+
+    $buyable = digestProduct($user, 'Buyable', 'ah.nl', 'jumbo.com');
+    $buyable->shops->firstWhere('host', 'ah.nl')?->forceFill(['promotion_ends_at' => now()->addDays(3)])->save();
+
+    expect(array_map(fn (array $row): string => $row['product']->title, DashboardDigest::forUser($user)->endingSoon))->toBe(['Buyable']);
+});
+
+it('names this account\'s shops that fail to read and products at one shop only', function (): void {
     $user = User::factory()->create();
     $broken = digestProduct($user, 'Broken', 'ah.nl', 'jumbo.com');
     $broken->shops->firstWhere('host', 'jumbo.com')?->forceFill(['consecutive_failures' => 3])->save();
     $single = Product::factory()->for($user)->create(['title' => 'Lonely', 'currency' => 'EUR']);
     Shop::factory()->for($single)->create(['url' => 'https://ah.nl/p/lonely', 'current_price' => '1.00', 'currency' => 'EUR']);
+    $other = digestProduct(User::factory()->create(), 'Not mine', 'ah.nl', 'lidl.nl');
+    $other->shops->firstWhere('host', 'lidl.nl')?->forceFill(['consecutive_failures' => 5])->save();
 
-    $digest = DashboardDigest::of(digestProducts($user));
+    $digest = DashboardDigest::forUser($user);
 
     expect(array_map(fn (array $row): string => $row['shop']->host, $digest->failing))->toBe(['jumbo.com'])
         ->and(array_map(fn (Product $product): string => $product->title, $digest->singleShop))->toBe(['Lonely']);

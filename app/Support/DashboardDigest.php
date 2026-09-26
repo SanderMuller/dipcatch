@@ -2,21 +2,26 @@
 
 namespace App\Support;
 
+use App\Billing\Entitlements;
+use App\Billing\Plan;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 /**
  * What the dashboard adds over the product list: where to shop this week, the
  * deals that are about to stop, and what needs the user's hand.
  *
- * Built from one list of active products with their shops loaded, so the
- * dashboard costs the same number of queries for ten products as for one.
+ * A fixed number of queries whatever the account's size.
  */
 final readonly class DashboardDigest
 {
     private const int TRIPS = 3;
+
+    private const int TRIP_PRODUCTS = 250;
 
     private const int TRIP_ITEMS = 4;
 
@@ -38,22 +43,58 @@ final readonly class DashboardDigest
     ) {}
 
     /**
-     * @param  EloquentCollection<int, Product>  $products  Active products, with `shops` loaded.
-     * @param  array<int, string>  $inDrop  Ids of the products in a drop, as {@see Product::inVisibleDrop()} finds them.
+     * Every list is bounded in SQL. Trips read up to Pro's product cap, the
+     * most any account can add, so their counts stay complete.
      */
-    public static function of(EloquentCollection $products, array $inDrop = [], ?CarbonImmutable $now = null): self
+    public static function forUser(User $user, ?CarbonImmutable $now = null): self
     {
         $now ??= CarbonImmutable::now();
 
+        $tripProducts = self::activeProducts($user)
+            ->with(['cheapestShop', 'shops'])
+            // Products in a drop first, so a cap keeps the ones worth a trip.
+            ->orderByRaw('last_notified_price is null')
+            ->latest('updated_at')
+            ->limit(Entitlements::of(Plan::Pro)->maxProducts() ?? self::TRIP_PRODUCTS)
+            ->get();
+
+        $inDrop = self::activeProducts($user)
+            ->whereKey($tripProducts->modelKeys())
+            ->inVisibleDrop()
+            ->pluck('id')
+            ->all();
+
         return new self(
-            trips: self::trips($products, $inDrop),
-            endingSoon: self::endingSoon($products, $now),
-            failing: self::failing($products),
-            singleShop: array_values($products
-                ->filter(fn (Product $product): bool => $product->shops->count() === 1 && $product->shops->first()?->active === true)
-                ->take(self::ATTENTION)
+            trips: self::trips($tripProducts, array_values(array_filter($inDrop, is_string(...)))),
+            endingSoon: self::endingSoon($user, $now),
+            failing: self::failing($user),
+            singleShop: array_values(self::activeProducts($user)
+                ->has('shops', '=', 1)
+                ->whereHas('shops', fn (Builder $shop): Builder => $shop->where('active', true))
+                ->latest()
+                ->limit(self::ATTENTION)
+                ->get()
                 ->all()),
         );
+    }
+
+    /**
+     * @return Builder<Product>
+     */
+    private static function activeProducts(User $user): Builder
+    {
+        return Product::query()->where('user_id', $user->id)->where('active', true);
+    }
+
+    /**
+     * @return Builder<Shop>
+     */
+    private static function shopsOf(User $user): Builder
+    {
+        return Shop::query()
+            ->tracked()
+            ->where('active', true)
+            ->whereHas('product', fn (Builder $product): Builder => $product->where('user_id', $user->id)->where('active', true));
     }
 
     /**
@@ -105,45 +146,56 @@ final readonly class DashboardDigest
     }
 
     /**
-     * @param  EloquentCollection<int, Product>  $products
      * @return list<array{product: Product, shop: Shop, endsAt: CarbonImmutable}>
      */
-    private static function endingSoon(EloquentCollection $products, CarbonImmutable $now): array
+    private static function endingSoon(User $user, CarbonImmutable $now): array
     {
+        $shops = self::shopsOf($user)
+            ->where('promotion_ends_at', '>', $now)
+            ->where('promotion_ends_at', '<=', $now->addDays(self::ENDING_WITHIN_DAYS))
+            ->where(fn (Builder $started): Builder => $started->whereNull('promotion_starts_at')->orWhere('promotion_starts_at', '<=', $now))
+            ->whereNotNull('current_price')
+            ->where(fn (Builder $stock): Builder => $stock->whereNull('current_in_stock')->orWhere('current_in_stock', true))
+            ->oldest('promotion_ends_at')
+            ->with('product.shops')
+            // Room for the rarer rows only the full eligibility check leaves out.
+            ->limit(self::ATTENTION * 3)
+            ->get();
+
         $ending = [];
-        $cutoff = $now->addDays(self::ENDING_WITHIN_DAYS);
 
-        foreach ($products as $product) {
-            foreach ($product->eligibleShops() as $shop) {
-                $window = $shop->promotionWindow();
+        foreach ($shops as $shop) {
+            $product = $shop->product;
+            $window = $shop->promotionWindow();
 
-                if ($window !== null && $window->isRunning($now) && $window->endsAt <= $cutoff) {
-                    $ending[] = ['product' => $product, 'shop' => $shop, 'endsAt' => $window->endsAt];
-                }
+            if ($product instanceof Product && $window !== null && $window->isRunning($now) && $product->eligibleShops()->contains($shop)) {
+                $ending[] = ['product' => $product, 'shop' => $shop, 'endsAt' => $window->endsAt];
             }
         }
-
-        usort($ending, fn (array $a, array $b): int => $a['endsAt'] <=> $b['endsAt']);
 
         return array_slice($ending, 0, self::ATTENTION);
     }
 
     /**
-     * @param  EloquentCollection<int, Product>  $products
      * @return list<array{product: Product, shop: Shop}>
      */
-    private static function failing(EloquentCollection $products): array
+    private static function failing(User $user): array
     {
+        $shops = self::shopsOf($user)
+            ->where('consecutive_failures', '>', 0)
+            ->orderByDesc('consecutive_failures')
+            ->with('product')
+            ->limit(self::ATTENTION)
+            ->get();
+
         $failing = [];
 
-        foreach ($products as $product) {
-            foreach ($product->shops as $shop) {
-                if ($shop->active && $shop->readsAreFailing()) {
-                    $failing[] = ['product' => $product, 'shop' => $shop];
-                }
+        foreach ($shops as $shop) {
+            if ($shop->product instanceof Product) {
+                $failing[] = ['product' => $shop->product, 'shop' => $shop];
             }
         }
 
-        return array_slice($failing, 0, self::ATTENTION);
+        return $failing;
     }
 }
