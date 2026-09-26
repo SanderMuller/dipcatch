@@ -51,7 +51,7 @@ final class DispatchDailyDigestsCommand extends Command
                 continue;
             }
 
-            // "Already ran today" = last_digest_sent_at falls on the same
+            // "Already ran today" = digest_processed_until falls on the same
             // local date as `localNow`. Comparing local-dates in SQL would
             // need timezone gymnastics, so we use a UTC lower bound: anyone
             // whose last digest is older than the start-of-today-local
@@ -69,8 +69,8 @@ final class DispatchDailyDigestsCommand extends Command
                 ->where('notify_via_email', true)
                 ->where('timezone', $timezone)
                 ->where(function (EloquentQueryBuilder $q) use ($startOfTodayLocalUtc): void {
-                    $q->whereNull('last_digest_sent_at')
-                        ->orWhere('last_digest_sent_at', '<', $startOfTodayLocalUtc);
+                    $q->whereNull('digest_processed_until')
+                        ->orWhere('digest_processed_until', '<', $startOfTodayLocalUtc);
                 })
                 ->limit($remaining)
                 ->each(function (User $user) use ($digestDate, &$dispatched): void {

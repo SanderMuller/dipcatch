@@ -31,21 +31,21 @@ test('empty value is not a timezone failure (required validates separately)', fu
     expect(runRule(new IanaTimezone(), 'timezone', ''))->toBeEmpty();
 });
 
-test('User model round-trips timezone + last_digest_sent_at', function (): void {
+test('User model round-trips timezone + digest_processed_until', function (): void {
     $user = User::factory()->create([
         'timezone' => 'Asia/Tokyo',
-        'last_digest_sent_at' => now()->subDay(),
+        'digest_processed_until' => now()->subDay(),
     ]);
 
     $user->refresh();
 
     expect($user->timezone)->toBe('Asia/Tokyo')
-        ->and($user->last_digest_sent_at)->toBeInstanceOf(CarbonImmutable::class);
+        ->and($user->digest_processed_until)->toBeInstanceOf(CarbonImmutable::class);
 });
 
-test('new users default to Europe/Amsterdam timezone with null last_digest_sent_at', function (): void {
+test('new users default to Europe/Amsterdam timezone with null digest_processed_until', function (): void {
     $user = User::factory()->create();
 
     expect($user->timezone)->toBe('Europe/Amsterdam')
-        ->and($user->last_digest_sent_at)->toBeNull();
+        ->and($user->digest_processed_until)->toBeNull();
 });

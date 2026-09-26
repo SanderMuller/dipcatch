@@ -67,9 +67,9 @@ final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
         // configured lookback to avoid emailing a giant backlog if mail
         // bounced for days.
         $minSince = $now->subDays($lookbackDays);
-        $lastSent = $this->user->last_digest_sent_at;
-        $since = $lastSent instanceof CarbonImmutable
-            ? $lastSent->max($minSince)
+        $processedUntil = $this->user->digest_processed_until;
+        $since = $processedUntil instanceof CarbonImmutable
+            ? $processedUntil->max($minSince)
             : $now->subDay()->max($minSince);
 
         $events = PriceDropEvent::query()
@@ -96,7 +96,7 @@ final class SendDailyDigest implements ShouldBeUnique, ShouldQueue
         // Trade-off: a failed mail loses that batch from the email channel —
         // but those drops are still in the DB and were already delivered live
         // via the Filament bell + web push channels.
-        $this->user->forceFill(['last_digest_sent_at' => $until])->save();
+        $this->user->forceFill(['digest_processed_until' => $until])->save();
 
         if ($events->isEmpty() && $reached->isEmpty()) {
             return;

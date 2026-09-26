@@ -43,7 +43,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property bool $notify_via_push
  * @property string $timezone
  * @property bool $auto_categories
- * @property CarbonImmutable|null $last_digest_sent_at
+ * @property CarbonImmutable|null $digest_processed_until
  * @property CarbonImmutable|null $timezone_detected_at
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
@@ -89,7 +89,7 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
             'notify_via_filament' => 'boolean',
             'notify_via_push' => 'boolean',
             'auto_categories' => 'boolean',
-            'last_digest_sent_at' => 'datetime',
+            'digest_processed_until' => 'datetime',
             'timezone_detected_at' => 'datetime',
         ];
     }

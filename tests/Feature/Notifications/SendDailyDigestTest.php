@@ -27,20 +27,20 @@ afterEach(function (): void {
 test('an empty window sends no mail but still marks the day as done', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
     Mail::assertNothingSent();
-    expect($user->fresh()->last_digest_sent_at?->equalTo(now()->subMinute()))->toBeTrue();
+    expect($user->fresh()->digest_processed_until?->equalTo(now()->subMinute()))->toBeTrue();
 });
 
 test('an event after an empty run waits for the next morning and is not lost', function (): void {
     $user = User::factory()->create([
         'timezone' => 'Europe/Amsterdam',
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
     $product = Product::factory()->for($user)->create();
 
@@ -59,10 +59,10 @@ test('an event after an empty run waits for the next morning and is not lost', f
     Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => $mail->totalDrops === 1);
 });
 
-test('sends one mail grouping drops by product and updates last_digest_sent_at', function (): void {
+test('sends one mail grouping drops by product and updates digest_processed_until', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
     $product1 = Product::factory()->for($user)->create();
     $product2 = Product::factory()->for($user)->create();
@@ -87,13 +87,13 @@ test('sends one mail grouping drops by product and updates last_digest_sent_at',
             && $mail->grouped->count() === 2
             && $mail->totalDrops === 3;
     });
-    expect($user->fresh()->last_digest_sent_at)->not->toBeNull();
+    expect($user->fresh()->digest_processed_until)->not->toBeNull();
 });
 
-test('only includes events since last_digest_sent_at', function (): void {
+test('only includes events since digest_processed_until', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
-        'last_digest_sent_at' => now()->subHours(2),
+        'digest_processed_until' => now()->subHours(2),
     ]);
     $product = Product::factory()->for($user)->create();
 
@@ -115,12 +115,12 @@ test('only includes events since last_digest_sent_at', function (): void {
     Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => $mail->totalDrops === 1);
 });
 
-test('caps the lookback at configured days even with stale last_digest_sent_at', function (): void {
+test('caps the lookback at configured days even with stale digest_processed_until', function (): void {
     config()->set('dipcatch.digest.lookback_days', 3);
     $user = User::factory()->create([
         'notify_via_email' => true,
         // Bounced for two weeks — would otherwise pull a huge backlog.
-        'last_digest_sent_at' => now()->subDays(14),
+        'digest_processed_until' => now()->subDays(14),
     ]);
     $product = Product::factory()->for($user)->create();
 
@@ -145,7 +145,7 @@ test('caps the lookback at configured days even with stale last_digest_sent_at',
 test('claims the cursor before sending so a mail failure does not double-send on retry', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
     $product = Product::factory()->for($user)->create();
     PriceDropEvent::factory()
@@ -165,13 +165,13 @@ test('claims the cursor before sending so a mail failure does not double-send on
 
     // Cursor advanced even though send failed — second attempt (retry) sees
     // an empty window and won't double-send.
-    expect($user->fresh()->last_digest_sent_at)->not->toBeNull();
+    expect($user->fresh()->digest_processed_until)->not->toBeNull();
 });
 
 test('second run within the same digest window sends no new mail', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
     $product = Product::factory()->for($user)->create();
     PriceDropEvent::factory()
@@ -192,7 +192,7 @@ test('a zero lookback still sends a digest rather than going silent forever', fu
     config()->set('dipcatch.digest.lookback_days', 0);
     $user = User::factory()->create([
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
     $product = Product::factory()->for($user)->create();
     PriceDropEvent::factory()
@@ -209,7 +209,7 @@ test('a zero lookback still sends a digest rather than going silent forever', fu
 test('the cursor is the instant the window ended, not a later clock read', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
     $product = Product::factory()->for($user)->create();
     PriceDropEvent::factory()
@@ -233,14 +233,14 @@ test('the cursor is the instant the window ended, not a later clock read', funct
 
     // A minute before the first read, because one read now serves both the
     // window's end and the cursor. Three separate reads would stamp 09:29:02.
-    expect($user->fresh()->last_digest_sent_at?->toIso8601String())
+    expect($user->fresh()->digest_processed_until?->toIso8601String())
         ->toBe('2026-01-15T09:29:00+00:00');
 });
 
 test('an event fired in the same second as the window end is still mailed', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
     $product = Product::factory()->for($user)->create();
     PriceDropEvent::factory()
@@ -265,7 +265,7 @@ test('an event fired in the same second as the window end is still mailed', func
 test('an event fired after the window stays above the cursor and arrives next run', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
     $product = Product::factory()->for($user)->create();
     PriceDropEvent::factory()
@@ -303,7 +303,7 @@ test('an event fired after the window stays above the cursor and arrives next ru
 test('the digest table renders money as symbol-first, not the ISO code', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
         'timezone' => 'UTC',
     ]);
     $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
@@ -375,7 +375,7 @@ test('digest reads bundle terms from protected triggering check', function (): v
 });
 
 test('digest eager loads every triggering price check', function (): void {
-    $user = User::factory()->create(['last_digest_sent_at' => null]);
+    $user = User::factory()->create(['digest_processed_until' => null]);
     $product = Product::factory()->for($user)->create();
     $shop = Shop::factory()->for($product)->create();
 
@@ -570,7 +570,7 @@ test('a reached target alone sends the digest, with the price, the target and th
             && str_contains($text, 'your price €18.00')
             && str_contains($text, '2 for €34.10');
     });
-    expect($user->fresh()->last_digest_sent_at)->not->toBeNull();
+    expect($user->fresh()->digest_processed_until)->not->toBeNull();
 });
 
 test('a reached unit-price target leads with the price per unit and names the pack', function (): void {
@@ -588,7 +588,7 @@ test('a reached unit-price target leads with the price per unit and names the pa
 });
 
 test('drops and reached targets share one mail, grouped per product, counted together', function (): void {
-    $user = User::factory()->create(['notify_via_email' => true, 'last_digest_sent_at' => null]);
+    $user = User::factory()->create(['notify_via_email' => true, 'digest_processed_until' => null]);
     $both = Product::factory()->for($user)->create();
     $dropOnly = Product::factory()->for($user)->create();
 

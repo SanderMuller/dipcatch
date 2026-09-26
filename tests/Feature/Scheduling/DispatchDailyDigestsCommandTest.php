@@ -22,7 +22,7 @@ test('dispatches digest for users in a timezone where local 09:00 has passed', f
     $due = User::factory()->create([
         'timezone' => 'Europe/Amsterdam',
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
 
     $this->artisan('dipcatch:dispatch-daily-digests')->assertSuccessful();
@@ -35,7 +35,7 @@ test('skips users whose local 09:00 has NOT passed', function (): void {
     User::factory()->create([
         'timezone' => 'America/Los_Angeles',
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
 
     $this->artisan('dipcatch:dispatch-daily-digests')->assertSuccessful();
@@ -47,7 +47,7 @@ test('skips users with notify_via_email = false', function (): void {
     User::factory()->create([
         'timezone' => 'Europe/Amsterdam',
         'notify_via_email' => false,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
 
     $this->artisan('dipcatch:dispatch-daily-digests')->assertSuccessful();
@@ -56,12 +56,12 @@ test('skips users with notify_via_email = false', function (): void {
 });
 
 test('skips users who already received today\'s digest', function (): void {
-    // last_digest_sent_at = 08:00 UTC same day = 09:00 local Amsterdam,
+    // digest_processed_until = 08:00 UTC same day = 09:00 local Amsterdam,
     // which falls within today's local day. Not due again.
     User::factory()->create([
         'timezone' => 'Europe/Amsterdam',
         'notify_via_email' => true,
-        'last_digest_sent_at' => CarbonImmutable::create(2026, 1, 15, 8, 0, 0, 'UTC'),
+        'digest_processed_until' => CarbonImmutable::create(2026, 1, 15, 8, 0, 0, 'UTC'),
     ]);
 
     $this->artisan('dipcatch:dispatch-daily-digests')->assertSuccessful();
@@ -74,7 +74,7 @@ test('redispatches users whose last digest was on a prior local day', function (
     $due = User::factory()->create([
         'timezone' => 'Europe/Amsterdam',
         'notify_via_email' => true,
-        'last_digest_sent_at' => CarbonImmutable::create(2026, 1, 14, 8, 0, 0, 'UTC'),
+        'digest_processed_until' => CarbonImmutable::create(2026, 1, 14, 8, 0, 0, 'UTC'),
     ]);
 
     $this->artisan('dipcatch:dispatch-daily-digests')->assertSuccessful();
@@ -87,7 +87,7 @@ test('respects the configured batch size across mixed timezones', function (): v
     User::factory()->count(5)->create([
         'timezone' => 'Europe/Amsterdam',
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
 
     $this->artisan('dipcatch:dispatch-daily-digests')->assertSuccessful();
@@ -99,7 +99,7 @@ test('dispatched jobs land on the default queue', function (): void {
     User::factory()->create([
         'timezone' => 'Europe/Amsterdam',
         'notify_via_email' => true,
-        'last_digest_sent_at' => null,
+        'digest_processed_until' => null,
     ]);
 
     $this->artisan('dipcatch:dispatch-daily-digests')->assertSuccessful();
