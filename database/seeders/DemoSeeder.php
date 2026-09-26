@@ -152,7 +152,7 @@ final class DemoSeeder extends Seeder
         $configured = config('dipcatch.admin.email');
 
         if (is_string($configured) && $configured !== '') {
-            $admin = User::query()->where('email', $configured)->first();
+            $admin = User::query()->where('email', Str::lower($configured))->first();
 
             if ($admin instanceof User) {
                 $admin->forceFill(self::developerPerks())->save();

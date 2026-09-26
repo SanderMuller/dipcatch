@@ -356,11 +356,12 @@ test('claiming an unverified local account is not blocked by the squatter linkin
 });
 
 test('two accounts differing only in case are refused rather than one picked at random', function (): void {
-    // Reachable through an invitation, which stores the address as the admin
-    // typed it. Picking either row would reset a password on an account that
-    // may not belong to the person signing in.
+    // Rows written before addresses were stored lower-case, which the backfill
+    // left alone. Picking either row would reset a password on an account
+    // that may not belong to the person signing in.
     User::factory()->create(['email' => 'dubbel@example.test']);
-    User::factory()->create(['email' => 'Dubbel@Example.test']);
+    $legacy = User::factory()->create(['email' => 'dubbel-2@example.test']);
+    DB::table('users')->where('id', $legacy->id)->update(['email' => 'Dubbel@Example.test']);
 
     fakeSocialiteDriver(fakeSocialiteUser('google-sub-16', 'dubbel@example.test', 'Dubbel', [
         'email_verified' => true,
@@ -414,10 +415,11 @@ test('a second account at a provider the user already linked is refused, not a 5
 });
 
 test('an address that differs only in case matches the account that already owns it', function (): void {
-    // `users.email` is byte-unique on Postgres and registration stores the
-    // address as typed, so a case-sensitive match would silently hand the user
-    // a second, empty account instead of the one holding their products.
-    $user = User::factory()->create(['email' => 'Sander@Example.test']);
+    // A row written before addresses were stored lower-case. `users.email` is
+    // byte-unique on Postgres, so a case-sensitive match would silently hand
+    // the user a second, empty account instead of the one holding their products.
+    $user = User::factory()->create(['email' => 'sander-oud@example.test']);
+    DB::table('users')->where('id', $user->id)->update(['email' => 'Sander@Example.test']);
 
     fakeSocialiteDriver(fakeSocialiteUser('google-sub-11', 'sander@example.test', 'Sander', [
         'email_verified' => true,

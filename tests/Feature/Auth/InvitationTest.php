@@ -5,7 +5,9 @@ use App\Filament\Admin\Resources\Invitations\Pages\ManageInvitations;
 use App\Mail\InvitationMail;
 use App\Models\Invitation;
 use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 
 use function Pest\Livewire\livewire;
 
@@ -126,16 +128,27 @@ test('admin creating an invitation in Filament dispatches email and persists row
     Mail::assertSent(InvitationMail::class, fn (InvitationMail $mail) => $mail->hasTo('invitee@dipcatch.test'));
 });
 
-test('Filament invitation form rejects emails that already belong to a user', function (): void {
+test('Filament invitation form rejects emails that already belong to a user', function (string $typed): void {
     $admin = User::factory()->admin()->create();
     User::factory()->create(['email' => 'already@dipcatch.test']);
     $this->actingAs($admin);
 
     livewire(ManageInvitations::class)
-        ->callAction('create', ['email' => 'already@dipcatch.test'])
+        ->callAction('create', ['email' => $typed])
         ->assertHasActionErrors(['email']);
 
     expect(Invitation::query()->where('email', 'already@dipcatch.test')->count())->toBe(0);
+})->with(['as stored' => 'already@dipcatch.test', 'in capitals' => 'Already@Dipcatch.test']);
+
+test('Filament invitation form rejects a second pending invitation in any case', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+    Invitation::factory()->create(['email' => 'wacht@dipcatch.test']);
+
+    livewire(ManageInvitations::class)
+        ->callAction('create', ['email' => 'Wacht@Dipcatch.test'])
+        ->assertHasActionErrors(['email' => 'The email has already been taken.']);
+
+    expect(Invitation::query()->where('email', 'wacht@dipcatch.test')->count())->toBe(1);
 });
 
 test('deleting a user who created invitations keeps the invitations and detaches the inviter', function (): void {
@@ -146,4 +159,32 @@ test('deleting a user who created invitations keeps the invitations and detaches
 
     expect($invitation->fresh())->not->toBeNull()
         ->and($invitation->fresh()?->invited_by)->toBeNull();
+});
+
+test('an invited address with capitals can sign in and reset its password afterwards', function (): void {
+    Notification::fake();
+
+    $invitation = Invitation::factory()->create(['email' => 'Anna.Jansen@Example.test']);
+
+    $this->post(route('invitation.redeem', ['token' => $invitation->token]), [
+        'name' => 'Anna',
+        'password' => 'super-secret-pass',
+        'password_confirmation' => 'super-secret-pass',
+    ])->assertRedirect('/app');
+
+    auth()->logout();
+
+    // Typed exactly as it was invited. Fortify lower-cases login input.
+    $this->post(route('login.store'), [
+        'email' => 'Anna.Jansen@Example.test',
+        'password' => 'super-secret-pass',
+    ]);
+
+    $this->assertAuthenticated();
+
+    auth()->logout();
+
+    $this->post(route('password.email'), ['email' => 'Anna.Jansen@Example.test']);
+
+    Notification::assertSentTo(User::query()->where('name', 'Anna')->sole(), ResetPassword::class);
 });

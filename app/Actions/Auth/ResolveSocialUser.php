@@ -84,12 +84,10 @@ final class ResolveSocialUser
     /**
      * The account that already holds this address, matched case-insensitively.
      *
-     * Fortify lower-cases the username on register and on profile update
-     * (`fortify.lowercase_usernames`), but an invitation does not — the admin
-     * form stores the address exactly as typed and `InvitationController`
-     * passes it straight through. `users.email` is byte-unique on Postgres, so
-     * a mixed-case row is reachable and a case-sensitive match would hand the
-     * user a second, empty account instead of the one holding their products.
+     * `User` stores the address lower-case, but rows written before that are
+     * not all lower-case: the backfill skipped a row whose lower-case form
+     * another row holds. A case-sensitive match would hand such a user a
+     * second, empty account instead of the one holding their products.
      */
     private function userOwningTheAddress(SocialProvider $provider, string $email): ?User
     {

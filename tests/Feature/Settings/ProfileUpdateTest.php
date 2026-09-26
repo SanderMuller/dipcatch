@@ -46,6 +46,33 @@ test('email verification status is unchanged when email address is unchanged', f
     expect($user->refresh()->email_verified_at)->not->toBeNull();
 });
 
+test('an address another account holds is refused in any case', function (): void {
+    User::factory()->create(['email' => 'bezet@example.test']);
+
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(Profile::class)
+        ->set('email', 'Bezet@Example.test')
+        ->call('updateProfileInformation')
+        ->assertHasErrors(['email' => 'unique']);
+});
+
+test('retyping the own address in capitals keeps it verified', function (): void {
+    $user = User::factory()->create(['email' => 'eigen@example.test']);
+
+    $this->actingAs($user);
+
+    Livewire::test(Profile::class)
+        ->set('email', 'Eigen@Example.test')
+        ->call('updateProfileInformation')
+        ->assertHasNoErrors();
+
+    $user->refresh();
+
+    expect($user->email)->toBe('eigen@example.test')
+        ->and($user->email_verified_at)->not->toBeNull();
+});
+
 test('user can delete their account', function (): void {
     $user = User::factory()->create();
 

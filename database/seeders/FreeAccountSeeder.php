@@ -51,7 +51,8 @@ final class FreeAccountSeeder extends Seeder
         }
 
         $user = User::query()->updateOrCreate(
-            ['email' => $email],
+            // Stored lower-case, so the lookup has to be too.
+            ['email' => Str::lower($email)],
             [
                 'name' => 'Free Account',
                 'password' => $password,

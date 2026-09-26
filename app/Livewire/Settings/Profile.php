@@ -7,6 +7,7 @@ use App\Models\User;
 use Flux\Flux;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -39,6 +40,10 @@ final class Profile extends Component
     {
         $user = Auth::user();
         assert($user instanceof User);
+
+        // Before validation: the unique rule compares byte for byte, and the
+        // model stores the address lower-case.
+        $this->email = Str::lower($this->email);
 
         /** @var array<string, mixed> $validated */
         $validated = $this->validate($this->profileRules($user->id));
