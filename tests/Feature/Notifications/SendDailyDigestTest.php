@@ -24,7 +24,7 @@ afterEach(function (): void {
     Date::setTestNow();
 });
 
-test('empty window does not send mail and does not update last_digest_sent_at', function (): void {
+test('an empty window sends no mail but still marks the day as done', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
         'last_digest_sent_at' => null,
@@ -33,7 +33,30 @@ test('empty window does not send mail and does not update last_digest_sent_at', 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
     Mail::assertNothingSent();
-    expect($user->fresh()->last_digest_sent_at)->toBeNull();
+    expect($user->fresh()->last_digest_sent_at?->equalTo(now()->subMinute()))->toBeTrue();
+});
+
+test('an event after an empty run waits for the next morning and is not lost', function (): void {
+    $user = User::factory()->create([
+        'timezone' => 'Europe/Amsterdam',
+        'notify_via_email' => true,
+        'last_digest_sent_at' => null,
+    ]);
+    $product = Product::factory()->for($user)->create();
+
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    $this->travelTo(CarbonImmutable::create(2026, 1, 15, 13, 0, 0, 'UTC'));
+    PriceDropEvent::factory()->for($user)->for($product)->state(['fired_at' => now()])->create();
+
+    // The same afternoon the account is done for the day.
+    $this->artisan('dipcatch:dispatch-daily-digests')->assertSuccessful();
+    Mail::assertNothingSent();
+
+    $this->travelTo(CarbonImmutable::create(2026, 1, 16, 9, 30, 0, 'UTC'));
+    new SendDailyDigest($user->fresh() ?? $user, '2026-01-16')->handle();
+
+    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => $mail->totalDrops === 1);
 });
 
 test('sends one mail grouping drops by product and updates last_digest_sent_at', function (): void {
@@ -208,10 +231,10 @@ test('the cursor is the instant the window ended, not a later clock read', funct
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    // The first read, because one read now serves both the window's end and
-    // the cursor. Three separate reads would stamp 09:30:02 here.
+    // A minute before the first read, because one read now serves both the
+    // window's end and the cursor. Three separate reads would stamp 09:29:02.
     expect($user->fresh()->last_digest_sent_at?->toIso8601String())
-        ->toBe('2026-01-15T09:30:00+00:00');
+        ->toBe('2026-01-15T09:29:00+00:00');
 });
 
 test('an event fired in the same second as the window end is still mailed', function (): void {
@@ -226,13 +249,12 @@ test('an event fired in the same second as the window end is still mailed', func
         ->state(['fired_at' => now()->subHour()])
         ->create();
     // Both columns hold whole seconds, so this is the live boundary rather
-    // than a corner: every drop that fires in the run's own second lands
-    // here. Narrowing the bound to `<` would drop it from the mail and then
-    // bury it under the cursor, which is the loss the change set out to fix.
+    // than a corner. Narrowing the bound to `<` would drop it from the mail
+    // and then bury it under the cursor.
     PriceDropEvent::factory()
         ->for($user)
         ->for($product)
-        ->state(['fired_at' => now()])
+        ->state(['fired_at' => now()->subMinute()])
         ->create();
 
     new SendDailyDigest($user, '2026-01-15')->handle();
@@ -251,12 +273,13 @@ test('an event fired after the window stays above the cursor and arrives next ru
         ->for($product)
         ->state(['fired_at' => now()->subHour()])
         ->create();
-    // A drop stamped in a later second than the run that is selecting now.
-    // The bound must leave it above the cursor so the next run picks it up.
+    // A drop stamped inside the last minute: its transaction may not have
+    // committed when this run selects. The bound must leave it above the
+    // cursor so the next run picks it up.
     PriceDropEvent::factory()
         ->for($user)
         ->for($product)
-        ->state(['fired_at' => now()->addSeconds(30)])
+        ->state(['fired_at' => now()->subSeconds(30)])
         ->create();
 
     new SendDailyDigest($user, '2026-01-15')->handle();

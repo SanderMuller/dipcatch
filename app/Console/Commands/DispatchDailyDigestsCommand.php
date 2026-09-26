@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Config;
 
 /**
  * Dispatches SendDailyDigest jobs for users whose local clock has reached the
- * configured send-hour and who haven't received today's digest yet.
+ * configured send-hour and whose digest has not run yet today.
  *
  * Runs every five minutes (see bootstrap/app.php schedule). The dispatch test
  * is hour-granular, so the cadence only bounds the skew: at most five minutes
@@ -51,7 +51,7 @@ final class DispatchDailyDigestsCommand extends Command
                 continue;
             }
 
-            // "Already sent today" = last_digest_sent_at falls on the same
+            // "Already ran today" = last_digest_sent_at falls on the same
             // local date as `localNow`. Comparing local-dates in SQL would
             // need timezone gymnastics, so we use a UTC lower bound: anyone
             // whose last digest is older than the start-of-today-local
