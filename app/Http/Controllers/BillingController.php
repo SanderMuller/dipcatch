@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Billing\BillingGate;
+use App\Billing\BillingInterval;
 use App\Billing\CheckoutSessions;
 use App\Billing\Plan;
 use App\Billing\ProPrice;
@@ -25,15 +26,18 @@ final class BillingController extends Controller
      * and strangers alike.
      *
      * A stranger is sent to registration with the billing page recorded as
-     * the intended URL. Fortify's register, login and email-verification
-     * responses all redirect through `intended()`, so the intent survives
-     * the whole signup — without this the CTA landed them on the dashboard
-     * with nothing to say why they were there.
+     * the intended URL, or this link again for a yearly choice, so it is not
+     * lost. Fortify's register, login and email-verification responses all
+     * redirect through `intended()`, so the intent survives the whole signup
+     * — without this the CTA landed them on the dashboard with nothing to say
+     * why they were there.
      */
-    public function upgrade(): RedirectResponse
+    public function upgrade(string $interval = 'monthly'): RedirectResponse
     {
         if (! auth()->check()) {
-            session()->put('url.intended', url('/app/billing'));
+            session()->put('url.intended', $interval === BillingInterval::Yearly->value
+                ? route('upgrade', ['interval' => $interval])
+                : url('/app/billing'));
 
             return redirect()->route('register');
         }
@@ -45,17 +49,25 @@ final class BillingController extends Controller
             return redirect('/app/billing');
         }
 
-        return redirect()->route('billing.checkout');
+        return redirect()->route('billing.checkout', $interval === BillingInterval::Yearly->value ? ['interval' => $interval] : []);
     }
 
-    public function checkout(): Checkout|RedirectResponse
+    public function checkout(string $interval = 'monthly'): Checkout|RedirectResponse
     {
         if (! BillingGate::isOpen()) {
             return $this->failed('Pro is not on sale yet.');
         }
 
         $user = $this->user();
-        $priceId = ProPrice::priceId();
+        $billingInterval = BillingInterval::from($interval);
+
+        // Never sell the monthly Price under a yearly link: the buyer would
+        // pay a price they did not choose.
+        if ($billingInterval === BillingInterval::Yearly && ! ProPrice::hasYearly()) {
+            return $this->failed('Pro is sold per month only for now.');
+        }
+
+        $priceId = ProPrice::priceIdFor($billingInterval);
 
         // Not `isPro()`: a lost chargeback deliberately makes that false
         // while Stripe still bills an active subscription. Selling a second
@@ -78,13 +90,13 @@ final class BillingController extends Controller
         }
 
         try {
-            $pending = $this->pendingSession($user);
+            $pending = $this->pendingSession($user, $billingInterval);
 
             if ($pending instanceof RedirectResponse) {
                 return $pending;
             }
 
-            return $this->startCheckout($user, $priceId);
+            return $this->startCheckout($user, $priceId, $billingInterval);
         } catch (Throwable) {
             // Stripe down, wrong key, deleted price: the customer gets a
             // way forward instead of a 500.
@@ -109,7 +121,7 @@ final class BillingController extends Controller
         }
     }
 
-    private function startCheckout(User $user, string $priceId): Checkout
+    private function startCheckout(User $user, string $priceId, BillingInterval $interval): Checkout
     {
         $subscription = $user->newSubscription(Plan::SUBSCRIPTION_TYPE, $priceId);
 
@@ -127,6 +139,9 @@ final class BillingController extends Controller
             'stripe_checkout_session_id' => $checkout->asStripeCheckoutSession()->id,
         ])->save();
 
+        // A Checkout session lives for a day at most.
+        Cache::put(self::sessionIntervalKey($user), $interval->value, now()->addDay());
+
         return $checkout;
     }
 
@@ -139,7 +154,7 @@ final class BillingController extends Controller
      * Without this, one customer could complete two sessions and be billed
      * twice.
      */
-    private function pendingSession(User $user): ?RedirectResponse
+    private function pendingSession(User $user, BillingInterval $interval): ?RedirectResponse
     {
         $sessionId = $user->stripe_checkout_session_id;
 
@@ -159,9 +174,25 @@ final class BillingController extends Controller
             return $this->notice('Your payment went through. Pro appears here as soon as Stripe confirms it — usually within a minute.');
         }
 
-        return $session->isOpen() && $session->url !== null
-            ? redirect($session->url)
-            : null;
+        if (! $session->isOpen() || $session->url === null) {
+            return null;
+        }
+
+        // Resume it when it sells what was just chosen. Otherwise — the other
+        // interval, or one nobody recorded — end it and start afresh:
+        // `expire()` throws rather than leave a second payable session.
+        if (Cache::get(self::sessionIntervalKey($user)) === $interval->value) {
+            return redirect($session->url);
+        }
+
+        app(CheckoutSessions::class)->expire((string) $user->stripe_checkout_session_id);
+
+        return null;
+    }
+
+    private static function sessionIntervalKey(User $user): string
+    {
+        return 'billing:checkout-interval:' . $user->id;
     }
 
     private function notice(string $message): RedirectResponse

@@ -45,7 +45,7 @@ test('pages describe themselves to search engines', function (string $url, strin
     $this->get($url)->assertOk()->assertSeeHtml($needle);
 })->with([
     'homepage' => ['/', '<meta name="description"'],
-    'pricing' => ['/pricing', 'Pro removes the limits'],
+    'pricing' => ['/pricing', 'can sort them into categories for you'],
     'privacy' => ['/privacy', 'What DipCatch stores about you'],
     'use case' => ['/price-alerts/groceries', 'Supermarket prices move every week'],
     'register' => ['/register', 'No card, no extension'],

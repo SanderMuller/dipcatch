@@ -63,9 +63,10 @@ call already read. A shop is one page fetch, not two.
 Never confirm on the user's behalf; a scrape can read the wrong number, and the
 first call exists so a person sees it before it is stored.
 
-Every tool acts on this user's own data and takes no user id. Free accounts have
-a product limit; when it is reached the tool says so and writes nothing, and the
-answer is to upgrade rather than to retry.
+Every tool acts on this user's own data and takes no user id. Every plan has a
+product limit, Free a small one and Pro a generous one; when it is reached the
+tool says so and writes nothing. On Free the answer is to upgrade, on Pro to
+remove a product, never to retry.
 TEXT)]
 final class DipCatchServer extends Server
 {

@@ -28,7 +28,7 @@ Languages: English (default), Dutch ({!! route('home', ['lang' => 'nl']) !!})
 ## Plans
 
 - Free: {!! $maxProducts === null ? 'unlimited' : $maxProducts !!} products, {!! $maxShopsPerProduct === null ? 'unlimited' : $maxShopsPerProduct !!} shops per product. No card needed.
-- Pro: no limits, and prices checked more often. See {!! route('pricing') !!}.
+- Pro: up to {!! $proMaxProducts !!} products, as many shops per product as you like, new products sorted into categories automatically once switched on, and prices checked more often. See {!! route('pricing') !!}.
 
 ## Pages
 

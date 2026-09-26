@@ -21,12 +21,11 @@
         default => __('Start with Pro'),
     };
     $onSale = \App\Billing\BillingGate::isOpen();
-    // maxProducts() is nullable, where null means unlimited, so it cannot be
-    // interpolated without a branch.
-    $freeProducts = $free->maxProducts();
-    $description = $freeProducts === null
-        ? __('DipCatch is free, with no limit on how much you track. Pro checks prices more often.')
-        : __('DipCatch is free for :count products. Pro removes the limits and checks prices more often.', ['count' => $freeProducts]);
+    $description = __('DipCatch is free for :count products at up to :shops shops each. Pro follows up to :pro products at every shop you like, and can sort them into categories for you.', [
+        'count' => $free->maxProducts(),
+        'shops' => $free->maxShopsPerProduct(),
+        'pro' => $pro->maxProducts(),
+    ]);
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-canvas">
@@ -49,7 +48,7 @@
             <main class="mx-auto w-full max-w-app flex-1 px-6 pt-8 pb-20 lg:px-8">
                 <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{{ __('Pricing') }}</h1>
                 <p class="mt-2 max-w-2xl text-base text-zinc-600 dark:text-zinc-300">
-                    {{ __('Track your first :count products for nothing. Pro removes the limits and looks more often.', ['count' => $free->maxProducts()]) }}
+                    {{ __('Track your first :count products for nothing. Pro compares every shop you like, follows up to :pro products and can sort them for you.', ['count' => $free->maxProducts(), 'pro' => $pro->maxProducts()]) }}
                 </p>
 
                 <div class="mt-10 grid max-w-4xl gap-6 sm:grid-cols-2">
@@ -74,6 +73,9 @@
                     <section class="rounded-2xl bg-paper p-6 shadow-xl shadow-ink/5 ring-2 ring-ink dark:shadow-none">
                         <h2 class="text-lg font-semibold">{{ __('Pro') }}</h2>
                         <p class="mt-1 text-3xl font-semibold tracking-tight text-brand tabular-nums">{{ $price }}<span class="text-base font-normal text-zinc-500 dark:text-zinc-400"> / {{ __('month') }}</span></p>
+                        @if (\App\Billing\ProPrice::hasYearly())
+                            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">{{ __('or :price a year', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}</p>
+                        @endif
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ __('VAT included.') }}</p>
                         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                             @if ($onSale)
@@ -84,18 +86,24 @@
                         </p>
 
                         <ul class="mt-6 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-                            <li>{{ __('Unlimited products') }}</li>
                             <li>{{ __('Unlimited shops per product') }}</li>
-                            <li>{{ __('Prices checked every :hours hours', ['hours' => $pro->recheckIntervalHours()]) }}</li>
+                            <li>{{ __('Up to :count products', ['count' => $pro->maxProducts()]) }}</li>
+                            <li>{{ __('New products sorted into a category automatically, once you switch it on') }}</li>
                             <li>{{ __('A target price per kilo, litre or piece') }}</li>
-                            <li>{{ __('More alerts per hour') }}</li>
                             <li>{{ __('Full price history, kept for as long as you subscribe') }}</li>
+                            <li>{{ __('Prices checked every :hours hours', ['hours' => $pro->recheckIntervalHours()]) }}</li>
+                            <li>{{ __('More alerts per hour') }}</li>
                         </ul>
 
                         @if ($onSale)
                             <a href="{{ $proCtaHref }}" class="mt-8 inline-flex items-center rounded-full bg-ink px-5 py-3 text-base font-medium text-paper shadow-md hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:text-sm dark:shadow-none">
                                 {{ $proCtaLabel }}
                             </a>
+                            @if (! $isPro && \App\Billing\ProPrice::hasYearly())
+                                <a href="{{ route('upgrade', ['interval' => 'yearly']) }}" class="mt-3 block text-sm font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">
+                                    {{ __('Pay yearly instead: :price', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}
+                                </a>
+                            @endif
                         @else
                             <p class="mt-8 inline-flex items-center rounded-full bg-ink/5 px-5 py-3 text-base font-medium text-zinc-500 ring-1 ring-line sm:text-sm dark:text-zinc-400">
                                 {{ __('Coming soon') }}

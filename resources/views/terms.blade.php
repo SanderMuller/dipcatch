@@ -55,12 +55,12 @@
                     <section>
                         <h2>{{ __('Paying for Pro') }}</h2>
                         <ul class="mt-2">
-                            <li>{{ __('Free costs nothing and needs no card. Pro is a monthly subscription, and the price on the pricing page includes VAT.') }}</li>
+                            <li>{{ __('Free costs nothing and needs no card. Pro is a subscription paid per month, or per year where the pricing page offers it, and the price there includes VAT.') }}</li>
                             <li>{{ __('Payments are handled by Stripe. DipCatch never receives your card details.') }}</li>
                             @if ($trialDays > 0)
                                 <li>{{ __('A :days-day trial is available once per account. Cancel before it ends and nothing is charged.', ['days' => $trialDays]) }}</li>
                             @endif
-                            <li>{{ __('Cancel whenever you like. Cancelling stops the next payment, and Pro keeps working until the end of the period you already paid for. We do not refund part of a month.') }}</li>
+                            <li>{{ __('Cancel whenever you like. Cancelling stops the next payment, and Pro keeps working until the end of the period you already paid for. We do not refund part of a month or a year.') }}</li>
                             <li>{{ __('Your statutory rights as a consumer in the EU are not affected by anything on this page.') }}</li>
                             <li>{{ __('If the price changes, you hear about it before it applies to you, and you can cancel.') }}</li>
                         </ul>

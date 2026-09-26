@@ -30,12 +30,50 @@ final class ProPrice
     {
         $amount = config('plans.stripe.pro_amount');
 
-        return is_numeric($amount) ? (string) $amount : '2.99';
+        return is_numeric($amount) ? (string) $amount : '4.99';
     }
 
     public static function label(): string
     {
         return MoneyFormatter::format(self::amount(), self::currency());
+    }
+
+    public static function yearlyPriceId(): string
+    {
+        return self::text('pro_yearly_price_id', '');
+    }
+
+    public static function hasYearly(): bool
+    {
+        return self::yearlyPriceId() !== '';
+    }
+
+    public static function yearlyAmount(): string
+    {
+        $amount = config('plans.stripe.pro_yearly_amount');
+
+        return is_numeric($amount) ? (string) $amount : '39.00';
+    }
+
+    public static function yearlyLabel(): string
+    {
+        return MoneyFormatter::format(self::yearlyAmount(), self::currency());
+    }
+
+    /** The Stripe Price to sell; yearly falls back to monthly while it has no Price of its own. */
+    public static function priceIdFor(BillingInterval $interval): string
+    {
+        return $interval === BillingInterval::Yearly && self::hasYearly()
+            ? self::yearlyPriceId()
+            : self::priceId();
+    }
+
+    /** The interval a subscription's Stripe Price bills at. */
+    public static function intervalOf(?string $stripePrice): BillingInterval
+    {
+        return self::hasYearly() && $stripePrice === self::yearlyPriceId()
+            ? BillingInterval::Yearly
+            : BillingInterval::Monthly;
     }
 
     public static function trialDays(): int

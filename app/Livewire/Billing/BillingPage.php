@@ -3,6 +3,7 @@
 namespace App\Livewire\Billing;
 
 use App\Billing\BillingGate;
+use App\Billing\BillingInterval;
 use App\Billing\Entitlements;
 use App\Billing\PlanLimits;
 use App\Billing\ProPrice;
@@ -35,6 +36,8 @@ final class BillingPage extends Component
             'isOnTrial' => $this->isOnTrial(),
             'isBlocked' => $this->isBlocked(),
             'priceLabel' => ProPrice::label(),
+            'yearlyLabel' => ProPrice::hasYearly() ? ProPrice::yearlyLabel() : null,
+            'billedYearly' => ProPrice::intervalOf($this->user()->payingSubscription()?->stripe_price) === BillingInterval::Yearly,
             'trialDays' => ProPrice::trialDays(),
             'offersTrial' => $this->offersTrial(),
             'canUpgrade' => $this->canUpgrade(),

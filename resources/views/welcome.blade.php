@@ -61,7 +61,7 @@
         ['q' => __('How often are prices checked?'), 'a' => __('A shop is checked the moment you add it or change the link. After that DipCatch looks again about every :hours hours.', ['hours' => config('dipcatch.recheck.interval_hours', 6)])],
         ['q' => __('Is it free?'), 'a' => $freeProducts === null
             ? __('Yes. The free plan has no product limit, you do not need a card, and there is no trial that runs out.')
-            : __('Yes, for your first :count products. You do not need a card, and there is no trial that runs out. Pro lifts the limit when you want more.', ['count' => $freeProducts])],
+            : __('Yes, for your first :count products. You do not need a card, and there is no trial that runs out. Pro raises the limit to :pro when you want more.', ['count' => $freeProducts, 'pro' => \App\Billing\Entitlements::of(\App\Billing\Plan::Pro)->maxProducts()])],
         ['q' => __('Do I need an extension or app?'), 'a' => __('No. You paste a link in your browser. You hear from us in one email a day, under the bell in the app, or in your browser if you switch that on.')],
         ['q' => __('Can I use DipCatch in ChatGPT or Claude?'), 'a' => __('Yes. Ask it to follow something new, to add another shop, to change the price you want, or to show you how a price moved. Before it saves anything, it shows you what it found: the name and the price. That way you can spot a link that points at the wrong pack. Connect DipCatch once on the Connections page in your account.')],
         ['q' => __('Can I compare different pack sizes?'), 'a' => __('Yes. When DipCatch can read how much is in the pack, it shows a price per kilo, litre or piece next to that shop. A 200 g bag and a 370 g bag then compare fairly.')],

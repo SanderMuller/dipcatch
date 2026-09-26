@@ -158,8 +158,11 @@ it('does not promise a trial to a former subscriber', function (): void {
 it('serves the public pricing page to a guest', function (): void {
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('Unlimited products')
-        ->assertSee('20 products');
+        ->assertSee('Up to 250 products')
+        ->assertSee('Unlimited shops per product')
+        ->assertSee('New products sorted into a category automatically, once you switch it on')
+        ->assertSee('20 products')
+        ->assertDontSee('no limit on how much you track');
 });
 
 it('links to the pricing page from the marketing site', function (): void {
@@ -169,7 +172,7 @@ it('links to the pricing page from the marketing site', function (): void {
 it('shows the pricing page in Dutch', function (): void {
     $this->get('/pricing?lang=nl')
         ->assertOk()
-        ->assertSee('Onbeperkt producten')
+        ->assertSee('Tot 250 producten')
         ->assertSee('20 producten');
 });
 

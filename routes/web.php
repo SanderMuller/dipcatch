@@ -158,14 +158,18 @@ Route::get('p/{slug}.md', [PublicProductController::class, 'markdown'])
 // Public on purpose: the marketing pages point Pro here, and the controller
 // decides between registration, checkout and the billing page. Guarding it
 // with `auth` would only redirect a stranger to login and lose the intent.
-Route::get('upgrade', [BillingController::class, 'upgrade'])->name('upgrade');
+Route::get('upgrade/{interval?}', [BillingController::class, 'upgrade'])
+    ->whereIn('interval', ['monthly', 'yearly'])
+    ->name('upgrade');
 
 Route::middleware(['auth', EnsureEmailIsVerified::class])->group(function (): void {
 
     Route::post('push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
     Route::delete('push/subscribe', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
 
-    Route::get('billing/checkout', [BillingController::class, 'checkout'])->name('billing.checkout');
+    Route::get('billing/checkout/{interval?}', [BillingController::class, 'checkout'])
+        ->whereIn('interval', ['monthly', 'yearly'])
+        ->name('billing.checkout');
     Route::get('billing/portal', [BillingController::class, 'portal'])->name('billing.portal');
 
     Route::post('profile/timezone/auto-detect', AutoDetectTimezoneController::class)

@@ -98,10 +98,10 @@ it('reads the free limits from config', function (): void {
         ->and($entitlements->allowsUnitPriceAlerts())->toBeFalse();
 });
 
-it('gives pro unlimited products and shops', function (): void {
+it('gives pro 250 products and unlimited shops', function (): void {
     $entitlements = Entitlements::of(Plan::Pro);
 
-    expect($entitlements->maxProducts())->toBeNull()
+    expect($entitlements->maxProducts())->toBe(250)
         ->and($entitlements->maxShopsPerProduct())->toBeNull()
         ->and($entitlements->recheckIntervalHours())->toBe(6)
         ->and($entitlements->allowsUnitPriceAlerts())->toBeTrue();

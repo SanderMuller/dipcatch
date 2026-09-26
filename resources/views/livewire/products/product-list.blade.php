@@ -33,7 +33,7 @@
                 </flux:button>
             @else
                 {{-- The limit is stated, not hidden: the guard also refuses the write. --}}
-                <flux:tooltip content="{{ __('You are following as many products as the free plan allows.') }}">
+                <flux:tooltip content="{{ auth()->user()?->isPro() === true ? __('You are following as many products as Pro allows.') : __('You are following as many products as the free plan allows.') }}">
                     <flux:button class="rounded-full!" icon="plus" variant="primary" disabled>{{ __('Track a product') }}</flux:button>
                 </flux:tooltip>
             @endif

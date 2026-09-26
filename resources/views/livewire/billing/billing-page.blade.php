@@ -32,7 +32,7 @@
             @elseif ($isCancelling)
                 <flux:text class="text-zinc-500">Cancelled. Pro runs until {{ $periodEndsAt }}</flux:text>
             @elseif ($isPro)
-                <flux:text class="text-zinc-500">{{ $priceLabel }} per month</flux:text>
+                <flux:text class="text-zinc-500">{{ $billedYearly ? $yearlyLabel . ' per year' : $priceLabel . ' per month' }}</flux:text>
             @endif
         </div>
 
@@ -68,11 +68,20 @@
             @if (! $isPro && $canUpgrade)
                 <flux:button :href="route('billing.checkout')" variant="primary">
                     @if ($offersTrial)
-                        Start {{ $trialDays }}-day trial
+                        Start {{ $trialDays }}-day trial, then {{ $priceLabel }} a month
                     @else
-                        Upgrade to Pro
+                        Upgrade to Pro: {{ $priceLabel }} a month
                     @endif
                 </flux:button>
+                @if ($yearlyLabel !== null)
+                    <flux:button :href="route('billing.checkout', ['interval' => 'yearly'])" variant="filled">
+                        @if ($offersTrial)
+                            Or {{ $yearlyLabel }} a year after the trial
+                        @else
+                            Or {{ $yearlyLabel }} a year
+                        @endif
+                    </flux:button>
+                @endif
             @elseif (! $isBlocked && ! $isPro)
                 <flux:text class="text-zinc-500">Pro is not on sale yet.</flux:text>
             @endif

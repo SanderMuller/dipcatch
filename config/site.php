@@ -25,7 +25,7 @@ return [
     'privacy_updated_at' => '2026-09-12',
 
     /** Shown on the terms page, and the date a change is measured from. */
-    'terms_updated_at' => '2026-09-09',
+    'terms_updated_at' => '2026-09-26',
 
     /**
      * Shops with a dedicated landing page. One host per brand, plus the

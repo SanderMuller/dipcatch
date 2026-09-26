@@ -280,6 +280,25 @@ final class StructuredData
                 : 'https://schema.org/PreOrder',
         ];
 
+        if (ProPrice::hasYearly()) {
+            $offers[] = [
+                '@type' => 'Offer',
+                'name' => __('Pro, yearly'),
+                'price' => ProPrice::yearlyAmount(),
+                'priceCurrency' => $currency,
+                'priceSpecification' => [
+                    '@type' => 'UnitPriceSpecification',
+                    'price' => ProPrice::yearlyAmount(),
+                    'priceCurrency' => $currency,
+                    'billingIncrement' => 1,
+                    'unitCode' => 'ANN',
+                ],
+                'availability' => BillingGate::isOpen()
+                    ? 'https://schema.org/InStock'
+                    : 'https://schema.org/PreOrder',
+            ];
+        }
+
         $trialDays = ProPrice::trialDays();
 
         if ($trialDays > 0) {

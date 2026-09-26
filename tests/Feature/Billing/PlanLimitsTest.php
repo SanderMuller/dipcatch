@@ -26,14 +26,25 @@ it('allows the product that lands exactly on the free limit', function (): void 
     expect(app(PlanLimits::class)->remainingProducts($user))->toBe(1);
 });
 
-it('lets a pro account past the product limit', function (): void {
+it('lets a pro account past the free limit', function (): void {
     $user = User::factory()->create();
     subscribeUser($user);
     Product::factory()->count(25)->create(['user_id' => $user->id]);
 
     app(PlanLimits::class)->guardProduct($user);
 
-    expect(app(PlanLimits::class)->remainingProducts($user))->toBeNull();
+    expect(app(PlanLimits::class)->remainingProducts($user))->toBe(225);
+});
+
+it('stops a pro account at its own cap, without offering an upgrade', function (): void {
+    config()->set('plans.pro.max_products', 3);
+
+    $user = User::factory()->create();
+    subscribeUser($user);
+    Product::factory()->count(3)->create(['user_id' => $user->id]);
+
+    expect(fn () => app(PlanLimits::class)->guardProduct($user))
+        ->toThrow(PlanLimitReached::class, 'Pro tracks up to 3 products. Remove one before you add another.');
 });
 
 it('names the limit in the singular when the plan allows one', function (): void {
@@ -43,7 +54,7 @@ it('names the limit in the singular when the plan allows one', function (): void
     Product::factory()->create(['user_id' => $user->id]);
 
     expect(fn () => app(PlanLimits::class)->guardProduct($user))
-        ->toThrow(PlanLimitReached::class, 'Your plan tracks one product. Upgrade to Pro for unlimited products, or remove it first.');
+        ->toThrow(PlanLimitReached::class, 'Your plan tracks one product. Upgrade to Pro to track up to 250, or remove it first.');
 });
 
 it('blocks the fifth shop on a free account', function (): void {

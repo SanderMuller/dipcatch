@@ -67,7 +67,7 @@
                         <h2>{{ __('Plans, payment and cancelling') }}</h2>
                         <ul class="mt-2">
                             <li>{{ __('Free needs no card and does not expire.') }}</li>
-                            <li>{{ __('Pro is billed monthly through Stripe, VAT included, and can be cancelled at any time from Plan & billing inside the app.') }}</li>
+                            <li>{{ __('Pro is billed through Stripe per month, or per year if you chose that, VAT included, and can be cancelled at any time from Plan & billing inside the app.') }}</li>
                             <li>{{ __('Cancelling stops the next payment. Pro keeps working until the end of the period already paid for.') }}</li>
                             @if ($trialDays > 0)
                                 <li>{{ __('The :days-day trial runs once per account. An account that has subscribed before goes straight to a paid subscription.', ['days' => $trialDays]) }}</li>

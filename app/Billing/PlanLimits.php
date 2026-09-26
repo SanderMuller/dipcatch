@@ -74,7 +74,7 @@ final class PlanLimits
         }
 
         if ($this->countProducts($user) >= $limit) {
-            throw PlanLimitReached::products($limit);
+            throw PlanLimitReached::products($limit, $user->plan());
         }
     }
 
