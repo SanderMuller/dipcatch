@@ -54,8 +54,10 @@ _ide_helper_models.php
 frankenphp
 frankenphp-worker.php
 
-# Eye-verify session state: holds a live cookie.
+# Eye-verify session state: holds a live cookie. A harness writes its cached
+# login as `state-<email>.json` under whatever artifacts dir it was given.
 .github/eye-verify/admin-state.json
+**/state-*.json
 .github/eye-verify/*.html
 /.auth
 
