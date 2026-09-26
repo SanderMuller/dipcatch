@@ -136,7 +136,7 @@
                                         'bg-amber-500' => $shop->active && $shop->current_in_stock === false,
                                         'bg-zinc-400' => ! $shop->active || $shop->current_in_stock === null,
                                     ])></span>
-                                    {{ ! $shop->active ? __('Paused') : match ($shop->current_in_stock) { true => __('In stock'), false => __('Out of stock'), null => __('Stock unknown') } }}@if ($shop->priceReadAt()) · {{ $shop->priceReadAt()->diffForHumans(short: true) }}@endif
+                                    {{ ! $shop->active ? __('Not readable') : match ($shop->current_in_stock) { true => __('In stock'), false => __('Out of stock'), null => __('Stock unknown') } }}@if ($shop->priceReadAt()) · {{ $shop->priceReadAt()->diffForHumans(short: true) }}@endif
                                 </p>
                             </div>
                         </div>

@@ -830,16 +830,17 @@ it('keeps an announced deal on a dashboard card', function (): void {
     livewire(Dashboard::class)->assertSee('Upcoming deal');
 });
 
-it('lists a paused shop in the hover, marked as paused', function (): void {
+it('lists a shop that can no longer be read in the hover, marked as such', function (): void {
+    // Only a dead shop is inactive: no code pauses a single shop.
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'title' => 'Crisps']);
     Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69']);
-    Shop::factory()->for($product)->create(['url' => 'https://dirk.nl/p/1', 'current_price' => '1.49', 'active' => false]);
+    Shop::factory()->for($product)->dead()->create(['url' => 'https://dirk.nl/p/1', 'current_price' => '1.49']);
     $product->refresh()->recomputeCheapestShop();
 
     $this->actingAs($user);
 
     preg_match('#data-test="product-card-details".*?</ui-tooltip>#s', livewire(ProductList::class)->html(), $match);
 
-    expect(preg_replace('/\s+/', ' ', strip_tags($match[0] ?? '')))->toContain('2 shops')->toMatch('/dirk\.nl Paused/');
+    expect(preg_replace('/\s+/', ' ', strip_tags($match[0] ?? '')))->toContain('2 shops')->toMatch('/dirk\.nl Not readable/');
 });
