@@ -7,6 +7,7 @@ use App\Console\Commands\RecheckActiveShopsCommand;
 use App\Console\Commands\RefreshCheckjebonDatasetCommand;
 use App\Console\Commands\RetryReferenceShopsCommand;
 use App\Console\Commands\RunAdapterCanaryCommand;
+use App\Http\Middleware\RequireVerifiedEmailToAuthorizeClients;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\QueryException;
@@ -15,6 +16,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Session\Middleware\AuthenticateSession;
 use Laravel\Passport\Http\Middleware\CheckToken;
 use Laravel\Passport\Http\Middleware\CheckTokenForAnyScope;
 use Sentry\Laravel\Integration;
@@ -87,6 +89,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append([
             SecurityHeaders::class,
             StrictTransportSecurity::class,
+        ]);
+
+        // `AuthenticateSession` ends every other session of an account whose
+        // password hash changed. Claiming a squatted account resets the
+        // password, and a Redis session is keyed by its id, not the user, so
+        // deleting `sessions` rows cannot end the squatter's browser session.
+        $middleware->web(append: [
+            AuthenticateSession::class,
+            RequireVerifiedEmailToAuthorizeClients::class,
         ]);
 
         // Laravel 11+ stopped aliasing Passport's middleware, and the MCP

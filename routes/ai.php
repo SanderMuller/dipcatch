@@ -23,4 +23,7 @@ Mcp::web('/mcp', DipCatchServer::class)
     // was issued for this. laravel/mcp advertises `mcp:use` in discovery and
     // attaches it to registered clients, but nothing checks it server-side —
     // without `scopes` any Passport token would reach every tool.
-    ->middleware(['auth:api', 'scopes:mcp:use', 'throttle:mcp']);
+    //
+    // `verified`: a token issued to an account that never proved its address
+    // must not reach the tools — see RequireVerifiedEmailToAuthorizeClients.
+    ->middleware(['auth:api', 'verified', 'scopes:mcp:use', 'throttle:mcp']);

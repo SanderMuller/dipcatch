@@ -89,3 +89,22 @@ test('uses a third-party-safe session cookie for MCP authorization', function ()
         ->and(config('session.secure'))->toBeTrue()
         ->and(config('session.same_site'))->toBe('none');
 });
+
+test('an unverified account is sent to verify its address before it can approve a client', function (): void {
+    // Anyone can register someone else's address and sit on it unverified.
+    // Approving a client from there would outlive the real owner's claim.
+    $this->actingAs(User::factory()->unverified()->create());
+
+    $this->get(route('passport.authorizations.authorize', ['client_id' => (string) Str::uuid(), 'response_type' => 'code']))
+        ->assertRedirect(route('verification.notice'));
+
+    $this->post(route('passport.authorizations.approve'))
+        ->assertRedirect(route('verification.notice'));
+});
+
+test('a guest reaching the consent route is left to Passport, not sent to verify an address', function (): void {
+    // Passport answers the unknown client itself. A redirect here would be
+    // this app's check firing for someone with no account yet.
+    $this->get(route('passport.authorizations.authorize', ['client_id' => (string) Str::uuid(), 'response_type' => 'code']))
+        ->assertUnauthorized();
+});
