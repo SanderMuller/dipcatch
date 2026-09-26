@@ -11,6 +11,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -227,6 +228,22 @@ it('shows subscription entitlement even with no Stripe configured', function ():
 
     expect($comped->fresh()?->isPro())->toBeTrue()
         ->and($granted->fresh()?->isPro())->toBeTrue();
+});
+
+it('counts an account trial beside a dead subscription once, as a trial', function (): void {
+    $this->actingAs(adminUser());
+    Filament::setCurrentPanel('admin');
+
+    $lapsed = User::factory()->create(['trial_ends_at' => now()->addDays(14)]);
+    subscribeUser($lapsed, 'canceled', endsAt: CarbonImmutable::now()->subMonth());
+
+    // A paying subscriber whose old account trial still runs is paying, not
+    // also on trial.
+    $paying = User::factory()->create(['trial_ends_at' => now()->addDays(14)]);
+    subscribeUser($paying, 'active');
+
+    livewire(SubscriptionOverviewWidget::class)
+        ->assertSee('1 paying · 1 on trial · 0 comped');
 });
 
 it('counts a comp with no end date separately', function (): void {

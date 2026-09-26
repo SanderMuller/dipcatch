@@ -47,15 +47,6 @@ trait Subscribes
             return PlanSource::Comp;
         }
 
-        $subscriptions = $this->proSubscriptions();
-
-        if ($subscriptions->isEmpty()) {
-            // A generic trial started before any subscription exists still
-            // grants Pro — `onTrial()` with no arguments reads the user's
-            // own `trial_ends_at`.
-            return $this->onTrial() ? PlanSource::AccountTrial : PlanSource::None;
-        }
-
         // `active()`, not `valid()`, because `ProUsers` — the scheduler's
         // reader — selects on Cashier's `active()` scope, and the instance
         // method is that same predicate.
@@ -69,9 +60,14 @@ trait Subscribes
         //
         // `keepPastDueSubscriptionsActive()` in AppServiceProvider is what
         // keeps Pro through the dunning retries.
-        return $subscriptions->contains(static fn (Subscription $subscription): bool => $subscription->active())
-            ? PlanSource::Subscription
-            : PlanSource::None;
+        if ($this->proSubscriptions()->contains(static fn (Subscription $subscription): bool => $subscription->active())) {
+            return PlanSource::Subscription;
+        }
+
+        // A trial granted on the account itself, whatever rows it holds: a
+        // lapsed subscription does not cancel a trial granted to win the
+        // customer back. `ProUsers` selects it the same way.
+        return $this->onGenericTrial() ? PlanSource::AccountTrial : PlanSource::None;
     }
 
     /**

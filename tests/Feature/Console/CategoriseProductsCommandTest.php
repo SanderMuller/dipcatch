@@ -55,20 +55,19 @@ it('categorises only the null, never-touched products of opted-in Pro accounts',
         ->and($free->fresh()?->category)->toBeNull();
 });
 
-it('skips, without a request, an account the SQL pre-filter includes but the entitlement rejects', function (): void {
+it('categorises an account on a granted trial beside a lapsed subscription', function (): void {
     Http::fake([TypeSafeClient::ENDPOINT => Http::response(confidentCoffeeAnswer())]);
-    // ProUsers::ids() ORs a future trial_ends_at; plan() ignores that trial
-    // once a subscription exists and has ended.
+    // The SQL pre-filter and plan() both count this account as Pro, so the
+    // per-row check lets it through rather than skipping it.
     $user = User::factory()->create(['auto_categories' => true, 'trial_ends_at' => CarbonImmutable::now()->addWeek()]);
     subscribeUser($user, status: 'canceled', endsAt: CarbonImmutable::now()->subDay());
     $product = Product::factory()->create(['user_id' => $user->id]);
 
     $this->artisan('dipcatch:categorise-products')
-        ->expectsOutputToContain('0 categorised, 1 skipped, 0 failed.')
+        ->expectsOutputToContain('1 categorised, 0 skipped, 0 failed.')
         ->assertSuccessful();
 
-    Http::assertNothingSent();
-    expect($product->fresh()?->category)->toBeNull();
+    expect($product->fresh()?->category)->toBe(ProductCategory::CoffeeTea);
 });
 
 it('prints the verdict per product and writes nothing on a dry run', function (): void {

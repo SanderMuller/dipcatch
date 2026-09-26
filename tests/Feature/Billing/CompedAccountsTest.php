@@ -195,4 +195,55 @@ it('labels each account by the branch that decided its plan', function (Closure 
         fn (User $user) => subscribeUser($user, 'incomplete', trialEndsAt: CarbonImmutable::now()->addDays(10)),
         ['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false],
     ],
+    // A trial granted on the account, for example to win back an
+    // ex-subscriber. A row that no longer counts must not cancel it.
+    'account trial beside a canceled row' => [
+        function (User $user): void {
+            subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subMonth());
+            grantAccountTrial($user);
+        },
+        ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
+    ],
+    'account trial beside an incomplete row' => [
+        function (User $user): void {
+            subscribeUser($user, 'incomplete');
+            grantAccountTrial($user);
+        },
+        ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
+    ],
+    'account trial beside an incomplete_expired row' => [
+        function (User $user): void {
+            subscribeUser($user, 'incomplete_expired');
+            grantAccountTrial($user);
+        },
+        ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
+    ],
+    'expired account trial beside a canceled row' => [
+        function (User $user): void {
+            subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subMonth());
+            grantAccountTrial($user, CarbonImmutable::now()->subDay());
+        },
+        ['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false],
+    ],
+    'blocked account on an account trial beside a canceled row' => [
+        function (User $user): void {
+            subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subMonth());
+            grantAccountTrial($user);
+            $user->forceFill(['billing_blocked_at' => CarbonImmutable::now()])->save();
+        },
+        ['plan' => false, 'sql' => false, 'label' => 'Blocked', 'comped' => false],
+    ],
+    // A live row decides the label over an account trial beside it.
+    'account trial beside a past due row' => [
+        function (User $user): void {
+            subscribeUser($user, 'past_due');
+            grantAccountTrial($user);
+        },
+        ['plan' => true, 'sql' => true, 'label' => 'Past due', 'comped' => false],
+    ],
 ]);
+
+function grantAccountTrial(User $user, ?CarbonImmutable $endsAt = null): void
+{
+    $user->forceFill(['trial_ends_at' => $endsAt ?? CarbonImmutable::now()->addDays(14)])->save();
+}

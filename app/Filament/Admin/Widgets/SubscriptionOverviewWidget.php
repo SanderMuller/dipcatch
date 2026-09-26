@@ -86,8 +86,8 @@ final class SubscriptionOverviewWidget extends BaseWidget
 
     /**
      * Both doors marked "trial": a Stripe subscription still inside its trial,
-     * and an account-level `trial_ends_at` granted before any subscription
-     * exists. `Subscribes::plan()` honours both, so both belong here.
+     * and an account-level `trial_ends_at` on an account no live subscription
+     * already makes Pro. `Subscribes::plan()` honours both, so both belong here.
      */
     private function trialingCount(): int
     {
@@ -100,7 +100,9 @@ final class SubscriptionOverviewWidget extends BaseWidget
         $granted = User::query()
             ->whereNull('billing_blocked_at')
             ->where('trial_ends_at', '>', CarbonImmutable::now())
-            ->whereDoesntHave('subscriptions', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('type', Plan::SUBSCRIPTION_TYPE))
+            ->whereDoesntHave('subscriptions', function (EloquentQueryBuilder $query): void {
+                $query->where('type', Plan::SUBSCRIPTION_TYPE)->active();
+            })
             ->count();
 
         return $onSubscription + $granted;

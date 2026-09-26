@@ -17,7 +17,7 @@ enum PlanSource
     case Comp;
     /** A subscription row that grants Pro. */
     case Subscription;
-    /** The account's own trial, before any subscription exists. */
+    /** A trial granted on the account itself, with no live subscription. */
     case AccountTrial;
     /** Nothing grants Pro. */
     case None;

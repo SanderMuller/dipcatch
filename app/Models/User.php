@@ -82,7 +82,7 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
             'is_admin' => 'boolean',
             'billing_blocked_at' => 'datetime',
             'comped_until' => 'datetime',
-            // Cashier reads this one directly (`onTrial()` calls `isFuture()`
+            // Cashier reads this one directly (`onGenericTrial()` calls `isFuture()`
             // on it), and it is not in the model's own casts by default.
             'trial_ends_at' => 'datetime',
             'notify_via_email' => 'boolean',
