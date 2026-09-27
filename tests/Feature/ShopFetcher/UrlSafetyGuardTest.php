@@ -2,6 +2,9 @@
 
 use App\Services\ShopFetcher\UrlSafetyGuard;
 use App\Support\UrlNormalizer;
+use GuzzleHttp\Psr7\Request;
+use Illuminate\Support\Facades\Cache;
+use Psr\Http\Message\RequestInterface;
 
 beforeEach(function (): void {
     // These tests assert the prod behavior — temporarily disable the test-suite
@@ -79,4 +82,57 @@ test('the unresolved-host bypass still works outside production', function (): v
 test('a fully qualified host loses its DNS root dot, so host checks still match', function (): void {
     expect(UrlNormalizer::normalizeHost('www.plus.nl.'))->toBe('plus.nl')
         ->and(UrlNormalizer::normalizeHost('WWW.Vomar.NL.'))->toBe('vomar.nl');
+});
+
+test('refuses the internal ranges PHP counts as public', function (string $url): void {
+    config()->set('dipcatch.fetcher.allow_private_ips', false);
+
+    expect(fn () => new UrlSafetyGuard()->assertSafe($url))
+        ->toThrow(InvalidArgumentException::class, 'non-public address');
+})->with([
+    'carrier-grade NAT' => ['http://100.64.0.1/'],
+    'benchmark range' => ['http://198.18.0.1/'],
+    'NAT64 of loopback' => ['http://[64:ff9b::7f00:1]/'],
+    'IPv4-mapped loopback' => ['http://[::ffff:127.0.0.1]/'],
+]);
+
+test('still lets a public address through', function (): void {
+    config()->set('dipcatch.fetcher.allow_private_ips', false);
+
+    expect(fn () => new UrlSafetyGuard()->assertSafe('http://93.184.216.34/'))->not->toThrow(InvalidArgumentException::class)
+        ->and(fn () => new UrlSafetyGuard()->assertSafe('http://[2606:2800:220:1:248:1893:25c8:1946]/'))->not->toThrow(InvalidArgumentException::class);
+});
+
+test('makes curl connect to the address it checked, so a second DNS answer cannot redirect it', function (): void {
+    config()->set('dipcatch.fetcher.allow_private_ips', false);
+    Cache::put('dipcatch:dns:rebind.example', ['93.184.216.34'], 300);
+
+    $seen = [];
+    $handler = function (RequestInterface $request, array $options) use (&$seen): string {
+        $seen = $options;
+
+        return 'sent';
+    };
+
+    new UrlSafetyGuard()->middleware()($handler)(new Request('GET', 'https://rebind.example/p'), []);
+
+    // A proxy from the environment would resolve the host itself, so none is used.
+    expect($seen['curl'][CURLOPT_RESOLVE] ?? null)->toBe(['rebind.example:443:93.184.216.34'])
+        ->and($seen['proxy'] ?? null)->toBe(['no' => ['*']]);
+});
+
+test('refuses a request whose host resolves inside the network, before anything is sent', function (): void {
+    config()->set('dipcatch.fetcher.allow_private_ips', false);
+    Cache::put('dipcatch:dns:inside.example', ['10.0.0.8'], 300);
+
+    $sent = false;
+    $handler = function () use (&$sent): string {
+        $sent = true;
+
+        return 'sent';
+    };
+
+    expect(fn () => new UrlSafetyGuard()->middleware()($handler)(new Request('GET', 'http://inside.example/robots.txt'), []))
+        ->toThrow(InvalidArgumentException::class)
+        ->and($sent)->toBeFalse();
 });

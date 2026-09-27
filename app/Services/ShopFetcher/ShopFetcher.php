@@ -117,7 +117,7 @@ final readonly class ShopFetcher
             // Only when every hop said "moved for good". A 302 or 307 is the
             // shop's answer for today — a sale page, a geo split — and the
             // address it left from is still the right one to keep.
-            movedPermanently: $redirects !== [] && array_all($redirects, static fn (int $status): bool => in_array($status, [301, 308], true)),
+            movedPermanently: $redirects !== [] && array_all($redirects, static fn (int $status): bool => in_array($status, [301, 308], strict: true)),
         );
     }
 
@@ -157,6 +157,7 @@ final readonly class ShopFetcher
     {
         $ua = Config::string('dipcatch.fetcher.user_agent');
         $timeout = Config::integer('dipcatch.fetcher.timeout_seconds');
+        $cap = Config::integer('dipcatch.fetcher.body_cap_bytes');
 
         try {
             $safety = $this->safety;
@@ -168,6 +169,8 @@ final readonly class ShopFetcher
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             ])
                 ->timeout($timeout)
+                ->withMiddleware($safety->middleware())
+                ->withMiddleware(CappedStream::middleware($cap))
                 ->withOptions([
                     'allow_redirects' => [
                         'max' => 5,
@@ -185,14 +188,15 @@ final readonly class ShopFetcher
                     ],
                 ])
                 ->get($url);
-        } catch (ConnectionException) {
-            throw new TemporaryFailure(599);
+        } catch (ConnectionException $e) {
+            // curl reports a sink that refused a write as a broken connection.
+            throw BodyTooLarge::or($e, new TemporaryFailure(599));
         } catch (FetchException $e) {
             // A redirect the callbacks refused: keep the reason, which the
             // caller turns into its own outcome.
             throw $e;
-        } catch (Throwable) {
-            throw new HttpError(0);
+        } catch (Throwable $e) {
+            throw BodyTooLarge::or($e, new HttpError(0));
         }
     }
 

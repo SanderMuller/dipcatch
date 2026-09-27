@@ -139,16 +139,16 @@
                     <flux:heading level="2" class="mt-6 px-3 pb-2 text-zinc-500">{{ __('Shops') }}</flux:heading>
                     <flux:navlist
                         variant="outline"
-                        class="[&_[data-content]]:text-base lg:[&_[data-flux-navlist-item]]:h-9 [&_[data-flux-navlist-item][data-current]]:bg-paper [&_[data-flux-navlist-item][data-current]]:shadow-none [&_[data-flux-navlist-item][data-current]]:ring-1 [&_[data-flux-navlist-item][data-current]]:ring-line [&_[data-flux-navlist-item][data-current]_[data-content]]:font-semibold"
+                        class="[&_[data-content]]:min-w-0 [&_[data-content]]:text-base lg:[&_[data-flux-navlist-item]]:h-9 [&_[data-flux-navlist-item][data-current]]:bg-paper [&_[data-flux-navlist-item][data-current]]:shadow-none [&_[data-flux-navlist-item][data-current]]:ring-1 [&_[data-flux-navlist-item][data-current]]:ring-line [&_[data-flux-navlist-item][data-current]_[data-content]]:font-semibold"
                     >
                         <flux:navlist.item icon="building-storefront" wire:click="$set('shop', '')" :current="$shop === ''" :aria-current="$shop === '' ? 'true' : 'false'">
                             {{ __('All shops') }}
                         </flux:navlist.item>
                         @foreach ($shopHosts as $host)
                             <flux:navlist.item wire:click="$set('shop', '{{ $host }}')" :current="$shop === $host" :aria-current="$shop === $host ? 'true' : 'false'" wire:key="shop-{{ $host }}">
-                                <span class="inline-flex items-center gap-2.5">
-                                    <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
-                                    {{ $host }}
+                                <span class="flex min-w-0 items-center gap-2.5" title="{{ $host }}">
+                                    <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 shrink-0 rounded-sm" />
+                                    <span class="truncate">{{ $host }}</span>
                                 </span>
                             </flux:navlist.item>
                         @endforeach

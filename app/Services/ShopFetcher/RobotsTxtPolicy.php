@@ -22,6 +22,8 @@ use Throwable;
  */
 final readonly class RobotsTxtPolicy
 {
+    public function __construct(private UrlSafetyGuard $safety) {}
+
     public function isAllowed(string $host, string $path, string $scheme = 'https'): bool
     {
         $cacheKey = "dipcatch:robots:{$host}";
@@ -56,8 +58,16 @@ final readonly class RobotsTxtPolicy
         $userAgent = Config::string('dipcatch.fetcher.user_agent');
 
         try {
+            // The same guard as the page fetch, on this request and on every
+            // redirect it follows: the robots host is not the one the page
+            // check resolved, and its answer can point anywhere.
             $response = Http::withHeaders(['User-Agent' => $userAgent])
                 ->timeout(5)
+                ->withMiddleware($this->safety->middleware())
+                // Search engines read at most 500 KiB of a robots.txt; a larger
+                // one is refused while it downloads, and the fetch fails open.
+                ->withMiddleware(CappedStream::middleware(512_000))
+                ->withOptions(['allow_redirects' => ['max' => 5, 'strict' => true]])
                 ->get($url);
         } catch (ConnectionException $e) {
             Log::info('robots.txt fetch failed; fail-open', [

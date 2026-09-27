@@ -63,7 +63,8 @@ final class CreateProductTool extends Tool
             // to confirm.
             'confirm' => ['nullable', 'boolean:strict'],
             'title' => ['nullable', 'string', 'max:255'],
-            'variant_key' => ['nullable', 'string', 'max:255'],
+            // A key can be an offer URL, so longer than a name; the column is text.
+            'variant_key' => ['nullable', 'string', 'max:2048'],
             'category' => ['nullable', 'string', Rule::enum(ProductCategory::class)],
         ], [
             'url.required' => 'Pass a url to preview a product page.',

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Products;
 
+use App\Actions\Shops\ProbeBudget;
 use App\Billing\BillingGate;
 use App\Billing\Entitlements;
 use App\Billing\HistoryWindow;
@@ -12,6 +13,7 @@ use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\User;
 use App\Services\Drops\LargeDropConfirmation;
 use App\Support\AlertRules;
 use App\Support\UrlNormalizer;
@@ -211,6 +213,17 @@ final class ProductShow extends Component
 
         if ($collision) {
             $this->shopMessage = 'Another shop for this product already uses that URL';
+
+            return;
+        }
+
+        // The same per-account page budget as adding a shop: without it a
+        // script could make the server fetch without limit through this form.
+        $user = auth()->user();
+        $retryAfter = $user instanceof User ? app(ProbeBudget::class)->spend($user) : null;
+
+        if ($retryAfter !== null) {
+            $this->shopMessage = "You have checked too many links in the last minute. Try again in {$retryAfter} seconds.";
 
             return;
         }

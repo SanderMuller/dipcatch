@@ -68,7 +68,8 @@ final class AddShopTool extends Tool
             // the `=== true` below — the preview branch, on a call that meant
             // to confirm.
             'confirm' => ['nullable', 'boolean:strict'],
-            'variant_key' => ['nullable', 'string', 'max:255'],
+            // A key can be an offer URL, so longer than a name; the column is text.
+            'variant_key' => ['nullable', 'string', 'max:2048'],
             'keep_as_link' => ['nullable', 'boolean:strict', Rule::prohibitedIf($keepingAsLink && $confirming)],
         ], [
             'url.required' => 'Pass a url to preview a product page.',

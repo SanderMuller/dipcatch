@@ -48,6 +48,8 @@
 
         @if ($errorCode === 'user_selector_required')
             <flux:text class="text-red-600">Price selector is required.</flux:text>
+        @elseif ($errorCode === 'user_selector_too_long')
+            <flux:text class="text-red-600">A selector can be at most 255 characters.</flux:text>
         @elseif ($errorCode === 'user_selector_invalid')
             <flux:text class="text-red-600">That CSS selector isn't valid syntax.</flux:text>
         @elseif ($errorCode === 'user_selector_no_match')

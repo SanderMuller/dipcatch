@@ -128,8 +128,10 @@ final readonly class DashboardDigest
         $trips = [];
 
         foreach ($byHost as $host => $items) {
-            // Offers first, so the products a trip shows are the ones worth the trip.
-            usort($items, fn (array $a, array $b): int => $b['onOffer'] <=> $a['onOffer']);
+            // Offers first, so the products a trip shows are the ones worth the
+            // trip; then by id, so equal items keep their place between visits
+            // instead of following whichever product was rechecked last.
+            usort($items, fn (array $a, array $b): int => [$b['onOffer'], $a['product']->id] <=> [$a['onOffer'], $b['product']->id]);
 
             $trips[] = [
                 'host' => (string) $host,
@@ -140,7 +142,9 @@ final readonly class DashboardDigest
             ];
         }
 
-        usort($trips, fn (array $a, array $b): int => [$b['count'], $b['onOffer']] <=> [$a['count'], $a['onOffer']]);
+        // The host breaks a tie, so two shops with the same count do not swap
+        // places from one visit to the next.
+        usort($trips, fn (array $a, array $b): int => [$b['count'], $b['onOffer'], $a['host']] <=> [$a['count'], $a['onOffer'], $b['host']]);
 
         return array_slice($trips, 0, self::TRIPS);
     }

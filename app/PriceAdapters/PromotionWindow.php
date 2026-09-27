@@ -37,7 +37,8 @@ final readonly class PromotionWindow
             return null;
         }
 
-        $label = $label === null ? null : trim($label);
+        // Stored in a 255-character column; a shop can write any length.
+        $label = $label === null ? null : trim(mb_substr(trim($label), 0, 255));
 
         return new self($endsAt, $startsAt, $label === '' ? null : $label);
     }

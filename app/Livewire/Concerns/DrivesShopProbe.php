@@ -96,6 +96,14 @@ trait DrivesShopProbe
             return;
         }
 
+        // Each selector is stored in a 255-character column.
+        if (array_any([$price, trim($this->titleSelector), trim($this->imageSelector)], static fn (string $selector): bool => mb_strlen($selector) > 255)) {
+            $this->errorCode = 'user_selector_too_long';
+            $this->errorContext = null;
+
+            return;
+        }
+
         $this->runProbe($probe, [
             'price' => $price,
             'title' => trim($this->titleSelector) ?: null,
