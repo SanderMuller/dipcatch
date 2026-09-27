@@ -3,14 +3,10 @@
 namespace App\Filament\Admin\Widgets;
 
 use App\Billing\Plan;
-use App\Billing\ProUsers;
+use App\Billing\PlanSource;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
-use Illuminate\Support\Facades\DB;
-use Laravel\Cashier\Subscription;
 
 /**
  * Who is entitled to Pro, and how they got there.
@@ -36,10 +32,12 @@ final class SubscriptionOverviewWidget extends BaseWidget
      */
     protected function getStats(): array
     {
-        $pro = $this->proCount();
-        $paying = $this->payingCount();
-        $trialing = $this->trialingCount();
-        $comped = $this->compedCount();
+        $accounts = $this->accountsByStatus();
+        $paying = $accounts['paying'] ?? 0;
+        $trialing = $accounts['trial'] ?? 0;
+        $comped = $accounts['comped'] ?? 0;
+        $blocked = $accounts['blocked'] ?? 0;
+        $pro = $paying + $trialing + $comped;
 
         return [
             Stat::make('Pro accounts', $pro)
@@ -52,18 +50,39 @@ final class SubscriptionOverviewWidget extends BaseWidget
                 ->icon('heroicon-o-gift')
                 ->color($comped > 0 ? 'info' : 'gray'),
 
-            Stat::make('Free accounts', max(0, User::query()->count() - $pro))
+            Stat::make('Free accounts', array_sum($accounts) - $pro)
                 ->description('Everyone not entitled to Pro')
                 ->icon('heroicon-o-users')
                 ->color('gray'),
 
-            $this->blockedStat(),
+            $this->blockedStat($blocked),
         ];
     }
 
-    private function proCount(): int
+    /**
+     * Every account counted once, by `User::planSource()`, so the widget, the
+     * subscribers table and `ProUsers` cannot disagree. Counted per account,
+     * not per Stripe row: a comp beside a live row is a comp, and two live rows
+     * are one paying account.
+     *
+     * @return array<string, int>
+     */
+    private function accountsByStatus(): array
     {
-        return DB::query()->fromSub(ProUsers::ids(), 'pro')->count();
+        $accounts = [];
+
+        foreach (User::query()->with('subscriptions')->lazyById(500) as $user) {
+            $group = match ($user->planSource()) {
+                PlanSource::Subscription => $user->payingSubscription()?->onTrial() === true ? 'trial' : 'paying',
+                PlanSource::AccountTrial => 'trial',
+                PlanSource::Comp => 'comped',
+                PlanSource::Blocked => 'blocked',
+                PlanSource::None => 'free',
+            };
+            $accounts[$group] = ($accounts[$group] ?? 0) + 1;
+        }
+
+        return $accounts;
     }
 
     /**
@@ -73,47 +92,6 @@ final class SubscriptionOverviewWidget extends BaseWidget
     private function grantBreakdown(int $paying, int $trialing, int $comped): string
     {
         return $paying . ' paying · ' . $trialing . ' on trial · ' . $comped . ' comped';
-    }
-
-    private function payingCount(): int
-    {
-        return Subscription::query()
-            ->where('type', Plan::SUBSCRIPTION_TYPE)
-            ->active()
-            ->notOnTrial()
-            ->count();
-    }
-
-    /**
-     * Both doors marked "trial": a Stripe subscription still inside its trial,
-     * and an account-level `trial_ends_at` on an account no live subscription
-     * already makes Pro. `Subscribes::plan()` honours both, so both belong here.
-     */
-    private function trialingCount(): int
-    {
-        $onSubscription = Subscription::query()
-            ->where('type', Plan::SUBSCRIPTION_TYPE)
-            ->active()
-            ->onTrial()
-            ->count();
-
-        $granted = User::query()
-            ->whereNull('billing_blocked_at')
-            ->where('trial_ends_at', '>', CarbonImmutable::now())
-            ->whereDoesntHave('subscriptions', function (EloquentQueryBuilder $query): void {
-                $query->where('type', Plan::SUBSCRIPTION_TYPE)->active();
-            })
-            ->count();
-
-        return $onSubscription + $granted;
-    }
-
-    private function compedCount(): int
-    {
-        return User::query()
-            ->whereNull('billing_blocked_at')
-            ->where('comped_until', '>', CarbonImmutable::now())
-            ->count();
     }
 
     private function compDescription(): string
@@ -132,10 +110,8 @@ final class SubscriptionOverviewWidget extends BaseWidget
      * A blocked account is still a customer — it keeps its subscription and
      * its billing portal — so it is worth seeing, not hiding.
      */
-    private function blockedStat(): Stat
+    private function blockedStat(int $blocked): Stat
     {
-        $blocked = User::query()->whereNotNull('billing_blocked_at')->count();
-
         return Stat::make('Blocked', $blocked)
             ->description($blocked === 0 ? 'No chargebacks lost' : 'Pro withdrawn after a lost dispute')
             ->icon('heroicon-o-shield-exclamation')

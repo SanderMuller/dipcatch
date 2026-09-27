@@ -246,6 +246,27 @@ it('counts an account trial beside a dead subscription once, as a trial', functi
         ->assertSee('1 paying · 1 on trial · 0 comped');
 });
 
+it('counts each account once, by the branch that decided its plan', function (): void {
+    $this->actingAs(adminUser());
+    Filament::setCurrentPanel('admin');
+
+    // A comp with an account trial beside it is a comp, not also a trial.
+    User::factory()->create(['comped_until' => now()->addYear(), 'trial_ends_at' => now()->addDays(14)]);
+    // A comp with a live subscription is a comp, not also paying.
+    $compedPaying = User::factory()->create(['comped_until' => now()->addYear()]);
+    subscribeUser($compedPaying, 'active');
+    // A blocked account with a live subscription is not paying for Pro.
+    $blocked = User::factory()->create(['billing_blocked_at' => now()]);
+    subscribeUser($blocked, 'active');
+    // Two live rows are one paying account.
+    $twoRows = User::factory()->create();
+    subscribeUser($twoRows, 'active');
+    subscribeUser($twoRows, 'active');
+
+    livewire(SubscriptionOverviewWidget::class)
+        ->assertSee('1 paying · 0 on trial · 2 comped');
+});
+
 it('counts a comp with no end date separately', function (): void {
     $this->actingAs(adminUser());
     Filament::setCurrentPanel('admin');

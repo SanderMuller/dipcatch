@@ -247,3 +247,36 @@ function grantAccountTrial(User $user, ?CarbonImmutable $endsAt = null): void
 {
     $user->forceFill(['trial_ends_at' => $endsAt ?? CarbonImmutable::now()->addDays(14)])->save();
 }
+
+it('dates each account by the branch that decided its plan', function (Closure $setUp, ?string $expected): void {
+    $this->travelTo(CarbonImmutable::parse('2026-01-15 12:00:00'));
+    $user = User::factory()->create();
+    $setUp($user);
+
+    expect(SubscribersTable::periodEnd($user->fresh() ?? $user))->toBe($expected);
+})->with([
+    'account trial, no subscription' => [
+        fn (User $user) => grantAccountTrial($user, CarbonImmutable::parse('2026-01-25')),
+        '25 Jan 2026',
+    ],
+    // The dead row's own end date is not the one that matters.
+    'account trial beside a canceled row' => [
+        function (User $user): void {
+            subscribeUser($user, 'canceled', endsAt: CarbonImmutable::parse('2025-12-01'));
+            grantAccountTrial($user, CarbonImmutable::parse('2026-01-25'));
+        },
+        '25 Jan 2026',
+    ],
+    'comp with an end date' => [
+        fn (User $user) => $user->forceFill(['comped_until' => CarbonImmutable::parse('2026-03-01')])->save(),
+        '1 Mar 2026',
+    ],
+    'comp with no end date' => [
+        fn (User $user) => $user->forceFill(['comped_until' => Plan::COMPED_FOREVER])->save(),
+        null,
+    ],
+    'live row cancelling at period end' => [
+        fn (User $user) => subscribeUser($user, 'active', endsAt: CarbonImmutable::parse('2026-02-01')),
+        '1 Feb 2026',
+    ],
+]);

@@ -2,12 +2,14 @@
 
 namespace App\Filament\Admin\Resources\Subscribers\Tables;
 
+use App\Billing\Plan;
 use App\Billing\PlanSource;
 use App\Billing\ProPrice;
 use App\Billing\ProUsers;
 use App\Models\User;
 use App\Support\MoneyFormatter;
 use App\Support\StripeDashboard;
+use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -148,16 +150,27 @@ final class SubscribersTable
         };
     }
 
-    private static function periodEnd(User $record): ?string
+    /**
+     * The end date of the account trial or comp that grants Pro; otherwise
+     * the paying row's end or trial date, if it has one. Public for the same
+     * reason as `status()`.
+     */
+    public static function periodEnd(User $record): ?string
+    {
+        $date = match ($record->planSource()) {
+            PlanSource::AccountTrial => $record->trial_ends_at,
+            // A comp with no end date has none to show.
+            PlanSource::Comp => $record->comped_until?->lessThan(Plan::COMPED_FOREVER) === true ? $record->comped_until : null,
+            default => self::rowEnd($record),
+        };
+
+        return $date?->isoFormat('D MMM YYYY');
+    }
+
+    private static function rowEnd(User $record): ?CarbonInterface
     {
         $subscription = $record->payingSubscription();
 
-        if ($subscription === null) {
-            return null;
-        }
-
-        $date = $subscription->ends_at ?? $subscription->trial_ends_at;
-
-        return $date?->isoFormat('D MMM YYYY');
+        return $subscription->ends_at ?? $subscription?->trial_ends_at;
     }
 }
