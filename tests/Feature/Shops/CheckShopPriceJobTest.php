@@ -197,7 +197,7 @@ test('main counter reaching dead_after flips health to dead + active=false', fun
         ->and($shop->active)->toBeFalse();
 });
 
-test('a counter reaching its threshold moves health', function (int $status, array $counters, ShopHealth $health, bool $active): void {
+test('a counter reaching its threshold moves health', function (int $status, int $failures, int $fiveXxFailures, ShopHealth $health, bool $active): void {
     config()->set('dipcatch.shop.failing_after', 3);
     config()->set('dipcatch.shop.failing_5xx_after', 5);
     config()->set('dipcatch.shop.dead_5xx_after', 8);
@@ -211,7 +211,8 @@ test('a counter reaching its threshold moves health', function (int $status, arr
         'url' => 'https://shop.test/p/1',
         'active' => true,
         'health' => 'ok',
-        ...$counters,
+        'consecutive_failures' => $failures,
+        'consecutive_5xx_failures' => $fiveXxFailures,
     ]);
 
     new CheckShopPrice($shop)->handle(
@@ -225,13 +226,13 @@ test('a counter reaching its threshold moves health', function (int $status, arr
     expect($shop->health)->toBe($health)
         ->and($shop->active)->toBe($active);
 })->with([
-    'failing_after' => [200, ['consecutive_failures' => 2], ShopHealth::Failing, true],
-    'failing_5xx_after' => [503, ['consecutive_5xx_failures' => 4], ShopHealth::Failing, true],
-    'dead_5xx_after' => [503, ['consecutive_5xx_failures' => 7], ShopHealth::Dead, false],
-    'below 5xx threshold' => [503, ['consecutive_5xx_failures' => 3], ShopHealth::Ok, true],
+    'failing_after' => [200, 2, 0, ShopHealth::Failing, true],
+    'failing_5xx_after' => [503, 0, 4, ShopHealth::Failing, true],
+    'dead_5xx_after' => [503, 0, 7, ShopHealth::Dead, false],
+    'below 5xx threshold' => [503, 0, 3, ShopHealth::Ok, true],
     // Each counter is judged by its own thresholds: a 5xx does not revisit a
     // main count already past failing_after.
-    '5xx beside a high main count' => [503, ['consecutive_failures' => 9], ShopHealth::Ok, true],
+    '5xx beside a high main count' => [503, 9, 0, ShopHealth::Ok, true],
 ]);
 
 test('robots disallow flips offer to dead immediately', function (): void {
