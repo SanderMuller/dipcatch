@@ -212,9 +212,9 @@ test('claiming an unverified local account kills the password that was set on it
 });
 
 test('claiming an unverified local account revokes its passkeys, two factor and live sessions', function (): void {
-    // The password alone is not the whole credential set. Fortify's passkey
-    // and two-factor routes sit behind `auth` and `password.confirm` but not
-    // `verified`, so a squatter can set both up before the real owner arrives.
+    // The password alone is not the whole credential set. A squatter could set
+    // up a passkey and two-factor before those routes required a verified
+    // address, and such rows are still out there.
     $squatted = User::factory()->unverified()->withTwoFactor()->create([
         'email' => 'kraker@example.test',
     ]);

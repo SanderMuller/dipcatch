@@ -35,5 +35,8 @@ final readonly class RevokeCredentials
 
         $user->passkeys()->delete();
         $user->socialAccounts()->delete();
+        // Not a way in, but a squatter's browser would keep receiving the
+        // owner's price alerts. The table is polymorphic, with no foreign key.
+        $user->pushSubscriptions()->delete();
     }
 }

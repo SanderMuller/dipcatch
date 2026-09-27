@@ -25,5 +25,5 @@ Mcp::web('/mcp', DipCatchServer::class)
     // without `scopes` any Passport token would reach every tool.
     //
     // `verified`: a token issued to an account that never proved its address
-    // must not reach the tools — see RequireVerifiedEmailToAuthorizeClients.
+    // must not reach the tools — see RequireVerifiedEmailToAddCredentials.
     ->middleware(['auth:api', 'verified', 'scopes:mcp:use', 'throttle:mcp']);

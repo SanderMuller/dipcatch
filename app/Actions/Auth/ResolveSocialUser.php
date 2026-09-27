@@ -2,7 +2,7 @@
 
 namespace App\Actions\Auth;
 
-use App\Actions\Users\RevokeCredentials;
+use App\Actions\Users\ClaimUnverifiedAccount;
 use App\Enums\SocialProvider;
 use App\Models\SocialAccount;
 use App\Models\User;
@@ -21,7 +21,7 @@ use Laravel\Socialite\AbstractUser as SocialiteUser;
  */
 final class ResolveSocialUser
 {
-    public function __construct(private readonly RevokeCredentials $revokeCredentials) {}
+    public function __construct(private readonly ClaimUnverifiedAccount $claimUnverifiedAccount) {}
 
     public function __invoke(SocialProvider $provider, SocialiteUser $socialiteUser, ?string $acceptLanguage = null): User
     {
@@ -131,31 +131,10 @@ final class ResolveSocialUser
             return;
         }
 
-        // Nobody ever proved they own this mailbox, so nothing already on the
-        // row is evidence of ownership: anyone can register an address that is
-        // not theirs and wait. The provider has now proved it, which makes the
-        // person signing in the rightful owner and every credential set before
-        // this moment untrusted.
-        //
-        // Every one of them has to go, not only the password. Fortify's
-        // passkey and two-factor routes sit behind `auth` and `password.confirm`
-        // but not `verified`, so the squatter can register a passkey and enable
-        // two-factor on an unverified account. Leaving either behind hands them
-        // a way back in — and a stale two-factor secret would lock the rightful
-        // owner out at a challenge they cannot answer.
-        $user->forceFill([
-            'password' => Str::password(),
-            'email_verified_at' => now(),
-            'remember_token' => null,
-            'two_factor_secret' => null,
-            'two_factor_recovery_codes' => null,
-            'two_factor_confirmed_at' => null,
-        ])->save();
-
-        // The new password ends the squatter's browser sessions on their next
-        // request. It does not end provider links, passkeys, or OAuth tokens
-        // issued before unverified accounts were kept off MCP.
-        ($this->revokeCredentials)($user);
+        // Nobody ever proved they own this mailbox. The provider has now, so
+        // the person signing in is the rightful owner. They sign in through
+        // the provider, so the password is a random one they never see.
+        ($this->claimUnverifiedAccount)($user, Str::password());
     }
 
     private function createUser(SocialiteUser $socialiteUser, string $email, ?string $acceptLanguage): User

@@ -7,7 +7,7 @@ use App\Console\Commands\RecheckActiveShopsCommand;
 use App\Console\Commands\RefreshCheckjebonDatasetCommand;
 use App\Console\Commands\RetryReferenceShopsCommand;
 use App\Console\Commands\RunAdapterCanaryCommand;
-use App\Http\Middleware\RequireVerifiedEmailToAuthorizeClients;
+use App\Http\Middleware\RequireVerifiedEmailToAddCredentials;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\QueryException;
@@ -97,7 +97,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // deleting `sessions` rows cannot end the squatter's browser session.
         $middleware->web(append: [
             AuthenticateSession::class,
-            RequireVerifiedEmailToAuthorizeClients::class,
+            RequireVerifiedEmailToAddCredentials::class,
         ]);
 
         // Laravel 11+ stopped aliasing Passport's middleware, and the MCP

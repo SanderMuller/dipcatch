@@ -2,14 +2,18 @@
 
 namespace App\Actions\Fortify;
 
+use App\Actions\Users\ClaimUnverifiedAccount;
 use App\Concerns\PasswordValidationRules;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
 
 final class ResetUserPassword implements ResetsUserPasswords
 {
     use PasswordValidationRules;
+
+    public function __construct(private readonly ClaimUnverifiedAccount $claimUnverifiedAccount) {}
 
     /**
      * Validate and reset the user's forgotten password.
@@ -22,8 +26,21 @@ final class ResetUserPassword implements ResetsUserPasswords
             'password' => $this->passwordRules(),
         ])->validate();
 
-        $user->forceFill([
-            'password' => $input['password'],
-        ])->save();
+        if ($user->hasVerifiedEmail()) {
+            // A verified account keeps its passkeys and two-factor: removing
+            // them on reset would let anyone who reads the mailbox past the
+            // second factor.
+            $user->forceFill([
+                'password' => $input['password'],
+            ])->save();
+
+            return;
+        }
+
+        // The reset link reached the mailbox, which proves ownership the
+        // account never had. Marking it verified and revoking what the row
+        // held happen together: a verified account with a squatter's old
+        // OAuth token would reach MCP again.
+        DB::transaction(fn () => ($this->claimUnverifiedAccount)($user, $input['password']));
     }
 }
