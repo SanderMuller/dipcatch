@@ -26,7 +26,6 @@ final class DispatchDailyDigestsCommand extends Command
     public function handle(): int
     {
         $sendHour = Config::integer('dipcatch.digest.send_hour');
-        $batchSize = Config::integer('dipcatch.digest.batch_size');
         $nowUtc = CarbonImmutable::now('UTC');
 
         // Per-timezone dispatch: each timezone has its own "is it 09:00 here
@@ -58,11 +57,6 @@ final class DispatchDailyDigestsCommand extends Command
             // (converted to UTC) is still due.
             $startOfTodayLocalUtc = $localNow->startOfDay()->setTimezone('UTC');
 
-            $remaining = $batchSize - $dispatched;
-            if ($remaining <= 0) {
-                break;
-            }
-
             $digestDate = $localNow->format('Y-m-d');
 
             User::query()
@@ -72,15 +66,16 @@ final class DispatchDailyDigestsCommand extends Command
                     $q->whereNull('digest_processed_until')
                         ->orWhere('digest_processed_until', '<', $startOfTodayLocalUtc);
                 })
-                ->limit($remaining)
+                // No batch cap. Each account runs once per local day, and a
+                // cap spent itself on accounts whose job was still queued: the
+                // unique lock skips their re-dispatch without a word, and the
+                // same low ids filled every tick while the queue was behind.
+                // Workers set the sending pace.
+                ->lazyById()
                 ->each(function (User $user) use ($digestDate, &$dispatched): void {
                     dispatch(new SendDailyDigest($user, $digestDate));
                     $dispatched++;
                 });
-
-            if ($dispatched >= $batchSize) {
-                break;
-            }
         }
 
         $this->info("Dispatched {$dispatched} SendDailyDigest jobs.");
