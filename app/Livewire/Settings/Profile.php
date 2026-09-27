@@ -41,16 +41,19 @@ final class Profile extends Component
         $user = Auth::user();
         assert($user instanceof User);
 
-        // Before validation: the unique rule compares byte for byte, and the
-        // model stores the address lower-case.
-        $this->email = Str::lower($this->email);
+        // Compared without case: the model stores the address lower-case, and
+        // the unique rule compares byte for byte. An unchanged address keeps
+        // its stored value and is not written back, so a row the lower-case
+        // backfill had to skip can still save its name.
+        $emailChanged = Str::lower($this->email) !== Str::lower($user->email);
+        $this->email = $emailChanged ? Str::lower($this->email) : $user->email;
 
         /** @var array<string, mixed> $validated */
         $validated = $this->validate($this->profileRules($user->id));
 
-        $user->fill($validated);
+        $user->fill($emailChanged ? $validated : array_diff_key($validated, ['email' => true]));
 
-        if ($user->isDirty('email')) {
+        if ($emailChanged) {
             $user->email_verified_at = null;
         }
 

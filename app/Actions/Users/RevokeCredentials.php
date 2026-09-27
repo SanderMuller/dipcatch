@@ -8,13 +8,15 @@ use Illuminate\Support\Facades\DB;
 /**
  * Ends every way in to an account that lives outside its own row.
  *
- * A password change ends none of them, and Passport and the session table
- * have no foreign key, so even deleting the user leaves them working. Every
- * path that takes an account away from someone uses this one list. Callers
- * run it inside their own transaction.
+ * A password change ends only the browser sessions (`AuthenticateSession` in
+ * the `web` group), and Passport and the session table have no foreign key,
+ * so even deleting the user leaves the rest working. Every path that takes an
+ * account away from someone uses this one list. Callers run it inside their
+ * own transaction.
  *
- * The `sessions` delete only reaches sessions under the `database` driver;
- * a Redis session is keyed by its id, not by the user, and survives this.
+ * The `sessions` delete only reaches sessions under the `database` driver; a
+ * Redis session is keyed by its id, not by the user. It ends through the
+ * password change instead.
  */
 final readonly class RevokeCredentials
 {

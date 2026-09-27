@@ -336,7 +336,7 @@ test('the digest table renders money as symbol-first, not the ISO code', functio
     expect($html)->toContain('€1.69')
         ->and($html)->toContain('€0.30')
         ->and($html)->not->toContain('EUR 1.69')
-        ->and($html)->toContain('15.0%');
+        ->and($html)->toContain('15%');
 });
 
 test('digest reads bundle terms from protected triggering check', function (): void {
@@ -468,7 +468,7 @@ test('the digest states the change per unit and omits money it cannot honestly r
     $html = new DailyDigestMail($user, PriceDropEvent::query()->whereKey($events->modelKeys())->get())->render();
 
     expect($html)->toContain('Digest product')
-        ->and($html)->toContain('20.0% per kilo')
+        ->and($html)->toContain('20% per kilo')
         ->and($html)->toContain('€8.00 /kg')
         ->and($html)->toContain('was €10.00 /kg')
         // The till price of the winning pack follows on the second line; this

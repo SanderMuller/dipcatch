@@ -25,7 +25,7 @@ vendor/bin/pest || true                       # 0 failures
 | 005 | Index, env documentation, and the SSRF escape hatch | P2 | S | — | DONE |
 | 006 | Alert budget after the claim; reference out of the lock | P2 | S | — | DONE |
 | 007 | Clear the old price when an offer is repointed | P2 | S | — | DONE |
-| 008 | Only dispatch a digest when there is something to digest | P3 | M | — | TODO |
+| 008 | Only dispatch a digest when there is something to digest | P3 | M | — | SUPERSEDED (`b01cf00`, `6b225d9`) |
 | 009 | Make the nightly prune's cost independent of product count | P3 | M | 005 | TODO |
 | 010 | Let each alert fail on its own, and say when one is dropped | P2 | S | 006 | DONE |
 | 011 | Split the notification budget into asking and paying | P3 | S | 010 | TODO |
@@ -84,9 +84,10 @@ Recorded so an executor does not re-litigate them:
    a switch that turns the bug back on. Plan 003 is the only candidate, and its
    rollback lever is the health machinery itself: an offer marked failing
    recovers on its next good check.
-6. **Plan 008 must not stamp `last_digest_sent_at` on an empty run.** That would
-   trade a performance problem for a correctness one by skipping events that
-   arrive later the same day.
+6. **Plan 008 is superseded.** `b01cf00` made the digest stamp its cursor on
+   every run, empty or not, and `6b225d9` renamed the column to
+   `digest_processed_until`. An event later the same day is not skipped: it
+   goes into the next morning's digest. Do not execute plan 008.
 
 ## Execution log
 

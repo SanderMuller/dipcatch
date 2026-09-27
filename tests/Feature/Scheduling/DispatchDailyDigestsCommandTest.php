@@ -69,7 +69,7 @@ test('skips users who already received today\'s digest', function (): void {
     Queue::assertNotPushed(SendDailyDigest::class);
 });
 
-test('redispatches users whose last digest was on a prior local day', function (): void {
+test('redispatches users whose digest last ran on a prior local day', function (): void {
     // last sent yesterday morning local time = due today.
     $due = User::factory()->create([
         'timezone' => 'Europe/Amsterdam',

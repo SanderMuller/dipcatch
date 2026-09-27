@@ -152,9 +152,9 @@ final class ResolveSocialUser
             'two_factor_confirmed_at' => null,
         ])->save();
 
-        // A password change ends none of these on its own: provider links,
-        // passkeys, stored sessions, and the MCP access the squatter approved
-        // while unverified.
+        // The new password ends the squatter's browser sessions on their next
+        // request. It does not end provider links, passkeys, or OAuth tokens
+        // issued before unverified accounts were kept off MCP.
         ($this->revokeCredentials)($user);
     }
 

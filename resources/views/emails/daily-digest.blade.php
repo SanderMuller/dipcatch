@@ -85,7 +85,7 @@ $image = $product->safeImageUrl();
     $unitWord = \App\Support\UnitWord::forCode($event->comparison_unit);
     $perUnit = $event->comparison_unit !== null && $event->new_unit_price !== null;
     $unitLabel = \App\Support\UnitWord::labelFor($event->comparison_unit);
-    $changeLabel = '↓ ' . number_format((float) $event->drop_pct, 1, '.', '') . '%'
+    $changeLabel = '↓ ' . \App\Support\Numeric::percent($event->drop_pct)
         . ($unitWord === null ? '' : ' ' . $unitWord);
 
     if ($event->drop_abs !== null) {

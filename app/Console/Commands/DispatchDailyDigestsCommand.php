@@ -54,7 +54,7 @@ final class DispatchDailyDigestsCommand extends Command
             // "Already ran today" = digest_processed_until falls on the same
             // local date as `localNow`. Comparing local-dates in SQL would
             // need timezone gymnastics, so we use a UTC lower bound: anyone
-            // whose last digest is older than the start-of-today-local
+            // whose digest last ran before the start-of-today-local
             // (converted to UTC) is still due.
             $startOfTodayLocalUtc = $localNow->startOfDay()->setTimezone('UTC');
 
