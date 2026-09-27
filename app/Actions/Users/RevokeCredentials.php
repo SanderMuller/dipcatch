@@ -20,16 +20,11 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class RevokeCredentials
 {
+    public function __construct(private RevokeOAuthAccess $revokeOAuthAccess) {}
+
     public function __invoke(User $user): void
     {
-        // A subquery rather than a plucked list, so a token exchanged while
-        // this runs is not missed between the read and the delete.
-        DB::table('oauth_refresh_tokens')
-            ->whereIn('access_token_id', DB::table('oauth_access_tokens')->select('id')->where('user_id', $user->getKey()))
-            ->delete();
-        DB::table('oauth_access_tokens')->where('user_id', $user->getKey())->delete();
-        DB::table('oauth_auth_codes')->where('user_id', $user->getKey())->delete();
-        DB::table('oauth_device_codes')->where('user_id', $user->getKey())->delete();
+        ($this->revokeOAuthAccess)($user);
         DB::table('sessions')->where('user_id', $user->getKey())->delete();
         DB::table('password_reset_tokens')->where('email', $user->email)->delete();
 
