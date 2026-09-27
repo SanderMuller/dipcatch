@@ -573,6 +573,37 @@ it('ignores a deal at a shop that is not the cheapest', function (): void {
     livewire(ProductList::class)->set('discounted', true)->assertDontSee('Deal elsewhere');
 });
 
+it('with a shop chosen, shows only the products on discount at that shop', function (): void {
+    $user = User::factory()->create();
+    $drop = ['last_notified_price' => '2.00', 'last_notified_at' => now()];
+
+    $dealHere = productWithCheapestShop($user, 'Deal at ah', ['url' => 'https://jumbo.com/p/1', 'host' => 'jumbo.com']);
+    Shop::factory()->for($dealHere)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '3.00', 'promotion_ends_at' => now()->addDays(3)]);
+    $dealThere = productWithCheapestShop($user, 'Deal at jumbo', ['url' => 'https://jumbo.com/p/2', 'host' => 'jumbo.com', 'promotion_ends_at' => now()->addDays(3)]);
+    Shop::factory()->for($dealThere)->create(['url' => 'https://ah.nl/p/2', 'current_price' => '3.00']);
+    $dropHere = productWithCheapestShop($user, 'Drop at ah', ['url' => 'https://ah.nl/p/3', 'host' => 'ah.nl'], $drop);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $dropHere->id]);
+    $dropThere = productWithCheapestShop($user, 'Drop at jumbo', ['url' => 'https://jumbo.com/p/4', 'host' => 'jumbo.com'], $drop);
+    Shop::factory()->for($dropThere)->create(['url' => 'https://ah.nl/p/4', 'current_price' => '3.00']);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $dropThere->id]);
+    productWithCheapestShop($user, 'Full price at ah', ['url' => 'https://ah.nl/p/5', 'host' => 'ah.nl']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('shop', 'ah.nl')
+        ->set('discounted', true)
+        ->assertSee('Deal at ah')
+        ->assertSee('Drop at ah')
+        ->assertDontSee('Deal at jumbo')
+        ->assertDontSee('Drop at jumbo')
+        ->assertDontSee('Full price at ah')
+        // Without a shop, a deal or drop at any shop the card leads with counts.
+        ->set('shop', '')
+        ->assertSee('Deal at jumbo')
+        ->assertSee('Drop at jumbo');
+});
+
 it('says so when no product has a discount', function (): void {
     $user = User::factory()->create();
     Product::factory()->create(['user_id' => $user->id, 'title' => 'Full price']);

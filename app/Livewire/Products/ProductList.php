@@ -173,15 +173,9 @@ final class ProductList extends Component
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', $this->status === 'active'),
             )
             ->when($this->discounted, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where(
-                fn (EloquentQueryBuilder $discount): EloquentQueryBuilder => $discount
-                    ->inVisibleDrop()
-                    // A deal at either shop a card names: the lowest price, or
-                    // the best value it leads with.
-                    ->orWhereHas('cheapestShop', self::dealRunningNow(...))
-                    // A string column beside a uuid key: cast for PostgreSQL.
-                    ->orWhereExists(self::dealRunningNow(
-                        Shop::query()->select(DB::raw(1))->whereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id'),
-                    )),
+                fn (EloquentQueryBuilder $discount): EloquentQueryBuilder => $this->shop === ''
+                    ? self::discountedAnywhere($discount)
+                    : self::discountedAt($discount, $this->shop),
             ))
             ->when(
                 $categories !== null,
@@ -204,6 +198,45 @@ final class ProductList extends Component
             ->orderBy('id', 'desc')
             // 24 fills whole rows at one, two, three and four cards across.
             ->paginate(24);
+    }
+
+    /**
+     * In a drop, or with a deal at either shop a card names: the lowest price,
+     * or the best value it leads with.
+     *
+     * @param  EloquentQueryBuilder<Product>  $query
+     * @return EloquentQueryBuilder<Product>
+     */
+    private static function discountedAnywhere(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query
+            ->inVisibleDrop()
+            ->orWhereHas('cheapestShop', self::dealRunningNow(...))
+            // A string column beside a uuid key: cast for PostgreSQL.
+            ->orWhereExists(self::dealRunningNow(
+                Shop::query()->select(DB::raw(1))->whereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id'),
+            ));
+    }
+
+    /**
+     * On discount at this shop itself: a deal running there, or a drop to the
+     * price there, which is the lowest price or the best value.
+     *
+     * @param  EloquentQueryBuilder<Product>  $query
+     * @return EloquentQueryBuilder<Product>
+     */
+    private static function discountedAt(EloquentQueryBuilder $query, string $host): EloquentQueryBuilder
+    {
+        return $query
+            ->whereHas('shops', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => self::dealRunningNow($shop->where('host', $host)->where('active', true)))
+            ->orWhere(fn (EloquentQueryBuilder $drop): EloquentQueryBuilder => $drop
+                ->inVisibleDrop()
+                ->where(fn (EloquentQueryBuilder $there): EloquentQueryBuilder => $there
+                    ->whereHas('cheapestShop', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $shop->where('host', $host))
+                    ->orWhereExists(Shop::query()
+                        ->select(DB::raw(1))
+                        ->whereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id')
+                        ->where('host', $host))));
     }
 
     /**

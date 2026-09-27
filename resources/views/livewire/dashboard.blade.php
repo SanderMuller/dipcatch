@@ -71,7 +71,9 @@
                     @foreach ($digest->trips as $trip)
                         <li class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-6" wire:key="trip-{{ $trip['host'] }}">
                             <div class="w-40 shrink-0">
-                                <p class="font-semibold"><x-shop-link :shop="$trip['shop']" /></p>
+                                <p class="font-semibold">
+                                    <a href="{{ route('app.products.index', ['shop' => $trip['host'], ...($trip['onOffer'] > 0 ? ['discounted' => 'true'] : [])]) }}" wire:navigate class="inline-flex max-w-full min-w-0 items-center underline-offset-4 hover:underline">{!! \App\Support\Favicon::html($trip['host']) !!}</a>
+                                </p>
                                 <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ trans_choice(':count best buy|:count best buys', $trip['count'], ['count' => $trip['count']]) }}</p>
                             </div>
                             <div class="flex min-w-0 flex-1 items-center gap-3">

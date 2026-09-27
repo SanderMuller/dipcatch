@@ -100,3 +100,17 @@ it('shows where to shop this week on the dashboard, and only this account\'s pro
         ->assertSeeInOrder(['ah.nl', 'My coffee'])
         ->assertDontSee('Someone elses tea');
 });
+
+it('links a trip\'s shop to its products there, only the discounted ones when some are on offer', function (): void {
+    $user = User::factory()->create();
+    $onOffer = digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com');
+    $onOffer->shops->firstWhere('host', 'ah.nl')?->forceFill(['promotion_ends_at' => now()->addDays(2)])->save();
+    digestProduct($user, 'Tea', 'jumbo.com', 'ah.nl');
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertSeeHtml('href="' . e(route('app.products.index', ['shop' => 'ah.nl', 'discounted' => 'true'])) . '"')
+        ->assertSeeHtml('href="' . e(route('app.products.index', ['shop' => 'jumbo.com'])) . '"')
+        ->assertDontSeeHtml('href="' . e(route('app.products.index', ['shop' => 'jumbo.com', 'discounted' => 'true'])) . '"');
+});
