@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Services\TypeSafe\TypeSafeClient;
+use App\Support\DashboardDigest;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
@@ -54,6 +55,10 @@ final class ProductList extends Component
     /** Only products in an active drop, or with a deal running now at their cheapest or best-value shop. */
     #[Url(except: false)]
     public bool $discounted = false;
+
+    /** With a shop chosen: only the products that shop is the best buy for, as the dashboard counts them. */
+    #[Url(except: false)]
+    public bool $bestBuy = false;
 
     #[Url(except: self::DEFAULT_SORT)]
     public string $sort = self::DEFAULT_SORT;
@@ -119,9 +124,24 @@ final class ProductList extends Component
     public function updatedShop(): void
     {
         $this->resetPage();
+
+        // The best-buy filter means nothing without a shop.
+        if ($this->shop === '') {
+            $this->bestBuy = false;
+        }
     }
 
     public function updatedDiscounted(): void
+    {
+        $this->resetPage();
+    }
+
+    private function bestBuyFilterOn(): bool
+    {
+        return $this->bestBuy && $this->shop !== '';
+    }
+
+    public function updatedBestBuy(): void
     {
         $this->resetPage();
     }
@@ -172,7 +192,8 @@ final class ProductList extends Component
                 in_array($this->status, ['active', 'paused'], strict: true),
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', $this->status === 'active'),
             )
-            ->when($this->discounted, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where(
+            // With best buys on, the offers come from the same rule as the dashboard badge, below.
+            ->when($this->discounted && ! $this->bestBuyFilterOn(), fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where(
                 fn (EloquentQueryBuilder $discount): EloquentQueryBuilder => $this->shop === ''
                     ? self::discountedAnywhere($discount)
                     : self::discountedAt($discount, $this->shop),
@@ -182,6 +203,9 @@ final class ProductList extends Component
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []),
             )
             ->when($this->category === self::NO_CATEGORY, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('category'))
+            ->when($this->bestBuyFilterOn(), fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereKey(
+                auth()->user() instanceof User ? DashboardDigest::bestBuyIds(auth()->user(), $this->shop, onOfferOnly: $this->discounted) : [],
+            ))
             ->when($this->shop !== '', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereHas(
                 'shops',
                 fn (EloquentQueryBuilder $shops): EloquentQueryBuilder => $shops->where('host', $this->shop)->where('active', true),

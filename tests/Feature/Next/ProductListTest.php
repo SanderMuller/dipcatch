@@ -875,3 +875,56 @@ it('lists a shop that can no longer be read in the hover, marked as such', funct
 
     expect(preg_replace('/\s+/', ' ', strip_tags($match[0] ?? '')))->toContain('2 shops')->toMatch('/dirk\.nl Not readable/');
 });
+
+it('with a shop chosen, shows only the products that shop is the best buy for', function (): void {
+    $user = User::factory()->create();
+    $make = function (string $title, string $cheapHost, string $dearHost) use ($user): void {
+        $product = Product::factory()->for($user)->create(['title' => $title, 'currency' => 'EUR']);
+        Shop::factory()->for($product)->create(['url' => "https://{$cheapHost}/p/1", 'current_price' => '1.00', 'currency' => 'EUR']);
+        Shop::factory()->for($product)->create(['url' => "https://{$dearHost}/p/1", 'current_price' => '2.00', 'currency' => 'EUR']);
+        $product->refresh()->recomputeCheapestShop();
+    };
+    $make('Cheapest at ah', 'ah.nl', 'jumbo.com');
+    $make('Cheapest at jumbo', 'jumbo.com', 'ah.nl');
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('shop', 'ah.nl')
+        ->assertSee('Cheapest at ah')
+        ->assertSee('Cheapest at jumbo')
+        ->set('bestBuy', true)
+        ->assertSee('Cheapest at ah')
+        ->assertDontSee('Cheapest at jumbo')
+        // Without a shop the filter has nothing to compare against, so it switches off.
+        ->set('shop', '')
+        ->assertSet('bestBuy', false)
+        ->assertSee('Cheapest at jumbo');
+});
+
+it('names the best-buy filter when it alone empties the list, and the whole filter otherwise', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['title' => 'Coffee', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '1.00', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '2.00', 'currency' => 'EUR']);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('shop', 'ah.nl')
+        ->set('bestBuy', true)
+        ->assertSee('No product has its best buy at that shop right now.')
+        ->set('search', 'Coffee')
+        ->assertDontSee('No product has its best buy at that shop right now.')
+        ->assertSee('No product matches this filter.');
+});
+
+it('offers the best-buy filter only with a shop chosen', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    livewire(ProductList::class)
+        ->assertDontSeeHtml('data-test="product-best-buy-filter"')
+        ->set('shop', 'ah.nl')
+        ->assertSeeHtml('data-test="product-best-buy-filter"');
+});

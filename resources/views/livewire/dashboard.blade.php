@@ -72,9 +72,9 @@
                         <li class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-6" wire:key="trip-{{ $trip['host'] }}">
                             <div class="w-40 shrink-0">
                                 <p class="font-semibold">
-                                    <a href="{{ route('app.products.index', ['shop' => $trip['host'], ...($trip['onOffer'] > 0 ? ['discounted' => 'true'] : [])]) }}" wire:navigate class="inline-flex max-w-full min-w-0 items-center underline-offset-4 hover:underline">{!! \App\Support\Favicon::html($trip['host']) !!}</a>
+                                    <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true']) }}" wire:navigate class="inline-flex max-w-full min-w-0 items-center underline-offset-4 hover:underline">{!! \App\Support\Favicon::html($trip['host']) !!}</a>
                                 </p>
-                                <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ trans_choice(':count best buy|:count best buys', $trip['count'], ['count' => $trip['count']]) }}</p>
+                                <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true']) }}" wire:navigate class="text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400">{{ trans_choice(':count best buy|:count best buys', $trip['count'], ['count' => $trip['count']]) }}</a>
                             </div>
                             <div class="flex min-w-0 flex-1 items-center gap-3">
                                 <div class="flex shrink-0 -space-x-3">
@@ -91,7 +91,8 @@
                             </div>
                             <div class="flex shrink-0 items-center gap-3">
                                 @if ($trip['onOffer'] > 0)
-                                    <span class="rounded-full bg-savings/10 px-2 py-0.5 text-xs font-semibold text-savings-strong">{{ trans_choice(':count on offer|:count on offer', $trip['onOffer'], ['count' => $trip['onOffer']]) }}</span>
+                                    {{-- Best buys and discounted: the same products the badge counts, not every deal at the shop. --}}
+                                    <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true', 'discounted' => 'true']) }}" wire:navigate class="rounded-full bg-savings/10 px-2 py-0.5 text-xs font-semibold text-savings-strong hover:bg-savings/20">{{ trans_choice(':count on offer|:count on offer', $trip['onOffer'], ['count' => $trip['onOffer']]) }}</a>
                                 @endif
                                 <a href="{{ route('app.products.index', ['shop' => $trip['host']]) }}" wire:navigate class="inline-flex items-center gap-1 text-sm font-medium text-brand">{{ __('Everything at :shop', ['shop' => $trip['host']]) }} <flux:icon.arrow-right variant="micro" class="size-4" /></a>
                             </div>

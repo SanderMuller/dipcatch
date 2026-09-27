@@ -50,22 +50,10 @@ final readonly class DashboardDigest
     {
         $now ??= CarbonImmutable::now();
 
-        $tripProducts = self::activeProducts($user)
-            ->with(['cheapestShop', 'shops'])
-            // Products in a drop first, so a cap keeps the ones worth a trip.
-            ->orderByRaw('last_notified_price is null')
-            ->latest('updated_at')
-            ->limit(Entitlements::of(Plan::Pro)->maxProducts() ?? self::TRIP_PRODUCTS)
-            ->get();
-
-        $inDrop = self::activeProducts($user)
-            ->whereKey($tripProducts->modelKeys())
-            ->inVisibleDrop()
-            ->pluck('id')
-            ->all();
+        $tripProducts = self::tripProducts($user);
 
         return new self(
-            trips: self::trips($tripProducts, array_values(array_filter($inDrop, is_string(...)))),
+            trips: self::trips($tripProducts, self::inDrop($user, $tripProducts)),
             endingSoon: self::endingSoon($user, $now),
             failing: self::failing($user),
             singleShop: array_values(self::activeProducts($user)
@@ -76,6 +64,65 @@ final readonly class DashboardDigest
                 ->get()
                 ->all()),
         );
+    }
+
+    /**
+     * The ids of the products a trip to this shop holds, or only the ones it
+     * counts as on offer: the rows behind the dashboard's two numbers, for the
+     * product list to filter on.
+     *
+     * @return list<string>
+     */
+    public static function bestBuyIds(User $user, string $host, bool $onOfferOnly = false): array
+    {
+        $products = self::tripProducts($user);
+        $items = self::itemsByHost($products, self::inDrop($user, $products))[$host] ?? [];
+
+        return array_values(array_map(
+            fn (array $item): string => (string) $item['product']->id,
+            array_filter($items, fn (array $item): bool => ! $onOfferOnly || $item['onOffer']),
+        ));
+    }
+
+    /**
+     * @param  EloquentCollection<int, Product>  $products
+     * @return list<string>
+     */
+    private static function inDrop(User $user, EloquentCollection $products): array
+    {
+        $ids = self::activeProducts($user)
+            ->whereKey($products->modelKeys())
+            ->inVisibleDrop()
+            ->pluck('id')
+            ->all();
+
+        return array_values(array_filter($ids, is_string(...)));
+    }
+
+    /**
+     * @return EloquentCollection<int, Product>
+     */
+    private static function tripProducts(User $user): EloquentCollection
+    {
+        return self::activeProducts($user)
+            ->with(['cheapestShop', 'shops'])
+            // Products in a drop first, so a cap keeps the ones worth a trip.
+            ->orderByRaw('last_notified_price is null')
+            ->latest('updated_at')
+            ->limit(Entitlements::of(Plan::Pro)->maxProducts() ?? self::TRIP_PRODUCTS)
+            ->get();
+    }
+
+    /**
+     * The shop the product card leads with, when it sells the product now.
+     * With none, the headline falls back to the last cheapest shop, which may
+     * be sold out or switched off, and the product belongs to no trip.
+     */
+    private static function bestBuyShop(Product $product): ?Shop
+    {
+        $shop = HeadlinePrice::of($product)->shop;
+
+        return $shop instanceof Shop && $product->eligibleShops()->contains($shop) ? $shop : null;
     }
 
     /**
@@ -107,27 +154,9 @@ final readonly class DashboardDigest
      */
     private static function trips(EloquentCollection $products, array $inDrop): array
     {
-        $byHost = [];
-
-        foreach ($products as $product) {
-            $shop = HeadlinePrice::of($product)->shop;
-
-            // Only a shop that sells it now. With none, the headline falls back
-            // to the last cheapest shop, which may be sold out or switched off.
-            if (! $shop instanceof Shop || ! $product->eligibleShops()->contains($shop)) {
-                continue;
-            }
-
-            $byHost[$shop->host][] = [
-                'product' => $product,
-                'shop' => $shop,
-                'onOffer' => in_array($product->id, $inDrop, true) || PromotionLabel::runningDeal($shop) !== null,
-            ];
-        }
-
         $trips = [];
 
-        foreach ($byHost as $host => $items) {
+        foreach (self::itemsByHost($products, $inDrop) as $host => $items) {
             // Offers first, so the products a trip shows are the ones worth the
             // trip; then by id, so equal items keep their place between visits
             // instead of following whichever product was rechecked last.
@@ -147,6 +176,34 @@ final readonly class DashboardDigest
         usort($trips, fn (array $a, array $b): int => [$b['count'], $b['onOffer'], $a['host']] <=> [$a['count'], $a['onOffer'], $b['host']]);
 
         return array_slice($trips, 0, self::TRIPS);
+    }
+
+    /**
+     * Each product under the shop it is the best buy at, and whether it counts as on offer there.
+     *
+     * @param  EloquentCollection<int, Product>  $products
+     * @param  array<int, string>  $inDrop
+     * @return array<string, list<array{product: Product, shop: Shop, onOffer: bool}>>
+     */
+    private static function itemsByHost(EloquentCollection $products, array $inDrop): array
+    {
+        $byHost = [];
+
+        foreach ($products as $product) {
+            $shop = self::bestBuyShop($product);
+
+            if (! $shop instanceof Shop) {
+                continue;
+            }
+
+            $byHost[$shop->host][] = [
+                'product' => $product,
+                'shop' => $shop,
+                'onOffer' => in_array($product->id, $inDrop, true) || PromotionLabel::runningDeal($shop) !== null,
+            ];
+        }
+
+        return $byHost;
     }
 
     /**

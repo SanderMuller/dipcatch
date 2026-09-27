@@ -101,7 +101,7 @@ it('shows where to shop this week on the dashboard, and only this account\'s pro
         ->assertDontSee('Someone elses tea');
 });
 
-it('links a trip\'s shop to its products there, only the discounted ones when some are on offer', function (): void {
+it('links a trip\'s best buys and its offers to the product list rows they count', function (): void {
     $user = User::factory()->create();
     $onOffer = digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com');
     $onOffer->shops->firstWhere('host', 'ah.nl')?->forceFill(['promotion_ends_at' => now()->addDays(2)])->save();
@@ -110,7 +110,26 @@ it('links a trip\'s shop to its products there, only the discounted ones when so
     $this->actingAs($user);
 
     livewire(Dashboard::class)
-        ->assertSeeHtml('href="' . e(route('app.products.index', ['shop' => 'ah.nl', 'discounted' => 'true'])) . '"')
-        ->assertSeeHtml('href="' . e(route('app.products.index', ['shop' => 'jumbo.com'])) . '"')
-        ->assertDontSeeHtml('href="' . e(route('app.products.index', ['shop' => 'jumbo.com', 'discounted' => 'true'])) . '"');
+        ->assertSeeHtml('href="' . e(route('app.products.index', ['shop' => 'ah.nl', 'bestBuy' => 'true'])) . '"')
+        ->assertSeeHtml('href="' . e(route('app.products.index', ['shop' => 'ah.nl', 'bestBuy' => 'true', 'discounted' => 'true'])) . '"')
+        ->assertSeeHtml('href="' . e(route('app.products.index', ['shop' => 'jumbo.com', 'bestBuy' => 'true'])) . '"')
+        ->assertDontSeeHtml('href="' . e(route('app.products.index', ['shop' => 'jumbo.com', 'bestBuy' => 'true', 'discounted' => 'true'])) . '"');
+});
+
+it('finds the same best buys for a shop as the trip counts', function (): void {
+    $user = User::factory()->create();
+    $coffee = digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com');
+    $tea = digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com');
+    digestProduct($user, 'Milk', 'jumbo.com', 'ah.nl');
+    digestProduct(User::factory()->create(), 'Not mine', 'ah.nl', 'jumbo.com');
+
+    $trip = collect(DashboardDigest::forUser($user)->trips)->firstWhere('host', 'ah.nl');
+
+    $coffee->shops->firstWhere('host', 'ah.nl')?->forceFill(['promotion_ends_at' => now()->addDays(2)])->save();
+    // A deal at the shop that is not the best buy does not put a product on offer in this trip.
+    $tea->shops->firstWhere('host', 'jumbo.com')?->forceFill(['promotion_ends_at' => now()->addDays(2)])->save();
+
+    expect(DashboardDigest::bestBuyIds($user, 'ah.nl'))->toEqualCanonicalizing([$coffee->id, $tea->id])
+        ->and($trip['count'] ?? null)->toBe(2)
+        ->and(DashboardDigest::bestBuyIds($user, 'ah.nl', onOfferOnly: true))->toBe([$coffee->id]);
 });
