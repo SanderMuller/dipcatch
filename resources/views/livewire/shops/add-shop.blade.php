@@ -105,6 +105,12 @@
                              with nothing saying the other two existed. --}}
                         <flux:text size="sm" class="mt-1 text-zinc-500">{{ $variantNote }}</flux:text>
                     @endif
+                    @if ($variantPicked)
+                        <div class="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-zinc-500" data-test="picked-variant">
+                            <span>{{ __('This page sells several packs. DipCatch picked the one that matches this product\'s size.') }}</span>
+                            <flux:button variant="ghost" size="xs" wire:click="chooseAnotherVariant">{{ __('Choose another') }}</flux:button>
+                        </div>
+                    @endif
                     @if ($bundleLabel)
                         <flux:text size="sm" class="mt-1 text-zinc-500">{{ $bundleLabel }}</flux:text>
                     @endif

@@ -485,3 +485,82 @@ test('the variant chooser states a price per unit for a variant whose name gives
         ->assertSee('€3.00 /l · €0.99 for 330 ml · can')
         ->assertSee('€1.53 /l · €2.29 for 1.5 L · bottle');
 });
+
+/**
+ * A page like brekz.nl: one Product named without a size, each variant an
+ * offer naming its own, and no variant in the URL.
+ */
+function fakePackVariantsPage(): void
+{
+    $offer = static fn (string $size, string $price, string $sku): array => [
+        '@type' => 'Offer',
+        'name' => 'Iams Adult met verse kip - ' . $size,
+        'price' => $price,
+        'priceCurrency' => 'EUR',
+        'sku' => $sku,
+        'availability' => 'https://schema.org/InStock',
+    ];
+
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/iams-kip.html' => Http::response(withJsonLd(json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'Product',
+            'name' => 'Iams Adult met verse kip',
+            'offers' => [$offer('3 kg', '15.89', 'kip-3'), $offer('10 kg', '24.97', 'kip-10'), $offer('2 x 10 kg', '48.94', 'kip-20')],
+        ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']),
+    ]);
+}
+
+test('a variant matching the pack the product already tracks is picked without asking', function (): void {
+    fakePackVariantsPage();
+    $product = Product::factory()->create(['currency' => 'EUR', 'title' => 'IAMS Adult met Kip']);
+    Shop::factory()->for($product)->create(['pack_quantity' => 10000, 'pack_unit' => 'g']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/iams-kip.html')
+        ->call('probe')
+        ->assertSet('state', 'preview')
+        ->assertSet('snapshot.price', '24.97')
+        ->assertSet('variantPicked', true)
+        ->assertSeeHtml('data-test="picked-variant"')
+        ->call('confirm');
+
+    expect($product->shops()->where('variant_key', 'kip-10')->sole()->current_price)->toBe('24.97');
+});
+
+test('a picked variant can be swapped for another from the preview', function (): void {
+    fakePackVariantsPage();
+    $product = Product::factory()->create(['currency' => 'EUR', 'title' => 'IAMS Adult met Kip 10 kg']);
+    $this->actingAs($product->user()->sole());
+
+    // No shop states a size yet, so the product's own title answers.
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/iams-kip.html')
+        ->call('probe')
+        ->assertSet('chosenVariantKey', 'kip-10')
+        ->call('chooseAnotherVariant')
+        ->assertSet('state', 'variant_chooser')
+        ->set('chosenVariantKey', 'kip-3')
+        ->call('selectVariant')
+        ->assertSet('state', 'preview')
+        ->assertSet('snapshot.price', '15.89')
+        ->assertSet('variantPicked', false)
+        ->call('confirm');
+
+    expect($product->shops()->sole()->variant_key)->toBe('kip-3');
+});
+
+test('a product whose shops sell different packs is asked, not guessed for', function (): void {
+    fakePackVariantsPage();
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['pack_quantity' => 10000, 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['pack_quantity' => 3000, 'pack_unit' => 'g']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/iams-kip.html')
+        ->call('probe')
+        ->assertSet('state', 'variant_chooser');
+});

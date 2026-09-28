@@ -54,6 +54,9 @@ trait DrivesShopProbe
 
     public ?string $chosenVariantKey = null;
 
+    /** True when the probe picked the variant itself, from the product's pack size. */
+    public bool $variantPicked = false;
+
     /**
      * The product the probe dedupes and currency-checks against, or null
      * in create mode (the probed currency then defines the product).
@@ -142,6 +145,9 @@ trait DrivesShopProbe
     ): void {
         $this->authorizeProbeSubject();
         $this->resetPreview();
+        // The key this probe asks for, and no other: a choice made for an
+        // earlier URL must not be saved against this one.
+        $this->chosenVariantKey = $variantKey;
         $url = trim($this->url);
 
         if ($url === '') {
@@ -188,7 +194,31 @@ trait DrivesShopProbe
         $this->state = 'variant_chooser';
         $this->normalizedUrl = $outcome->normalizedUrl;
         $this->host = $outcome->host;
-        $this->variants = array_map(
+        $this->variants = self::variantRows($outcome);
+        $this->chosenVariantKey ??= $this->variants[0]['key'] ?? null;
+    }
+
+    /**
+     * Back to the chooser from a preview whose variant the probe picked.
+     */
+    public function chooseAnotherVariant(): void
+    {
+        $this->authorizeProbeSubject();
+
+        if ($this->variants === null || $this->variants === []) {
+            return;
+        }
+
+        $this->state = 'variant_chooser';
+        $this->variantPicked = false;
+    }
+
+    /**
+     * @return list<array{key: string, title: string, price: string, currency: string}>
+     */
+    private static function variantRows(ProbeOutcome $outcome): array
+    {
+        return array_map(
             static fn (VariantCandidate $v): array => [
                 'key' => $v->key,
                 'title' => $v->title,
@@ -197,7 +227,6 @@ trait DrivesShopProbe
             ],
             $outcome->variants,
         );
-        $this->chosenVariantKey ??= $this->variants[0]['key'] ?? null;
     }
 
     /**
@@ -283,6 +312,12 @@ trait DrivesShopProbe
         $this->normalizedUrl = $outcome->normalizedUrl;
         $this->host = $outcome->host;
         $this->adapterKey = $outcome->adapterKey;
+        $this->variantPicked = $outcome->pickedVariantKey !== null;
+
+        if ($outcome->pickedVariantKey !== null) {
+            $this->chosenVariantKey = $outcome->pickedVariantKey;
+            $this->variants = self::variantRows($outcome);
+        }
 
         $this->onPreviewShown($outcome);
     }
@@ -344,6 +379,7 @@ trait DrivesShopProbe
             'imageSelector',
             'variants',
             'chosenVariantKey',
+            'variantPicked',
         ]);
         $this->state = 'idle';
         $this->manualCurrency = $this->defaultManualCurrency();

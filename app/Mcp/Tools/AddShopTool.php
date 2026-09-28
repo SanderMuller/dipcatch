@@ -15,6 +15,7 @@ use App\Mcp\Support\ProbeReporter;
 use App\Mcp\Support\ProductPresenter;
 use App\Models\Product;
 use App\Models\Shop;
+use App\PriceAdapters\VariantCandidate;
 use App\Services\ShopFetcher\HostFetchMemory;
 use App\Support\PackSize;
 use App\Support\UrlNormalizer;
@@ -121,9 +122,18 @@ final class AddShopTool extends Tool
             return $this->reporter->explain($outcome);
         }
 
+        $variantKey = $outcome->pickedVariantKey ?? $variantKey;
         $snapshot = ShopDraft::flatten($outcome);
 
         $preview = ['found' => $this->reporter->preview($snapshot, $outcome)];
+
+        if ($outcome->pickedVariantKey !== null) {
+            $preview['variant_note'] = 'The page names no variant, so the one matching the pack size already on this product was picked. To track another, call add_shop again with its variant_key.';
+            $preview['other_variants'] = array_map(
+                static fn (VariantCandidate $variant): array => ['variant_key' => $variant->key, 'title' => $variant->title, 'price' => $variant->price],
+                array_values(array_filter($outcome->variants, static fn (VariantCandidate $variant): bool => $variant->key !== $outcome->pickedVariantKey)),
+            );
+        }
 
         $mismatch = self::packSizeMismatch($product, $snapshot);
 

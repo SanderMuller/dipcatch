@@ -1004,3 +1004,46 @@ it('tells a caller that a dear shop is still worth adding', function (): void {
     expect($description)->toContain('even when its price is high today')
         ->and($description)->toContain('not whether it is cheap now');
 });
+
+it('picks the variant matching the product pack and says which others the page sells', function (): void {
+    $offer = static fn (string $size, string $price, string $sku): array => [
+        '@type' => 'Offer', 'name' => 'Iams Adult met verse kip - ' . $size, 'price' => $price, 'priceCurrency' => 'EUR', 'sku' => $sku,
+    ];
+
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/iams-kip.html' => Http::response(withJsonLd(json_encode([
+            '@type' => 'Product',
+            'name' => 'Iams Adult met verse kip',
+            'offers' => [$offer('3 kg', '15.89', 'kip-3'), $offer('10 kg', '24.97', 'kip-10')],
+        ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['pack_quantity' => 10000, 'pack_unit' => 'g']);
+
+    $draft = null;
+
+    DipCatchServer::actingAs($user)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'url' => 'https://shop.example.com/iams-kip.html'])
+        ->assertOk()
+        ->assertSee('24.97')
+        ->assertSee('matching the pack size already on this product')
+        ->assertSee('"variant_key":"kip-3"')
+        // The picked one is not an "other" variant.
+        ->assertDontSee('"variant_key":"kip-10"')
+        ->assertStructuredContent(function (AssertableJson $json) use (&$draft): void {
+            $json->where('draft', function (mixed $value) use (&$draft): bool {
+                $draft = $value;
+
+                return is_string($value);
+            })->etc();
+        });
+
+    DipCatchServer::actingAs($user)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'draft' => $draft, 'confirm' => true])
+        ->assertOk();
+
+    expect($product->shops()->where('variant_key', 'kip-10')->exists())->toBeTrue();
+});

@@ -8,6 +8,7 @@ use App\Models\Shop;
 use App\Models\User;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
+use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
@@ -138,6 +139,15 @@ final readonly class ProbeShopUrl
             context: $context,
         );
 
+        $variants = $extraction->variants;
+        [$picked, $extraction] = MatchingPackVariant::answer(
+            $product,
+            $extraction,
+            $variantKey,
+            fn (string $key): ExtractionResult => $this->resolver->resolve(url: $fetch->finalUrl, html: $fetch->html, context: $context->withVariantKey($key)),
+        ) ?? [null, $extraction];
+        $variantKey ??= $picked;
+
         if ($extraction->isAmbiguous()) {
             return ProbeOutcome::ambiguous(
                 variants: $extraction->variants,
@@ -181,6 +191,8 @@ final readonly class ProbeShopUrl
             normalizedUrl: $target,
             host: $fetch->host,
             adapterKey: $extraction->adapterKey ?? 'generic',
+            pickedVariantKey: $picked,
+            variants: $variants,
         );
     }
 
