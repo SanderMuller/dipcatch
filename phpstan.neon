@@ -31,19 +31,6 @@ parameters:
 
     tmpDir: .cache/phpstan
 
-    # symplify/phpstan-rules 14.17 registers its whole rule sets by default.
-    # This project opts into single rules under `rules:` above instead, so
-    # every set stays off.
-    symplify:
-        naming: false
-        complexity: false
-        configurable: false
-        static: false
-        symfony: false
-        symfonyConfig: false
-        doctrine: false
-        phpunit: false
-
     # Lets hihaho/phpstan-rules' RouteBindingReturnTypeExtension infer $this->route('x')
     # return types from the Route::model()/Route::bind() declarations in these providers.
     routeBindingProviders:
