@@ -4,7 +4,6 @@ use App\Livewire\Settings\Security;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
@@ -254,8 +253,11 @@ test('a user cannot open the delete modal for another users passkey', function (
     $this->actingAs($user);
 
     Livewire::test(Security::class)
-        ->call('confirmDelete', $otherPasskey->id);
-})->throws(ModelNotFoundException::class);
+        ->call('confirmDelete', $otherPasskey->id)
+        ->assertNotFound();
+
+    $this->assertModelExists($otherPasskey);
+});
 
 test('passkey well known endpoints advertise the security page', function (): void {
     $this->get('/.well-known/passkey-endpoints')
