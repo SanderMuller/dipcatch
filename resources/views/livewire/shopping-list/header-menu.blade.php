@@ -25,7 +25,8 @@
             </div>
         @else
             @foreach ($items as $item)
-                <flux:menu.item :href="route('app.products.show', $item['product'])" wire:navigate class="!h-auto !items-start py-2" wire:key="shopping-menu-{{ $item['product']->id }}">
+                <flux:menu.item :href="route('app.products.show', $item['product'])" wire:navigate class="!h-auto !items-center gap-3 py-2" wire:key="shopping-menu-{{ $item['product']->id }}">
+                    <x-product-thumb :product="$item['product']" size="size-10" />
                     <div class="grid min-w-0 gap-0.5">
                         <flux:text class="truncate font-medium">{{ $item['product']->title }}</flux:text>
                         <flux:text size="sm" class="truncate text-zinc-500">

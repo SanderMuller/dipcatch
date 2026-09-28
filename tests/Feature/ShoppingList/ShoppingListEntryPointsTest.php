@@ -83,7 +83,7 @@ it('marks a listed product on its card, and no other', function (): void {
 
     $html = livewire(ProductList::class)->html();
 
-    expect(substr_count($html, '>On list<'))->toBe(1)
+    expect(substr_count($html, 'group/list'))->toBe(1)
         ->and($html)->toContain('aria-label="Remove Listed coffee from shopping list"')
         ->and($html)->toContain('aria-label="Add Plain tea to shopping list"');
 });
@@ -98,6 +98,7 @@ it('shows the open count, the first items and the way to the list in the header'
     livewire(HeaderMenu::class)
         ->assertSeeHtml('data-test="shopping-list-badge"')
         ->assertSeeInOrder(['Coffee', '€2.49', 'ah.nl'])
+        ->assertSeeHtml('src="' . e(Product::query()->where('title', 'Coffee')->firstOrFail()->safeImageUrl()) . '"')
         ->assertDontSee('Crossed tea')
         ->assertSeeHtml('href="' . route('app.shopping-list') . '"')
         ->assertSeeHtml('wire:poll.60s');

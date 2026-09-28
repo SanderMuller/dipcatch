@@ -43,7 +43,7 @@
                 @endunless
                 @class([
                     'absolute top-5 left-5 z-10 flex items-center gap-1 rounded-full text-xs font-medium shadow-xs ring-1 backdrop-blur-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-white',
-                    'bg-white/90 px-2 py-0.5 text-zinc-700 ring-black/5 hover:bg-white dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10' => $product->isOnShoppingList(),
+                    'group/list bg-white/90 px-2 py-0.5 text-zinc-700 ring-black/5 hover:bg-red-50 hover:text-red-700 hover:ring-red-200 focus-visible:bg-red-50 focus-visible:text-red-700 dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10 dark:hover:bg-red-950/80 dark:hover:text-red-200 dark:focus-visible:bg-red-950/80 dark:focus-visible:text-red-200' => $product->isOnShoppingList(),
                     'size-8 justify-center bg-white/90 text-zinc-600 ring-black/5 hover:bg-white hover:text-zinc-900 dark:bg-zinc-800/90 dark:text-zinc-300 dark:ring-white/10 dark:hover:text-white' => ! $product->isOnShoppingList(),
                 ])
                 aria-label="{{ $product->isOnShoppingList() ? __('Remove :title from shopping list', ['title' => $product->title]) : __('Add :title to shopping list', ['title' => $product->title]) }}"
@@ -51,8 +51,15 @@
                 data-test="card-list-toggle"
             >
                 @if ($product->isOnShoppingList())
-                    <flux:icon.check variant="micro" class="size-3.5" />
-                    <span aria-hidden="true">{{ __('On list') }}</span>
+                    {{-- Says what a click does once the pointer or focus is on it. --}}
+                    <span class="flex items-center gap-1 group-hover/list:hidden group-focus-visible/list:hidden" aria-hidden="true">
+                        <flux:icon.check variant="micro" class="size-3.5" />
+                        {{ __('On list') }}
+                    </span>
+                    <span class="hidden items-center gap-1 group-hover/list:flex group-focus-visible/list:flex" aria-hidden="true">
+                        <flux:icon.x-mark variant="micro" class="size-3.5" />
+                        {{ __('Remove') }}
+                    </span>
                 @else
                     <flux:icon.list-bullet variant="micro" class="size-4" />
                 @endif
