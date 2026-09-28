@@ -37,7 +37,7 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, OwnsHosts, S
      * for example a pack size its JSON-LD leaves ambiguous. Unchanged by
      * default.
      */
-    protected function refine(ShopSnapshot $snapshot, string $url, string $html): ShopSnapshot
+    protected function refine(ShopSnapshot $snapshot, string $url, string $html, ?AdapterContext $context): ShopSnapshot
     {
         return $snapshot;
     }
@@ -67,7 +67,7 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, OwnsHosts, S
         $jsonLd = new JsonLdAdapter()->extract($url, $html, $context);
 
         if ($jsonLd->snapshot !== null && $jsonLd->isSuccess()) {
-            return ExtractionResult::success($this->refine($jsonLd->snapshot, $url, $html));
+            return ExtractionResult::success($this->refine($jsonLd->snapshot, $url, $html, $context));
         }
 
         // A page that lists several variants and states no way to tell
@@ -80,7 +80,7 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, OwnsHosts, S
 
         $snapshot = $this->extractFromHtml($html, $currency);
         if ($snapshot !== null) {
-            return ExtractionResult::success($this->refine($snapshot, $url, $html));
+            return ExtractionResult::success($this->refine($snapshot, $url, $html, $context));
         }
 
         return ExtractionResult::failed($this->key() . '_extraction_failed');

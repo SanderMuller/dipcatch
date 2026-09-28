@@ -143,7 +143,7 @@ HTML;
  *
  * @param  array<string, mixed>  $unit
  */
-function bitibaSalePage(array $unit = [], ?string $activeVariant = '397805.33'): string
+function bitibaSalePage(array $unit = [], ?string $activeVariant = '397805.33', float $otherPrice = 13.19): string
 {
     $jsonLd = json_encode([
         '@context' => 'https://schema.org',
@@ -179,7 +179,7 @@ function bitibaSalePage(array $unit = [], ?string $activeVariant = '397805.33'):
     $state = json_encode(['props' => ['pageProps' => ['pageLevelProps' => [
         'activeVariantFromUrl' => $activeVariant,
         'productDetails' => ['product' => ['articleVariants' => [
-            $variant(32, 13.19, ['unitPriceRaw' => 4.4, 'unitQuantity' => 3, 'unitName' => 'kg', 'unitNameRaw' => 'kg']),
+            $variant(32, $otherPrice, ['unitPriceRaw' => 4.4, 'unitQuantity' => 3, 'unitName' => 'kg', 'unitNameRaw' => 'kg']),
             $variant(33, 31.99, [...['unitPriceRaw' => 3.2, 'unitQuantity' => 10, 'unitName' => 'kg', 'unitNameRaw' => 'kg'], ...$unit], [
                 ['discountedPriceRaw' => 28.79, 'label' => '-10%', 'type' => 'ABD'],
             ]),
@@ -230,8 +230,36 @@ test('the page state of another variant is not read for this one', function (): 
     expect($result->snapshot?->packSizeAuthoritative)->toBeFalse();
 });
 
-test('a page that names no variant and sells several states no size', function (): void {
+test('a variant the user chose is read even when the page names none', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.bitiba.nl/shop/katten/iams_adult/397805',
+        bitibaSalePage(activeVariant: null, otherPrice: 28.79),
+        new AdapterContext(variantKey: '397805.33'),
+    );
+
+    expect($result->snapshot?->packSize)->toBe('10 kg');
+});
+
+test('a bare variant id in the URL names the variant', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.bitiba.nl/shop/katten/iams_adult/397805?activeVariant=33',
+        bitibaSalePage(activeVariant: null, otherPrice: 28.79),
+    );
+
+    expect($result->snapshot?->packSize)->toBe('10 kg');
+});
+
+test('with no variant named, the only variant selling at the tracked price is read', function (): void {
     $result = $this->adapter->extract('https://www.bitiba.nl/shop/katten/iams_adult/397805', bitibaSalePage(activeVariant: null));
+
+    expect($result->snapshot?->packSize)->toBe('10 kg');
+});
+
+test('with no variant named and two selling at the tracked price, no size is read', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.bitiba.nl/shop/katten/iams_adult/397805',
+        bitibaSalePage(activeVariant: null, otherPrice: 28.79),
+    );
 
     expect($result->snapshot?->packSizeAuthoritative)->toBeFalse();
 });

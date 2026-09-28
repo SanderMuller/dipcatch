@@ -14,43 +14,80 @@ use App\Support\PackSize;
 final readonly class ZooplusPackSize
 {
     /**
-     * Null when the page names no variant it sells, or when that variant
-     * does not sell at the price the snapshot tracked.
-     */
-    public static function read(string $url, string $html, string $trackedPrice): ?string
-    {
-        $offer = self::activeOffer($url, $html);
-
-        return $offer === null ? null : self::packSize($offer, $trackedPrice);
-    }
-
-    /**
-     * The first offer of the variant the page itself took from the URL, from
-     * the Next.js page state. Null when the page names no variant and sells
-     * more than one.
+     * Null when no variant can be told apart, or when the one found does not
+     * sell at the price the snapshot tracked.
      *
-     * @return array<mixed>|null
+     * @param  ?string  $variantKey  The variant the user chose, as the JSON-LD
+     *                               chooser keyed it: a sku, a gtin or a URL.
      */
-    private static function activeOffer(string $url, string $html): ?array
+    public static function read(string $url, string $html, string $trackedPrice, ?string $variantKey = null): ?string
     {
         $state = NextData::decode($html);
         $page = $state === null ? null : NextData::value($state, 'props.pageProps.pageLevelProps');
         $variants = is_array($page) ? NextData::value($page, 'productDetails.product.articleVariants') : null;
 
-        if (! is_array($page) || ! is_array($variants) || $variants === []) {
+        if (! is_array($page) || ! is_array($variants)) {
             return null;
         }
 
-        $active = $page['activeVariantFromUrl'] ?? self::queryVariant($url);
-        $variantId = is_string($active) && str_contains($active, '.') ? substr($active, strrpos($active, '.') + 1) : null;
+        /** @var list<array<mixed>> $rows */
+        $rows = array_values(array_filter($variants, is_array(...)));
+        $pageVariant = is_string($page['activeVariantFromUrl'] ?? null) ? $page['activeVariantFromUrl'] : null;
+        $variant = self::variant($rows, [$variantKey, $pageVariant, self::queryVariant($url)], $trackedPrice);
+        $offer = $variant['offers'][0] ?? null;
 
-        $variant = $variantId === null
-            ? (count($variants) === 1 ? array_first($variants) : null)
-            : array_find($variants, static fn (mixed $row): bool => is_array($row) && is_int($row['variantId'] ?? null) && (string) $row['variantId'] === $variantId);
+        return is_array($offer) ? self::packSize($offer, $trackedPrice) : null;
+    }
 
-        $offer = is_array($variant) ? ($variant['offers'][0] ?? null) : null;
+    /**
+     * The first hint that names a variant wins, in the JSON-LD's own order: a
+     * chosen variant outranks the URL. With no hint, a page that sells one
+     * variant, or only one at the tracked price, has answered anyway.
+     *
+     * @param  list<array<mixed>>  $variants
+     * @param  list<?string>  $hints
+     * @return array<mixed>|null
+     */
+    private static function variant(array $variants, array $hints, string $trackedPrice): ?array
+    {
+        foreach ($hints as $hint) {
+            $match = $hint === null ? null : array_find($variants, static fn (array $row): bool => self::names($row, $hint));
 
-        return is_array($offer) ? $offer : null;
+            if ($match !== null) {
+                return $match;
+            }
+        }
+
+        $selling = array_values(array_filter($variants, static function (array $row) use ($trackedPrice): bool {
+            $price = $row['offers'][0]['price'] ?? null;
+
+            return is_array($price) && self::sellsAt($price, $trackedPrice);
+        }));
+
+        return count($variants) === 1 ? $variants[0] : (count($selling) === 1 ? $selling[0] : null);
+    }
+
+    /**
+     * Whether a hint names this variant: its gtin, a sku or URL ending in
+     * ".{variantId}", or the bare variant id.
+     *
+     * @param  array<mixed>  $variant
+     */
+    private static function names(array $variant, string $hint): bool
+    {
+        $id = $variant['variantId'] ?? null;
+
+        if (is_string($variant['ean'] ?? null) && $variant['ean'] === $hint) {
+            return true;
+        }
+
+        if (! is_int($id)) {
+            return false;
+        }
+
+        $value = str_contains($hint, '?') ? (self::queryVariant($hint) ?? '') : $hint;
+
+        return $value === (string) $id || str_ends_with($value, '.' . $id);
     }
 
     private static function queryVariant(string $url): ?string
@@ -84,7 +121,7 @@ final readonly class ZooplusPackSize
         $rate = self::number($unit['unitPriceRaw'] ?? null);
         $stated = self::number($unit['unitQuantity'] ?? null);
 
-        if ($current === null || $rate === null || $stated === null || ! self::pricesTheSnapshot($price, $current, $trackedPrice)) {
+        if ($current === null || $rate === null || $stated === null || ! self::sellsAt($price, $trackedPrice)) {
             return null;
         }
 
@@ -132,14 +169,14 @@ final readonly class ZooplusPackSize
     }
 
     /**
-     * The offer is the one the snapshot priced: its regular price, or one of
-     * its discounts.
+     * The offer sells at the tracked price: its regular price, or one of its
+     * discounts.
      *
      * @param  array<mixed>  $price
      */
-    private static function pricesTheSnapshot(array $price, float $current, string $trackedPrice): bool
+    private static function sellsAt(array $price, string $trackedPrice): bool
     {
-        $prices = [$current];
+        $prices = [self::number($price['currentPrice']['value'] ?? null)];
 
         foreach (is_array($price['discounts'] ?? null) ? $price['discounts'] : [] as $discount) {
             $prices[] = is_array($discount) ? self::number($discount['discountedPriceRaw'] ?? null) : null;
