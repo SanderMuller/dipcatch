@@ -1200,7 +1200,7 @@ test('a size the chosen offer names stands in for one the product name lacks', f
         new AdapterContext(variantKey: $sku),
     )->snapshot;
 
-    $size = PackSize::resolve($snapshot?->packSize, $snapshot?->packSizeAuthoritative ?? false, $snapshot?->title);
+    $size = PackSize::resolve($snapshot?->packSize, $snapshot->packSizeAuthoritative ?? false, $snapshot?->title);
 
     expect($snapshot?->title)->toBe('Iams Adult kattenvoer met verse kip')
         ->and($size?->quantity . ' ' . $size?->unit)->toBe($expected);

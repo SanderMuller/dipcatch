@@ -158,7 +158,7 @@ test('a sale offer takes its pack size from the title instead', function (): voi
     ], JSON_THROW_ON_ERROR);
 
     $snapshot = new JsonLdAdapter()->extract('https://shop.test/p/1', withJsonLd($json))->snapshot;
-    $size = PackSize::resolve($snapshot?->packSize, $snapshot?->packSizeAuthoritative ?? false, $snapshot?->title);
+    $size = PackSize::resolve($snapshot?->packSize, $snapshot->packSizeAuthoritative ?? false, $snapshot?->title);
 
     expect($snapshot?->packSizeAuthoritative)->toBeFalse()
         ->and($size?->quantity)->toBe(10000.0)
