@@ -114,18 +114,6 @@ final readonly class DashboardDigest
     }
 
     /**
-     * The shop the product card leads with, when it sells the product now.
-     * With none, the headline falls back to the last cheapest shop, which may
-     * be sold out or switched off, and the product belongs to no trip.
-     */
-    private static function bestBuyShop(Product $product): ?Shop
-    {
-        $shop = HeadlinePrice::of($product)->shop;
-
-        return $shop instanceof Shop && $product->eligibleShops()->contains($shop) ? $shop : null;
-    }
-
-    /**
      * @return Builder<Product>
      */
     private static function activeProducts(User $user): Builder
@@ -190,7 +178,7 @@ final readonly class DashboardDigest
         $byHost = [];
 
         foreach ($products as $product) {
-            $shop = self::bestBuyShop($product);
+            $shop = HeadlinePrice::of($product)->buyableShop();
 
             if (! $shop instanceof Shop) {
                 continue;

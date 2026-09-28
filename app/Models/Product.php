@@ -12,6 +12,7 @@ use App\Support\ImageUrl;
 use App\Support\Numeric;
 use App\Support\PackSize;
 use Carbon\CarbonImmutable;
+use Closure;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
@@ -30,6 +31,8 @@ use Illuminate\Support\Facades\DB;
  * @property CategorySource|null $category_set_by
  * @property ProductCategory|null $suggested_category
  * @property CarbonImmutable|null $history_kept_from
+ * @property CarbonImmutable|null $listed_at
+ * @property CarbonImmutable|null $list_checked_at
  * @property-read PriceDropEvent|null $latestPriceDropEvent
  */
 #[Unguarded]
@@ -80,6 +83,8 @@ final class Product extends Model
             'last_notified_price' => 'decimal:2',
             'last_notified_at' => 'datetime',
             'history_kept_from' => 'datetime',
+            'listed_at' => 'datetime',
+            'list_checked_at' => 'datetime',
             'active' => 'boolean',
             'category' => ProductCategory::class,
             'category_set_by' => CategorySource::class,
@@ -186,6 +191,70 @@ final class Product extends Model
             ->latest('fired_at')
             ->latest('id')
             ->limit(1);
+    }
+
+    /**
+     * @param  EloquentBuilder<$this>  $query
+     */
+    #[Scope]
+    protected function onShoppingList(EloquentBuilder $query): void
+    {
+        $query->whereNotNull('listed_at');
+    }
+
+    public function isOnShoppingList(): bool
+    {
+        return $this->listed_at !== null;
+    }
+
+    public function isCrossedOff(): bool
+    {
+        return $this->listed_at !== null && $this->list_checked_at !== null;
+    }
+
+    /**
+     * Puts the product on the list, un-crossed. A list change must not touch
+     * `updated_at`: the dashboard orders its trips by it.
+     */
+    public function addToShoppingList(): void
+    {
+        $this->writeListColumns(fn (EloquentBuilder $query): int => $query->update(['listed_at' => now(), 'list_checked_at' => null]));
+    }
+
+    /**
+     * Only while the product is still listed: another tab may have removed
+     * it, and crossing it off must not bring it back.
+     */
+    public function setCrossedOff(bool $crossedOff): void
+    {
+        $this->writeListColumns(fn (EloquentBuilder $query): int => $query->onShoppingList()->update(['list_checked_at' => $crossedOff ? now() : null]));
+    }
+
+    public function removeFromShoppingList(): void
+    {
+        $this->writeListColumns(fn (EloquentBuilder $query): int => $query->update(['listed_at' => null, 'list_checked_at' => null]));
+    }
+
+    /**
+     * Takes every crossed-off product of the account off its list.
+     */
+    public static function clearCrossedOffFor(User $user): int
+    {
+        return self::withoutTimestamps(fn (): int => self::query()
+            ->where('user_id', $user->id)
+            ->onShoppingList()
+            ->whereNotNull('list_checked_at')
+            ->update(['listed_at' => null, 'list_checked_at' => null]));
+    }
+
+    /**
+     * @param  Closure(EloquentBuilder<self>): int  $write
+     */
+    private function writeListColumns(Closure $write): void
+    {
+        self::withoutTimestamps(fn (): int => $write(self::query()->whereKey($this->getKey())));
+
+        $this->refresh();
     }
 
     /**

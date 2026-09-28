@@ -41,6 +41,8 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 
 - ~~`mcp-server.md`~~ — ✅ shipped 2026-09-07 (`laravel/mcp` server behind Passport OAuth with the `mcp:use` scope; list, create and inspect products, attach shops, read prices and history; add-product and add-shop logic shared with the web through `ShopDraft`).
 
+- **[shopping-list.md](shopping-list.md)** — one shopping list per account across all shops: add from the product page, an "On list" pill on cards, a list icon beside the bell, and a full list grouped by each product's best-buy shop with cross-off, "Clear crossed off" and print.
+
 - **[chatgpt-plugin-directory.md](chatgpt-plugin-directory.md)** — list DipCatch in the ChatGPT Plugins Directory: MCP tool annotations, OpenAI domain-challenge endpoint, Connections Connect/Install buttons and copy, privacy text for connected assistants. Claude gets an install link; ChatGPT Free cannot paste `/mcp`.
 
 - ~~`adapter-canary.md`~~ — ✅ shipped 2026-09-18 (one known URL per host adapter, fetched daily; the canary command and its health check share `CanaryEntries`).

@@ -12,9 +12,25 @@
             <flux:breadcrumbs.item class="min-w-0 [&>div]:min-w-0"><span class="block truncate">{{ Str::limit($product->title, 40) }}</span></flux:breadcrumbs.item>
         </flux:breadcrumbs>
 
-        <flux:button size="sm" variant="primary" class="rounded-full!" icon="pencil-square" :href="route('app.products.edit', $product)" wire:navigate>
-            {{ __('Edit') }}
-        </flux:button>
+        <div class="flex shrink-0 items-center gap-2">
+            {{-- One element whichever way it reads, so focus stays on it after a
+                 click. It names the next action rather than the state. --}}
+            <flux:button
+                size="sm"
+                variant="ghost"
+                class="rounded-full!"
+                :icon="$product->isOnShoppingList() ? 'check' : 'list-bullet'"
+                wire:click="toggleShoppingList"
+                wire:key="shopping-list-toggle"
+                data-test="shopping-list-toggle"
+            >
+                {{ $product->isOnShoppingList() ? __('Remove from shopping list') : __('Add to shopping list') }}
+            </flux:button>
+
+            <flux:button size="sm" variant="primary" class="rounded-full!" icon="pencil-square" :href="route('app.products.edit', $product)" wire:navigate>
+                {{ __('Edit') }}
+            </flux:button>
+        </div>
     </div>
 
     @php($headline = \App\Support\HeadlinePrice::of($product, $packs))

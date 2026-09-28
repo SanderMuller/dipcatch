@@ -61,7 +61,7 @@
         <header
             x-data="{ open: false }"
             x-on:keydown.escape.window="open = false"
-            class="sticky top-0 z-50 border-b border-zinc-900/5 bg-amber-50/80 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/80"
+            class="sticky top-0 z-50 border-b border-zinc-900/5 bg-amber-50/80 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/80 print:hidden"
         >
             <div class="mx-auto flex w-full max-w-app items-center gap-3 px-4 py-3 sm:px-6 lg:gap-6 lg:px-8">
                 <a href="{{ route('app.dashboard') }}" wire:navigate aria-label="{{ __('Dashboard') }}" @if ($dashboardIsCurrent) aria-current="page" @endif class="flex shrink-0 items-center gap-2 font-semibold">
@@ -123,6 +123,8 @@
                 <livewire:app-command-palette />
 
                 <div class="flex shrink-0 items-center gap-1 sm:gap-2">
+                    <livewire:shopping-list.header-menu />
+
                     {{-- Bell slot. --}}
                     @includeWhen(view()->exists('partials.notification-bell'), 'partials.notification-bell')
 

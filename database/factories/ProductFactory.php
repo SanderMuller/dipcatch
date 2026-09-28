@@ -53,4 +53,20 @@ class ProductFactory extends Factory
             'active' => false,
         ]);
     }
+
+    public function listed(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'listed_at' => now(),
+            'list_checked_at' => null,
+        ]);
+    }
+
+    public function listedAndCrossedOff(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'listed_at' => now()->subHour(),
+            'list_checked_at' => now(),
+        ]);
+    }
 }

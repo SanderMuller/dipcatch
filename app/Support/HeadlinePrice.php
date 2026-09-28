@@ -60,6 +60,16 @@ final readonly class HeadlinePrice
         );
     }
 
+    /**
+     * The headline shop when it sells the product now. With none, the
+     * headline falls back to the last cheapest shop, which may be sold out or
+     * switched off, and nobody can buy there at that price.
+     */
+    public function buyableShop(): ?Shop
+    {
+        return $this->shop instanceof Shop && $this->eligible->contains($this->shop) ? $this->shop : null;
+    }
+
     public function isPerUnit(): bool
     {
         return $this->unit !== null;

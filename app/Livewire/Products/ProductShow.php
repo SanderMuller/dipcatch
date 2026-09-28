@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Drops\LargeDropConfirmation;
 use App\Support\AlertRules;
 use App\Support\UrlNormalizer;
+use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -177,6 +178,25 @@ final class ProductShow extends Component
 
         $this->product->forceFill(['active' => ! $this->product->active])->save();
         $this->product->refresh();
+    }
+
+    /**
+     * Puts the product on the account's shopping list, or takes it off. The
+     * list writes refresh the product, so the button changes in this response.
+     */
+    public function toggleShoppingList(): void
+    {
+        $this->authorize('update', $this->product);
+
+        if ($this->product->isOnShoppingList()) {
+            $this->product->removeFromShoppingList();
+            Flux::toast(text: __('Removed from your shopping list.'));
+        } else {
+            $this->product->addToShoppingList();
+            Flux::toast(text: __('Added to your shopping list.'));
+        }
+
+        $this->dispatch('shopping-list-changed');
     }
 
     /**

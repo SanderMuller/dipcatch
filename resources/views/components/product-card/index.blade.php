@@ -27,6 +27,13 @@
                 {{ __('Paused') }}
             </span>
         @endif
+        @if ($product->isOnShoppingList())
+            <span class="absolute top-5 left-5 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium text-zinc-700 shadow-xs ring-1 ring-black/5 backdrop-blur-sm dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10" data-test="on-list-label">
+                <flux:icon.list-bullet variant="micro" class="size-3.5" />
+                <span aria-hidden="true">{{ __('On list') }}</span>
+                <span class="sr-only">{{ __('On your shopping list') }}</span>
+            </span>
+        @endif
     </div>
 
     <div @class(['flex min-w-0 flex-1 flex-col p-4', 'opacity-60' => ! $product->active])>

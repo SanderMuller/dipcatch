@@ -23,6 +23,7 @@ use App\Livewire\Products\EditProduct;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\Settings\NotificationPreferences;
+use App\Livewire\ShoppingList\ShoppingListPage;
 use App\Livewire\Stats\StatsPage;
 use App\Livewire\Support\SupportPage;
 use App\Support\ShopPages;
@@ -234,6 +235,7 @@ Route::prefix('app')
         Route::livewire('connections', ConnectionsPage::class)->name('connections');
         Route::livewire('support', SupportPage::class)->name('support');
         Route::livewire('stats', StatsPage::class)->name('stats');
+        Route::livewire('shopping-list', ShoppingListPage::class)->name('shopping-list');
     });
 
 require __DIR__ . '/settings.php';
