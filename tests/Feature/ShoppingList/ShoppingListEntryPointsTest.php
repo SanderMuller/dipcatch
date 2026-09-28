@@ -84,6 +84,7 @@ it('marks a listed product on its card, and no other', function (): void {
     $html = livewire(ProductList::class)->html();
 
     expect(substr_count($html, 'group/list'))->toBe(1)
+        ->and(substr_count($html, 'data-test="card-list-tooltip"'))->toBe(1)
         ->and($html)->toContain('aria-label="Remove Listed coffee from shopping list"')
         ->and($html)->toContain('aria-label="Add Plain tea to shopping list"');
 });
