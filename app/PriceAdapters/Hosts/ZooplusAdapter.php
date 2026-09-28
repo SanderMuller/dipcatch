@@ -109,6 +109,18 @@ final readonly class ZooplusAdapter extends HostAdapter
         return $text === '' ? null : $text;
     }
 
+    /**
+     * The pack size the page state states for the variant this snapshot
+     * priced. The JSON-LD cannot say it: on a sale it pairs the sale price
+     * with the regular price's rate, so a 10 kg bag reads as 9 kg.
+     */
+    protected function refine(ShopSnapshot $snapshot, string $url, string $html): ShopSnapshot
+    {
+        $size = ZooplusPackSize::read($url, $html, $snapshot->price);
+
+        return $size === null ? $snapshot : $snapshot->withPackSize($size);
+    }
+
     private static function title(Crawler $crawler): string
     {
         // Scoped to the product-title component rather than a bare h1.

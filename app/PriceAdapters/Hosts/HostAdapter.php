@@ -32,6 +32,16 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, OwnsHosts, S
      */
     abstract protected function extractFromHtml(string $html, string $currency): ?ShopSnapshot;
 
+    /**
+     * Adds what only this host's page states to a snapshot either path read,
+     * for example a pack size its JSON-LD leaves ambiguous. Unchanged by
+     * default.
+     */
+    protected function refine(ShopSnapshot $snapshot, string $url, string $html): ShopSnapshot
+    {
+        return $snapshot;
+    }
+
     public function ownedHosts(): array
     {
         return array_keys($this->hosts());
@@ -56,8 +66,8 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, OwnsHosts, S
         // page stayed ambiguous however often it was answered.
         $jsonLd = new JsonLdAdapter()->extract($url, $html, $context);
 
-        if ($jsonLd->isSuccess()) {
-            return $jsonLd;
+        if ($jsonLd->snapshot !== null && $jsonLd->isSuccess()) {
+            return ExtractionResult::success($this->refine($jsonLd->snapshot, $url, $html));
         }
 
         // A page that lists several variants and states no way to tell
@@ -70,7 +80,7 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, OwnsHosts, S
 
         $snapshot = $this->extractFromHtml($html, $currency);
         if ($snapshot !== null) {
-            return ExtractionResult::success($snapshot);
+            return ExtractionResult::success($this->refine($snapshot, $url, $html));
         }
 
         return ExtractionResult::failed($this->key() . '_extraction_failed');
