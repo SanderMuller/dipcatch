@@ -76,7 +76,10 @@ test('a promotion that has passed says so, so the price reads as suspect', funct
 
 test('a date-only window renders its own day, not the day before', function (): void {
     // 8 September in Amsterdam is stored as 7 September 22:00 UTC. Printed
-    // without converting back, it would read "7 Sep".
+    // without converting back, it would read "7 Sep". The clock is fixed
+    // too: the page also prints today's date, and on the 17th or 27th that
+    // contains "7 Sep" as well.
+    $this->travelTo('2036-09-01 12:00:00');
     [$user, $product] = seedShopWith([
         'promotion_starts_at' => '2036-09-07 22:00:00',
         'promotion_ends_at' => '2036-09-13 21:59:59',
