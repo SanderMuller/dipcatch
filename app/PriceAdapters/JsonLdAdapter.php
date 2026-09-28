@@ -4,6 +4,7 @@ namespace App\PriceAdapters;
 
 use App\Enums\VariantResolution;
 use App\Support\Gtin;
+use App\Support\PackSize;
 use JsonException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -145,7 +146,7 @@ final readonly class JsonLdAdapter implements ShopAdapter
         $imageUrl = JsonLdEntities::firstImageUrl($product['image'] ?? null)
             ?? JsonLdEntities::firstImageUrl($shop['image'] ?? null);
 
-        $packSize = UnitPriceSize::from($shop, $price);
+        $packSize = UnitPriceSize::from($shop, $price) ?? self::offerNameSize($shop, $title);
         [$inStock, $stockSignal] = StockAvailability::read($shop['availability'] ?? null);
 
         $result = ExtractionResult::success(new ShopSnapshot(
@@ -178,6 +179,25 @@ final readonly class JsonLdAdapter implements ShopAdapter
      * nothing about variants, and answering "one" there would state a fact
      * this reader did not read.
      */
+    /**
+     * The chosen offer's own name, when it states a size its product's name
+     * does not: brekz.nl names one Product without a size and each variant
+     * offer "… - 10 kg". Given whole, as {@see PackSize::parse()} finds the
+     * size in it, a multipack's count included.
+     *
+     * @param  array<string, mixed>  $offer
+     */
+    private static function offerNameSize(array $offer, string $title): ?string
+    {
+        $name = JsonLdEntities::nonEmptyString($offer['name'] ?? null);
+
+        if ($name === null || PackSize::parse($title) !== null || PackSize::parse($name) === null) {
+            return null;
+        }
+
+        return $name;
+    }
+
     private static function withVariantCount(ExtractionResult $result, JsonLdSearchState $state, ?string $variantKey): ExtractionResult
     {
         $snapshot = $result->snapshot;

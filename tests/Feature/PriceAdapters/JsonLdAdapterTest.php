@@ -4,6 +4,7 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\EntityUrl;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\VariantCandidate;
+use App\Support\PackSize;
 
 test('skips when no application/ld+json script is present', function (): void {
     $result = new JsonLdAdapter()->extract('https://x.test', '<html></html>');
@@ -1163,4 +1164,59 @@ test('a page with no variant markup claims nothing about variants', function ():
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->variantsOnPage)->toBeNull()
         ->and($result->snapshot?->variantNote())->toBeNull();
+});
+
+/**
+ * brekz.nl, as published on 2026-09-28: one Product named without a size,
+ * its variants as offers that each name theirs.
+ */
+function brekzPage(): string
+{
+    $offer = static fn (string $size, float $price, string $sku): array => [
+        '@type' => 'Offer',
+        'name' => 'Iams Adult kattenvoer met verse kip - ' . $size,
+        'priceCurrency' => 'EUR',
+        'price' => $price,
+        'sku' => $sku,
+        'availability' => 'InStock',
+    ];
+
+    return withJsonLd(json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Iams Adult kattenvoer met verse kip',
+        'offers' => [
+            $offer('3 kg', 15.89, '15884-1313'),
+            $offer('2 x 10 kg', 48.94, '15884-5392'),
+            $offer('10 kg', 24.97, '15884-2751'),
+        ],
+    ], JSON_THROW_ON_ERROR));
+}
+
+test('a size the chosen offer names stands in for one the product name lacks', function (string $sku, string $expected): void {
+    $snapshot = new JsonLdAdapter()->extract(
+        'https://www.brekz.nl/iams-kattenvoer/iams-adult-kattenvoer-met-verse-kip.html',
+        brekzPage(),
+        new AdapterContext(variantKey: $sku),
+    )->snapshot;
+
+    $size = PackSize::resolve($snapshot?->packSize, $snapshot?->packSizeAuthoritative ?? false, $snapshot?->title);
+
+    expect($snapshot?->title)->toBe('Iams Adult kattenvoer met verse kip')
+        ->and($size?->quantity . ' ' . $size?->unit)->toBe($expected);
+})->with([
+    'a single bag' => ['15884-2751', '10000 g'],
+    'a double pack' => ['15884-5392', '20000 g'],
+]);
+
+test('an offer name adds nothing when the product name states the size', function (): void {
+    $html = withJsonLd(json_encode([
+        '@type' => 'Product',
+        'name' => 'Chips 200 g',
+        'offers' => ['@type' => 'Offer', 'name' => 'Chips 200 g - voordeel 2 x 200 g', 'price' => '2.45', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR));
+
+    $snapshot = new JsonLdAdapter()->extract('https://shop.test/p/1', $html)->snapshot;
+
+    expect($snapshot?->packSize)->toBeNull();
 });
