@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\DB;
@@ -100,6 +101,7 @@ test('a reset on an unverified account takes it from whoever squatted it', funct
     ]);
 
     $squatted->updatePushSubscription('https://push.example.test/squatter', 'key', 'token');
+    $published = Product::factory()->for($squatted)->create(['share_slug' => 'squatter-published']);
 
     resetPasswordTo($squatted, 'the-owners-password')->assertSessionHasNoErrors();
 
@@ -111,6 +113,8 @@ test('a reset on an unverified account takes it from whoever squatted it', funct
         ->and($squatted->passkeys()->exists())->toBeFalse()
         // Otherwise the squatter's browser keeps receiving the owner's alerts.
         ->and($squatted->pushSubscriptions()->exists())->toBeFalse()
+        // Unpublished, not deleted: the row alone does not say whose it is.
+        ->and($published->fresh()?->share_slug)->toBeNull()
         ->and(DB::table('oauth_access_tokens')->where('user_id', $squatted->id)->exists())->toBeFalse();
 });
 

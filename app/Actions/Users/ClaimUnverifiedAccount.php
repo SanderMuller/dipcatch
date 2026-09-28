@@ -14,8 +14,16 @@ use SensitiveParameter;
  * address that is not theirs and wait. So every credential set before this
  * moment goes, not only the password. A squatter's passkey or two-factor
  * secret left behind would be a way back in, and a stale two-factor secret
- * would lock the owner out at a challenge they cannot answer. Callers run it
- * inside their own transaction.
+ * would lock the owner out at a challenge they cannot answer.
+ *
+ * The data on the row is not evidence either way. An unverified account can
+ * hold products and a paid subscription: a verified account that changes its
+ * address becomes unverified, and a real owner who did that and then resets
+ * their password lands here too. So products, settings and billing stay, and
+ * the owner can remove them. Public share links do not: a squatter's product
+ * would stay published under the owner's account without their knowing.
+ *
+ * Callers run it inside their own transaction.
  */
 final readonly class ClaimUnverifiedAccount
 {
@@ -33,5 +41,7 @@ final readonly class ClaimUnverifiedAccount
         ])->save();
 
         ($this->revokeCredentials)($user);
+
+        $user->products()->whereNotNull('share_slug')->update(['share_slug' => null]);
     }
 }
