@@ -65,7 +65,7 @@
                                     class="size-5 shrink-0 rounded border-zinc-300 text-brand focus:ring-brand print:hidden dark:border-zinc-600 dark:bg-zinc-800"
                                     @checked($item['crossedOff'])
                                     wire:click="toggleCrossedOff('{{ $product->id }}')"
-                                    aria-label="{{ __('Cross off :title', ['title' => $product->title]) }}"
+                                    aria-label="{{ $item['crossedOff'] ? __('Put :title back on the list', ['title' => $product->title]) : __('Cross off :title', ['title' => $product->title]) }}"
                                 />
                                 <span class="hidden size-4 shrink-0 border border-black print:inline-block" aria-hidden="true"></span>
 
@@ -116,7 +116,7 @@
                 <flux:modal.close>
                     <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
                 </flux:modal.close>
-                <flux:button variant="primary" wire:click="clearCrossedOff" x-on:click="$flux.modal('clear-crossed-off').close(); $nextTick(() => document.getElementById('shopping-list-heading')?.focus())" data-test="shopping-list-clear-confirm">{{ __('Clear crossed off') }}</flux:button>
+                <flux:button variant="primary" wire:click="clearCrossedOff" data-test="shopping-list-clear-confirm">{{ __('Clear crossed off') }}</flux:button>
             </div>
         </div>
     </flux:modal>

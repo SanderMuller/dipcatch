@@ -4,6 +4,7 @@ use App\Livewire\ShoppingList\ShoppingListPage;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 use function Pest\Livewire\livewire;
@@ -67,7 +68,8 @@ it('crosses an item off and back, and says the list changed', function (): void 
     $page = livewire(ShoppingListPage::class)
         ->call('toggleCrossedOff', $product->id)
         ->assertDispatched('shopping-list-changed')
-        ->assertSee('Clear crossed off (1)');
+        ->assertSee('Clear crossed off (1)')
+        ->assertSeeHtml('aria-label="Put Coffee back on the list"');
 
     expect($product->refresh()->isCrossedOff())->toBeTrue();
 
@@ -152,4 +154,26 @@ it('does not bring back an item another tab removed when it is crossed off', fun
     $page->call('toggleCrossedOff', $product->id);
 
     expect($product->refresh()->isOnShoppingList())->toBeFalse();
+});
+
+it('renders the page in the same number of queries however long the list is', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+    shoppingPageProduct($user, 'First');
+
+    $count = function (): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        livewire(ShoppingListPage::class);
+
+        return count(DB::getQueryLog());
+    };
+
+    $one = $count();
+
+    foreach (range(1, 12) as $i) {
+        shoppingPageProduct($user, 'Product ' . $i, $i % 2 === 0 ? 'ah.nl' : 'lidl.nl');
+    }
+
+    expect($count())->toBe($one);
 });

@@ -16,13 +16,13 @@
     </head>
     {{-- The same warm canvas as the marketing site, so the app a person
          lands in after signing up looks like the page that sold it. --}}
-    <body class="min-h-dvh bg-amber-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50">
+    <body class="min-h-dvh bg-amber-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50 print:bg-white print:text-black">
         {{-- The same two blurred washes the marketing hero uses. They are what
              gives that page its depth, and a flat tint could not reproduce it.
              Fixed and behind everything, so scrolling and hit-testing are
              untouched; light mode only, as on the marketing page. --}}
-        <div aria-hidden="true" class="pointer-events-none fixed -top-40 left-40 -z-10 size-[32rem] rounded-full bg-amber-200/40 blur-3xl dark:hidden"></div>
-        <div aria-hidden="true" class="pointer-events-none fixed right-0 -bottom-40 -z-10 size-[32rem] rounded-full bg-rose-200/40 blur-3xl dark:hidden"></div>
+        <div aria-hidden="true" class="pointer-events-none fixed -top-40 left-40 -z-10 size-[32rem] rounded-full bg-amber-200/40 blur-3xl dark:hidden print:hidden"></div>
+        <div aria-hidden="true" class="pointer-events-none fixed right-0 -bottom-40 -z-10 size-[32rem] rounded-full bg-rose-200/40 blur-3xl dark:hidden print:hidden"></div>
 
         @php
             // One declaration of the navigation, read by the bar, the "More"

@@ -42,6 +42,9 @@ final class ShoppingListPage extends Component
         $cleared = Product::clearCrossedOffFor($this->user());
 
         Flux::toast(text: trans_choice('Cleared :count item.|Cleared :count items.', $cleared, ['count' => $cleared]));
+        // Closed only once the clear went through; the trigger it came from is
+        // gone, so focus goes to the heading.
+        $this->js("\$flux.modal('clear-crossed-off').close(); document.getElementById('shopping-list-heading')?.focus()");
         $this->dispatch('shopping-list-changed');
     }
 
