@@ -32,8 +32,13 @@
         <div class="mt-5 print:hidden" data-test="shopping-list-shops">
             <p id="shopping-list-shops-label" class="text-sm font-medium text-zinc-700 dark:text-zinc-300">{{ __('Shops you are going to') }}</p>
             <div class="mt-2 flex flex-wrap gap-2" role="group" aria-labelledby="shopping-list-shops-label">
+                {{-- The number is what is listed under the shop, as its group
+                     says, not every item it sells: a shop that sells an item
+                     another shop has cheaper would otherwise count it too. --}}
+                @php($toBuyAt = array_column(array_filter($list->groups, fn (array $group): bool => $group['host'] !== ''), 'open', 'host'))
                 @foreach ($list->shops as $shop)
                     @php($going = ! in_array($shop['host'], $skip, true))
+                    @php($toBuy = $toBuyAt[$shop['host']] ?? 0)
                     <button
                         type="button"
                         wire:click="toggleShop(@js($shop['host']))"
@@ -52,7 +57,9 @@
                             <flux:icon.x-mark variant="micro" class="size-4" />
                         @endif
                         <span class="inline-flex items-center">{!! \App\Support\Favicon::html($shop['host']) !!}</span>
-                        <span class="text-xs text-zinc-500 tabular-nums no-underline dark:text-zinc-400">{{ $shop['items'] }}</span>
+                        @if ($going && $toBuy > 0)
+                            <span class="text-xs text-zinc-500 tabular-nums dark:text-zinc-400" title="{{ trans_choice(':count to buy here|:count to buy here', $toBuy, ['count' => $toBuy]) }}">{{ $toBuy }}</span>
+                        @endif
                     </button>
                 @endforeach
             </div>

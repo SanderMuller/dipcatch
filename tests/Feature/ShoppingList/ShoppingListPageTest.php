@@ -214,3 +214,15 @@ it('reads skipped shops from the URL', function (): void {
         ->assertSeeText('Only at shops you skip')
         ->assertSeeText('Sold at lidl.nl');
 });
+
+it('counts on each shop button what is listed under that shop, not every item it sells', function (): void {
+    $user = User::factory()->create();
+    $coffee = shoppingPageProduct($user, 'Coffee', 'ah.nl', '1.00');
+    Shop::factory()->for($coffee)->create(['url' => 'https://jumbo.com/p/coffee', 'current_price' => '1.50', 'currency' => 'EUR']);
+    shoppingPageProduct($user, 'Milk', 'jumbo.com', '0.99');
+
+    $this->actingAs($user);
+
+    // jumbo.com sells both, but only Milk is listed under it.
+    livewire(ShoppingListPage::class)->assertSeeHtml('title="1 to buy here"')->assertDontSeeHtml('title="2 to buy here"');
+});
