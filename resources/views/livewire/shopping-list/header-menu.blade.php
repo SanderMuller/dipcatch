@@ -1,7 +1,7 @@
 {{-- Polls, as the bell does, for changes the page's own event cannot reach:
      another tab, and a price check that moves a best buy or a price. --}}
 <flux:dropdown position="bottom" align="end" wire:poll.60s data-test="shopping-list-menu">
-    <flux:button variant="ghost" size="sm" icon="list-bullet" class="relative" aria-label="{{ $openCount > 0 ? trans_choice('Shopping list, :count to buy|Shopping list, :count to buy', $openCount, ['count' => $openCount]) : __('Shopping list') }}">
+    <flux:button variant="ghost" size="sm" icon="list-bullet" id="shopping-list-trigger" class="relative" aria-label="{{ $openCount > 0 ? trans_choice('Shopping list, :count to buy|Shopping list, :count to buy', $openCount, ['count' => $openCount]) : __('Shopping list') }}">
         @if ($openCount > 0)
             <flux:badge color="zinc" size="sm" class="absolute -end-1 -top-1" data-test="shopping-list-badge">{{ $openCount > 9 ? '9+' : $openCount }}</flux:badge>
         @endif

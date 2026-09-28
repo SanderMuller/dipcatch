@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\ShoppingList\HeaderMenu;
@@ -82,8 +83,9 @@ it('marks a listed product on its card, and no other', function (): void {
 
     $html = livewire(ProductList::class)->html();
 
-    expect(substr_count($html, 'data-test="on-list-label"'))->toBe(1)
-        ->and($html)->toContain('On your shopping list');
+    expect(substr_count($html, '>On list<'))->toBe(1)
+        ->and($html)->toContain('aria-label="Remove Listed coffee from shopping list"')
+        ->and($html)->toContain('aria-label="Add Plain tea to shopping list"');
 });
 
 it('shows the open count, the first items and the way to the list in the header', function (): void {
@@ -175,4 +177,45 @@ it('reads the header in the same number of queries however long the list is', fu
     $thirty = count(array_filter(DB::getQueryLog(), fn (array $query): bool => str_contains($query['query'], '"products"') || str_contains($query['query'], '"shops"')));
 
     expect($thirty)->toBe($eight)->toBe(4);
+});
+
+it('adds and removes a product from its card on the product list', function (): void {
+    $user = User::factory()->create();
+    $product = entryPointProduct($user, 'Coffee');
+
+    $this->actingAs($user);
+
+    $list = livewire(ProductList::class)
+        ->assertSeeHtml('aria-label="Add Coffee to shopping list"')
+        ->assertSeeHtml('window.flyToList(')
+        ->call('toggleShoppingList', $product->id)
+        ->assertDispatched('shopping-list-changed')
+        ->assertSeeHtml('aria-label="Remove Coffee from shopping list"')
+        ->assertDontSeeHtml('window.flyToList(');
+
+    expect($product->refresh()->isOnShoppingList())->toBeTrue();
+
+    $list->call('toggleShoppingList', $product->id);
+
+    expect($product->refresh()->isOnShoppingList())->toBeFalse();
+});
+
+it('answers 404 from the card for another account\'s product or a non-UUID id', function (string $id): void {
+    $theirs = entryPointProduct(User::factory()->create(), 'Theirs');
+    $this->actingAs(User::factory()->create());
+
+    livewire(ProductList::class)
+        ->call('toggleShoppingList', $id === 'theirs' ? $theirs->id : $id)
+        ->assertNotFound();
+
+    expect($theirs->refresh()->isOnShoppingList())->toBeFalse();
+})->with(['theirs', "1' OR 1=1"]);
+
+it('keeps the dashboard cards to a plain label, with no list button', function (): void {
+    $user = User::factory()->create();
+    entryPointProduct($user, 'Listed coffee', ['listed_at' => now()]);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)->assertDontSeeHtml('data-test="card-list-toggle"');
 });

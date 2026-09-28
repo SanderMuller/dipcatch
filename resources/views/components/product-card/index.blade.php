@@ -1,9 +1,13 @@
-@props(['product', 'compare' => true])
+@props(['product', 'compare' => true, 'listToggle' => false])
 
 {{--
     `compare` lists the shops and notes the lowest pack price. The dashboard
     turns it off: its cards answer what is cheap now and where, and leave the
     comparison to the hover panel, the product list and the product page.
+
+    `listToggle` turns the "On list" label into a button that puts the product
+    on the shopping list or takes it off. The parent Livewire component must
+    have a `toggleShoppingList(string $productId)` action.
 --}}
 @php($headline = \App\Support\HeadlinePrice::of($product))
 
@@ -19,7 +23,7 @@
     'border border-dashed border-zinc-300 bg-zinc-100/70 dark:border-white/15 dark:bg-zinc-900/40' => ! $product->active,
 ]) }}>
     <div class="relative p-3 pb-0">
-        <x-product-thumb :product="$product" size="aspect-[4/3] w-full" @class(['opacity-40 grayscale' => ! $product->active]) />
+        <x-product-thumb :product="$product" size="aspect-[4/3] w-full" @class(['opacity-40 grayscale' => ! $product->active]) data-fly-source />
         {{-- Outside the faded image, so the label itself stays readable. --}}
         @if (! $product->active)
             <span class="absolute top-5 right-5 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium text-zinc-700 shadow-xs ring-1 ring-black/5 backdrop-blur-sm dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10" data-test="paused-label">
@@ -27,7 +31,33 @@
                 {{ __('Paused') }}
             </span>
         @endif
-        @if ($product->isOnShoppingList())
+        @if ($listToggle)
+            {{-- Above the link stretched over the card (z-10), so a click adds
+                 rather than opens the product. The flight is decoration; the
+                 action and its toast carry the change. --}}
+            <button
+                type="button"
+                wire:click="toggleShoppingList('{{ $product->id }}')"
+                @unless ($product->isOnShoppingList())
+                    x-on:click="window.flyToList($el.closest('article')?.querySelector('[data-fly-source]'))"
+                @endunless
+                @class([
+                    'absolute top-5 left-5 z-10 flex items-center gap-1 rounded-full text-xs font-medium shadow-xs ring-1 backdrop-blur-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-white',
+                    'bg-white/90 px-2 py-0.5 text-zinc-700 ring-black/5 hover:bg-white dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10' => $product->isOnShoppingList(),
+                    'size-8 justify-center bg-white/90 text-zinc-600 ring-black/5 hover:bg-white hover:text-zinc-900 dark:bg-zinc-800/90 dark:text-zinc-300 dark:ring-white/10 dark:hover:text-white' => ! $product->isOnShoppingList(),
+                ])
+                aria-label="{{ $product->isOnShoppingList() ? __('Remove :title from shopping list', ['title' => $product->title]) : __('Add :title to shopping list', ['title' => $product->title]) }}"
+                title="{{ $product->isOnShoppingList() ? __('Remove from shopping list') : __('Add to shopping list') }}"
+                data-test="card-list-toggle"
+            >
+                @if ($product->isOnShoppingList())
+                    <flux:icon.check variant="micro" class="size-3.5" />
+                    <span aria-hidden="true">{{ __('On list') }}</span>
+                @else
+                    <flux:icon.list-bullet variant="micro" class="size-4" />
+                @endif
+            </button>
+        @elseif ($product->isOnShoppingList())
             <span class="absolute top-5 left-5 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium text-zinc-700 shadow-xs ring-1 ring-black/5 backdrop-blur-sm dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10" data-test="on-list-label">
                 <flux:icon.list-bullet variant="micro" class="size-3.5" />
                 <span aria-hidden="true">{{ __('On list') }}</span>

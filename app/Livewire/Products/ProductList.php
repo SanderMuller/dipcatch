@@ -12,12 +12,14 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Support\DashboardDigest;
+use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -153,6 +155,31 @@ final class ProductList extends Component
         if (array_key_exists($this->sort, self::SORTS)) {
             Cookie::queue(self::SORT_COOKIE, $this->sort, 60 * 24 * 365);
         }
+    }
+
+    /**
+     * The card's shopping-list button. Only this account's products: a value
+     * that is not a UUID answers 404 before any query, as Postgres would
+     * reject it in a uuid comparison.
+     */
+    public function toggleShoppingList(mixed $productId): void
+    {
+        abort_unless(is_string($productId) && Str::isUuid($productId), 404);
+
+        $user = auth()->user();
+        abort_unless($user instanceof User, 403);
+
+        $product = $user->products()->findOrFail($productId);
+
+        if ($product->isOnShoppingList()) {
+            $product->removeFromShoppingList();
+            Flux::toast(text: __(':title is off the list.', ['title' => $product->title]));
+        } else {
+            $product->addToShoppingList();
+            Flux::toast(text: __(':title is on your shopping list.', ['title' => $product->title]));
+        }
+
+        $this->dispatch('shopping-list-changed');
     }
 
     public function render(): View

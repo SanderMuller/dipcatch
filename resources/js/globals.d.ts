@@ -16,6 +16,9 @@ declare global {
             }) => void): () => void;
         };
 
+        /** Exposed by `resources/js/fly-to-list.js` for the product cards. */
+        flyToList(source: HTMLElement | null): void;
+
         /** Flux's global, present once `@fluxScripts` has loaded. */
         Flux?: {
             toast(options: { variant?: 'success' | 'warning' | 'danger'; heading?: string; text: string }): void;
