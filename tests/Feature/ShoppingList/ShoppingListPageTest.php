@@ -177,3 +177,40 @@ it('renders the page in the same number of queries however long the list is', fu
 
     expect($count())->toBe($one);
 });
+
+it('regroups the list when a shop is skipped, and back when it is picked again', function (): void {
+    $user = User::factory()->create();
+    $coffee = shoppingPageProduct($user, 'Coffee', 'ah.nl', '1.00');
+    Shop::factory()->for($coffee)->create(['url' => 'https://jumbo.com/p/coffee', 'current_price' => '1.50', 'currency' => 'EUR']);
+    shoppingPageProduct($user, 'Milk', 'jumbo.com', '0.99');
+
+    $this->actingAs($user);
+
+    livewire(ShoppingListPage::class)
+        ->assertSeeHtml('data-test="shopping-list-shops"')
+        ->assertSeeInOrder(['ah.nl', 'Coffee', 'jumbo.com', 'Milk'])
+        ->call('toggleShop', 'ah.nl')
+        ->assertSet('skip', ['ah.nl'])
+        ->assertSeeHtml('aria-pressed="false"')
+        ->assertSeeInOrder(['Shops you are going to', 'jumbo.com', 'Coffee', 'Milk'])
+        ->assertSee('€1.50')
+        ->call('toggleShop', 'ah.nl')
+        ->assertSet('skip', []);
+});
+
+it('ignores a shop value that is not a host', function (mixed $host): void {
+    $this->actingAs(User::factory()->create());
+
+    livewire(ShoppingListPage::class)->call('toggleShop', $host)->assertSet('skip', []);
+})->with([[''], [['ah.nl']], [str_repeat('a', 300)]]);
+
+it('reads skipped shops from the URL', function (): void {
+    $user = User::factory()->create();
+    shoppingPageProduct($user, 'Tea', 'lidl.nl');
+
+    $this->actingAs($user)
+        ->get(route('app.shopping-list', ['skip' => ['lidl.nl']]))
+        ->assertOk()
+        ->assertSeeText('Only at shops you skip')
+        ->assertSeeText('Sold at lidl.nl');
+});

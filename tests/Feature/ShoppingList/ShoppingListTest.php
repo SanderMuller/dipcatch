@@ -224,3 +224,55 @@ it('reads the list in the same number of queries however long it is', function (
 
     expect(count(DB::getQueryLog()))->toBe($few)->toBe(3);
 });
+
+it('moves a product to its next best shop when its best shop is skipped', function (): void {
+    $user = User::factory()->create();
+    listedProduct($user, 'Coffee', 'ah.nl', 'jumbo.com');
+    listedProduct($user, 'Tea', 'lidl.nl', 'jumbo.com');
+    listedProduct($user, 'Milk', 'jumbo.com', 'ah.nl');
+
+    $list = ShoppingList::forUser($user, skip: ['lidl.nl']);
+
+    expect(array_column($list->groups, 'host'))->toBe(['jumbo.com', 'ah.nl'])
+        ->and(array_map(fn (array $item): string => $item['product']->title, $list->groups[0]['items']))->toBe(['Tea', 'Milk'])
+        ->and(array_map(fn (array $item): string => $item['headline']->text(), $list->groups[0]['items']))->toBe(['€2.00', '€1.00']);
+});
+
+it('puts a product only skipped shops sell in its own group, naming where it is sold', function (): void {
+    $user = User::factory()->create();
+    listedProduct($user, 'Coffee', 'ah.nl');
+    listedProduct($user, 'Tea', 'lidl.nl');
+    listedProduct($user, 'Sold out', 'ah.nl')->shops()->update(['current_in_stock' => false]);
+
+    $list = ShoppingList::forUser($user, skip: ['lidl.nl']);
+
+    expect(array_map(fn (array $group): array => [$group['host'], $group['skipped']], $list->groups))->toBe([['ah.nl', false], ['', true], ['', false]])
+        ->and($list->groups[1]['items'][0]['skippedBest']?->host)->toBe('lidl.nl')
+        ->and($list->groups[1]['items'][0]['shop'])->toBeNull()
+        ->and($list->groups[2]['items'][0]['skippedBest'])->toBeNull();
+});
+
+it('offers every shop that sells an open item, skipped ones included, most items first', function (): void {
+    $user = User::factory()->create();
+    listedProduct($user, 'Coffee', 'ah.nl', 'jumbo.com');
+    listedProduct($user, 'Tea', 'lidl.nl', 'jumbo.com');
+    $crossed = listedProduct($user, 'Bread', 'plus.nl');
+    $crossed->setCrossedOff(crossedOff: true);
+
+    expect(ShoppingList::forUser($user, skip: ['jumbo.com'])->shops)->toBe([
+        ['host' => 'jumbo.com', 'items' => 2],
+        ['host' => 'ah.nl', 'items' => 1],
+        ['host' => 'lidl.nl', 'items' => 1],
+    ]);
+});
+
+it('leaves the loaded product\'s shops alone when it skips one', function (): void {
+    $user = User::factory()->create();
+    $product = listedProduct($user, 'Coffee', 'ah.nl', 'jumbo.com');
+    $product->load('shops');
+
+    $item = ShoppingList::item($product, ['ah.nl']);
+
+    expect($item['shop']?->host)->toBe('jumbo.com')
+        ->and($product->shops)->toHaveCount(2);
+});

@@ -46,6 +46,6 @@
         @endif
 
         <flux:menu.separator />
-        <flux:menu.item icon="arrow-right" :href="route('app.shopping-list')" wire:navigate data-test="shopping-list-open">{{ __('Open shopping list') }}</flux:menu.item>
+        <flux:menu.item icon:trailing="arrow-right" :href="route('app.shopping-list')" wire:navigate data-test="shopping-list-open">{{ __('Open shopping list') }}</flux:menu.item>
     </flux:menu>
 </flux:dropdown>

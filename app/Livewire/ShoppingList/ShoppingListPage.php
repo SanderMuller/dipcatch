@@ -9,6 +9,7 @@ use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -19,6 +20,27 @@ use Livewire\Component;
 #[Title('Shopping list')]
 final class ShoppingListPage extends Component
 {
+    /**
+     * Shops the user is not going to this time. Each product then goes to its
+     * best buy among the others. In the URL, so a printed or shared link
+     * keeps the choice, and a new visit starts with every shop.
+     *
+     * @var list<string>
+     */
+    #[Url(except: [])]
+    public array $skip = [];
+
+    public function toggleShop(mixed $host): void
+    {
+        if (! is_string($host) || $host === '' || mb_strlen($host) > 255) {
+            return;
+        }
+
+        $this->skip = in_array($host, $this->skip, true)
+            ? array_values(array_diff($this->skip, [$host]))
+            : [...$this->skip, $host];
+    }
+
     public function toggleCrossedOff(mixed $productId): void
     {
         $product = $this->ownProduct($productId);
@@ -51,8 +73,19 @@ final class ShoppingListPage extends Component
     public function render(): View
     {
         return view('livewire.shopping-list.shopping-list-page', [
-            'list' => ShoppingList::forUser($this->user()),
+            'list' => ShoppingList::forUser($this->user(), $this->skippedHosts()),
         ]);
+    }
+
+    /**
+     * The URL value, cleaned: whatever a hand-edited link carries, only
+     * strings reach the grouping.
+     *
+     * @return list<string>
+     */
+    private function skippedHosts(): array
+    {
+        return array_values(array_unique(array_filter($this->skip, fn (mixed $host): bool => is_string($host) && $host !== '')));
     }
 
     /**

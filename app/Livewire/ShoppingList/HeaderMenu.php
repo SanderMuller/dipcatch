@@ -71,7 +71,7 @@ final class HeaderMenu extends Component
     }
 
     /**
-     * @return list<array{product: Product, headline: HeadlinePrice, shop: ?Shop, crossedOff: bool}>
+     * @return list<array{product: Product, headline: HeadlinePrice, shop: ?Shop, skippedBest: ?Shop, crossedOff: bool}>
      */
     private function items(User $user): array
     {
@@ -85,7 +85,7 @@ final class HeaderMenu extends Component
             ->limit(self::LIMIT)
             ->get();
 
-        return array_values($products->map(ShoppingList::item(...))->all());
+        return array_values($products->map(fn (Product $product): array => ShoppingList::item($product))->all());
     }
 
     private function user(): User
