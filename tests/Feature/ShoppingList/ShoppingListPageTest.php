@@ -240,3 +240,15 @@ it('counts on each shop button what is listed under that shop, not every item it
     // jumbo.com sells both, but only Milk is listed under it.
     livewire(ShoppingListPage::class)->assertSeeHtml('title="1 to buy here"')->assertDontSeeHtml('title="2 to buy here"');
 });
+
+it('survives a hand-edited skip value in the URL', function (): void {
+    $user = User::factory()->create();
+    shoppingPageProduct($user, 'Tea', 'lidl.nl');
+
+    $this->actingAs($user);
+
+    livewire(ShoppingListPage::class, ['skip' => [['nested'], 'lidl.nl', 5]])
+        ->assertSee('Only at shops you skip')
+        ->call('toggleShop', 'ah.nl')
+        ->assertSet('skip', ['lidl.nl', 'ah.nl']);
+});

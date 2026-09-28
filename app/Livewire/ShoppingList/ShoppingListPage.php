@@ -36,9 +36,11 @@ final class ShoppingListPage extends Component
             return;
         }
 
-        $this->skip = in_array($host, $this->skip, true)
-            ? array_values(array_diff($this->skip, [$host]))
-            : [...$this->skip, $host];
+        $skipped = $this->skippedHosts();
+
+        $this->skip = in_array($host, $skipped, true)
+            ? array_values(array_diff($skipped, [$host]))
+            : [...$skipped, $host];
     }
 
     public function toggleCrossedOff(mixed $productId): void
