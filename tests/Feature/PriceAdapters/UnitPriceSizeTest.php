@@ -2,6 +2,7 @@
 
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\UnitPriceSize;
+use App\Support\PackSize;
 
 /**
  * @return array<string, mixed>
@@ -110,4 +111,56 @@ test('an offer without a unit price leaves the title fallback available', functi
 
     expect($result->snapshot?->packSize)->toBeNull()
         ->and($result->snapshot?->packSizeAuthoritative)->toBeFalse();
+});
+
+/**
+ * A zooplus/bitiba sale offer, as published on 2026-09-28: the unit price
+ * belongs to the struck-through regular price (31.99 / 3.20 = 10 kg), not to
+ * the sale price the offer states (28.79 / 3.20 = 9 kg).
+ *
+ * @return array<string, mixed>
+ */
+function saleOfferWithRegularUnitPrice(float $regular = 31.99): array
+{
+    return [
+        '@type' => 'Offer',
+        'price' => 28.79,
+        'priceCurrency' => 'EUR',
+        'priceSpecification' => [
+            ['@type' => 'UnitPriceSpecification', 'priceType' => 'https://schema.org/StrikethroughPrice', 'price' => $regular],
+            ['@type' => 'UnitPriceSpecification', 'priceType' => 'https://schema.org/SalePrice', 'price' => 28.79],
+            [
+                '@type' => 'UnitPriceSpecification',
+                'priceType' => 'https://schema.org/UnitPrice',
+                'price' => 3.2,
+                'referenceQuantity' => ['@type' => 'QuantitativeValue', 'value' => 1, 'unitCode' => 'KGM'],
+            ],
+        ],
+    ];
+}
+
+test('a unit price that could belong to the sale or the regular price yields no size', function (): void {
+    // Either reading is possible, and the two differ by a whole kilo.
+    expect(UnitPriceSize::from(saleOfferWithRegularUnitPrice(), '28.79'))->toBeNull();
+});
+
+test('a struck-through price equal to the offer price leaves the size readable', function (): void {
+    expect(UnitPriceSize::from(saleOfferWithRegularUnitPrice(regular: 28.79), '28.79'))->toBe('8996.88 g');
+});
+
+test('a sale offer takes its pack size from the title instead', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'IAMS Advanced Nutrition Adult met Kip 10 kg',
+        'url' => 'https://shop.test/p/1',
+        'offers' => saleOfferWithRegularUnitPrice(),
+    ], JSON_THROW_ON_ERROR);
+
+    $snapshot = new JsonLdAdapter()->extract('https://shop.test/p/1', withJsonLd($json))->snapshot;
+    $size = PackSize::resolve($snapshot?->packSize, $snapshot?->packSizeAuthoritative ?? false, $snapshot?->title);
+
+    expect($snapshot?->packSizeAuthoritative)->toBeFalse()
+        ->and($size?->quantity)->toBe(10000.0)
+        ->and($size?->unit)->toBe('g');
 });
