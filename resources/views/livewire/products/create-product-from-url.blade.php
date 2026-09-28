@@ -4,6 +4,16 @@
         <flux:breadcrumbs.item>{{ __('Track a product') }}</flux:breadcrumbs.item>
     </flux:breadcrumbs>
 
+    @if ($trackingIdea !== null && ($state === 'idle' || $state === 'error'))
+        <flux:callout icon="light-bulb" color="zinc" data-test="tracking-idea-hint">
+            <flux:callout.heading>{{ $trackingIdea->label() }}</flux:callout.heading>
+            <flux:callout.text>
+                {{ __('Paste a product link from any shop. DipCatch reads these well:') }}
+                {{ implode(', ', $trackingIdea->group()->shops()) }}.
+            </flux:callout.text>
+        </flux:callout>
+    @endif
+
     @if ($state === 'idle' || $state === 'error')
         <form wire:submit.prevent="probe" class="space-y-3">
             <flux:input

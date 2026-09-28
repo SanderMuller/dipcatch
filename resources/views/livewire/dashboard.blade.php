@@ -186,4 +186,6 @@
             </x-product-card.grid>
         </section>
     @endif
+
+    <livewire:dashboard.tracking-ideas />
 </div>

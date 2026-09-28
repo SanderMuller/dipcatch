@@ -6,6 +6,7 @@ use App\Actions\Products\CreateProductWithShop;
 use App\Actions\Products\ProductDraft;
 use App\Actions\Shops\ProbeOutcome;
 use App\Billing\PlanLimitReached;
+use App\Enums\TrackingIdea;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\Shop;
 use App\Models\User;
@@ -17,6 +18,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\View\View;
 use Laravel\Passport\Token;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use RuntimeException;
 use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
@@ -46,6 +48,10 @@ final class CreateProductFromUrl extends Component
     public string $thresholdAbs = '';
 
     public string $unitPriceTarget = '';
+
+    /** The getting-started idea the person came from, for its shop hints. */
+    #[Url(as: 'idea', except: '')]
+    public string $idea = '';
 
     /** @var array{id: string, title: string}|null Another product of this user already tracking the pasted URL. */
     public ?array $existingTrackedProduct = null;
@@ -240,6 +246,7 @@ final class CreateProductFromUrl extends Component
         return view('livewire.products.create-product-from-url', [
             // Only before a lookup: once a preview is on screen, the hint is noise.
             'connectedAssistant' => in_array($this->state, ['idle', 'error'], strict: true) ? $this->connectedAssistant() : null,
+            'trackingIdea' => TrackingIdea::tryFrom($this->idea),
         ]);
     }
 }

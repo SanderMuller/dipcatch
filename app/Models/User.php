@@ -44,6 +44,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property string $timezone
  * @property bool $auto_categories
  * @property CarbonImmutable|null $digest_processed_until
+ * @property CarbonImmutable|null $tracking_ideas_hidden_at
  * @property CarbonImmutable|null $timezone_detected_at
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
@@ -90,6 +91,7 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
             'notify_via_push' => 'boolean',
             'auto_categories' => 'boolean',
             'digest_processed_until' => 'datetime',
+            'tracking_ideas_hidden_at' => 'datetime',
             'timezone_detected_at' => 'datetime',
         ];
     }
@@ -112,6 +114,16 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
     public function socialAccounts(): HasMany
     {
         return $this->hasMany(SocialAccount::class);
+    }
+
+    /**
+     * Getting-started ideas this person ticked by hand.
+     *
+     * @return HasMany<TrackingIdeaMark, $this>
+     */
+    public function trackingIdeaMarks(): HasMany
+    {
+        return $this->hasMany(TrackingIdeaMark::class);
     }
 
     /** The one guard for automatic categories: opted in, and the plan allows it. */
