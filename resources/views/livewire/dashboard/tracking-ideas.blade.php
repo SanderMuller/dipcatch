@@ -1,5 +1,5 @@
 <div>
-    @if ($checklist !== null && $checklist->open !== [])
+    @if ($checklist->open !== [] && ! $hidden)
         <flux:card class="mt-6 space-y-6" data-test="tracking-ideas">
             <div class="space-y-4">
                 <div>
@@ -102,5 +102,11 @@
                 <flux:button size="sm" variant="ghost" class="ml-auto" wire:click="hide">{{ __('Hide this list') }}</flux:button>
             </div>
         </flux:card>
+    @elseif ($checklist->open !== [])
+        <p class="mt-6 text-base/7 sm:text-sm/6">
+            <button type="button" wire:click="show" class="text-zinc-500 underline-offset-4 hover:text-zinc-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:text-zinc-400 dark:hover:text-zinc-200" data-test="tracking-ideas-show">
+                {{ __('Show ideas for what else to track') }}
+            </button>
+        </p>
     @endif
 </div>

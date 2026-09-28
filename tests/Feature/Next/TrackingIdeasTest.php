@@ -48,7 +48,7 @@ test('a shower gel does not tick sunscreen or skincare, though they share its ca
 });
 
 test('every keyword idea recognises a typical product title', function (TrackingIdea $idea, string $title): void {
-    expect($idea->isTrackedBy($title, null))->toBeTrue();
+    expect($idea->isTrackedBy($title, category: null))->toBeTrue();
 })->with([
     [TrackingIdea::Sunscreen, 'Garnier Ambre Solaire SPF50+'],
     [TrackingIdea::VacuumBags, 'Philips stofzuigerzakken s-bag 4 stuks'],
@@ -72,7 +72,7 @@ test('every keyword idea recognises a typical product title', function (Tracking
 ]);
 
 test('a title that only looks like an idea does not tick it', function (TrackingIdea $idea, string $title): void {
-    expect($idea->isTrackedBy($title, null))->toBeFalse();
+    expect($idea->isTrackedBy($title, category: null))->toBeFalse();
 })->with([
     [TrackingIdea::PrinterInk, 'Hydrating Toner 200 ml'],
     [TrackingIdea::BeerWine, 'Wijnglazen 6 stuks'],
@@ -153,6 +153,38 @@ test('the card can be hidden, and shows on the dashboard until then', function (
         ->assertDontSeeHtml('data-test="tracking-ideas"');
 
     $this->get(route('app.dashboard'))->assertOk()->assertDontSeeHtml('data-test="tracking-ideas"');
+});
+
+test('a hidden card leaves a link that shows it again', function (): void {
+    $user = User::factory()->create(['tracking_ideas_hidden_at' => now()]);
+    $this->actingAs($user);
+
+    livewire(TrackingIdeas::class)
+        ->assertSeeHtml('data-test="tracking-ideas-show"')
+        ->call('show')
+        ->assertSeeHtml('data-test="tracking-ideas"')
+        ->assertDontSeeHtml('data-test="tracking-ideas-show"');
+
+    expect($user->fresh()->tracking_ideas_hidden_at)->toBeNull();
+});
+
+test('the show link stays away while the card is visible or everything is covered', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    livewire(TrackingIdeas::class)->assertDontSeeHtml('data-test="tracking-ideas-show"');
+
+    foreach (TrackingIdea::cases() as $idea) {
+        $user->trackingIdeaMarks()->create(['idea' => $idea, 'state' => TrackingIdeaMarkState::Done, 'marked_at' => now()]);
+    }
+
+    livewire(TrackingIdeas::class)
+        ->assertDontSeeHtml('data-test="tracking-ideas"')
+        ->assertDontSeeHtml('data-test="tracking-ideas-show"');
+
+    $user->forceFill(['tracking_ideas_hidden_at' => now()])->save();
+
+    livewire(TrackingIdeas::class)->assertDontSeeHtml('data-test="tracking-ideas-show"');
 });
 
 test('the add-product page names shops for the idea the person came from', function (): void {

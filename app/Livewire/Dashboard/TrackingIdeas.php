@@ -12,7 +12,8 @@ use Livewire\Component;
 
 /**
  * A getting-started checklist of things people buy again and again, on the
- * dashboard until every idea is covered or the card is hidden.
+ * dashboard until every idea is covered. A hidden card leaves a link to
+ * show it again.
  */
 final class TrackingIdeas extends Component
 {
@@ -40,12 +41,18 @@ final class TrackingIdeas extends Component
         $this->user()->forceFill(['tracking_ideas_hidden_at' => now()])->save();
     }
 
+    public function show(): void
+    {
+        $this->user()->forceFill(['tracking_ideas_hidden_at' => null])->save();
+    }
+
     public function render(): View
     {
         $user = $this->user();
 
         return view('livewire.dashboard.tracking-ideas', [
-            'checklist' => $user->tracking_ideas_hidden_at === null ? TrackingIdeaChecklist::for($user) : null,
+            'checklist' => TrackingIdeaChecklist::for($user),
+            'hidden' => $user->tracking_ideas_hidden_at !== null,
         ]);
     }
 
