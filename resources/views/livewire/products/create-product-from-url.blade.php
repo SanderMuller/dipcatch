@@ -8,9 +8,15 @@
         <flux:callout icon="light-bulb" color="zinc" data-test="tracking-idea-hint">
             <flux:callout.heading>{{ $trackingIdea->label() }}</flux:callout.heading>
             <flux:callout.text>
-                {{ __('Paste a product link from any shop. DipCatch reads these well:') }}
-                {{ implode(', ', $trackingIdea->group()->shops()) }}.
+                {{ __('Find the product at any shop and paste its link below. DipCatch reads these shops well:') }}
             </flux:callout.text>
+            <ul role="list" class="mt-2 flex flex-wrap gap-2">
+                @foreach ($trackingIdea->group()->shops() as $host)
+                    <li class="text-base/7 sm:text-sm/6">
+                        <a href="https://www.{{ $host }}" target="_blank" rel="noopener noreferrer" class="flex items-center rounded-full bg-paper py-0.5 pr-3 pl-2 font-medium ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{!! \App\Support\Favicon::html($host) !!}</a>
+                    </li>
+                @endforeach
+            </ul>
         </flux:callout>
     @endif
 
