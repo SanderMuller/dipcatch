@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Livewire\Notifications\Bell;
+use App\Models\Product;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Notifications\TargetPriceNotification;
@@ -264,4 +265,20 @@ it('names the unit in the reader\'s language from the stored code', function ():
     $this->actingAs($user);
 
     livewire(Bell::class)->assertSee('€0.0275 /stuk');
+});
+
+it('shows the product picture beside an alert, and only for this account\'s products', function (): void {
+    $user = User::factory()->create();
+    $mine = Product::factory()->for($user)->create(['image_url' => 'https://example.test/mine.png']);
+    $theirs = Product::factory()->create(['image_url' => 'https://example.test/theirs.png']);
+    storeNotification($user, ['product_id' => $mine->id]);
+    storeNotification($user, ['product_id' => $theirs->id, 'title' => 'Not mine']);
+    storeNotification($user, ['product_id' => 'not-a-uuid', 'title' => 'Broken id']);
+
+    $this->actingAs($user);
+
+    livewire(Bell::class)
+        ->assertSeeHtml('https://example.test/mine.png')
+        ->assertDontSeeHtml('https://example.test/theirs.png')
+        ->assertSee('Broken id');
 });

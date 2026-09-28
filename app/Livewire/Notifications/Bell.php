@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Models\Product;
 use App\Models\User;
 use App\Notifications\TargetPriceNotification;
 use App\Support\AlsoWorthChecking;
@@ -12,9 +13,11 @@ use App\Support\PackLine;
 use App\Support\PackSize;
 use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 /**
@@ -66,16 +69,49 @@ final class Bell extends Component
      */
     private function items(): Collection
     {
-        return $this->notificationQuery()
+        $notifications = $this->notificationQuery()
             ->latest()
             ->limit(self::LIMIT)
-            ->get()
-            ->map(fn (DatabaseNotification $notification): array => [
-                'id' => $notification->id,
-                'unread' => $notification->read_at === null,
-                'at' => $notification->created_at,
-                ...$this->present($notification),
-            ]);
+            ->get();
+
+        $products = $this->productsFor($notifications);
+
+        return $notifications->map(fn (DatabaseNotification $notification): array => [
+            'id' => $notification->id,
+            'unread' => $notification->read_at === null,
+            'at' => $notification->created_at,
+            'product' => $products->get(self::productId($notification)),
+            ...$this->present($notification),
+        ]);
+    }
+
+    /**
+     * The products the listed alerts are about, for their pictures, in one
+     * query. This account's own only; a deleted product has none.
+     *
+     * @param  Collection<int, DatabaseNotification>  $notifications
+     * @return EloquentCollection<string, Product>
+     */
+    private function productsFor(Collection $notifications): EloquentCollection
+    {
+        $ids = $notifications->map(self::productId(...))->filter()->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return new EloquentCollection();
+        }
+
+        return Product::query()
+            ->where('user_id', $this->user()?->id)
+            ->whereKey($ids->all())
+            ->get(['id', 'user_id', 'title', 'image_url'])
+            ->keyBy(fn (Product $product): string => (string) $product->id);
+    }
+
+    private static function productId(DatabaseNotification $notification): ?string
+    {
+        $id = $notification->data['product_id'] ?? null;
+
+        return is_string($id) && Str::isUuid($id) ? $id : null;
     }
 
     /**

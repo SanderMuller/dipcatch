@@ -20,9 +20,12 @@
             <flux:menu.item
                 :href="$item['url']"
                 wire:click="markAsRead('{{ $item['id'] }}')"
-                class="!h-auto !items-start gap-2 py-2"
+                class="!h-auto !items-start gap-3 py-2"
             >
-                <div class="grid gap-0.5">
+                @if ($item['product'] !== null)
+                    <x-product-thumb :product="$item['product']" size="size-10" class="mt-0.5" />
+                @endif
+                <div class="grid min-w-0 gap-0.5">
                     <div class="flex items-start gap-2">
                         @if ($item['unread'])
                             <span class="mt-1.5 size-2 shrink-0 rounded-full bg-red-500"></span>
