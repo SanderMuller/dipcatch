@@ -212,7 +212,21 @@ it('reads skipped shops from the URL', function (): void {
         ->get(route('app.shopping-list', ['skip' => ['lidl.nl']]))
         ->assertOk()
         ->assertSeeText('Only at shops you skip')
-        ->assertSeeText('Sold at lidl.nl');
+        ->assertSeeText('Sold at lidl.nl')
+        ->assertSeeText('Go to lidl.nl too');
+});
+
+it('brings a skipped shop back from the item that needs it', function (): void {
+    $user = User::factory()->create();
+    shoppingPageProduct($user, 'Tea', 'lidl.nl');
+
+    $this->actingAs($user);
+
+    livewire(ShoppingListPage::class, ['skip' => ['lidl.nl']])
+        ->assertSee('Only at shops you skip')
+        ->call('toggleShop', 'lidl.nl')
+        ->assertSet('skip', [])
+        ->assertDontSee('Only at shops you skip');
 });
 
 it('counts on each shop button what is listed under that shop, not every item it sells', function (): void {

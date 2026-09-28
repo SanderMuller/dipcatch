@@ -81,17 +81,25 @@
                 <section
                     wire:key="shopping-group-{{ $group['skipped'] ? 'skipped' : ($group['host'] === '' ? 'none' : $group['host']) }}"
                     @class([
-                        'overflow-hidden rounded-2xl bg-paper shadow-xs ring-1 ring-line dark:shadow-none',
+                        'overflow-hidden rounded-2xl bg-paper shadow-xs ring-1 ring-line dark:shadow-none' => ! $group['skipped'],
+                        // Not a stop on this trip: dashed and amber, so it
+                        // reads as left over rather than as another shop.
+                        'overflow-hidden rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/60 dark:border-amber-500/40 dark:bg-amber-950/20' => $group['skipped'],
                         'print:mb-6 print:overflow-visible print:rounded-none print:bg-transparent print:shadow-none print:ring-0',
                         'print:hidden' => $group['open'] === 0,
                     ])
                     data-test="shopping-list-group"
                 >
-                    <div class="flex items-center justify-between gap-3 border-b border-line bg-zinc-50/70 px-4 py-2.5 break-after-avoid dark:bg-white/5 print:border-black print:bg-transparent print:px-0 print:py-1">
+                    <div @class([
+                        'flex items-center justify-between gap-3 border-b px-4 py-2.5 break-after-avoid print:border-black print:bg-transparent print:px-0 print:py-1',
+                        'border-line bg-zinc-50/70 dark:bg-white/5' => ! $group['skipped'],
+                        'border-amber-200 bg-amber-100/60 text-amber-900 dark:border-amber-500/30 dark:bg-amber-900/30 dark:text-amber-100' => $group['skipped'],
+                    ])>
                         <h2 class="flex min-w-0 items-center gap-2 text-base font-semibold print:text-[13pt]">
                             @if ($group['skipped'])
-                                <flux:icon.arrow-uturn-left variant="micro" class="size-4 text-zinc-400" />
+                                <flux:icon.exclamation-triangle variant="micro" class="size-4 text-amber-600 dark:text-amber-400" />
                                 <span>{{ __('Only at shops you skip') }}</span>
+                                <span class="text-sm font-normal text-amber-800/80 dark:text-amber-200/80 print:hidden">{{ __('Not on this trip') }}</span>
                             @elseif ($group['host'] === '')
                                 <flux:icon.exclamation-circle variant="micro" class="size-4 text-zinc-400" />
                                 <span>{{ __('No shop sells this now') }}</span>
@@ -139,7 +147,15 @@
                                         ])
                                     >{{ $product->title }}</a>
                                     @if ($item['skippedBest'] !== null && ! $item['crossedOff'])
-                                        <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400 print:text-[9pt]">{{ __('Sold at :host', ['host' => $item['skippedBest']->host]) }}</p>
+                                        <p class="mt-1 flex flex-wrap items-center gap-2 text-xs text-amber-900 dark:text-amber-200 print:text-[9pt]">
+                                            <span>{{ __('Sold at :host', ['host' => $item['skippedBest']->host]) }}</span>
+                                            <button
+                                                type="button"
+                                                wire:click="toggleShop(@js($item['skippedBest']->host))"
+                                                class="rounded-full bg-white px-2 py-0.5 font-medium text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 dark:bg-amber-950 dark:text-amber-100 dark:ring-amber-500/40 print:hidden"
+                                                data-test="shopping-list-unskip"
+                                            >{{ __('Go to :host too', ['host' => $item['skippedBest']->host]) }}</button>
+                                        </p>
                                     @endif
                                     @if (! $item['crossedOff'] && ($packLine !== null || $deal !== null))
                                         <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-500 dark:text-zinc-400 print:text-[9pt] print:text-zinc-700">
