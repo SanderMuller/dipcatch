@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Billing\BillingGate;
 use App\Enums\ProductCategory;
 use App\Models\Product;
 use App\Models\User;
@@ -23,8 +24,12 @@ final class AppCommandPalette extends Component
 
     public function render(): View
     {
+        $user = auth()->user();
+
         return view('livewire.app-command-palette', [
             'products' => $this->products(),
+            // Only for someone who can buy it now.
+            'showUpgrade' => $user instanceof User && ! $user->isPro() && BillingGate::isOpen(),
         ]);
     }
 

@@ -85,3 +85,30 @@ it('never finds another account\'s product', function (): void {
 
     livewire(AppCommandPalette::class)->set('search', 'coffee')->assertDontSee('Someone elses coffee');
 });
+
+it('lists the settings pages and the other pages people look for', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    livewire(AppCommandPalette::class)
+        ->assertSeeHtml('href="' . route('security.edit') . '"')
+        ->assertSeeHtml('href="' . route('appearance.edit') . '"')
+        ->assertSeeHtml('href="' . route('app.products.create-manual') . '"')
+        ->assertSeeHtml('href="' . route('shops') . '"')
+        ->assertSeeHtml('keywords="password change password two-factor');
+});
+
+it('offers Upgrade to Pro only to a free account while Pro is on sale', function (): void {
+    configureStripe();
+    $this->actingAs(User::factory()->create());
+
+    livewire(AppCommandPalette::class)->assertSee('Upgrade to Pro');
+
+    $this->actingAs(User::factory()->create(['comped_until' => now()->addYear()]));
+
+    livewire(AppCommandPalette::class)->assertDontSee('Upgrade to Pro');
+
+    config()->set('plans.enabled', false);
+    $this->actingAs(User::factory()->create());
+
+    livewire(AppCommandPalette::class)->assertDontSee('Upgrade to Pro');
+});

@@ -37,9 +37,17 @@
                 <flux:command.item icon="plus" :href="route('app.products.create')" wire:navigate keywords="add new product link url watch follow">
                     {{ __('Track a product') }}
                 </flux:command.item>
+                <flux:command.item icon="pencil-square" :href="route('app.products.create-manual')" wire:navigate keywords="manual by hand without link no url custom">
+                    {{ __('Add a product by hand') }}
+                </flux:command.item>
                 <flux:command.item icon="credit-card" :href="route('app.billing')" wire:navigate keywords="pro upgrade subscription payment invoice stripe plan price">
                     {{ __('Plan & billing') }}
                 </flux:command.item>
+                @if ($showUpgrade)
+                    <flux:command.item icon="sparkles" :href="route('upgrade')" keywords="pro upgrade buy premium yearly monthly price">
+                        {{ __('Upgrade to Pro') }}
+                    </flux:command.item>
+                @endif
                 <flux:command.item icon="bell" :href="route('app.notifications')" wire:navigate keywords="alerts email push digest price drop">
                     {{ __('Notification settings') }}
                 </flux:command.item>
@@ -49,8 +57,17 @@
                 <flux:command.item icon="lifebuoy" :href="route('app.support')" wire:navigate keywords="help contact question bug problem feedback">
                     {{ __('Support') }}
                 </flux:command.item>
-                <flux:command.item icon="cog-6-tooth" :href="route('profile.edit')" wire:navigate keywords="profile account password email security two-factor passkey appearance dark mode">
+                <flux:command.item icon="cog-6-tooth" :href="route('profile.edit')" wire:navigate keywords="profile account name email delete account remove account close account">
                     {{ __('Settings') }}
+                </flux:command.item>
+                <flux:command.item icon="shield-check" :href="route('security.edit')" wire:navigate keywords="password change password two-factor 2fa authenticator passkey face id fingerprint login sign in sign out everywhere log out sessions devices hacked stolen wachtwoord">
+                    {{ __('Security') }}
+                </flux:command.item>
+                <flux:command.item icon="swatch" :href="route('appearance.edit')" wire:navigate keywords="theme dark mode light mode colours colors display">
+                    {{ __('Appearance') }}
+                </flux:command.item>
+                <flux:command.item icon="building-storefront" :href="route('shops')" keywords="stores supermarket which shops supported unsupported winkels">
+                    {{ __('Supported shops') }}
                 </flux:command.item>
 
                 @foreach ($products as $product)
