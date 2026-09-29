@@ -24,7 +24,7 @@ final readonly class ProductMarkdown
         $headline = HeadlinePrice::of($product, $packs);
         $shops = $packs->tableOrder($product->shops()->orderBy('current_price')->get(), $product->eligibleShops());
 
-        $lines = ['# ' . self::inline($product->title), ''];
+        $lines = ['# ' . self::plain($product->title), ''];
         $lines[] = '- ' . __('Status') . ': ' . ($product->active ? __('Active') : __('Paused'));
 
         if ($product->category !== null) {
@@ -87,7 +87,7 @@ final readonly class ProductMarkdown
     public static function shared(Product $product, Collection $shops, HeadlinePrice $headline): string
     {
         $packs = $headline->packs;
-        $lines = ['# ' . self::inline($product->title), ''];
+        $lines = ['# ' . self::plain($product->title), ''];
 
         if ($product->publicShareUrl() !== null) {
             $lines = [...$lines, '- ' . __('Page') . ': ' . $product->publicShareUrl()];
@@ -275,6 +275,17 @@ final readonly class ProductMarkdown
     private static function cell(string $text): string
     {
         return str_replace('|', '\|', self::inline($text));
+    }
+
+    /**
+     * Text a person typed or a shop page supplied, shown as text. A title
+     * like `[Click here](https://…)` would otherwise render as a link in the
+     * reader of the copy — on the public share page, a link under the
+     * owner's name to wherever the title points.
+     */
+    private static function plain(?string $text): string
+    {
+        return (string) preg_replace('/([\\\\`*_{}\[\]()<>#+!|~])/', '\\\\$1', self::inline($text));
     }
 
     private static function inline(?string $text): string

@@ -157,3 +157,14 @@ it('lists the lowest price first, above a cheaper shop that cannot be bought fro
 
     expect($lowest)->toBeLessThan($soldOut);
 });
+
+it('prints a title as text, not as a link or other markup', function (): void {
+    $user = User::factory()->create();
+    $product = markdownProduct($user, '[Click here](https://evil.test) *now* \\ #1');
+
+    $content = (string) $this->actingAs($user)->get(route('app.products.markdown', $product))->getContent();
+
+    expect($content)
+        ->toStartWith("# \\[Click here\\]\\(https://evil.test\\) \\*now\\* \\\\ \\#1\n")
+        ->not->toContain('[Click here](');
+});
