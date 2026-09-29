@@ -10,12 +10,13 @@
          one on, it speaks of the filter as a whole. --}}
     @php($uncategorisedOnly = $category === \App\Livewire\Products\ProductList::NO_CATEGORY)
     @php($inCategory = $uncategorisedOnly || \App\Enums\ProductCategory::leavesFor($category) !== null)
-    @php($filters = count(array_filter([$search !== '', in_array($status, ['active', 'paused'], true), $inCategory, $shop !== ''])))
+    @php($filters = count(array_filter([$search !== '', in_array($status, ['active', 'paused'], true), $inCategory, $shop !== '', $onList])))
     @php($emptyMessage = match (true) {
         $bestBuy && $shop !== '' && $filters === 1 && ! $discounted =>__('No product has its best buy at that shop right now.'),
         $discounted && $filters > 0 => __('No product in this filter has a discount right now.'),
         $discounted => __('No product has a discount right now.'),
         $filters > 1 => __('No product matches this filter.'),
+        $onList => __('Nothing on your shopping list.'),
         $search !== '' => __('No product matches that search.'),
         $uncategorisedOnly => __('Every product has a category.'),
         $inCategory => __('No product in that category.'),
@@ -59,6 +60,10 @@
 
             {{-- An active drop, or a deal running now at the cheapest or best-value shop. --}}
             <flux:switch wire:model.live="discounted" :label="__('Only discounts')" data-test="product-discount-filter" />
+
+            @if ($hasListed)
+                <flux:switch wire:model.live="onList" :label="__('On shopping list')" data-test="product-on-list-filter" />
+            @endif
 
             {{-- The dashboard's best buys at the chosen shop: the shop the product card price comes from. --}}
             @if ($shop !== '')

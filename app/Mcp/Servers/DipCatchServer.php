@@ -3,6 +3,7 @@
 namespace App\Mcp\Servers;
 
 use App\Mcp\Tools\AddShopTool;
+use App\Mcp\Tools\AddToShoppingListTool;
 use App\Mcp\Tools\CreateProductTool;
 use App\Mcp\Tools\DeleteProductTool;
 use App\Mcp\Tools\GetProductTool;
@@ -10,11 +11,13 @@ use App\Mcp\Tools\ListCategoriesTool;
 use App\Mcp\Tools\ListProductsTool;
 use App\Mcp\Tools\PriceHistoryTool;
 use App\Mcp\Tools\RecheckTool;
+use App\Mcp\Tools\RemoveFromShoppingListTool;
 use App\Mcp\Tools\RemoveShopTool;
 use App\Mcp\Tools\SetCategoryTool;
 use App\Mcp\Tools\SetImageTool;
 use App\Mcp\Tools\SetThresholdTool;
 use App\Mcp\Tools\SetTitleTool;
+use App\Mcp\Tools\ShoppingListTool;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -32,7 +35,7 @@ use Laravel\Mcp\Server\Tool;
  * gets that its cached copy is stale. Two tools were added without moving it,
  * and a live session kept seeing the nine that came before them.
  */
-#[Version('1.11.0')]
+#[Version('1.12.0')]
 #[Instructions(<<<'TEXT'
 DipCatch tracks the price of things this user buys more than once, across Dutch
 supermarkets and webshops, and tells them when one drops.
@@ -67,9 +70,21 @@ Every tool acts on this user's own data and takes no user id. Every plan has a
 product limit, Free a small one and Pro a generous one; when it is reached the
 tool says so and writes nothing. On Free the answer is to upgrade, on Pro to
 remove a product, never to retry.
+
+The shopping list holds tracked products the user means to buy, each under the
+shop where it is the best buy now. To put a whole shopping list on it, find
+each product in list_products and add them all in one add_to_shopping_list
+call. Something the user does not track yet needs create_product first.
 TEXT)]
 final class DipCatchServer extends Server
 {
+    /**
+     * The package pages tools/list at 15. Past that, a client that does not
+     * follow `nextCursor` never sees the rest of the roster, so every tool
+     * goes out in the first page.
+     */
+    public int $defaultPaginationLength = 50;
+
     /**
      * @var array<int, class-string<Tool>>
      */
@@ -87,5 +102,8 @@ final class DipCatchServer extends Server
         SetImageTool::class,
         PriceHistoryTool::class,
         DeleteProductTool::class,
+        ShoppingListTool::class,
+        AddToShoppingListTool::class,
+        RemoveFromShoppingListTool::class,
     ];
 }

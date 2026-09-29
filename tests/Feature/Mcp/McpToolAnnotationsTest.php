@@ -87,6 +87,24 @@ function expectedToolAnnotations(): array
             'destructiveHint' => true,
             'openWorldHint' => false,
         ],
+        'shopping_list' => [
+            'title' => 'Shopping list',
+            'readOnlyHint' => true,
+            'destructiveHint' => false,
+            'openWorldHint' => false,
+        ],
+        'add_to_shopping_list' => [
+            'title' => 'Add to shopping list',
+            'readOnlyHint' => false,
+            'destructiveHint' => false,
+            'openWorldHint' => false,
+        ],
+        'remove_from_shopping_list' => [
+            'title' => 'Remove from shopping list',
+            'readOnlyHint' => false,
+            'destructiveHint' => true,
+            'openWorldHint' => false,
+        ],
     ];
 }
 

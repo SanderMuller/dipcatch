@@ -62,6 +62,10 @@ final class ProductList extends Component
     #[Url(except: false)]
     public bool $bestBuy = false;
 
+    /** Only the products on the shopping list, crossed off or not. */
+    #[Url(except: false)]
+    public bool $onList = false;
+
     #[Url(except: self::DEFAULT_SORT)]
     public string $sort = self::DEFAULT_SORT;
 
@@ -151,6 +155,11 @@ final class ProductList extends Component
         $this->resetPage();
     }
 
+    public function updatedOnList(): void
+    {
+        $this->resetPage();
+    }
+
     public function updatedSort(): void
     {
         $this->resetPage();
@@ -197,6 +206,8 @@ final class ProductList extends Component
             'shopHosts' => $this->shopHosts(),
             // Kept while selected, for the same reason as categoryGroups().
             'hasUncategorised' => $this->category === self::NO_CATEGORY || $this->uncategorised()->exists(),
+            // Kept while on, so the switch that emptied the list can turn it off.
+            'hasListed' => $this->onList || Product::query()->where('user_id', auth()->id())->onShoppingList()->exists(),
             'showAutoCategoriesPromo' => $showAutoCategoriesPromo,
             // "Try" only when checkout starts a free trial for this account.
             'promoOffersTrial' => $showAutoCategoriesPromo && ProPrice::trialDays() > 0 && auth()->user()?->qualifiesForTrial() === true,
@@ -257,6 +268,7 @@ final class ProductList extends Component
                 $categories !== null,
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []),
             )
+            ->when($this->onList, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->onShoppingList())
             ->when($this->category === self::NO_CATEGORY, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('category'))
             ->when($this->bestBuyFilterOn(), fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereKey($this->bestBuyIds()))
             ->when($this->shop !== '', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereHas(

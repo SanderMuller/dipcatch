@@ -979,3 +979,47 @@ it('offers the best-buy filter only with a shop chosen', function (): void {
         ->set('shop', 'ah.nl')
         ->assertSeeHtml('data-test="product-best-buy-filter"');
 });
+
+it('shows only the products on the shopping list, crossed off or not', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->listed()->create(['user_id' => $user->id, 'title' => 'Listed coffee']);
+    Product::factory()->listedAndCrossedOff()->create(['user_id' => $user->id, 'title' => 'Bought tea']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Dish soap']);
+
+    $this->actingAs($user);
+
+    Livewire::withQueryParams(['onList' => '1'])
+        ->test(ProductList::class)
+        ->assertSee('Listed coffee')
+        ->assertSee('Bought tea')
+        ->assertDontSee('Dish soap');
+});
+
+it('drops a product from the on-list filter once it comes off the list', function (): void {
+    $user = User::factory()->create();
+    $coffee = Product::factory()->listed()->create(['user_id' => $user->id, 'title' => 'Listed coffee']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('onList', true)
+        ->assertSee('Listed coffee')
+        ->call('toggleShoppingList', (string) $coffee->id)
+        ->assertDontSee('Listed coffee')
+        ->assertSee('Nothing on your shopping list.')
+        // Still there, so the filter that emptied the list can be turned off.
+        ->assertSeeHtml('data-test="product-on-list-filter"');
+});
+
+it('offers the on-list filter only to an account with something on its list', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)->assertDontSeeHtml('data-test="product-on-list-filter"');
+
+    Product::factory()->listed()->create(['user_id' => $user->id]);
+
+    livewire(ProductList::class)->assertSeeHtml('data-test="product-on-list-filter"');
+});

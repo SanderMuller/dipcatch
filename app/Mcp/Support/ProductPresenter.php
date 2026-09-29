@@ -4,6 +4,7 @@ namespace App\Mcp\Support;
 
 use App\Models\Product;
 use App\Support\HeadlinePrice;
+use App\Support\ShoppingList;
 use Carbon\CarbonInterface;
 
 /**
@@ -64,6 +65,52 @@ final readonly class ProductPresenter
             'category' => $product->category?->value,
             'category_label' => $product->category?->label(),
             'department' => $product->category?->department()->value,
+            'on_shopping_list' => $product->isOnShoppingList(),
+        ];
+    }
+
+    /**
+     * The list as the app shows it: one group per shop, each product under
+     * the shop where it is the best buy now. The group with a null `shop`
+     * holds the products no shop sells now.
+     *
+     * @return array<string, mixed>
+     */
+    public function shoppingList(ShoppingList $list): array
+    {
+        $groups = [];
+
+        foreach ($list->groups as $group) {
+            $items = [];
+
+            foreach ($group['items'] as $item) {
+                $headline = $item['headline'];
+                $buyable = $item['shop'] !== null;
+
+                $items[] = [
+                    'product_id' => self::id($item['product']->getKey()),
+                    'title' => $item['product']->title,
+                    'currency' => $headline->currency(),
+                    // No price without a shop that sells it now: the headline
+                    // would fall back to a last price nobody can pay.
+                    'headline_price' => ! $buyable ? null : ($headline->isPerUnit() ? $headline->unitPrice() : $headline->packPrice()),
+                    'headline_unit' => $buyable ? $headline->unit : null,
+                    'headline_price_basis' => ! $buyable ? null : ($headline->isPerUnit() ? 'unit' : 'pack'),
+                    'crossed_off' => $item['crossedOff'],
+                ];
+            }
+
+            $groups[] = [
+                'shop' => $group['shop']?->host,
+                'open_count' => $group['open'],
+                'items' => $items,
+            ];
+        }
+
+        return [
+            'open_count' => $list->openCount,
+            'crossed_off_count' => $list->crossedOffCount,
+            'groups' => $groups,
         ];
     }
 
