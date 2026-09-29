@@ -26,6 +26,7 @@ it('shows a free account its usage and the upgrade route', function (): void {
     livewire(BillingPage::class)
         ->assertSee('Free')
         ->assertSee('3')
+        ->assertSee('17 places left')
         ->assertSee('Start 14-day trial');
 });
 
@@ -314,4 +315,50 @@ test('a comped account with no Stripe customer is offered no billing portal', fu
     $this->actingAs($user);
 
     $this->get('/app/billing')->assertOk()->assertDontSeeHtml('billing/portal');
+});
+
+it('tells a free account at its product limit how far Pro goes', function (): void {
+    configureStripe();
+
+    $user = User::factory()->create();
+    Product::factory()->count(20)->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(BillingPage::class)
+        ->assertSee('Full. Pro holds up to 250.')
+        ->assertSeeInOrder(['What Pro adds', 'Products', '20', '250']);
+});
+
+it('shows a pro account which opt-in AI help it has switched on', function (): void {
+    config()->set('services.typesafe.key', 'test-key');
+    $user = User::factory()->create(['auto_categories' => true, 'shop_checks' => false]);
+    subscribeUser($user);
+
+    $this->actingAs($user);
+
+    livewire(BillingPage::class)
+        ->assertDontSee('What Pro adds')
+        ->assertSeeInOrder(['Automatic categories', 'On', 'Same-product check', 'Off'])
+        ->assertSee(route('product-features.edit'));
+});
+
+it('shows a blocked account neither what Pro adds nor the AI help it cannot use', function (): void {
+    configureStripe();
+
+    $this->actingAs(User::factory()->create(['billing_blocked_at' => now(), 'auto_categories' => true]));
+
+    livewire(BillingPage::class)
+        ->assertDontSee('What Pro adds')
+        ->assertDontSee('AI help in your plan');
+});
+
+it('says nothing about AI help while the AI provider is not set up', function (): void {
+    config()->set('services.typesafe.key', '');
+    $user = User::factory()->create(['auto_categories' => true]);
+    subscribeUser($user);
+
+    $this->actingAs($user);
+
+    livewire(BillingPage::class)->assertDontSee('AI help in your plan');
 });

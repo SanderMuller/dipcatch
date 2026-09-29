@@ -5,21 +5,19 @@ namespace App\Livewire\Billing;
 use App\Billing\BillingGate;
 use App\Billing\BillingInterval;
 use App\Billing\Entitlements;
+use App\Billing\Plan;
 use App\Billing\PlanLimits;
 use App\Billing\ProPrice;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\TypeSafe\TypeSafeClient;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 /**
- * The customer's own billing screen: which plan they are on, how much of it
- * they are using, and the two buttons that matter — upgrade, and manage the
- * card in Stripe's portal.
- *
- * A port of the Filament page rather than a redesign: every rule below decides
- * whether money is offered or refused, so the logic moves unchanged and only
- * the rendering is new.
+ * The customer's own billing screen: the plan, how much of it they use, what
+ * Pro adds, and the way to Stripe's portal. The private rules below decide
+ * whether money is offered or refused.
  */
 final class BillingPage extends Component
 {
@@ -28,23 +26,39 @@ final class BillingPage extends Component
         return view('livewire.billing.billing-page', [
             'plan' => $this->user()->plan(),
             'entitlements' => $this->entitlements(),
+            'free' => Entitlements::of(Plan::Free),
+            'pro' => Entitlements::of(Plan::Pro),
             'productCount' => $this->productCount(),
             'remainingProducts' => app(PlanLimits::class)->remainingProducts($this->user()),
-            'periodEndsAt' => $this->periodEndsAt(),
-            'isComped' => $this->user()->isComped(),
-            'isCancelling' => $this->isCancelling(),
-            'isOnTrial' => $this->isOnTrial(),
+            'status' => $this->status(),
             'isBlocked' => $this->isBlocked(),
             'priceLabel' => ProPrice::label(),
             'yearlyLabel' => ProPrice::hasYearly() ? ProPrice::yearlyLabel() : null,
-            'billedYearly' => ProPrice::intervalOf($this->user()->payingSubscription()?->stripe_price) === BillingInterval::Yearly,
             'trialDays' => ProPrice::trialDays(),
             'offersTrial' => $this->offersTrial(),
             'canUpgrade' => $this->canUpgrade(),
             'canManageBilling' => $this->canManageBilling(),
             'isPastDue' => $this->user()->isPastDue(),
             'isPro' => $this->user()->isPro(),
+            'autoCategoriesOn' => $this->user()->auto_categories,
+            'shopChecksOn' => $this->user()->shop_checks,
+            'aiAvailable' => TypeSafeClient::configured(),
         ]);
+    }
+
+    /** The one line under the plan name: what it costs, or why it costs nothing now. */
+    private function status(): string
+    {
+        $free = Entitlements::of(Plan::Free);
+
+        return match (true) {
+            $this->user()->isComped() => __('Pro is on us, so there is nothing to pay'),
+            $this->isOnTrial() => __('Trial ends :date', ['date' => $this->periodEndsAt()]),
+            $this->isCancelling() => __('Cancelled. Pro runs until :date', ['date' => $this->periodEndsAt()]),
+            $this->user()->isPro() && ProPrice::intervalOf($this->user()->payingSubscription()?->stripe_price) === BillingInterval::Yearly => __(':price per year', ['price' => ProPrice::yearlyLabel()]),
+            $this->user()->isPro() => __(':price per month', ['price' => ProPrice::label()]),
+            default => __('Free for :count products at up to :shops shops each', ['count' => $free->maxProducts(), 'shops' => $free->maxShopsPerProduct()]),
+        };
     }
 
     private function user(): User
@@ -86,8 +100,8 @@ final class BillingPage extends Component
      * Both of these explain why the account has Pro, so both are gated on
      * having it. A subscription can sit in a grace period or carry a future
      * `trial_ends_at` while `plan()` says Free — an expired or never-paid row
-     * does both — and the card would then print "Trial ends Friday" beside a
-     * Free badge.
+     * does both — and the card would then print "Trial ends Friday" under the
+     * Free plan name.
      */
     private function isCancelling(): bool
     {

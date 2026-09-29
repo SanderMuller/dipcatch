@@ -1,92 +1,176 @@
 <div>
-    <flux:heading size="xl">{{ __('Plan & billing') }}</flux:heading>
+    <flux:heading size="xl" level="1" class="text-2xl! font-semibold! tracking-tight sm:text-3xl!">{{ __('Plan & billing') }}</flux:heading>
+    <flux:text class="mt-1 max-w-[60ch] text-pretty text-zinc-500 dark:text-zinc-400">
+        {{ __('Your plan, how much of it you use, and where to change how you pay.') }}
+    </flux:text>
 
     @if ($isBlocked)
         {{-- A lost chargeback drops the account to Free while Stripe may still
              be billing it, so the portal stays reachable below. --}}
-        <flux:callout variant="danger" class="mt-4" icon="exclamation-triangle">
-            <flux:callout.heading>Pro is paused after a chargeback</flux:callout.heading>
+        <flux:callout variant="danger" class="mt-6" icon="exclamation-triangle">
+            <flux:callout.heading>{{ __('Pro is paused after a chargeback') }}</flux:callout.heading>
             <flux:callout.text>
-                A payment was charged back and lost, so Pro features are off. Everything you track is untouched and still being checked. Contact support to sort it out.
+                {{ __('A payment was charged back and lost, so Pro features are off. Everything you track is untouched and still being checked. Contact support to sort it out.') }}
             </flux:callout.text>
         </flux:callout>
     @elseif ($isPastDue)
         {{-- keepPastDueSubscriptionsActive() means Pro survives dunning, so the
              warning must not threaten what is not at risk. --}}
-        <flux:callout variant="warning" class="mt-4" icon="exclamation-triangle">
-            <flux:callout.heading>Your last payment did not go through</flux:callout.heading>
-            <flux:callout.text>Update your card to keep Pro. Your tracked products keep working either way.</flux:callout.text>
-            <flux:button class="mt-3" size="sm" :href="route('billing.portal')">Update payment details</flux:button>
+        <flux:callout variant="warning" class="mt-6" icon="exclamation-triangle">
+            <flux:callout.heading>{{ __('Your last payment did not go through') }}</flux:callout.heading>
+            <flux:callout.text>{{ __('Update your card to keep Pro. Your tracked products keep working either way.') }}</flux:callout.text>
+            <flux:button class="mt-3 w-fit" size="sm" :href="route('billing.portal')">{{ __('Update payment details') }}</flux:button>
         </flux:callout>
     @endif
 
-    <flux:card class="mt-6">
-        <div class="flex flex-wrap items-center gap-3">
-            <flux:heading size="lg">Your plan</flux:heading>
-            <flux:badge :color="$isPro ? 'green' : 'zinc'">{{ $isPro ? 'Pro' : 'Free' }}</flux:badge>
+    @php
+        $maxProducts = $entitlements->maxProducts();
+        $usedPercent = $maxProducts ? min(100, (int) round($productCount / $maxProducts * 100)) : null;
+        $productsFull = $remainingProducts === 0;
+        $statClass = 'border-ink/10 px-6 py-5 even:border-l dark:border-white/10 [&:nth-child(n+3)]:border-t @2xl:[&:not(:first-child)]:border-l @2xl:[&:nth-child(n+3)]:border-t-0';
+        $historyLabel = fn (\App\Billing\Entitlements $plan): string => $plan->historyDays() === null
+            ? __('Everything, kept')
+            : __(':days days', ['days' => $plan->historyDays()]);
+    @endphp
 
-            @if ($isComped)
-                <flux:text class="text-zinc-500">Pro is on us, so there is nothing to pay</flux:text>
-            @elseif ($isOnTrial)
-                <flux:text class="text-zinc-500">Trial ends {{ $periodEndsAt }}</flux:text>
-            @elseif ($isCancelling)
-                <flux:text class="text-zinc-500">Cancelled. Pro runs until {{ $periodEndsAt }}</flux:text>
-            @elseif ($isPro)
-                <flux:text class="text-zinc-500">{{ $billedYearly ? $yearlyLabel . ' per year' : $priceLabel . ' per month' }}</flux:text>
-            @endif
-        </div>
-
-        <div class="mt-6 grid gap-4 sm:grid-cols-3">
-            <div>
-                <flux:text size="sm" class="text-zinc-500">Products</flux:text>
-                <flux:heading size="lg">
-                    {{ $productCount }}
-                    @if ($entitlements->maxProducts() !== null)
-                        <span class="text-zinc-500">/ {{ $entitlements->maxProducts() }}</span>
-                    @else
-                        <span class="text-zinc-500">tracked, no limit</span>
-                    @endif
-                </flux:heading>
+    <flux:card class="mt-8 overflow-hidden p-0!">
+        <div class="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+                <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">{{ __('Your plan') }}</flux:text>
+                <p class="mt-1 text-2xl font-semibold tracking-tight text-ink dark:text-white">{{ $isPro ? 'Pro' : 'Free' }}</p>
+                <flux:text class="mt-1 text-pretty text-zinc-600 dark:text-zinc-400">{{ $status }}</flux:text>
             </div>
 
-            <div>
-                <flux:text size="sm" class="text-zinc-500">Shops per product</flux:text>
-                <flux:heading size="lg">{{ $entitlements->maxShopsPerProduct() ?? 'No limit' }}</flux:heading>
-            </div>
-
-            <div>
-                <flux:text size="sm" class="text-zinc-500">Price check</flux:text>
-                <flux:heading size="lg">Every {{ $entitlements->recheckIntervalHours() }} hours</flux:heading>
-            </div>
-        </div>
-
-        <div class="mt-6 flex flex-wrap gap-3">
-            @if ($canManageBilling)
-                <flux:button :href="route('billing.portal')" variant="filled">Manage subscription</flux:button>
-            @endif
-
-            @if (! $isPro && $canUpgrade)
-                <flux:button :href="route('billing.checkout')" variant="primary">
-                    @if ($offersTrial)
-                        Start {{ $trialDays }}-day trial, then {{ $priceLabel }} a month
-                    @else
-                        Upgrade to Pro: {{ $priceLabel }} a month
-                    @endif
-                </flux:button>
-                @if ($yearlyLabel !== null)
-                    <flux:button :href="route('billing.checkout', ['interval' => 'yearly'])" variant="filled">
-                        @if ($offersTrial)
-                            Or {{ $yearlyLabel }} a year after the trial
-                        @else
-                            Or {{ $yearlyLabel }} a year
-                        @endif
-                    </flux:button>
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                @if ($canManageBilling)
+                    <flux:button :href="route('billing.portal')" variant="filled" icon-trailing="arrow-top-right-on-square">{{ __('Manage subscription') }}</flux:button>
                 @endif
-            @elseif (! $isBlocked && ! $isPro)
-                <flux:text class="text-zinc-500">Pro is not on sale yet.</flux:text>
-            @endif
+                <flux:button :href="route('pricing')" variant="ghost">{{ __('Compare plans') }}</flux:button>
+            </div>
+        </div>
 
-            <flux:button :href="route('pricing')" variant="ghost">Compare plans</flux:button>
+        @if ($canManageBilling)
+            <p class="-mt-2 px-6 pb-5 text-sm text-pretty text-zinc-500 dark:text-zinc-400">
+                {{ __('Your card, invoices and cancelling live in Stripe, where payments are handled.') }}
+            </p>
+        @endif
+
+        <div class="@container border-t border-ink/10 dark:border-white/10">
+            <dl class="grid grid-cols-2 @2xl:grid-cols-4">
+                <div class="{{ $statClass }}">
+                    <dt id="products-used" class="truncate text-sm text-zinc-500 dark:text-zinc-400">{{ __('Products') }}</dt>
+                    <dd class="mt-1 text-lg font-semibold text-ink tabular-nums dark:text-white">
+                        {{ $productCount }}
+                        <span class="font-normal text-zinc-500 dark:text-zinc-400">{{ $maxProducts === null ? __('tracked, no limit') : __('of :max', ['max' => $maxProducts]) }}</span>
+                    </dd>
+                    @if ($usedPercent !== null)
+                        <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/10 dark:bg-white/10" role="progressbar" aria-valuemin="0" aria-valuemax="{{ $maxProducts }}" aria-valuenow="{{ min($productCount, $maxProducts) }}" aria-valuetext="{{ __(':count of :max', ['count' => $productCount, 'max' => $maxProducts]) }}" aria-labelledby="products-used">
+                            <div @class(['h-full rounded-full', 'bg-alert' => $productsFull, 'bg-chart' => ! $productsFull && $usedPercent >= 80, 'bg-savings' => $usedPercent < 80]) style="width: {{ $usedPercent }}%"></div>
+                        </div>
+                        <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                            {{ $productsFull ? ($isPro ? __('Full') : __('Full. Pro holds up to :max.', ['max' => $pro->maxProducts()])) : trans_choice(':count place left|:count places left', $remainingProducts ?? 0) }}
+                        </p>
+                    @endif
+                </div>
+
+                <div class="{{ $statClass }}">
+                    <dt class="truncate text-sm text-zinc-500 dark:text-zinc-400">{{ __('Shops per product') }}</dt>
+                    <dd class="mt-1 text-lg font-semibold text-ink tabular-nums dark:text-white">{{ $entitlements->maxShopsPerProduct() ?? __('No limit') }}</dd>
+                </div>
+
+                <div class="{{ $statClass }}">
+                    <dt class="truncate text-sm text-zinc-500 dark:text-zinc-400">{{ __('Price checks') }}</dt>
+                    <dd class="mt-1 text-lg font-semibold text-ink tabular-nums dark:text-white">{{ __('Every :hours h', ['hours' => $entitlements->recheckIntervalHours()]) }}</dd>
+                </div>
+
+                <div class="{{ $statClass }}">
+                    <dt class="truncate text-sm text-zinc-500 dark:text-zinc-400">{{ __('Price history') }}</dt>
+                    <dd class="mt-1 text-lg font-semibold text-ink dark:text-white">{{ $historyLabel($entitlements) }}</dd>
+                </div>
+            </dl>
         </div>
     </flux:card>
+
+    @if (! $isPro && $canUpgrade)
+        @php
+            $gains = [
+                [__('Products'), (string) $free->maxProducts(), $pro->maxProducts() === null ? __('Unlimited') : (string) $pro->maxProducts()],
+                [__('Shops per product'), (string) $free->maxShopsPerProduct(), $pro->maxShopsPerProduct() === null ? __('Unlimited') : (string) $pro->maxShopsPerProduct()],
+                [__('Price checks'), __('Every :hours h', ['hours' => $free->recheckIntervalHours()]), __('Every :hours h', ['hours' => $pro->recheckIntervalHours()])],
+                [__('Price history'), $historyLabel($free), $historyLabel($pro)],
+            ];
+            $extras = [
+                __('Target price per kilo, at any shop and any pack'),
+                __('Automatic categories, and a check that a new shop sells the same product. AI help stays off until you switch it on.'),
+            ];
+        @endphp
+
+        <section class="mt-8 rounded-xl bg-soft-yellow/60 p-6 ring-1 ring-ink/5 sm:p-8 dark:bg-zinc-900 dark:ring-0 dark:inset-ring dark:inset-ring-white/5" aria-labelledby="pro-adds">
+            <flux:heading size="lg" level="2" id="pro-adds" class="font-semibold! tracking-tight">{{ __('What Pro adds') }}</flux:heading>
+
+            <dl class="mt-5 grid gap-x-10 sm:grid-cols-2">
+                @foreach ($gains as [$label, $freeValue, $proValue])
+                    <div class="flex items-baseline justify-between gap-4 border-b border-ink/10 py-3 dark:border-white/10">
+                        <dt class="text-zinc-700 dark:text-zinc-300">{{ $label }}</dt>
+                        <dd class="flex shrink-0 items-center gap-1.5 tabular-nums">
+                            <span class="text-zinc-500 dark:text-zinc-400">{{ $freeValue }}</span>
+                            <svg viewBox="0 0 16 16" class="size-4 shrink-0 fill-zinc-400 dark:fill-zinc-500" aria-hidden="true"><path fill-rule="evenodd" d="M2 8a.75.75 0 0 1 .75-.75h8.69L8.22 4.03a.75.75 0 0 1 1.06-1.06l4.5 4.5a.75.75 0 0 1 0 1.06l-4.5 4.5a.75.75 0 0 1-1.06-1.06l3.22-3.22H2.75A.75.75 0 0 1 2 8Z" clip-rule="evenodd" /></svg>
+                            <span class="sr-only">{{ __('becomes') }}</span>
+                            <span class="font-semibold text-ink dark:text-white">{{ $proValue }}</span>
+                        </dd>
+                    </div>
+                @endforeach
+            </dl>
+
+            <ul role="list" class="mt-5 space-y-2">
+                @foreach ($extras as $extra)
+                    <li class="flex gap-3 text-zinc-700 dark:text-zinc-300">
+                        <svg viewBox="0 0 16 16" class="mt-1 size-4 shrink-0 fill-savings-strong dark:fill-savings" aria-hidden="true"><path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>
+                        <span class="text-pretty">{{ $extra }}</span>
+                    </li>
+                @endforeach
+            </ul>
+
+            <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <flux:button :href="route('billing.checkout')" variant="primary">
+                    {{ $offersTrial
+                        ? __('Start :days-day trial, then :price a month', ['days' => $trialDays, 'price' => $priceLabel])
+                        : __('Upgrade to Pro: :price a month', ['price' => $priceLabel]) }}
+                </flux:button>
+                @if ($yearlyLabel !== null)
+                    <flux:link :href="route('billing.checkout', ['interval' => 'yearly'])" variant="subtle" class="text-sm">
+                        {{ $offersTrial
+                            ? __('Or :price a year after the trial', ['price' => $yearlyLabel])
+                            : __('Or :price a year', ['price' => $yearlyLabel]) }}
+                    </flux:link>
+                @endif
+            </div>
+        </section>
+    @elseif (! $isPro && ! $isBlocked)
+        <flux:text class="mt-6 text-zinc-500 dark:text-zinc-400">{{ __('Pro is not on sale yet.') }}</flux:text>
+    @elseif ($isPro && $aiAvailable)
+        <section class="mt-8" aria-labelledby="ai-help">
+            <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <flux:heading size="lg" level="2" id="ai-help" class="font-semibold! tracking-tight">{{ __('AI help in your plan') }}</flux:heading>
+                <flux:link :href="route('product-features.edit')" wire:navigate class="text-sm">{{ __('Change in Product features') }}</flux:link>
+            </div>
+            <flux:text class="mt-0.5 max-w-[60ch] text-pretty text-zinc-500 dark:text-zinc-400">{{ __('Included in Pro. Each one stays off until you switch it on.') }}</flux:text>
+
+            <ul role="list" class="mt-4 divide-y divide-ink/10 border-y border-ink/10 dark:divide-white/10 dark:border-white/10">
+                @foreach ([
+                    [__('Automatic categories'), __('New products filed for you.'), $autoCategoriesOn, $entitlements->allowsAutoCategories()],
+                    [__('Same-product check'), __('A warning when a new shop sells another flavour or pack.'), $shopChecksOn, $entitlements->allowsShopChecks()],
+                ] as [$label, $hint, $on, $allowed])
+                    @continue(! $allowed)
+                    <li class="flex items-center justify-between gap-4 py-3">
+                        <div class="min-w-0">
+                            <p class="font-medium text-ink dark:text-white">{{ $label }}</p>
+                            <p class="text-sm text-pretty text-zinc-500 dark:text-zinc-400">{{ $hint }}</p>
+                        </div>
+                        <flux:badge :color="$on ? 'green' : 'zinc'" size="sm" class="shrink-0">{{ $on ? __('On') : __('Off') }}</flux:badge>
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    @endif
 </div>
