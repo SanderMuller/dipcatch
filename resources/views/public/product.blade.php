@@ -2,7 +2,6 @@
     use App\Support\Favicon;
     use App\Support\MoneyFormatter;
 
-    $image = $product->safeImageUrl();
     // The live shop behind the figure the page leads with: the best value per
     // unit, or the lowest price when the product compares no unit.
     // Never a listed shop the owner page would not crown, such as a trade-only price.
@@ -30,9 +29,9 @@
     <meta name="robots" content="noindex, nofollow">
     <title>{{ $product->title }} — DipCatch</title>
 
-    {{-- Open Graph / Twitter Card. og:image / twitter:image only emit when
-         the user-supplied image_url passes the http(s) scheme check via
-         safeImageUrl(). --}}
+    {{-- Open Graph / Twitter Card. og:image / twitter:image only emit for a
+         picture one of the product's shops reported, with an http(s) scheme;
+         see PublicProductController::publicImage(). --}}
     <meta property="og:type" content="website">
     <meta property="og:title" content="{{ $product->title }}">
     <meta property="og:description" content="{{ $ogDescription }}">
@@ -96,6 +95,7 @@
                         <img
                             src="{{ $image }}"
                             alt=""
+                            referrerpolicy="no-referrer"
                             class="size-32 shrink-0 rounded-2xl bg-white object-contain p-2 ring-1 ring-line"
                         >
                     @endif

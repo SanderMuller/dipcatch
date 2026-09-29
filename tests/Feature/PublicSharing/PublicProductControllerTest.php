@@ -238,7 +238,7 @@ test('response includes X-Robots-Tag noindex header', function (): void {
 
 test('emits OG + Twitter meta tags with safeImageUrl-guarded image', function (): void {
     $product = makeSharedProduct(['image_url' => 'https://example.com/img.png']);
-    Shop::factory()->for($product)->create(['current_price' => '85.00']);
+    Shop::factory()->for($product)->create(['current_price' => '85.00', 'image_url' => 'https://example.com/img.png']);
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
@@ -683,4 +683,21 @@ test('a trade-only public row leads with its reason, not a price per unit', func
     $this->get('/p/' . str_repeat('a', 32))->assertOk()
         ->assertSeeText('€8.45 /kg')
         ->assertDontSeeText('€4.95 /kg');
+});
+
+test('shows only a picture one of the shops reported, never an address the owner typed', function (): void {
+    $product = makeSharedProduct(['image_url' => 'https://tracker.example/pixel.png']);
+    Shop::factory()->for($product)->create(['current_price' => '85.00', 'image_url' => 'https://static.shop.example/headphones.png']);
+
+    $this->get('/p/' . str_repeat('a', 32))
+        ->assertOk()
+        ->assertDontSeeHtml('tracker.example')
+        ->assertSeeHtml('<meta name="twitter:card" content="summary">');
+
+    $product->forceFill(['image_url' => 'https://static.shop.example/headphones.png'])->save();
+
+    $this->get('/p/' . str_repeat('a', 32))
+        ->assertOk()
+        ->assertSeeHtml('<meta property="og:image" content="https://static.shop.example/headphones.png">')
+        ->assertSeeHtml('referrerpolicy="no-referrer"');
 });

@@ -38,6 +38,7 @@ final class PublicProductController extends Controller
         return response()
             ->view('public.product', [
                 'product' => $product,
+                'image' => $this->publicImage($product),
                 'shops' => $shops,
                 'chart' => $this->chartPayload($product, $headline->unit),
                 'headline' => $headline,
@@ -103,6 +104,25 @@ final class PublicProductController extends Controller
         );
 
         return [$product, $shops, $headline];
+    }
+
+    /**
+     * The product picture, only when one of the product's shops reported it.
+     *
+     * Every visitor's browser loads this address. A URL the owner typed could
+     * point at a server that logs who opened the link, so the public page
+     * shows only a picture a shop page supplied, the same rule the MCP
+     * `set_image` tool follows. The owner's own pages still show any image.
+     */
+    private function publicImage(Product $product): ?string
+    {
+        $image = $product->safeImageUrl();
+
+        if ($image === null) {
+            return null;
+        }
+
+        return $product->shops()->where('image_url', $product->image_url)->exists() ? $image : null;
     }
 
     /**
