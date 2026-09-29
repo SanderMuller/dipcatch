@@ -9,11 +9,11 @@ use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
-use App\Support\Config as DipConfig;
 use App\Support\UnservableShops;
 use App\Support\UrlNormalizer;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use InvalidArgumentException;
@@ -31,23 +31,10 @@ use Throwable;
  *  - 401 → Blocked; 429 → RateLimitedByHost; 5xx → TemporaryFailure.
  *  - Per-host rate limit enforced INSIDE the fetcher (probe path can't
  *    bypass), keyed on normalized host.
- *  - Body cap 2 MB; charset → UTF-8.
+ *  - Body cap from `dipcatch.fetcher.body_cap_bytes`; charset → UTF-8.
  */
 final readonly class ShopFetcher
 {
-    // Cloudflare / Akamai blanket-block anything that admits to being a bot,
-    // even when robots.txt would allow us. We still honor robots.txt, throttle
-    // per host, and respect Retry-After — we just don't announce as a bot.
-    // Override via DIPCATCH_FETCHER_USER_AGENT when a shop demands a real
-    // bot UA in robots.txt.
-    private const string DEFAULT_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15';
-
-    private const int DEFAULT_TIMEOUT = 10;
-
-    private const int DEFAULT_BODY_CAP_BYTES = 2_000_000;
-
-    private const int DEFAULT_RATE_LIMIT_PER_MINUTE = 12;
-
     /** @var list<string> Lowercased substrings that indicate WAF challenge pages. */
     private const array BLOCK_MARKERS = [
         'cf-mitigated',
@@ -95,7 +82,8 @@ final readonly class ShopFetcher
         // Remember how this host answers: a caller told "try again shortly"
         // for the tenth deterministic refusal in a row is being sent back to
         // do the same thing again.
-        $response = $this->sendAndRemember($url, $host, $rememberHost);
+        $redirects = [];
+        $response = $this->sendAndRemember($url, $host, $rememberHost, $redirects);
 
         $html = $this->prepareBody($response);
 
@@ -126,6 +114,10 @@ final readonly class ShopFetcher
             host: $finalHost,
             html: $html,
             statusCode: $response->status(),
+            // Only when every hop said "moved for good". A 302 or 307 is the
+            // shop's answer for today — a sale page, a geo split — and the
+            // address it left from is still the right one to keep.
+            movedPermanently: $redirects !== [] && array_all($redirects, static fn (int $status): bool => in_array($status, [301, 308], strict: true)),
         );
     }
 
@@ -140,7 +132,7 @@ final readonly class ShopFetcher
 
     private function throttle(string $host): void
     {
-        $limit = DipConfig::int('dipcatch.fetcher.rate_limit_per_minute', self::DEFAULT_RATE_LIMIT_PER_MINUTE);
+        $limit = Config::integer('dipcatch.fetcher.rate_limit_per_minute');
         $key = self::throttleKey($host);
 
         // Use attempt() so the check + hit happen as a single atomic operation
@@ -158,10 +150,14 @@ final readonly class ShopFetcher
         }
     }
 
-    private function sendRequest(string $url): Response
+    /**
+     * @param  list<int>  $redirects  filled with the status of each redirect hop
+     */
+    private function sendRequest(string $url, array &$redirects): Response
     {
-        $ua = DipConfig::string('dipcatch.fetcher.user_agent', self::DEFAULT_USER_AGENT);
-        $timeout = DipConfig::int('dipcatch.fetcher.timeout_seconds', self::DEFAULT_TIMEOUT);
+        $ua = Config::string('dipcatch.fetcher.user_agent');
+        $timeout = Config::integer('dipcatch.fetcher.timeout_seconds');
+        $cap = Config::integer('dipcatch.fetcher.body_cap_bytes');
 
         try {
             $safety = $this->safety;
@@ -173,6 +169,8 @@ final readonly class ShopFetcher
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             ])
                 ->timeout($timeout)
+                ->withMiddleware($safety->middleware())
+                ->withMiddleware(CappedStream::middleware($cap))
                 ->withOptions([
                     'allow_redirects' => [
                         'max' => 5,
@@ -182,21 +180,23 @@ final readonly class ShopFetcher
                         // and against the target's own robots.txt — the rules
                         // checked before the request belong to the host that was
                         // asked, not to the host the redirect points at.
-                        'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $uri) use ($safety): void {
+                        'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $uri) use ($safety, &$redirects): void {
                             $safety->assertSafe((string) $uri);
                             $this->assertRobotsAllows((string) $uri);
+                            $redirects[] = $response->getStatusCode();
                         },
                     ],
                 ])
                 ->get($url);
-        } catch (ConnectionException) {
-            throw new TemporaryFailure(599);
+        } catch (ConnectionException $e) {
+            // curl reports a sink that refused a write as a broken connection.
+            throw BodyTooLarge::or($e, new TemporaryFailure(599));
         } catch (FetchException $e) {
             // A redirect the callbacks refused: keep the reason, which the
             // caller turns into its own outcome.
             throw $e;
-        } catch (Throwable) {
-            throw new HttpError(0);
+        } catch (Throwable $e) {
+            throw BodyTooLarge::or($e, new HttpError(0));
         }
     }
 
@@ -205,10 +205,13 @@ final readonly class ShopFetcher
      * asked not to — the adapter canary fetches pages no user tracks, so its
      * result must not rewrite what a real probe learned about the host.
      */
-    private function sendAndRemember(string $url, string $host, bool $rememberHost): Response
+    /**
+     * @param  list<int>  $redirects  see {@see self::sendRequest()}
+     */
+    private function sendAndRemember(string $url, string $host, bool $rememberHost, array &$redirects): Response
     {
         try {
-            $response = $this->sendRequest($url);
+            $response = $this->sendRequest($url, $redirects);
 
             $this->classify($response);
         } catch (Blocked|TemporaryFailure $e) {
@@ -302,8 +305,14 @@ final readonly class ShopFetcher
         }
 
         if ($status === 429) {
-            $retryAfter = (int) ($response->header('Retry-After') ?: 60);
-            throw new RateLimitedByHost($retryAfter);
+            // Only when the shop states one. A default here was reported back
+            // as the shop's own instruction — dierapotheker.nl sends a bare
+            // nginx 429 with no header, and a caller told to "try again in 60
+            // seconds" did, four times, and was refused every time. A number
+            // nobody gave us is worse than no number: it reads as a promise.
+            $stated = (int) $response->header('Retry-After');
+
+            throw new RateLimitedByHost(max($stated, 0));
         }
 
         if ($status >= 500 && $status <= 599) {
@@ -329,7 +338,7 @@ final readonly class ShopFetcher
     private function prepareBody(Response $response): string
     {
         $body = $response->body();
-        $cap = DipConfig::int('dipcatch.fetcher.body_cap_bytes', self::DEFAULT_BODY_CAP_BYTES);
+        $cap = Config::integer('dipcatch.fetcher.body_cap_bytes');
 
         if (strlen($body) > $cap) {
             // Truncating produced false `no_adapter_matched` failures and

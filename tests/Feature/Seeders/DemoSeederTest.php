@@ -239,3 +239,61 @@ it('renders a seeded product page with its price history', function (): void {
         ->assertOk()
         ->assertSee('jumbo.com');
 });
+
+test('the real catalog points at pages that exist and photos that load', function (): void {
+    // Every other catalog here is invented, so a recheck reads a 404 and no
+    // image ever loads. These were read through DipCatch's own probe, and a
+    // developer needs at least one account where a check does what it does in
+    // production.
+    $this->seed(DemoSeeder::class);
+
+    $roter = Product::query()->where('title', 'Roter Vitamine C 70 mg citroen kauwtabletten')->first();
+
+    expect($roter)->not->toBeNull()
+        ->and($roter?->image_url)->toStartWith('https://static.ah.nl/');
+
+    $roter = Product::query()->where('title', 'Roter Vitamine C 70 mg citroen kauwtabletten')->firstOrFail();
+    $hosts = $roter->shops->pluck('url', 'host')->all();
+
+    expect($hosts)->toHaveKeys(['ah.nl', 'benushop.nl'])
+        ->and($hosts['ah.nl'])->toBe('https://www.ah.nl/producten/product/wi56116/roter-vitamine-c-70-mg-kauwtabletten-citroen');
+
+    // Every shop on a real product carries the photo its own page serves.
+    foreach ($roter->shops as $shop) {
+        expect($shop->safeImageUrl())->not->toBeNull();
+    }
+});
+
+test('the two Roter packs are the per-unit comparison, live in the demo', function (): void {
+    // 12.99 for 400 tablets is 0.0325 each; 21.99 for 800 is 0.0275. Both
+    // rendered 0.03 until the ranking stopped comparing the display figure.
+    $this->seed(DemoSeeder::class);
+
+    $roter = Product::query()->where('title', 'Roter Vitamine C 70 mg citroen kauwtabletten')->firstOrFail();
+
+    expect($roter->bestValueShop()?->host)->toBe('benushop.nl');
+});
+
+test('the seeded history carries the best value from its first day', function (): void {
+    // Without it the per-unit chart line began at the first live check, and
+    // the chart opened on one dot at its right edge.
+    $roter = Product::query()->where('title', 'Roter Vitamine C 70 mg citroen kauwtabletten')->firstOrFail();
+    $first = $roter->cheapestHistory()->oldest('started_at')->firstOrFail();
+
+    expect($first->best_value_shop_id)->not->toBeNull()
+        ->and($first->best_value_price)->not->toBeNull()
+        ->and($first->pack_unit)->toBe('piece');
+});
+
+test('a product with no photo of its own names itself in the stand-in', function (): void {
+    // Better than an empty frame, and better than showing some other
+    // product's picture.
+    $this->seed(DemoSeeder::class);
+
+    $generated = Product::query()
+        ->where('image_url', 'like', 'https://placehold.co/%')
+        ->first();
+
+    expect($generated)->not->toBeNull()
+        ->and($generated?->image_url)->toContain(rawurlencode((string) $generated?->title));
+});

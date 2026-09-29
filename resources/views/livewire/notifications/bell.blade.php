@@ -20,9 +20,12 @@
             <flux:menu.item
                 :href="$item['url']"
                 wire:click="markAsRead('{{ $item['id'] }}')"
-                class="!h-auto !items-start gap-2 py-2"
+                class="!h-auto !items-start gap-3 py-2"
             >
-                <div class="grid gap-0.5">
+                @if ($item['product'] !== null)
+                    <x-product-thumb :product="$item['product']" size="size-10" class="mt-0.5" />
+                @endif
+                <div class="grid min-w-0 gap-0.5">
                     <div class="flex items-start gap-2">
                         @if ($item['unread'])
                             <span class="mt-1.5 size-2 shrink-0 rounded-full bg-red-500"></span>
@@ -31,18 +34,42 @@
                     </div>
 
                     @if ($item['price'] !== null)
+                        {{-- Per unit first when the alert was measured per unit; a
+                             target-price alert leads with the pack price that fired. --}}
+                        @if ($item['leadsWithUnit'])
+                            <flux:text size="sm" class="font-medium text-zinc-700 dark:text-zinc-300" data-test="bell-unit-figure">
+                                {{ $item['unitFigure'] }}@if ($item['host'] !== null) · {{ $item['host'] }} @endif
+                            </flux:text>
+                        @endif
                         <flux:text size="sm" class="text-zinc-500">
-                            {{ \App\Support\MoneyFormatter::format($item['price'], $item['currency'] ?? 'EUR') }}
+                            {{ $item['pack'] }}
                             @if ($item['bundleLabel'] !== null)
                                 <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($item['singleItemPrice'], $item['currency'] ?? 'EUR') }}</del>
                             @endif
-                            @if ($item['host'] !== null) · {{ $item['host'] }} @endif
+                            @if (! $item['leadsWithUnit'])
+                                @if ($item['host'] !== null) · {{ $item['host'] }} @endif
+                                @if ($item['unitFigure'] !== null) · {{ $item['unitFigure'] }} @endif
+                            @endif
                         </flux:text>
+                        @if ($item['change'] !== null)
+                            <flux:text size="sm" class="text-zinc-500" data-test="bell-change">{{ $item['change'] }}</flux:text>
+                        @endif
+                        @if ($item['target'] !== null)
+                            <flux:text size="sm" class="text-zinc-500" data-test="bell-target">{{ $item['target'] }}</flux:text>
+                        @endif
+                        @if ($item['betterValue'] !== null)
+                            <flux:text size="sm" class="text-zinc-500" data-test="bell-better-value">{{ $item['betterValue'] }}</flux:text>
+                        @endif
                         @if ($item['bundleLabel'] !== null)
                             <flux:text size="sm" class="text-zinc-500">{{ $item['bundleLabel'] }}</flux:text>
                         @endif
                     @elseif ($item['body'] !== null)
                         <flux:text size="sm" class="text-zinc-500">{{ $item['body'] }}</flux:text>
+                    @endif
+
+                    @if ($item['alsoCheck'] !== null)
+                        {{-- Shops DipCatch cannot read. Named, never priced. --}}
+                        <flux:text size="sm" class="text-zinc-400">{{ $item['alsoCheck'] }}</flux:text>
                     @endif
 
                     <flux:text size="sm" class="text-zinc-400">{{ $item['at']?->diffForHumans() }}</flux:text>

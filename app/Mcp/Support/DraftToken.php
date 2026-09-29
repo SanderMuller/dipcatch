@@ -6,7 +6,9 @@ use App\Actions\Shops\ShopDraft;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
 use JsonException;
 
 /**
@@ -21,7 +23,8 @@ use JsonException;
  * Encrypted, so a client cannot read or edit a price; stamped, so a stale
  * draft is refused instead of quietly writing an old one; and bound to the
  * account it was issued for, so it means what it claims — that this user saw
- * this and agreed to it.
+ * this and agreed to it. And spent on first use, so a replayed confirm cannot
+ * write the same product twice.
  */
 final readonly class DraftToken
 {
@@ -35,6 +38,8 @@ final readonly class DraftToken
         return Crypt::encryptString(json_encode([
             'v' => 1,
             'at' => CarbonImmutable::now()->getTimestamp(),
+            // Spent on first use, so one approval writes one product or shop.
+            'n' => Str::random(32),
             'uid' => self::ownerKey($owner),
             'pid' => $productId,
             'snapshot' => $snapshot,
@@ -93,6 +98,12 @@ final readonly class DraftToken
             return DraftFailure::WrongProduct;
         }
 
+        $nonce = $payload['n'] ?? null;
+
+        if (! is_string($nonce) || $nonce === '') {
+            return DraftFailure::Malformed;
+        }
+
         $snapshot = $payload['snapshot'] ?? null;
         $url = $payload['url'] ?? null;
         $adapterKey = $payload['adapterKey'] ?? null;
@@ -101,6 +112,13 @@ final readonly class DraftToken
 
         if (! is_array($snapshot) || ! is_string($url) || ! is_string($adapterKey)) {
             return DraftFailure::Malformed;
+        }
+
+        // Last, so a token refused for any other reason stays usable once
+        // that is fixed. `add` is atomic: two confirms sent at once cannot
+        // both pass.
+        if (! Cache::add('mcp:draft-spent:' . $nonce, true, self::TTL_SECONDS)) {
+            return DraftFailure::Spent;
         }
 
         $clean = [];

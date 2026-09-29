@@ -2,6 +2,7 @@
 
 namespace App\Actions\Auth;
 
+use App\Actions\Users\ClaimUnverifiedAccount;
 use App\Enums\SocialProvider;
 use App\Models\SocialAccount;
 use App\Models\User;
@@ -18,8 +19,10 @@ use Laravel\Socialite\AbstractUser as SocialiteUser;
  * DipCatch account owns the same address, or nobody does and the account is
  * new.
  */
-final class ResolveSocialUser
+final readonly class ResolveSocialUser
 {
+    public function __construct(private ClaimUnverifiedAccount $claimUnverifiedAccount) {}
+
     public function __invoke(SocialProvider $provider, SocialiteUser $socialiteUser, ?string $acceptLanguage = null): User
     {
         $providerId = trim((string) $socialiteUser->getId());
@@ -81,12 +84,10 @@ final class ResolveSocialUser
     /**
      * The account that already holds this address, matched case-insensitively.
      *
-     * Fortify lower-cases the username on register and on profile update
-     * (`fortify.lowercase_usernames`), but an invitation does not — the admin
-     * form stores the address exactly as typed and `InvitationController`
-     * passes it straight through. `users.email` is byte-unique on Postgres, so
-     * a mixed-case row is reachable and a case-sensitive match would hand the
-     * user a second, empty account instead of the one holding their products.
+     * `User` stores the address lower-case, but rows written before that are
+     * not all lower-case: the backfill skipped a row whose lower-case form
+     * another row holds. A case-sensitive match would hand such a user a
+     * second, empty account instead of the one holding their products.
      */
     private function userOwningTheAddress(SocialProvider $provider, string $email): ?User
     {
@@ -119,44 +120,21 @@ final class ResolveSocialUser
             throw SocialLoginFailed::unverifiedEmail($provider);
         }
 
-        if ($user->socialAccounts()->where('provider', $provider)->exists()) {
-            // A different account at the same provider. The unique index on
-            // (user_id, provider) would reject the insert with a 500; refuse
-            // it here with something the user can act on.
-            throw SocialLoginFailed::alreadyLinked($provider);
-        }
-
         if ($user->hasVerifiedEmail()) {
+            if ($user->socialAccounts()->where('provider', $provider)->exists()) {
+                // A different account at the same provider. The unique index on
+                // (user_id, provider) would reject the insert with a 500; refuse
+                // it here with something the user can act on.
+                throw SocialLoginFailed::alreadyLinked($provider);
+            }
+
             return;
         }
 
-        // Nobody ever proved they own this mailbox, so nothing already on the
-        // row is evidence of ownership: anyone can register an address that is
-        // not theirs and wait. The provider has now proved it, which makes the
-        // person signing in the rightful owner and every credential set before
-        // this moment untrusted.
-        //
-        // Every one of them has to go, not only the password. Fortify's
-        // passkey and two-factor routes sit behind `auth` and `password.confirm`
-        // but not `verified`, so the squatter can register a passkey and enable
-        // two-factor on an unverified account. Leaving either behind hands them
-        // a way back in — and a stale two-factor secret would lock the rightful
-        // owner out at a challenge they cannot answer.
-        $user->forceFill([
-            'password' => Str::password(),
-            'email_verified_at' => now(),
-            'remember_token' => null,
-            'two_factor_secret' => null,
-            'two_factor_recovery_codes' => null,
-            'two_factor_confirmed_at' => null,
-        ])->save();
-
-        $user->passkeys()->delete();
-
-        // A password change does not end a live session on its own: the app
-        // does not use `AuthenticateSession`, and the session driver is the
-        // database. Same table `DeleteUser` clears.
-        DB::table('sessions')->where('user_id', $user->getKey())->delete();
+        // Nobody ever proved they own this mailbox. The provider has now, so
+        // the person signing in is the rightful owner. They sign in through
+        // the provider, so the password is a random one they never see.
+        ($this->claimUnverifiedAccount)($user, Str::password());
     }
 
     private function createUser(SocialiteUser $socialiteUser, string $email, ?string $acceptLanguage): User

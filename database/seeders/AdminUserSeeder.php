@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 final class AdminUserSeeder extends Seeder
 {
@@ -20,7 +21,8 @@ final class AdminUserSeeder extends Seeder
         }
 
         User::query()->updateOrCreate(
-            ['email' => $email],
+            // Stored lower-case, so the lookup has to be too.
+            ['email' => Str::lower($email)],
             [
                 'name' => config('dipcatch.admin.name', 'Admin'),
                 'password' => Hash::make($password),

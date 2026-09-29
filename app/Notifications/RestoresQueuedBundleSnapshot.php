@@ -5,7 +5,8 @@ namespace App\Notifications;
 use App\PriceAdapters\BundleOffer;
 
 /**
- * Rebuild `$snapshotBundle` from the flat pair an older payload carries.
+ * Rebuild `$snapshotBundle` from the flat pair an older payload carries, and
+ * give every snapshot added since a null default.
  *
  * The three alert notifications are `ShouldQueue`, so one dispatched before
  * `snapshotBundleQuantity` and `snapshotBundleTotalPrice` became a single
@@ -14,10 +15,22 @@ use App\PriceAdapters\BundleOffer;
  * `toDatabase()` or `toWebPush()` throws. A retry deserializes the same
  * payload, so the job fails for good and the bell row and the push are lost.
  *
- * Delete this once no payload predating that change can still be queued.
+ * Delete the bundle branch once no payload predating that change can still be
+ * queued. Every snapshot property added later belongs in LATER_SNAPSHOTS.
  */
 trait RestoresQueuedBundleSnapshot
 {
+    /** Snapshot properties that are null on a payload queued before they existed. */
+    private const array LATER_SNAPSHOTS = [
+        'snapshotPackQuantity',
+        'snapshotPackUnit',
+        'snapshotUnit',
+        'snapshotUnitPrice',
+        'snapshotBetterValueHost',
+        'snapshotBetterValueUnitPrice',
+        'snapshotTargetPrice',
+    ];
+
     /**
      * Fold a legacy payload into the current shape, then hand it to
      * `SerializesModels`, which still owns restoring the models in it.
@@ -39,6 +52,13 @@ trait RestoresQueuedBundleSnapshot
             );
 
             unset($values['snapshotBundleQuantity'], $values['snapshotBundleTotalPrice']);
+        }
+
+        // Snapshots added after a payload was queued. A missing key would leave
+        // the typed property uninitialized, which throws on first read; null
+        // renders the line these payloads were written for.
+        foreach (self::LATER_SNAPSHOTS as $name) {
+            $values[$name] ??= null;
         }
 
         parent::__unserialize($values);

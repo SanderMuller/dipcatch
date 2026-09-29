@@ -29,13 +29,21 @@ use Illuminate\Support\Collection;
 final readonly class ComparablePacks
 {
     /**
-     * How far below the stating shops' median unit price an inferred size may
-     * land before it reads as a wrong size rather than a good offer.
+     * How far from the stating shops' median unit price an inherited size may
+     * land before it reads as a wrong size rather than a real offer.
      *
-     * One-sided on purpose. A row stamped too *expensive* loses nothing a reader
-     * acts on, because an inferred size can neither win nor alert either way.
+     * Tested in both directions. It used to refuse only the implausibly cheap,
+     * reasoning that a row stamped too expensive loses nothing a reader acts on
+     * — an inferred size can neither win nor alert. That was wrong about what a
+     * reader acts on. A 150-tablet pack that inherited a sibling's 75 showed
+     * 0.1265 a tablet against a true 0.0633, so the best deal on the product
+     * was displayed as the worst. It could not win, and nobody needed it to in
+     * order to be misled by it. Reported 2026-09-22.
+     *
+     * One ratio rather than two constants, so the two sides of the band cannot
+     * drift apart.
      */
-    private const float IMPLAUSIBLE_BELOW_MEDIAN = 0.60;
+    private const float IMPLAUSIBLE_RATIO = 0.60;
 
     /**
      * @param  array<string, ComparablePack>  $packs  keyed by shop id
@@ -129,7 +137,7 @@ final readonly class ComparablePacks
         // answers null for a price at or below zero, and a null cast to float
         // is the smallest number there is.
         return $shops->filter(fn (Shop $shop): bool => $this->for($shop)?->canWin() === true
-            && $this->unitPriceOf($shop) !== null);
+            && $this->unitPriceValueOf($shop) !== null);
     }
 
     /**
@@ -139,19 +147,83 @@ final readonly class ComparablePacks
      * the public share page alike — a second one would let two surfaces crown
      * different shops.
      *
+     * Ranked on the unrounded figure. Two decimals is coarser than the field
+     * it sorts: a 400-tablet pack and an 800-tablet pack of the same tablet
+     * both read `0.03` while being 18% apart, and the tie then went to whoever
+     * was added first.
+     *
      * @param  Collection<int, Shop>  $shops
      */
     public function cheapestPerUnit(Collection $shops): ?Shop
     {
-        return $this->winnable($shops)
-            ->sort(fn (Shop $a, Shop $b): int => [(float) $this->unitPriceOf($a), $a->created_at, (string) $a->id]
-                <=> [(float) $this->unitPriceOf($b), $b->created_at, (string) $b->id])
-            ->first();
+        return $this->rankedPerUnit($shops)->first();
     }
 
+    /**
+     * The shops that may win, cheapest per unit first, in the order
+     * {@see cheapestPerUnit()} crowns them: a list that leads with any other
+     * shop disagrees with the headline on a tie.
+     *
+     * @param  Collection<int, Shop>  $shops
+     * @return Collection<int, Shop>
+     */
+    public function rankedPerUnit(Collection $shops): Collection
+    {
+        return $this->winnable($shops)
+            ->sort(fn (Shop $a, Shop $b): int => [$this->unitPriceValueOf($a), $a->created_at, (string) $a->id]
+                <=> [$this->unitPriceValueOf($b), $b->created_at, (string) $b->id])
+            ->values();
+    }
+
+    /**
+     * The order the product page, its Markdown copy and the public page list
+     * shops in, led by the shop the headline names:
+     *
+     *  1. the shops that may win per unit, in the ranking's own order;
+     *  2. the other eligible shops by pack price, as the pack-price headline
+     *     picks among them;
+     *  3. every other row by price per unit, then pack price, unpriced last.
+     *
+     * A cheaper row that cannot be bought from — sold out, a size it did not
+     * state, a trade-only price — never sits above the headline's shop.
+     * Returns the `$shops` instances; `$eligible` is only read for which rows
+     * qualify.
+     *
+     * @param  Collection<int, Shop>  $shops  the rows to order
+     * @param  Collection<int, Shop>  $eligible  the shops allowed to win
+     * @return Collection<int, Shop>
+     */
+    public function tableOrder(Collection $shops, Collection $eligible): Collection
+    {
+        $eligibleKeys = $eligible->map(fn (Shop $shop): string => $shop->id)->all();
+        $isEligible = fn (Shop $shop): bool => in_array($shop->id, $eligibleKeys, strict: true);
+
+        $ranked = $this->rankedPerUnit($shops->filter($isEligible));
+        $rankedKeys = $ranked->map(fn (Shop $shop): string => $shop->id)->all();
+        $unranked = $shops->reject(fn (Shop $shop): bool => in_array($shop->id, $rankedKeys, strict: true));
+
+        $otherEligible = $unranked->filter($isEligible)
+            ->sort(fn (Shop $a, Shop $b): int => [(float) $a->current_price, $a->created_at, (string) $a->id]
+                <=> [(float) $b->current_price, $b->created_at, (string) $b->id]);
+
+        $rest = $unranked->reject($isEligible)
+            ->sortBy(fn (Shop $shop): array => [
+                $this->unitPriceValueOf($shop) === null ? 1 : 0,
+                $this->unitPriceValueOf($shop) ?? ($shop->current_price === null ? PHP_FLOAT_MAX : (float) $shop->current_price),
+            ]);
+
+        return $ranked->concat($otherEligible)->concat($rest)->values();
+    }
+
+    /** The figure a surface prints. {@see unitPriceValueOf()} is what ranks. */
     public function unitPriceOf(Shop $shop): ?string
     {
         return $this->for($shop)?->unitPriceFor($shop->current_price);
+    }
+
+    public function unitPriceValueOf(Shop $shop): ?float
+    {
+        return $this->for($shop)?->unitPriceValueFor($shop->current_price);
     }
 
     private static function resolveOne(
@@ -194,18 +266,24 @@ final readonly class ComparablePacks
     }
 
     /**
-     * An inherited size that makes this shop look far cheaper per unit than
-     * every shop that stated its own is evidence the size is wrong.
+     * An inherited size that puts this shop far from every shop that stated its
+     * own is evidence the size is wrong, whichever way it lands.
+     *
+     * The size is a guess borrowed from the siblings, so a figure far off the
+     * field says the guess does not hold rather than that the shop is unusual.
+     * "Pack size unknown" is the honest answer, and it costs nothing a reader
+     * acts on: the row could not win on an inferred size either way.
      */
     private static function isImplausible(Shop $shop, PackSize $agreed, ?float $median): bool
     {
-        if ($median === null) {
+        if ($median === null || $median <= 0.0) {
             return false;
         }
 
-        $implied = $agreed->unitPriceFor((string) ($shop->current_price ?? ''));
+        $implied = $agreed->unitPriceValueFor((string) ($shop->current_price ?? ''));
 
-        return $implied !== null && (float) $implied < $median * self::IMPLAUSIBLE_BELOW_MEDIAN;
+        return $implied !== null
+            && ($implied < $median * self::IMPLAUSIBLE_RATIO || $implied > $median / self::IMPLAUSIBLE_RATIO);
     }
 
     private static function statedSize(Shop $shop): ?PackSize
@@ -272,9 +350,8 @@ final readonly class ComparablePacks
     {
         $prices = $shops
             ->filter(fn (Shop $shop, int|string $key): bool => $inUnit->has($key) && $shop->current_price !== null)
-            ->map(fn (Shop $shop, int|string $key): ?string => $inUnit->get($key)?->unitPriceFor((string) $shop->current_price))
+            ->map(fn (Shop $shop, int|string $key): ?float => $inUnit->get($key)?->unitPriceValueFor((string) $shop->current_price))
             ->filter()
-            ->map(fn (string $price): float => (float) $price)
             ->sort()
             ->values();
 

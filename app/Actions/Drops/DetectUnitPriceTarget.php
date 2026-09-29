@@ -4,6 +4,7 @@ namespace App\Actions\Drops;
 
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\TargetPriceEvent;
 use App\Notifications\UnitPriceTargetNotification;
 use App\Services\Drops\NotificationBudget;
 use App\Support\Numeric;
@@ -29,7 +30,7 @@ use Throwable;
  */
 final readonly class DetectUnitPriceTarget
 {
-    private const int BC_SCALE = 4;
+    private const int BC_SCALE = 6;
 
     public function __invoke(Product $product): void
     {
@@ -44,14 +45,19 @@ final readonly class DetectUnitPriceTarget
 
         $shop = $product->bestValueShop();
         $unitPrice = $shop?->unitPrice();
+        // Two figures on purpose: the unrounded one decides, the rounded one is
+        // what the latch stores and the notification prints. Deciding on the
+        // rounded one fired the alert on a shop whose true price per tablet was
+        // above the target and merely rounded down onto it.
+        $unitValue = $shop?->unitPriceValue();
 
-        if ($shop === null || $unitPrice === null) {
+        if ($shop === null || $unitPrice === null || $unitValue === null) {
             $this->clearLatch($product);
 
             return;
         }
 
-        if (bccomp(Numeric::str($unitPrice), Numeric::str((string) $target), self::BC_SCALE) > 0) {
+        if (bccomp(self::precise($unitValue), Numeric::str((string) $target), self::BC_SCALE) > 0) {
             // Above the target: nothing to say, and the next time it drops
             // below is worth saying again.
             $this->clearLatch($product);
@@ -81,6 +87,16 @@ final readonly class DetectUnitPriceTarget
         }
 
         return bccomp(Numeric::str($unitPrice), Numeric::str((string) $notified), self::BC_SCALE) >= 0;
+    }
+
+    /**
+     * A float rendered at a scale bccomp can read without losing the decision.
+     *
+     * @return numeric-string
+     */
+    private static function precise(float $value): string
+    {
+        return Numeric::str(number_format($value, self::BC_SCALE, '.', ''));
     }
 
     private function clearLatch(Product $product): void
@@ -121,6 +137,16 @@ final readonly class DetectUnitPriceTarget
         }
 
         $product->refresh();
+
+        // Before the budget: an alert the hourly ceiling holds back still
+        // reaches the daily email.
+        TargetPriceEvent::record(
+            $product,
+            $shop,
+            (string) $product->unit_price_target,
+            price: $shop->current_price === null ? null : (string) $shop->current_price,
+            unitPrice: $unitPrice,
+        );
 
         // Asked here and nowhere earlier: asking spends a slot of the hourly
         // ceiling, the limiter is cache-backed and does not roll back, and

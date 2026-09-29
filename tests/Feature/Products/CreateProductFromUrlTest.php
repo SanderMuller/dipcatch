@@ -13,6 +13,9 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+use Laravel\Passport\Client;
+use Laravel\Passport\Token;
 use Livewire\Livewire;
 
 function fakeCreateFlowOffer(string $url = 'https://shop.example.com/p/1', string $price = '50.00', string $currency = 'EUR', string $title = 'Demo Item'): array
@@ -41,7 +44,7 @@ beforeEach(function (): void {
     RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
 });
 
-test('probe success prefills title, image, and tier-default thresholds', function (): void {
+test('probe success prefills title and image, and suggests the tier-default thresholds', function (): void {
     Http::fake(fakeCreateFlowOffer());
     $this->actingAs(User::factory()->create());
 
@@ -51,9 +54,12 @@ test('probe success prefills title, image, and tier-default thresholds', functio
         ->assertSet('state', 'preview')
         ->assertSet('title', 'Demo Item')
         ->assertSet('imageUrl', 'https://shop.example.com/img.jpg')
-        // 50.00 sits in the 25–100 tier: 10% / 7.00 absolute.
-        ->assertSet('thresholdPct', '10.00')
-        ->assertSet('thresholdAbs', '7.00')
+        // The thresholds are optional and start empty; 50.00 sits in the
+        // 25–100 tier, so the placeholders suggest 10% / 7.00 absolute.
+        ->assertSet('thresholdPct', '')
+        ->assertSet('thresholdAbs', '')
+        ->assertSeeHtml('placeholder="10.00"')
+        ->assertSeeHtml('placeholder="7.00"')
         ->assertSet('existingTrackedProduct', null);
 });
 
@@ -88,8 +94,9 @@ test('confirm creates product + shop + initial price check and recomputes cheape
     expect($product)->not->toBeNull()
         ->and($product->title)->toBe('My Tracked Item')
         ->and($product->currency)->toBe('EUR')
-        ->and((string) $product->drop_threshold_pct)->toBe('10.00')
-        ->and((string) $product->drop_threshold_abs)->toBe('7.00')
+        // Left empty, so nothing is stored and the drop check uses the default.
+        ->and($product->drop_threshold_pct)->toBeNull()
+        ->and($product->drop_threshold_abs)->toBeNull()
         ->and($product->active)->toBeTrue();
 
     $shop = Shop::query()->where('product_id', $product->id)->first();
@@ -218,8 +225,8 @@ test('extraction failure flips to manual selector and selectors create the produ
         ->call('probeWithSelectors')
         ->assertSet('state', 'preview')
         // 19.95 sits in the <25 tier: 15% / 3.00 absolute.
-        ->assertSet('thresholdPct', '15.00')
-        ->assertSet('thresholdAbs', '3.00')
+        ->assertSeeHtml('placeholder="15.00"')
+        ->assertSeeHtml('placeholder="3.00"')
         ->set('title', 'Selector Item')
         ->call('confirm')
         ->assertHasNoErrors();
@@ -402,4 +409,182 @@ test('too many probes in a minute states the wait', function (): void {
         ->assertSet('errorCode', 'probe_rate_limited')
         ->assertSee('You have checked too many links in the last minute.')
         ->assertDontSee('Try again in ~60 seconds');
+});
+
+test('stores the drop thresholds a person does enter', function (): void {
+    Http::fake(fakeCreateFlowOffer());
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->set('thresholdPct', '12.5')
+        ->set('thresholdAbs', '')
+        ->call('confirm')
+        ->assertHasNoErrors();
+
+    $product = Product::query()->where('user_id', $user->id)->firstOrFail();
+    expect((string) $product->drop_threshold_pct)->toBe('12.50')
+        ->and($product->drop_threshold_abs)->toBeNull();
+});
+
+test('still refuses a drop threshold out of range', function (): void {
+    Http::fake(fakeCreateFlowOffer());
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->set('thresholdPct', '0')
+        ->call('confirm')
+        ->assertHasErrors(['thresholdPct']);
+});
+
+test('offers a price per unit when the page states a pack size, and stores it', function (): void {
+    Http::fake(fakeCreateFlowOffer(price: '4.00', title: 'Crisps 500 g'));
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSeeHtml('data-test="unit-target"')
+        ->assertSee('same price per kilo')
+        // What the component sets from "€3.00 for the 500 g bag".
+        ->set('unitPriceTarget', '6')
+        ->call('confirm')
+        ->assertHasNoErrors();
+
+    expect((string) Product::query()->where('user_id', $user->id)->firstOrFail()->unit_price_target)->toBe('6.0000');
+});
+
+test('offers no price per unit when the page states no pack size', function (): void {
+    Http::fake(fakeCreateFlowOffer());
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertDontSeeHtml('data-test="unit-target"');
+});
+
+function connectAssistantFor(User $user, bool $revoked = false): void
+{
+    $client = new Client();
+    $client->forceFill([
+        'id' => (string) Str::uuid(),
+        'name' => 'Claude',
+        'redirect_uris' => ['https://example.test/callback'],
+        'grant_types' => ['authorization_code'],
+        'revoked' => false,
+    ])->save();
+
+    Token::query()->forceCreate([
+        'id' => (string) Str::uuid(),
+        'user_id' => $user->getKey(),
+        'client_id' => $client->getKey(),
+        'scopes' => ['mcp:use'],
+        'revoked' => $revoked,
+        'expires_at' => now()->addDay(),
+    ]);
+}
+
+test('the page offers Claude as another way to add products and shops', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->assertSeeHtml('data-test="assistant-hint"')
+        ->assertSee('Add products and shops from Claude')
+        ->assertSee('Connect Claude once')
+        ->assertSeeHtml('href="' . route('app.connections') . '"');
+});
+
+test('with Claude connected, the hint says to ask it rather than to connect it', function (): void {
+    $user = User::factory()->create();
+    connectAssistantFor($user);
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->assertSee('Claude is connected.')
+        ->assertDontSee('Connect Claude once');
+});
+
+test('a disconnected Claude counts as not connected', function (): void {
+    $user = User::factory()->create();
+    connectAssistantFor($user, revoked: true);
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->assertSee('Connect Claude once')
+        ->assertDontSee('Claude is connected.');
+});
+
+test('the hint leaves once a product is looked up', function (): void {
+    Http::fake(fakeCreateFlowOffer());
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'preview')
+        ->assertDontSeeHtml('data-test="assistant-hint"');
+});
+
+test('a grant without the DipCatch tools scope, or an expired one, does not count as connected', function (): void {
+    $user = User::factory()->create();
+    connectAssistantFor($user);
+    Token::query()->where('user_id', $user->getKey())->update(['scopes' => json_encode(['profile'])]);
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)->assertSee('Connect Claude once');
+
+    Token::query()->where('user_id', $user->getKey())->update(['scopes' => json_encode(['mcp:use']), 'expires_at' => now()->subMinute()]);
+
+    Livewire::test(CreateProductFromUrl::class)->assertSee('Connect Claude once');
+});
+
+test('the hint names the assistant that is connected', function (): void {
+    $user = User::factory()->create();
+    connectAssistantFor($user);
+    Client::query()->update(['name' => 'ChatGPT']);
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->assertSee('Add products and shops from ChatGPT')
+        ->assertSee('ChatGPT is connected.');
+});
+
+test('a grant from a revoked client does not count as connected', function (): void {
+    $user = User::factory()->create();
+    connectAssistantFor($user);
+    Client::query()->update(['revoked' => true]);
+    $this->actingAs($user);
+
+    Livewire::test(CreateProductFromUrl::class)->assertSee('Connect Claude once');
+});
+
+test('the preview leads with the price per unit when the page states a pack size', function (): void {
+    Http::fake(fakeCreateFlowOffer(price: '1.99', title: 'Chips naturel 370 g'));
+    $this->actingAs(User::factory()->create());
+
+    $text = (string) preg_replace('/\s+/', ' ', strip_tags(Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'preview')
+        ->html()));
+
+    expect($text)->toContain('shop.example.com €5.38 /kg €1.99 for 370 g');
+});
+
+test('the preview leads with the pack price when the page states no size', function (): void {
+    Http::fake(fakeCreateFlowOffer(price: '299.00', title: 'Camera'));
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSeeHtml('data-test="preview-price"')
+        ->assertSee('€299.00')
+        ->assertDontSeeHtml('data-test="preview-pack"');
 });

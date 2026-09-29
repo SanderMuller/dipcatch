@@ -25,7 +25,7 @@ final readonly class ProbeOutcome
 
     /**
      * @param  array<string, mixed>|null  $context           Extra info for the UI (e.g. expected/actual currency).
-     * @param  list<VariantCandidate>     $variants          Populated only when state === STATE_AMBIGUOUS.
+     * @param  list<VariantCandidate>     $variants          The page's variants: the question when ambiguous, the other choices when the probe picked one.
      * @param  ?string                    $extractionReason  Layer-1 adapter diagnostic (e.g. `no_adapter_matched`,
      *                                                       `user_selector_no_match`). Populated only when
      *                                                       errorCode === ProbeFailure::ExtractionFailed.
@@ -42,13 +42,21 @@ final readonly class ProbeOutcome
         public array $variants = [],
         public ?string $extractionReason = null,
         public ?string $unmatchedVariantKey = null,
+        /** The variant this probe chose itself, from the product's pack size. */
+        public ?string $pickedVariantKey = null,
     ) {}
 
+    /**
+     * @param  list<VariantCandidate>  $variants  Every variant the page sells,
+     *                                            when the probe picked one itself.
+     */
     public static function success(
         ShopSnapshot $snapshot,
         string $normalizedUrl,
         string $host,
         string $adapterKey,
+        ?string $pickedVariantKey = null,
+        array $variants = [],
     ): self {
         return new self(
             state: self::STATE_SUCCESS,
@@ -56,6 +64,8 @@ final readonly class ProbeOutcome
             normalizedUrl: $normalizedUrl,
             host: $host,
             adapterKey: $adapterKey,
+            variants: $pickedVariantKey === null ? [] : $variants,
+            pickedVariantKey: $pickedVariantKey,
         );
     }
 

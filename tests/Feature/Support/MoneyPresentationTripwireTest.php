@@ -42,6 +42,7 @@ function prohibitedMoneyPatterns(): array
         '->currency }} {{',
         "->currency . ' '",
         "['currency'] . ' '",
+        '€ {{',
     ];
 }
 
@@ -60,18 +61,6 @@ function tripwireAllowlist(): array
             [
                 'fragment' => 'number_format($defaults[',
                 'reason' => 'serialises threshold decimals into form state, not display',
-            ],
-        ],
-        'StatsPage.php' => [
-            [
-                'fragment' => 'number_format((float) $value, 1',
-                'reason' => 'percentage, not money',
-            ],
-        ],
-        'price-drop-digest.blade.php' => [
-            [
-                'fragment' => 'number_format((float) $event->drop_pct',
-                'reason' => 'percentage, not money',
             ],
         ],
     ];

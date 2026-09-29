@@ -65,4 +65,14 @@ final readonly class ComparablePack
 
         return $this->size->unitPriceFor((string) $price);
     }
+
+    /** The unrounded figure, for any caller that compares rather than prints. */
+    public function unitPriceValueFor(mixed $price): ?float
+    {
+        if (! $this->size instanceof PackSize || (! is_string($price) && ! is_numeric($price))) {
+            return null;
+        }
+
+        return $this->size->unitPriceValueFor((string) $price);
+    }
 }

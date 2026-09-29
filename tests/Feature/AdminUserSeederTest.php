@@ -16,15 +16,15 @@ test('seeder creates an admin user from config', function (): void {
         ->and($admin->email_verified_at)->not->toBeNull();
 });
 
-test('seeder is idempotent — running twice does not duplicate or unset is_admin', function (): void {
-    config()->set('dipcatch.admin.email', 'root@dipcatch.test');
+test('seeder is idempotent — running twice does not duplicate or unset is_admin', function (string $configured): void {
+    config()->set('dipcatch.admin.email', $configured);
     config()->set('dipcatch.admin.password', 'super-secret');
 
     $this->seed(AdminUserSeeder::class);
     $this->seed(AdminUserSeeder::class);
 
     expect(User::query()->where('email', 'root@dipcatch.test')->count())->toBe(1);
-});
+})->with(['lower-case' => 'root@dipcatch.test', 'with capitals' => 'Root@DipCatch.test']);
 
 test('seeder skips silently when ADMIN_EMAIL missing so default db:seed pipelines do not break', function (): void {
     config()->set('dipcatch.admin.email');

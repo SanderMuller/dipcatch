@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Support\PackSize;
+use App\Support\StatedPackSize;
 
 // --- Basic units, aliases, comma decimals -------------------------------
 
@@ -248,13 +249,13 @@ test('two distinct masses outside a multipack parse to null', function (): void 
 test('unit price for a mass pack size', function (): void {
     $size = PackSize::parse('200 g');
 
-    expect($size->unitPriceFor('1.69'))->toBe('8.45');
+    expect($size->unitPriceFor('1.69'))->toBe('8.4500');
 });
 
 test('unit price for a piece pack size', function (): void {
     $size = PackSize::parse('4 rollen');
 
-    expect($size->unitPriceFor('1.80'))->toBe('0.45');
+    expect($size->unitPriceFor('1.80'))->toBe('0.4500');
 });
 
 test('unit price is null for a zero price', function (): void {
@@ -277,10 +278,6 @@ test('label for mass is per kg', function (): void {
 
 test('label for volume is per liter', function (): void {
     expect(PackSize::parse('1 l')->label())->toBe('/l');
-});
-
-test('label for pieces is per stuk', function (): void {
-    expect(PackSize::parse('4 rollen')->label())->toBe('/stuk');
 });
 
 test('additive piece sizes parse to null', function (): void {
@@ -357,4 +354,69 @@ test('an authoritative empty size still clears the pack data', function (): void
     // able to clear a stale one (spec Section 4).
     expect(PackSize::resolve(packSize: null, authoritative: true, title: 'Barebells 12 x 55 g'))->toBeNull()
         ->and(PackSize::resolve(packSize: null, authoritative: false, title: 'Barebells 12 x 55 g')?->quantity)->toBe(660.0);
+});
+
+// --- a count written as a bare multiplier ------------------------------------
+
+test('a bare count multiplier counts the items', function (): void {
+    expect(StatedPackSize::bareCountIn('AURMOO 200x Garbage Bags 5L, Degradable'))->toBe(200.0);
+});
+
+test('a cross form is not read as a bare count', function (): void {
+    expect(StatedPackSize::bareCountIn('Barebells 12 x 55 g'))->toBeNull();
+});
+
+test('a title counting two things states no bare count', function (): void {
+    expect(StatedPackSize::bareCountIn('2x doos 200x zakken'))->toBeNull();
+});
+
+test('the unit price value is not rounded', function (): void {
+    $size = PackSize::of(400.0, 'piece');
+
+    expect($size->unitPriceValueFor('12.99'))->toBeGreaterThan(0.0324)
+        ->and($size->unitPriceValueFor('12.99'))->toBeLessThan(0.0325)
+        ->and($size->unitPriceFor('12.99'))->toBe('0.0325');
+});
+
+test('a bare count multiplies the item size the shop stated', function (): void {
+    // The AURMOO case: Amazon states 5 L, which is one bag, and the title
+    // counts two hundred of them. Left alone it priced the box at 3.20 a litre.
+    $size = PackSize::resolve('5 L', authoritative: true, title: 'AURMOO 200x Vuilniszakken 5L, Afbreekbaar');
+
+    expect($size?->quantity)->toBe(1000000.0)
+        ->and($size?->unit)->toBe('ml');
+});
+
+// --- Dutch drugstore count abbreviations -------------------------------------
+
+test('a count written as a drugstore abbreviation is read', function (string $title, float $expected): void {
+    // deonlinedrogist.nl writes every listing this way, and so do its
+    // neighbours. Unread, the row inherits a sibling's size instead.
+    expect(PackSize::parse($title)?->quantity)->toBe($expected)
+        ->and(PackSize::parse($title)?->unit)->toBe('piece');
+})->with([
+    ['Davitamon Vitamine D3 20mcg Smelttabletten 150TB', 150.0],
+    ['Davitamon Vitamine D3 20mcg Smelttabletten 75TB', 75.0],
+    ['Roter Vitamine C 400 TABL', 400.0],
+    ['Omega 3 visolie 60 caps', 60.0],
+    ['Magnesium 90 CPS', 90.0],
+    ['Thee 20 SACH', 20.0],
+    ['Bouillon 6 STK', 6.0],
+]);
+
+test('a terabyte is not a tablet', function (string $title): void {
+    // `TB` is seventy-five tablets at a drugstore and two thousand gigabytes
+    // at an electronics shop. Reading a disk as two tablets would price it per
+    // half-disk.
+    expect(PackSize::parse($title))->toBeNull();
+})->with([
+    'Samsung 870 EVO 2TB SSD',
+    'Crucial P3 1TB NVMe',
+    'Externe harde schijf 4TB',
+    'SanDisk 512 GB micro SD',
+]);
+
+test('a disk that states a real size still reads it', function (): void {
+    // The terabyte is dropped, not the whole string.
+    expect(PackSize::parse('Samsung 870 EVO 2TB SSD 500 g')?->quantity)->toBe(500.0);
 });

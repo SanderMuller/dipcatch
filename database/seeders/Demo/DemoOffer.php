@@ -22,10 +22,29 @@ final readonly class DemoOffer
         public string $state = 'ok',
         public bool $conditional = false,
         public ?string $promotion = null,
+        /**
+         * The real address of a real page, when this offer has one.
+         *
+         * `$path` builds `https://www.{host}/{path}`, which is the right
+         * shape for filler and wrong for anything else: a real offer needs
+         * its query string (zooplus pins a variant with `?activeVariant=`)
+         * and not every shop answers on `www.`. A recheck of an offer with
+         * no real URL reads a 404 and marks itself dead, which is why the
+         * curated products carry one.
+         */
+        public ?string $realUrl = null,
+        /** The product photo the shop itself serves. */
+        public ?string $imageUrl = null,
     ) {}
 
     public function url(): string
     {
-        return 'https://www.' . $this->host . '/' . ltrim($this->path, '/');
+        return $this->realUrl ?? 'https://www.' . $this->host . '/' . ltrim($this->path, '/');
+    }
+
+    /** True when this offer points at a page that exists. */
+    public function isReal(): bool
+    {
+        return $this->realUrl !== null;
     }
 }

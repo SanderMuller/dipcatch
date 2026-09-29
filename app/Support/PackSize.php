@@ -59,14 +59,34 @@ final readonly class PackSize
      */
     private const array PIECE_WORDS = [
         'tabletten', 'capsules', 'capsule', 'rollen', 'zakjes', 'tablet', 'vellen',
-        'stuks', 'zakje', 'stuk', 'pack', 'cups', 'pads', 'rol', 'vel', 'cup', 'pad', 'st',
+        'stuks', 'zakje', 'tabl', 'sach', 'caps', 'stuk', 'pack', 'cups', 'pads',
+        'cps', 'stk', 'rol', 'vel', 'cup', 'pad', 'st', 'tb',
     ];
+
+    /**
+     * Words that make a `TB` a terabyte rather than a tablet.
+     *
+     * `75TB` is how a Dutch drugstore writes seventy-five tablets, and it is on
+     * every listing of the shops that use it. It is also how a shop writes the
+     * size of a disk, and reading a 2 TB drive as two tablets would price it
+     * per half-disk. The abbreviation is kept and the one context that steals
+     * it is removed, the same way `vel` is dropped when another piece word is
+     * present.
+     */
+    private const string STORAGE_PATTERN = '/\b(?:ssd|hdd|nvme|harde\s?schijf|micro\s?sd|geheugenkaart)\b/iu';
 
     /**
      * A number token, comma-decimal aware, that never starts a size token
      * when directly suffixed with `+` or `%` (`"48+"`, `"40%"`).
      */
     private const string NUMBER = '(\d+(?:[.,]\d+)?)(?![%+])';
+
+    /**
+     * How many decimals a unit price is carried at. Matches the scale of the
+     * columns that store one and the bcmath scale the drop engine compares at,
+     * so a figure does not lose precision by being written down.
+     */
+    public const int VALUE_DECIMALS = 4;
 
     private function __construct(
         public float $quantity,
@@ -91,6 +111,12 @@ final readonly class PackSize
         $nonVelPieceAlt = self::alternation(array_values(array_diff(self::PIECE_WORDS, ['vel', 'vellen'])));
         if (preg_match('/' . self::NUMBER . '\s*(?:' . $nonVelPieceAlt . ')\b/iu', $text) === 1) {
             $text = preg_replace('/' . self::NUMBER . '\s*(?:vellen|vel)\b/iu', ' ', $text) ?? $text;
+        }
+
+        // A terabyte is not a tablet. Dropped before any bucket is collected,
+        // so a disk whose title also states grams still reads as grams.
+        if (preg_match(self::STORAGE_PATTERN, $text) === 1) {
+            $text = preg_replace('/' . self::NUMBER . '\s*tb\b/iu', ' ', $text) ?? $text;
         }
 
         // Step 1: whole-string rejects.
@@ -254,10 +280,31 @@ final readonly class PackSize
 
     /**
      * `price / quantity × 1000` for mass/volume, `price / count` for pieces.
-     * Returns a plain decimal string (no thousands separator) with two
-     * decimals, or null when the price or the quantity is not usable.
+     * Returns a plain decimal string (no thousands separator), or null when
+     * the price or the quantity is not usable.
+     *
+     * The value, not the display: it is what gets stored, compared and sent to
+     * an MCP client. Four decimals because two cannot separate the things
+     * people buy by the piece. A 400-tablet pack at €12,99 and an 800-tablet
+     * pack at €21,99 are 18% apart per tablet and both used to read `0.03` —
+     * indistinguishable in the field a shopper is meant to compare on, and in
+     * the one a target is measured against. Anything under about fifty cents a
+     * unit had the same problem: tablets, capsules, bags, wipes, cups.
+     *
+     * Render it with {@see MoneyFormatter::unitPrice()}, which drops back to
+     * two decimals once the figure is large enough not to need more.
      */
     public function unitPriceFor(string $price): ?string
+    {
+        $value = $this->unitPriceValueFor($price);
+
+        return $value === null ? null : number_format($value, self::VALUE_DECIMALS, '.', '');
+    }
+
+    /**
+     * The same figure unrounded — what every comparison uses.
+     */
+    public function unitPriceValueFor(string $price): ?float
     {
         if (! is_numeric($price)) {
             return null;
@@ -269,19 +316,18 @@ final readonly class PackSize
             return null;
         }
 
-        $result = $this->unit === 'piece'
+        return $this->unit === 'piece'
             ? $priceValue / $this->quantity
             : $priceValue / $this->quantity * 1000;
-
-        return number_format($result, 2, '.', '');
     }
 
+    /** `/kg`, `/l`, or `/piece` in the reader's language. */
     public function label(): string
     {
         return match ($this->unit) {
             'g' => '/kg',
             'ml' => '/l',
-            default => '/stuk',
+            default => (string) __('/piece'),
         };
     }
 

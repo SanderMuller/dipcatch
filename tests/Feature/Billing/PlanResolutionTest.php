@@ -98,10 +98,10 @@ it('reads the free limits from config', function (): void {
         ->and($entitlements->allowsUnitPriceAlerts())->toBeFalse();
 });
 
-it('gives pro unlimited products and shops', function (): void {
+it('gives pro 250 products and unlimited shops', function (): void {
     $entitlements = Entitlements::of(Plan::Pro);
 
-    expect($entitlements->maxProducts())->toBeNull()
+    expect($entitlements->maxProducts())->toBe(250)
         ->and($entitlements->maxShopsPerProduct())->toBeNull()
         ->and($entitlements->recheckIntervalHours())->toBe(6)
         ->and($entitlements->allowsUnitPriceAlerts())->toBeTrue();
@@ -124,14 +124,8 @@ function inProUsers(User $user): bool
  * on Cashier's `active()` scope, which asks neither question — so one account
  * was Pro on the billing page and Free to the scheduler at the same instant.
  *
- * Asserted against both readers rather than the `proAnswers()` harness in
- * CompedAccountsTest: that harness also asserts `SubscribersTable::status()`,
- * which derives its own label and answers "Trial" for these. Its divergence
- * on `unpaid` and `incomplete_expired` predates this change; for the rows
- * below it is this change that makes it disagree, and the same is true of
- * `UsersTable`'s "Trial" reason. Both are admin-facing labels that read the
- * subscription directly. The billing page had the same shape and is fixed
- * here, because a shopper reads that one.
+ * The admin labels for these rows are asserted in CompedAccountsTest, through
+ * the `proAnswers()` harness.
  */
 it('ends pro on an expired subscription whose own trial is still running', function (): void {
     $user = User::factory()->create();
@@ -165,6 +159,73 @@ it('ends pro on an incomplete subscription inside a future grace period', functi
     // does not make this an entitlement.
     $user = User::factory()->create();
     subscribeUser($user, 'incomplete', endsAt: CarbonImmutable::now()->addDays(10));
+
+    expect($user->plan())->toBe(Plan::Free)
+        ->and(inProUsers($user))->toBeFalse();
+});
+
+/**
+ * Cashier's `subscription()` returns the newest row of a type, so everything
+ * built on it read one row and ignored the rest. `ProUsers` matches any active
+ * one. Two rows were therefore enough to make the app and the scheduler
+ * disagree about the same account at the same instant.
+ */
+function withStrayIncompleteRow(User $user): void
+{
+    subscribeUser($user, 'active')
+        ->forceFill(['created_at' => CarbonImmutable::now()->subMonths(6)])->save();
+
+    // An abandoned checkout, or a card Stripe never collected on. Nothing
+    // ages this row out, so the account was stuck on the wrong answer.
+    subscribeUser($user, 'incomplete')
+        ->forceFill(['created_at' => CarbonImmutable::now()->subMinutes(5)])->save();
+
+    $user->refresh()->load('subscriptions');
+}
+
+it('keeps pro when a live subscription sits under a newer incomplete one', function (): void {
+    $user = User::factory()->create();
+    withStrayIncompleteRow($user);
+
+    expect($user->plan())->toBe(Plan::Pro)
+        ->and($user->isPro())->toBeTrue()
+        // The reader the scheduler uses always said Pro here. This is the
+        // agreement that was missing.
+        ->and(inProUsers($user))->toBeTrue();
+});
+
+it('keeps the entitlements a paying customer is owed under a stray row', function (): void {
+    // The failure a customer would feel: history window, unit-price alerts and
+    // the recheck cadence all follow the plan.
+    $user = User::factory()->create(['auto_categories' => true]);
+    withStrayIncompleteRow($user);
+
+    expect($user->entitlements()->allowsUnitPriceAlerts())->toBeTrue()
+        ->and($user->wantsAutoCategories())->toBeTrue();
+});
+
+it('does not offer a second checkout to an account Stripe already bills', function (): void {
+    // The guard read the same single row, so a stray `incomplete` let the
+    // billing page sell a second subscription to a live subscriber.
+    $user = User::factory()->create();
+    withStrayIncompleteRow($user);
+
+    expect($user->payingSubscription()?->valid())->toBeTrue();
+
+    // Both doors: the upgrade entry point and the checkout itself.
+    $this->actingAs($user)->get('/upgrade')->assertRedirect('/app/billing');
+    $this->actingAs($user)->get('/billing/checkout')->assertRedirect('/app/billing');
+});
+
+it('still drops to free when every row is dead', function (): void {
+    $user = User::factory()->create();
+
+    subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subDay())
+        ->forceFill(['created_at' => CarbonImmutable::now()->subMonths(6)])->save();
+    subscribeUser($user, 'incomplete')
+        ->forceFill(['created_at' => CarbonImmutable::now()->subMinutes(5)])->save();
+
+    $user->refresh()->load('subscriptions');
 
     expect($user->plan())->toBe(Plan::Free)
         ->and(inProUsers($user))->toBeFalse();

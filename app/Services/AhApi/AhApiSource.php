@@ -6,8 +6,8 @@ use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\Checkjebon\CheckjebonResult;
-use App\Support\UrlNormalizer;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -32,9 +32,44 @@ final readonly class AhApiSource
 
     private const string TOKEN_CACHE_KEY = 'dipcatch:ah-api:token';
 
+    private const string APPLICATION = 'AHWEBSHOP';
+
     public function supports(string $host): bool
     {
         return $host === 'ah.nl' || str_ends_with($host, '.ah.nl');
+    }
+
+    /**
+     * Resolve many ah.nl URLs at once, in flight together.
+     *
+     * One product at a time costs a round trip each, which is fine for a
+     * price check and not for a caller that wants dozens — the demo seeder
+     * spent sixteen of its twenty-four seconds waiting on sixty-eight of
+     * them. The answers come back keyed by the URL that was asked, so a
+     * caller can pair them up without relying on order.
+     *
+     * @param  list<string>  $normalizedUrls
+     * @return array<string, CheckjebonResult>
+     */
+    public function resolveMany(array $normalizedUrls): array
+    {
+        $token = $this->token();
+
+        if ($token === null) {
+            return array_map(
+                static fn (): CheckjebonResult => CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR),
+                array_flip($normalizedUrls),
+            );
+        }
+
+        return AhDetailBatch::resolve(
+            $token,
+            $normalizedUrls,
+            self::USER_AGENT,
+            self::APPLICATION,
+            static fn (string $url): ?string => self::productIdFromUrl($url),
+            fn (string $productId, Response $response): CheckjebonResult => $this->readDetail($productId, $response),
+        );
     }
 
     public function resolve(string $normalizedUrl): CheckjebonResult
@@ -51,7 +86,7 @@ final readonly class AhApiSource
 
         try {
             $response = Http::withToken($token)
-                ->withHeaders(['User-Agent' => self::USER_AGENT, 'X-Application' => 'AHWEBSHOP'])
+                ->withHeaders(['User-Agent' => self::USER_AGENT, 'X-Application' => self::APPLICATION])
                 ->timeout(15)
                 ->get(sprintf(self::DETAIL_URL, $productId));
         } catch (ConnectionException $e) {
@@ -60,6 +95,12 @@ final readonly class AhApiSource
             return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
         }
 
+        return $this->readDetail($productId, $response);
+    }
+
+    /** What one detail response says, whether it arrived alone or in a pool. */
+    private function readDetail(string $productId, Response $response): CheckjebonResult
+    {
         if ($response->status() === 401) {
             // Token expired early — drop it so the next check re-authenticates.
             Cache::forget(self::TOKEN_CACHE_KEY);
@@ -138,7 +179,20 @@ final readonly class AhApiSource
         $priceBeforeBonus = PriceNormalizer::fromMixed(data_get($card, 'priceBeforeBonus'));
         $mechanism = data_get($card, 'bonusMechanism');
         $bundleEligible = self::hasSupportedBundleContract($card);
-        $price = $bundleEligible ? $priceBeforeBonus : ($currentPrice ?? $priceBeforeBonus);
+        $promotionWindow = AhPromotionWindow::fromCard($card);
+        // AH announces next week's bonus days ahead, and `currentPrice`
+        // carries the bonus price from the moment it is announced — measured
+        // on 2026-09-25: Aviko Aardappelkroketjes at 2.17 with 25% korting
+        // starting 28 Sep and a price before it of 2.89. Tracking it then
+        // alerted a drop no shopper could have yet. Until the bonus starts
+        // the price is the one before it; without one there is no price to
+        // read here, and the check falls back to the dataset.
+        $upcoming = $promotionWindow?->hasNotStarted() === true;
+        $price = match (true) {
+            $upcoming => $priceBeforeBonus,
+            $bundleEligible => $priceBeforeBonus ?? $currentPrice,
+            default => $currentPrice ?? $priceBeforeBonus,
+        };
 
         if ($price === null) {
             return null;
@@ -153,7 +207,6 @@ final readonly class AhApiSource
         // pack data (spec Section 4).
         $hasSalesUnitSize = array_key_exists('salesUnitSize', $card);
         $salesUnitSize = $hasSalesUnitSize && is_string($card['salesUnitSize']) ? $card['salesUnitSize'] : null;
-        $promotionWindow = AhPromotionWindow::fromCard($card);
         $hasPromotionDate = array_key_exists('bonusStartDate', $card) || array_key_exists('bonusEndDate', $card);
         $invalidPromotionWindow = $bundleEligible && $hasPromotionDate && $promotionWindow === null;
         $bundleOffer = $bundleEligible && ! $invalidPromotionWindow && is_string($mechanism)
@@ -255,12 +308,5 @@ final readonly class AhApiSource
         }
 
         return null;
-    }
-
-    public static function hostOf(string $url): ?string
-    {
-        $host = parse_url($url, PHP_URL_HOST);
-
-        return is_string($host) && $host !== '' ? UrlNormalizer::normalizeHost($host) : null;
     }
 }

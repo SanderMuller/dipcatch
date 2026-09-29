@@ -8,6 +8,7 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\UnitPriceTargetNotification;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 
 function productAtTarget(User $user): Product
@@ -144,6 +145,7 @@ it('resumes a checkout session the customer left open', function (): void {
     configureStripe();
 
     $user = User::factory()->create(['stripe_checkout_session_id' => 'cs_open']);
+    Cache::put('billing:checkout-interval:' . $user->id, 'monthly');
 
     app()->instance(CheckoutSessions::class, new class extends CheckoutSessions {
         public function find(string $sessionId): CheckoutSession
@@ -155,6 +157,51 @@ it('resumes a checkout session the customer left open', function (): void {
     $this->actingAs($user)
         ->get('/billing/checkout')
         ->assertRedirect('https://checkout.stripe.test/cs_open');
+});
+
+it('ends an open session for the other interval instead of resuming it', function (): void {
+    configureStripe();
+    config()->set('plans.stripe.pro_yearly_price_id', 'price_year');
+
+    $user = User::factory()->create(['stripe_checkout_session_id' => 'cs_monthly']);
+    Cache::put('billing:checkout-interval:' . $user->id, 'monthly');
+
+    $sessions = new class extends CheckoutSessions {
+        /** @var list<string> */
+        public array $expired = [];
+
+        public function find(string $sessionId): CheckoutSession
+        {
+            return new CheckoutSession('open', url: 'https://checkout.stripe.test/cs_monthly');
+        }
+
+        public function expire(string $sessionId): void
+        {
+            $this->expired[] = $sessionId;
+
+            // Stop before a real Checkout session is created.
+            throw new RuntimeException('stop');
+        }
+    };
+    app()->instance(CheckoutSessions::class, $sessions);
+
+    $this->actingAs($user)
+        ->get('/billing/checkout/yearly')
+        ->assertRedirect('/app/billing');
+
+    expect($sessions->expired)->toBe(['cs_monthly']);
+});
+
+it('refuses a yearly checkout while there is no yearly Price, rather than sell monthly', function (): void {
+    configureStripe();
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get('/billing/checkout/yearly')
+        ->assertRedirect('/app/billing');
+
+    expect($user->fresh()?->stripe_checkout_session_id)->toBeNull();
 });
 
 it('sends a customer with no stripe account back from the portal', function (): void {

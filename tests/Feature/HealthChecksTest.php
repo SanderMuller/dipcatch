@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\ShopKind;
 use App\Health\LastSuccessfulScrapeCheck;
 use App\Models\Product;
 use App\Models\Shop;
@@ -128,6 +129,26 @@ test('LastSuccessfulScrapeCheck treats inactive products as not relevant', funct
     $result = new LastSuccessfulScrapeCheck()->run();
 
     expect($result->status->value)->toBe('ok');
+});
+
+test('LastSuccessfulScrapeCheck leaves a kept link out', function (): void {
+    $product = Product::factory()->create();
+    Shop::factory()->for($product)->create(['last_success_at' => now()->subHours(2)]);
+
+    // What `KeepShopAsLink` leaves: never read, and only touched by the weekly
+    // retry. Counted as an offer, it read as stale for days of every week.
+    Shop::factory()->for($product)->create([
+        'kind' => ShopKind::Reference,
+        'current_price' => null,
+        'last_success_at' => null,
+        'last_checked_at' => null,
+        'updated_at' => now()->subHours(120),
+    ]);
+
+    $result = new LastSuccessfulScrapeCheck()->warnAfterHours(48)->failAfterHours(96)->run();
+
+    expect($result->status->value)->toBe('ok')
+        ->and($result->shortSummary)->toBe('0/1 stale');
 });
 
 test('admin can access the Filament health page', function (): void {

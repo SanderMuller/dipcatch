@@ -63,7 +63,7 @@ test('the hero leads with the compare-across-shops headline', function (): void 
         ->assertSee('It compares the price per kilo or per piece');
 });
 
-test('the phone mock shows grocery examples from supported shops only', function (): void {
+test('the tracked-products mock shows grocery examples from supported shops only', function (): void {
     $response = $this->get(route('home'))->assertOk();
 
     $response->assertSeeHtml('Lay’s Naturel 200 g')->assertSeeHtml('Beemster Extra Belegen 48+ 150 g')
@@ -74,7 +74,7 @@ test('the phone mock shows grocery examples from supported shops only', function
         ->assertDontSee('mediamarkt.nl');
 });
 
-test('the phone mock is an informative image with a label matching the cards', function (): void {
+test('the tracked-products mock is an informative image with a label matching the cards', function (): void {
     $money = static fn (string $amount): string => MoneyFormatter::format($amount, 'EUR');
 
     $old = $money('2.19');
@@ -97,7 +97,7 @@ test('the phone mock is an informative image with a label matching the cards', f
 test('the homepage renders no decorative image element', function (): void {
     // A decorative <img alt=""> still becomes a bare `![](…)` reference in the
     // Markdown twin Cloudflare serves to assistants. The shop favicons and the
-    // phone mock's per-card favicons are therefore background images. The
+    // tracked-products mock's per-card favicons are therefore background images. The
     // logo keeps its <img>: it has a real alt and converts to `![DipCatch]`.
     $content = (string) $this->get(route('home'))->assertOk()->getContent();
 
@@ -106,31 +106,19 @@ test('the homepage renders no decorative image element', function (): void {
     expect($matches[0])->each->toMatch('#alt="[^"]+"#');
 });
 
-test('the phone mock contributes no chrome to the page text', function (): void {
-    // The converter ignores aria-hidden and role="img", so the only way the
-    // fake status bar stays out of the Markdown is to not be a text node.
-    $text = strip_tags((string) $this->get(route('home'))->assertOk()->getContent());
-
-    expect($text)->not->toContain('9:41')
-        ->and($text)->not->toContain('🥔')
-        ->and($text)->not->toContain('🧀')
-        ->and($text)->not->toContain('🧻');
-});
-
-test('each tracked example still carries its icon', function (): void {
-    // Guards the JIT trap: a `content-['{{ $p['icon'] }}']` utility is never
-    // scanned by Tailwind and would compile to nothing, silently dropping the
-    // emoji. A custom property survives, so assert the property is emitted.
+test('every homepage picture points at a file that ships', function (): void {
+    // The product and category pictures are CSS backgrounds, so a renamed or
+    // missing file breaks nothing a test would notice: the tile just paints
+    // empty. Each tracked product and each category has one.
     $content = (string) $this->get(route('home'))->assertOk()->getContent();
 
-    foreach (['🥔', '🧀', '🧻'] as $icon) {
-        expect($content)->toContain("--icon: '" . $icon . "'");
-    }
+    preg_match_all('#url\\(\'' . preg_quote(asset('images/home') . '/', '#') . '([^\']+)\'\\)#', $content, $matches);
 
-    // The property alone paints nothing. Without the utility that reads it the
-    // emoji vanish, which is the exact failure the custom property avoids.
-    expect(substr_count($content, 'before:content-[var(--icon)]'))->toBe(3)
-        ->and(substr_count($content, 'before:content-[var(--label)]'))->toBe(2);
+    expect($matches[1])->toContain('product-chips.webp', 'product-cheese.webp', 'product-toilet-paper.webp', 'category-filters.webp', 'category-ask-your-assistant.webp');
+
+    foreach ($matches[1] as $file) {
+        expect(public_path('images/home/' . $file))->toBeFile();
+    }
 });
 
 test('the shop list names the homepage hosts without contradicting itself', function (): void {
@@ -145,7 +133,7 @@ test('the shop list names the homepage hosts without contradicting itself', func
     // Country TLDs of the same brand stay off this row; the shops hub lists them.
     expect($content)->not->toContain('petsplace.nl')
         ->and($content)->not->toContain('amazon.com')
-        ->and($content)->toContain('etos.nl')
+        ->and($content)->not->toContain('etos.nl')
         ->and($content)->not->toContain(' more<')
         ->and($content)->toContain(__('and many other webshops'))
         ->and($content)->toMatch('/<a href="' . preg_quote(e(route('shops')), '/') . '"[^>]*>' . preg_quote(__('and many other webshops'), '/') . '<\/a>/');
@@ -160,7 +148,8 @@ test('the FAQ section shows every question the page defines', function (): void 
 
     $response->assertSee('Which shops work?')
         ->assertSee('What if my shop is not listed?')
-        ->assertSee('Etos, The Ordinary, Lookfantastic')
+        ->assertSee('Pets at Home, The Ordinary, Lookfantastic')
+        ->assertSee('such as Etos, Walmart and Kruidvat')
         ->assertSee('Pets Place, Medpets, Welkoop')
         ->assertSee('How often are prices checked?')
         ->assertSee('Is it free?')

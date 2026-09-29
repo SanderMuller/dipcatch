@@ -9,7 +9,9 @@ use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
 use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\ShopFetcher\ShopFetcher;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -300,4 +302,74 @@ test('the failure count survives a cleared cache, because it does not live there
     }
 
     expect($memory->isPersistent('blocked.com', HostFetchMemory::KIND_BLOCKED))->toBeTrue();
+});
+
+test('a 429 without a Retry-After states no interval', function (): void {
+    // dierapotheker.nl sends nginx's bare 429. DipCatch used to invent sixty
+    // seconds here and report it as the shop's own figure, and a caller
+    // followed it four times and was refused each time.
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response('<html><head><title>429 Too Many Requests</title></head></html>', 429),
+    ]);
+
+    try {
+        app(ShopFetcher::class)->fetch('https://example.com/p/1');
+        $this->fail('expected RateLimitedByHost');
+    } catch (RateLimitedByHost $e) {
+        expect($e->retryAfterSeconds)->toBe(0);
+    }
+});
+
+test('the page request sends the configured user agent', function (): void {
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 404),
+        'https://example.com/p/1' => Http::response('<html>ok</html>', 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    app(ShopFetcher::class)->fetch('https://example.com/p/1');
+
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://example.com/p/1'
+        && $request->hasHeader('User-Agent', Config::string('dipcatch.fetcher.user_agent')));
+});
+
+test('a missing user agent fails loudly rather than falling back to another', function (): void {
+    config()->set('dipcatch.fetcher.user_agent');
+
+    Http::fake();
+
+    expect(fn () => app(ShopFetcher::class)->fetch('https://example.com/p/1'))
+        ->toThrow(InvalidArgumentException::class);
+});
+
+test('a robots.txt that redirects inside the network is not followed', function (): void {
+    config()->set('dipcatch.fetcher.allow_private_ips', false);
+    Cache::put('dipcatch:dns:example.com', ['93.184.216.34'], 300);
+
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response('', 302, ['Location' => 'http://127.0.0.1:8080/admin/delete-everything']),
+        'http://127.0.0.1:8080/*' => Http::response("User-agent: *\nDisallow: /"),
+        'https://example.com/p/1' => Http::response('<html>ok</html>', 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    app(ShopFetcher::class)->fetch('https://example.com/p/1');
+
+    Http::assertNotSent(fn (Request $request): bool => str_starts_with($request->url(), 'http://127.0.0.1'));
+});
+
+test('a robots.txt host that resolves inside the network is never fetched', function (): void {
+    config()->set('dipcatch.fetcher.allow_private_ips', false);
+    // The page host resolves publicly, the www-less robots host does not:
+    // the robots fetch used to go out without a check.
+    Cache::put('dipcatch:dns:www.example.com', ['93.184.216.34'], 300);
+    Cache::put('dipcatch:dns:example.com', ['10.0.0.8'], 300);
+
+    Http::fake([
+        'https://example.com/robots.txt' => Http::response("User-agent: *\nAllow: /"),
+        'https://www.example.com/p/1' => Http::response('<html>ok</html>', 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    app(ShopFetcher::class)->fetch('https://www.example.com/p/1');
+
+    Http::assertNotSent(fn (Request $request): bool => $request->url() === 'https://example.com/robots.txt');
 });

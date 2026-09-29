@@ -12,6 +12,9 @@
  * The trap is a strict read used as a default: `env('X', config()->string('k'))`
  * evaluates the default eagerly, and the strict accessor throws on null instead
  * of returning it. `config('k')` returns null and lets the fallback stand.
+ *
+ * Fortify is package config, but it is loaded here too: its passkey secret
+ * falls back to APP_KEY.
  */
 test('every first-party config file loads when APP_KEY is not set yet', function (string $file): void {
     config()->set('app.key');
@@ -22,14 +25,7 @@ test('every first-party config file loads when APP_KEY is not set yet', function
     $config = require config_path($file);
 
     expect($config)->toBeArray()->not->toBeEmpty();
-})->with([
-    'fortify.php',
-    'dipcatch.php',
-    'hsts.php',
-    'plans.php',
-    'scraper.php',
-    'site.php',
-]);
+})->with(fn (): array => [...firstPartyConfigFiles(), 'fortify.php']);
 
 /**
  * The passkey user handle is derived from this secret, so a signed-in user's

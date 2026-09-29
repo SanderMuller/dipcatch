@@ -3,6 +3,7 @@
 use App\Billing\Plan;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
+use App\Enums\ShopKind;
 use App\Filament\Admin\Widgets\OperationsOverviewWidget;
 use App\Filament\Admin\Widgets\ShopsNeedingAttentionWidget;
 use App\Filament\Admin\Widgets\SubscriptionOverviewWidget;
@@ -10,6 +11,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -53,27 +55,27 @@ it('reports the share of offers the scraper can still read', function (): void {
         ->assertSee('0 failing, 1 dead');
 });
 
-it('lists only the active offers the scraper cannot read', function (): void {
+it('lists only the tracked offers the scraper cannot read', function (): void {
     $admin = adminUser();
     $product = Product::factory()->create(['user_id' => $admin->id]);
 
     $broken = Shop::factory()->for($product)->create([
         'url' => 'https://broken.test/p/1',
         'active' => true,
-        'health' => ShopHealth::Dead,
+        'health' => ShopHealth::Failing,
         'last_status' => ScrapeStatus::HttpError,
-        'consecutive_failures' => 9,
+        'consecutive_failures' => 4,
     ]);
     $healthy = Shop::factory()->for($product)->create([
         'url' => 'https://healthy.test/p/1',
         'active' => true,
         'health' => ShopHealth::Ok,
     ]);
-    // An offer the owner paused is not something to fix.
-    $paused = Shop::factory()->for($product)->create([
-        'url' => 'https://paused.test/p/1',
-        'active' => false,
-        'health' => ShopHealth::Dead,
+    // A kept link is never read, so it has nothing for anyone to fix.
+    $link = Shop::factory()->for($product)->create([
+        'url' => 'https://link.test/p/1',
+        'kind' => ShopKind::Reference,
+        'health' => ShopHealth::Failing,
     ]);
 
     $this->actingAs($admin);
@@ -81,7 +83,34 @@ it('lists only the active offers the scraper cannot read', function (): void {
 
     livewire(ShopsNeedingAttentionWidget::class)
         ->assertCanSeeTableRecords([$broken])
-        ->assertCanNotSeeTableRecords([$healthy, $paused]);
+        ->assertCanNotSeeTableRecords([$healthy, $link]);
+});
+
+it('shows an offer the job killed in both widgets', function (): void {
+    $admin = adminUser();
+    $product = Product::factory()->create(['user_id' => $admin->id]);
+    Shop::factory()->for($product)->create(['active' => true, 'health' => ShopHealth::Ok]);
+
+    // What `CheckShopPrice` writes on the last failure: dead, and switched
+    // off in the same write. Filtering on `active` hid exactly these.
+    $killed = Shop::factory()->for($product)->dead()->create(['url' => 'https://killed.test/p/1']);
+    // A kept link has no scrape health to report, whatever its row says.
+    Shop::factory()->for($product)->create([
+        'url' => 'https://link.test/p/1',
+        'kind' => ShopKind::Reference,
+        'health' => ShopHealth::Failing,
+    ]);
+
+    $this->actingAs($admin);
+    Filament::setCurrentPanel('admin');
+
+    livewire(ShopsNeedingAttentionWidget::class)
+        ->assertCanSeeTableRecords([$killed]);
+
+    livewire(OperationsOverviewWidget::class)
+        ->assertSee('1 offers watched')
+        ->assertSee('50%')
+        ->assertSee('0 failing, 1 dead');
 });
 
 it('separates the 24-hour alert count from the 7-day one', function (): void {
@@ -199,6 +228,43 @@ it('shows subscription entitlement even with no Stripe configured', function ():
 
     expect($comped->fresh()?->isPro())->toBeTrue()
         ->and($granted->fresh()?->isPro())->toBeTrue();
+});
+
+it('counts an account trial beside a dead subscription once, as a trial', function (): void {
+    $this->actingAs(adminUser());
+    Filament::setCurrentPanel('admin');
+
+    $lapsed = User::factory()->create(['trial_ends_at' => now()->addDays(14)]);
+    subscribeUser($lapsed, 'canceled', endsAt: CarbonImmutable::now()->subMonth());
+
+    // A paying subscriber whose old account trial still runs is paying, not
+    // also on trial.
+    $paying = User::factory()->create(['trial_ends_at' => now()->addDays(14)]);
+    subscribeUser($paying, 'active');
+
+    livewire(SubscriptionOverviewWidget::class)
+        ->assertSee('1 paying · 1 on trial · 0 comped');
+});
+
+it('counts each account once, by the branch that decided its plan', function (): void {
+    $this->actingAs(adminUser());
+    Filament::setCurrentPanel('admin');
+
+    // A comp with an account trial beside it is a comp, not also a trial.
+    User::factory()->create(['comped_until' => now()->addYear(), 'trial_ends_at' => now()->addDays(14)]);
+    // A comp with a live subscription is a comp, not also paying.
+    $compedPaying = User::factory()->create(['comped_until' => now()->addYear()]);
+    subscribeUser($compedPaying, 'active');
+    // A blocked account with a live subscription is not paying for Pro.
+    $blocked = User::factory()->create(['billing_blocked_at' => now()]);
+    subscribeUser($blocked, 'active');
+    // Two live rows are one paying account.
+    $twoRows = User::factory()->create();
+    subscribeUser($twoRows, 'active');
+    subscribeUser($twoRows, 'active');
+
+    livewire(SubscriptionOverviewWidget::class)
+        ->assertSee('1 paying · 0 on trial · 2 comped');
 });
 
 it('counts a comp with no end date separately', function (): void {

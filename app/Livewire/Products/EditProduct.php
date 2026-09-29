@@ -2,14 +2,18 @@
 
 namespace App\Livewire\Products;
 
+use App\Actions\Products\CategoriseProduct;
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
 use App\Support\Iso4217;
 use App\Support\MoneyFormatter;
+use App\Support\Numeric;
+use App\Support\UnitTargetGuide;
 use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Log;
@@ -77,7 +81,8 @@ final class EditProduct extends Component
         $this->dropThresholdPct = $product->drop_threshold_pct === null ? null : (string) $product->drop_threshold_pct;
         $this->dropThresholdAbs = $product->drop_threshold_abs === null ? null : (string) $product->drop_threshold_abs;
         $this->targetPrice = $product->target_price === null ? null : (string) $product->target_price;
-        $this->unitPriceTarget = $product->unit_price_target === null ? null : (string) $product->unit_price_target;
+        // The column keeps four decimals, which the form would show as 7.0000.
+        $this->unitPriceTarget = $product->unit_price_target === null ? null : Numeric::trimmed((string) $product->unit_price_target);
         $this->active = $product->active;
         $this->category = $product->category->value ?? '';
         $this->loadedCategory = $this->category;
@@ -99,9 +104,33 @@ final class EditProduct extends Component
                 ->between(0.01, 99.98999999999999),
             'dropThresholdAbs' => FluentRule::numeric('Alert me when it drops by (amount)')->nullable()->min(0.01),
             'targetPrice' => FluentRule::numeric('Target price')->nullable()->min(0.01),
-            'unitPriceTarget' => FluentRule::numeric('Target price per kilo, litre or piece')->nullable()->min(0.01),
+            // A cent is a floor for money and a ceiling for a rate: a tablet
+            // costs three hundredths of one, and a target above every real
+            // value cannot be set at all.
+            'unitPriceTarget' => FluentRule::numeric('Target price per kilo, litre or piece')->nullable()->min(0.0001),
             'category' => FluentRule::string('Category')->nullable()->in(ProductCategory::values()),
         ];
+    }
+
+    /**
+     * Replaces the product's own drop alert with a price alert at the same
+     * saving. The drop fields empty, which puts the drop check back on the
+     * default for the price; nothing is written until the form is saved.
+     */
+    public function switchToPriceAlert(): void
+    {
+        $suggestion = new UnitTargetGuide($this->product)->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs);
+
+        // A free account keeps its drop settings: its price alert would be
+        // stored but not checked, so the switch would leave it with no alert
+        // of its own.
+        if ($suggestion === null || $this->blankToNull($this->unitPriceTarget) !== null || ! $this->allowsUnitPriceAlerts()) {
+            return;
+        }
+
+        $this->unitPriceTarget = $suggestion['unit'];
+        $this->dropThresholdPct = null;
+        $this->dropThresholdAbs = null;
     }
 
     public function save(): void
@@ -110,14 +139,13 @@ final class EditProduct extends Component
 
         $this->validate();
 
-        // A choice, a clear included, is final; an untouched field is not a choice.
+        // An untouched field is not a choice.
         if ($this->category !== $this->loadedCategory) {
-            $this->product->forceFill([
-                'category' => ProductCategory::tryFrom($this->category),
-                'category_set_by' => CategorySource::User,
-            ]);
+            CategoriseProduct::chooseByUser($this->product, ProductCategory::tryFrom($this->category));
         }
 
+        // A placed product carries no suggestion; this also clears one left
+        // beside a category by an older write.
         if ($this->category !== '') {
             $this->product->forceFill(['suggested_category' => null]);
         }
@@ -237,6 +265,9 @@ final class EditProduct extends Component
 
     public function render(): View
     {
+        $guide = new UnitTargetGuide($this->product);
+        $packChoices = $guide->packs();
+
         return view('livewire.products.edit-product', [
             'currencies' => Iso4217::options(),
             'categoryGroups' => ProductCategory::grouped(),
@@ -244,10 +275,13 @@ final class EditProduct extends Component
             'allowsAutoCategories' => $this->allowsAutoCategories(),
             'suggestedLabel' => ProductCategory::tryFrom((string) $this->suggestedCategory)?->label(),
             'shopImages' => $this->shopImages(),
-            'allowsUnitPriceAlerts' => $this->product->user?->entitlements()->allowsUnitPriceAlerts() === true,
-            'unitWord' => $this->unitWord(),
-            'currentPrice' => $this->currentLowestPrice(),
-            'currentUnitPrice' => $this->currentBestUnitPrice(),
+            'allowsUnitPriceAlerts' => $this->allowsUnitPriceAlerts(),
+            'packChoices' => $packChoices,
+            'priceAlertSwitch' => $this->blankToNull($this->unitPriceTarget) === null && $this->allowsUnitPriceAlerts()
+                ? $guide->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs, $packChoices)
+                : null,
+            'unitHistory' => $guide->history(),
+            ...$this->alertAnchors(),
         ]);
     }
 
@@ -277,72 +311,87 @@ final class EditProduct extends Component
     }
 
     /**
-     * What the product costs today at the shop with the smallest outlay, and
-     * where — the figure a target price is set against.
+     * The two figures a reader sets an alert against, and the sentence under
+     * the per-unit field.
      *
-     * Null when no shop has a usable price, where a "now" line would be a
-     * number nobody can act on.
+     * Resolved together, from one read of the resolver and the same eligible
+     * set the ranking uses. Asking each question separately let this form name
+     * a dead shop as the best value while every other surface named a live one.
      *
-     * @return array{amount: string, host: string}|null
+     * @return array{unitWord: ?string, currentPrice: ?array{amount: string, host: string}, currentUnitPrice: ?array{amount: string, host: string}, unitTargetDescription: string}
      */
-    private function currentLowestPrice(): ?array
-    {
-        $shop = $this->product->cheapestShop;
-
-        if ($shop === null || $shop->current_price === null) {
-            return null;
-        }
-
-        return [
-            'amount' => MoneyFormatter::format((string) $shop->current_price, (string) $this->product->currency),
-            'host' => (string) $shop->host,
-        ];
-    }
-
-    /**
-     * The best price per unit on offer today, and where. The anchor for a
-     * per-unit target, which is a different question and often a different
-     * shop from the one above.
-     *
-     * @return array{amount: string, host: string}|null
-     */
-    private function currentBestUnitPrice(): ?array
+    private function alertAnchors(): array
     {
         $packs = $this->product->comparablePacks();
-        $shop = $packs->cheapestPerUnit($this->product->shops);
-        $unitPrice = $shop === null ? null : $packs->unitPriceOf($shop);
+        $unitWord = UnitWord::noun($packs->unit());
+        $bestValue = $this->product->bestValueShop();
+        $unitPrice = $bestValue === null ? null : $packs->unitPriceOf($bestValue);
 
-        if ($shop === null || $unitPrice === null) {
+        return [
+            'unitWord' => $unitWord,
+            'currentPrice' => $this->anchor($this->product->lowestOutlayShop(), fn (Shop $shop): ?string => $shop->current_price === null
+                ? null
+                : (string) $shop->current_price),
+            'currentUnitPrice' => $this->anchor(
+                $bestValue,
+                fn (): ?string => $unitPrice,
+                UnitWord::labelFor($packs->unit()),
+            ),
+            'unitTargetDescription' => $this->unitTargetDescription($unitWord),
+        ];
+    }
+
+    /**
+     * One shop's price and host, formatted — or null when there is no figure a
+     * reader could act on.
+     *
+     * @param  callable(Shop): ?string  $price
+     * @return array{amount: string, host: string}|null
+     */
+    private function anchor(?Shop $shop, callable $price, string $suffix = ''): ?array
+    {
+        $amount = $shop === null ? null : $price($shop);
+
+        if ($shop === null || $amount === null) {
             return null;
         }
 
+        $currency = (string) $this->product->currency;
+
         return [
-            'amount' => MoneyFormatter::format($unitPrice, (string) $this->product->currency)
-                . UnitWord::labelFor($packs->unit()),
+            // A per-unit anchor is what the reader types into the field beside
+            // it, so it is shown at the precision the field accepts.
+            'amount' => ($suffix === ''
+                ? MoneyFormatter::format($amount, $currency)
+                : MoneyFormatter::unitPrice($amount, $currency) . ' ' . $suffix),
             'host' => (string) $shop->host,
         ];
     }
 
     /**
-     * The unit this product's alert compares in, named rather than listed.
-     * Null while no shop has read a pack size, when the reader really does
-     * not know yet and neither do we.
+     * The sentence under the per-unit target field.
      *
-     * Read from the resolver rather than from the majority pack unit, so the
-     * label names the unit the alert actually fires on.
+     * Built here rather than in the template: it is three branches and a
+     * conditional clause, and gluing two translated sentences together is the
+     * part a second locale breaks first.
      */
-    private function unitWord(): ?string
+    private function unitTargetDescription(?string $unitWord): string
     {
-        $word = match ($this->product->comparablePacks()->unit()) {
-            'g' => __('kilo'),
-            'ml' => __('litre'),
-            'piece' => __('piece'),
-            default => null,
-        };
+        if (! $this->allowsUnitPriceAlerts()) {
+            // The figure still shows on a free account: the number is worth
+            // setting before an upgrade, and it is the one thing that makes it
+            // possible to pick.
+            return __('Pro alerts on this. We keep the number, and it starts working when you upgrade.');
+        }
 
-        // `__()` is typed as array|string: a key that maps to an array is not
-        // a word, and reads here as no unit at all.
-        return is_string($word) ? $word : null;
+        return $unitWord === null
+            ? __('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.')
+            : __('We tell you when the best value reaches this price per :unit.', ['unit' => $unitWord]);
+    }
+
+    private function allowsUnitPriceAlerts(): bool
+    {
+        return $this->product->user?->entitlements()->allowsUnitPriceAlerts() === true;
     }
 
     private function blankToNull(?string $value): ?string

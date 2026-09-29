@@ -13,6 +13,7 @@ use App\Health\StripeWebhookSecretCheck;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ShopAdapter;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -27,6 +28,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Cashier\Cashier;
 use Laravel\Passport\Passport;
+use Livewire\Livewire;
 use SocialiteProviders\Apple\Provider as AppleProvider;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
@@ -70,6 +72,12 @@ final class AppServiceProvider extends ServiceProvider
         $this->registerHealthChecks();
         $this->configureBilling();
         $this->registerSocialiteProviders();
+
+        // Livewire re-applies only listed middleware to its update requests.
+        // Without this, a component on a page behind `verified` stays callable
+        // by an unverified account that replays its snapshot: two-factor
+        // setup on the security page is one such action.
+        Livewire::addPersistentMiddleware([EnsureEmailIsVerified::class]);
 
         $this->isolateParallelTestProcesses();
 

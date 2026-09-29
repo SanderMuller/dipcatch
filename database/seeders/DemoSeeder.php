@@ -19,6 +19,8 @@ use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\ReferenceValue;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Demo\DatasetCatalog;
+use Database\Seeders\Demo\DemoBestValue;
 use Database\Seeders\Demo\DemoOffer;
 use Database\Seeders\Demo\DemoProduct;
 use Database\Seeders\Demo\GeneratedCatalog;
@@ -82,6 +84,11 @@ final class DemoSeeder extends Seeder
 
     public function run(): void
     {
+        // A fresh walk of the price dataset: the resolver remembers what the
+        // AH API answered so five accounts ask it once, and that memory must
+        // not outlive the seed that filled it.
+        DatasetCatalog::forget();
+
         if (app()->environment('production')) {
             $this->command->warn('DemoSeeder skipped: demo data is never seeded in production.');
 
@@ -112,8 +119,10 @@ final class DemoSeeder extends Seeder
 
         // Offset past the demo account's slice, so the two do not track the
         // same list of products.
+        $this->seedCatalog($admin, $this->realCatalog());
         $this->seedCatalog($admin, GeneratedCatalog::make(self::ADMIN_GENERATED, offset: self::DEMO_GENERATED));
 
+        $this->seedCatalog($demo, $this->realCatalog());
         $this->seedCatalog($demo, $this->demoCatalog());
         $this->seedCatalog($demo, GeneratedCatalog::make(self::DEMO_GENERATED));
 
@@ -143,7 +152,7 @@ final class DemoSeeder extends Seeder
         $configured = config('dipcatch.admin.email');
 
         if (is_string($configured) && $configured !== '') {
-            $admin = User::query()->where('email', $configured)->first();
+            $admin = User::query()->where('email', Str::lower($configured))->first();
 
             if ($admin instanceof User) {
                 $admin->forceFill(self::developerPerks())->save();
@@ -184,6 +193,144 @@ final class DemoSeeder extends Seeder
     // ---------------------------------------------------------------------
     // Catalogs
     // ---------------------------------------------------------------------
+
+    /**
+     * Products that exist, at addresses that answer.
+     *
+     * Every other catalog here is invented: plausible titles on invented
+     * paths, which is enough to fill a list and nothing more. A recheck of one
+     * reads a 404, so no price ever moves, no image ever loads, and the parts
+     * of the app that only work against a real page — the adapter chain, the
+     * unit comparison, the image — cannot be exercised at all without adding a
+     * shop by hand first.
+     *
+     * These were read through DipCatch's own probe on 2026-09-22, the pizza
+     * and the toothpaste on 2026-09-26, and the prices, pack sizes and photos
+     * below are what came back. Re-running a check on a seeded account now
+     * does what it does in production.
+     *
+     * Two of them earn their place twice. The Roter pair is the same tablet in
+     * a 400-pack and an 800-pack: 0.0325 against 0.0275 each, an 18% gap that
+     * both rendered as EUR 0.03 until this morning, so it is the per-unit
+     * ranking and the four-decimal display in one product. The AURMOO box is a
+     * title counting two hundred bags of five litres, which is the pack-count
+     * reading that used to price one bag's worth of plastic as the whole box.
+     *
+     * A price here ages. When one drifts far enough to bother a reader, probe
+     * the URL again and paste back what it says rather than guessing.
+     *
+     * @return list<DemoProduct>
+     */
+    private function realCatalog(): array
+    {
+        return [
+            new DemoProduct(
+                title: 'Roter Vitamine C 70 mg citroen kauwtabletten',
+                category: ProductCategory::MedicinesSupplements,
+                unitPriceTarget: 0.0280,
+                offers: [
+                    new DemoOffer(
+                        host: 'ah.nl', path: '', price: 12.99, packQuantity: 400, packUnit: 'piece',
+                        realUrl: 'https://www.ah.nl/producten/product/wi56116/roter-vitamine-c-70-mg-kauwtabletten-citroen',
+                        imageUrl: 'https://static.ah.nl/dam/product/AHI_41565f74504d4f34527a476c66355452435138536541?revLabel=1&rendition=800x800_WEBP&fileType=binary',
+                    ),
+                    new DemoOffer(
+                        host: 'benushop.nl', path: '', price: 21.99, packQuantity: 800, packUnit: 'piece',
+                        realUrl: 'https://www.benushop.nl/apotheek/vitaminen/vitamine-c/roter-voordeelverpakking-vitamine-c-70mg-citroen-kauwtabletten-800-stuks',
+                        imageUrl: 'https://www.benushop.nl/images/productimages/big/8713304941826_1.jpg',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Creapure Creatine 500 g',
+                category: ProductCategory::MedicinesSupplements,
+                offers: [
+                    new DemoOffer(
+                        host: 'bodyandfit.com', path: '', price: 29.99, packQuantity: 500, packUnit: 'g',
+                        realUrl: 'https://www.bodyandfit.com/en/products/creapure-creatine',
+                        imageUrl: 'https://www.bodyandfit.com/cdn/shop/files/01668_Image_01_79c5e785-834b-4215-a613-222613b78856.png?v=1783689694&width=1920',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'AURMOO Vuilniszakken 5 L (200 stuks)',
+                category: ProductCategory::PaperDisposables,
+                offers: [
+                    new DemoOffer(
+                        host: 'amazon.nl', path: '', price: 15.99, packQuantity: 1000000, packUnit: 'ml',
+                        realUrl: 'https://www.amazon.nl/AURMOO-Vuilniszakken-Afbreekbaar-Vuilniszak-M%C3%BCllbeutel/dp/B0BHZJYGY5',
+                        imageUrl: 'https://m.media-amazon.com/images/I/51np1PVT2+L.jpg',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Fanta Cassis 1,5 L',
+                category: ProductCategory::SoftDrinks,
+                offers: [
+                    new DemoOffer(
+                        host: 'spar.nl', path: '', price: 3.19, packQuantity: 1500, packUnit: 'ml',
+                        realUrl: 'https://www.spar.nl/fanta-fanta-cassis-pet-1.5l-9256413/',
+                        imageUrl: 'https://media.spar.nl/productdetail/fanta-fanta-cassis-pet-1.5l-1.5-Liter-9256413-168619.jpg',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Feliway Classic Startpakket verdamper',
+                category: ProductCategory::PetCare,
+                offers: [
+                    new DemoOffer(
+                        host: 'zooplus.nl', path: '', price: 27.99, packQuantity: 1, packUnit: 'piece',
+                        realUrl: 'https://www.zooplus.nl/shop/katten/verzorging/huisapotheek/verdamper/169589?activeVariant=169589.10',
+                        imageUrl: 'https://media.zooplus.com/bilder/9/400/67609_pla_ceva_feliway_classic_hs_01_9.jpg',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Vet-Concept Cat Sana Paard 3 kg',
+                category: ProductCategory::PetFood,
+                offers: [
+                    new DemoOffer(
+                        host: 'dierapotheker.nl', path: '', price: 30.55, packQuantity: 3000, packUnit: 'g',
+                        realUrl: 'https://www.dierapotheker.nl/vet-concept-sana-paard-kattenvoer/9271/',
+                        imageUrl: 'https://www.dierapotheker.nl/media/c1/2d/15/1725524946/Vet-Concept-Sana-Paard-Kattenvoer-10-kg.jpg',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Dr. Oetker Big Americans Pizza Texas 435 g',
+                category: ProductCategory::Frozen,
+                offers: [
+                    // Dirk's offer price, 23 to 29 September 2026. The normal price is 4.65.
+                    new DemoOffer(
+                        host: 'dirk.nl', path: '', price: 1.89, packQuantity: 435, packUnit: 'g',
+                        realUrl: 'https://www.dirk.nl/boodschappen/diepvries/diepvries-pizzas-maaltijden/dr-oetker-big-americans-pizza-texas/68429',
+                        imageUrl: 'https://web-fileserver.dirk.nl/artikelen/219747_1_421876_638771973556937168.png?width=500&height=500&mode=crop',
+                    ),
+                    new DemoOffer(
+                        host: 'jumbo.com', path: '', price: 4.95, packQuantity: 435, packUnit: 'g',
+                        realUrl: 'https://www.jumbo.com/producten/dr-oetker-big-americans-pizza-texas-435-g-184179DS',
+                        imageUrl: 'https://www.jumbo.com/dam-images/fit-in/360x360/Products/17042025_1744858686454_1744858693343_184179_DS_04001724023906_C1N1_s02.png',
+                    ),
+                ],
+            ),
+            new DemoProduct(
+                title: 'Sensodyne Rapid Relief Mint tandpasta 75 ml',
+                category: ProductCategory::Oral,
+                offers: [
+                    new DemoOffer(
+                        host: 'jumbo.com', path: '', price: 7.29, packQuantity: 75, packUnit: 'ml',
+                        realUrl: 'https://www.jumbo.com/producten/sensodyne-rapid-relief-mint-tandpasta-75-ml-705075DS',
+                        imageUrl: 'https://www.jumbo.com/dam-images/fit-in/360x360/Products/5054563235404_1788998419372_fmd1ih0j2knryphuqmte.png',
+                    ),
+                    new DemoOffer(
+                        host: 'deonlinedrogist.nl', path: '', price: 7.14, packQuantity: 75, packUnit: 'ml',
+                        realUrl: 'https://www.deonlinedrogist.nl/drogist/sensodyne-rapid-relief-tandpasta-75ml.htm',
+                        imageUrl: 'https://img.deonlinedrogist.nl/wjGOPaliQKXMLdrbhUuqk_GUxeaiBiLhhaXcxesUGI4/dpr:1/bg:FFFFFF/fn:sensodyne-rapid-relief-tandpasta-75ml/plain/s3://dod-storage/media/40/18/81f3945ad31198780d5398bd6c395755.png',
+                    ),
+                ],
+            ),
+        ];
+    }
 
     /**
      * @return list<DemoProduct>
@@ -373,7 +520,12 @@ final class DemoSeeder extends Seeder
         $product = Product::factory()->create([
             'user_id' => $user->id,
             'title' => $spec->title,
-            'image_url' => null,
+            // The photo the first offer that has one serves, exactly as a
+            // real add does: a product page with an empty frame is the first
+            // thing anyone notices about a seeded account, and the factory's
+            // own placeholder points at via.placeholder.com, which no longer
+            // resolves.
+            'image_url' => $spec->image(),
             'currency' => 'EUR',
             'drop_threshold_pct' => 5.00,
             'drop_threshold_abs' => 0.50,
@@ -413,6 +565,7 @@ final class DemoSeeder extends Seeder
         $shop = Shop::factory()->create([
             'product_id' => $product->id,
             'url' => $offer->url(),
+            'image_url' => $offer->imageUrl,
             'adapter_key' => $this->adapterKey($offer->host),
             'currency' => 'EUR',
             'initial_price' => $prices[0],
@@ -568,9 +721,16 @@ final class DemoSeeder extends Seeder
             return;
         }
 
+        // The best value per day too, as recomputeCheapestShop() writes it, so
+        // the per-unit chart line spans the history. Only the segments get it:
+        // the seeded drops are pack-price drops, and a best value on the
+        // product row would move them to the unit basis and hide them.
+        $packs = $product->load('shops')->comparablePacks();
+
         $segments = [];
         $openPrice = null;
         $openShopId = null;
+        $openBestValue = null;
         $openStart = null;
 
         for ($day = 0; $day < $historyDays; $day++) {
@@ -584,9 +744,10 @@ final class DemoSeeder extends Seeder
                 }
             }
 
+            $bestValue = DemoBestValue::on($eligible, $packs, $day);
             $startedAt = now()->subDays($historyDays - 1 - $day)->setTime(6, 5);
 
-            if ($openPrice !== null && abs($best - $openPrice) < 0.005 && $openShopId === $bestShopId) {
+            if ($openPrice !== null && abs($best - $openPrice) < 0.005 && $openShopId === $bestShopId && DemoBestValue::same($bestValue, $openBestValue)) {
                 continue;
             }
 
@@ -598,6 +759,10 @@ final class DemoSeeder extends Seeder
                 'product_id' => $product->id,
                 'cheapest_shop_id' => $bestShopId,
                 'cheapest_price' => $best,
+                'best_value_shop_id' => $bestValue?->shop->id,
+                'best_value_price' => $bestValue?->price,
+                'pack_quantity' => $bestValue?->size->quantity,
+                'pack_unit' => $bestValue?->size->unit,
                 'started_at' => $startedAt,
                 'ended_at' => null,
                 'triggering_price_check_id' => null,
@@ -605,6 +770,7 @@ final class DemoSeeder extends Seeder
 
             $openPrice = $best;
             $openShopId = $bestShopId;
+            $openBestValue = $bestValue;
             $openStart = $startedAt;
         }
 

@@ -54,9 +54,17 @@ _ide_helper_models.php
 frankenphp
 frankenphp-worker.php
 
-# Eye-verify session state: holds a live cookie.
+# Eye-verify session state: holds a live cookie. A harness writes its cached
+# login as `state-<email>.json` under whatever artifacts dir it was given.
 .github/eye-verify/admin-state.json
+**/state-*.json
 .github/eye-verify/*.html
+/.auth
+
+# What a failed eye-verify check dumps to disk: a full-page HTML capture of an
+# authenticated screen, so it carries the CSRF token and whatever the signed-in
+# account was looking at.
+/eye-verify-artifacts
 
 # Laravel Cloud CLI repo defaults (app/environment ids, no secrets).
 /.cloud

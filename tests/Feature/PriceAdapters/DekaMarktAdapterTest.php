@@ -132,3 +132,24 @@ test('records that price the same but state different periods yield no period', 
     expect($result->snapshot?->price)->toBe('1.59')
         ->and($result->snapshot?->promotionWindow)->toBeNull();
 });
+
+test('a whole-euro price is read, not lost to an array key', function (): void {
+    // The prices are collected as array keys, and PHP stores "16" as the
+    // integer 16, which the snapshot refused with a TypeError. Found while
+    // choosing canary products, 2026-09-24.
+    $page = dekaMarktPage(normalPrice: '16', offerPrice: null, offerStart: null, offerEnd: null);
+
+    expect($this->adapter->extract(dekaMarktUrl(), $page)->snapshot?->price)->toBe('16');
+});
+
+test('an offer price of zero is no offer, so the shelf price is read', function (): void {
+    // Seen live on 2026-09-24: every price record carried offerPrice 0 inside
+    // the week's offer window, and the adapter reported 0 as the price.
+    $page = dekaMarktPage(normalPrice: '18.98', offerPrice: '0');
+
+    $snapshot = $this->adapter->extract(dekaMarktUrl(), $page)->snapshot;
+
+    expect($snapshot?->price)->toBe('18.98')
+        // The shelf price is no promotion, whatever window the record carries.
+        ->and($snapshot?->promotionWindow)->toBeNull();
+});

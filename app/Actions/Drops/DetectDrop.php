@@ -9,11 +9,11 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
-use App\Services\AhApi\AhApiSource;
-use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\Drops\DropEvaluator;
 use App\Services\Drops\DropLatch;
 use App\Services\Drops\DropOutcome;
+use App\Services\Drops\LargeDropConfirmation;
+use App\Services\Drops\LargeDropVerdict;
 use App\Services\Drops\NotificationBudget;
 use App\Services\Drops\Reference;
 use App\Services\Drops\ReferenceValue;
@@ -31,6 +31,7 @@ final readonly class DetectDrop
         private Reference $reference,
         private DropEvaluator $evaluator,
         private DropLatch $latch,
+        private LargeDropConfirmation $confirmation,
     ) {}
 
     /**
@@ -156,68 +157,25 @@ final readonly class DetectDrop
 
         $trigger = PriceCheck::query()->find($triggeringPriceCheckId);
 
-        // `CheckShopPrice::persist()` recomputes on every outcome, a failure
-        // included, and a failed check leaves the shop's price cached. Without
-        // this the failure would re-evaluate that cached drop and notify,
-        // anchored to a check that read nothing.
-        if ($trigger === null || ! $trigger->isEligible()) {
+        if ($trigger === null) {
             return;
         }
 
-        // A shop joining a product watched elsewhere is not a fall: see
-        // triggerStartsAShop().
-        if ($trigger->joinsAProductAlreadyWatchedElsewhere()) {
-            return;
-        }
+        // Exhaustive on purpose: a verdict nobody handled must not fall
+        // through to an alert on one reading.
+        match ($this->confirmation->verdictFor($product, $trigger, $reference)) {
+            LargeDropVerdict::NotThisReading => null,
+            LargeDropVerdict::Exempt, LargeDropVerdict::Confirmed => $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit),
+            LargeDropVerdict::Awaiting => $this->askForSecondReading($trigger->shop),
+        };
+    }
 
-        // The drop must belong to the shop this check read — the one the basis
-        // is measured on, which is the best-value winner once the product has a
-        // comparison unit.
-        $basisShopId = $reference->isUnitBasis() ? $product->best_value_shop_id : $product->cheapest_shop_id;
-
-        if ($trigger->shop_id !== $basisShopId) {
-            return;
-        }
-
-        // Both sides pack money: a price check records what the page charged,
-        // never a price per kilo.
-        $winningPack = $product->winningPackPrice($reference->unit);
-
-        if ($winningPack === null
-            || bccomp(Numeric::str((string) $trigger->price), Numeric::str($winningPack), self::BC_SCALE) !== 0) {
-            return;
-        }
-
-        // A dataset or API shop reads a structured field and never fetches a
-        // page, so a second reading is the same row again and confirms
-        // nothing. Those shops alert on one reading, as they always have.
-        if ($this->readsWithoutFetching($trigger->shop)) {
-            $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit);
-
-            return;
-        }
-
-        $previous = PriceCheck::query()
-            ->where('shop_id', $trigger->shop_id)
-            ->where('id', '<', $trigger->id)
-            ->eligible()
-            ->latest('id')
-            ->first();
-
-        // The predecessor has to be a large drop in its own right. A merely
-        // discounted one — below the notify threshold but above the
-        // confirmation ceiling — would let a single anomalous reading through
-        // on its coat-tails, which is the whole failure this guard exists for.
-        if ($previous !== null && $this->qualifiesAsLargeDrop($product, (string) $previous->price, $reference)) {
-            $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit);
-
-            return;
-        }
-
-        // This reading is the transition. Ask for a second one now rather than
-        // waiting for the shop's next scheduled check.
-        $shop = $trigger->shop;
-
+    /**
+     * This reading is the transition. Ask for a second one now rather than
+     * waiting for the shop's next scheduled check.
+     */
+    private function askForSecondReading(Shop $shop): void
+    {
         DB::afterCommit(function () use ($shop): void {
             try {
                 dispatch(new CheckShopPrice($shop, confirmation: true))
@@ -245,33 +203,6 @@ final readonly class DetectDrop
                 ]);
             }
         });
-    }
-
-    /**
-     * `$packPrice` is what the shop charged at that earlier reading. It is
-     * converted with the winner's current size before it is compared: the
-     * reference is a unit figure, and handing it a pack price would compare two
-     * scales.
-     */
-    private function qualifiesAsLargeDrop(Product $product, string $packPrice, ReferenceValue $reference): bool
-    {
-        $price = $reference->isUnitBasis()
-            ? $product->bestValuePackSize()?->unitPriceFor($packPrice)
-            : $packPrice;
-
-        if ($price === null) {
-            return false;
-        }
-
-        $outcome = $this->evaluator->evaluate($product, $price, $reference, $packPrice);
-
-        return $outcome->belowThreshold && $outcome->needsConfirmation;
-    }
-
-    private function readsWithoutFetching(Shop $shop): bool
-    {
-        return app(AhApiSource::class)->supports($shop->host)
-            || app(CheckjebonSource::class)->supports($shop->host);
     }
 
     /** @see DropLatch::clearIfRecovered() — kept here as the caller's entry point. */
@@ -353,6 +284,9 @@ final readonly class DetectDrop
                 'reference_unit_price' => $outcome->referenceUnitPrice,
                 'new_unit_price' => $outcome->newUnitPrice,
                 'comparison_unit' => $outcome->comparisonUnit,
+                // The size the unit price was measured on, for "€2.75 for 227 g".
+                'pack_quantity' => $unit === null ? null : $locked->bestValuePackSize()?->quantity,
+                'pack_unit' => $unit === null ? null : $locked->bestValuePackSize()?->unit,
                 'fired_at' => now(),
             ]);
 
@@ -404,12 +338,12 @@ final readonly class DetectDrop
      * every `ok` row has been pruned.
      *
      * The fallback answers "which check read this price on this shop", so it
-     * applies the same three guards {@see confirmLargeDrop()} applies to an
-     * explicit id: the right shop, an eligible reading, and the drop's own
-     * price. The explicit branch needs none of them here — the direct path
-     * reaches this only through the recompute's `$changed` gate, so the id is
-     * the check that moved the price. `confirmLargeDrop()` runs before that
-     * gate, which is why it guards its own.
+     * applies three of the guards {@see LargeDropConfirmation::verdictFor()}
+     * applies to an explicit id: the right shop, an eligible reading, and the
+     * drop's own price. The explicit branch needs none of them here — the
+     * direct path reaches this only through the recompute's `$changed` gate,
+     * so the id is the check that moved the price. `confirmLargeDrop()` runs
+     * before that gate, which is why it runs the verdict's guards.
      *
      * Without the eligibility filter the latest row on a revived shop is
      * typically the failure that killed it, and the event would anchor to a

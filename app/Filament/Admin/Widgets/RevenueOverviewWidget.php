@@ -10,12 +10,14 @@ use App\Support\MoneyFormatter;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Laravel\Cashier\Subscription;
 
 /**
- * The owner's numbers, all from local tables. MRR is the count of paying
- * subscriptions times the configured price — a trialing account pays
- * nothing yet, so it is counted separately rather than folded into MRR.
+ * The owner's numbers, all from local tables. MRR is the paying
+ * subscriptions times the configured price, a yearly one at a twelfth of
+ * its price — a trialing account pays nothing yet, so it is counted
+ * separately rather than folded into MRR.
  */
 final class RevenueOverviewWidget extends BaseWidget
 {
@@ -32,12 +34,14 @@ final class RevenueOverviewWidget extends BaseWidget
     protected function getStats(): array
     {
         $paying = $this->payingCount();
+        $payingYearly = ProPrice::hasYearly() ? $this->payingCount(ProPrice::yearlyPriceId()) : 0;
+        $mrr = ($paying - $payingYearly) * $this->price() + $payingYearly * (float) ProPrice::yearlyAmount() / 12;
         $trialing = $this->trialingCount();
         $cancelled = $this->cancelledThisMonth();
         $new = $this->startedThisMonth();
 
         return [
-            Stat::make('MRR', MoneyFormatter::format(sprintf('%.2F', $paying * $this->price()), $this->currency()))
+            Stat::make('MRR', MoneyFormatter::format(sprintf('%.2F', $mrr), $this->currency()))
                 ->description($paying . ' paying, ' . $trialing . ' on trial')
                 ->icon('heroicon-o-banknotes')
                 ->color('success'),
@@ -64,13 +68,14 @@ final class RevenueOverviewWidget extends BaseWidget
      * Pro, which is a product decision, not revenue — MRR counts the money
      * Stripe is actually collecting.
      */
-    private function payingCount(): int
+    private function payingCount(?string $stripePrice = null): int
     {
         return Subscription::query()
             ->where('type', Plan::SUBSCRIPTION_TYPE)
             ->active()
             ->notOnTrial()
             ->where('stripe_status', '!=', 'past_due')
+            ->when($stripePrice !== null, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('stripe_price', $stripePrice))
             ->count();
     }
 

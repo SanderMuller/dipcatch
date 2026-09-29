@@ -367,7 +367,9 @@ final class SuggestShops
         $best = 0.0;
 
         foreach ($queries as $query) {
-            $best = max($best, $query->overlapWith($candidate));
+            if ($query->sameVariantAs($candidate)) {
+                $best = max($best, $query->overlapWith($candidate));
+            }
         }
 
         return $best;

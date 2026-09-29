@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\ConsumerPriceIssue;
+use App\Enums\PackExclusion;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
+use App\Enums\ShopKind;
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\ConditionalOffer;
 use App\PriceAdapters\PromotionWindow;
@@ -11,9 +14,12 @@ use App\Support\Favicon;
 use App\Support\ImageUrl;
 use App\Support\PackSize;
 use App\Support\UrlNormalizer;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\ShopFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -39,6 +45,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $bundle_quantity
  * @property string|null $bundle_total_price
  * @property CarbonInterface|null $repointed_at When this offer was last pointed at a different URL.
+ * @property CarbonInterface|null $last_checked_at Stamped by every attempt, a failed one included.
+ * @property CarbonInterface|null $last_success_at Stamped only when a price was actually read.
+ * @property int $consecutive_failures Reset to zero by any successful read.
+ * @property ShopKind $kind Read on a schedule, or kept as a link — see {@see ShopKind}.
+ * @property string|null $unreadable_reason Which wall the page hit when the link was kept.
+ * @property CarbonInterface|null $retried_at When a reference shop was last asked again.
+ * @property ConsumerPriceIssue|null $consumer_price_issue Why this is not a price a shopper can pay.
+ * @property string|null $consumer_price_note The words the page used to say so.
  */
 #[Unguarded]
 final class Shop extends Model
@@ -68,6 +82,9 @@ final class Shop extends Model
             'last_success_at' => 'datetime',
             'repointed_at' => 'datetime',
             'current_in_stock' => 'boolean',
+            'consumer_price_issue' => ConsumerPriceIssue::class,
+            'kind' => ShopKind::class,
+            'retried_at' => 'datetime',
             'active' => 'boolean',
             'health' => ShopHealth::class,
             'last_status' => ScrapeStatus::class,
@@ -184,7 +201,23 @@ final class Shop extends Model
     }
 
     /**
-     * `/kg`, `/l` or `/stuk` — null whenever {@see unitPrice()} is null, so
+     * The current unit price unrounded, for a caller that compares it rather
+     * than prints it. Two decimals cannot separate two shops selling the same
+     * tablet at prices 18% apart.
+     */
+    public function unitPriceValue(): ?float
+    {
+        $price = $this->current_price;
+
+        if (! is_string($price) && ! is_numeric($price)) {
+            return null;
+        }
+
+        return $this->packSize()?->unitPriceValueFor((string) $price);
+    }
+
+    /**
+     * `/kg`, `/l` or `/piece` — null whenever {@see unitPrice()} is null, so
      * no orphan label renders next to a missing price.
      */
     public function unitPriceLabel(): ?string
@@ -192,7 +225,7 @@ final class Shop extends Model
         return $this->unitPrice() === null ? null : $this->packSize()?->label();
     }
 
-    /** `/kg`, `/l` or `/stuk` for this shop's pack, whatever its price. */
+    /** `/kg`, `/l` or `/piece` for this shop's pack, whatever its price. */
     public function packUnitLabel(): ?string
     {
         return $this->packSize()?->label();
@@ -265,12 +298,115 @@ final class Shop extends Model
         return $offer !== null && $offer->isTrackedAt($this->current_price) ? $offer : null;
     }
 
+    /**
+     * When this shop's stored price was last actually read.
+     *
+     * Not `last_checked_at`, which a failed attempt stamps too. A shop failing
+     * for a week reads as "checked two hours ago" beside a week-old price, and
+     * nothing on the page said otherwise — the price simply stops moving and
+     * looks current while it does.
+     */
+    public function priceReadAt(): ?CarbonImmutable
+    {
+        return $this->last_success_at?->toImmutable();
+    }
+
+    /**
+     * Whether the most recent attempts to read this shop have failed.
+     *
+     * `consecutive_failures` is reset to zero by any successful read, so a
+     * non-zero count means every attempt since the stored price was written has
+     * failed.
+     */
+    public function readsAreFailing(): bool
+    {
+        return $this->consecutive_failures > 0;
+    }
+
+    /**
+     * One sentence a shopper can act on, or null when this shop's price is a
+     * price they can pay.
+     *
+     * Not a {@see PackExclusion}: that enum's reasons keep a shop
+     * competing for the lowest-price answer, and a price quoted without VAT is
+     * not a lower price — it is an incomplete one.
+     */
+    public function notAConsumerPriceReason(): ?string
+    {
+        return $this->consumer_price_issue?->label();
+    }
+
+    /**
+     * A link, kept because its page could not be read.
+     *
+     * It holds no price, so it cannot reach either answer — {@see
+     * Product::votingShops()} bars it, and would bar it anyway for having no
+     * price. Both guards on purpose: the one that reads the kind says what is
+     * meant, and the one that reads the price is what holds if a price ever
+     * arrives on a row that should not have one.
+     */
+    public function isReference(): bool
+    {
+        return $this->kind === ShopKind::Reference;
+    }
+
+    /**
+     * Shops whose price DipCatch reads.
+     *
+     * A scope rather than a condition repeated at each call site: every query
+     * that dispatches a price check has to exclude the links, and a new one
+     * that forgets would spend a fetch on a page known to refuse it and then
+     * count the refusal against the row's health until it died.
+     *
+     * @param  EloquentQueryBuilder<Shop>  $query
+     * @return EloquentQueryBuilder<Shop>
+     */
+    #[Scope]
+    protected function tracked(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query->where('kind', ShopKind::Tracked->value);
+    }
+
+    /**
+     * Tracked shops on a product that is not paused, whatever their health.
+     *
+     * Not filtered on the shop's own `active` flag: the job clears it in the
+     * same write that marks a shop dead, so a filter on it hides every shop
+     * the job killed.
+     *
+     * @param  EloquentQueryBuilder<Shop>  $query
+     * @return EloquentQueryBuilder<Shop>
+     */
+    #[Scope]
+    protected function onActiveProducts(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query
+            ->tracked()
+            ->whereHas('product', fn (EloquentQueryBuilder $product): EloquentQueryBuilder => $product->where('active', true));
+    }
+
+    /**
+     * Shops the scheduler rechecks. Use this rather than a copy of the chain.
+     *
+     * @param  EloquentQueryBuilder<Shop>  $query
+     * @return EloquentQueryBuilder<Shop>
+     */
+    #[Scope]
+    protected function scheduled(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query
+            ->onActiveProducts()
+            ->where('active', true)
+            ->where('health', '!=', ShopHealth::Dead->value);
+    }
+
     public function faviconUrl(): string
     {
         return Favicon::url($this->host);
     }
 
-    private function packSize(): ?PackSize
+    /** The size this shop's own page states, before any comparison with its siblings. */
+    public function packSize(): ?PackSize
     {
         if ($this->pack_quantity === null || $this->pack_unit === null) {
             return null;

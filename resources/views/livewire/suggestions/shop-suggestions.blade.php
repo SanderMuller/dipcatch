@@ -39,11 +39,15 @@
                                 {{ $suggestion->chainLabel }}
                                 <span class="font-normal text-zinc-500">— {{ $suggestion->name }}</span>
                             </flux:text>
-                            <flux:text size="sm" class="text-zinc-500">
-                                @if ($suggestion->size)
-                                    {{ $suggestion->size }} ·
+                            {{-- Per unit first when the dataset names a size, as everywhere
+                                 else a price is compared. The dataset is in euros. --}}
+                            @php($suggestionSize = \App\Support\PackSize::resolve($suggestion->size, false, $suggestion->name))
+                            @php($suggestionUnitPrice = $suggestionSize?->unitPriceFor($suggestion->price))
+                            <flux:text size="sm" class="text-zinc-500 tabular-nums" data-test="suggestion-price">
+                                @if ($suggestionUnitPrice !== null)
+                                    <span class="font-medium text-zinc-700 dark:text-zinc-300">{{ \App\Support\MoneyFormatter::unitPrice($suggestionUnitPrice, 'EUR') }} {{ $suggestionSize->label() }}</span> ·
                                 @endif
-                                <span title="Regular price from the daily dataset">dataset price € {{ $suggestion->price }}</span>
+                                <span title="Regular price from the daily dataset">{{ __('dataset price :price', ['price' => \App\Support\PackLine::format($suggestion->price, 'EUR', $suggestionSize)]) }}</span>
                                 @unless ($suggestion->trackable)
                                     · <span class="text-amber-600 dark:text-amber-400">not trackable yet</span>
                                 @endunless

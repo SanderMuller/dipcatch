@@ -9,7 +9,6 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Support\BundlePriceLabel;
-use App\Support\MoneyFormatter;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
@@ -50,7 +49,7 @@ final readonly class PriceHistorySeries
      * Rows a Flux line chart can plot. Null prices stay as gaps; notified
      * points are omitted when no alert fired on that stamp.
      *
-     * @return array{rows: list<array<string, mixed>>, currency: string, unitLabel: ?string, hasNotified: bool, hasBundles: bool}
+     * @return array{rows: list<array<string, mixed>>, currency: string, unit: ?string, unitDecimals: int, hasNotified: bool, hasBundles: bool, unitCoverage: float}
      */
     public function fluxChart(): array
     {
@@ -58,7 +57,11 @@ final readonly class PriceHistorySeries
     }
 
     /**
-     * @return array{datasets: list<array<string, mixed>>, labels: list<string>, bundleConditions: list<?string>}
+     * One entry per stamp in every list. `unit` is null when no segment in view
+     * states a pack size; `notified` holds the alerted price at the stamp an
+     * alert fired on, null elsewhere.
+     *
+     * @return array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>}
      */
     public function data(): array
     {
@@ -98,75 +101,34 @@ final readonly class PriceHistorySeries
 
         $markers = $this->notificationMarkers($product, $segments, $labels);
 
-        $datasets = [
-            [
-                'label' => 'Cheapest (' . MoneyFormatter::symbol($product->currency) . ')',
-                'currency' => strtoupper($product->currency),
-                'data' => $points,
-                'borderColor' => '#6366f1',
-                'stepped' => true,
-                'tension' => 0,
-            ],
-        ];
-
-        // A second line, on its own axis: the same cheapest price stated per
-        // unit. The two only diverge where the cheapest shop changes — which
-        // is exactly where a cheaper total can be worse value.
-        if ($unit !== null) {
-            $datasets[] = [
-                'label' => 'Cheapest per ' . ltrim($unit['label'], '/') . ' (' . MoneyFormatter::symbol($product->currency) . ')',
-                'currency' => strtoupper($product->currency),
-                'data' => $unit['points'],
-                'borderColor' => '#0ea5e9',
-                'borderDash' => [6, 4],
-                'stepped' => true,
-                'tension' => 0,
-                'yAxisID' => 'unit',
-            ];
-        }
-
-        if ($markers !== []) {
-            $datasets[] = [
-                'label' => 'Notified',
-                'currency' => strtoupper($product->currency),
-                'data' => $markers,
-                'borderColor' => '#dc2626',
-                'backgroundColor' => '#dc2626',
-                'pointRadius' => 6,
-                'showLine' => false,
-            ];
-        }
-
         return [
-            'datasets' => $datasets,
             'labels' => $labels,
+            'price' => $points,
+            'unit' => $unit,
+            'notified' => $markers,
             'bundleConditions' => $bundleConditions,
         ];
     }
 
     /**
-     * The cheapest price stated per unit, point for point with the price
-     * line, or null when no shop in view states a pack size.
-     *
-     * Pack sizes are read as they are today — the app keeps no history of
-     * them — so a shop that changed its pack would restate its own past.
-     * Shops rarely do, and the alternative is no line at all.
+     * The best value stated per unit, point for point with the price line, or
+     * null when no shop in view states a pack size.
      *
      * Only one unit can share an axis: EUR/kg and EUR/piece are not the same
      * measure, so the unit most segments use wins and the rest read as gaps.
      *
      * @param  EloquentCollection<int, ProductCheapestHistory>  $segments
-     * @return array{label: string, points: list<float|null>}|null
+     * @return array{unit: string, points: list<float|null>}|null
      */
     private function unitSeries(EloquentCollection $segments, bool $repeatCurrent): ?array
     {
         $units = [];
 
         foreach ($segments as $segment) {
-            $label = $segment->packSize()?->label();
+            $unit = $segment->packSize()?->unit;
 
-            if ($label !== null) {
-                $units[$label] = ($units[$label] ?? 0) + 1;
+            if ($unit !== null) {
+                $units[$unit] = ($units[$unit] ?? 0) + 1;
             }
         }
 
@@ -175,22 +137,22 @@ final readonly class PriceHistorySeries
         }
 
         arsort($units);
-        $label = array_key_first($units);
+        $unit = array_key_first($units);
 
         $points = [];
 
         foreach ($segments as $segment) {
-            $points[] = self::unitPointFor($segment, $label);
+            $points[] = self::unitPointFor($segment, $unit);
         }
 
         if ($repeatCurrent) {
             $last = $segments->last();
-            $points[] = $last instanceof ProductCheapestHistory ? self::unitPointFor($last, $label) : null;
+            $points[] = $last instanceof ProductCheapestHistory ? self::unitPointFor($last, $unit) : null;
         }
 
         return array_filter($points, static fn (?float $point): bool => $point !== null) === []
             ? null
-            : ['label' => $label, 'points' => $points];
+            : ['unit' => $unit, 'points' => $points];
     }
 
     /**
@@ -202,11 +164,9 @@ final readonly class PriceHistorySeries
      * twelvefold. A segment with no recorded size plots nothing rather than a
      * plausible number.
      */
-    private static function unitPointFor(ProductCheapestHistory $segment, string $label): ?float
+    private static function unitPointFor(ProductCheapestHistory $segment, string $unit): ?float
     {
-        $size = $segment->packSize();
-
-        if ($size === null || $size->label() !== $label) {
+        if ($segment->packSize()?->unit !== $unit) {
             return null;
         }
 
@@ -220,22 +180,10 @@ final readonly class PriceHistorySeries
      */
     private function segmentsFor(Product $product): EloquentCollection
     {
-        $query = $product->cheapestHistory()
-            ->inOrder();
-
-        $windowStart = $this->windowStart();
-        if ($windowStart !== null) {
-            // Include any segment that overlaps the window — `started_at < window`
-            // but still active (`ended_at IS NULL` or `ended_at >= window`).
-            // Otherwise long-lived current prices disappear from the left edge.
-            $query->where(function (EloquentBuilder $q) use ($windowStart): void {
-                $q->where('started_at', '>=', $windowStart)
-                    ->orWhereNull('ended_at')
-                    ->orWhere('ended_at', '>=', $windowStart);
-            });
-        }
-
-        return $query->get();
+        return $product->cheapestHistory()
+            ->inOrder()
+            ->overlapping($this->windowStart())
+            ->get();
     }
 
     /**
@@ -256,8 +204,7 @@ final readonly class PriceHistorySeries
     /**
      * Map each price_drop_event onto the chart segment whose [started_at, ended_at)
      * interval contains the event's `fired_at`. Events outside any segment are
-     * skipped. Returns one float|null per label so it aligns with the cheapest
-     * dataset.
+     * skipped. Returns one float|null per label so it aligns with the price list.
      *
      * @param  EloquentCollection<int, ProductCheapestHistory>  $segments
      * @param  list<string>  $labels

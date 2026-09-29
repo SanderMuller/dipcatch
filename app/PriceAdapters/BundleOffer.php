@@ -2,6 +2,7 @@
 
 namespace App\PriceAdapters;
 
+use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 
 final readonly class BundleOffer
@@ -38,6 +39,15 @@ final readonly class BundleOffer
         }
 
         return bccomp($this->effectiveUnitPrice(), $singleItemPrice, 2) < 0;
+    }
+
+    /**
+     * Whether this offer sets the tracked price: it beats the single-item
+     * price, and no promotion window says it is not running now.
+     */
+    public function appliesTo(string $singleItemPrice, ?PromotionWindow $window, ?CarbonImmutable $now = null): bool
+    {
+        return $this->isCheaperThan($singleItemPrice) && ($window === null || $window->isRunning($now));
     }
 
     /**

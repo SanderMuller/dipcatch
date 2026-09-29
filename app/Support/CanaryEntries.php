@@ -2,9 +2,8 @@
 
 namespace App\Support;
 
-use App\PriceAdapters\HostSpecificAdapter;
+use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\ShopAdapter;
-use App\PriceAdapters\UserSelectorAdapter;
 use Illuminate\Support\Facades\Config;
 
 /**
@@ -39,11 +38,9 @@ final class CanaryEntries
     }
 
     /**
-     * The adapters a canary entry is expected for: the host-specific ones in
-     * the resolution chain. The generic adapters read no particular shop, so
-     * they have nothing to rot against — and neither does
-     * `UserSelectorAdapter`, which implements the same marker interface but
-     * reads whatever CSS selector a user typed, on any host at all.
+     * The adapters a canary entry is expected for: the ones written for
+     * particular shops. The generic adapters and `UserSelectorAdapter` read
+     * no particular shop, so they have nothing to rot against.
      *
      * @return list<string>
      */
@@ -52,11 +49,7 @@ final class CanaryEntries
         $keys = [];
 
         foreach (Config::array('dipcatch.adapters') as $class) {
-            if (! is_string($class) || ! is_subclass_of($class, HostSpecificAdapter::class)) {
-                continue;
-            }
-
-            if ($class === UserSelectorAdapter::class) {
+            if (! is_string($class) || ! is_subclass_of($class, OwnsHosts::class)) {
                 continue;
             }
 

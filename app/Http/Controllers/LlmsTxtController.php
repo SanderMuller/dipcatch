@@ -24,6 +24,7 @@ final class LlmsTxtController extends Controller
 
         $body = view('llms', [
             'maxProducts' => $free->maxProducts(),
+            'proMaxProducts' => Entitlements::of(Plan::Pro)->maxProducts() ?? 'unlimited',
             'maxShopsPerProduct' => $free->maxShopsPerProduct(),
             'recheckIntervalHours' => Config::get('dipcatch.recheck.interval_hours', 6),
             'contactEmail' => Config::get('site.contact_email'),

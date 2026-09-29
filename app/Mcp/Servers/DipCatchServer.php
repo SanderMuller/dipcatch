@@ -32,7 +32,7 @@ use Laravel\Mcp\Server\Tool;
  * gets that its cached copy is stale. Two tools were added without moving it,
  * and a live session kept seeing the nine that came before them.
  */
-#[Version('1.6.0')]
+#[Version('1.11.0')]
 #[Instructions(<<<'TEXT'
 DipCatch tracks the price of things this user buys more than once, across Dutch
 supermarkets and webshops, and tells them when one drops.
@@ -57,12 +57,16 @@ Adding a shop is two steps on purpose. Call create_product or add_shop without
 `confirm` first: DipCatch fetches the page and reports what it found — title,
 price, shop, pack size. Show that to the user. Only call again with
 `confirm: true` and the `draft` token from the first response once they agree.
+Confirming costs nothing against the page budget: it writes what the first
+call already read. A shop is one page fetch, not two.
+
 Never confirm on the user's behalf; a scrape can read the wrong number, and the
 first call exists so a person sees it before it is stored.
 
-Every tool acts on this user's own data and takes no user id. Free accounts have
-a product limit; when it is reached the tool says so and writes nothing, and the
-answer is to upgrade rather than to retry.
+Every tool acts on this user's own data and takes no user id. Every plan has a
+product limit, Free a small one and Pro a generous one; when it is reached the
+tool says so and writes nothing. On Free the answer is to upgrade, on Pro to
+remove a product, never to retry.
 TEXT)]
 final class DipCatchServer extends Server
 {

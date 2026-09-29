@@ -21,4 +21,25 @@ final class TierDefaults
             default => ['pct' => 3.0,  'abs' => 100.0],
         };
     }
+
+    /**
+     * The defaults a drop is measured against for this reference: the
+     * percentage banded on the reference itself, the money amount banded on
+     * the pack price. A reference with no pack price (a unit basis across pack
+     * sizes) has no money amount, and no money rule applies.
+     *
+     * The drop check and every screen that names a default read this, so
+     * they cannot name different rules.
+     *
+     * @return array{pct: float, abs: ?float}
+     */
+    public static function forReference(ReferenceValue $reference): array
+    {
+        $pack = $reference->packBasis();
+
+        return [
+            'pct' => self::for($reference->value)['pct'],
+            'abs' => $pack === null ? null : self::for($pack)['abs'],
+        ];
+    }
 }

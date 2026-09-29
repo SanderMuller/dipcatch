@@ -3,11 +3,23 @@
 use App\Support\UrlNormalizer;
 
 test('keeps the required trailing slash on SPAR product URLs', function (): void {
+    // SPAR answers 404 without it.
     $url = 'https://www.spar.nl/fanta-fanta-cassis-pet-1.5l-9256413/';
 
     expect(UrlNormalizer::normalize($url))->toBe($url)
         ->and(UrlNormalizer::hash(UrlNormalizer::normalize($url)))
         ->toBe(UrlNormalizer::hash(rtrim($url, '/')));
+});
+
+test('keeps the trailing slash a Shopware shop canonicalises to', function (): void {
+    // Measured on production 2026-09-22. Without the slash dierapotheker.nl
+    // answers 301 to the slash form, and following that redirect is a second
+    // request a millisecond after the first. That host rate limits on exactly
+    // that shape, so every probe was refused — nine in a row — while a direct
+    // request to the same page succeeded five times out of five.
+    $url = 'https://www.dierapotheker.nl/vet-concept-sana-paard-kattenvoer/9271/';
+
+    expect(UrlNormalizer::normalize($url))->toBe($url);
 });
 
 test('lowercases scheme and host', function (): void {
@@ -53,9 +65,20 @@ test('empty path normalizes to /', function (): void {
         ->toBe('https://example.com/');
 });
 
-test('strips trailing slash from non-root paths', function (): void {
+test('keeps the path as the shop wrote it', function (): void {
+    // A stripped slash is a redirect waiting to happen on every CMS that
+    // canonicalises with one, and a redirect is a second request.
     expect(UrlNormalizer::normalize('https://example.com/foo/bar/'))
+        ->toBe('https://example.com/foo/bar/')
+        ->and(UrlNormalizer::normalize('https://example.com/foo/bar'))
         ->toBe('https://example.com/foo/bar');
+});
+
+test('both slash forms are still one shop', function (): void {
+    // Identity is the resource, not the spelling — and this is what keeps
+    // every hash written while the slash was being stripped still matching.
+    expect(UrlNormalizer::hash(UrlNormalizer::normalize('https://example.com/foo/bar/')))
+        ->toBe(UrlNormalizer::hash(UrlNormalizer::normalize('https://example.com/foo/bar')));
 });
 
 test('preserves path case', function (): void {
@@ -135,3 +158,15 @@ test('hash returns 64-char sha256 hex', function (): void {
         ->toHaveLength(64)
         ->toMatch('/^[a-f0-9]{64}$/');
 });
+
+test('strips the click and campaign ids shops and ad networks add', function (string $param): void {
+    expect(UrlNormalizer::normalize("https://shop.test/p/1?{$param}=abc123&size=xl"))->toBe('https://shop.test/p/1?size=xl');
+})->with(['srsltid', 'gbraid', 'wbraid', 'gad_source', 'gad_campaignid', '_gl', 'msclkid', 'igshid', 'ttclid', 'awc', 'cjevent', 'irclickid', '_hsenc', 'mkt_tok']);
+
+test('strips a tracking parameter whatever its case', function (): void {
+    expect(UrlNormalizer::normalize('https://shop.test/p/1?UTM_Source=mail&SrsltId=x'))->toBe('https://shop.test/p/1');
+});
+
+test('keeps the parameters that choose what is sold', function (string $query): void {
+    expect(UrlNormalizer::normalize("https://shop.test/p/1?{$query}"))->toBe("https://shop.test/p/1?{$query}");
+})->with(['variant=123', 'sku=MP4838', 'activeVariant=169589.19', 'th=1', 'psc=1']);

@@ -4,16 +4,25 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
+
+        {{-- Filament's notification toasts. The admin panel boots these for
+             itself; this layout is Flux and had no outlet, so every
+             `Notification::make()->send()` from a Livewire component here was
+             built, queued and never drawn — a shop kept as a link saved
+             correctly and said nothing. Found by driving it in a browser on
+             2026-09-23. --}}
+        @filamentStyles
+        <link rel="stylesheet" href="{{ asset('css/filament/filament/app.css') }}">
     </head>
     {{-- The same warm canvas as the marketing site, so the app a person
          lands in after signing up looks like the page that sold it. --}}
-    <body class="min-h-dvh bg-amber-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50">
+    <body class="min-h-dvh bg-amber-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50 print:bg-white print:text-black">
         {{-- The same two blurred washes the marketing hero uses. They are what
              gives that page its depth, and a flat tint could not reproduce it.
              Fixed and behind everything, so scrolling and hit-testing are
              untouched; light mode only, as on the marketing page. --}}
-        <div aria-hidden="true" class="pointer-events-none fixed -top-40 left-40 -z-10 size-[32rem] rounded-full bg-amber-200/40 blur-3xl dark:hidden"></div>
-        <div aria-hidden="true" class="pointer-events-none fixed right-0 -bottom-40 -z-10 size-[32rem] rounded-full bg-rose-200/40 blur-3xl dark:hidden"></div>
+        <div aria-hidden="true" class="pointer-events-none fixed -top-40 left-40 -z-10 size-[32rem] rounded-full bg-amber-200/40 blur-3xl dark:hidden print:hidden"></div>
+        <div aria-hidden="true" class="pointer-events-none fixed right-0 -bottom-40 -z-10 size-[32rem] rounded-full bg-rose-200/40 blur-3xl dark:hidden print:hidden"></div>
 
         @php
             // One declaration of the navigation, read by the bar, the "More"
@@ -52,7 +61,7 @@
         <header
             x-data="{ open: false }"
             x-on:keydown.escape.window="open = false"
-            class="sticky top-0 z-50 border-b border-zinc-900/5 bg-amber-50/80 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/80"
+            class="sticky top-0 z-50 border-b border-zinc-900/5 bg-amber-50/80 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/80 print:hidden"
         >
             <div class="mx-auto flex w-full max-w-app items-center gap-3 px-4 py-3 sm:px-6 lg:gap-6 lg:px-8">
                 <a href="{{ route('app.dashboard') }}" wire:navigate aria-label="{{ __('Dashboard') }}" @if ($dashboardIsCurrent) aria-current="page" @endif class="flex shrink-0 items-center gap-2 font-semibold">
@@ -114,6 +123,8 @@
                 <livewire:app-command-palette />
 
                 <div class="flex shrink-0 items-center gap-1 sm:gap-2">
+                    <livewire:shopping-list.header-menu />
+
                     {{-- Bell slot. --}}
                     @includeWhen(view()->exists('partials.notification-bell'), 'partials.notification-bell')
 
@@ -177,6 +188,12 @@
         --}}
         @include('partials.timezone-autodetect')
 
+        {{-- The outlet itself, and the script that animates it. Last in the
+             body so a toast paints above the page rather than inside the
+             layout's stacking contexts. --}}
+        @livewire('notifications')
+
+        @filamentScripts
         @fluxScripts
     </body>
 </html>

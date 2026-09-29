@@ -4,6 +4,7 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
+use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 
@@ -362,4 +363,54 @@ HTML;
     expect($result->isSuccess())->toBeTrue()
         ->and($result->adapterKey)->toBe('walmart')
         ->and($result->snapshot?->price)->toBe('15.97');
+});
+
+/**
+ * A host adapter that claims `owned.test` and skips anyway — what a forgotten
+ * conversion of an inner JSON-LD skip looks like.
+ */
+function skippingOwner(): ShopAdapter
+{
+    return new class implements HostSpecificAdapter, OwnsHosts, ShopAdapter {
+        public function key(): string
+        {
+            return 'owner';
+        }
+
+        public function ownedHosts(): array
+        {
+            return ['owned.test'];
+        }
+
+        public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
+        {
+            return ExtractionResult::skip();
+        }
+    };
+}
+
+test('a host adapter that skips its own host fails instead of handing the page on', function (?string $persistedKey): void {
+    // A generic reader further down would read some number off the page and
+    // store it as this product's price.
+    $resolver = new AdapterResolver([
+        skippingOwner(),
+        fakeAdapter('generic', ExtractionResult::success(snap('1.00'))),
+    ]);
+
+    $result = $resolver->resolve('https://www.owned.test/p/1', '<html></html>', $persistedKey);
+
+    expect($result->isFailed())->toBeTrue()
+        ->and($result->failureReason)->toBe('owner_extraction_failed');
+})->with([
+    'first probe' => [null],
+    'persisted key' => ['owner'],
+]);
+
+test('a host adapter that skips another host still hands the page on', function (): void {
+    $resolver = new AdapterResolver([
+        skippingOwner(),
+        fakeAdapter('generic', ExtractionResult::success(snap('1.00'))),
+    ]);
+
+    expect($resolver->resolve('https://elsewhere.test/p/1', '<html></html>', 'owner')->snapshot?->price)->toBe('1.00');
 });

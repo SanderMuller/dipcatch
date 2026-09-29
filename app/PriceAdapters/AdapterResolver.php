@@ -2,6 +2,9 @@
 
 namespace App\PriceAdapters;
 
+use App\Enums\ConsumerPriceIssue;
+use App\PriceAdapters\Hosts\HostUrl;
+
 /**
  * Chain-of-responsibility over registered adapters. Per spec §2:
  *
@@ -39,10 +42,10 @@ final readonly class AdapterResolver
         // Generic keys (jsonld etc.) never short-circuit — a host that
         // later gained a dedicated adapter must get it on the next check.
         if (! $persisted instanceof HostSpecificAdapter) {
-            return $this->readStock($this->runChain($url, $html, skipKey: null, context: $context), $html);
+            return $this->readPage($this->runChain($url, $html, skipKey: null, context: $context), $html);
         }
 
-        $result = $persisted->extract($url, $html, $context);
+        $result = $this->extractWith($persisted, $url, $html, $context);
 
         // Only `skip` falls through: the adapter said the URL is not its
         // host. Anything else is that host's own verdict.
@@ -53,11 +56,11 @@ final readonly class AdapterResolver
         // present it as this product's price, which is how a wrong price
         // reaches a drop alert. Fail loudly instead.
         if (! $result->isSkip()) {
-            return $this->readStock($result->withAdapterKey($persisted->key()), $html);
+            return $this->readPage($result->withAdapterKey($persisted->key()), $html);
         }
 
         // The hint already ran and skipped — exclude it from the chain.
-        return $this->readStock($this->runChain($url, $html, $persistedKey, $context), $html);
+        return $this->readPage($this->runChain($url, $html, $persistedKey, $context), $html);
     }
 
     private function runChain(string $url, string $html, ?string $skipKey, ?AdapterContext $context): ExtractionResult
@@ -67,7 +70,7 @@ final readonly class AdapterResolver
                 continue;
             }
 
-            $result = $adapter->extract($url, $html, $context);
+            $result = $this->extractWith($adapter, $url, $html, $context);
 
             if ($result->isSuccess() || $result->isFailed() || $result->isAmbiguous()) {
                 return $result->withAdapterKey($adapter->key());
@@ -75,6 +78,64 @@ final readonly class AdapterResolver
         }
 
         return ExtractionResult::failed('no_adapter_matched');
+    }
+
+    /**
+     * An adapter's verdict, with one rule enforced for every host adapter: on
+     * a host it owns, `skip` is not an answer. It would hand the page to a
+     * weaker reader that prices whatever number it finds.
+     */
+    private function extractWith(ShopAdapter $adapter, string $url, string $html, ?AdapterContext $context): ExtractionResult
+    {
+        $result = $adapter->extract($url, $html, $context);
+
+        if ($result->isSkip() && $adapter instanceof OwnsHosts && HostUrl::matchesAny($url, $adapter->ownedHosts())) {
+            return ExtractionResult::failed($adapter->key() . '_extraction_failed');
+        }
+
+        return $result;
+    }
+
+    /**
+     * What the page says in its own words, whichever adapter read the price.
+     */
+    private function readPage(ExtractionResult $result, string $html): ExtractionResult
+    {
+        return $this->readConsumerPrice($this->readStock($result, $html), $html);
+    }
+
+    /**
+     * Whether the number that was read is a price a shopper can pay.
+     *
+     * Read here rather than in an adapter because it is a fact about the shop,
+     * not about the markup the price came from: fivestartrading-holland.eu
+     * publishes ordinary JSON-LD and says "excl. BTW" in the line under the
+     * price, and prometeus.nl publishes an ordinary OpenGraph price on a page
+     * that says "Sign in to see prices". Every adapter would otherwise have to
+     * know to look.
+     *
+     * VAT is tested first. A page can be both, and a shopper shown one reason
+     * is told the same thing either way: this row is not their price.
+     */
+    private function readConsumerPrice(ExtractionResult $result, string $html): ExtractionResult
+    {
+        $snapshot = $result->snapshot;
+
+        if (! $result->isSuccess() || ! $snapshot instanceof ShopSnapshot) {
+            return $result;
+        }
+
+        $vat = VatStatement::exclusivePhrase($html);
+        $gate = $vat === null ? TradeGate::gatedPhrase($html, $snapshot->price) : null;
+
+        $issue = match (true) {
+            $vat !== null => ConsumerPriceIssue::ExcludesVat,
+            $gate !== null => ConsumerPriceIssue::TradeOnly,
+            default => null,
+        };
+
+        return ExtractionResult::success($snapshot->withConsumerPriceIssue($issue, $vat ?? $gate))
+            ->withAdapterKey((string) $result->adapterKey);
     }
 
     /**

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\GoogleProvider;
 use Laravel\Socialite\Two\InvalidStateException;
@@ -211,9 +212,9 @@ test('claiming an unverified local account kills the password that was set on it
 });
 
 test('claiming an unverified local account revokes its passkeys, two factor and live sessions', function (): void {
-    // The password alone is not the whole credential set. Fortify's passkey
-    // and two-factor routes sit behind `auth` and `password.confirm` but not
-    // `verified`, so a squatter can set both up before the real owner arrives.
+    // The password alone is not the whole credential set. A squatter could set
+    // up a passkey and two-factor before those routes required a verified
+    // address, and such rows are still out there.
     $squatted = User::factory()->unverified()->withTwoFactor()->create([
         'email' => 'kraker@example.test',
     ]);
@@ -248,12 +249,119 @@ test('claiming an unverified local account revokes its passkeys, two factor and 
         ->and(DB::table('sessions')->where('id', 'squatter-session')->exists())->toBeFalse();
 });
 
+test('claiming an unverified local account revokes the OAuth access it granted', function (): void {
+    // A squatter can sign in unverified and approve an MCP client; the
+    // authorize and MCP routes do not require a verified address. That grant
+    // must not outlive the real owner's claim.
+    $squatted = User::factory()->unverified()->create(['email' => 'toegang@example.test']);
+    $bystander = User::factory()->create();
+
+    foreach ([$squatted, $bystander] as $user) {
+        DB::table('oauth_access_tokens')->insert([
+            'id' => 'token-' . $user->id,
+            'user_id' => $user->id,
+            'client_id' => (string) Str::uuid(),
+            'scopes' => '["mcp:use"]',
+            'revoked' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'expires_at' => now()->addDay(),
+        ]);
+
+        DB::table('oauth_refresh_tokens')->insert([
+            'id' => 'refresh-' . $user->id,
+            'access_token_id' => 'token-' . $user->id,
+            'revoked' => false,
+            'expires_at' => now()->addMonth(),
+        ]);
+
+        DB::table('oauth_auth_codes')->insert([
+            'id' => 'code-' . $user->id,
+            'user_id' => $user->id,
+            'client_id' => (string) Str::uuid(),
+            'scopes' => '["mcp:use"]',
+            'revoked' => false,
+            'expires_at' => now()->addMinutes(10),
+        ]);
+
+        DB::table('oauth_device_codes')->insert([
+            'id' => 'device-' . $user->id,
+            'user_id' => $user->id,
+            'client_id' => (string) Str::uuid(),
+            'user_code' => substr('D' . $user->id . 'XXXXXXX', 0, 8),
+            'scopes' => '["mcp:use"]',
+            'revoked' => false,
+            'user_approved_at' => now(),
+            'expires_at' => now()->addMinutes(10),
+        ]);
+    }
+
+    fakeSocialiteDriver(fakeSocialiteUser('google-sub-17', 'toegang@example.test', 'Echte Eigenaar', [
+        'email_verified' => true,
+    ]));
+
+    $this->get(route('social.callback', 'google'))->assertRedirect('/app');
+
+    expect(DB::table('oauth_access_tokens')->where('user_id', $squatted->id)->exists())->toBeFalse()
+        ->and(DB::table('oauth_refresh_tokens')->where('id', 'refresh-' . $squatted->id)->exists())->toBeFalse()
+        ->and(DB::table('oauth_auth_codes')->where('user_id', $squatted->id)->exists())->toBeFalse()
+        ->and(DB::table('oauth_device_codes')->where('user_id', $squatted->id)->exists())->toBeFalse()
+        ->and(DB::table('oauth_access_tokens')->where('user_id', $bystander->id)->exists())->toBeTrue()
+        ->and(DB::table('oauth_refresh_tokens')->where('id', 'refresh-' . $bystander->id)->exists())->toBeTrue()
+        ->and(DB::table('oauth_auth_codes')->where('user_id', $bystander->id)->exists())->toBeTrue()
+        ->and(DB::table('oauth_device_codes')->where('user_id', $bystander->id)->exists())->toBeTrue();
+});
+
+test('claiming an unverified local account unlinks the provider accounts the squatter attached', function (): void {
+    // A provider account can sit on an unverified row: a provider that did not
+    // vouch for the address, or a verified user who changed their address. A
+    // claim through another provider must not leave that way back in.
+    $squatted = User::factory()->unverified()->create(['email' => 'gekoppeld@example.test']);
+    SocialAccount::factory()->create([
+        'user_id' => $squatted->id,
+        'provider' => SocialProvider::Google,
+        'provider_id' => 'google-sub-squatter',
+    ]);
+
+    fakeSocialiteDriver(fakeSocialiteUser('apple-sub-owner', 'gekoppeld@example.test', 'Echte Eigenaar', [
+        'email_verified' => true,
+    ]), 'apple');
+
+    $this->post(route('social.callback.post', 'apple'))->assertRedirect('/app');
+
+    $this->assertAuthenticatedAs($squatted);
+
+    expect($squatted->socialAccounts()->pluck('provider_id')->all())->toBe(['apple-sub-owner']);
+});
+
+test('claiming an unverified local account is not blocked by the squatter linking the same provider first', function (): void {
+    // The squatter's Google link used to trip the one-account-per-provider
+    // refusal, which locked the real owner out of their own address.
+    $squatted = User::factory()->unverified()->create(['email' => 'eerst-gekoppeld@example.test']);
+    SocialAccount::factory()->create([
+        'user_id' => $squatted->id,
+        'provider' => SocialProvider::Google,
+        'provider_id' => 'google-sub-squatter-2',
+    ]);
+
+    fakeSocialiteDriver(fakeSocialiteUser('google-sub-owner', 'eerst-gekoppeld@example.test', 'Echte Eigenaar', [
+        'email_verified' => true,
+    ]));
+
+    $this->get(route('social.callback', 'google'))->assertRedirect('/app');
+
+    $this->assertAuthenticatedAs($squatted);
+
+    expect($squatted->socialAccounts()->pluck('provider_id')->all())->toBe(['google-sub-owner']);
+});
+
 test('two accounts differing only in case are refused rather than one picked at random', function (): void {
-    // Reachable through an invitation, which stores the address as the admin
-    // typed it. Picking either row would reset a password on an account that
-    // may not belong to the person signing in.
+    // Rows written before addresses were stored lower-case, which the backfill
+    // left alone. Picking either row would reset a password on an account
+    // that may not belong to the person signing in.
     User::factory()->create(['email' => 'dubbel@example.test']);
-    User::factory()->create(['email' => 'Dubbel@Example.test']);
+    $legacy = User::factory()->create(['email' => 'dubbel-2@example.test']);
+    DB::table('users')->where('id', $legacy->id)->update(['email' => 'Dubbel@Example.test']);
 
     fakeSocialiteDriver(fakeSocialiteUser('google-sub-16', 'dubbel@example.test', 'Dubbel', [
         'email_verified' => true,
@@ -307,10 +415,11 @@ test('a second account at a provider the user already linked is refused, not a 5
 });
 
 test('an address that differs only in case matches the account that already owns it', function (): void {
-    // `users.email` is byte-unique on Postgres and registration stores the
-    // address as typed, so a case-sensitive match would silently hand the user
-    // a second, empty account instead of the one holding their products.
-    $user = User::factory()->create(['email' => 'Sander@Example.test']);
+    // A row written before addresses were stored lower-case. `users.email` is
+    // byte-unique on Postgres, so a case-sensitive match would silently hand
+    // the user a second, empty account instead of the one holding their products.
+    $user = User::factory()->create(['email' => 'sander-oud@example.test']);
+    DB::table('users')->where('id', $user->id)->update(['email' => 'Sander@Example.test']);
 
     fakeSocialiteDriver(fakeSocialiteUser('google-sub-11', 'sander@example.test', 'Sander', [
         'email_verified' => true,

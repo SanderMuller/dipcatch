@@ -5,6 +5,7 @@ namespace App\PriceAdapters\Hosts;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
+use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
@@ -24,7 +25,7 @@ use Symfony\Component\DomCrawler\Crawler;
  * sampled; when one is not, the adapter fails rather than guessing. The
  * title falls back to the page's `<h1>`, which carries the product name.
  */
-final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
+final readonly class VomarAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
     private const string IMAGE_BASE = 'https://d3vricquk1sjgf.cloudfront.net/';
 
@@ -36,9 +37,14 @@ final readonly class VomarAdapter implements HostSpecificAdapter, ShopAdapter
         return 'vomar';
     }
 
+    public function ownedHosts(): array
+    {
+        return ['vomar.nl'];
+    }
+
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        if (! HostUrl::matches($url, 'vomar.nl')) {
+        if (! HostUrl::matchesAny($url, $this->ownedHosts())) {
             return ExtractionResult::skip();
         }
 

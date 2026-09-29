@@ -1,8 +1,8 @@
 <?php declare(strict_types=1);
 
-use App\PriceAdapters\HostSpecificAdapter;
+use App\PriceAdapters\Hosts\HostUrl;
+use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\ShopAdapter;
-use App\PriceAdapters\UserSelectorAdapter;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Support\SupportedShops;
@@ -40,25 +40,14 @@ function readsHost(string $host): bool
         return true;
     }
 
-    // A host adapter returns `skip` only when the host is not its own, so a
-    // non-skip verdict on an empty page proves it claims the host — whether
-    // it could read that particular page or not.
     foreach (Config::array('dipcatch.adapters') as $class) {
-        if (! is_string($class) || ! is_subclass_of($class, HostSpecificAdapter::class)) {
-            continue;
-        }
-
-        if ($class === UserSelectorAdapter::class) {
+        if (! is_string($class) || ! is_subclass_of($class, OwnsHosts::class)) {
             continue;
         }
 
         $adapter = app($class);
 
-        if (! $adapter instanceof ShopAdapter) {
-            continue;
-        }
-
-        if (! $adapter->extract("https://{$host}/p/1", '<html><body></body></html>')->isSkip()) {
+        if ($adapter instanceof OwnsHosts && HostUrl::matchesAny("https://{$host}/p/1", $adapter->ownedHosts())) {
             return true;
         }
     }
@@ -119,4 +108,24 @@ test('no two marketed hosts claim the same landing page', function (): void {
     $slugs = array_column(SupportedShops::rows(), 'slug');
 
     expect(array_unique($slugs))->toHaveSameSize($slugs);
+});
+
+test('every adapter reads the hosts it declares', function (): void {
+    // The declaration drives the canary and the resolver's own-host rule; the
+    // guard inside extract() must agree with it, or a declared shop never reads.
+    foreach (Config::array('dipcatch.adapters') as $class) {
+        if (! is_string($class) || ! is_subclass_of($class, OwnsHosts::class)) {
+            continue;
+        }
+
+        $adapter = app($class);
+
+        expect($adapter)->toBeInstanceOf(ShopAdapter::class);
+        assert($adapter instanceof OwnsHosts && $adapter instanceof ShopAdapter);
+
+        foreach ($adapter->ownedHosts() as $host) {
+            expect($adapter->extract("https://{$host}/p/1", '<html><body></body></html>')->isSkip())
+                ->toBeFalse("{$class} declares {$host} but skips it");
+        }
+    }
 });

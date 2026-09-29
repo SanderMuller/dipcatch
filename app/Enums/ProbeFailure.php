@@ -50,4 +50,29 @@ enum ProbeFailure: string
      * of offering the selector flow. See {@see UnservableShops}.
      */
     case ShopNotServable = 'shop_not_servable';
+
+    /**
+     * Whether this wall is one worth keeping the URL behind.
+     *
+     * A page that cannot be read today is still a page that sells the thing,
+     * and finding it was the slow part. Keeping it as a link preserves that
+     * work and puts the URL on the weekly retry, which is how a shop that
+     * stops refusing us gets picked up — see {@see ShopKind}.
+     *
+     * Not every failure qualifies. A rate limit is a wall that clears in
+     * seconds, so offering to keep the link there would turn "wait a moment"
+     * into a permanent second-class row. A URL that is not a URL, a page in
+     * the wrong currency, and a product missing from the dataset are not
+     * shops that refuse to be read at all — they are answers to a different
+     * question.
+     */
+    public function isWorthKeepingAsLink(): bool
+    {
+        return match ($this) {
+            self::Blocked, self::RobotsDisallowed, self::TemporaryFailure,
+            self::HttpError, self::ExtractionFailed, self::ShopNotServable => true,
+            self::InvalidUrl, self::ProbeRateLimited, self::LocalThrottle,
+            self::HostRateLimited, self::CurrencyMismatch, self::NotInDataset => false,
+        };
+    }
 }

@@ -101,7 +101,7 @@ test('a conditional offer never becomes the tracked price', function (): void {
         ->and($shop->priceChecks()->latest('id')->first()?->price)->toBe('3.49');
 });
 
-test('a source that reads offers and finds none clears a stored one', function (): void {
+test('a price check leaves a stored conditional offer alone', function (): void {
     Http::fake(fakeShopPage('/p/2', '3.49'));
 
     $product = Product::factory()->create(['currency' => 'EUR']);
@@ -114,7 +114,6 @@ test('a source that reads offers and finds none clears a stored one', function (
 
     dispatch_sync(new CheckShopPrice($shop));
 
-    // The JSON-LD adapter states no conditional offer and is not
-    // authoritative about them, so the stored one survives.
+    // No source reads conditional offers, so a check never writes them.
     expect($shop->refresh()->conditional_price)->toBe('2.97');
 });

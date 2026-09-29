@@ -25,6 +25,7 @@ use App\PriceAdapters\Hosts\ZooplusAdapter;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\MicrodataAdapter;
 use App\PriceAdapters\OpenGraphAdapter;
+use App\PriceAdapters\ShopifyAdapter;
 use App\PriceAdapters\UserSelectorAdapter;
 
 return [
@@ -72,7 +73,9 @@ return [
          */
         'user_agent' => (string) env('DIPCATCH_FETCHER_USER_AGENT', 'DipCatchBot/1.0 (+https://dipcatch.eu/bot)'),
         'timeout_seconds' => (int) env('DIPCATCH_FETCHER_TIMEOUT', 10),
-        'body_cap_bytes' => (int) env('DIPCATCH_FETCHER_BODY_CAP_BYTES', 2_000_000),
+        // Welkoop's product pages run to 2.05 MB, over the old 2 MB cap. One
+        // read in 32 MB and 0.6 s (measured 2026-09-24).
+        'body_cap_bytes' => (int) env('DIPCATCH_FETCHER_BODY_CAP_BYTES', 5_000_000),
         'rate_limit_per_minute' => (int) env('DIPCATCH_FETCHER_RATE_LIMIT_PER_MINUTE', 30),
         'robots_cache_seconds' => (int) env('DIPCATCH_FETCHER_ROBOTS_CACHE_SECONDS', 86_400),
         // SSRF guard toggles. Never enable in production.
@@ -87,6 +90,13 @@ return [
         // Separate higher tolerance for transient upstream 5xx outages.
         'failing_5xx_after' => (int) env('DIPCATCH_SHOP_FAILING_5XX_AFTER', 10),
         'dead_5xx_after' => (int) env('DIPCATCH_SHOP_DEAD_5XX_AFTER', 30),
+    ],
+
+    'reference' => [
+        // How long a shop kept as a link waits before it is asked again. A
+        // block is a fact about today, not a permanent one — but it changes
+        // on the timescale of a shop replatforming, not of an afternoon.
+        'retry_every_days' => (int) env('DIPCATCH_REFERENCE_RETRY_EVERY_DAYS', 7),
     ],
 
     'recheck' => [
@@ -111,9 +121,6 @@ return [
     'digest' => [
         // Local hour-of-day at which each user's daily digest fires. 24h.
         'send_hour' => (int) env('DIPCATCH_DIGEST_SEND_HOUR', 9),
-        // Max users dispatched per scheduler tick. Bounds the 09:00 burst
-        // across timezones so the mailer isn't slammed.
-        'batch_size' => (int) env('DIPCATCH_DIGEST_BATCH_SIZE', 500),
         // Max age of PriceDropEvents pulled into a single digest, in days.
         // Caps the backlog if a user's mail bounced for a while.
         'lookback_days' => (int) env('DIPCATCH_DIGEST_LOOKBACK_DAYS', 7),
@@ -161,6 +168,7 @@ return [
         WelkoopAdapter::class,
         ZooplusAdapter::class,
         JsonLdAdapter::class,
+        ShopifyAdapter::class,
         MicrodataAdapter::class,
         OpenGraphAdapter::class,
         GenericAdapter::class,

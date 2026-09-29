@@ -1,6 +1,8 @@
 <?php declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Fortify\Features;
 
 test('login screen can be rendered', function (): void {
@@ -148,4 +150,22 @@ test('login screen omits passkeys when the feature is disabled', function (): vo
     $this->get(route('login'))
         ->assertOk()
         ->assertDontSee('Sign in with a passkey');
+});
+
+test('a password changed elsewhere ends this session', function (): void {
+    // Claiming a squatted account resets its password. A Redis session is keyed
+    // by its id, not the user, so the squatter's browser must be ended by the
+    // password hash it no longer matches.
+    $user = User::factory()->create();
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+    $this->get('/app')->assertOk();
+
+    DB::table('users')->where('id', $user->id)->update(['password' => Hash::make('a-new-password')]);
+    // A new request reads the user afresh; the test keeps one guard, which
+    // would otherwise hand back the model it cached before the change.
+    auth()->forgetGuards();
+
+    $this->get('/app')->assertRedirect(route('login'));
+    $this->assertGuest();
 });

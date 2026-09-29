@@ -21,6 +21,7 @@ final readonly class DeleteUser
     public function __construct(
         private CheckoutSessions $sessions,
         private StripeCustomers $customers,
+        private RevokeCredentials $revokeCredentials,
     ) {}
 
     public function __invoke(User $user, User $actor): void
@@ -34,7 +35,7 @@ final readonly class DeleteUser
 
             $user->subscriptions()->delete();
 
-            self::deleteAuthRows($user);
+            ($this->revokeCredentials)($user);
 
             $user->notifications()->delete();
             $user->pushSubscriptions()->delete();
@@ -80,24 +81,5 @@ final readonly class DeleteUser
         }
 
         $this->customers->delete($user->stripe_id);
-    }
-
-    /**
-     * Passport and the session table key on the user without a foreign key,
-     * so a deleted account otherwise keeps working credentials. Refresh
-     * tokens hang off the access token id and go first.
-     */
-    private static function deleteAuthRows(User $user): void
-    {
-        $accessTokenIds = DB::table('oauth_access_tokens')
-            ->where('user_id', $user->getKey())
-            ->pluck('id');
-
-        DB::table('oauth_refresh_tokens')->whereIn('access_token_id', $accessTokenIds)->delete();
-        DB::table('oauth_access_tokens')->where('user_id', $user->getKey())->delete();
-        DB::table('oauth_auth_codes')->where('user_id', $user->getKey())->delete();
-        DB::table('oauth_device_codes')->where('user_id', $user->getKey())->delete();
-        DB::table('sessions')->where('user_id', $user->getKey())->delete();
-        DB::table('password_reset_tokens')->where('email', $user->email)->delete();
     }
 }

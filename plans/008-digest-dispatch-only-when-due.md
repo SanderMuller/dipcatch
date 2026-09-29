@@ -1,3 +1,7 @@
+> **SUPERSEDED — do not execute.** Commit `b01cf00` solved this by stamping the
+> digest cursor on every run, and `6b225d9` renamed `last_digest_sent_at` to
+> `digest_processed_until`. See `plans/README.md`.
+
 # Plan 008: Stop dispatching a digest job every minute for users with nothing to digest
 
 > **Executor instructions**: Follow this plan step by step. Run every

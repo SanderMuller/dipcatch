@@ -18,5 +18,5 @@
          baseline is the image's bottom edge: as inline text the deadline sat
          a few pixels below the host. The space inside the span keeps the
          page's text reading "ah.nl · until 6 Sep" as one string. --}}
-    <flux:text size="sm" class="flex max-w-xs flex-wrap items-center gap-x-1 text-zinc-500 whitespace-normal"><a href="{{ $shop->url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center hover:underline underline-offset-4">{!! \App\Support\Favicon::html($shop->host) !!}</a>@if ($window)<span> · {{ $window }}</span>@endif</flux:text>
+    <flux:text size="sm" class="flex max-w-xs flex-wrap items-center gap-x-1 text-zinc-500 dark:text-zinc-400 whitespace-normal"><a href="{{ $shop->url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center hover:underline underline-offset-4">{!! \App\Support\Favicon::html($shop->host) !!}</a>@if ($window)<span> · {{ $window }}</span>@endif</flux:text>
 @endif

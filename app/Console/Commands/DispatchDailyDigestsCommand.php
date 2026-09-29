@@ -4,16 +4,16 @@ namespace App\Console\Commands;
 
 use App\Jobs\SendDailyDigest;
 use App\Models\User;
-use App\Support\Config as DipConfig;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Support\Facades\Config;
 
 /**
  * Dispatches SendDailyDigest jobs for users whose local clock has reached the
- * configured send-hour and who haven't received today's digest yet.
+ * configured send-hour and whose digest has not run yet today.
  *
  * Runs every five minutes (see bootstrap/app.php schedule). The dispatch test
  * is hour-granular, so the cadence only bounds the skew: at most five minutes
@@ -25,8 +25,7 @@ final class DispatchDailyDigestsCommand extends Command
 {
     public function handle(): int
     {
-        $sendHour = DipConfig::int('dipcatch.digest.send_hour', 8);
-        $batchSize = DipConfig::int('dipcatch.digest.batch_size', 500);
+        $sendHour = Config::integer('dipcatch.digest.send_hour');
         $nowUtc = CarbonImmutable::now('UTC');
 
         // Per-timezone dispatch: each timezone has its own "is it 09:00 here
@@ -51,17 +50,12 @@ final class DispatchDailyDigestsCommand extends Command
                 continue;
             }
 
-            // "Already sent today" = last_digest_sent_at falls on the same
+            // "Already ran today" = digest_processed_until falls on the same
             // local date as `localNow`. Comparing local-dates in SQL would
             // need timezone gymnastics, so we use a UTC lower bound: anyone
-            // whose last digest is older than the start-of-today-local
+            // whose digest last ran before the start-of-today-local
             // (converted to UTC) is still due.
             $startOfTodayLocalUtc = $localNow->startOfDay()->setTimezone('UTC');
-
-            $remaining = $batchSize - $dispatched;
-            if ($remaining <= 0) {
-                break;
-            }
 
             $digestDate = $localNow->format('Y-m-d');
 
@@ -69,18 +63,19 @@ final class DispatchDailyDigestsCommand extends Command
                 ->where('notify_via_email', true)
                 ->where('timezone', $timezone)
                 ->where(function (EloquentQueryBuilder $q) use ($startOfTodayLocalUtc): void {
-                    $q->whereNull('last_digest_sent_at')
-                        ->orWhere('last_digest_sent_at', '<', $startOfTodayLocalUtc);
+                    $q->whereNull('digest_processed_until')
+                        ->orWhere('digest_processed_until', '<', $startOfTodayLocalUtc);
                 })
-                ->limit($remaining)
+                // No batch cap. Each account runs once per local day, and a
+                // cap spent itself on accounts whose job was still queued: the
+                // unique lock skips their re-dispatch without a word, and the
+                // same low ids filled every tick while the queue was behind.
+                // Workers set the sending pace.
+                ->lazyById()
                 ->each(function (User $user) use ($digestDate, &$dispatched): void {
                     dispatch(new SendDailyDigest($user, $digestDate));
                     $dispatched++;
                 });
-
-            if ($dispatched >= $batchSize) {
-                break;
-            }
         }
 
         $this->info("Dispatched {$dispatched} SendDailyDigest jobs.");

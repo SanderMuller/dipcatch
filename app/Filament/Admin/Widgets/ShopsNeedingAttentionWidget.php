@@ -70,11 +70,10 @@ final class ShopsNeedingAttentionWidget extends BaseWidget
     private function failingQuery(): EloquentQueryBuilder
     {
         return Shop::query()
-            ->where('active', true)
             // A paused product's offers are not rechecked at all, so listing
             // them here would ask the owner to fix something the app has
-            // deliberately stopped doing. Matches the scheduler's own filter.
-            ->whereHas('product', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', true))
+            // deliberately stopped doing.
+            ->onActiveProducts()
             ->whereIn('health', [ShopHealth::Failing->value, ShopHealth::Dead->value]);
     }
 }

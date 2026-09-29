@@ -282,3 +282,28 @@ test('a chain row left without prices by an older run is cleared', function (): 
     expect(CheckjebonChain::query()->where('chain', 'ghostchain')->exists())->toBeFalse()
         ->and(CheckjebonChain::query()->where('chain', 'ah')->exists())->toBeTrue();
 });
+
+test('a product page finds the row the import stored for it', function (string $url, string $name): void {
+    Http::fake([checkjebonUrl() => Http::response(checkjebonFixture())]);
+
+    $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
+
+    $result = app(CheckjebonSource::class)->resolve($url);
+
+    expect($result->isFound())->toBeTrue()
+        ->and($result->snapshot?->title)->toBe($name);
+})->with([
+    'ah' => ['https://www.ah.nl/producten/product/wi257/ah-kruiden-roomkaas', 'AH Kruiden roomkaas'],
+    'ah, upper-case id' => ['https://www.ah.nl/producten/product/WI195828/7up-regular', '7up Regular'],
+    'lidl via boodschaapje' => ['https://boodschaapje.nl/product/8128671', 'Vlies filterzakken'],
+]);
+
+test('an upper-case AH id in the dataset still matches the product page', function (): void {
+    Http::fake([checkjebonUrl() => Http::response(checkjebonFixture(ah: [
+        ['n' => 'AH Kruiden roomkaas', 'l' => 'WI257/ah-kruiden-roomkaas', 'p' => 1.25, 's' => '125 g'],
+    ]))]);
+
+    $this->artisan(RefreshCheckjebonDatasetCommand::class)->assertSuccessful();
+
+    expect(app(CheckjebonSource::class)->resolve('https://www.ah.nl/producten/product/wi257/ah-kruiden-roomkaas')->isFound())->toBeTrue();
+});

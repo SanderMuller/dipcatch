@@ -27,6 +27,10 @@ final readonly class JsonLdOfferVariants
             return false;
         }
 
+        // Counted before any of them wins, for the same reason the hasVariant
+        // scan counts as it walks — see {@see JsonLdSearchState::$variantsSeen}.
+        $state->variantsSeen += count($offers);
+
         $pinned = self::pinned($offers, $variantKey);
 
         if ($pinned !== null) {
@@ -117,7 +121,7 @@ final readonly class JsonLdOfferVariants
         $matches = [];
 
         foreach ($offers as $offer) {
-            if (self::keyFor($offer) === $variantKey) {
+            if (JsonLdMatch::publishedKey($offer) === $variantKey) {
                 // An offer naming itself with this exact key is the answer,
                 // whatever else the page lists.
                 return $offer;
@@ -180,7 +184,7 @@ final readonly class JsonLdOfferVariants
         $keys = [];
 
         foreach ($offers as $offer) {
-            $key = self::keyFor($offer);
+            $key = JsonLdMatch::publishedKey($offer);
 
             if ($key === null) {
                 return false;
@@ -193,24 +197,6 @@ final readonly class JsonLdOfferVariants
     }
 
     /**
-     * How this offer names itself, or null when it does not.
-     *
-     * @param  array<string, mixed>  $offer
-     */
-    private static function keyFor(array $offer): ?string
-    {
-        foreach (JsonLdMatch::KEY_FIELDS as $field) {
-            $value = $offer[$field] ?? null;
-
-            if (is_scalar($value) && (string) $value !== '') {
-                return (string) $value;
-            }
-        }
-
-        return JsonLdEntities::nonEmptyString($offer['url'] ?? null);
-    }
-
-    /**
      * One offer, as a choice the caller can pick.
      *
      * @param  array<string, mixed>  $entity
@@ -220,7 +206,7 @@ final readonly class JsonLdOfferVariants
     {
         $price = JsonLdOfferPrice::price($offer);
         $currency = JsonLdOfferPrice::currency($offer);
-        $key = self::keyFor($offer);
+        $key = JsonLdMatch::publishedKey($offer);
 
         if ($price === null || $currency === null || $key === null) {
             return null;

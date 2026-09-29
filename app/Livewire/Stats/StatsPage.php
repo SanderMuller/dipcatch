@@ -10,6 +10,7 @@ use App\Notifications\UnitPriceTargetNotification;
 use App\PriceAdapters\BundleOffer;
 use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
+use App\Support\Numeric;
 use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Notifications\DatabaseNotification;
@@ -73,11 +74,10 @@ final class StatsPage extends Component
 
                 $productId = is_string($data['product_id'] ?? null) ? $data['product_id'] : null;
                 $currency = is_string($data['currency'] ?? null) ? $data['currency'] : 'EUR';
-                $rawPercent = $data['drop_percent'] ?? null;
                 $unit = is_string($data['comparison_unit'] ?? null) ? $data['comparison_unit'] : null;
                 $amount = $data['drop_absolute'] ?? null;
 
-                $percent = self::percentage($rawPercent);
+                $percent = Numeric::percent($data['drop_percent'] ?? null);
 
                 // Read through the same gate the bell uses, so one stored row
                 // cannot claim a bundle on this page and be refused on that
@@ -106,13 +106,5 @@ final class StatsPage extends Component
                 ];
             })
             ->values();
-    }
-
-    /** One place decides how a drop percentage reads, and its type. */
-    private static function percentage(mixed $value): ?string
-    {
-        return is_numeric($value)
-            ? number_format((float) $value, 1, '.', '') . '%'
-            : null;
     }
 }

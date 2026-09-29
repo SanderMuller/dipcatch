@@ -3,7 +3,7 @@
 namespace App\Billing;
 
 use App\Models\User;
-use App\Support\Config;
+use Illuminate\Support\Facades\Config;
 
 /**
  * The single reader of the plan entitlements in `config/plans.php`. Every
@@ -49,12 +49,12 @@ final readonly class Entitlements
      */
     public function recheckIntervalHours(): int
     {
-        return $this->number('recheck_interval_hours', 'dipcatch.recheck.interval_hours', 6);
+        return $this->number('recheck_interval_hours', 'dipcatch.recheck.interval_hours');
     }
 
     public function notificationsHourlyLimit(): int
     {
-        return $this->number('notifications_hourly_limit', 'dipcatch.notifications.user_hourly_limit', 30);
+        return $this->number('notifications_hourly_limit', 'dipcatch.notifications.user_hourly_limit');
     }
 
     /**
@@ -76,7 +76,7 @@ final readonly class Entitlements
         return $this->value('auto_categories') === true;
     }
 
-    private function number(string $key, string $fallbackKey, int $default): int
+    private function number(string $key, string $fallbackKey): int
     {
         $value = $this->value($key);
 
@@ -84,7 +84,7 @@ final readonly class Entitlements
             return (int) $value;
         }
 
-        return Config::int($fallbackKey, $default);
+        return Config::integer($fallbackKey);
     }
 
     private function limit(string $key): ?int

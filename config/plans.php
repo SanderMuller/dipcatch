@@ -60,7 +60,9 @@ return [
     ],
 
     'pro' => [
-        'max_products' => null,
+        // Generous rather than unlimited: every product is fetched four times
+        // a day, and that load lands on the shops' own rate limits too.
+        'max_products' => (int) (env('PLAN_PRO_MAX_PRODUCTS') ?: 250),
         'max_shops_per_product' => null,
         'recheck_interval_hours' => (int) env('PLAN_PRO_RECHECK_INTERVAL_HOURS', 6),
         'notifications_hourly_limit' => (int) env('PLAN_PRO_NOTIFICATIONS_HOURLY_LIMIT', 200),
@@ -94,7 +96,10 @@ return [
         'automatic_tax' => filter_var(env('STRIPE_AUTOMATIC_TAX', false), FILTER_VALIDATE_BOOLEAN),
 
         'pro_price_id' => env('STRIPE_PRICE_PRO_MONTHLY'),
-        'pro_amount' => env('PLAN_PRO_DISPLAY_AMOUNT', '2.99'),
+        'pro_amount' => env('PLAN_PRO_DISPLAY_AMOUNT', '4.99'),
+        // Optional: without a yearly Price the shop sells monthly only.
+        'pro_yearly_price_id' => env('STRIPE_PRICE_PRO_YEARLY'),
+        'pro_yearly_amount' => env('PLAN_PRO_YEARLY_DISPLAY_AMOUNT', '39.00'),
         'pro_currency' => env('PLAN_PRO_DISPLAY_CURRENCY', 'EUR'),
         'trial_days' => (int) env('PLAN_PRO_TRIAL_DAYS', 14),
     ],

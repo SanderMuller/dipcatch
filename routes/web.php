@@ -6,6 +6,7 @@ use App\Http\Controllers\BillingController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LlmsTxtController;
 use App\Http\Controllers\OpenaiAppsChallengeController;
+use App\Http\Controllers\ProductMarkdownController;
 use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ShopPageController;
@@ -22,6 +23,7 @@ use App\Livewire\Products\EditProduct;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\Settings\NotificationPreferences;
+use App\Livewire\ShoppingList\ShoppingListPage;
 use App\Livewire\Stats\StatsPage;
 use App\Livewire\Support\SupportPage;
 use App\Support\ShopPages;
@@ -92,6 +94,14 @@ Route::get('shops/poiesz-nl', fn (): RedirectResponse => redirect()->route(
     301,
 ))->name('shop.poiesz-legacy');
 
+// Etos and Walmart had pages until they started blocking DipCatch. Those
+// addresses were in the sitemap, so they point at the shops page, which now
+// lists both under the shops that block us.
+foreach (['etos-nl', 'walmart-com'] as $blockedSlug) {
+    Route::get("shops/{$blockedSlug}", fn (): RedirectResponse => redirect()->route('shops', request()->query(), 301))
+        ->name("shop.blocked-legacy.{$blockedSlug}");
+}
+
 Route::get('price-alerts/{slug}', UseCasePageController::class)
     ->where('slug', UseCases::slugPattern())
     ->middleware(MarketingLocale::class)
@@ -141,17 +151,26 @@ Route::get('p/{slug}', PublicProductController::class)
     ->middleware(ThrottleRequestsWithRedis::using('public-product'))
     ->name('product.public');
 
+Route::get('p/{slug}.md', [PublicProductController::class, 'markdown'])
+    ->where('slug', '[A-Za-z0-9]{32}')
+    ->middleware(ThrottleRequestsWithRedis::using('public-product'))
+    ->name('product.public.markdown');
+
 // Public on purpose: the marketing pages point Pro here, and the controller
 // decides between registration, checkout and the billing page. Guarding it
 // with `auth` would only redirect a stranger to login and lose the intent.
-Route::get('upgrade', [BillingController::class, 'upgrade'])->name('upgrade');
+Route::get('upgrade/{interval?}', [BillingController::class, 'upgrade'])
+    ->whereIn('interval', ['monthly', 'yearly'])
+    ->name('upgrade');
 
 Route::middleware(['auth', EnsureEmailIsVerified::class])->group(function (): void {
 
     Route::post('push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
     Route::delete('push/subscribe', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
 
-    Route::get('billing/checkout', [BillingController::class, 'checkout'])->name('billing.checkout');
+    Route::get('billing/checkout/{interval?}', [BillingController::class, 'checkout'])
+        ->whereIn('interval', ['monthly', 'yearly'])
+        ->name('billing.checkout');
     Route::get('billing/portal', [BillingController::class, 'portal'])->name('billing.portal');
 
     Route::post('profile/timezone/auto-detect', AutoDetectTimezoneController::class)
@@ -206,13 +225,17 @@ Route::prefix('app')
         Route::livewire('products', ProductList::class)->name('products.index');
         Route::livewire('products/create', CreateProductFromUrl::class)->name('products.create');
         Route::livewire('products/create-manual', CreateProductManual::class)->name('products.create-manual');
-        Route::livewire('products/{product}', ProductShow::class)->name('products.show');
-        Route::livewire('products/{product}/edit', EditProduct::class)->name('products.edit');
+        // Product ids are UUIDs. Without the constraint `products/{product}`
+        // also matches `<uuid>.md`, and the markdown route below is never reached.
+        Route::livewire('products/{product}', ProductShow::class)->whereUuid('product')->name('products.show');
+        Route::get('products/{product}.md', ProductMarkdownController::class)->whereUuid('product')->name('products.markdown');
+        Route::livewire('products/{product}/edit', EditProduct::class)->whereUuid('product')->name('products.edit');
         Route::livewire('billing', BillingPage::class)->name('billing');
         Route::livewire('notifications', NotificationPreferences::class)->name('notifications');
         Route::livewire('connections', ConnectionsPage::class)->name('connections');
         Route::livewire('support', SupportPage::class)->name('support');
         Route::livewire('stats', StatsPage::class)->name('stats');
+        Route::livewire('shopping-list', ShoppingListPage::class)->name('shopping-list');
     });
 
 require __DIR__ . '/settings.php';

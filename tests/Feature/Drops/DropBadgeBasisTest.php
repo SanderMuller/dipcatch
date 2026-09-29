@@ -11,7 +11,7 @@ use App\Services\Drops\ReferenceValue;
  * event's reference with the product's current price, so both sides have to be
  * the same kind of money — the event says which in `comparison_unit`.
  */
-function badgeProduct(string $unit = 'g'): Product
+function badgeProduct(?string $unit = 'g'): Product
 {
     $product = Product::factory()->create(['currency' => 'EUR']);
 
@@ -20,7 +20,7 @@ function badgeProduct(string $unit = 'g'): Product
         'currency' => 'EUR',
         'current_price' => '8.00',
         'current_in_stock' => true,
-        'pack_quantity' => '1000.00',
+        'pack_quantity' => $unit === null ? null : '1000.00',
         'pack_unit' => $unit,
     ])->save();
 
@@ -30,7 +30,8 @@ function badgeProduct(string $unit = 'g'): Product
 }
 
 it('reads a pack-basis event against the pack price', function (): void {
-    $product = badgeProduct();
+    // No pack size, so the product compares pack prices.
+    $product = badgeProduct(null);
     $product->forceFill(['last_notified_price' => '8.00', 'last_notified_unit' => null])->save();
 
     PriceDropEvent::factory()->for($product)->create([
@@ -44,6 +45,25 @@ it('reads a pack-basis event against the pack price', function (): void {
 
     // 8.00 a pack against a 10.00 pack reference.
     expect($product->refresh()->activeDropPercent())->toBe(20);
+});
+
+it('shows no drop for a pack-basis alert once the product compares per unit', function (): void {
+    // Alerted on pack prices before the shops stated sizes. Packs can differ in
+    // size, so that figure is no drop the card can show beside a unit price.
+    $product = badgeProduct();
+    $product->forceFill(['last_notified_price' => '8.00', 'last_notified_unit' => null])->save();
+
+    PriceDropEvent::factory()->for($product)->create([
+        'user_id' => $product->user_id,
+        'currency' => 'EUR',
+        'reference_price' => '10.00',
+        'comparison_unit' => null,
+        'drop_pct' => '20.0',
+        'fired_at' => now(),
+    ]);
+
+    expect($product->refresh()->activeDropPercent())->toBeNull()
+        ->and(Product::query()->whereKey($product->id)->inVisibleDrop()->exists())->toBeFalse();
 });
 
 it('reads a unit-basis event against the unit price', function (): void {

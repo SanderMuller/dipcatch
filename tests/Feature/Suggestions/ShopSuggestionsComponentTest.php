@@ -40,10 +40,14 @@ test('it lists a trackable and an untrackable suggestion, each labelled', functi
     $product = suggestionProduct();
     $this->actingAs($product->user()->sole());
 
-    Livewire::test(ShopSuggestions::class, ['product' => $product])
+    $component = Livewire::test(ShopSuggestions::class, ['product' => $product]);
+
+    // Per kilo first, the dataset's pack price beside it, through the money formatter.
+    expect(preg_replace('/\s+/', ' ', strip_tags($component->html())))->toContain('€24.60 /kg · dataset price €3.69 for 150 g');
+
+    $component
         ->assertSee('SPAR')
         ->assertSee('PLUS')
-        ->assertSee('dataset price € 3.69')
         ->assertSee('not trackable yet')
         ->assertSee('https://www.plus.nl/product/beemster-plus-1')
         // Both rows link out: a shopper may want to see a product before

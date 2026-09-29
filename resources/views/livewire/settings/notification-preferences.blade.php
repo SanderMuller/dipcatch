@@ -48,15 +48,27 @@
                 <flux:heading size="lg">{{ __('Products') }}</flux:heading>
 
                 <div class="mt-4 space-y-4">
-                    <flux:switch
-                        wire:model="auto_categories"
-                        :disabled="! $allowsAutoCategories"
-                        :label="__('Sort new products into a category automatically')"
-                        :description="$allowsAutoCategories
-                            ? __('Products you add from now on. Products you already track keep their category.')
-                            : __('Pro sorts products for you. Your choice is kept, and it starts working when you upgrade.')"
-                        data-test="auto-categories"
-                    />
+                    {{-- Composed by hand: `flux:switch` takes its label as a
+                         string, so it has no room for the badge. The badge
+                         shows on Pro too, so a subscriber knows what the plan
+                         pays for. --}}
+                    <flux:field variant="inline">
+                        <flux:label>
+                            {{ __('Sort new products into a category automatically') }}
+                            <flux:badge size="sm" color="zinc" class="ms-2" data-test="auto-categories-pro">{{ __('Pro') }}</flux:badge>
+                        </flux:label>
+                        <flux:description>
+                            {{ $allowsAutoCategories
+                                ? __('Products you add from now on. Products you already track keep their category.')
+                                : __('Pro sorts products for you. Your choice is kept, and it starts working when you upgrade.') }}
+                        </flux:description>
+                        <flux:switch
+                            wire:model="auto_categories"
+                            :disabled="! $allowsAutoCategories"
+                            data-test="auto-categories"
+                        />
+                        <flux:error name="auto_categories" />
+                    </flux:field>
                 </div>
             </flux:card>
         @endif

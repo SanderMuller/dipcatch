@@ -6,6 +6,7 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopAdapter;
@@ -21,16 +22,21 @@ use Symfony\Component\DomCrawler\Crawler;
  * Cult Beauty geo-prices; CSS `#product-price` takes £ / € / $ from the
  * painted text rather than a host→currency map.
  */
-final readonly class LookfantasticAdapter implements HostSpecificAdapter, ShopAdapter
+final readonly class LookfantasticAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
     public function key(): string
     {
         return 'lookfantastic';
     }
 
+    public function ownedHosts(): array
+    {
+        return ['lookfantastic.com', 'cultbeauty.com'];
+    }
+
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        if (! HostUrl::matches($url, 'lookfantastic.com') && ! HostUrl::matches($url, 'cultbeauty.com')) {
+        if (! HostUrl::matchesAny($url, $this->ownedHosts())) {
             return ExtractionResult::skip();
         }
 

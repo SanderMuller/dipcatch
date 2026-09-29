@@ -4,9 +4,12 @@ namespace App\Concerns;
 
 use App\Billing\Entitlements;
 use App\Billing\Plan;
+use App\Billing\PlanSource;
 use App\Models\StripeDispute;
 use App\Models\StripePayment;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
+use Laravel\Cashier\Subscription;
 
 /**
  * Billing state for a user. `plan()` is the only place that turns Stripe
@@ -31,31 +34,73 @@ trait Subscribes
 
     public function plan(): Plan
     {
+        return $this->planSource()->plan();
+    }
+
+    public function planSource(): PlanSource
+    {
         if ($this->billing_blocked_at !== null) {
-            return Plan::Free;
+            return PlanSource::Blocked;
         }
 
         if ($this->isComped()) {
-            return Plan::Pro;
-        }
-
-        $subscription = $this->subscription(Plan::SUBSCRIPTION_TYPE);
-
-        if ($subscription === null) {
-            // A generic trial started before any subscription exists still
-            // grants Pro — `onTrial()` with no arguments reads the user's
-            // own `trial_ends_at`.
-            return $this->onTrial() ? Plan::Pro : Plan::Free;
+            return PlanSource::Comp;
         }
 
         // `active()`, not `valid()`, because `ProUsers` — the scheduler's
         // reader — selects on Cashier's `active()` scope, and the instance
-        // method is that same predicate. It is the predicate that matches,
-        // not the answer: `plan()` reads the newest `pro` row while
-        // `ProUsers` matches any active one, so two rows can still disagree.
+        // method is that same predicate.
+        //
+        // Any row, not the newest one. `subscription()` returns the newest of
+        // a type, so an abandoned checkout writing a later `incomplete` row
+        // hid a live subscription underneath it: `plan()` said Free while
+        // `ProUsers` said Pro and Stripe went on charging. The customer lost
+        // their history window, their unit-price alerts and their recheck
+        // cadence, permanently, because nothing ages an `incomplete` row out.
+        //
         // `keepPastDueSubscriptionsActive()` in AppServiceProvider is what
         // keeps Pro through the dunning retries.
-        return $subscription->active() ? Plan::Pro : Plan::Free;
+        if ($this->proSubscriptions()->contains(static fn (Subscription $subscription): bool => $subscription->active())) {
+            return PlanSource::Subscription;
+        }
+
+        // A trial granted on the account itself, whatever rows it holds: a
+        // lapsed subscription does not cancel a trial granted to win the
+        // customer back. `ProUsers` selects it the same way.
+        return $this->onGenericTrial() ? PlanSource::AccountTrial : PlanSource::None;
+    }
+
+    /**
+     * Every `pro` row this account holds, newest first.
+     *
+     * Cashier's `subscription()` answers with one of these, and which one it
+     * picks is an accident of creation order rather than of entitlement.
+     *
+     * @return Collection<int, Subscription>
+     */
+    public function proSubscriptions(): Collection
+    {
+        return collect($this->subscriptions->all())
+            ->filter(static fn (mixed $row): bool => $row instanceof Subscription && $row->type === Plan::SUBSCRIPTION_TYPE)
+            ->values();
+    }
+
+    /**
+     * The `pro` row that decides what the customer is being sold, if any.
+     *
+     * A live row wins over a dead one whatever their order, so a stray
+     * `incomplete` cannot make the billing page offer a second subscription
+     * to somebody Stripe already bills. The row that grants Pro comes first:
+     * `valid()` also holds for an `incomplete` row inside its trial or grace
+     * dates, which grants nothing.
+     */
+    public function payingSubscription(): ?Subscription
+    {
+        $rows = $this->proSubscriptions();
+
+        return $rows->first(static fn (Subscription $subscription): bool => $subscription->active())
+            ?? $rows->first(static fn (Subscription $subscription): bool => $subscription->valid())
+            ?? $rows->first();
     }
 
     public function isPro(): bool
@@ -81,7 +126,7 @@ trait Subscribes
 
     public function isPastDue(): bool
     {
-        return $this->subscription(Plan::SUBSCRIPTION_TYPE)?->pastDue() === true;
+        return $this->payingSubscription()?->pastDue() === true;
     }
 
     /**

@@ -18,9 +18,9 @@ use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\Exceptions\FetchException;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\ShopFetcher;
-use App\Support\Config as DipConfig;
 use App\Support\ImageUrl;
 use App\Support\Iso4217;
+use App\Support\MovedShopUrl;
 use App\Support\PackSize;
 use App\Support\RecheckJitter;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -29,6 +29,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -227,6 +228,9 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             ],
             fallbackCurrency: $shop->currency,
             variantKey: $shop->variant_key,
+            // A shop saved without a variant keeps reading the page's default
+            // rather than start failing: see ShopifyAdapter.
+            acceptPageDefault: true,
         );
 
         $extraction = $resolver->resolve(
@@ -247,6 +251,8 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $snapshot,
             $extraction->adapterKey,
             ImageUrl::absolute($snapshot->imageUrl, $fetch->finalUrl),
+            movedTo: $fetch->movedPermanently ? $fetch->finalUrl : null,
+            movedFrom: $shop->url,
         );
     }
 
@@ -301,6 +307,11 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                     // Unknown stays unknown: coercing it to true is what
                     // reported a sold-out product as available.
                     'current_in_stock' => $snapshot->inStock,
+                    // Re-read on every successful check, so a shop that opens
+                    // to the public, or starts quoting ex-VAT, joins or leaves
+                    // the comparison on its own.
+                    'consumer_price_issue' => $snapshot->consumerPriceIssue,
+                    'consumer_price_note' => $snapshot->consumerPriceNote,
                     // An empty currency is no signal at all — keep the last known one
                     // rather than blanking the column.
                     'currency' => $storedCurrency ?? $locked->currency,
@@ -316,6 +327,10 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 if ($outcome->adapterKey !== null) {
                     $updates['adapter_key'] = $outcome->adapterKey;
                 }
+
+                // Store where the page moved for good, so the next check
+                // asks once instead of following the redirect every time.
+                $updates += MovedShopUrl::updates($locked, $outcome->movedFrom, $outcome->movedTo);
 
                 // Keep the last known image when an extraction returns none —
                 // an empty picker is worse than a slightly stale thumbnail.
@@ -343,26 +358,11 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 }
 
                 $updates += $pricing->promotionUpdates;
-
-                // Same rule as the GTIN: a source that reads conditional
-                // offers and finds none clears the stored one, so a campaign
-                // that ended stops being shown. A source with no such concept
-                // leaves it alone.
-                $offer = $snapshot->conditionalOffer;
-                if ($offer !== null || $snapshot->conditionalOfferAuthoritative) {
-                    $updates['conditional_price'] = $offer?->price;
-                    $updates['conditional_label'] = $offer?->label;
-                    $updates['conditional_starts_at'] = $offer?->startsAt?->utc();
-                    $updates['conditional_ends_at'] = $offer?->endsAt?->utc();
-                }
             } else {
                 $updates['last_error'] = $outcome->error;
                 $updates += ResolvedBundlePricing::expiredFailureUpdates($locked);
 
-                $counters = $this->incrementCountersFor($locked, $status);
-                $updates += $counters;
-
-                $updates += $this->healthTransitionsFor($counters);
+                $updates += self::failureUpdatesFor($locked, $status);
             }
 
             $check = PriceCheck::create($pricing->priceCheckAttributes(
@@ -414,61 +414,45 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * @return array{consecutive_failures?: int, consecutive_5xx_failures?: int}
+     * @return array{consecutive_failures?: int, consecutive_5xx_failures?: int, health?: string, active?: bool}
      */
-    private function incrementCountersFor(Shop $shop, ScrapeStatus $status): array
+    private static function failureUpdatesFor(Shop $shop, ScrapeStatus $status): array
     {
-        return match ($status) {
-            ScrapeStatus::TransientServerError => [
-                'consecutive_5xx_failures' => $shop->consecutive_5xx_failures + 1,
-            ],
-            ScrapeStatus::RobotsDisallowed => [
-                // Permanent — both counters preserved but health flips to dead below.
-            ],
-            default => [
-                'consecutive_failures' => $shop->consecutive_failures + 1,
-            ],
-        };
+        // Permanent: both counters are kept, the offer dies now.
+        if ($status === ScrapeStatus::RobotsDisallowed) {
+            return ['health' => ShopHealth::Dead->value, 'active' => false];
+        }
+
+        if ($status === ScrapeStatus::TransientServerError) {
+            $failures = $shop->consecutive_5xx_failures + 1;
+
+            return ['consecutive_5xx_failures' => $failures] + self::healthAt(
+                $failures,
+                Config::integer('dipcatch.shop.failing_5xx_after'),
+                Config::integer('dipcatch.shop.dead_5xx_after'),
+            );
+        }
+
+        $failures = $shop->consecutive_failures + 1;
+
+        return ['consecutive_failures' => $failures] + self::healthAt(
+            $failures,
+            Config::integer('dipcatch.shop.failing_after'),
+            Config::integer('dipcatch.shop.dead_after'),
+        );
     }
 
     /**
-     * @param  array<string, mixed>  $counters
      * @return array{health?: string, active?: bool}
      */
-    private function healthTransitionsFor(array $counters): array
+    private static function healthAt(int $failures, int $failingAfter, int $deadAfter): array
     {
-        $failingAfter = DipConfig::int('dipcatch.shop.failing_after', 3);
-        $deadAfter = DipConfig::int('dipcatch.shop.dead_after', 10);
-        $failing5xx = DipConfig::int('dipcatch.shop.failing_5xx_after', 10);
-        $dead5xx = DipConfig::int('dipcatch.shop.dead_5xx_after', 30);
-
-        $main = $counters['consecutive_failures'] ?? null;
-        $five = $counters['consecutive_5xx_failures'] ?? null;
-
-        $dead = ['health' => ShopHealth::Dead->value, 'active' => false];
-        $failing = ['health' => ShopHealth::Failing->value];
-
-        // robots_disallowed: hard fail.
-        if ($main === null && $five === null) {
-            return $dead;
+        if ($failures >= $deadAfter) {
+            return ['health' => ShopHealth::Dead->value, 'active' => false];
         }
 
-        if ($main !== null) {
-            if ($main >= $deadAfter) {
-                return $dead;
-            }
-            if ($main >= $failingAfter) {
-                return $failing;
-            }
-        }
-
-        if ($five !== null) {
-            if ($five >= $dead5xx) {
-                return $dead;
-            }
-            if ($five >= $failing5xx) {
-                return $failing;
-            }
+        if ($failures >= $failingAfter) {
+            return ['health' => ShopHealth::Failing->value];
         }
 
         return [];

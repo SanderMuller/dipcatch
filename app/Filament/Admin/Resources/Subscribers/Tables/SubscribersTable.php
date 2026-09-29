@@ -3,11 +3,13 @@
 namespace App\Filament\Admin\Resources\Subscribers\Tables;
 
 use App\Billing\Plan;
+use App\Billing\PlanSource;
 use App\Billing\ProPrice;
 use App\Billing\ProUsers;
 use App\Models\User;
 use App\Support\MoneyFormatter;
 use App\Support\StripeDashboard;
+use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -117,44 +119,58 @@ final class SubscribersTable
     }
 
     /**
-     * One of the three places that decide whether an account reads as Pro —
-     * see `ProUsers`. Public so a test can assert it agrees with the other
-     * two, rather than only through a rendered table.
+     * The label for `User::planSource()`. Public so a test can assert it
+     * against `plan()` and `ProUsers`, rather than only through a rendered
+     * table.
      */
     public static function status(User $record): string
     {
-        if ($record->billing_blocked_at !== null) {
-            return 'Blocked';
-        }
-
-        // Without this a comped account reads Free here while the Pro filter
-        // above counts it as Pro.
-        if ($record->isComped()) {
-            return 'Comped';
-        }
-
-        $subscription = $record->subscription(Plan::SUBSCRIPTION_TYPE);
-
-        return match (true) {
-            $subscription === null => 'Free',
-            $subscription->onTrial() => 'Trial',
-            $subscription->onGracePeriod() => 'Cancelling',
-            $subscription->pastDue() => 'Past due',
-            $subscription->valid() => 'Pro',
-            default => 'Free',
+        return match ($record->planSource()) {
+            PlanSource::Blocked => 'Blocked',
+            PlanSource::Comp => 'Comped',
+            PlanSource::AccountTrial => 'Trial',
+            PlanSource::None => 'Free',
+            PlanSource::Subscription => self::subscriptionStatus($record),
         };
     }
 
-    private static function periodEnd(User $record): ?string
+    /**
+     * Only reached when a subscription grants Pro, so the row read here is
+     * that one — see `User::payingSubscription()`.
+     */
+    private static function subscriptionStatus(User $record): string
     {
-        $subscription = $record->subscription(Plan::SUBSCRIPTION_TYPE);
+        $subscription = $record->payingSubscription();
 
-        if ($subscription === null) {
-            return null;
-        }
+        return match (true) {
+            $subscription?->onTrial() === true => 'Trial',
+            $subscription?->onGracePeriod() === true => 'Cancelling',
+            $subscription?->pastDue() === true => 'Past due',
+            default => 'Pro',
+        };
+    }
 
-        $date = $subscription->ends_at ?? $subscription->trial_ends_at;
+    /**
+     * The end date of the account trial or comp that grants Pro; otherwise
+     * the paying row's end or trial date, if it has one. Public for the same
+     * reason as `status()`.
+     */
+    public static function periodEnd(User $record): ?string
+    {
+        $date = match ($record->planSource()) {
+            PlanSource::AccountTrial => $record->trial_ends_at,
+            // A comp with no end date has none to show.
+            PlanSource::Comp => $record->comped_until?->lessThan(Plan::COMPED_FOREVER) === true ? $record->comped_until : null,
+            default => self::rowEnd($record),
+        };
 
         return $date?->isoFormat('D MMM YYYY');
+    }
+
+    private static function rowEnd(User $record): ?CarbonInterface
+    {
+        $subscription = $record->payingSubscription();
+
+        return $subscription->ends_at ?? $subscription?->trial_ends_at;
     }
 }

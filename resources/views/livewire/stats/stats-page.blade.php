@@ -1,12 +1,12 @@
 <div>
-    <flux:heading size="xl" level="1" class="tracking-tight">{{ __('Stats') }}</flux:heading>
-    <flux:text class="mt-1 max-w-[60ch] text-pretty text-zinc-600 dark:text-zinc-400">
+    <flux:heading size="xl" level="1" class="text-2xl! font-semibold! tracking-tight sm:text-3xl!">{{ __('Stats') }}</flux:heading>
+    <flux:text class="mt-1 max-w-[60ch] text-pretty text-zinc-500 dark:text-zinc-400">
         {{ __('The history behind your alerts. The dashboard shows what is happening now.') }}
     </flux:text>
 
     <div class="mt-8">
-        <flux:heading size="lg" level="2">{{ __('Savings by month') }}</flux:heading>
-        <flux:text class="mt-1 max-w-[60ch] text-pretty text-zinc-600 dark:text-zinc-400">
+        <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ __('Savings by month') }}</flux:heading>
+        <flux:text size="sm" class="mt-0.5 max-w-[60ch] text-pretty text-zinc-500 dark:text-zinc-400">
             {{ __('Added up from every alert we sent in the last twelve months. One bar per currency, and we never convert between them.') }}
         </flux:text>
 
@@ -26,12 +26,12 @@
                             @endforeach
                         @endif
                     <flux:chart.axis axis="x" field="date" :format="['month' => 'short', 'year' => '2-digit']">
-                        <flux:chart.axis.tick />
-                        <flux:chart.axis.line />
+                        <flux:chart.axis.tick class="text-xs text-zinc-400" />
+                        <flux:chart.axis.line class="text-ink/10" />
                     </flux:chart.axis>
                     <flux:chart.axis axis="y" tick-start="0">
-                        <flux:chart.axis.grid />
-                        <flux:chart.axis.tick />
+                        <flux:chart.axis.grid class="text-ink/5" />
+                        <flux:chart.axis.tick class="text-xs text-zinc-400" />
                     </flux:chart.axis>
                     <flux:chart.cursor type="area" />
                 </flux:chart.svg>
@@ -64,41 +64,43 @@
 
     @if ($recentAlerts->isNotEmpty())
         <div class="mt-8">
-            <flux:heading size="lg" level="2">{{ __('Recent alerts') }}</flux:heading>
-            <flux:text class="mt-1 text-zinc-600 dark:text-zinc-400">
+            <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ __('Recent alerts') }}</flux:heading>
+            <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">
                 {{ __('What DipCatch has told you, newest first. The bell empties itself. This list does not.') }}
             </flux:text>
 
-            <flux:timeline class="mt-4">
-                @foreach ($recentAlerts as $alert)
-                    <flux:timeline.item wire:key="alert-{{ $loop->index }}">
-                        <flux:timeline.indicator color="green">
-                            <flux:icon.arrow-trending-down variant="micro" />
-                        </flux:timeline.indicator>
-                        <flux:timeline.content>
-                            <flux:heading>
-                                @if ($alert['url'])
-                                    <a href="{{ $alert['url'] }}" wire:navigate>{{ Str::limit($alert['title'], 60) }}</a>
-                                @else
-                                    {{ Str::limit($alert['title'], 60) }}
-                                @endif
-                                @if ($alert['sentAt'])
-                                    <flux:text inline>· {{ $alert['sentAt'] }}</flux:text>
-                                @endif
-                            </flux:heading>
-                            <flux:text class="tabular-nums">
-                                {{ $alert['percent'] ?? '—' }}
-                                @if ($alert['amount'])
-                                    · {{ $alert['amount'] }}
-                                @endif
-                                @if ($alert['bundle'])
-                                    · {{ $alert['bundle'] }}
-                                @endif
-                            </flux:text>
-                        </flux:timeline.content>
-                    </flux:timeline.item>
-                @endforeach
-            </flux:timeline>
+            <flux:card class="mt-6">
+                <flux:timeline>
+                    @foreach ($recentAlerts as $alert)
+                        <flux:timeline.item wire:key="alert-{{ $loop->index }}">
+                            <flux:timeline.indicator color="green">
+                                <flux:icon.arrow-trending-down variant="micro" />
+                            </flux:timeline.indicator>
+                            <flux:timeline.content>
+                                <flux:heading>
+                                    @if ($alert['url'])
+                                        <a href="{{ $alert['url'] }}" wire:navigate>{{ Str::limit($alert['title'], 60) }}</a>
+                                    @else
+                                        {{ Str::limit($alert['title'], 60) }}
+                                    @endif
+                                    @if ($alert['sentAt'])
+                                        <flux:text inline>· {{ $alert['sentAt'] }}</flux:text>
+                                    @endif
+                                </flux:heading>
+                                <flux:text class="tabular-nums">
+                                    <span class="font-semibold text-savings-strong">{{ $alert['percent'] ?? '—' }}</span>
+                                    @if ($alert['amount'])
+                                        · {{ $alert['amount'] }}
+                                    @endif
+                                    @if ($alert['bundle'])
+                                        · {{ $alert['bundle'] }}
+                                    @endif
+                                </flux:text>
+                            </flux:timeline.content>
+                        </flux:timeline.item>
+                    @endforeach
+                </flux:timeline>
+            </flux:card>
         </div>
     @endif
 </div>

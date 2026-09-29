@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 
+use App\Enums\ConsumerPriceIssue;
+use App\Enums\PackProvenance;
 use App\Enums\ShopHealth;
 use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
@@ -41,7 +43,7 @@ test('the best value is the lowest price per unit, not the lowest price', functi
     ]);
 
     expect($product->bestValueShop()?->host)->toBe('lidl.nl')
-        ->and($product->bestValueShop()?->unitPrice())->toBe('5.38');
+        ->and($product->bestValueShop()?->unitPrice())->toBe('5.3784');
 });
 
 test('a shop with no pack size cannot be the best value', function (): void {
@@ -103,7 +105,7 @@ test('a product whose shops state no size has no best value', function (): void 
     expect($product->bestValueShop())->toBeNull();
 });
 
-test('the product page shows the best value beside the cheapest price', function (): void {
+test('the product page leads with the best value and notes the lowest price', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
 
@@ -120,13 +122,13 @@ test('the product page shows the best value beside the cheapest price', function
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
-        ->assertSeeText('Best price now')
-        ->assertSeeText('€1.69')
-        // Both stated per kilo, so the gap between them can be read off.
-        ->assertSeeText('€8.45 /kg')
-        ->assertSeeText('Best value')
-        ->assertSeeText('€5.38 /kg')
-        ->assertSeeText('lidl.nl');
+        ->assertDontSeeText('Best price now')
+        ->assertSeeTextInOrder(['Best value', '€5.38 /kg', '€1.99 for 370 g', 'lidl.nl'])
+        // The lowest pack price is a note under it, with the gap per kilo.
+        ->assertSeeText('Lowest price: €1.69 for 200 g at')
+        ->assertSeeText('That is 57% more per kilo than the best value.')
+        // Both stated per kilo in the shops table, so the gap can be read off.
+        ->assertSeeText('€8.45 /kg');
 });
 
 test('the products list shows the best value beside the cheapest price', function (): void {
@@ -206,7 +208,7 @@ test('the dashboard says how long the drop price lasts', function (): void {
         ->assertSeeText('until 6 Sep');
 });
 
-test('the dashboard leaves the best value to the product page', function (): void {
+test('the dashboard card leads with the best value and links its shop', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([
         'currency' => 'EUR',
@@ -227,13 +229,17 @@ test('the dashboard leaves the best value to the product page', function (): voi
 
     $this->actingAs($user);
 
+    // The figure is the best value, and the shop link beneath it names the
+    // shop that sells it. The comparison with the lowest pack price stays on
+    // the product list and the product page.
+    $card = strip_tags(withoutCardDetails(livewire(Dashboard::class)->html()));
+
+    expect($card)->not->toContain('Lowest price')->not->toContain('ah.nl');
+
     livewire(Dashboard::class)
-        ->assertSeeText('€1.69')
-        ->assertSeeText('ah.nl')
-        // Best value is a comparison across shops, so it reads where the shops
-        // are listed. The dashboard answers what is cheap now, and where.
-        ->assertDontSeeText('€5.38 /kg')
-        ->assertDontSeeText('lidl.nl');
+        ->assertSeeTextInOrder(['€5.38 /kg', '€1.99 for 370 g', 'lidl.nl'])
+        ->assertSeeHtml('href="https://lidl.nl/p/lay-s/p7"')
+        ->assertDontSeeHtml('href="https://ah.nl/producten/product/wi7/x"');
 });
 
 test('the list says how long a quoted price lasts', function (): void {
@@ -276,4 +282,139 @@ test('a shop with no promotion is named without a deadline', function (): void {
     livewire(ProductList::class)
         ->assertSeeText('jumbo.com')
         ->assertDontSeeText('jumbo.com ·');
+});
+
+test('two shops a rounding step apart are ranked on the unrounded figure', function (): void {
+    // The Roter vitamin C case, reported from production: a 400-tablet pack at
+    // 12.99 is 0.032475 a tablet and an 800-tablet pack at 21.99 is 0.0274875.
+    // Both print as 0.03. Ranked on that string the older row kept the crown,
+    // and it is 18% the dearer tablet.
+    $product = productWithShops([
+        'ah.nl' => ['current_price' => '12.99', 'pack_quantity' => '400.00', 'pack_unit' => 'piece'],
+        'benushop.nl' => ['current_price' => '21.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece'],
+    ]);
+
+    expect($product->bestValueShop()?->host)->toBe('benushop.nl');
+});
+
+test('the page shows a cheap per-piece price at the precision that separates it', function (): void {
+    // Both packs used to render EUR 0.03 — the field a shopper compares on
+    // could not show an 18% difference.
+    $product = productWithShops([
+        'ah.nl' => ['current_price' => '12.99', 'pack_quantity' => '400.00', 'pack_unit' => 'piece'],
+        'benushop.nl' => ['current_price' => '21.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece'],
+    ]);
+
+    $this->actingAs($product->user ?? User::factory()->create());
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeText('€0.0325')
+        ->assertSeeText('€0.0275');
+});
+
+test('a price quoted without VAT takes neither answer', function (): void {
+    // The fivestartrading case: 90 cups at 21.15 ex-VAT undercuts a real
+    // 22.00 at Amazon by 4%, and took both the lowest price and the best
+    // value on a figure nobody can pay.
+    $product = productWithShops([
+        'amazon.nl' => ['current_price' => '22.00', 'pack_quantity' => '90.00', 'pack_unit' => 'piece'],
+        'fivestartrading-holland.eu' => [
+            'current_price' => '21.15', 'pack_quantity' => '90.00', 'pack_unit' => 'piece',
+            'consumer_price_issue' => ConsumerPriceIssue::ExcludesVat, 'consumer_price_note' => 'excl. btw',
+        ],
+    ]);
+
+    $product->recomputeCheapestShop();
+    $product->refresh();
+
+    expect($product->bestValueShop()?->host)->toBe('amazon.nl')
+        ->and($product->lowestOutlayShop()?->host)->toBe('amazon.nl');
+});
+
+test('a shop out for VAT does not decide the comparison unit', function (): void {
+    // Two ex-VAT rows measured in pieces must not make the one live gram row
+    // "measured in a different unit" and leave the product with no winner.
+    $product = productWithShops([
+        'a.test' => ['current_price' => '1.00', 'pack_quantity' => '10.00', 'pack_unit' => 'piece', 'consumer_price_issue' => ConsumerPriceIssue::ExcludesVat],
+        'b.test' => ['current_price' => '1.00', 'pack_quantity' => '10.00', 'pack_unit' => 'piece', 'consumer_price_issue' => ConsumerPriceIssue::ExcludesVat],
+        'c.test' => ['current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g'],
+    ]);
+
+    expect($product->bestValueShop()?->host)->toBe('c.test');
+});
+
+test('the product page says why a VAT-exclusive shop is out', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+
+    foreach ([
+        ['amazon.nl', '22.00', false],
+        ['fivestartrading-holland.eu', '21.15', true],
+    ] as [$host, $price, $exVat]) {
+        Shop::factory()->for($product)->create(['url' => 'https://' . $host . '/p/1'])
+            ->forceFill([
+                'currency' => 'EUR', 'current_price' => $price,
+                'pack_quantity' => '90.00', 'pack_unit' => 'piece',
+                'consumer_price_issue' => $exVat ? ConsumerPriceIssue::ExcludesVat : null,
+                'consumer_price_note' => $exVat ? 'excl. btw' : null,
+            ])->save();
+    }
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeText('Price excludes VAT — not comparable');
+});
+
+test('a trade-only price takes neither answer either', function (): void {
+    // The Prometeus case: 12.99 undercut two real consumer shops at 14.99.
+    $product = productWithShops([
+        'prometeus.nl' => [
+            'current_price' => '12.99', 'pack_quantity' => '550.00', 'pack_unit' => 'g',
+            'consumer_price_issue' => ConsumerPriceIssue::TradeOnly,
+            'consumer_price_note' => 'sign in to see prices',
+        ],
+        'bodyandfit.com' => ['current_price' => '14.99', 'pack_quantity' => '550.00', 'pack_unit' => 'g'],
+    ]);
+
+    $product->recomputeCheapestShop();
+    $product->refresh();
+
+    expect($product->bestValueShop()?->host)->toBe('bodyandfit.com')
+        ->and($product->lowestOutlayShop()?->host)->toBe('bodyandfit.com');
+});
+
+test('an inherited size that reads far dearer than the field is refused', function (): void {
+    // Reported 2026-09-22. A 150-tablet pack whose own size could not be read
+    // inherited a sibling's 75 and showed 0.1265 a tablet against a true
+    // 0.0633 — the best deal on the product, displayed as the worst. The guard
+    // used to refuse only the implausibly cheap, because an inferred row
+    // cannot win. Nobody needed it to win in order to be misled by it.
+    $product = productWithShops([
+        'internetdrogisterij.nl' => ['current_price' => '4.75', 'pack_quantity' => '75.00', 'pack_unit' => 'piece'],
+        'koopjesdrogisterij.nl' => ['current_price' => '4.75', 'pack_quantity' => '75.00', 'pack_unit' => 'piece'],
+        // States no size of its own, and is really a 150-pack.
+        'deonlinedrogist.nl' => ['current_price' => '9.49'],
+    ]);
+
+    $packs = $product->comparablePacks();
+    $borrowed = $product->shops->where('host', 'deonlinedrogist.nl')->sole();
+
+    expect($packs->for($borrowed)?->reason())->toBe('Pack size looks wrong for this product')
+        ->and($packs->unitPriceOf($borrowed))->toBeNull();
+});
+
+test('an inherited size close to the field is still used', function (): void {
+    // The guard refuses a figure far off the field, not any figure at all.
+    $product = productWithShops([
+        'a.test' => ['current_price' => '4.75', 'pack_quantity' => '75.00', 'pack_unit' => 'piece'],
+        'b.test' => ['current_price' => '4.75', 'pack_quantity' => '75.00', 'pack_unit' => 'piece'],
+        'c.test' => ['current_price' => '5.25'],
+    ]);
+
+    $packs = $product->comparablePacks();
+    $borrowed = $product->shops->where('host', 'c.test')->sole();
+
+    expect($packs->for($borrowed)?->provenance)->toBe(PackProvenance::Inferred)
+        ->and($packs->unitPriceOf($borrowed))->toBe('0.0700');
 });

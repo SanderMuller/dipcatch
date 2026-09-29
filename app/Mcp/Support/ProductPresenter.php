@@ -3,6 +3,7 @@
 namespace App\Mcp\Support;
 
 use App\Models\Product;
+use App\Support\HeadlinePrice;
 use Carbon\CarbonInterface;
 
 /**
@@ -20,11 +21,18 @@ final readonly class ProductPresenter
         $bundle = $cheapest?->liveBundleOffer();
         $packs = $product->comparablePacks();
         $bestValue = $product->bestValueShop();
+        $headline = HeadlinePrice::of($product, $packs);
 
         return [
             'product_id' => self::id($product->getKey()),
             'title' => $product->title,
             'currency' => $product->currency,
+            // The figure the app leads with, so an assistant states the one a
+            // person sees: the best value per unit while the product compares
+            // per unit, else the lowest pack price.
+            'headline_price' => $headline->isPerUnit() ? $headline->unitPrice() : $headline->packPrice(),
+            'headline_unit' => $headline->unit,
+            'headline_price_basis' => $headline->isPerUnit() ? 'unit' : 'pack',
             // The pack price of the shop with the smallest outlay — what the
             // shopper hands over. `best_value_*` answers the other question:
             // which shop is cheapest per kilo, litre or piece, which is the
@@ -41,7 +49,8 @@ final readonly class ProductPresenter
             'cheapest_single_item_price' => $cheapest?->singleItemPrice(),
             'cheapest_bundle_quantity' => $bundle?->quantity,
             'cheapest_bundle_total_price' => $bundle?->totalPrice,
-            'shop_count' => $product->shops()->count(),
+            // The loaded collection: a count query here ran once per product.
+            'shop_count' => $product->shops->count(),
             'threshold_pct' => self::decimal($product->drop_threshold_pct),
             'threshold_abs' => self::decimal($product->drop_threshold_abs),
             'target_price' => self::decimal($product->target_price),
@@ -104,6 +113,14 @@ final readonly class ProductPresenter
                 'pack_size_provenance' => $pack?->provenance?->value,
                 'unit_price' => $packs->unitPriceOf($shop),
                 'excluded_reason' => $pack?->reason(),
+                // Not a pack exclusion: that one keeps a shop competing for
+                // the lowest price. This one bars it from both answers,
+                // because the number is not a price anyone pays.
+                'not_a_consumer_price' => $shop->notAConsumerPriceReason(),
+                // A link rather than a tracked price. Never in either answer,
+                // and retried weekly — see ShopKind.
+                'kind' => $shop->kind->value,
+                'link_note' => $shop->kind->note(),
                 'is_cheapest' => $shop->getKey() === $product->cheapest_shop_id,
                 'is_best_value' => $bestValueId !== null && $shop->getKey() === $bestValueId,
                 'last_checked_at' => $checked instanceof CarbonInterface ? $checked->toIso8601String() : null,

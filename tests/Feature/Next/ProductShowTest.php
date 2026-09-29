@@ -1,13 +1,19 @@
 <?php declare(strict_types=1);
 
+use App\Enums\PackExclusion;
 use App\Enums\ProductCategory;
+use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
+use App\Services\Drops\DropEvaluator;
+use App\Services\Drops\Reference;
 use App\Support\Favicon;
+use App\Support\Numeric;
+use App\Support\ProductMarkdown;
 use App\Support\PromotionLabel;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
@@ -92,6 +98,75 @@ it('discloses bundle terms in headline and shop row', function (): void {
     expect(substr_count($component->html(), '2 for €4.00'))->toBe(2);
 });
 
+it('shows how far a deal puts the best value below the regular price', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '2.00');
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'promotion_ends_at' => now()->addDays(2),
+        'pack_quantity' => '1500',
+        'pack_unit' => 'ml',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
+
+    $this->actingAs($user);
+
+    // €1.33 /l on the deal against €1.90 /l for one bottle at the regular price.
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeHtml('data-test="below-regular"')
+        ->assertSeeInOrder(['below the regular price', '30%'])
+        ->assertDontSeeHtml('data-test="no-drop"');
+});
+
+it('shows the drop an alert fired on in the price box', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '8.00');
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '8.00', 'currency' => 'EUR']);
+    $product->refresh()->recomputeCheapestShop();
+    $product->forceFill(['last_notified_price' => '8.00', 'last_notified_unit' => null])->save();
+
+    PriceDropEvent::factory()->for($product)->create([
+        'user_id' => $user->id,
+        'currency' => 'EUR',
+        'reference_price' => '10.00',
+        'comparison_unit' => null,
+        'drop_pct' => '20.0',
+        'fired_at' => now(),
+    ]);
+
+    $this->actingAs($user);
+
+    // 8.00 a pack against the 10.00 the alert fired from.
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeHtml('data-test="active-drop"')
+        ->assertSeeInOrder(['Was €10.00', '20%'])
+        ->assertDontSeeHtml('data-test="no-drop"');
+});
+
+it('says there is no drop when the best value has no regular price beside it', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '2.00');
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'pack_quantity' => '1500',
+        'pack_unit' => 'ml',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeText('€1.33 /l')
+        ->assertDontSeeHtml('data-test="below-regular"')
+        ->assertSeeHtml('data-test="no-drop"')
+        ->assertSeeText('No drop right now');
+});
+
 it('warns about an ended bundle in the headline and shop row', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user, cheapestPrice: '2.00');
@@ -124,6 +199,35 @@ it('pauses and resumes', function (): void {
     livewire(ProductShow::class, ['product' => $product])->call('togglePaused');
 
     expect($product->fresh()?->active)->toBeFalse();
+});
+
+it('shows the tracking state on the pill that toggles it', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, active: true);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeText('Tracking')
+        ->assertDontSeeText('Paused')
+        ->call('togglePaused')
+        ->assertSeeText('Paused')
+        ->assertSeeText('Resume tracking');
+});
+
+it('shows whether the product has a public link', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeText('Not shared')
+        ->call('generateShareLink')
+        ->assertDontSeeText('Not shared')
+        ->assertSeeText('Shared')
+        ->call('stopSharing')
+        ->assertSeeText('Not shared');
 });
 
 /**
@@ -397,6 +501,110 @@ it('renders a product with no shops and no history', function (): void {
         ->assertSee('No price history yet.');
 });
 
+it('charts the best value per unit first, with the pack price one switch away', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create(['pack_quantity' => '800.00', 'pack_unit' => 'piece']);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'best_value_shop_id' => $shop->id,
+        'cheapest_price' => '21.99',
+        'pack_quantity' => '800.00',
+        'pack_unit' => 'piece',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee("x-data=\"{ basis: 'unit' }\"", escape: false)
+        ->assertSee('Price over time')->assertSeeInOrder(['Price per piece, at the shop that is the best value.', 'Price per pack, at the shop with the lowest price.'])->assertSeeHtml('data-test="price-history-basis"')->assertSeeHtml('data-test="price-history-chart-unit"')->assertSeeHtml('data-test="price-history-chart-price"');
+});
+
+it('opens on the pack price when the current price has no pack size', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create();
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '21.99',
+        'pack_quantity' => '800.00',
+        'pack_unit' => 'piece',
+        'started_at' => now()->subDays(10),
+        'ended_at' => now()->subDays(5),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '19.99',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    // The per-unit line would end in a gap today, so the switch starts on the pack price.
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee("x-data=\"{ basis: 'price' }\"", escape: false)
+        ->assertSee('data-test="price-history-basis"', escape: false);
+});
+
+it('opens on the pack price while the per-unit line is too short to read', function (): void {
+    // A pack size that appeared at the last check: a month on the pack price,
+    // then an hour with a size. The per-unit line would be one dot.
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create();
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '1.50',
+        'started_at' => now()->subDays(25),
+        'ended_at' => now()->subHour(),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '1.50',
+        'best_value_shop_id' => $shop->id,
+        'best_value_price' => '1.50',
+        'pack_quantity' => '75.00',
+        'pack_unit' => 'g',
+        'started_at' => now()->subHour(),
+        'ended_at' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee("x-data=\"{ basis: 'price' }\"", escape: false)
+        ->assertSee('data-test="price-history-basis"', escape: false);
+});
+
+it('charts the pack price alone when no pack size is known', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create(['pack_quantity' => null, 'pack_unit' => null]);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '2.19',
+        'started_at' => now()->subDays(5),
+        'ended_at' => null,
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee("x-data=\"{ basis: 'price' }\"", escape: false)
+        ->assertSee('Price over time')
+        ->assertSee('Price per pack, at the shop with the lowest price.')
+        ->assertDontSee('at the shop that is the best value')
+        ->assertDontSee('data-test="price-history-basis"', escape: false)
+        ->assertDontSee('data-test="price-history-chart-unit"', escape: false);
+});
+
 it('states the shop limit instead of offering another', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user);
@@ -497,7 +705,7 @@ it('links the alert threshold to the edit form', function (): void {
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product])
-        ->assertSee('Alerts below')
+        ->assertSee('Alerts')
         ->assertSeeHtml('data-test="edit-alert-threshold"')
         ->assertSeeHtml(route('app.products.edit', $product));
 });
@@ -513,14 +721,16 @@ it('shows the category as a badge that links to the list filtered on it', functi
         ->assertSeeHtml(route('app.products.index', ['category' => 'food.coffee_tea']));
 });
 
-it('shows no category badge on a product without one', function (): void {
+it('says a product has no category, and links to the others without one', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user);
 
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product])
-        ->assertDontSeeHtml('data-test="product-category-badge"');
+        ->assertDontSeeHtml('data-test="product-category-badge"')
+        ->assertSeeText('No category')
+        ->assertSeeHtml(route('app.products.index', ['category' => ProductList::NO_CATEGORY]));
 });
 
 it('shows why a shop carries no unit price, and marks an inherited size', function (): void {
@@ -552,4 +762,387 @@ it('shows why a shop carries no unit price, and marks an inherited size', functi
         ->assertSee('Sold by the piece — no item size to compare')
         ->assertSee('barebells.nl')
         ->assertSee('estimated');
+});
+
+it('dates the price by when it was last read, not by the last attempt', function (): void {
+    // `last_checked_at` is stamped by every attempt, a failed one included, so a
+    // shop failing for a week showed "2 hours ago" beside a week-old price. The
+    // price simply stopped moving and looked current while it did — the same
+    // silent failure the unit comparison had to have removed from it.
+    $user = User::factory()->create();
+    $product = ownedProduct($user, title: 'Coffee beans');
+
+    Shop::factory()->for($product)->create(['url' => 'https://failing.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR',
+            'current_price' => '12.49',
+            'last_success_at' => now()->subDays(8),
+            'last_checked_at' => now()->subHours(2),
+            'consecutive_failures' => 5,
+        ])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('failing since')
+        ->assertSee('1 week ago')
+        ->assertDontSee('2 hours ago');
+});
+
+it('shows a healthy shop the age of its price', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, title: 'Coffee beans');
+
+    Shop::factory()->for($product)->create(['url' => 'https://healthy.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR',
+            'current_price' => '12.49',
+            'last_success_at' => now()->subHours(3),
+            'last_checked_at' => now()->subHours(3),
+            'consecutive_failures' => 0,
+        ])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('3 hours ago')
+        ->assertDontSee('failing since');
+});
+
+it('says a shop has never been read rather than showing nothing', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, title: 'Coffee beans');
+
+    Shop::factory()->for($product)->create(['url' => 'https://new.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR', 'current_price' => null,
+            'last_success_at' => null, 'last_checked_at' => now(), 'consecutive_failures' => 2,
+        ])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('never read');
+});
+
+/**
+ * A product whose cheapest shop sells a small pack and whose best value
+ * is a bigger pack elsewhere.
+ */
+function smallPackCheapest(User $user, string $bigPackPrice): Product
+{
+    $product = ownedProduct($user);
+    $small = Shop::factory()->for($product)->create([
+        'url' => 'https://dirk.nl/p/sticks', 'currency' => 'EUR', 'current_price' => '2.55',
+        'pack_quantity' => '8.00', 'pack_unit' => 'piece',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/sticks', 'currency' => 'EUR', 'current_price' => $bigPackPrice,
+        'pack_quantity' => '30.00', 'pack_unit' => 'piece',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $small->id, 'cheapest_price' => '2.55'])->save();
+
+    return $product->refresh();
+}
+
+it('notes how much more per unit the lowest pack price costs', function (): void {
+    $user = User::factory()->create();
+    // €0.32 a piece against €0.22 a piece: 45% more.
+    $product = smallPackCheapest($user, '6.60');
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        // A note beside the best value, not a warning: the headline already names it.
+        ->assertSeeHtml('data-test="lowest-price-note"')
+        ->assertDontSeeHtml('data-test="unit-price-warning"')
+        ->assertSee('45% more per piece than the best value')
+        ->assertSee('jumbo.com');
+});
+
+it('notes a small gap the same way', function (): void {
+    $user = User::factory()->create();
+    // €0.32 a piece against €0.30 a piece: about 6% more.
+    $product = smallPackCheapest($user, '9.00');
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeHtml('data-test="lowest-price-note"')
+        ->assertSee('6% more per piece than the best value');
+});
+
+it('does not warn when the best price is also the best value', function (): void {
+    $user = User::factory()->create();
+    // €0.32 a piece against €0.40 a piece: the small pack wins both.
+    $product = smallPackCheapest($user, '12.00');
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])->assertDontSeeHtml('data-test="lowest-price-note"');
+});
+
+it('lists the tracked shops cheapest per unit first, then the shops outside the comparison', function (): void {
+    // The vissticks shape: dirk has the lowest pack price and the highest price per kilo.
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://dirk.nl/p/1', 'current_price' => '2.55', 'pack_quantity' => '240.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '6.15', 'pack_quantity' => '840.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '6.59', 'pack_quantity' => '30.00', 'pack_unit' => 'piece']);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product->refresh()])->html());
+    preg_match_all('/data-test="shop-price-cell"[^>]*>(.*?)<\/td>/', $html, $cells);
+    $prices = array_map(fn (string $cell): string => trim((string) preg_replace('/\s+/', ' ', strip_tags($cell))), $cells[1]);
+
+    expect($prices)->toHaveCount(3)
+        ->and($prices[0])->toStartWith('€7.32 /kg')
+        ->and($prices[1])->toStartWith('€10.62 /kg')
+        ->and($prices[2])->toContain('€6.59 for 30 pieces');
+});
+
+it('leads with the pack price when no shop states a pack size', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '11.95');
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://bol.com/p/1', 'current_price' => '11.95', 'pack_quantity' => null, 'pack_unit' => null]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
+
+    $this->actingAs($user);
+
+    $tiles = summaryTiles(livewire(ProductShow::class, ['product' => $product->refresh()])->html());
+
+    expect($tiles)->toContain('Best price now')
+        ->toContain('€11.95')
+        ->not->toContain('Best value')
+        ->not->toContain('data-test="pack-line"');
+});
+
+it('leads each shop row with its price per unit, and an excluded shop with its reason', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '5.49', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://fitnesscandy.nl/p/1', 'current_price' => '3.00', 'pack_quantity' => '12.00', 'pack_unit' => 'piece']);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product->refresh()])->html());
+    preg_match_all('/data-test="shop-price-cell"[^>]*>(.*?)<\/td>/', $html, $cells);
+    $text = array_map(fn (string $cell): string => trim((string) preg_replace('/\s+/', ' ', strip_tags($cell))), $cells[1]);
+
+    expect($html)->toContain('Price per kilo')
+        ->and(collect($text)->first(fn (string $cell): bool => str_contains($cell, '€4.99')))->toStartWith('€7.56 /kg')->toContain('Best value')->toContain('€4.99 for 660 g')
+        // Excluded from the per-kilo comparison: its reason, then its own pack.
+        ->and(collect($text)->first(fn (string $cell): bool => str_contains($cell, '€3.00')))
+        ->toContain(PackExclusion::SoldByThePiece->label())
+        ->toContain('€3.00 for 12 pieces')
+        ->not->toContain('/piece');
+});
+
+it('gives each tracked shop its pack size, and a dash when none is known', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://bol.com/p/1', 'current_price' => '11.95', 'pack_quantity' => null, 'pack_unit' => null]);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product->refresh()])->html());
+    preg_match_all('/data-test="shop-pack-size"[^>]*>(.*?)<\/td>/', $html, $cells);
+    $sizes = array_map(fn (string $cell): string => trim(strip_tags($cell)), $cells[1]);
+
+    expect($html)->toContain('Pack size')
+        ->and($sizes)->toContain('660 g')
+        ->and(collect($sizes)->first(fn (string $size): bool => $size !== '660 g'))->toContain('Unknown');
+});
+
+it('marks the best-value shop in the comparison table', function (): void {
+    // The vissticks shape: dirk has the lowest pack price, jumbo the best value.
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://dirk.nl/p/1', 'current_price' => '2.55', 'pack_quantity' => '240.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '6.15', 'pack_quantity' => '840.00', 'pack_unit' => 'g']);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product->refresh()])->html());
+    preg_match_all('/data-test="shop-price-cell"[^>]*>(.*?)<\/td>/', $html, $cells);
+    $marked = array_values(array_filter($cells[1], fn (string $cell): bool => str_contains($cell, 'data-test="best-value-chip"')));
+
+    expect($marked)->toHaveCount(1)
+        ->and(strip_tags($marked[0]))->toContain('€7.32 /kg');
+});
+
+it('marks no best-value shop when there is only one shop', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '6.15', 'pack_quantity' => '840.00', 'pack_unit' => 'g']);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])->assertDontSeeHtml('data-test="best-value-chip"');
+});
+
+it('labels the last alert on the price chart without a hover', function (bool $alerted): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '85.00');
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => null,
+        'cheapest_price' => '85.00',
+        'started_at' => now()->subDays(10),
+        'ended_at' => null,
+    ]);
+
+    if ($alerted) {
+        PriceDropEvent::factory()->for($product)->create([
+            'user_id' => $user->id,
+            'fired_at' => now()->subDays(2),
+            'new_price' => '85.00',
+        ]);
+    }
+
+    $this->actingAs($user);
+
+    $component = livewire(ProductShow::class, ['product' => $product]);
+
+    if ($alerted) {
+        $component->assertSeeHtml('data-test="notified-callout-price"')->assertSeeInOrder(['data-test="notified-callout-price"', 'Notified', '€85.00'], escape: false);
+    } else {
+        $component->assertDontSeeHtml('data-test="notified-callout-price"');
+    }
+})->with([
+    'after an alert' => [true],
+    'before any alert' => [false],
+]);
+
+it('marks stock with an icon in the stock column, named for screen readers', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '4.99', 'current_in_stock' => false]);
+
+    $this->actingAs($user);
+
+    $html = (string) preg_replace('/\s+/', ' ', livewire(ProductShow::class, ['product' => $product->refresh()])->html());
+    preg_match('/data-test="shop-stock-cell"[^>]*>(.*?)<\/td>/', $html, $cell);
+
+    expect($cell[1] ?? '')->toContain('<svg')
+        ->toContain('<span class="sr-only">Out of stock</span>')
+        ->not->toContain('data-flux-badge');
+});
+
+it('explains the unit price, the pack price and the read time on hover', function (): void {
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://ah.nl/p/1',
+        'current_price' => '4.99',
+        'pack_quantity' => '660.00',
+        'pack_unit' => 'g',
+        'last_success_at' => CarbonImmutable::parse('2026-09-23 10:15', 'UTC'),
+    ]);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeText('Price per kilo: the pack price divided by the pack size, so packs of different sizes compare fairly.')
+        ->assertSeeText('Pack price: what ah.nl charges for 660 g.')
+        ->assertSeeText('Price last read 23 Sep 2026, 12:15.');
+});
+
+it('shows every alert rule the product has', function (): void {
+    $user = User::factory()->create();
+    $product = smallPackCheapest($user, '6.60');
+    $product->forceFill(['target_price' => null, 'drop_threshold_pct' => '10.00', 'drop_threshold_abs' => null, 'unit_price_target' => '0.2000'])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeInOrder(['€0.2000 /piece', 'when a price reaches it', 'or 10% drop'])
+        ->assertDontSee('Any drop');
+});
+
+it('says any drop when the product has no alert rule and no price yet', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $product->forceFill(['target_price' => null, 'drop_threshold_pct' => null, 'drop_threshold_abs' => null, 'unit_price_target' => null])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])->assertSee('Any drop');
+});
+
+it('says below for a second price target too', function (): void {
+    $user = User::factory()->create();
+    $product = smallPackCheapest($user, '6.60');
+    $product->forceFill(['target_price' => '2.00', 'unit_price_target' => '0.2000', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeInOrder(['€2.00', 'when a price reaches it', 'or €0.2000 /piece or less']);
+});
+
+it('names the default drop thresholds when the product has none of its own', function (): void {
+    $user = User::factory()->create();
+    // A €20 reference sits in the <25 tier: 15% or €3.00.
+    $product = ownedProduct($user, cheapestPrice: '20.00');
+    $product->forceFill(['target_price' => null, 'unit_price_target' => null, 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+    ProductCheapestHistory::query()->create(['product_id' => $product->id, 'cheapest_price' => '20.00', 'started_at' => now()->subDays(10)]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeInOrder(['15% drop (default)', 'or €3.00 drop (default)'])
+        ->assertDontSee('Any drop');
+});
+
+it('names the same default drop the drop check uses on a per-unit reference', function (): void {
+    $user = User::factory()->create();
+    // €7 for 250 g: €28 a kilo. The pack price and the kilo price sit in
+    // different tiers, which is where a guess from the pack price goes wrong.
+    $product = ownedProduct($user, cheapestPrice: '7.00');
+    $shop = Shop::factory()->for($product)->create(['currency' => 'EUR', 'current_price' => '7.00', 'pack_quantity' => '250.00', 'pack_unit' => 'g']);
+    $product->forceFill(['cheapest_shop_id' => $shop->id, 'target_price' => null, 'unit_price_target' => null, 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+    ProductCheapestHistory::query()->create([
+        'product_id' => $product->id, 'cheapest_shop_id' => $shop->id, 'cheapest_price' => '7.00',
+        'pack_quantity' => '250.00', 'pack_unit' => 'g', 'started_at' => now()->subDays(10),
+    ]);
+    $product->refresh();
+
+    $reference = app(Reference::class)->compute($product);
+
+    if ($reference === null) {
+        throw new RuntimeException('The product needs a reference for the drop check to compare with.');
+    }
+
+    $outcome = app(DropEvaluator::class)->evaluate($product, '6.00', $reference);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee(Numeric::trimmed((string) $outcome->thresholdPct) . '% drop (default)');
+});
+
+it('shows no unit figure from a shop\'s own size when the product compares none', function (): void {
+    // The sized shop is paused, so it does not vote, and nothing resolves a unit.
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://bol.com/p/1', 'current_price' => '11.95', 'pack_quantity' => null, 'pack_unit' => null]);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '12.49', 'pack_quantity' => '500.00', 'pack_unit' => 'g', 'active' => false]);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('€12.49')
+        ->assertDontSee('/kg');
+
+    expect(ProductMarkdown::of($product->refresh()))->not->toContain('/kg');
 });

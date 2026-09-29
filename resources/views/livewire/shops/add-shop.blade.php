@@ -20,7 +20,7 @@
                 placeholder="https://shop.example.com/product/123"
                 required
             />
-            <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
+            <flux:button type="submit" variant="primary">
                 <span wire:loading.remove wire:target="probe">Check price</span>
                 <span wire:loading wire:target="probe">Checking…</span>
             </flux:button>
@@ -46,23 +46,28 @@
             $previewUnitPrice = null;
             $previewRegularPrice = is_string($snapshot['single_item_price'] ?? null) ? $snapshot['single_item_price'] : null;
             $previewRegularUnitPrice = null;
-            $bundleLabel = \App\Support\BundlePriceLabel::forSnapshot($snapshot);
-            $hasLivePreviewBundle = $bundleLabel !== null
-                && \App\Support\BundlePriceLabel::snapshotPriceIsBundleUnit($snapshot);
+            $bundleLabel = $this->previewBundleLabel();
+            $hasLivePreviewBundle = $bundleLabel !== null && $this->previewBundleIsLive();
             if ($previewPackSize !== null && is_string($snapshot['price'] ?? null)) {
                 $previewUnitPriceValue = $previewPackSize->unitPriceFor($snapshot['price']);
                 if ($previewUnitPriceValue !== null) {
-                    $previewUnitPrice = \App\Support\MoneyFormatter::format($previewUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
+                    $previewUnitPrice = \App\Support\MoneyFormatter::unitPrice($previewUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
                 }
                 if ($previewRegularPrice !== null) {
                     $previewRegularUnitPriceValue = $previewPackSize->unitPriceFor($previewRegularPrice);
                     if ($previewRegularUnitPriceValue !== null) {
-                        $previewRegularUnitPrice = \App\Support\MoneyFormatter::format($previewRegularUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
+                        $previewRegularUnitPrice = \App\Support\MoneyFormatter::unitPrice($previewRegularUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
                     }
                 }
             }
         @endphp
         <flux:card class="space-y-3">
+            @php($alreadyTracked = $this->alreadyTrackedNote())
+            @if ($alreadyTracked !== null)
+                <flux:callout icon="exclamation-triangle" color="amber">
+                    <flux:callout.text>{{ $alreadyTracked }}</flux:callout.text>
+                </flux:callout>
+            @endif
             <div class="flex items-start gap-3">
                 @if (! empty($snapshot['image_url']))
                     <img src="{{ $snapshot['image_url'] }}" alt="" class="h-20 w-20 object-cover rounded" />
@@ -73,10 +78,17 @@
                         {{ $host }}
                     </div>
                     <flux:heading>{{ $snapshot['title'] }}</flux:heading>
-                    <div class="mt-1 text-lg font-semibold tabular-nums">
-                        {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
-                        @if ($hasLivePreviewBundle)
-                            @if ($previewRegularPrice !== null)
+                    {{-- Per unit first when the page states a pack size: the figure
+                         shops are compared on. The pack price follows beneath. --}}
+                    <div class="mt-1 text-lg font-semibold tabular-nums" data-test="preview-price">
+                        @if ($previewUnitPrice !== null)
+                            {{ $previewUnitPrice }}
+                            @if ($hasLivePreviewBundle && $previewRegularUnitPrice !== null)
+                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ $previewRegularUnitPrice }}</del>
+                            @endif
+                        @else
+                            {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
+                            @if ($hasLivePreviewBundle && $previewRegularPrice !== null)
                                 <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
                             @endif
                         @endif
@@ -86,14 +98,27 @@
                             <flux:badge color="zinc" size="sm" class="ms-2">Stock unknown</flux:badge>
                         @endif
                     </div>
+                    @php($variantNote = is_string($snapshot['variant_note'] ?? null) ? $snapshot['variant_note'] : null)
+                    @if ($variantNote !== null)
+                        {{-- Which of the page's variants this price belongs to. A
+                             page selling three flavours used to preview one price
+                             with nothing saying the other two existed. --}}
+                        <flux:text size="sm" class="mt-1 text-zinc-500">{{ $variantNote }}</flux:text>
+                    @endif
+                    @if ($variantPicked)
+                        <div class="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-zinc-500" data-test="picked-variant">
+                            <span>{{ __('This page sells several packs. DipCatch picked the one that matches this product\'s size.') }}</span>
+                            <flux:button variant="ghost" size="xs" wire:click="chooseAnotherVariant">{{ __('Choose another') }}</flux:button>
+                        </div>
+                    @endif
                     @if ($bundleLabel)
                         <flux:text size="sm" class="mt-1 text-zinc-500">{{ $bundleLabel }}</flux:text>
                     @endif
                     @if ($previewUnitPrice !== null)
-                        <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500">
-                            {{ $previewUnitPrice }}
-                            @if ($hasLivePreviewBundle && $previewRegularUnitPrice !== null)
-                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ $previewRegularUnitPrice }}</del>
+                        <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500" data-test="preview-pack">
+                            {{ \App\Support\PackLine::format($snapshot['price'], $snapshot['currency'], $previewPackSize) }}
+                            @if ($hasLivePreviewBundle && $previewRegularPrice !== null)
+                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
                             @endif
                         </flux:text>
                     @endif
@@ -123,7 +148,24 @@
             <flux:callout.text>
                 @include('livewire.shops.partials.probe-error')
             </flux:callout.text>
-            <flux:button type="button" class="mt-2" wire:click="cancel">Try a different URL</flux:button>
+            <div class="mt-2 flex flex-wrap gap-2">
+                <flux:button type="button" wire:click="cancel">{{ __('Try a different URL') }}</flux:button>
+                @if ($this->canKeepAsLink())
+                    {{-- Finding a shop that sells the thing is the slow part, and
+                         this is the moment that work would otherwise be thrown
+                         away. The link holds no price, so it can never decide
+                         either answer. --}}
+                    <flux:button type="button" variant="primary" wire:click="keepAsLink">
+                        <span wire:loading.remove wire:target="keepAsLink">{{ __('Keep as a link') }}</span>
+                        <span wire:loading wire:target="keepAsLink">{{ __('Keeping…') }}</span>
+                    </flux:button>
+                @endif
+            </div>
+            @if ($this->canKeepAsLink())
+                <flux:text size="sm" class="mt-2 text-zinc-500">
+                    {{ __('It is saved without a price, never decides the cheapest or the best value, and is checked again weekly — if the page becomes readable, DipCatch starts tracking it by itself.') }}
+                </flux:text>
+            @endif
         </flux:callout>
     @endif
 </div>

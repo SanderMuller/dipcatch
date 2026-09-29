@@ -5,16 +5,15 @@ namespace App\Console\Commands;
 use App\Billing\Entitlements;
 use App\Billing\Plan;
 use App\Billing\ProUsers;
-use App\Enums\ShopHealth;
 use App\Jobs\CheckShopPrice;
 use App\Models\Shop;
-use App\Support\Config as DipConfig;
 use App\Support\RecheckJitter;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Support\Facades\Config;
 
 #[Signature('dipcatch:recheck-offers')]
 #[Description('Dispatch CheckShopPrice jobs for offers that are due for a recheck.')]
@@ -29,7 +28,7 @@ final class RecheckActiveShopsCommand extends Command
         $dispatched = 0;
 
         $this->dueQuery()
-            ->limit(DipConfig::int('dipcatch.scheduler.batch_size', 200))
+            ->limit(Config::integer('dipcatch.scheduler.batch_size'))
             ->each(function (Shop $shop) use ($jitterSeconds, &$dispatched): void {
                 $delay = random_int(0, $jitterSeconds);
                 dispatch(new CheckShopPrice($shop))
@@ -58,16 +57,17 @@ final class RecheckActiveShopsCommand extends Command
         $freeCutoff = $this->cutoff(Plan::Free);
 
         return Shop::query()
-            ->where('active', true)
-            ->where('health', '!=', ShopHealth::Dead->value)
-            ->whereHas('product', function (EloquentQueryBuilder $q): void {
-                $q->where('active', true);
-            })
+            // Never a reference shop: its page is known to refuse us, so a
+            // check spends a fetch to learn nothing and counts the refusal
+            // against the row's health until `dead_after` switches it off.
+            // Asking again is the retry command's job, on its own schedule.
+            ->scheduled()
             ->where(function (EloquentQueryBuilder $q) use ($proCutoff, $freeCutoff): void {
                 $q->whereNull('last_checked_at')
                     ->orWhere(fn (EloquentQueryBuilder $due): EloquentQueryBuilder => $this->duePerPlan($due, Plan::Pro, $proCutoff))
                     ->orWhere(fn (EloquentQueryBuilder $due): EloquentQueryBuilder => $this->duePerPlan($due, Plan::Free, $freeCutoff))
-                    ->orWhere(fn (EloquentQueryBuilder $boundary): EloquentQueryBuilder => $this->dueBundleBoundary($boundary));
+                    ->orWhere(fn (EloquentQueryBuilder $boundary): EloquentQueryBuilder => $this->dueBundleBoundary($boundary))
+                    ->orWhere(fn (EloquentQueryBuilder $boundary): EloquentQueryBuilder => $this->dueDealStart($boundary));
             })
             ->orderByRaw('last_checked_at IS NULL DESC')
             ->oldest('last_checked_at');
@@ -97,6 +97,28 @@ final class RecheckActiveShopsCommand extends Command
                         ->where('promotion_ends_at', '<', now())
                         ->whereColumn('current_price', '!=', 'single_item_price');
                 });
+            });
+    }
+
+    /**
+     * A deal without bundle terms that started since the row was last read.
+     * An announced deal is tracked at the price before it (see AhApiSource),
+     * so without this the row shows the deal as running beside that price
+     * until its normal recheck — up to a day on a free account. Bundles have
+     * their own rule above.
+     *
+     * @param  EloquentQueryBuilder<Shop>  $query
+     * @return EloquentQueryBuilder<Shop>
+     */
+    private function dueDealStart(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query
+            ->whereNull('bundle_quantity')
+            ->whereNotNull('promotion_starts_at')
+            ->where('promotion_starts_at', '<=', now())
+            ->whereColumn('last_checked_at', '<', 'promotion_starts_at')
+            ->where(function (EloquentQueryBuilder $end): void {
+                $end->whereNull('promotion_ends_at')->orWhere('promotion_ends_at', '>=', now());
             });
     }
 

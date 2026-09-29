@@ -10,6 +10,7 @@ use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -42,7 +43,8 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property bool $notify_via_push
  * @property string $timezone
  * @property bool $auto_categories
- * @property CarbonImmutable|null $last_digest_sent_at
+ * @property CarbonImmutable|null $digest_processed_until
+ * @property CarbonImmutable|null $tracking_ideas_hidden_at
  * @property CarbonImmutable|null $timezone_detected_at
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
@@ -52,12 +54,23 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property CarbonImmutable $updated_at
  * @property-read EloquentCollection<int, SocialAccount> $socialAccounts
  */
-#[Fillable(['name', 'email', 'password', 'is_admin', 'timezone'])]
+#[Fillable(['name', 'email', 'password', 'timezone'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 final class User extends Authenticatable implements FilamentUser, MustVerifyEmail, OAuthenticatable, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use Billable, HasApiTokens, HasFactory, HasPushSubscriptions, Notifiable, PasskeyAuthenticatable, Subscribes, TwoFactorAuthenticatable;
+
+    /**
+     * Stored lower-case. Fortify lower-cases what a person types to sign in or
+     * to ask for a reset link, and `email` compares byte for byte on Postgres.
+     *
+     * @return Attribute<string, string>
+     */
+    protected function email(): Attribute
+    {
+        return Attribute::make(set: fn (string $value): string => Str::lower($value));
+    }
 
     /**
      * @return array<string, string>
@@ -70,14 +83,15 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
             'is_admin' => 'boolean',
             'billing_blocked_at' => 'datetime',
             'comped_until' => 'datetime',
-            // Cashier reads this one directly (`onTrial()` calls `isFuture()`
+            // Cashier reads this one directly (`onGenericTrial()` calls `isFuture()`
             // on it), and it is not in the model's own casts by default.
             'trial_ends_at' => 'datetime',
             'notify_via_email' => 'boolean',
             'notify_via_filament' => 'boolean',
             'notify_via_push' => 'boolean',
             'auto_categories' => 'boolean',
-            'last_digest_sent_at' => 'datetime',
+            'digest_processed_until' => 'datetime',
+            'tracking_ideas_hidden_at' => 'datetime',
             'timezone_detected_at' => 'datetime',
         ];
     }
@@ -100,6 +114,16 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
     public function socialAccounts(): HasMany
     {
         return $this->hasMany(SocialAccount::class);
+    }
+
+    /**
+     * Getting-started ideas this person ticked by hand.
+     *
+     * @return HasMany<TrackingIdeaMark, $this>
+     */
+    public function trackingIdeaMarks(): HasMany
+    {
+        return $this->hasMany(TrackingIdeaMark::class);
     }
 
     /** The one guard for automatic categories: opted in, and the plan allows it. */

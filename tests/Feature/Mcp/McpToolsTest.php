@@ -26,7 +26,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Mcp\Server\Attributes\Description;
-use ReflectionClass;
 
 it('lists only the products of the token owner', function (): void {
     $me = User::factory()->create();
@@ -300,6 +299,40 @@ it('sets the unit price target, and says when the account is not alerted on it',
         ->assertSee('Pro feature');
 
     expect((float) $product->fresh()?->unit_price_target)->toBe(6.5);
+});
+
+it('keeps a unit price target to four decimals, cut rather than rounded up', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+
+    // A nappy at a cent and a quarter: two decimals would have stored 0.01.
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 0.01259])
+        ->assertOk();
+
+    expect((string) $product->fresh()?->unit_price_target)->toBe('0.0125');
+});
+
+it('cuts a unit price target without rounding it up first', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 0.012599999999])
+        ->assertOk();
+
+    expect((string) $product->fresh()?->unit_price_target)->toBe('0.0125');
+});
+
+it('refuses a unit price target below the smallest one the column keeps', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+
+    DipCatchServer::actingAs($me)
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 0.00005])
+        ->assertHasErrors();
+
+    expect($product->fresh()?->unit_price_target)->toBeNull();
 });
 
 it('sets the unit price target without a caveat for a Pro account', function (): void {
@@ -632,6 +665,17 @@ it('files a product under a category, and records that a person chose it', funct
         ->and($product->shops()->pluck('id')->all())->toBe([$shop->id]);
 });
 
+it('drops a pending suggestion when a category is chosen or cleared', function (?string $category): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['suggested_category' => ProductCategory::SnacksSweets]);
+
+    DipCatchServer::actingAs($user)
+        ->tool(SetCategoryTool::class, ['product_id' => (string) $product->id, 'category' => $category])
+        ->assertOk();
+
+    expect($product->refresh()->suggested_category)->toBeNull();
+})->with(['chosen' => ['food.snacks_sweets'], 'cleared' => [null]]);
+
 it('clears a category, and a clear is a choice too', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create([
@@ -959,4 +1003,63 @@ it('tells a caller that a dear shop is still worth adding', function (): void {
 
     expect($description)->toContain('even when its price is high today')
         ->and($description)->toContain('not whether it is cheap now');
+});
+
+it('picks the variant matching the product pack and says which others the page sells', function (): void {
+    $offer = static fn (string $size, string $price, string $sku): array => [
+        '@type' => 'Offer', 'name' => 'Iams Adult met verse kip - ' . $size, 'price' => $price, 'priceCurrency' => 'EUR', 'sku' => $sku,
+    ];
+
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/iams-kip.html' => Http::response(withJsonLd(json_encode([
+            '@type' => 'Product',
+            'name' => 'Iams Adult met verse kip',
+            'offers' => [$offer('3 kg', '15.89', 'kip-3'), $offer('10 kg', '24.97', 'kip-10')],
+        ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['pack_quantity' => 10000, 'pack_unit' => 'g']);
+
+    $draft = null;
+
+    DipCatchServer::actingAs($user)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'url' => 'https://shop.example.com/iams-kip.html'])
+        ->assertOk()
+        ->assertSee('24.97')
+        ->assertSee('matching the pack size already on this product')
+        ->assertSee('"variant_key":"kip-3"')
+        // The picked one is not an "other" variant.
+        ->assertDontSee('"variant_key":"kip-10"')
+        ->assertStructuredContent(function (AssertableJson $json) use (&$draft): void {
+            $json->where('draft', function (mixed $value) use (&$draft): bool {
+                $draft = $value;
+
+                return is_string($value);
+            })->etc();
+        });
+
+    DipCatchServer::actingAs($user)
+        ->tool(AddShopTool::class, ['product_id' => (string) $product->id, 'draft' => $draft, 'confirm' => true])
+        ->assertOk();
+
+    expect($product->shops()->where('variant_key', 'kip-10')->exists())->toBeTrue();
+});
+
+it('spends a draft on its first confirm, so a replay writes nothing', function (): void {
+    $me = User::factory()->create();
+    $draft = DraftToken::issue($me, ['title' => 'Coffee 500 g', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true], 'https://ah.nl/p/coffee', 'ah', variantKey: null);
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $draft, 'confirm' => true])
+        ->assertOk();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $draft, 'confirm' => true])
+        ->assertHasErrors()
+        ->assertSee('already used');
+
+    expect($me->products()->count())->toBe(1);
 });

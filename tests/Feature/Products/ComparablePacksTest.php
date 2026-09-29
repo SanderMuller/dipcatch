@@ -261,14 +261,30 @@ test('an inherited size right on the plausibility boundary is kept', function ()
     expect(packFor($product->refresh(), 'silent.nl')?->exclusion)->toBe(PackExclusion::SizeImplausible);
 });
 
-test('an inherited size far above the field is kept, because it costs nobody anything', function (): void {
-    // The guard is one-sided on purpose. A row stamped too expensive cannot win
-    // and cannot alert either way, so refusing it would remove information
-    // without protecting anyone.
+test('an inherited size far above the field is refused too', function (): void {
+    // The guard used to be one-sided, reasoning that a row stamped too
+    // expensive cannot win and cannot alert, so refusing it would remove
+    // information without protecting anyone. That was wrong about what a
+    // reader acts on: reported 2026-09-22, a 150-tablet pack that inherited a
+    // sibling's 75 was displayed at twice its real price per tablet, so the
+    // best deal on the product read as the worst. It never won, and it did not
+    // need to in order to mislead.
     $product = productForPacks([
         'ah.nl' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
         'jumbo.com' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
         'silent.nl' => ['current_price' => '80.00', 'pack_quantity' => null, 'pack_unit' => null],
+    ]);
+
+    expect(packFor($product, 'silent.nl')?->exclusion)->toBe(PackExclusion::SizeImplausible);
+});
+
+test('an inherited size merely dearer than the field is kept', function (): void {
+    // The band is the same distance either side of the median, so an ordinary
+    // dearer shop keeps its figure. Median is 20.00/kg; 30.00 sits inside.
+    $product = productForPacks([
+        'ah.nl' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'jumbo.com' => ['current_price' => '20.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g'],
+        'silent.nl' => ['current_price' => '30.00', 'pack_quantity' => null, 'pack_unit' => null],
     ]);
 
     expect(packFor($product, 'silent.nl')?->provenance)->toBe(PackProvenance::Inferred);
@@ -325,4 +341,26 @@ test('two shops tied on unit price resolve to the one added first', function ():
     $product->refresh()->recomputeCheapestShop();
 
     expect($product->refresh()->best_value_shop_id)->toBe($first->id);
+});
+
+test('the two answers are drawn from the same set of buyable shops', function (): void {
+    // `winnable()` filters on provenance and a usable unit price — it knows
+    // nothing about stock or health, because that lives in the eligible set. A
+    // caller that hands it every shop gets a winner no other surface agrees
+    // with, which is the divergence one shared definition exists to prevent.
+    $product = productForPacks([
+        'live.nl' => ['current_price' => '10.00', 'pack_quantity' => '500.00', 'pack_unit' => 'g'],
+        'dead.nl' => ['current_price' => '1.00', 'pack_quantity' => '500.00', 'pack_unit' => 'g', 'health' => 'dead'],
+        'paused.nl' => ['current_price' => '2.00', 'pack_quantity' => '500.00', 'pack_unit' => 'g', 'active' => false],
+        'gone.nl' => ['current_price' => '3.00', 'pack_quantity' => '500.00', 'pack_unit' => 'g', 'current_in_stock' => false],
+    ]);
+
+    expect($product->bestValueShop()?->host)->toBe('live.nl')
+        ->and($product->lowestOutlayShop()?->host)->toBe('live.nl');
+
+    $product->recomputeCheapestShop();
+
+    // And the stored answers agree with the live ones.
+    expect($product->refresh()->best_value_shop_id)->toBe($product->bestValueShop()?->id)
+        ->and($product->cheapest_shop_id)->toBe($product->lowestOutlayShop()?->id);
 });

@@ -4,6 +4,22 @@
         <flux:breadcrumbs.item>{{ __('Track a product') }}</flux:breadcrumbs.item>
     </flux:breadcrumbs>
 
+    @if ($trackingIdea !== null && ($state === 'idle' || $state === 'error'))
+        <flux:callout icon="light-bulb" color="zinc" data-test="tracking-idea-hint">
+            <flux:callout.heading>{{ $trackingIdea->label() }}</flux:callout.heading>
+            <flux:callout.text>
+                {{ __('Find the product at any shop and paste its link below. DipCatch reads these shops well:') }}
+            </flux:callout.text>
+            <ul role="list" class="mt-2 flex flex-wrap gap-2">
+                @foreach ($trackingIdea->group()->shops() as $host)
+                    <li class="text-base/7 sm:text-sm/6">
+                        <a href="https://www.{{ $host }}" target="_blank" rel="noopener noreferrer" class="flex items-center rounded-full bg-paper py-0.5 pr-3 pl-2 font-medium ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{!! \App\Support\Favicon::html($host) !!}</a>
+                    </li>
+                @endforeach
+            </ul>
+        </flux:callout>
+    @endif
+
     @if ($state === 'idle' || $state === 'error')
         <form wire:submit.prevent="probe" class="space-y-3">
             <flux:input
@@ -17,7 +33,7 @@
                 autofocus
             />
             <div class="flex items-center gap-3">
-                <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
+                <flux:button type="submit" variant="primary">
                     <span wire:loading.remove wire:target="probe">Look up this product</span>
                     <span wire:loading wire:target="probe">Looking it up…</span>
                 </flux:button>
@@ -31,6 +47,24 @@
             <flux:skeleton animate="pulse" class="h-4 w-2/3" />
             <flux:skeleton animate="pulse" class="h-20 w-full" />
         </div>
+
+        {{-- Another way in, for someone adding many products: the assistant
+             runs the same lookup and shows what it found before it saves. --}}
+        <flux:callout icon="sparkles" color="zinc" class="mt-6" data-test="assistant-hint">
+            <flux:callout.heading>{{ __('Add products and shops from :assistant', ['assistant' => $connectedAssistant ?? 'Claude']) }}</flux:callout.heading>
+            @if ($connectedAssistant !== null)
+                <flux:callout.text>
+                    {{ __(':assistant is connected. Paste a product link and ask it to track it, or ask it to add a shop to a product you follow. It shows the name and the price it found before it saves anything.', ['assistant' => $connectedAssistant]) }}
+                </flux:callout.text>
+            @else
+                <flux:callout.text>
+                    {{ __('Connect Claude once, then paste a product link and ask it to track it, or ask it to add a shop to a product you follow. It shows the name and the price it found before it saves anything.') }}
+                </flux:callout.text>
+                <x-slot name="actions">
+                    <flux:button size="sm" :href="route('app.connections')" wire:navigate>{{ __('Connect Claude') }}</flux:button>
+                </x-slot>
+            @endif
+        </flux:callout>
     @endif
 
     @if ($state === 'manual_selector')
@@ -47,18 +81,17 @@
             $previewUnitPrice = null;
             $previewRegularPrice = is_string($snapshot['single_item_price'] ?? null) ? $snapshot['single_item_price'] : null;
             $previewRegularUnitPrice = null;
-            $bundleLabel = \App\Support\BundlePriceLabel::forSnapshot($snapshot);
-            $hasLivePreviewBundle = $bundleLabel !== null
-                && \App\Support\BundlePriceLabel::snapshotPriceIsBundleUnit($snapshot);
+            $bundleLabel = $this->previewBundleLabel();
+            $hasLivePreviewBundle = $bundleLabel !== null && $this->previewBundleIsLive();
             if ($previewPackSize !== null && is_string($snapshot['price'] ?? null)) {
                 $previewUnitPriceValue = $previewPackSize->unitPriceFor($snapshot['price']);
                 if ($previewUnitPriceValue !== null) {
-                    $previewUnitPrice = \App\Support\MoneyFormatter::format($previewUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
+                    $previewUnitPrice = \App\Support\MoneyFormatter::unitPrice($previewUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
                 }
                 if ($previewRegularPrice !== null) {
                     $previewRegularUnitPriceValue = $previewPackSize->unitPriceFor($previewRegularPrice);
                     if ($previewRegularUnitPriceValue !== null) {
-                        $previewRegularUnitPrice = \App\Support\MoneyFormatter::format($previewRegularUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
+                        $previewRegularUnitPrice = \App\Support\MoneyFormatter::unitPrice($previewRegularUnitPriceValue, $snapshot['currency']) . ' ' . $previewPackSize->label();
                     }
                 }
             }
@@ -81,10 +114,17 @@
                         <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
                         {{ $host }}
                     </div>
-                    <div class="mt-1 text-lg font-semibold tabular-nums">
-                        {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
-                        @if ($hasLivePreviewBundle)
-                            @if ($previewRegularPrice !== null)
+                    {{-- Per unit first when the page states a pack size: the figure
+                         shops are compared on. The pack price follows beneath. --}}
+                    <div class="mt-1 text-lg font-semibold tabular-nums" data-test="preview-price">
+                        @if ($previewUnitPrice !== null)
+                            {{ $previewUnitPrice }}
+                            @if ($hasLivePreviewBundle && $previewRegularUnitPrice !== null)
+                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ $previewRegularUnitPrice }}</del>
+                            @endif
+                        @else
+                            {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
+                            @if ($hasLivePreviewBundle && $previewRegularPrice !== null)
                                 <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
                             @endif
                         @endif
@@ -94,14 +134,21 @@
                             <flux:badge color="zinc" size="sm" class="ms-2">Stock unknown</flux:badge>
                         @endif
                     </div>
+                    @php($variantNote = is_string($snapshot['variant_note'] ?? null) ? $snapshot['variant_note'] : null)
+                    @if ($variantNote !== null)
+                        {{-- Which of the page's variants this price belongs to. A
+                             page selling three flavours used to preview one price
+                             with nothing saying the other two existed. --}}
+                        <flux:text size="sm" class="mt-1 text-zinc-500">{{ $variantNote }}</flux:text>
+                    @endif
                     @if ($bundleLabel)
                         <flux:text size="sm" class="mt-1 text-zinc-500">{{ $bundleLabel }}</flux:text>
                     @endif
                     @if ($previewUnitPrice !== null)
-                        <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500">
-                            {{ $previewUnitPrice }}
-                            @if ($hasLivePreviewBundle && $previewRegularUnitPrice !== null)
-                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ $previewRegularUnitPrice }}</del>
+                        <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500" data-test="preview-pack">
+                            {{ \App\Support\PackLine::format($snapshot['price'], $snapshot['currency'], $previewPackSize) }}
+                            @if ($hasLivePreviewBundle && $previewRegularPrice !== null)
+                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
                             @endif
                         </flux:text>
                     @endif
@@ -118,31 +165,59 @@
                 <flux:input id="create-product-title" wire:model="title" :label="__('Title')" required />
                 <flux:input id="create-product-image-url" type="url" wire:model="imageUrl" :label="__('Image URL')" />
 
-                <div class="grid grid-cols-2 gap-3">
-                    <flux:input
-                        id="create-product-threshold-pct"
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        max="99.99"
-                        wire:model="thresholdPct"
-                        :label="__('Alert me when it drops by (%)')"
-                        class="tabular-nums"
+                @php($suggested = $this->suggestedThresholds())
+                @php($targetPacks = $this->unitTargetPacks())
+
+                @if ($targetPacks !== [])
+                    {{-- The per-unit target leads: it holds every shop and pack
+                         size added later to the same rate. Optional. --}}
+                    @php($targetUnitWord = \App\Support\UnitWord::noun($this->snapshotPackSize()?->unit) ?? __('unit'))
+                    <x-unit-target
+                        class="pt-2"
+                        model="unitPriceTarget"
+                        :description="auth()->user()?->entitlements()->allowsUnitPriceAlerts()
+                            ? __('Optional.')
+                            : __('Pro alerts on this. We keep the number, and it starts working when you upgrade.')"
+                        :upgrade="! auth()->user()?->entitlements()->allowsUnitPriceAlerts()"
+                        :packs="$targetPacks"
+                        :currency="$snapshot['currency'] ?? 'EUR'"
+                        :unit-word="$targetUnitWord"
                     />
-                    <flux:input
-                        id="create-product-threshold-abs"
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        wire:model="thresholdAbs"
-                        :label="'Alert me when it drops by ('.$snapshot['currency'].')'"
-                        class="tabular-nums"
-                    />
-                </div>
-                <flux:text size="sm" class="text-zinc-500">We suggest these from the price. You hear from us as soon as the price drops past either one.</flux:text>
+                @endif
+
+                <details class="group" wire:ignore.self @if ($targetPacks === []) open @endif>
+                    <summary class="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-zinc-700 select-none dark:text-zinc-300 [&::-webkit-details-marker]:hidden">
+                        <flux:icon.chevron-right variant="micro" class="transition group-open:rotate-90" />
+                        {{ __('Other alerts: a drop in percent or money') }}
+                    </summary>
+                    <div class="mt-3 grid grid-cols-2 gap-3">
+                        <flux:input
+                            id="create-product-threshold-pct"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            max="99.99"
+                            wire:model="thresholdPct"
+                            :placeholder="$suggested['pct']"
+                            :label="__('Alert me when it drops by (%)')"
+                            class="tabular-nums"
+                        />
+                        <flux:input
+                            id="create-product-threshold-abs"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            wire:model="thresholdAbs"
+                            :placeholder="$suggested['abs']"
+                            :label="'Alert me when it drops by ('.$snapshot['currency'].')'"
+                            class="tabular-nums"
+                        />
+                    </div>
+                    <flux:text size="sm" class="mt-2 text-zinc-500">Optional. Leave them empty and we use the suggestion shown, worked out from the price at the time. You hear from us as soon as the price drops past either one.</flux:text>
+                </details>
 
                 <div class="flex gap-2">
-                    <flux:button type="submit" variant="primary" wire:loading.attr="disabled">
+                    <flux:button type="submit" variant="primary">
                         <span wire:loading.remove wire:target="confirm">Create product</span>
                         <span wire:loading wire:target="confirm">Creating…</span>
                     </flux:button>

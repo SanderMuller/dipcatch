@@ -11,12 +11,18 @@ use RuntimeException;
  */
 final class PlanLimitReached extends RuntimeException
 {
-    public static function products(int $limit): self
+    public static function products(int $limit, Plan $plan = Plan::Free): self
     {
+        if ($plan === Plan::Pro) {
+            return new self(__('Pro tracks up to :limit products. Remove one before you add another.', ['limit' => $limit]));
+        }
+
+        $proLimit = Entitlements::of(Plan::Pro)->maxProducts();
+
         return new self(trans_choice(
-            'Your plan tracks one product. Upgrade to Pro for unlimited products, or remove it first.|Your plan tracks up to :limit products. Upgrade to Pro for unlimited products, or remove one first.',
+            'Your plan tracks one product. Upgrade to Pro to track up to :pro, or remove it first.|Your plan tracks up to :limit products. Upgrade to Pro to track up to :pro, or remove one first.',
             $limit,
-            ['limit' => $limit],
+            ['limit' => $limit, 'pro' => $proLimit ?? __('any number')],
         ));
     }
 

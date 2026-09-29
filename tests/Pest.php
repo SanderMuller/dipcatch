@@ -83,6 +83,29 @@ expect()->extend('toBeSameTimestampAs', function (DateTimeInterface $expected): 
 */
 
 /**
+ * The config files DipCatch authors, read off disk so a new one is covered
+ * without being added anywhere. Files a package or the framework skeleton
+ * ships are left out: they carry knobs for drivers this app does not use.
+ *
+ * @return list<string> file names under `config/`
+ */
+function firstPartyConfigFiles(): array
+{
+    $shipped = [
+        'app.php', 'auth.php', 'cache.php', 'cashier.php', 'database.php',
+        'failed-job-monitor.php', 'filesystems.php', 'fortify.php', 'health.php',
+        'logging.php', 'mail.php', 'octane.php', 'queue-insights.php', 'queue.php',
+        'richter.php', 'sentry.php', 'services.php', 'session.php', 'webpush.php',
+    ];
+
+    // Off `__DIR__`, not `config_path()`: a dataset reads this before the
+    // app boots.
+    $files = array_map(basename(...), glob(__DIR__ . '/../config/*.php') ?: []);
+
+    return array_values(array_diff($files, $shipped));
+}
+
+/**
  * Every `href` under one selector. Scoped rather than page-wide: a marketing
  * page links the same routes from its header, its body and its footer, so a
  * whole-page assertion passes on the wrong one.
@@ -765,4 +788,13 @@ function typesafeAnswer(array $departments, array $leaves = []): array
     }
 
     return ['model' => 'jev-latest', 'answers' => $answers, 'usage' => ['input_tokens' => 1200, 'output_tokens' => 90]];
+}
+
+/**
+ * A page's HTML without the product cards' hover details, which repeat every
+ * shop and the full discount in a popover the card itself does not show.
+ */
+function withoutCardDetails(string $html): string
+{
+    return (string) preg_replace('#<div popover="manual"[^>]*data-flux-tooltip-content[^>]*>\s*<div[^>]*data-test="product-card-details".*?</ui-tooltip>#s', '</ui-tooltip>', $html);
 }

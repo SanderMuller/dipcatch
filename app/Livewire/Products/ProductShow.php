@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Products;
 
+use App\Actions\Shops\ProbeBudget;
 use App\Billing\BillingGate;
 use App\Billing\Entitlements;
 use App\Billing\HistoryWindow;
@@ -12,7 +13,11 @@ use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\User;
+use App\Services\Drops\LargeDropConfirmation;
+use App\Support\AlertRules;
 use App\Support\UrlNormalizer;
+use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -176,6 +181,25 @@ final class ProductShow extends Component
     }
 
     /**
+     * Puts the product on the account's shopping list, or takes it off. The
+     * list writes refresh the product, so the button changes in this response.
+     */
+    public function toggleShoppingList(): void
+    {
+        $this->authorize('update', $this->product);
+
+        if ($this->product->isOnShoppingList()) {
+            $this->product->removeFromShoppingList();
+            Flux::toast(text: __('Removed from your shopping list.'));
+        } else {
+            $this->product->addToShoppingList();
+            Flux::toast(text: __('Added to your shopping list.'));
+        }
+
+        $this->dispatch('shopping-list-changed');
+    }
+
+    /**
      * Repair a shop's URL when the product moved. The re-check runs
      * synchronously because the person is waiting on the new price, and a
      * sync dispatch also bypasses ShouldBeUnique — a background recheck
@@ -209,6 +233,17 @@ final class ProductShow extends Component
 
         if ($collision) {
             $this->shopMessage = 'Another shop for this product already uses that URL';
+
+            return;
+        }
+
+        // The same per-account page budget as adding a shop: without it a
+        // script could make the server fetch without limit through this form.
+        $user = auth()->user();
+        $retryAfter = $user instanceof User ? app(ProbeBudget::class)->spend($user) : null;
+
+        if ($retryAfter !== null) {
+            $this->shopMessage = "You have checked too many links in the last minute. Try again in {$retryAfter} seconds.";
 
             return;
         }
@@ -279,10 +314,17 @@ final class ProductShow extends Component
             'chart' => new PriceHistorySeries($this->product, $this->range)->fluxChart(),
             'ranges' => HistoryWindow::filters($this->historyDays()),
             'historyNotice' => $this->historyNotice(),
-            'shops' => $this->product->shops()->orderBy('current_price')->get(),
+            'shops' => $this->product->comparablePacks()->tableOrder(
+                $this->product->shops()->orderBy('current_price')->get(),
+                $this->product->eligibleShops(),
+            ),
             'shareUrl' => $this->product->publicShareUrl(),
             'canAddShop' => app(PlanLimits::class)->canAddShop($this->product),
             'shopLimit' => $this->product->user?->entitlements()->maxShopsPerProduct(),
+            'alertRules' => AlertRules::of($this->product),
+            // The chart shows a large drop the moment it is read; the alert
+            // waits for a second reading. Say so, or the silence reads as a bug.
+            'awaitsConfirmation' => app(LargeDropConfirmation::class)->isAwaited($this->product),
         ]);
     }
 

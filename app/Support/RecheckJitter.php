@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Config;
+
 final class RecheckJitter
 {
     /**
@@ -22,7 +24,7 @@ final class RecheckJitter
      */
     public static function maxSeconds(): int
     {
-        $configured = Config::int('dipcatch.recheck.jitter_minutes', 30) * 60;
+        $configured = Config::integer('dipcatch.recheck.jitter_minutes') * 60;
 
         return max(0, min($configured, self::MAX_DELAY_SECONDS));
     }

@@ -1,40 +1,39 @@
 <div>
-    <flux:heading size="xl" level="1" class="tracking-tight">{{ __('Dashboard') }}</flux:heading>
-    <flux:text class="mt-1 text-zinc-600 dark:text-zinc-400">
-        {{ __('What you track, and what it has saved you so far.') }}
-    </flux:text>
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <flux:heading size="xl" level="1" class="text-2xl! font-semibold! tracking-tight sm:text-3xl!">{{ __('Dashboard') }}</flux:heading>
+            <flux:text class="mt-1 text-zinc-500 dark:text-zinc-400">
+                {{ __('Where to shop this week, what dropped, and what needs you.') }}
+            </flux:text>
+        </div>
 
-    {{-- One surface with dividers, not three cards: these three numbers are
-         siblings in one context, so they need separation, not elevation. --}}
-    <flux:card class="mt-6 p-0!">
-        <dl class="grid divide-y divide-zinc-950/5 sm:grid-cols-3 sm:divide-x sm:divide-y-0 dark:divide-white/10">
-            <div class="p-5">
-                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Tracked products') }}</dt>
-                <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{{ $trackedProducts }}</dd>
-                <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('You are following these right now.') }}</dd>
-            </div>
+        <a href="{{ route('app.products.index') }}" wire:navigate class="inline-flex items-center gap-1 rounded-full bg-paper py-1 pr-2 pl-3 text-sm font-medium ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
+            {{ __('All products') }}
+            <flux:icon.arrow-right variant="micro" class="size-4 shrink-0" />
+        </a>
+    </div>
 
-            <div class="p-5">
-                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Active drops') }}</dt>
-                <dd @class([
-                    'mt-2 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl',
-                    'text-emerald-600 dark:text-emerald-400' => $activeDropCount > 0,
-                ])>{{ $activeDropCount }}</dd>
-                <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Cheaper right now than the price you set.') }}</dd>
-            </div>
-
-            <div class="p-5">
-                <dt class="truncate text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Saved so far') }}</dt>
-                <dd class="mt-2 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{{ $lifetimeSavings }}</dd>
-                <dd class="mt-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('Compared with the price we alerted you from.') }}</dd>
-                <dd class="mt-1">
-                    <flux:link :href="route('app.stats')" variant="subtle" class="text-base sm:text-sm" wire:navigate data-test="savings-by-month-link">
-                        {{ __('See it by month') }}
-                    </flux:link>
-                </dd>
-            </div>
-        </dl>
-    </flux:card>
+    {{-- The counts are context, not the point of the page, so they sit on
+         one quiet line rather than a card of their own. --}}
+    <dl class="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
+        <div class="flex items-baseline gap-1.5">
+            <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Tracked products') }}</dt>
+            <dd class="font-semibold tabular-nums">{{ $trackedProducts }}</dd>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+            <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Active drops') }}</dt>
+            <dd @class(['font-semibold tabular-nums', 'text-savings-strong' => $activeDropCount > 0])>{{ $activeDropCount }}</dd>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+            <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Potential savings so far') }}</dt>
+            <dd class="font-semibold tabular-nums">{{ $lifetimeSavings }}</dd>
+            <dd>
+                <flux:link :href="route('app.stats')" variant="subtle" class="text-sm" wire:navigate data-test="savings-by-month-link">
+                    {{ __('See it by month') }}
+                </flux:link>
+            </dd>
+        </div>
+    </dl>
 
     @unless ($hasAnyProduct)
         <flux:callout class="mt-6" icon="sparkles">
@@ -62,106 +61,131 @@
         </flux:callout>
     @endif
 
-    @if ($watching->isNotEmpty())
-        <div class="mt-8">
-            <div class="flex items-end justify-between gap-3">
-                <flux:heading size="lg" level="2">{{ __('Recently tracked') }}</flux:heading>
-                <flux:link :href="route('app.products.index')" wire:navigate>{{ __('All products') }}</flux:link>
-            </div>
+    @if ($digest->trips !== [])
+        <section class="mt-8" data-test="shopping-trips">
+            <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ __('Where to shop this week') }}</flux:heading>
+            <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('Your products, under the shop where each is the best buy right now.') }}</flux:text>
 
-            {{-- Cards here, dividers above: each tile navigates on its own, and
-                 a card is the treatment for an independently interactive item. --}}
-            <div class="@container mt-4">
-                <ul role="list" class="grid gap-4 @md:grid-cols-2 @3xl:grid-cols-3">
-                    @foreach ($watching as $product)
-                        {{-- min-w-0: a grid track sizes to its content by default,
-                             so a long title pushed the card past the viewport
-                             on a phone. --}}
-                        <li class="min-w-0" wire:key="watching-{{ $product->id }}">
-                            {{-- An anchor carrying the card styling, not flux:card:
-                                 that component always renders a div, so an href on
-                                 it produces a tile nobody can click. --}}
-                            <a
-                                href="{{ route('app.products.show', $product) }}"
-                                wire:navigate
-                                class="flex h-full items-center gap-4 rounded-2xl bg-white/80 p-4 ring-1 ring-zinc-200 backdrop-blur-sm hover:bg-white dark:bg-zinc-900/60 dark:ring-zinc-800 dark:hover:bg-zinc-900"
-                            >
-                                <x-product-thumb :product="$product" size="size-14" />
-                                <div class="min-w-0">
-                                    <flux:text class="truncate font-medium">{{ Str::limit($product->title, 40) }}</flux:text>
-                                    <flux:text size="sm" class="flex flex-wrap items-center gap-x-1 text-zinc-500 tabular-nums">
-                                        <x-drop-badge :product="$product" />
-                                        <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
-                                        @if ($product->cheapestShop)
-                                            · {{ $product->cheapestShop->host }}
-                                        @endif
-                                    </flux:text>
-                                    @if ($bundleLabel = \App\Support\BundlePriceLabel::forShop($product->cheapestShop))
-                                        <flux:text size="sm" class="truncate text-zinc-500">{{ $bundleLabel }}</flux:text>
-                                    @endif
+            <flux:card class="mt-4 p-0!">
+                <ul role="list" class="divide-y divide-ink/5">
+                    @foreach ($digest->trips as $trip)
+                        <li class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-6" wire:key="trip-{{ $trip['host'] }}">
+                            <div class="w-40 shrink-0">
+                                <p class="font-semibold">
+                                    <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true']) }}" wire:navigate class="inline-flex max-w-full min-w-0 items-center underline-offset-4 hover:underline">{!! \App\Support\Favicon::html($trip['host']) !!}</a>
+                                </p>
+                                <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true']) }}" wire:navigate class="text-sm text-zinc-500 underline-offset-4 hover:underline dark:text-zinc-400">{{ trans_choice(':count best buy|:count best buys', $trip['count'], ['count' => $trip['count']]) }}</a>
+                            </div>
+                            <div class="flex min-w-0 flex-1 items-center gap-3">
+                                <div class="flex shrink-0 -space-x-3">
+                                    @foreach ($trip['products'] as $product)
+                                        <a href="{{ route('app.products.show', $product) }}" wire:navigate title="{{ $product->title }}" class="rounded-xl ring-2 ring-paper">
+                                            <x-product-thumb :product="$product" size="size-11" />
+                                            <span class="sr-only">{{ $product->title }}</span>
+                                        </a>
+                                    @endforeach
                                 </div>
-                            </a>
+                                @if ($trip['count'] > count($trip['products']))
+                                    <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('and :count more', ['count' => $trip['count'] - count($trip['products'])]) }}</span>
+                                @endif
+                            </div>
+                            <div class="flex shrink-0 items-center gap-3">
+                                @if ($trip['onOffer'] > 0)
+                                    {{-- Best buys and discounted: the same products the badge counts, not every deal at the shop. --}}
+                                    <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true', 'discounted' => 'true']) }}" wire:navigate class="rounded-full bg-savings/10 px-2 py-0.5 text-xs font-semibold text-savings-strong hover:bg-savings/20">{{ trans_choice(':count on offer|:count on offer', $trip['onOffer'], ['count' => $trip['onOffer']]) }}</a>
+                                @endif
+                                <a href="{{ route('app.products.index', ['shop' => $trip['host']]) }}" wire:navigate class="inline-flex items-center gap-1 text-sm font-medium text-brand">{{ __('Everything at :shop', ['shop' => $trip['host']]) }} <flux:icon.arrow-right variant="micro" class="size-4" /></a>
+                            </div>
                         </li>
                     @endforeach
                 </ul>
-            </div>
-        </div>
+            </flux:card>
+        </section>
     @endif
 
-    <div class="mt-8">
-        <flux:heading size="lg" level="2">{{ __('Active drops') }}</flux:heading>
+    @if ($digest->endingSoon !== [] || $digest->failing !== [] || $digest->singleShop !== [])
+        <section class="mt-8" data-test="worth-a-look">
+            <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ __('Worth a look') }}</flux:heading>
+            <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('Deals about to stop, and products DipCatch cannot follow well.') }}</flux:text>
 
-        <flux:table>
-            <flux:table.columns>
-                <flux:table.column>{{ __('Product') }}</flux:table.column>
-                <flux:table.column>{{ __('Now') }}</flux:table.column>
-                <flux:table.column class="hidden sm:table-cell">{{ __('Since') }}</flux:table.column>
-                <flux:table.column class="hidden md:table-cell">{{ __('Shop') }}</flux:table.column>
-            </flux:table.columns>
-            <flux:table.rows>
-                @forelse ($activeDrops as $product)
-                    <flux:table.row :key="'drop-'.$product->id">
-                        <flux:table.cell>
-                            <a href="{{ route('app.products.show', $product) }}" wire:navigate class="flex items-center gap-3">
-                                <x-product-thumb :product="$product" size="size-12" />
-                                <flux:text class="font-medium">{{ Str::limit($product->title, 60) }}</flux:text>
-                            </a>
-                        </flux:table.cell>
-                        <flux:table.cell class="tabular-nums">
-                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <flux:text class="font-medium text-emerald-600 dark:text-emerald-400">
-                                    <x-shop-price :shop="$product->cheapestShop" :fallback="$product->cheapest_price" :currency="$product->currency" />
-                                </flux:text>
-                                <x-drop-badge :product="$product" />
+            <flux:card class="mt-4 p-0!">
+                <ul role="list" class="divide-y divide-ink/5">
+                    @foreach ($digest->endingSoon as $row)
+                        <li class="flex items-start gap-3 px-4 py-3" wire:key="list-ending-{{ $row['shop']->id }}">
+                            <span class="mt-2 size-2 shrink-0 rounded-full bg-chart-line"></span>
+                            <div class="min-w-0 flex-1">
+                                <a href="{{ route('app.products.show', $row['product']) }}" wire:navigate class="block truncate font-medium underline-offset-4 hover:underline">{{ $row['product']->title }}</a>
+                                <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Deal at :shop ends :when', ['shop' => $row['shop']->host, 'when' => $row['endsAt']->diffForHumans()]) }}</p>
                             </div>
-                            @if ($drop = $product->activeDrop())
-                                <flux:text size="sm" class="text-zinc-500">{{ $drop->wasLabel() }}</flux:text>
-                            @endif
-                            @if ($product->cheapestShop)
-                                <x-shop-deal :shop="$product->cheapestShop" :show-source="false" class="mt-2 min-w-52 max-w-sm whitespace-normal" />
-                            @endif
-                        </flux:table.cell>
-                        <flux:table.cell class="hidden sm:table-cell">
-                            @if ($product->last_notified_at)
-                                <flux:text size="sm" class="text-zinc-500">{{ $product->last_notified_at->diffForHumans() }}</flux:text>
-                            @endif
-                        </flux:table.cell>
-                        <flux:table.cell class="hidden md:table-cell">
-                            @if ($product->cheapestShop)
-                                <x-shop-link :shop="$product->cheapestShop" />
-                            @endif
-                        </flux:table.cell>
-                    </flux:table.row>
-                @empty
-                    <flux:table.row>
-                        <flux:table.cell colspan="4" class="py-10 text-center">
-                            <flux:text class="text-zinc-500">{{ __('No active drops right now.') }}</flux:text>
-                            <flux:text size="sm" class="text-zinc-400">{{ __("DipCatch is watching. You hear from us as soon as a price drops far enough.") }}</flux:text>
-                        </flux:table.cell>
-                    </flux:table.row>
-                @endforelse
-            </flux:table.rows>
-        </flux:table>
-    </div>
+                        </li>
+                    @endforeach
+                    @foreach ($digest->failing as $row)
+                        <li class="flex items-start gap-3 px-4 py-3" wire:key="list-failing-{{ $row['shop']->id }}">
+                            <span class="mt-2 size-2 shrink-0 rounded-full bg-alert"></span>
+                            <div class="min-w-0 flex-1">
+                                <a href="{{ route('app.products.show', $row['product']) }}" wire:navigate class="block truncate font-medium underline-offset-4 hover:underline">{{ $row['product']->title }}</a>
+                                <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('DipCatch cannot read :shop right now. The page may have moved.', ['shop' => $row['shop']->host]) }}</p>
+                            </div>
+                        </li>
+                    @endforeach
+                    @foreach ($digest->singleShop as $product)
+                        <li class="flex items-start gap-3 px-4 py-3" wire:key="list-single-{{ $product->id }}">
+                            <span class="mt-2 size-2 shrink-0 rounded-full bg-zinc-400"></span>
+                            <div class="min-w-0 flex-1">
+                                <a href="{{ route('app.products.show', $product) }}" wire:navigate class="block truncate font-medium underline-offset-4 hover:underline">{{ $product->title }}</a>
+                                <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Tracked at one shop only.') }} <a href="{{ route('app.products.show', [$product, 'add-shop' => 1]) }}" wire:navigate class="font-medium text-brand">{{ __('Add a shop') }}</a></p>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </flux:card>
+        </section>
+    @endif
 
+    <section class="mt-8">
+        <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ __('Biggest drops') }}</flux:heading>
+        <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('Cheaper than the price you set, biggest drop first.') }}</flux:text>
+
+        @if ($activeDrops->isEmpty())
+            <div class="mt-4 rounded-2xl border border-dashed border-line px-6 py-10 text-center">
+                <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('No active drops right now.') }}</flux:text>
+                <flux:text size="sm" class="text-zinc-400">{{ __("DipCatch is watching. You hear from us as soon as a price drops far enough.") }}</flux:text>
+            </div>
+        @else
+            <x-product-card.grid class="mt-4">
+                @foreach ($activeDrops as $product)
+                    <li class="min-w-0" wire:key="drop-{{ $product->id }}">
+                        <x-product-card :product="$product" :compare="false">
+                            @if ($product->last_notified_at)
+                                <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">
+                                    {{ __('Dropped :ago', ['ago' => $product->last_notified_at->diffForHumans()]) }}
+                                </flux:text>
+                            @endif
+                        </x-product-card>
+                    </li>
+                @endforeach
+            </x-product-card.grid>
+        @endif
+    </section>
+
+    @if ($watching->isNotEmpty())
+        <section class="mt-8">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ __('Recently tracked') }}</flux:heading>
+                    <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('The last products you added.') }}</flux:text>
+                </div>
+            </div>
+
+            <x-product-card.grid class="mt-4">
+                @foreach ($watching as $product)
+                    <li class="min-w-0" wire:key="watching-{{ $product->id }}">
+                        <x-product-card :product="$product" :compare="false" />
+                    </li>
+                @endforeach
+            </x-product-card.grid>
+        </section>
+    @endif
+
+    <livewire:dashboard.tracking-ideas />
 </div>

@@ -4,6 +4,7 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\EntityUrl;
 use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\VariantCandidate;
+use App\Support\PackSize;
 
 test('skips when no application/ld+json script is present', function (): void {
     $result = new JsonLdAdapter()->extract('https://x.test', '<html></html>');
@@ -831,6 +832,45 @@ test('offers pricing themselves through a priceSpecification still become choice
         ->and(array_map(fn (VariantCandidate $variant): string => $variant->price, $result->variants))->toBe(['10.00', '20.00']);
 });
 
+test('hasVariant entries priced outside the direct price field still become choices', function (array $small, array $large): void {
+    $variant = fn (string $name, string $id, array $offer): array => [
+        '@type' => 'Product',
+        'name' => $name,
+        'productID' => $id,
+        'url' => 'https://shop.test/p/' . $id . '/',
+        'offers' => $offer,
+    ];
+
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Feliway Family',
+        'hasVariant' => [
+            $variant('Feliway 1-pack', '111-1', $small),
+            $variant('Feliway 3-pack', '111-3', $large),
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/canonical', withJsonLd($json));
+
+    expect($result->isAmbiguous())->toBeTrue()
+        ->and(array_map(fn (VariantCandidate $variant): string => $variant->key, $result->variants))->toBe(['111-1', '111-3'])
+        ->and(array_map(fn (VariantCandidate $variant): string => $variant->price, $result->variants))->toBe(['23.95', '52.86']);
+})->with([
+    'priceSpecification' => [
+        ['@type' => 'Offer', 'priceSpecification' => ['@type' => 'UnitPriceSpecification', 'price' => '23.95', 'priceCurrency' => 'EUR']],
+        ['@type' => 'Offer', 'priceSpecification' => ['@type' => 'UnitPriceSpecification', 'price' => '52.86', 'priceCurrency' => 'EUR']],
+    ],
+    'AggregateOffer lowPrice' => [
+        ['@type' => 'AggregateOffer', 'lowPrice' => '23.95', 'highPrice' => '25.00', 'priceCurrency' => 'EUR'],
+        ['@type' => 'AggregateOffer', 'lowPrice' => '52.86', 'highPrice' => '55.00', 'priceCurrency' => 'EUR'],
+    ],
+    'capitalised Price' => [
+        ['@type' => 'Offer', 'Price' => '23.95', 'priceCurrency' => 'EUR'],
+        ['@type' => 'Offer', 'Price' => '52.86', 'priceCurrency' => 'EUR'],
+    ],
+]);
+
 test('two offers that repeat the product name are still told apart', function (): void {
     $json = json_encode([
         '@context' => 'https://schema.org',
@@ -941,4 +981,242 @@ test('two offers naming the request equally precisely are put to the user', func
 
     expect($result->isAmbiguous())->toBeTrue()
         ->and($result->variants)->toHaveCount(2);
+});
+
+/**
+ * The fitpiggy.nl shape, reported from production: a Shopify shop publishing
+ * `"sku": null` and no per-variant URL on either variant. The chooser has no
+ * identifier to print, so it synthesises one — and the matcher only ever
+ * tested the four identifier fields and the URL, which are exactly the ones
+ * that were empty. Every synthesised key was refused, and the refusal listed
+ * the same key back as a valid choice.
+ */
+function unidentifiedVariants(): string
+{
+    return json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Double Chocolate',
+        'hasVariant' => [
+            [
+                '@type' => 'Product',
+                'name' => 'Double Chocolate - 1 Reep',
+                'offers' => ['@type' => 'Offer', 'price' => '2.99', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product',
+                'name' => 'Double Chocolate - 12 Repen (11+1 Gratis)',
+                'offers' => ['@type' => 'Offer', 'price' => '32.89', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+}
+
+test('a key the chooser synthesised matches on the next call', function (): void {
+    $url = 'https://fitpiggy.test/products/double-chocolate-2';
+
+    $chooser = new JsonLdAdapter()->extract($url, withJsonLd(unidentifiedVariants()));
+
+    expect($chooser->isAmbiguous())->toBeTrue()
+        ->and($chooser->variants)->toHaveCount(2);
+
+    $key = $chooser->variants[1]->key;
+
+    expect($key)->toStartWith('variant-');
+
+    $result = new JsonLdAdapter()->extract($url, withJsonLd(unidentifiedVariants()), new AdapterContext(variantKey: $key));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('32.89');
+});
+
+test('the keys a chooser prints stay exactly what shops already store', function (): void {
+    // `variant_key` is persisted on the shop row. A round trip would still
+    // pass if the chooser and the matcher changed a key together, and every
+    // stored key would then match nothing.
+    $synthesised = new JsonLdAdapter()->extract('https://fitpiggy.test/products/double-chocolate-2', withJsonLd(unidentifiedVariants()));
+
+    $byUrl = new JsonLdAdapter()->extract('https://shop.test/canonical', withJsonLd((string) json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Shirt',
+        'hasVariant' => [
+            ['@type' => 'Product', 'name' => 'Small', 'url' => 'https://shop.test/p/small', 'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR']],
+            ['@type' => 'Product', 'name' => 'Large', 'url' => 'https://shop.test/p/large', 'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR']],
+        ],
+    ])));
+
+    expect(array_map(fn (VariantCandidate $variant): string => $variant->key, $synthesised->variants))->toBe(['variant-322f821ec80d', 'variant-0cabc509745f'])
+        ->and(array_map(fn (VariantCandidate $variant): string => $variant->key, $byUrl->variants))->toBe(['https://shop.test/p/small', 'https://shop.test/p/large']);
+});
+
+test('a synthesised key survives the shop changing its price', function (): void {
+    $url = 'https://fitpiggy.test/products/double-chocolate-2';
+
+    $chooser = new JsonLdAdapter()->extract($url, withJsonLd(unidentifiedVariants()));
+    $key = $chooser->variants[1]->key;
+
+    // The same page a week later, one variant on promotion. A key hashed from
+    // the whole entry moved with the price and named nothing.
+    $cheaper = str_replace('32.89', '27.89', unidentifiedVariants());
+
+    $result = new JsonLdAdapter()->extract($url, withJsonLd($cheaper), new AdapterContext(variantKey: $key));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('27.89');
+});
+
+/**
+ * Bug 3 from the 2026-09-22 report: a multi-variant page read as a single
+ * price, with nothing in the answer saying variants existed. Confirming it
+ * tracks whichever variant the page defaults to inside a product named after
+ * a different one — silently, until the first flavour-specific promotion.
+ */
+test('a page that sells one variant says so', function (): void {
+    // The Body & Fit Creapure shape: the title carries a variant suffix, so a
+    // caller could not tell one variant from one of several silently picked.
+    // The adapter knew the count all along and threw it away.
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Creapure Creatine',
+        'hasVariant' => [[
+            '@type' => 'Product',
+            'name' => 'Creapure Creatine - Natural (Unflavoured) / 500g',
+            'sku' => '1089215',
+            'offers' => ['@type' => 'Offer', 'price' => '29.99', 'priceCurrency' => 'EUR'],
+        ]],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/creapure', withJsonLd($json));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->variantsOnPage)->toBe(1)
+        ->and($result->snapshot?->variantNote())->toBe('This page sells one variant.');
+});
+
+test('a variant the URL names says how many it was chosen from', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Feliway Family',
+        'hasVariant' => [
+            [
+                '@type' => 'Product', 'name' => 'Feliway 1-pack', 'productID' => '111-1',
+                'url' => 'https://shop.test/p/1pack/',
+                'offers' => ['@type' => 'Offer', 'price' => '23.95', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product', 'name' => 'Feliway 3-pack', 'productID' => '111-3',
+                'url' => 'https://shop.test/p/3pack/',
+                'offers' => ['@type' => 'Offer', 'price' => '52.86', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/3pack/', withJsonLd($json));
+
+    expect($result->snapshot?->price)->toBe('52.86')
+        ->and($result->snapshot?->variantsOnPage)->toBe(2)
+        ->and($result->snapshot?->variantNote())->toBe('This page sells 2 variants; the URL names this one.');
+});
+
+test('a variant a key names says the key chose it', function (): void {
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Feliway Family',
+        'hasVariant' => [
+            [
+                '@type' => 'Product', 'name' => 'Feliway 1-pack', 'productID' => '111-1',
+                'offers' => ['@type' => 'Offer', 'price' => '23.95', 'priceCurrency' => 'EUR'],
+            ],
+            [
+                '@type' => 'Product', 'name' => 'Feliway 3-pack', 'productID' => '111-3',
+                'offers' => ['@type' => 'Offer', 'price' => '52.86', 'priceCurrency' => 'EUR'],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract(
+        'https://shop.test/canonical',
+        withJsonLd($json),
+        new AdapterContext(variantKey: '111-3'),
+    );
+
+    expect($result->snapshot?->price)->toBe('52.86')
+        ->and($result->snapshot?->variantNote())->toBe('This page sells 2 variants; variant_key names this one.');
+});
+
+test('a page with no variant markup claims nothing about variants', function (): void {
+    // Null is not one. A plain Product entity says nothing about variants, and
+    // answering "one variant" would state a fact this reader did not read —
+    // which is the same error as the silent pick, wearing a confident face.
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Plain Product',
+        'offers' => ['@type' => 'Offer', 'price' => '9.99', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', withJsonLd($json));
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->variantsOnPage)->toBeNull()
+        ->and($result->snapshot?->variantNote())->toBeNull();
+});
+
+/**
+ * brekz.nl, as published on 2026-09-28: one Product named without a size,
+ * its variants as offers that each name theirs.
+ */
+function brekzPage(): string
+{
+    $offer = static fn (string $size, float $price, string $sku): array => [
+        '@type' => 'Offer',
+        'name' => 'Iams Adult kattenvoer met verse kip - ' . $size,
+        'priceCurrency' => 'EUR',
+        'price' => $price,
+        'sku' => $sku,
+        'availability' => 'InStock',
+    ];
+
+    return withJsonLd(json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Iams Adult kattenvoer met verse kip',
+        'offers' => [
+            $offer('3 kg', 15.89, '15884-1313'),
+            $offer('2 x 10 kg', 48.94, '15884-5392'),
+            $offer('10 kg', 24.97, '15884-2751'),
+        ],
+    ], JSON_THROW_ON_ERROR));
+}
+
+test('a size the chosen offer names stands in for one the product name lacks', function (string $sku, string $expected): void {
+    $snapshot = new JsonLdAdapter()->extract(
+        'https://www.brekz.nl/iams-kattenvoer/iams-adult-kattenvoer-met-verse-kip.html',
+        brekzPage(),
+        new AdapterContext(variantKey: $sku),
+    )->snapshot;
+
+    $size = PackSize::resolve($snapshot?->packSize, $snapshot->packSizeAuthoritative ?? false, $snapshot?->title);
+
+    expect($snapshot?->title)->toBe('Iams Adult kattenvoer met verse kip')
+        ->and($size?->quantity . ' ' . $size?->unit)->toBe($expected);
+})->with([
+    'a single bag' => ['15884-2751', '10000 g'],
+    'a double pack' => ['15884-5392', '20000 g'],
+]);
+
+test('an offer name adds nothing when the product name states the size', function (): void {
+    $html = withJsonLd(json_encode([
+        '@type' => 'Product',
+        'name' => 'Chips 200 g',
+        'offers' => ['@type' => 'Offer', 'name' => 'Chips 200 g - voordeel 2 x 200 g', 'price' => '2.45', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR));
+
+    $snapshot = new JsonLdAdapter()->extract('https://shop.test/p/1', $html)->snapshot;
+
+    expect($snapshot?->packSize)->toBeNull();
 });

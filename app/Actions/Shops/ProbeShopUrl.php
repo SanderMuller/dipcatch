@@ -8,6 +8,7 @@ use App\Models\Shop;
 use App\Models\User;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
+use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
@@ -17,9 +18,11 @@ use App\Services\ShopFetcher\Exceptions\NotServable;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\Exceptions\RobotsDisallowed;
 use App\Services\ShopFetcher\Exceptions\TemporaryFailure;
+use App\Services\ShopFetcher\FetchResult;
 use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Iso4217;
+use App\Support\MovedShopUrl;
 use App\Support\UnservableShops;
 use App\Support\UrlNormalizer;
 use InvalidArgumentException;
@@ -53,6 +56,16 @@ final readonly class ProbeShopUrl
         array $selectors = [],
         ?string $manualCurrency = null,
         ?string $variantKey = null,
+        /**
+         * False for a probe nobody asked for.
+         *
+         * The budget paces what a caller sets in motion, and the weekly retry
+         * of a shop kept as a link is not that — it runs on a schedule, and
+         * charging it to whoever happens to be working at 04:00 would throttle
+         * them for a request they did not make. The shops are still paced:
+         * `ShopFetcher` holds every host to its own ceiling regardless.
+         */
+        bool $spendBudget = true,
     ): ProbeOutcome {
         try {
             $normalizedUrl = UrlNormalizer::normalize($rawUrl);
@@ -82,10 +95,10 @@ final readonly class ProbeShopUrl
             return $local;
         }
 
-        $probeRetryAfter = $this->budget->spend($actor);
+        $overBudget = $this->overBudget($actor, $spendBudget);
 
-        if ($probeRetryAfter !== null) {
-            return ProbeOutcome::failed(ProbeFailure::ProbeRateLimited, ['retry_after_seconds' => $probeRetryAfter]);
+        if ($overBudget instanceof ProbeOutcome) {
+            return $overBudget;
         }
 
         try {
@@ -126,6 +139,15 @@ final readonly class ProbeShopUrl
             context: $context,
         );
 
+        $variants = $extraction->variants;
+        [$picked, $extraction] = MatchingPackVariant::answer(
+            $product,
+            $extraction,
+            $variantKey,
+            fn (string $key): ExtractionResult => $this->resolver->resolve(url: $fetch->finalUrl, html: $fetch->html, context: $context->withVariantKey($key)),
+        ) ?? [null, $extraction];
+        $variantKey ??= $picked;
+
         if ($extraction->isAmbiguous()) {
             return ProbeOutcome::ambiguous(
                 variants: $extraction->variants,
@@ -149,13 +171,16 @@ final readonly class ProbeShopUrl
         }
 
         $snapshot = $checked;
+        $pasted = $normalizedUrl;
+
+        $normalizedUrl = self::storedAddress($normalizedUrl, $fetch);
 
         // The link must point at what the price refers to. A caller that
         // pastes a product page and pins a variant would otherwise store the
         // page, and the shopper who clicks it lands on the default pack at a
         // different price than the one they were quoted.
         $target = self::variantTarget($normalizedUrl, $variantKey);
-        $duplicate = $target === $normalizedUrl ? null : $this->existingShopFor($product, $target);
+        $duplicate = $target === $pasted ? null : $this->existingShopFor($product, $target);
 
         if ($duplicate instanceof ProbeOutcome) {
             return $duplicate;
@@ -166,7 +191,22 @@ final readonly class ProbeShopUrl
             normalizedUrl: $target,
             host: $fetch->host,
             adapterKey: $extraction->adapterKey ?? 'generic',
+            pickedVariantKey: $picked,
+            variants: $variants,
         );
+    }
+
+    /**
+     * The refusal when this account has spent its page budget, or null when
+     * the probe may go ahead.
+     */
+    private function overBudget(User $actor, bool $spendBudget): ?ProbeOutcome
+    {
+        $retryAfter = $spendBudget ? $this->budget->spend($actor) : null;
+
+        return $retryAfter === null
+            ? null
+            : ProbeOutcome::failed(ProbeFailure::ProbeRateLimited, ['retry_after_seconds' => $retryAfter]);
     }
 
     /**
@@ -214,6 +254,17 @@ final readonly class ProbeShopUrl
         $existing = $product->shops()->where('url_hash', UrlNormalizer::hash($target))->first();
 
         return $existing instanceof Shop ? ProbeOutcome::duplicate($existing) : null;
+    }
+
+    /**
+     * The address the page moved to for good, when it did, so the first check
+     * does not pay the redirect the paste did. See {@see MovedShopUrl}.
+     */
+    private static function storedAddress(string $normalizedUrl, FetchResult $fetch): string
+    {
+        return $fetch->movedPermanently
+            ? MovedShopUrl::target($normalizedUrl, $fetch->finalUrl) ?? $normalizedUrl
+            : $normalizedUrl;
     }
 
     /**

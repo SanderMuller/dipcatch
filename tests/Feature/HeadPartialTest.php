@@ -45,7 +45,7 @@ test('pages describe themselves to search engines', function (string $url, strin
     $this->get($url)->assertOk()->assertSeeHtml($needle);
 })->with([
     'homepage' => ['/', '<meta name="description"'],
-    'pricing' => ['/pricing', 'Pro removes the limits'],
+    'pricing' => ['/pricing', 'can sort them into categories for you'],
     'privacy' => ['/privacy', 'What DipCatch stores about you'],
     'use case' => ['/price-alerts/groceries', 'Supermarket prices move every week'],
     'register' => ['/register', 'No card, no extension'],
@@ -96,7 +96,7 @@ test('pages declare the light theme colour, because light is the default mode', 
     // One colour, not one per OS scheme: the appearance script defaults to
     // light whatever the OS says, so a dark colour keyed on the OS painted
     // the wrong browser chrome. The script rewrites it when dark is chosen.
-    $this->get('/')->assertOk()->assertSeeHtml('<meta name="theme-color" content="#fffbeb">')->assertDontSeeHtml('media="(prefers-color-scheme');
+    $this->get('/')->assertOk()->assertSeeHtml('<meta name="theme-color" content="#fff9e8">')->assertDontSeeHtml('media="(prefers-color-scheme');
 });
 
 test('nothing stored means light, not the operating system preference', function (): void {

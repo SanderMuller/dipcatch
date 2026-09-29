@@ -113,18 +113,18 @@ test('the coffee and filters pages list Amazon in the UK and the US', function (
         ->toContain('amazon.co.uk');
 });
 
-test('the beauty page lists Etos, Lookfantastic, Ulta, Walmart and Amazon', function (): void {
+test('the beauty page lists Lookfantastic, Ulta and Amazon, and not the shops it cannot read', function (): void {
     $case = UseCases::find('beauty');
 
     expect($case)->not->toBeNull();
     assert($case !== null);
 
-    expect(array_column($case->shops(), 'host'))->toContain('etos.nl')
+    expect(array_column($case->shops(), 'host'))->not->toContain('etos.nl')
+        ->not->toContain('walmart.com')
         ->toContain('theordinary.com')
         ->toContain('lookfantastic.com')
         ->toContain('cultbeauty.com')
         ->toContain('ulta.com')
-        ->toContain('walmart.com')
         ->toContain('bol.com')
         ->toContain('amazon.nl')
         ->toContain('ah.nl')
@@ -182,6 +182,19 @@ test('a use-case page renders its own heading, description and canonical', funct
 test('an unknown slug is a 404', function (): void {
     $this->get('/price-alerts/nonsense')->assertNotFound();
 });
+
+test('the ask-your-assistant page shows the chat screenshot in both languages', function (?string $locale, string $alt): void {
+    $case = UseCases::find('ask-your-assistant');
+    assert($case !== null);
+
+    $content = (string) $this->get($case->url($locale))->assertOk()->getContent();
+
+    expect($content)->toContain('images/use-cases/ask-your-assistant-chat.webp" alt="' . $alt)
+        ->and(public_path('images/use-cases/ask-your-assistant-chat.webp'))->toBeFile();
+})->with([
+    'English' => [null, 'A chat with an assistant.'],
+    'Dutch' => ['nl', 'Een chat met een assistent.'],
+]);
 
 test('the Dutch variant is canonical to itself and reciprocal with the English one', function (): void {
     $case = UseCases::find('coffee');

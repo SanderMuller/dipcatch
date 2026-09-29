@@ -66,9 +66,7 @@ final readonly class ResolvedBundlePricing
             $offer = null;
         }
 
-        // The offer has already been gated against the single-item price
-        // above, so reaching here with one means it beats that price.
-        if ($offer !== null && ($window === null || $window->isRunning())) {
+        if (is_string($singleItemPrice) && $offer?->appliesTo($singleItemPrice, $window) === true) {
             $trackedPrice = $offer->effectiveUnitPrice();
             $appliedOffer = $offer;
         }

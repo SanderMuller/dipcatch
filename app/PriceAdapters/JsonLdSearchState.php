@@ -21,6 +21,20 @@ final class JsonLdSearchState
     public array $variants = [];
 
     /**
+     * How many variants the page turned out to sell.
+     *
+     * Counted at the source rather than read off {@see $variants}, which holds
+     * only the ones that did not win: a variant the URL names is offered, not
+     * collected, so a two-variant page with a winner leaves one candidate
+     * behind. Reporting that as the page's count would be off by one every
+     * time the caller got what it asked for.
+     *
+     * Zero means the page stated no variant structure at all, which is not the
+     * same as stating one variant.
+     */
+    public int $variantsSeen = 0;
+
+    /**
      * The entities that identified the request, ranked by how precisely
      * each one names it.
      *

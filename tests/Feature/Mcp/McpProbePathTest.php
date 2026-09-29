@@ -207,7 +207,12 @@ test('a page with no readable price is explained, not just refused', function ()
     DipCatchServer::actingAs(User::factory()->create())
         ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
         ->assertHasErrors()
-        ->assertSee('no price could be read');
+        ->assertSee('no price could be read')
+        // Named as a class of cause. Blaming JavaScript alone sent a reader
+        // after the wrong thing on a shop whose price is in the server HTML and
+        // simply split across four elements.
+        ->assertSee('splits it across elements')
+        ->assertDontSee('which DipCatch cannot see');
 });
 
 test('a malformed url is explained in words', function (): void {
@@ -501,3 +506,163 @@ test('a second refusal says how many there have been', function (): void {
         }
     }
 });
+
+test('a 429 with no Retry-After does not invent a retry interval', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response('<html><head><title>429 Too Many Requests</title></head></html>', 429),
+    ]);
+
+    $me = User::factory()->create();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
+        ->assertHasErrors()
+        ->assertSee('It did not say for how long')
+        ->assertDontSee('60 seconds');
+});
+
+test('a 429 that states an interval quotes the shop', function (): void {
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response('slow down', 429, ['Retry-After' => '120']),
+    ]);
+
+    $me = User::factory()->create();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
+        ->assertHasErrors()
+        ->assertSee('It asks for 120 seconds.');
+});
+
+test('the preview says how many variants the page sells', function (): void {
+    // The caller could not tell a single-variant page from one of several
+    // silently picked, and fetched the shop's own JSON to find out.
+    $json = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProductGroup',
+        'name' => 'Creapure Creatine',
+        'hasVariant' => [[
+            '@type' => 'Product',
+            'name' => 'Creapure Creatine - Natural (Unflavoured) / 500g',
+            'sku' => '1089215',
+            'offers' => ['@type' => 'Offer', 'price' => '29.99', 'priceCurrency' => 'EUR'],
+        ]],
+    ], JSON_THROW_ON_ERROR);
+
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+
+    $me = User::factory()->create();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['url' => 'https://shop.example.com/p/1'])
+        ->assertSee('This page sells one variant.');
+});
+
+test('a page DipCatch cannot read can be kept as a link', function (): void {
+    // The research that used to be discarded: a URL verified as the right
+    // product at the right size, at a shop that refuses to be read.
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create(['currency' => 'EUR']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, [
+            'product_id' => (string) $product->id,
+            'url' => 'https://www.bol.com/nl/nl/p/thing/9200000000000001/',
+            'keep_as_link' => true,
+        ])
+        ->assertHasNoErrors()
+        ->assertSee('reference');
+
+    $shop = $product->refresh()->shops->sole();
+
+    expect($shop->isReference())->toBeTrue()
+        ->and($shop->current_price)->toBeNull();
+
+    // No fetch, so nothing was spent from the page budget — which is what
+    // makes it possible to keep a page add_shop has just refused to read.
+    Http::assertNothingSent();
+});
+
+test('keeping a link twice says so instead of adding it twice', function (): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create(['currency' => 'EUR']);
+    $url = 'https://www.bol.com/nl/nl/p/thing/9200000000000001/';
+
+    $call = fn (): object => DipCatchServer::actingAs($me)->tool(AddShopTool::class, [
+        'product_id' => (string) $product->id,
+        'url' => $url,
+        'keep_as_link' => true,
+    ]);
+
+    $call()->assertHasNoErrors();
+    $call()->assertHasErrors()->assertSee('already kept as a link');
+
+    expect($product->refresh()->shops)->toHaveCount(1);
+});
+
+test('a url already tracked cannot be downgraded to a link', function (): void {
+    // The price is being read. Keeping it as a link would throw that away.
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://shop.example.com/p/1']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, [
+            'product_id' => (string) $product->id,
+            'url' => 'https://shop.example.com/p/1',
+            'keep_as_link' => true,
+        ])
+        ->assertHasErrors()
+        ->assertSee('already tracked on this product');
+});
+
+test('keep_as_link alongside a confirmed draft is refused rather than saving the url as a link', function (): void {
+    // A confirmed draft must never be dropped while the url is kept as a link.
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create(['currency' => 'EUR']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, [
+            'product_id' => (string) $product->id,
+            'url' => 'https://shop.example.com/p/1',
+            'draft' => 'a-token',
+            'confirm' => true,
+            'keep_as_link' => true,
+        ])
+        ->assertHasErrors();
+
+    expect($product->refresh()->shops)->toBeEmpty();
+});
+
+test('keep_as_link with confirm gets only the message that names the conflict', function (?string $url, ?string $draft): void {
+    $me = User::factory()->create();
+    $product = Product::factory()->for($me)->create(['currency' => 'EUR']);
+
+    DipCatchServer::actingAs($me)
+        ->tool(AddShopTool::class, array_filter([
+            'product_id' => (string) $product->id,
+            'url' => $url,
+            'draft' => $draft,
+            'confirm' => true,
+            'keep_as_link' => true,
+        ], fn (mixed $value): bool => $value !== null))
+        ->assertHasErrors()
+        ->assertSee('keep_as_link cannot be combined with confirm')
+        ->assertDontSee('does not look like a URL')
+        ->assertDontSee('Pass a url')
+        ->assertDontSee('Pass the draft')
+        ->assertDontSee('adds the shop only with confirm')
+        ->assertDontSee('confirm takes a JSON boolean')
+        // Laravel's own messages all name "the … field".
+        ->assertDontSee('field');
+})->with([
+    'url and draft' => ['https://shop.example.com/p/1', 'a-token'],
+    'draft only' => [null, 'a-token'],
+    'url only' => ['https://shop.example.com/p/1', null],
+    'neither' => [null, null],
+]);

@@ -59,6 +59,13 @@ it('accepts a token that carries it', function (): void {
         ->assertOk();
 });
 
+it('refuses a token issued to an account that never verified its address', function (): void {
+    Passport::actingAs(User::factory()->unverified()->create(), ['mcp:use']);
+
+    $this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list'])
+        ->assertForbidden();
+});
+
 it('registers the scope middleware alias, since Laravel does not alias Passport for us', function (): void {
     $aliases = app('router')->getMiddleware();
 
@@ -215,6 +222,6 @@ it('advertises a version that moves with the tool roster', function (): void {
         ->getAttributes(Version::class)[0] ?? null;
 
     expect($version)->not->toBeNull()
-        ->and($version->newInstance()->value)->toBe('1.6.0')
+        ->and($version->newInstance()->value)->toBe('1.11.0')
         ->and($declared)->toHaveCount(13);
 });

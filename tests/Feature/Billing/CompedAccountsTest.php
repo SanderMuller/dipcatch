@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Laravel\Cashier\Subscription;
 
 /**
  * The three places that decide whether an account is Pro. `ProUsers` warns in
@@ -149,3 +150,134 @@ test('a blocked account that is also comped reads as blocked everywhere', functi
     expect($content)->not->toContain('Pro is on us')
         ->and($user->isComped())->toBeFalse();
 });
+
+it('reads pro everywhere when a live row sits under a newer incomplete one', function (): void {
+    // Cashier's `subscription()` returns the newest row of a type, so every
+    // reader built on it ignored a live subscription underneath a stray
+    // `incomplete`. `ProUsers` matched the live one all along, which is how
+    // the three answers came apart. Reported 2026-09-22.
+    $user = User::factory()->create();
+
+    subscribeUser($user, 'active')
+        ->forceFill(['created_at' => CarbonImmutable::now()->subMonths(6)])->save();
+    subscribeUser($user, 'incomplete')
+        ->forceFill(['created_at' => CarbonImmutable::now()->subMinutes(5)])->save();
+
+    expect(proAnswers($user))->toBe(['plan' => true, 'sql' => true, 'label' => 'Pro', 'comped' => false]);
+});
+
+it('labels each account by the branch that decided its plan', function (Closure $setUp, array $answers): void {
+    $user = User::factory()->create();
+    $setUp($user);
+
+    expect(proAnswers($user))->toBe($answers);
+})->with([
+    'account trial, no subscription' => [
+        fn (User $user) => $user->forceFill(['trial_ends_at' => CarbonImmutable::now()->addDays(10)])->save(),
+        ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
+    ],
+    'canceled row whose own trial still runs' => [
+        fn (User $user): Subscription => subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subDay(), trialEndsAt: CarbonImmutable::now()->addDays(10)),
+        ['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false],
+    ],
+    'live trialing row' => [
+        fn (User $user): Subscription => subscribeUser($user, 'trialing', trialEndsAt: CarbonImmutable::now()->addDays(5)),
+        ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
+    ],
+    'live row cancelling at period end' => [
+        fn (User $user): Subscription => subscribeUser($user, 'active', endsAt: CarbonImmutable::now()->addDays(5)),
+        ['plan' => true, 'sql' => true, 'label' => 'Cancelling', 'comped' => false],
+    ],
+    'past due row in dunning' => [
+        fn (User $user): Subscription => subscribeUser($user, 'past_due'),
+        ['plan' => true, 'sql' => true, 'label' => 'Past due', 'comped' => false],
+    ],
+    'incomplete row inside its trial' => [
+        fn (User $user): Subscription => subscribeUser($user, 'incomplete', trialEndsAt: CarbonImmutable::now()->addDays(10)),
+        ['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false],
+    ],
+    // A trial granted on the account, for example to win back an
+    // ex-subscriber. A row that no longer counts must not cancel it.
+    'account trial beside a canceled row' => [
+        function (User $user): void {
+            subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subMonth());
+            grantAccountTrial($user);
+        },
+        ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
+    ],
+    'account trial beside an incomplete row' => [
+        function (User $user): void {
+            subscribeUser($user, 'incomplete');
+            grantAccountTrial($user);
+        },
+        ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
+    ],
+    'account trial beside an incomplete_expired row' => [
+        function (User $user): void {
+            subscribeUser($user, 'incomplete_expired');
+            grantAccountTrial($user);
+        },
+        ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
+    ],
+    'expired account trial beside a canceled row' => [
+        function (User $user): void {
+            subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subMonth());
+            grantAccountTrial($user, CarbonImmutable::now()->subDay());
+        },
+        ['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false],
+    ],
+    'blocked account on an account trial beside a canceled row' => [
+        function (User $user): void {
+            subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subMonth());
+            grantAccountTrial($user);
+            $user->forceFill(['billing_blocked_at' => CarbonImmutable::now()])->save();
+        },
+        ['plan' => false, 'sql' => false, 'label' => 'Blocked', 'comped' => false],
+    ],
+    // A live row decides the label over an account trial beside it.
+    'account trial beside a past due row' => [
+        function (User $user): void {
+            subscribeUser($user, 'past_due');
+            grantAccountTrial($user);
+        },
+        ['plan' => true, 'sql' => true, 'label' => 'Past due', 'comped' => false],
+    ],
+]);
+
+function grantAccountTrial(User $user, ?CarbonImmutable $endsAt = null): void
+{
+    $user->forceFill(['trial_ends_at' => $endsAt ?? CarbonImmutable::now()->addDays(14)])->save();
+}
+
+it('dates each account by the branch that decided its plan', function (Closure $setUp, ?string $expected): void {
+    $this->travelTo(CarbonImmutable::parse('2026-01-15 12:00:00'));
+    $user = User::factory()->create();
+    $setUp($user);
+
+    expect(SubscribersTable::periodEnd($user->fresh() ?? $user))->toBe($expected);
+})->with([
+    'account trial, no subscription' => [
+        fn (User $user) => grantAccountTrial($user, CarbonImmutable::parse('2026-01-25')),
+        '25 Jan 2026',
+    ],
+    // The dead row's own end date is not the one that matters.
+    'account trial beside a canceled row' => [
+        function (User $user): void {
+            subscribeUser($user, 'canceled', endsAt: CarbonImmutable::parse('2025-12-01'));
+            grantAccountTrial($user, CarbonImmutable::parse('2026-01-25'));
+        },
+        '25 Jan 2026',
+    ],
+    'comp with an end date' => [
+        fn (User $user) => $user->forceFill(['comped_until' => CarbonImmutable::parse('2026-03-01')])->save(),
+        '1 Mar 2026',
+    ],
+    'comp with no end date' => [
+        fn (User $user) => $user->forceFill(['comped_until' => Plan::COMPED_FOREVER])->save(),
+        null,
+    ],
+    'live row cancelling at period end' => [
+        fn (User $user): Subscription => subscribeUser($user, 'active', endsAt: CarbonImmutable::parse('2026-02-01')),
+        '1 Feb 2026',
+    ],
+]);

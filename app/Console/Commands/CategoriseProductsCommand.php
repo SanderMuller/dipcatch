@@ -35,9 +35,8 @@ final class CategoriseProductsCommand extends Command
             ->whereNull('category_set_by')
             // Judged once already; its best guess waits on the edit form.
             ->whereNull('suggested_category')
-            // A pre-filter in SQL: ProUsers ORs the generic trial without
-            // looking at the subscription, so each row is re-checked below
-            // with the one guard the app uses everywhere.
+            // A pre-filter in SQL. Each row is re-checked below with the one
+            // guard the app uses everywhere.
             ->whereIn('user_id', ProUsers::ids())
             ->whereHas('user', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('auto_categories', true))
             ->when(is_string($userId) && $userId !== '', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('user_id', $userId))

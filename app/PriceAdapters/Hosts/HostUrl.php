@@ -34,6 +34,16 @@ final class HostUrl
     }
 
     /**
+     * True when the URL's host is one of `$hosts` or a subdomain of one.
+     *
+     * @param  list<string>  $hosts
+     */
+    public static function matchesAny(string $url, array $hosts): bool
+    {
+        return array_any($hosts, static fn (string $host): bool => self::matches($url, $host));
+    }
+
+    /**
      * The last path segment when it is a plain number — the product id in
      * `/boodschappen/x/x/x/115212`. Null when the URL names no article, which
      * an adapter must treat as "cannot price this page" rather than guessing.

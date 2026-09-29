@@ -3,8 +3,10 @@
 namespace App\Mcp\Tools;
 
 use App\Actions\Shops\AttachShop;
+use App\Actions\Shops\KeepShopAsLink;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\ShopDraft;
+use App\Actions\Shops\TrackedElsewhere;
 use App\Billing\PlanLimitReached;
 use App\Mcp\Concerns\InteractsWithOwner;
 use App\Mcp\Support\DraftFailure;
@@ -13,10 +15,14 @@ use App\Mcp\Support\ProbeReporter;
 use App\Mcp\Support\ProductPresenter;
 use App\Models\Product;
 use App\Models\Shop;
+use App\PriceAdapters\VariantCandidate;
+use App\Services\ShopFetcher\HostFetchMemory;
 use App\Support\PackSize;
+use App\Support\UrlNormalizer;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -53,27 +59,35 @@ final class AddShopTool extends Tool
         $arguments = $request->all();
         $confirming = ($arguments['confirm'] ?? null) === true;
         $draftSent = ($arguments['draft'] ?? '') !== '';
+        $keepingAsLink = ($arguments['keep_as_link'] ?? null) === true;
 
         $validated = $request->validate([
             'product_id' => ['required', 'uuid'],
             'url' => [Rule::requiredIf(! $confirming && ! $draftSent), 'nullable', 'string', 'max:2048'],
-            'draft' => ['required_if:confirm,true', 'prohibited_unless:confirm,true', 'nullable', 'string'],
+            'draft' => [Rule::requiredIf($confirming && ! $keepingAsLink), 'prohibited_unless:confirm,true', 'nullable', 'string'],
             // `strict`, because 1 and "1" pass a plain `boolean` and then fail
             // the `=== true` below — the preview branch, on a call that meant
             // to confirm.
             'confirm' => ['nullable', 'boolean:strict'],
-            'variant_key' => ['nullable', 'string', 'max:255'],
+            // A key can be an offer URL, so longer than a name; the column is text.
+            'variant_key' => ['nullable', 'string', 'max:2048'],
+            'keep_as_link' => ['nullable', 'boolean:strict', Rule::prohibitedIf($keepingAsLink && $confirming)],
         ], [
             'url.required' => 'Pass a url to preview a product page.',
             'confirm.boolean' => 'confirm takes a JSON boolean: true or false, not a number and not a string.',
             'draft.prohibited_unless' => 'A draft adds the shop only with confirm: true. Send the draft again with confirm: true once the user has agreed to the preview, or drop the draft to preview a url instead.',
-            'draft.required_if' => 'Pass the draft from the preview call alongside confirm: true.',
+            'draft.required' => 'Pass the draft from the preview call alongside confirm: true.',
+            'keep_as_link.prohibited' => 'keep_as_link cannot be combined with confirm: true. To add the shop you previewed, send the draft with confirm: true and without keep_as_link. To keep a page DipCatch cannot read, send its url with keep_as_link: true and no draft or confirm.',
         ]);
 
         $product = $this->ownedProduct($request, $this->str($validated, 'product_id'));
 
         if ($product === null) {
             return Response::error('No such product.');
+        }
+
+        if (($validated['keep_as_link'] ?? null) === true) {
+            return $this->keepAsLink($product, $this->str($validated, 'url'));
         }
 
         if ($confirming) {
@@ -108,14 +122,38 @@ final class AddShopTool extends Tool
             return $this->reporter->explain($outcome);
         }
 
+        $variantKey = $outcome->pickedVariantKey ?? $variantKey;
         $snapshot = ShopDraft::flatten($outcome);
 
         $preview = ['found' => $this->reporter->preview($snapshot, $outcome)];
+
+        if ($outcome->pickedVariantKey !== null) {
+            $preview['variant_note'] = 'The page names no variant, so the one matching the pack size already on this product was picked. To track another, call add_shop again with its variant_key.';
+            $preview['other_variants'] = array_map(
+                static fn (VariantCandidate $variant): array => ['variant_key' => $variant->key, 'title' => $variant->title, 'price' => $variant->price],
+                array_values(array_filter($outcome->variants, static fn (VariantCandidate $variant): bool => $variant->key !== $outcome->pickedVariantKey)),
+            );
+        }
 
         $mismatch = self::packSizeMismatch($product, $snapshot);
 
         if ($mismatch !== null) {
             $preview['pack_size_note'] = $mismatch;
+        }
+
+        // Duplicates were only ever checked inside this product. Across
+        // products the same URL is permitted — a variant page serves several —
+        // so an accidental second copy said nothing and both alerted on the
+        // same fall.
+        $elsewhere = TrackedElsewhere::note(TrackedElsewhere::productTitles(
+            $this->user($request)->getKey(),
+            $outcome->normalizedUrl,
+            $variantKey,
+            excludeProductId: $product->getKey(),
+        ));
+
+        if ($elsewhere !== null) {
+            $preview['already_tracked_note'] = $elsewhere;
         }
 
         return Response::structured($preview + [
@@ -199,6 +237,72 @@ final class AddShopTool extends Tool
     /**
      * @return array<string, Type>
      */
+    /**
+     * Keep the URL without reading it.
+     *
+     * One call rather than two: the two-step confirm exists because a scrape
+     * can read the wrong number, and there is no number here to read wrongly.
+     *
+     * No fetch either, so it costs nothing from the page budget. That makes it
+     * possible to keep a page this tool has just refused to read, which is the
+     * whole point — and if the caller is wrong and the page turns out to be
+     * readable, the weekly retry promotes it without anyone doing anything.
+     */
+    private function keepAsLink(Product $product, string $url): Response|ResponseFactory
+    {
+        try {
+            $normalized = UrlNormalizer::normalize($url);
+        } catch (InvalidArgumentException) {
+            return Response::error('That does not look like a URL. Paste the address of a product page.');
+        }
+
+        $existing = $product->shops()->where('url_hash', UrlNormalizer::hash($normalized))->first();
+
+        if ($existing instanceof Shop) {
+            return Response::error($existing->isReference()
+                ? 'That page is already kept as a link on this product.'
+                : 'That shop is already tracked on this product, and its price is being read.');
+        }
+
+        try {
+            app(KeepShopAsLink::class)($product, $normalized, $this->unreadableReason($normalized));
+        } catch (PlanLimitReached $e) {
+            return Response::error($e->getMessage());
+        }
+
+        $product->refresh()->load('shops');
+
+        return Response::structured($this->presenter->detail($product));
+    }
+
+    /**
+     * How this host last refused DipCatch, when it has refused it recently.
+     *
+     * Read from what the fetcher already remembers rather than by asking the
+     * shop again — the caller is keeping this link precisely because asking
+     * did not work. Null when the memory has nothing, which is honest: the
+     * caller may be recording a shop it never tried.
+     */
+    private function unreadableReason(string $normalized): ?string
+    {
+        $host = UrlNormalizer::normalizeHost((string) parse_url($normalized, PHP_URL_HOST));
+
+        if ($host === '') {
+            return null;
+        }
+
+        $memory = app(HostFetchMemory::class);
+
+        return match (true) {
+            $memory->count($host, HostFetchMemory::KIND_BLOCKED) > 0 => HostFetchMemory::KIND_BLOCKED,
+            $memory->count($host, HostFetchMemory::KIND_SILENT) > 0 => HostFetchMemory::KIND_SILENT,
+            default => null,
+        };
+    }
+
+    /**
+     * @return array<string, Type>
+     */
     public function schema(JsonSchema $schema): array
     {
         return [
@@ -207,6 +311,7 @@ final class AddShopTool extends Tool
             'draft' => $schema->string()->description('The draft token from the previous call. Send it only alongside confirm: true; on its own it is refused.'),
             'confirm' => $schema->boolean()->description('Set true, with a draft, to actually add the shop.'),
             'variant_key' => $schema->string()->description('Which variant to track, when the previous call reported several.'),
+            'keep_as_link' => $schema->boolean()->description('Set true with a url to keep a page DipCatch cannot read — one this tool has already refused, or one a shop blocks. It is saved as a link, never priced, and never counts towards cheapest or best value. No draft and no confirm: there is no price to check. DipCatch retries it weekly and starts tracking it by itself if the page ever becomes readable, so a blocked shop is worth keeping rather than discarding.'),
         ];
     }
 }

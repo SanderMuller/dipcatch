@@ -21,7 +21,10 @@ class ProductFactory extends Factory
         return [
             'user_id' => User::factory(),
             'title' => fake()->sentence(3),
-            'image_url' => fake()->imageUrl(),
+            // Not `fake()->imageUrl()`: that points at via.placeholder.com,
+            // which no longer resolves, so every seeded product rendered a
+            // broken frame.
+            'image_url' => 'https://placehold.co/600x600/e4e4e7/52525b.png?text=' . rawurlencode(fake()->word()),
             'currency' => 'EUR',
             'drop_threshold_pct' => 10.00,
             'drop_threshold_abs' => 5.00,
@@ -48,6 +51,22 @@ class ProductFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'active' => false,
+        ]);
+    }
+
+    public function listed(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'listed_at' => now(),
+            'list_checked_at' => null,
+        ]);
+    }
+
+    public function listedAndCrossedOff(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'listed_at' => now()->subHour(),
+            'list_checked_at' => now(),
         ]);
     }
 }

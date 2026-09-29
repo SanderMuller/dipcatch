@@ -523,7 +523,7 @@ if (! Schema::hasIndex('orders', 'orders_reference_index')) {
 }
 ```
 
-Keep slow work out of the migration on a large table: build an index, backfill a column, or add a foreign key as a separate job or an out-of-band task, not inside the deploy step.
+Keep slow work out of the migration on a large table: build an index, backfill a column, or add a foreign key as a separate job or an out-of-band task, not inside the deploy step. On MySQL, where the session has the `database-specialist` subagent, dispatch it before any DDL on a large table: it names the algorithm and lock each statement takes.
 
 ---
 

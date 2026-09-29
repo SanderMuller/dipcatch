@@ -3,7 +3,7 @@
 namespace App\Services\TypeSafe;
 
 use App\Models\User;
-use App\Support\Config as DipConfig;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
@@ -18,8 +18,8 @@ final class CategorisationBudget
 
     public function allows(User $user): bool
     {
-        $userLimit = DipConfig::int('dipcatch.categories.daily_limit_per_user', 50);
-        $appLimit = DipConfig::int('dipcatch.categories.daily_limit', 2000);
+        $userLimit = Config::integer('dipcatch.categories.daily_limit_per_user');
+        $appLimit = Config::integer('dipcatch.categories.daily_limit');
 
         if (($userLimit > 0 && RateLimiter::tooManyAttempts(self::userKey($user), $userLimit))
             || ($appLimit > 0 && RateLimiter::tooManyAttempts(self::appKey(), $appLimit))) {

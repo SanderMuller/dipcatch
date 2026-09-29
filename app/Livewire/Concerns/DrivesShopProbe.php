@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\PriceAdapters\ShopSnapshot;
 use App\PriceAdapters\VariantCandidate;
+use App\Support\BundlePriceLabel;
 use App\Support\PackSize;
 
 /**
@@ -53,6 +54,9 @@ trait DrivesShopProbe
 
     public ?string $chosenVariantKey = null;
 
+    /** True when the probe picked the variant itself, from the product's pack size. */
+    public bool $variantPicked = false;
+
     /**
      * The product the probe dedupes and currency-checks against, or null
      * in create mode (the probed currency then defines the product).
@@ -90,6 +94,14 @@ trait DrivesShopProbe
         $price = trim($this->priceSelector);
         if ($price === '') {
             $this->errorCode = 'user_selector_required';
+            $this->errorContext = null;
+
+            return;
+        }
+
+        // Each selector is stored in a 255-character column.
+        if (array_any([$price, trim($this->titleSelector), trim($this->imageSelector)], static fn (string $selector): bool => mb_strlen($selector) > 255)) {
+            $this->errorCode = 'user_selector_too_long';
             $this->errorContext = null;
 
             return;
@@ -133,6 +145,9 @@ trait DrivesShopProbe
     ): void {
         $this->authorizeProbeSubject();
         $this->resetPreview();
+        // The key this probe asks for, and no other: a choice made for an
+        // earlier URL must not be saved against this one.
+        $this->chosenVariantKey = $variantKey;
         $url = trim($this->url);
 
         if ($url === '') {
@@ -179,7 +194,31 @@ trait DrivesShopProbe
         $this->state = 'variant_chooser';
         $this->normalizedUrl = $outcome->normalizedUrl;
         $this->host = $outcome->host;
-        $this->variants = array_map(
+        $this->variants = self::variantRows($outcome);
+        $this->chosenVariantKey ??= $this->variants[0]['key'] ?? null;
+    }
+
+    /**
+     * Back to the chooser from a preview whose variant the probe picked.
+     */
+    public function chooseAnotherVariant(): void
+    {
+        $this->authorizeProbeSubject();
+
+        if ($this->variants === null || $this->variants === []) {
+            return;
+        }
+
+        $this->state = 'variant_chooser';
+        $this->variantPicked = false;
+    }
+
+    /**
+     * @return list<array{key: string, title: string, price: string, currency: string}>
+     */
+    private static function variantRows(ProbeOutcome $outcome): array
+    {
+        return array_map(
             static fn (VariantCandidate $v): array => [
                 'key' => $v->key,
                 'title' => $v->title,
@@ -188,7 +227,6 @@ trait DrivesShopProbe
             ],
             $outcome->variants,
         );
-        $this->chosenVariantKey ??= $this->variants[0]['key'] ?? null;
     }
 
     /**
@@ -198,6 +236,30 @@ trait DrivesShopProbe
     public function snapshotPackSize(): ?PackSize
     {
         return $this->shopDraft()->packSize;
+    }
+
+    /**
+     * The previewed bundle in the shop's words, on the same terms the draft
+     * will be written under — a promotion date that does not parse drops it.
+     */
+    public function previewBundleLabel(): ?string
+    {
+        $draft = $this->shopDraft();
+
+        return $draft->bundleOffer === null
+            ? null
+            : BundlePriceLabel::forTerms($draft->bundleOffer, $draft->currency, $draft->singleItemPrice ?? $draft->price, $draft->promotionWindow);
+    }
+
+    /**
+     * True when the previewed price is the bundle's unit price, so the
+     * single-item price beside it is the regular one worth striking through.
+     */
+    public function previewBundleIsLive(): bool
+    {
+        $draft = $this->shopDraft();
+
+        return $draft->bundleOffer?->isTrackedAt($draft->price) === true;
     }
 
     /**
@@ -250,6 +312,12 @@ trait DrivesShopProbe
         $this->normalizedUrl = $outcome->normalizedUrl;
         $this->host = $outcome->host;
         $this->adapterKey = $outcome->adapterKey;
+        $this->variantPicked = $outcome->pickedVariantKey !== null;
+
+        if ($outcome->pickedVariantKey !== null) {
+            $this->chosenVariantKey = $outcome->pickedVariantKey;
+            $this->variants = self::variantRows($outcome);
+        }
 
         $this->onPreviewShown($outcome);
     }
@@ -265,7 +333,14 @@ trait DrivesShopProbe
         }
 
         assert($outcome->errorCode !== null);
-        $this->failWith($outcome->errorCode->value, $outcome->context);
+
+        // The adapter's reason rides along, so the message can name a cause
+        // the shop itself is behind rather than a page DipCatch cannot read.
+        $context = $outcome->extractionReason === null
+            ? $outcome->context
+            : [...$outcome->context ?? [], 'reason' => $outcome->extractionReason];
+
+        $this->failWith($outcome->errorCode->value, $context);
     }
 
     /**
@@ -304,6 +379,7 @@ trait DrivesShopProbe
             'imageSelector',
             'variants',
             'chosenVariantKey',
+            'variantPicked',
         ]);
         $this->state = 'idle';
         $this->manualCurrency = $this->defaultManualCurrency();

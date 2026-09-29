@@ -181,7 +181,7 @@ test('a denied unit-price budget keeps the claim and drops that alert', function
     // and this alert is dropped rather than retried on the next check. That
     // is what `DetectDrop` has always done.
     Notification::assertNothingSent();
-    expect($product->refresh()->unit_price_notified)->toBe('5.38');
+    expect($product->refresh()->unit_price_notified)->toBe('5.3784');
 });
 
 test('a target-price claim lost to another worker spends no slot', function (): void {

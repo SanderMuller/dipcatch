@@ -18,12 +18,17 @@ final readonly class ProbeBudget
     /**
      * Public so a caller-facing message can state the number.
      *
-     * Matches the fetcher's default per-host ceiling, so one account working
-     * through a list of products is held by the shops' own pace rather than
-     * by a tighter budget on top of it. Only a real page fetch spends from
-     * it: confirming a draft writes what the earlier probe already read.
+     * Matches `dipcatch.fetcher.rate_limit_per_minute`, the ceiling the
+     * fetcher already holds each host to, so one account working through a
+     * list of products is paced by the shops rather than by a tighter budget
+     * stacked on top of them. It sat at twelve, which made this the binding
+     * limit and left an agent triaging candidate shops instead of adding
+     * them — and breadth is the whole point of adding a shop.
+     *
+     * Only a real page fetch spends from it. Confirming a draft writes what
+     * the earlier probe already read, so a shop costs one page, not two.
      */
-    public const int PER_MINUTE = 12;
+    public const int PER_MINUTE = 30;
 
     /**
      * Take one page from this account's budget. Returns null when it was

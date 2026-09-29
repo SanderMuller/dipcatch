@@ -20,6 +20,8 @@ use Illuminate\Support\Str;
  */
 final readonly class ProductTitle
 {
+    public const int MAX_LENGTH = 255;
+
     /** The Shopify placeholder for a product with one unnamed variant. */
     private const string DEFAULT_VARIANT = 'default title';
 
@@ -55,7 +57,11 @@ final readonly class ProductTitle
 
         // A title that was nothing but junk keeps what the page said: a blank
         // name helps nobody, and the caller can still override it.
-        return $cleaned === '' ? trim($title) : $cleaned;
+        $name = $cleaned === '' ? trim($title) : $cleaned;
+
+        // The column holds 255 characters. A shop page can hold any number,
+        // and Postgres refuses the insert rather than cutting it.
+        return rtrim(mb_substr($name, 0, self::MAX_LENGTH));
     }
 
     /**

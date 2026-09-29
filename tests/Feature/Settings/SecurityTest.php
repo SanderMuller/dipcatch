@@ -3,7 +3,7 @@
 use App\Livewire\Settings\Security;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
@@ -253,8 +253,11 @@ test('a user cannot open the delete modal for another users passkey', function (
     $this->actingAs($user);
 
     Livewire::test(Security::class)
-        ->call('confirmDelete', $otherPasskey->id);
-})->throws(ModelNotFoundException::class);
+        ->call('confirmDelete', $otherPasskey->id)
+        ->assertNotFound();
+
+    $this->assertModelExists($otherPasskey);
+});
 
 test('passkey well known endpoints advertise the security page', function (): void {
     $this->get('/.well-known/passkey-endpoints')
@@ -386,4 +389,43 @@ test('without confirmation mode enabling turns two factor on immediately', funct
         ->assertSet('twoFactorEnabled', true)
         ->call('closeModal')
         ->assertSet('twoFactorEnabled', true);
+});
+
+test('an unverified account cannot add a passkey or two factor', function (string $method, string $route): void {
+    // A squatter on someone else's address would keep the credential after the
+    // real owner claims the account.
+    $this->actingAs(User::factory()->unverified()->create())
+        ->withSession(['auth.password_confirmed_at' => Carbon::now()->getTimestamp()])
+        ->call($method, route($route))
+        ->assertRedirect(route('verification.notice'));
+})->with([
+    'passkey options' => ['GET', 'passkey.registration-options'],
+    'passkey store' => ['POST', 'passkey.store'],
+    'two factor enable' => ['POST', 'two-factor.enable'],
+    'two factor confirm' => ['POST', 'two-factor.confirm'],
+    'recovery codes' => ['POST', 'two-factor.regenerate-recovery-codes'],
+]);
+
+test('a verified account still reaches two factor setup', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->withSession(['auth.password_confirmed_at' => Carbon::now()->getTimestamp()])
+        ->post(route('two-factor.enable'));
+
+    expect($user->fresh()?->two_factor_secret)->not->toBeNull();
+});
+
+test('a script asking for passkey options on an unverified account gets a 403, not a page', function (): void {
+    $this->actingAs(User::factory()->unverified()->create())
+        ->withSession(['auth.password_confirmed_at' => Carbon::now()->getTimestamp()])
+        ->getJson(route('passkey.registration-options'))
+        ->assertForbidden();
+});
+
+test('livewire re-checks the verified address on every update of a verified page', function (): void {
+    // Two-factor setup runs through Livewire updates, not Fortify's routes, so
+    // the route check does not see it. A snapshot replayed by an unverified
+    // account must meet the same middleware as the page load.
+    expect(Livewire::getPersistentMiddleware())->toContain(EnsureEmailIsVerified::class);
 });

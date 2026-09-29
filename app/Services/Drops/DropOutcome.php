@@ -23,7 +23,7 @@ final class DropOutcome extends Data
         public ?string $dropAbsolute,
         public string $dropPercent,
         public ?string $thresholdAbs,
-        public string $thresholdPct,
+        public ?string $thresholdPct,
         public ?string $referenceUnitPrice = null,
         public ?string $newUnitPrice = null,
         public ?string $comparisonUnit = null,

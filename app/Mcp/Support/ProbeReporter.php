@@ -4,8 +4,10 @@ namespace App\Mcp\Support;
 
 use App\Actions\Shops\ProbeBudget;
 use App\Actions\Shops\ProbeOutcome;
+use App\Enums\ConsumerPriceIssue;
 use App\Enums\ProbeFailure;
 use App\PriceAdapters\VariantCandidate;
+use App\Support\PackSize;
 use Laravel\Mcp\Response;
 
 /**
@@ -40,6 +42,10 @@ final readonly class ProbeReporter
             );
         }
 
+        if ($outcome->extractionReason === 'amazon_no_featured_offer') {
+            return Response::error('Amazon shows no main offer for this product right now: only "See All Buying Options", or nothing it ships to the address it assumes for DipCatch. The page carries no price to read. Try again later, or offer the user keep_as_link.');
+        }
+
         if ($outcome->extractionReason === 'variant_key_no_match') {
             return Response::error('That page lists no variant matching the variant_key that was sent. Call again without variant_key to see what the page offers.');
         }
@@ -72,6 +78,24 @@ final readonly class ProbeReporter
             // instead of trusting a bare flag.
             'stock_signal' => $snapshot['stock_signal'] ?? null,
             'pack_size' => $snapshot['pack_size'] ?? null,
+            // The price per kilo, litre or piece the page works out to, when it
+            // states a pack size — the figure shops are compared on.
+            ...self::unitPrice($snapshot),
+            // How many variants the page sells, and how this one was picked.
+            // Null means this reader cannot see variants at all — not that
+            // the page has one. A bare price from a page whose title looks
+            // like a variant is worse than an error, because it looks like a
+            // success, and a caller had no way to tell the two apart without
+            // fetching the page itself.
+            'variants_on_page' => $snapshot['variants_on_page'] ?? null,
+            'variant_note' => $snapshot['variant_note'] ?? null,
+            // Stated before the caller confirms, because this is the one fact
+            // that makes an otherwise ordinary price unusable: the shop is
+            // added and tracked, but it takes no part in either answer.
+            'not_a_consumer_price' => ConsumerPriceIssue::tryFrom(
+                is_string($snapshot['consumer_price_issue'] ?? null) ? $snapshot['consumer_price_issue'] : '',
+            )?->label(),
+            'consumer_price_note' => $snapshot['consumer_price_note'] ?? null,
             'shop' => $outcome->host,
             'url' => $outcome->normalizedUrl,
         ];
@@ -85,12 +109,20 @@ final readonly class ProbeReporter
         return match ($code) {
             ProbeFailure::InvalidUrl => 'That does not look like a URL. Paste the address of a product page.',
             ProbeFailure::ProbeRateLimited => 'DipCatch reads at most ' . ProbeBudget::PER_MINUTE . ' pages a minute for one account. ' . self::waitSentence($context),
-            ProbeFailure::LocalThrottle, ProbeFailure::HostRateLimited => 'That shop asked DipCatch to slow down. ' . self::waitSentence($context),
+            // Split from the host's own 429 on purpose. This one is DipCatch's
+            // per-host throttle, and it knows exactly when it next opens.
+            ProbeFailure::LocalThrottle => 'DipCatch is pacing its own requests to that shop. ' . self::waitSentence($context),
+            ProbeFailure::HostRateLimited => 'That shop asked DipCatch to slow down. ' . self::hostWaitSentence($context),
             ProbeFailure::RobotsDisallowed => 'That shop asks crawlers not to read this page, and DipCatch honours that.',
             ProbeFailure::Blocked => self::persistent($context)
                 ? 'That shop has blocked DipCatch on its last ' . self::failures($context) . ' requests. Retrying will not help — the shop refuses automated readers.'
                 : 'That shop blocked the request.' . self::streak($context),
-            ProbeFailure::ExtractionFailed => 'The page loaded but no price could be read from it. Some shops load prices with JavaScript, which DipCatch cannot see.',
+            // Named as a class of cause rather than one cause. Blaming
+            // JavaScript sent a reader after the wrong thing on hoogvliet.com,
+            // where the price is in the server HTML and simply never a
+            // contiguous string: `<span>7</span><span>.</span><sup>29</sup>`,
+            // with no text node anywhere reading 7.29.
+            ProbeFailure::ExtractionFailed => 'The page loaded but no price could be read from it. Either the shop builds the price in the browser, or it splits it across elements in a way DipCatch does not recognise. Another URL from the same shop will read the same way.',
             ProbeFailure::CurrencyMismatch => 'That page prices in a different currency from the product.',
             ProbeFailure::NotInDataset => 'That shop is covered by a price dataset that does not list this product yet.',
             // Without this the default fired, which tells a caller to try a
@@ -144,8 +176,31 @@ final readonly class ProbeReporter
     }
 
     /**
-     * How long to wait, when the failure carries a retry-after. Without one
-     * the caller still gets a bound rather than a guess.
+     * What to tell a caller a shop refused with HTTP 429.
+     *
+     * Only a figure the shop itself stated. DipCatch used to default to sixty
+     * seconds and print it as the shop's own instruction; dierapotheker.nl
+     * sends a bare nginx 429 with no `Retry-After`, so a caller followed that
+     * invented number four times and was refused each time. A retry interval
+     * we made up reads as a promise, and a caller that keeps it hammers a shop
+     * that has asked us to stop.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private static function hostWaitSentence(array $context): string
+    {
+        $seconds = $context['retry_after_seconds'] ?? null;
+
+        if (! is_int($seconds) || $seconds < 1) {
+            return 'It did not say for how long, so DipCatch cannot tell you when to retry. Leave it several minutes. A shop that keeps refusing is limiting DipCatch rather than being briefly busy, and retrying sooner makes that worse.';
+        }
+
+        return 'It asks for ' . $seconds . ' ' . ($seconds === 1 ? 'second' : 'seconds') . '.';
+    }
+
+    /**
+     * How long to wait when DipCatch is the one holding the request back. Its
+     * own limiters always know, so the fallback is a formality.
      *
      * @param  array<string, mixed>  $context
      */
@@ -158,5 +213,21 @@ final readonly class ProbeReporter
         }
 
         return 'Try again in ' . $seconds . ' ' . ($seconds === 1 ? 'second' : 'seconds') . '.';
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return array{unit_price: ?string, comparison_unit: ?string}
+     */
+    private static function unitPrice(array $snapshot): array
+    {
+        $text = static fn (string $key): ?string => is_string($snapshot[$key] ?? null) ? $snapshot[$key] : null;
+        $size = PackSize::resolve($text('pack_size'), (bool) ($snapshot['pack_size_authoritative'] ?? false), $text('title'));
+        $price = $snapshot['price'] ?? null;
+
+        return [
+            'unit_price' => $size === null || ! is_numeric($price) ? null : $size->unitPriceFor((string) $price),
+            'comparison_unit' => $size?->unit,
+        ];
     }
 }

@@ -21,4 +21,28 @@ final class Numeric
 
         return $value;
     }
+
+    /**
+     * A stored decimal without the zeros its column pads it with: `7.0000`
+     * reads as `7`, and `7.3200` as `7.32`.
+     */
+    public static function trimmed(string $value): string
+    {
+        if (! str_contains($value, '.')) {
+            return $value;
+        }
+
+        return rtrim(rtrim($value, '0'), '.');
+    }
+
+    /**
+     * A drop percentage with one decimal at most: `12.3` reads as `12.3%`
+     * and `12.0` as `12%`.
+     */
+    public static function percent(mixed $value): ?string
+    {
+        return is_numeric($value)
+            ? self::trimmed(number_format((float) $value, 1, '.', '')) . '%'
+            : null;
+    }
 }

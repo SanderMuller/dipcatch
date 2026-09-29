@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Billing\ProPrice;
 use App\Filament\Admin\Resources\Disputes\Pages\ListDisputes;
 use App\Filament\Admin\Resources\Subscribers\Pages\ListSubscribers;
 use App\Filament\Admin\Widgets\RevenueOverviewWidget;
@@ -84,6 +85,49 @@ it('does not print cancelling copy beside a Free badge', function (): void {
         ->assertDontSee('Pro runs until');
 });
 
+it('describes the live subscription, not a newer abandoned checkout above it', function (string $status, ?int $endsInDays, ?int $trialEndsInDays, string $copy): void {
+    $this->freezeTime();
+    $user = User::factory()->create();
+
+    $live = subscribeUser(
+        $user,
+        $status,
+        endsAt: $endsInDays === null ? null : CarbonImmutable::now()->addDays($endsInDays),
+        trialEndsAt: $trialEndsInDays === null ? null : CarbonImmutable::now()->addDays($trialEndsInDays),
+    );
+    $live->forceFill(['created_at' => CarbonImmutable::now()->subMonth()])->save();
+
+    subscribeUser($user, 'incomplete');
+
+    $this->actingAs($user);
+
+    $page = livewire(BillingPage::class)->assertSee($copy);
+
+    // The date must come from the live row too, not from the one above it.
+    $days = $endsInDays ?? $trialEndsInDays;
+
+    if ($days !== null) {
+        $page->assertSee(CarbonImmutable::now()->addDays($days)->timezone($user->timezone ?: 'Europe/Amsterdam')->isoFormat('D MMMM YYYY'));
+    }
+})->with([
+    'past due' => ['past_due', null, null, 'Your last payment did not go through'],
+    'trialing' => ['trialing', null, 10, 'Trial ends'],
+    'cancelling' => ['active', 10, null, 'Pro runs until'],
+]);
+
+it('describes the live subscription even when the abandoned checkout above it carries a trial', function (): void {
+    $user = User::factory()->create();
+
+    subscribeUser($user)->forceFill(['created_at' => CarbonImmutable::now()->subMonth()])->save();
+    subscribeUser($user, 'incomplete', trialEndsAt: CarbonImmutable::now()->addDays(10));
+
+    $this->actingAs($user);
+
+    livewire(BillingPage::class)
+        ->assertSee(ProPrice::label() . ' per month')
+        ->assertDontSee('Trial ends');
+});
+
 it('says why pro is off after a lost chargeback, and offers no way to buy again', function (): void {
     configureStripe();
 
@@ -114,8 +158,11 @@ it('does not promise a trial to a former subscriber', function (): void {
 it('serves the public pricing page to a guest', function (): void {
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('Unlimited products')
-        ->assertSee('20 products');
+        ->assertSee('Up to 250 products')
+        ->assertSee('Unlimited shops per product')
+        ->assertSee('New products sorted into a category automatically, once you switch it on')
+        ->assertSee('20 products')
+        ->assertDontSee('no limit on how much you track');
 });
 
 it('links to the pricing page from the marketing site', function (): void {
@@ -125,7 +172,7 @@ it('links to the pricing page from the marketing site', function (): void {
 it('shows the pricing page in Dutch', function (): void {
     $this->get('/pricing?lang=nl')
         ->assertOk()
-        ->assertSee('Onbeperkt producten')
+        ->assertSee('Tot 250 producten')
         ->assertSee('20 producten');
 });
 

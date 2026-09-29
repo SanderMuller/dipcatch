@@ -18,7 +18,7 @@ Languages: English (default), Dutch ({!! route('home', ['lang' => 'nl']) !!})
 
 ## What it does
 
-- Paste a product URL from almost any webshop. Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, Etos, The Ordinary, Lookfantastic, Cult Beauty, Ulta and Walmart have a reader of their own when a generic read is not enough or not reliable. Shops that block bots or only load the price with JavaScript will not work.
+- Paste a product URL from almost any webshop. Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon country sites, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, The Ordinary, Lookfantastic, Cult Beauty and Ulta have a reader of their own when a generic read is not enough or not reliable. Shops that block bots or only load the price with JavaScript will not work; Etos, Walmart, Kruidvat, Boots, Superdrug and Notino block DipCatch today, and Target loads its price with a script.
 - Reads AH Bonus and Dirk promo prices, not only the shelf price.
 - Compares pack sizes fairly by working out the price per kilo, litre or piece.
 - Re-checks each shop about every {!! $recheckIntervalHours !!} hours.
@@ -28,7 +28,7 @@ Languages: English (default), Dutch ({!! route('home', ['lang' => 'nl']) !!})
 ## Plans
 
 - Free: {!! $maxProducts === null ? 'unlimited' : $maxProducts !!} products, {!! $maxShopsPerProduct === null ? 'unlimited' : $maxShopsPerProduct !!} shops per product. No card needed.
-- Pro: no limits, and prices checked more often. See {!! route('pricing') !!}.
+- Pro: up to {!! $proMaxProducts !!} products, as many shops per product as you like, new products sorted into categories automatically once switched on, and prices checked more often. See {!! route('pricing') !!}.
 
 ## Pages
 

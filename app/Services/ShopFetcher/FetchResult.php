@@ -9,5 +9,7 @@ final readonly class FetchResult
         public string $host,
         public string $html,
         public int $statusCode,
+        /** The URL answered with 301 or 308 on every hop to `finalUrl`. */
+        public bool $movedPermanently = false,
     ) {}
 }

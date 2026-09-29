@@ -51,3 +51,41 @@ test('the shared formatters do not leak state between symbol() and format()', fu
         ->and(MoneyFormatter::format('200', 'JPY'))->toBe('¥200')
         ->and(MoneyFormatter::format('1.69', 'EUR'))->toBe('€1.69');
 });
+
+// --- unit prices -------------------------------------------------------------
+
+test('a unit price under one is shown at four decimals', function (): void {
+    // A 400-tablet pack at 12.99 and an 800-tablet pack at 21.99 are 18%
+    // apart and both rendered EUR 0.03.
+    expect(MoneyFormatter::unitPrice('0.0325', 'EUR'))->toBe('€0.0325')
+        ->and(MoneyFormatter::unitPrice('0.0275', 'EUR'))->toBe('€0.0275');
+});
+
+test('a unit price of one or more is shown as money', function (): void {
+    // Nobody needs EUR 5.3784 per kilo.
+    expect(MoneyFormatter::unitPrice('5.3784', 'EUR'))->toBe('€5.38')
+        ->and(MoneyFormatter::unitPrice('33.5700', 'EUR'))->toBe('€33.57');
+});
+
+test('the precision follows the magnitude, not the unit', function (): void {
+    // A price per piece can be eleven euros, and a price per kilo can be
+    // twenty cents.
+    expect(MoneyFormatter::unitPrice('11.0000', 'EUR'))->toBe('€11.00')
+        ->and(MoneyFormatter::unitPrice('0.2000', 'EUR'))->toBe('€0.2000');
+});
+
+test('widening a unit price does not widen ordinary money', function (): void {
+    // The two formatters share no instance: setting fraction digits on one
+    // would otherwise widen every price on every surface.
+    expect(MoneyFormatter::unitPrice('0.0325', 'EUR'))->toBe('€0.0325')
+        ->and(MoneyFormatter::format('1.69', 'EUR'))->toBe('€1.69');
+});
+
+test('a currency intl cannot render still gets the extra decimals', function (): void {
+    expect(MoneyFormatter::unitPrice('0.0275', 'XYZ'))->toBe('XYZ 0.0275');
+});
+
+test('a unit price that is not a number renders as a dash', function (): void {
+    expect(MoneyFormatter::unitPrice(amount: null, currency: 'EUR'))->toBe('—')
+        ->and(MoneyFormatter::unitPrice('abc', 'EUR'))->toBe('—');
+});

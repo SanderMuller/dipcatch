@@ -2,6 +2,7 @@
 
 namespace App\PriceAdapters;
 
+use App\Support\Numeric;
 use App\Support\PackSize;
 
 /**
@@ -61,6 +62,14 @@ final readonly class UnitPriceSize
             return null;
         }
 
+        // A shop on sale may state the rate of its regular price beside the
+        // sale price: 28.79 at 3.20 per kilo reads as 9 kg for a 10 kg bag.
+        // Which price the rate belongs to is not stated, so a regular price
+        // that differs leaves the size to the title.
+        if (self::regularPriceDiffers($offer, $price)) {
+            return null;
+        }
+
         [$name, $multiplier] = $unit;
         $quantity = ((float) $price / (float) $rate) * $per * $multiplier;
 
@@ -81,10 +90,27 @@ final readonly class UnitPriceSize
      */
     private static function unitPriceSpecification(array $offer): ?array
     {
+        foreach (self::specifications($offer) as $specification) {
+            $type = $specification['priceType'] ?? null;
+
+            if (is_string($type) && str_ends_with($type, 'UnitPrice')) {
+                return $specification;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $offer
+     * @return list<array<string, mixed>>
+     */
+    private static function specifications(array $offer): array
+    {
         $specifications = $offer['priceSpecification'] ?? null;
 
         if (! is_array($specifications)) {
-            return null;
+            return [];
         }
 
         // A single specification may be given unwrapped.
@@ -92,20 +118,30 @@ final readonly class UnitPriceSize
             $specifications = [$specifications];
         }
 
-        foreach ($specifications as $specification) {
-            if (! is_array($specification)) {
+        /** @var list<array<string, mixed>> */
+        return array_values(array_filter($specifications, is_array(...)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $offer
+     */
+    private static function regularPriceDiffers(array $offer, string $price): bool
+    {
+        foreach (self::specifications($offer) as $specification) {
+            $type = $specification['priceType'] ?? null;
+
+            if (! is_string($type) || ! (str_ends_with($type, 'StrikethroughPrice') || str_ends_with($type, 'ListPrice'))) {
                 continue;
             }
 
-            $type = $specification['priceType'] ?? null;
+            $regular = PriceNormalizer::fromMixed($specification['price'] ?? null);
 
-            if (is_string($type) && str_ends_with($type, 'UnitPrice')) {
-                /** @var array<string, mixed> $specification */
-                return $specification;
+            if ($regular !== null && bccomp(Numeric::str($regular), Numeric::str($price), 2) !== 0) {
+                return true;
             }
         }
 
-        return null;
+        return false;
     }
 
     /**

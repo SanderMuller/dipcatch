@@ -188,3 +188,36 @@ test('a failed activation check waits for normal cadence before retrying', funct
 
     Queue::assertNotPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($shop));
 });
+
+test('a deal without bundle terms that has started is read once, off cadence', function (): void {
+    // Announced, it was tracked at the price before it. Once it runs, waiting
+    // for the normal recheck would show the deal beside that price for a day.
+    config()->set('dipcatch.recheck.interval_hours', 24);
+    config()->set('dipcatch.recheck.jitter_minutes', 0);
+    $product = Product::factory()->create();
+    $started = Shop::factory()->for($product)->create([
+        'last_checked_at' => now()->subHours(3),
+        'current_price' => '2.89',
+        'promotion_starts_at' => now()->subHour(),
+        'promotion_ends_at' => now()->addDays(6),
+        'promotion_label' => '25% korting',
+    ]);
+    $readSinceStart = Shop::factory()->for($product)->create([
+        'last_checked_at' => now()->subMinutes(30),
+        'current_price' => '2.17',
+        'promotion_starts_at' => now()->subHour(),
+        'promotion_ends_at' => now()->addDays(6),
+    ]);
+    $notYetStarted = Shop::factory()->for($product)->create([
+        'last_checked_at' => now()->subHours(3),
+        'current_price' => '2.89',
+        'promotion_starts_at' => now()->addDay(),
+        'promotion_ends_at' => now()->addDays(7),
+    ]);
+
+    $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
+
+    Queue::assertPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($started));
+    Queue::assertNotPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($readSinceStart));
+    Queue::assertNotPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($notYetStarted));
+});

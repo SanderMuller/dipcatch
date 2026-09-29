@@ -5,6 +5,7 @@ namespace App\PriceAdapters\Hosts;
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
+use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopAdapter;
@@ -21,16 +22,21 @@ use Symfony\Component\DomCrawler\Crawler;
  * live region the storefront itself announces. JSON-LD is the list price,
  * so a missing label is a failure, not a fallback.
  */
-final readonly class WelkoopAdapter implements HostSpecificAdapter, ShopAdapter
+final readonly class WelkoopAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
     public function key(): string
     {
         return 'welkoop';
     }
 
+    public function ownedHosts(): array
+    {
+        return ['welkoop.nl'];
+    }
+
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        if (! HostUrl::matches($url, 'welkoop.nl')) {
+        if (! HostUrl::matchesAny($url, $this->ownedHosts())) {
             return ExtractionResult::skip();
         }
 

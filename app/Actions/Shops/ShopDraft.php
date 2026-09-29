@@ -2,6 +2,7 @@
 
 namespace App\Actions\Shops;
 
+use App\Enums\ConsumerPriceIssue;
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
@@ -47,19 +48,19 @@ final readonly class ShopDraft
          * not a name a person chose.
          */
         public ?string $titleOverride = null,
+        /** Why this price is not one a shopper can pay, when it is not. */
+        public ?ConsumerPriceIssue $consumerPriceIssue = null,
+        /** The words the page used to say so. */
+        public ?string $consumerPriceNote = null,
     ) {}
 
     public function trackedPrice(): string
     {
         $singleItemPrice = $this->singleItemPrice ?? $this->price;
 
-        if ($this->bundleOffer === null
-            || ! $this->bundleOffer->isCheaperThan($singleItemPrice)
-            || ($this->promotionWindow !== null && ! $this->promotionWindow->isRunning())) {
-            return $singleItemPrice;
-        }
-
-        return $this->bundleOffer->effectiveUnitPrice();
+        return $this->bundleOffer?->appliesTo($singleItemPrice, $this->promotionWindow) === true
+            ? $this->bundleOffer->effectiveUnitPrice()
+            : $singleItemPrice;
     }
 
     /**
@@ -95,6 +96,10 @@ final readonly class ShopDraft
             'stock_signal' => $snapshot->stockSignal,
             'pack_size' => $snapshot->packSize,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
+            'consumer_price_issue' => $snapshot->consumerPriceIssue?->value,
+            'consumer_price_note' => $snapshot->consumerPriceNote,
+            'variants_on_page' => $snapshot->variantsOnPage,
+            'variant_note' => $snapshot->variantNote(),
         ];
     }
 
@@ -105,6 +110,14 @@ final readonly class ShopDraft
     private static function stock(mixed $value): ?bool
     {
         return is_bool($value) ? $value : null;
+    }
+
+    /**
+     * The draft a probe produced, without the form state a preview adds.
+     */
+    public static function fromOutcome(ProbeOutcome $outcome, string $url, string $adapterKey): self
+    {
+        return self::fromSnapshot(self::flatten($outcome), $url, $adapterKey);
     }
 
     /**
@@ -161,6 +174,8 @@ final readonly class ShopDraft
             bundleOffer: $bundleOffer,
             promotionWindow: $promotionWindow,
             titleOverride: $titleOverride,
+            consumerPriceIssue: ConsumerPriceIssue::tryFrom(self::string($snapshot, 'consumer_price_issue') ?? ''),
+            consumerPriceNote: self::string($snapshot, 'consumer_price_note'),
         );
     }
 

@@ -133,3 +133,26 @@ test('the tracked-price test compares numerically, not by string identity', func
         ->and($offer->isTrackedAt(price: null))->toBeFalse()
         ->and($offer->isTrackedAt('free'))->toBeFalse();
 });
+
+test('a bundle sets the tracked price only when it beats the single price and its window is open', function (string $single, ?string $window, bool $applies): void {
+    $now = CarbonImmutable::parse('2026-09-25 12:00');
+    // 2 for 4.00 is 2.00 each.
+    $offer = new BundleOffer(2, '4.00');
+
+    $windows = [
+        'not started' => PromotionWindow::make($now->addDays(3), $now->addDay()),
+        'running' => PromotionWindow::make($now->addDays(3), $now->subDay()),
+        'ended' => PromotionWindow::make($now->subDay(), $now->subDays(3)),
+    ];
+
+    expect($offer->appliesTo($single, $window === null ? null : $windows[$window], $now))->toBe($applies);
+})->with([
+    'cheaper, no window' => ['2.85', null, true],
+    'cheaper, window running' => ['2.85', 'running', true],
+    'cheaper, window not started' => ['2.85', 'not started', false],
+    'cheaper, window ended' => ['2.85', 'ended', false],
+    'not cheaper, no window' => ['1.50', null, false],
+    'not cheaper, window running' => ['1.50', 'running', false],
+    'equal to the single price' => ['2.00', null, false],
+    'single price not money' => ['free', null, false],
+]);

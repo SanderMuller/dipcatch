@@ -46,6 +46,50 @@ test('email verification status is unchanged when email address is unchanged', f
     expect($user->refresh()->email_verified_at)->not->toBeNull();
 });
 
+test('an address another account holds is refused in any case', function (): void {
+    User::factory()->create(['email' => 'bezet@example.test']);
+
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(Profile::class)
+        ->set('email', 'Bezet@Example.test')
+        ->call('updateProfileInformation')
+        ->assertHasErrors(['email' => 'unique']);
+});
+
+test('retyping the own address in capitals keeps it verified', function (): void {
+    $user = User::factory()->create(['email' => 'eigen@example.test']);
+
+    $this->actingAs($user);
+
+    Livewire::test(Profile::class)
+        ->set('email', 'Eigen@Example.test')
+        ->call('updateProfileInformation')
+        ->assertHasNoErrors();
+
+    $user->refresh();
+
+    expect($user->email)->toBe('eigen@example.test')
+        ->and($user->email_verified_at)->not->toBeNull();
+});
+
+test('an address the lower-case backfill skipped can still save a new name', function (): void {
+    // Two rows differing only in case: the backfill left the second as it was.
+    User::factory()->create(['email' => 'dubbel@example.test']);
+    $legacy = User::factory()->create(['email' => 'dubbel-2@example.test']);
+    DB::table('users')->where('id', $legacy->id)->update(['email' => 'Dubbel@Example.test']);
+
+    $this->actingAs($legacy->fresh() ?? $legacy);
+
+    Livewire::test(Profile::class)
+        ->set('name', 'Nieuwe Naam')
+        ->call('updateProfileInformation')
+        ->assertHasNoErrors();
+
+    expect($legacy->fresh()?->name)->toBe('Nieuwe Naam')
+        ->and($legacy->fresh()?->email)->toBe('Dubbel@Example.test');
+});
+
 test('user can delete their account', function (): void {
     $user = User::factory()->create();
 

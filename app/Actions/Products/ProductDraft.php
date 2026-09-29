@@ -18,5 +18,6 @@ final readonly class ProductDraft
         public ?string $dropThresholdPct = null,
         public ?string $dropThresholdAbs = null,
         public ?ProductCategory $category = null,
+        public ?string $unitPriceTarget = null,
     ) {}
 }

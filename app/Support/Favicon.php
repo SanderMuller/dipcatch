@@ -24,9 +24,11 @@ final readonly class Favicon
         // Inline styles, not Tailwind classes — panel themes purge utility
         // classes that only appear in PHP strings (the admin panel renders
         // them unstyled, blowing the icon up to natural size).
-        return '<span style="display:inline-flex;align-items:center;gap:0.375rem">'
+        // The host shortens with an ellipsis rather than widening whatever
+        // holds it: a shop can live on a subdomain of any length.
+        return '<span style="display:inline-flex;align-items:center;gap:0.375rem;min-width:0;max-width:100%" title="' . e($host) . '">'
             . '<img src="' . e(self::url($host)) . '" alt="" loading="lazy" style="width:1rem;height:1rem;flex:none;border-radius:0.25rem" />'
-            . '<span>' . e($host) . '</span>'
+            . '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' . e($host) . '</span>'
             . '</span>';
     }
 }

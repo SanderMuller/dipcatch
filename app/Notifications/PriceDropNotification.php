@@ -9,9 +9,13 @@ use App\Models\User;
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PriceNormalizer;
 use App\Services\Drops\DropOutcome;
+use App\Support\AlsoWorthChecking;
 use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
 use App\Support\Numeric;
+use App\Support\PackLine;
+use App\Support\PackSize;
+use App\Support\UnitWord;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -44,6 +48,11 @@ final class PriceDropNotification extends Notification implements ShouldQueue
 
     public readonly ?BundleOffer $snapshotBundle;
 
+    /** The pack the drop was measured on, on the unit basis only. */
+    public readonly ?string $snapshotPackQuantity;
+
+    public readonly ?string $snapshotPackUnit;
+
     public function __construct(
         public Product $product,
         public DropOutcome $outcome,
@@ -60,6 +69,9 @@ final class PriceDropNotification extends Notification implements ShouldQueue
         $useTriggeringCheck = $triggeringCheck !== null
             && $this->checkRepresentsCurrentPricing($triggeringCheck, $product, $cheapest);
         $this->snapshotPrice = $winningPrice ?? '0.00';
+        $packSize = $unit === null ? null : $product->bestValuePackSize();
+        $this->snapshotPackQuantity = $packSize === null ? null : (string) $packSize->quantity;
+        $this->snapshotPackUnit = $packSize?->unit;
         $this->snapshotHost = is_string($cheapest?->host) && $cheapest->host !== '' ? $cheapest->host : null;
         $this->snapshotOfferUrl = is_string($cheapest?->url) && $cheapest->url !== '' ? $cheapest->url : null;
         $this->snapshotBundle = $useTriggeringCheck ? $triggeringCheck->bundleOffer() : $cheapest?->liveBundleOffer();
@@ -93,9 +105,19 @@ final class PriceDropNotification extends Notification implements ShouldQueue
 
     public function toWebPush(User $notifiable): WebPushMessage
     {
-        $priceLine = MoneyFormatter::format($this->snapshotPrice, $this->product->currency);
+        $currency = $this->product->currency;
+        $bundle = BundlePriceLabel::suffix($this->snapshotBundle, $currency);
+        $unitPrice = $this->outcome->newUnitPrice;
+        $unit = $this->outcome->comparisonUnit;
+
+        // Per unit first when the drop was measured per unit: that is the
+        // figure that fell. The pack price follows as what the shop charges.
+        $priceLine = $unitPrice !== null && $unit !== null
+            ? MoneyFormatter::unitPrice($unitPrice, $currency) . ' ' . UnitWord::labelFor($unit)
+                . ' (' . PackLine::format($this->snapshotPrice, $currency, $this->packSize()) . $bundle . ')'
+            : MoneyFormatter::format($this->snapshotPrice, $currency) . $bundle;
+
         $body = $this->product->title . ' is now ' . $priceLine
-            . BundlePriceLabel::suffix($this->snapshotBundle, $this->product->currency)
             . ($this->snapshotHost !== null ? ' at ' . $this->snapshotHost : '');
 
         return new WebPushMessage()
@@ -116,6 +138,11 @@ final class PriceDropNotification extends Notification implements ShouldQueue
         return [
             'price_drop_event_id' => $this->priceDropEventId,
             'product_id' => $this->product->id,
+            // The shops this product holds as links. An alert is the moment
+            // the reader opens a tab anyway, and these are the ones DipCatch
+            // cannot read — often the largest retailers, running the biggest
+            // promotions. Hosts, never prices: a link holds no figure.
+            'also_check' => AlsoWorthChecking::of($this->product),
             'title' => $this->product->title,
             'image_url' => $this->product->image_url,
             'currency' => $this->product->currency,
@@ -137,8 +164,17 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             'reference_unit_price' => $this->outcome->referenceUnitPrice,
             'new_unit_price' => $this->outcome->newUnitPrice,
             'comparison_unit' => $this->outcome->comparisonUnit,
+            'pack_quantity' => $this->snapshotPackQuantity,
+            'pack_unit' => $this->snapshotPackUnit,
             'view_url' => route('app.products.show', $this->product),
         ];
+    }
+
+    private function packSize(): ?PackSize
+    {
+        return $this->snapshotPackQuantity === null || $this->snapshotPackUnit === null
+            ? null
+            : PackSize::of((float) $this->snapshotPackQuantity, $this->snapshotPackUnit);
     }
 
     private function checkRepresentsCurrentPricing(PriceCheck $check, Product $product, ?Shop $shop): bool

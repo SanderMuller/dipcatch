@@ -7,6 +7,7 @@ use App\Mail\InvitationMail;
 use App\Models\Invitation;
 use App\Models\User;
 use BackedEnum;
+use Closure;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -19,8 +20,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Unique;
+use Illuminate\Translation\PotentiallyTranslatedString;
 
 final class InvitationResource extends Resource
 {
@@ -34,16 +34,30 @@ final class InvitationResource extends Resource
             TextInput::make('email')
                 ->email()
                 ->required()
-                ->unique(
-                    table: 'invitations',
-                    column: 'email',
-                    modifyRuleUsing: fn (Unique $rule): Unique => $rule->whereNull('redeemed_at'),
-                )
-                // Reject invites for emails that already correspond to a user —
-                // otherwise the redeem flow would 422 on `users.email` and
-                // leave a permanently-broken invitation row behind.
-                ->rule(fn (): Unique => Rule::unique(User::class, 'email')),
+                ->rule(fn (): Closure => self::rejectTakenAddress(...)),
         ]);
+    }
+
+    /**
+     * Reject an address with a pending invitation or an account — otherwise
+     * the redeem flow would 422 on `users.email` and leave a permanently-broken
+     * invitation row behind. Lower-cased first: both are stored that way, and
+     * a `unique` rule compares byte for byte.
+     *
+     * @param  Closure(string): PotentiallyTranslatedString  $fail
+     */
+    private static function rejectTakenAddress(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (! is_string($value)) {
+            return;
+        }
+
+        $email = Str::lower($value);
+
+        if (Invitation::query()->where('email', $email)->whereNull('redeemed_at')->exists()
+            || User::query()->where('email', $email)->exists()) {
+            $fail('validation.unique')->translate();
+        }
     }
 
     public static function table(Table $table): Table

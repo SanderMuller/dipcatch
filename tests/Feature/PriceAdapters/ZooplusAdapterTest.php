@@ -135,3 +135,131 @@ HTML;
 
     expect($result->snapshot?->title)->toBe('Product name');
 });
+
+/**
+ * A bitiba page trimmed to what the pack size is read from, as published on
+ * 2026-09-28: a 10 kg bag on sale at 28.79, regular 31.99. The JSON-LD pairs
+ * the sale price with the regular price's rate of 3.20 per kilo.
+ *
+ * @param  array<string, mixed>  $unit
+ */
+function bitibaSalePage(array $unit = [], ?string $activeVariant = '397805.33', float $otherPrice = 13.19): string
+{
+    $jsonLd = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'IAMS Advanced Nutrition Adult met Kip',
+        'sku' => '397805.33',
+        'offers' => [
+            '@type' => 'Offer',
+            'price' => 28.79,
+            'priceCurrency' => 'EUR',
+            'availability' => 'https://schema.org/InStock',
+            'priceSpecification' => [
+                ['@type' => 'UnitPriceSpecification', 'priceType' => 'https://schema.org/StrikethroughPrice', 'price' => 31.99],
+                ['@type' => 'UnitPriceSpecification', 'priceType' => 'https://schema.org/SalePrice', 'price' => 28.79],
+                [
+                    '@type' => 'UnitPriceSpecification',
+                    'priceType' => 'https://schema.org/UnitPrice',
+                    'price' => 3.2,
+                    'referenceQuantity' => ['@type' => 'QuantitativeValue', 'value' => 1, 'unitCode' => 'KGM'],
+                ],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $variant = static fn (int $id, float $price, array $unit, array $discounts = []): array => [
+        'variantId' => $id,
+        'offers' => [[
+            'price' => ['currency' => 'EUR', 'currentPrice' => ['value' => $price], 'discounts' => $discounts],
+            'unit' => $unit,
+        ]],
+    ];
+
+    $state = json_encode(['props' => ['pageProps' => ['pageLevelProps' => [
+        'activeVariantFromUrl' => $activeVariant,
+        'productDetails' => ['product' => ['articleVariants' => [
+            $variant(32, $otherPrice, ['unitPriceRaw' => 4.4, 'unitQuantity' => 3, 'unitName' => 'kg', 'unitNameRaw' => 'kg']),
+            $variant(33, 31.99, [...['unitPriceRaw' => 3.2, 'unitQuantity' => 10, 'unitName' => 'kg', 'unitNameRaw' => 'kg'], ...$unit], [
+                ['discountedPriceRaw' => 28.79, 'label' => '-10%', 'type' => 'ABD'],
+            ]),
+        ]]],
+    ]]]], JSON_THROW_ON_ERROR);
+
+    return '<html><head><script type="application/ld+json">' . $jsonLd . '</script></head><body>'
+        . '<script id="__NEXT_DATA__" type="application/json">' . $state . '</script></body></html>';
+}
+
+test('a bag on sale keeps the pack size its page states, not the one its JSON-LD implies', function (): void {
+    // 28.79 / 3.20 would read the 10 kg bag as 9 kg.
+    $result = $this->adapter->extract('https://www.bitiba.nl/shop/katten/iams_adult/397805?activeVariant=397805.33', bitibaSalePage());
+
+    expect($result->snapshot?->price)->toBe('28.79')
+        ->and($result->snapshot?->packSize)->toBe('10 kg')
+        ->and($result->snapshot?->packSizeAuthoritative)->toBeTrue();
+});
+
+test('a stated size rounded to two decimals gives way to the exact one', function (): void {
+    // The page states 0.14 l for three 48 ml bottles; 58.99 / 409.65 is 0.144.
+    $html = (string) file_get_contents(base_path('tests/Fixtures/scraper/zooplus_feliway.html'));
+
+    $result = $this->adapter->extract(
+        'https://www.zooplus.nl/shop/katten/verzorging/huisapotheek/verdamper/169589?activeVariant=169589.19',
+        $html,
+    );
+
+    expect($result->snapshot?->packSize)->toBe('0.144 l');
+});
+
+test('a page state that contradicts its own price and rate states no size', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.bitiba.nl/shop/katten/iams_adult/397805?activeVariant=397805.33',
+        bitibaSalePage(unit: ['unitQuantity' => 12]),
+    );
+
+    expect($result->snapshot?->packSizeAuthoritative)->toBeFalse();
+});
+
+test('the page state of another variant is not read for this one', function (): void {
+    // Variant 32 does not sell at 28.79, so its 3 kg is not this pack.
+    $result = $this->adapter->extract(
+        'https://www.bitiba.nl/shop/katten/iams_adult/397805?activeVariant=397805.32',
+        bitibaSalePage(activeVariant: '397805.32'),
+    );
+
+    expect($result->snapshot?->packSizeAuthoritative)->toBeFalse();
+});
+
+test('a variant the user chose is read even when the page names none', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.bitiba.nl/shop/katten/iams_adult/397805',
+        bitibaSalePage(activeVariant: null, otherPrice: 28.79),
+        new AdapterContext(variantKey: '397805.33'),
+    );
+
+    expect($result->snapshot?->packSize)->toBe('10 kg');
+});
+
+test('a bare variant id in the URL names the variant', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.bitiba.nl/shop/katten/iams_adult/397805?activeVariant=33',
+        bitibaSalePage(activeVariant: null, otherPrice: 28.79),
+    );
+
+    expect($result->snapshot?->packSize)->toBe('10 kg');
+});
+
+test('with no variant named, the only variant selling at the tracked price is read', function (): void {
+    $result = $this->adapter->extract('https://www.bitiba.nl/shop/katten/iams_adult/397805', bitibaSalePage(activeVariant: null));
+
+    expect($result->snapshot?->packSize)->toBe('10 kg');
+});
+
+test('with no variant named and two selling at the tracked price, no size is read', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.bitiba.nl/shop/katten/iams_adult/397805',
+        bitibaSalePage(activeVariant: null, otherPrice: 28.79),
+    );
+
+    expect($result->snapshot?->packSizeAuthoritative)->toBeFalse();
+});

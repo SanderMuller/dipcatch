@@ -75,6 +75,22 @@ it('lists alerts that have already been read', function (): void {
         ->assertSeeHtml('data-flux-timeline');
 });
 
+it('writes a whole drop percentage the way the bell does', function (): void {
+    $user = User::factory()->create();
+
+    $user->notifications()->create([
+        'id' => (string) Str::uuid(),
+        'type' => PriceDropNotification::class,
+        'data' => ['title' => 'Coffee beans 1 kg', 'currency' => 'EUR', 'drop_percent' => '12.00'],
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(StatsPage::class)
+        ->assertSee('12%')
+        ->assertDontSee('12.0%');
+});
+
 it('states the bundle terms of an alert whose bundle beats the single price', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Fanta 1.5 l']);

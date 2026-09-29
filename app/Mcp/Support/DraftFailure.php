@@ -23,6 +23,9 @@ enum DraftFailure: string
     /** Issued while previewing a different product. */
     case WrongProduct = 'wrong_product';
 
+    /** Already confirmed once. */
+    case Spent = 'spent';
+
     /**
      * What the caller should be told, including what would fix it.
      */
@@ -33,6 +36,7 @@ enum DraftFailure: string
             self::Expired => 'That draft has expired. Call ' . $tool . ' again without confirm to re-read the page.',
             self::WrongOwner => 'That draft belongs to another account.',
             self::WrongProduct => 'That draft was prepared for a different product. Call ' . $tool . ' again without confirm for this product.',
+            self::Spent => 'That draft was already used. Call ' . $tool . ' again without confirm to prepare a new one.',
         };
     }
 }

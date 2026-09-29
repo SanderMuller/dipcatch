@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 
+use App\Enums\ConsumerPriceIssue;
+use App\Enums\PackExclusion;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
@@ -52,7 +54,13 @@ test('bundle price always shows quantity total and single-item price', function 
         'pack_unit' => 'ml',
     ]);
 
-    $this->get('/p/' . str_repeat('a', 32))->assertOk()->assertSeeHtmlInOrder(['€2.00', '2 for €4.00', 'Cheapest across'])->assertSeeHtml('2 for €4.00')->assertSeeHtml('or €2.85 each')->assertSeeHtml('title="Regular price"')->assertSeeText('€1.90 /l')->assertSeeHtml('Tracked on DipCatch: cheapest at €2.00 · 2 for €4.00 · or €2.85 each');
+    // Sold by the litre, so the page leads per litre with the regular price per
+    // litre struck beside it, and the pack line carries the deal terms.
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()
+        ->assertSeeHtmlInOrder(['€1.33 /l', '€1.90 /l', '€2.00 for 1.5 L', '2 for €4.00', 'Compared across'])
+        ->assertSeeHtml('or €2.85 each')
+        ->assertSeeHtml('title="Regular price"')
+        ->assertSeeHtml('Tracked on DipCatch: best value €1.33 /l at jumbo.com (€2.00 for 1.5 L · 2 for €4.00 · or €2.85 each)');
 });
 
 test('equal prices use the same stable shop order as the cheapest-price engine', function (): void {
@@ -230,7 +238,7 @@ test('response includes X-Robots-Tag noindex header', function (): void {
 
 test('emits OG + Twitter meta tags with safeImageUrl-guarded image', function (): void {
     $product = makeSharedProduct(['image_url' => 'https://example.com/img.png']);
-    Shop::factory()->for($product)->create(['current_price' => '85.00']);
+    Shop::factory()->for($product)->create(['current_price' => '85.00', 'image_url' => 'https://example.com/img.png']);
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
@@ -347,7 +355,7 @@ test('shop without a pack size shows no unit price', function (): void {
 
     $response = $this->get('/p/' . str_repeat('a', 32));
 
-    $response->assertOk()->assertDontSeeHtml('/kg')->assertDontSeeHtml(' /l')->assertDontSeeHtml('/stuk');
+    $response->assertOk()->assertDontSeeHtml('/kg')->assertDontSeeHtml(' /l')->assertDontSeeHtml('/piece');
 });
 
 test('throttle: the 121st request in a minute returns 429', function (): void {
@@ -472,4 +480,224 @@ test('the shared page names both answers and says why a shop has no unit price',
         ->assertSeeHtml('Best value')
         ->assertSeeHtml('Sold by the piece — no item size to compare')
         ->assertDontSeeHtml('>Cheapest<');
+});
+
+test('the shared page dates the price by its last successful read', function (): void {
+    $product = makeSharedProduct(['cheapest_price' => '85.00']);
+
+    Shop::factory()->for($product)->create(['url' => 'https://failing.nl/p/1'])
+        ->forceFill([
+            'currency' => 'EUR',
+            'current_price' => '85.00',
+            'current_in_stock' => true,
+            'last_success_at' => now()->subDays(8),
+            'last_checked_at' => now()->subHours(2),
+            'consecutive_failures' => 5,
+        ])->save();
+
+    $response = $this->get('/p/' . str_repeat('a', 32));
+
+    // A shared link is the surface a reader trusts most and can correct least.
+    $response->assertOk()
+        ->assertSeeHtml('and not read since')
+        ->assertDontSeeHtml('Last checked');
+});
+
+test('markdown copy: the shared page as markdown, with no private field in it', function (): void {
+    $product = makeSharedProduct(['title' => 'Beans & more', 'drop_threshold_pct' => '12.50']);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://bol.com/p/beans',
+        'current_price' => '6.00',
+        'currency' => 'EUR',
+        'pack_quantity' => 500,
+        'pack_unit' => 'g',
+        'notes' => 'coupon SECRET10',
+    ]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://ah.nl/p/beans',
+        'current_price' => '9.00',
+        'currency' => 'EUR',
+        'pack_quantity' => 1000,
+        'pack_unit' => 'g',
+    ]);
+
+    $response = $this->get('/p/' . str_repeat('a', 32) . '.md');
+
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'text/markdown; charset=utf-8')
+        ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+
+    expect($response->getContent())
+        ->toStartWith("# Beans & more\n")
+        ->not->toContain('## Best price now')
+        ->toContain("## Best value\n\n€9.00 /kg at [ah.nl](<https://ah.nl/p/beans>)\n\n€9.00 for 1 kg")
+        ->toContain('> Lowest price: €6.00 for 500 g at bol.com. That is 33% more per kilo than the best value.')
+        ->toContain('Compared across 2 shops tracked.')
+        ->toContain('| [bol.com](<https://bol.com/p/beans>) | €12.00 /kg | €6.00 for 500 g |')
+        ->not->toContain('SECRET10')
+        ->not->toContain('drop')
+        ->not->toContain('/app/');
+});
+
+test('markdown copy: a shared product with no live price says so', function (): void {
+    makeSharedProduct();
+
+    expect($this->get('/p/' . str_repeat('a', 32) . '.md')->assertOk()->getContent())
+        ->toContain('No live price available right now.')
+        ->not->toContain('## Shops');
+});
+
+test('markdown copy: an unknown or withdrawn slug is a 404', function (): void {
+    makeSharedProduct(['share_slug' => null]);
+
+    $this->get('/p/' . str_repeat('a', 32) . '.md')->assertNotFound();
+});
+
+test('a shop outside the unit comparison shows its reason and pack price, never its own unit figure', function (): void {
+    $product = makeSharedProduct();
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/bars', 'current_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/bars', 'current_price' => '5.49', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://fitnesscandy.nl/p/bars', 'current_price' => '3.00', 'pack_quantity' => '12.00', 'pack_unit' => 'piece']);
+
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()
+        ->assertSeeText('€7.56 /kg')
+        ->assertSeeText(PackExclusion::SoldByThePiece->label())
+        ->assertSeeText('€3.00')
+        ->assertDontSeeText('/piece');
+});
+
+test('an estimated size is marked on the public page', function (): void {
+    $product = makeSharedProduct();
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/chips', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/chips', 'current_price' => '1.79', 'pack_quantity' => null, 'pack_unit' => null]);
+
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()
+        ->assertSeeTextInOrder(['€8.95 /kg', '€1.79 for 200 g (estimated)']);
+});
+
+test('a trade-only price wins neither answer on the public page', function (): void {
+    $product = makeSharedProduct();
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/chips', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://wholesale.test/p/chips',
+        'current_price' => '0.99',
+        'pack_quantity' => '200.00',
+        'pack_unit' => 'g',
+        'consumer_price_issue' => ConsumerPriceIssue::TradeOnly,
+    ]);
+
+    $html = (string) preg_replace('/\s+/', ' ', $this->get('/p/' . str_repeat('a', 32))->assertOk()->content());
+
+    expect($html)->toContain('Tracked on DipCatch: best value €8.45 /kg at ah.nl')
+        ->and(substr_count($html, '>Lowest price<'))->toBe(1)
+        ->and($html)->toContain(ConsumerPriceIssue::TradeOnly->label());
+
+    preg_match_all('/<li>(.*?)<\/li>/s', $html, $rows);
+    $wholesale = collect($rows[1])->first(fn (string $row): bool => str_contains($row, 'wholesale.test'));
+    $ah = collect($rows[1])->first(fn (string $row): bool => str_contains($row, 'ah.nl/p/chips'));
+
+    expect($wholesale)->not->toContain('>Lowest price<')->not->toContain('>Best value<')
+        ->and($ah)->toContain('>Lowest price<')->toContain('>Best value<');
+});
+
+test('sold-out sized shops still give the public page its unit', function (): void {
+    // The only sized shop is sold out: it is not listed, but it still decides
+    // what the product is measured in, as on the owner page. The listed shop
+    // states no size, so it shows the size it inherits, marked as estimated.
+    $product = makeSharedProduct();
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/chips', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'current_in_stock' => false]);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/chips', 'current_price' => '1.79', 'pack_quantity' => null, 'pack_unit' => null]);
+
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()
+        ->assertSeeTextInOrder(['€8.95 /kg', '€1.79 for 200 g (estimated)'])
+        ->assertDontSeeText('ah.nl');
+});
+
+test('the public chart plots the best value per unit, and falls back to the pack price for a history in another unit', function (): void {
+    $perKilo = makeSharedProduct();
+    $shop = Shop::factory()->for($perKilo)->create(['url' => 'https://ah.nl/p/chips', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    ProductCheapestHistory::factory()->for($perKilo)->create(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'started_at' => now()->subDays(5), 'ended_at' => null]);
+
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()
+        ->assertSeeHtml('Price per kilo (last 90 days)')
+        ->assertSeeHtml('"y":"8.4500"');
+
+    $perKilo->forceFill(['share_slug' => null])->save();
+    $perPiece = makeSharedProduct();
+    $pieces = Shop::factory()->for($perPiece)->create(['url' => 'https://ah.nl/p/bars', 'current_price' => '4.99', 'pack_quantity' => '12.00', 'pack_unit' => 'piece']);
+    ProductCheapestHistory::factory()->for($perPiece)->create(['cheapest_shop_id' => $pieces->id, 'cheapest_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g', 'started_at' => now()->subDays(5), 'ended_at' => null]);
+
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()
+        ->assertSeeHtml('Price (last 90 days)')
+        ->assertSeeHtml('"y":"4.99"');
+});
+
+test('a trade-only price never heads a shared product compared on pack prices', function (): void {
+    $product = makeSharedProduct();
+    Shop::factory()->for($product)->create(['url' => 'https://bol.com/p/cam', 'current_price' => '299.00']);
+    Shop::factory()->for($product)->create(['url' => 'https://wholesale.test/p/cam', 'current_price' => '249.00', 'consumer_price_issue' => ConsumerPriceIssue::ExcludesVat]);
+
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()
+        ->assertSeeHtml('Tracked on DipCatch: cheapest at €299.00');
+
+    expect($this->get('/p/' . str_repeat('a', 32) . '.md')->content())
+        ->toContain("## Best price now\n\n€299.00 at [bol.com]");
+});
+
+test('the public chart stays on the pack price when most of the history is in another unit', function (): void {
+    $product = makeSharedProduct();
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/bars', 'current_price' => '4.99', 'pack_quantity' => '12.00', 'pack_unit' => 'piece']);
+
+    foreach ([[40, 30, '660.00', 'g'], [30, 20, '660.00', 'g'], [20, 10, '660.00', 'g'], [10, null, '12.00', 'piece']] as [$from, $to, $quantity, $unit]) {
+        ProductCheapestHistory::factory()->for($product)->create([
+            'cheapest_shop_id' => $shop->id, 'cheapest_price' => '4.99', 'pack_quantity' => $quantity, 'pack_unit' => $unit,
+            'started_at' => now()->subDays($from), 'ended_at' => $to === null ? null : now()->subDays($to),
+        ]);
+    }
+
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()
+        ->assertSeeHtml('Price (last 90 days)')
+        ->assertDontSeeHtml('Price per piece (last 90 days)');
+});
+
+test('a per-unit chart point carries no deal from the lowest-price shop', function (): void {
+    $product = makeSharedProduct();
+    $small = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/t', 'current_price' => '12.99', 'pack_quantity' => '400.00', 'pack_unit' => 'piece']);
+    $big = Shop::factory()->for($product)->create(['url' => 'https://kruidvat.nl/p/t', 'current_price' => '21.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece']);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $small->id, 'cheapest_price' => '12.99', 'single_item_price' => '14.99', 'bundle_quantity' => 2, 'bundle_total_price' => '25.98',
+        'best_value_shop_id' => $big->id, 'best_value_price' => '21.99', 'pack_quantity' => '800.00', 'pack_unit' => 'piece',
+        'started_at' => now()->subDays(5), 'ended_at' => null,
+    ]);
+
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()
+        ->assertSeeHtml('"y":"0.0275"')
+        ->assertDontSeeHtml('"bundle":"2 for');
+});
+
+test('a trade-only public row leads with its reason, not a price per unit', function (): void {
+    $product = makeSharedProduct();
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/chips', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://wholesale.test/p/chips', 'current_price' => '0.99', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'consumer_price_issue' => ConsumerPriceIssue::TradeOnly]);
+
+    $this->get('/p/' . str_repeat('a', 32))->assertOk()
+        ->assertSeeText('€8.45 /kg')
+        ->assertDontSeeText('€4.95 /kg');
+});
+
+test('shows only a picture one of the shops reported, never an address the owner typed', function (): void {
+    $product = makeSharedProduct(['image_url' => 'https://tracker.example/pixel.png']);
+    Shop::factory()->for($product)->create(['current_price' => '85.00', 'image_url' => 'https://static.shop.example/headphones.png']);
+
+    $this->get('/p/' . str_repeat('a', 32))
+        ->assertOk()
+        ->assertDontSeeHtml('tracker.example')
+        ->assertSeeHtml('<meta name="twitter:card" content="summary">');
+
+    $product->forceFill(['image_url' => 'https://static.shop.example/headphones.png'])->save();
+
+    $this->get('/p/' . str_repeat('a', 32))
+        ->assertOk()
+        ->assertSeeHtml('<meta property="og:image" content="https://static.shop.example/headphones.png">')
+        ->assertSeeHtml('referrerpolicy="no-referrer"');
 });

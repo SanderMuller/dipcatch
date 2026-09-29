@@ -6,6 +6,7 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\UrlNormalizer;
@@ -16,7 +17,7 @@ use App\Support\UrlNormalizer;
  * unknown host, delegate to JSON-LD on the happy path, fall back to CSS, and
  * surface a host-specific failure code when both fail.
  */
-abstract readonly class HostAdapter implements HostSpecificAdapter, ShopAdapter
+abstract readonly class HostAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
     /**
      * Normalized host (no `www.`) → ISO 4217 currency code.
@@ -30,6 +31,21 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, ShopAdapter
      * subclass doesn't need to redo the host lookup.
      */
     abstract protected function extractFromHtml(string $html, string $currency): ?ShopSnapshot;
+
+    /**
+     * Adds what only this host's page states to a snapshot either path read,
+     * for example a pack size its JSON-LD leaves ambiguous. Unchanged by
+     * default.
+     */
+    protected function refine(ShopSnapshot $snapshot, string $url, string $html, ?AdapterContext $context): ShopSnapshot
+    {
+        return $snapshot;
+    }
+
+    public function ownedHosts(): array
+    {
+        return array_keys($this->hosts());
+    }
 
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
@@ -50,8 +66,8 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, ShopAdapter
         // page stayed ambiguous however often it was answered.
         $jsonLd = new JsonLdAdapter()->extract($url, $html, $context);
 
-        if ($jsonLd->isSuccess()) {
-            return $jsonLd;
+        if ($jsonLd->snapshot !== null && $jsonLd->isSuccess()) {
+            return ExtractionResult::success($this->refine($jsonLd->snapshot, $url, $html, $context));
         }
 
         // A page that lists several variants and states no way to tell
@@ -64,7 +80,7 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, ShopAdapter
 
         $snapshot = $this->extractFromHtml($html, $currency);
         if ($snapshot !== null) {
-            return ExtractionResult::success($snapshot);
+            return ExtractionResult::success($this->refine($snapshot, $url, $html, $context));
         }
 
         return ExtractionResult::failed($this->key() . '_extraction_failed');

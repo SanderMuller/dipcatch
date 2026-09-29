@@ -12,8 +12,11 @@ use App\Support\ImageUrl;
 use App\Support\Numeric;
 use App\Support\PackSize;
 use Carbon\CarbonImmutable;
+use Closure;
 use Database\Factories\ProductFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +31,8 @@ use Illuminate\Support\Facades\DB;
  * @property CategorySource|null $category_set_by
  * @property ProductCategory|null $suggested_category
  * @property CarbonImmutable|null $history_kept_from
+ * @property CarbonImmutable|null $listed_at
+ * @property CarbonImmutable|null $list_checked_at
  * @property-read PriceDropEvent|null $latestPriceDropEvent
  */
 #[Unguarded]
@@ -70,12 +75,16 @@ final class Product extends Model
             'target_price' => 'decimal:2',
             'target_price_notified' => 'decimal:2',
             'target_price_notified_at' => 'datetime',
-            'unit_price_target' => 'decimal:2',
-            'unit_price_notified' => 'decimal:2',
+            // Four, unlike the pack-money columns above: a price per piece is
+            // often under a cent's worth of resolution. See PackSize.
+            'unit_price_target' => 'decimal:4',
+            'unit_price_notified' => 'decimal:4',
             'unit_price_notified_at' => 'datetime',
             'last_notified_price' => 'decimal:2',
             'last_notified_at' => 'datetime',
             'history_kept_from' => 'datetime',
+            'listed_at' => 'datetime',
+            'list_checked_at' => 'datetime',
             'active' => 'boolean',
             'category' => ProductCategory::class,
             'category_set_by' => CategorySource::class,
@@ -145,6 +154,125 @@ final class Product extends Model
     }
 
     /**
+     * The drop a product is in now, in SQL: its latest alert while the latch
+     * is set, measured the way the card's badge is
+     * ({@see activeDropPercent()}). Today's price against the alert's
+     * reference, in the basis the alert fired on, and nothing once the price is
+     * back; the alert's own figure only when no price is known. Nothing for an
+     * alert on pack prices once the product compares per unit.
+     *
+     * @return EloquentQueryBuilder<PriceDropEvent>
+     */
+    public static function liveDropPercentQuery(): EloquentQueryBuilder
+    {
+        return PriceDropEvent::query()
+            // Real division throughout (`* 1.0`, `100.0`): SQLite stores a
+            // whole decimal as an integer and would divide integers. The unit
+            // price is rounded to four decimals, as dropBasisPrice() stores it.
+            ->selectRaw(<<<'SQL'
+                CASE
+                    WHEN comparison_unit IS NULL AND products.best_value_pack_unit IS NOT NULL
+                        THEN NULL
+                    WHEN comparison_unit IS NULL AND reference_price > 0 AND products.cheapest_price IS NOT NULL
+                        THEN CASE WHEN products.cheapest_price < reference_price
+                            THEN (reference_price - products.cheapest_price) * 100.0 / reference_price END
+                    WHEN comparison_unit IS NOT NULL AND reference_unit_price > 0
+                        AND products.best_value_price > 0 AND products.best_value_pack_quantity > 0
+                        AND products.best_value_pack_unit = comparison_unit
+                        THEN CASE WHEN ROUND(products.best_value_price * 1.0 / products.best_value_pack_quantity
+                                * (CASE comparison_unit WHEN 'piece' THEN 1 ELSE 1000 END), 4) < reference_unit_price
+                            THEN (reference_unit_price - ROUND(products.best_value_price * 1.0 / products.best_value_pack_quantity
+                                * (CASE comparison_unit WHEN 'piece' THEN 1 ELSE 1000 END), 4)) * 100.0 / reference_unit_price END
+                    ELSE drop_pct
+                END
+                SQL)
+            ->whereColumn('price_drop_events.product_id', 'products.id')
+            ->whereNotNull('products.last_notified_price')
+            ->latest('fired_at')
+            ->latest('id')
+            ->limit(1);
+    }
+
+    /**
+     * @param  EloquentQueryBuilder<$this>  $query
+     */
+    #[Scope]
+    protected function onShoppingList(EloquentQueryBuilder $query): void
+    {
+        $query->whereNotNull('listed_at');
+    }
+
+    public function isOnShoppingList(): bool
+    {
+        return $this->listed_at !== null;
+    }
+
+    public function isCrossedOff(): bool
+    {
+        return $this->listed_at !== null && $this->list_checked_at !== null;
+    }
+
+    /**
+     * Puts the product on the list, un-crossed. A list change must not touch
+     * `updated_at`: the dashboard orders its trips by it.
+     */
+    public function addToShoppingList(): void
+    {
+        $this->writeListColumns(fn (EloquentQueryBuilder $query): int => $query->update(['listed_at' => now(), 'list_checked_at' => null]));
+    }
+
+    /**
+     * Only while the product is still listed: another tab may have removed
+     * it, and crossing it off must not bring it back.
+     */
+    public function setCrossedOff(bool $crossedOff): void
+    {
+        $this->writeListColumns(fn (EloquentQueryBuilder $query): int => $query->onShoppingList()->update(['list_checked_at' => $crossedOff ? now() : null]));
+    }
+
+    public function removeFromShoppingList(): void
+    {
+        $this->writeListColumns(fn (EloquentQueryBuilder $query): int => $query->update(['listed_at' => null, 'list_checked_at' => null]));
+    }
+
+    /**
+     * Takes every crossed-off product of the account off its list.
+     */
+    public static function clearCrossedOffFor(User $user): int
+    {
+        return self::withoutTimestamps(fn (): int => self::query()
+            ->where('user_id', $user->id)
+            ->onShoppingList()
+            ->whereNotNull('list_checked_at')
+            ->update(['listed_at' => null, 'list_checked_at' => null]));
+    }
+
+    /**
+     * @param  Closure(EloquentQueryBuilder<self>): int  $write
+     */
+    private function writeListColumns(Closure $write): void
+    {
+        self::withoutTimestamps(fn (): int => $write(self::query()->whereKey($this->getKey())));
+
+        $this->refresh();
+    }
+
+    /**
+     * Products whose card shows a drop badge: a drop measured live, from half
+     * a percent, as the badge rounds it. The latch alone also holds a price
+     * that has climbed back to where it was.
+     *
+     * @param EloquentQueryBuilder<$this> $query
+     */
+    #[Scope]
+    protected function inVisibleDrop(EloquentQueryBuilder $query): void
+    {
+        // A literal, not a binding: SQLite (the local database) receives a
+        // bound float as text, and there no number compares >= a text value.
+        $query->where(self::liveDropPercentQuery(), '>=', DB::raw('0.5'));
+    }
+
+    /**
      * The drop the product is still in: the alert that last fired, while the
      * price has not recovered. `last_notified_price` is the latch DetectDrop
      * clears on recovery, so the latest event is the current drop only while
@@ -177,6 +305,13 @@ final class Product extends Model
         // reference with today's pack price answers a question nobody asked and
         // gets the badge wrong by whatever the pack size is.
         $unit = is_string($drop->comparison_unit) ? $drop->comparison_unit : null;
+
+        // An alert on pack prices, on a product that now compares per unit: it
+        // compared packs that can differ in size — a 240 g box against an
+        // 840 g one read as 61% off — so it is not a drop anyone can trust.
+        if ($unit === null && $this->best_value_pack_unit !== null) {
+            return null;
+        }
         $referenceValue = $unit === null ? $drop->reference_price : $drop->reference_unit_price;
         $current = $this->dropBasisPrice($unit);
 
@@ -193,6 +328,22 @@ final class Product extends Model
         $fraction = bcdiv(bcsub($reference, Numeric::str($current), self::BC_SCALE), $reference, self::BC_SCALE);
 
         return max(0, (int) round((float) $fraction * 100));
+    }
+
+    /**
+     * Whether the owner set a price to reach that is checked. Such a product
+     * alerts on what the owner configured and nothing else: no default drop
+     * thresholds. A unit-price target only counts when it can fire now: on
+     * an account that is alerted on it, with a best-value shop that has a unit
+     * price — what `DetectUnitPriceTarget` checks. Otherwise the product would
+     * be left with no working alert at all.
+     */
+    public function hasActiveTarget(): bool
+    {
+        return $this->target_price !== null
+            || ($this->unit_price_target !== null
+                && $this->user?->entitlements()->allowsUnitPriceAlerts() === true
+                && $this->bestValueShop()?->unitPrice() !== null);
     }
 
     public function isPubliclyShared(): bool
@@ -315,6 +466,20 @@ final class Product extends Model
     }
 
     /**
+     * The shop with the smallest outlay among those a shopper can actually buy
+     * from — the same answer {@see recomputeCheapestShop()} stores, computed
+     * live.
+     *
+     * Beside {@see bestValueShop()} on purpose: a surface that needs one of the
+     * two answers needs the other from the same eligible set, or it shows a
+     * winner nobody else agrees with.
+     */
+    public function lowestOutlayShop(): ?Shop
+    {
+        return self::lowestOutlayAmong($this->eligibleShops());
+    }
+
+    /**
      * Shops allowed to win either answer: active, not dead, priced, in this
      * product's own currency, and in stock or of unknown stock.
      *
@@ -323,7 +488,7 @@ final class Product extends Model
      *
      * @return Collection<int, Shop>
      */
-    private function eligibleShops(): Collection
+    public function eligibleShops(): Collection
     {
         return $this->votingShops()
             ->filter(fn (Shop $shop): bool => $shop->current_in_stock !== false);
@@ -350,7 +515,18 @@ final class Product extends Model
         return $this->shops->filter(fn (Shop $shop): bool => $shop->active
             && $shop->health !== ShopHealth::Dead
             && $shop->currency === $this->currency
-            && $shop->current_price !== null);
+            && $shop->current_price !== null
+            // A link is not an offer. It holds no price, so the line above
+            // already bars it; this one says why, and holds if a price ever
+            // lands on a row that should not have one.
+            && ! $shop->isReference()
+            // A price quoted without VAT, or shown only to trade accounts,
+            // is not a price anyone here pays. It is lower than every
+            // complete price beside it, so left in it takes both answers and
+            // fires alerts on a figure the shopper cannot act on. Barred from
+            // voting on the comparison unit too: the shop is not in the
+            // comparison. See {@see ConsumerPriceIssue}.
+            && $shop->consumer_price_issue === null);
     }
 
     /**

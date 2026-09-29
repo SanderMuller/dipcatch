@@ -2,17 +2,24 @@
 
 namespace App\Livewire\Products;
 
+use App\Billing\BillingGate;
 use App\Billing\PlanLimits;
+use App\Billing\ProPrice;
 use App\Enums\ProductCategory;
 use App\Enums\ProductDepartment;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
-use App\Support\MoneyFormatter;
+use App\Services\TypeSafe\TypeSafeClient;
+use App\Support\DashboardDigest;
+use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -25,9 +32,8 @@ use Livewire\WithPagination;
  * those are what a person tracking a few dozen products actually uses.
  *
  * Every query is scoped to the signed-in user — the Filament resource did this
- * in `getEloquentQuery()` and nothing else enforced it — and every mutation
- * goes through `ProductPolicy`, which the resource documented as its second
- * line of defence.
+ * in `getEloquentQuery()` and nothing else enforced it. The list changes
+ * nothing: pausing and resuming live on the product page.
  */
 final class ProductList extends Component
 {
@@ -40,18 +46,36 @@ final class ProductList extends Component
     #[Url(except: 'all')]
     public string $status = 'all';
 
-    /** A department key, a category key, or empty for all. Anything else reads as all. */
+    /** A department key, a category key, NO_CATEGORY, or empty for all. Anything else reads as all. */
     #[Url(except: '')]
     public string $category = '';
+
+    /** A shop host, or empty for all. Products tracked at that shop. */
+    #[Url(except: '')]
+    public string $shop = '';
+
+    /** Only products in an active drop, or with a deal running now at their cheapest or best-value shop. */
+    #[Url(except: false)]
+    public bool $discounted = false;
+
+    /** With a shop chosen: only the products that shop is the best buy for, as the dashboard counts them. */
+    #[Url(except: false)]
+    public bool $bestBuy = false;
 
     #[Url(except: self::DEFAULT_SORT)]
     public string $sort = self::DEFAULT_SORT;
 
-    private const string DEFAULT_SORT = 'created_at';
+    private const string DEFAULT_SORT = 'biggest_drop';
+
+    /** The sort this browser last chose, read before the first render. */
+    private const string SORT_COOKIE = 'products_sort';
+
+    /** The filter for products without a category. No category or department uses this key. */
+    public const string NO_CATEGORY = 'none';
 
     /**
      * The sort options, each with the direction that makes it read the way its
-     * label promises: newest first, but A before Z.
+     * label promises: biggest drop and newest first, but A before Z.
      *
      * Sorting used to live on the table headers, where it asked a person to
      * know that "Best price" was clickable and to guess what a second click
@@ -60,11 +84,29 @@ final class ProductList extends Component
      * @var array<string, 'asc'|'desc'>
      */
     private const array SORTS = [
+        'biggest_drop' => 'desc',
         'created_at' => 'desc',
         'title' => 'asc',
         'cheapest_price' => 'asc',
-        'biggest_drop' => 'desc',
     ];
+
+    /**
+     * A sort in the URL wins; otherwise the one this browser last chose.
+     * Read here, on the server, so the first render is already in that
+     * order — restoring it in the browser re-sorted the list after it drew.
+     */
+    public function mount(): void
+    {
+        if ($this->sort !== self::DEFAULT_SORT) {
+            return;
+        }
+
+        $remembered = request()->cookie(self::SORT_COOKIE);
+
+        if (is_string($remembered) && array_key_exists($remembered, self::SORTS)) {
+            $this->sort = $remembered;
+        }
+    }
 
     public function updatedStatus(): void
     {
@@ -81,30 +123,79 @@ final class ProductList extends Component
         $this->resetPage();
     }
 
-    public function updatedSort(): void
+    public function updatedShop(): void
+    {
+        $this->resetPage();
+
+        // The best-buy filter means nothing without a shop.
+        if ($this->shop === '') {
+            $this->bestBuy = false;
+        }
+    }
+
+    public function updatedDiscounted(): void
     {
         $this->resetPage();
     }
 
-    /**
-     * Pausing and resuming are mutations, so they authorize rather than trusting
-     * the scoped list the page was rendered from.
-     */
-    public function togglePaused(string $productId): void
+    private function bestBuyFilterOn(): bool
     {
-        $product = Product::query()->findOrFail($productId);
+        return $this->bestBuy && $this->shop !== '';
+    }
 
-        $this->authorize('update', $product);
+    public function updatedBestBuy(): void
+    {
+        $this->resetPage();
+    }
 
-        $product->forceFill(['active' => ! $product->active])->save();
+    public function updatedSort(): void
+    {
+        $this->resetPage();
+
+        if (array_key_exists($this->sort, self::SORTS)) {
+            Cookie::queue(self::SORT_COOKIE, $this->sort, 60 * 24 * 365);
+        }
+    }
+
+    /**
+     * The card's shopping-list button. Only this account's products: a value
+     * that is not a UUID answers 404 before any query, as Postgres would
+     * reject it in a uuid comparison.
+     */
+    public function toggleShoppingList(mixed $productId): void
+    {
+        abort_unless(is_string($productId) && Str::isUuid($productId), 404);
+
+        $user = auth()->user();
+        abort_unless($user instanceof User, 403);
+
+        $product = $user->products()->findOrFail($productId);
+
+        if ($product->isOnShoppingList()) {
+            $product->removeFromShoppingList();
+            Flux::toast(text: __(':title is off the list.', ['title' => $product->title]));
+        } else {
+            $product->addToShoppingList();
+            Flux::toast(text: __(':title is on your shopping list.', ['title' => $product->title]));
+        }
+
+        $this->dispatch('shopping-list-changed');
     }
 
     public function render(): View
     {
+        $showAutoCategoriesPromo = $this->category === self::NO_CATEGORY && $this->canBuyAutoCategories();
+
         return view('livewire.products.product-list', [
             'products' => $this->products(),
             'canAddProduct' => $this->canAddProduct(),
             'categoryGroups' => $this->categoryGroups(),
+            'shopHosts' => $this->shopHosts(),
+            // Kept while selected, for the same reason as categoryGroups().
+            'hasUncategorised' => $this->category === self::NO_CATEGORY || $this->uncategorised()->exists(),
+            'showAutoCategoriesPromo' => $showAutoCategoriesPromo,
+            // "Try" only when checkout starts a free trial for this account.
+            'promoOffersTrial' => $showAutoCategoriesPromo && ProPrice::trialDays() > 0 && auth()->user()?->qualifiesForTrial() === true,
         ]);
     }
 
@@ -128,14 +219,27 @@ final class ProductList extends Component
                 in_array($this->status, ['active', 'paused'], strict: true),
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', $this->status === 'active'),
             )
+            // With best buys on, the offers come from the same rule as the dashboard badge, below.
+            ->when($this->discounted && ! $this->bestBuyFilterOn(), fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where(
+                fn (EloquentQueryBuilder $discount): EloquentQueryBuilder => $this->shop === ''
+                    ? self::discountedAnywhere($discount)
+                    : self::discountedAt($discount, $this->shop),
+            ))
             ->when(
                 $categories !== null,
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []),
             )
-            ->withCount('shops')
-            ->withMax('priceDropEvents as biggest_drop', 'drop_pct')
+            ->when($this->category === self::NO_CATEGORY, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('category'))
+            ->when($this->bestBuyFilterOn(), fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereKey(
+                auth()->user() instanceof User ? DashboardDigest::bestBuyIds(auth()->user(), $this->shop, onOfferOnly: $this->discounted) : [],
+            ))
+            ->when($this->shop !== '', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereHas(
+                'shops',
+                fn (EloquentQueryBuilder $shops): EloquentQueryBuilder => $shops->where('host', $this->shop)->where('active', true),
+            ))
+            ->addSelect(['biggest_drop' => Product::liveDropPercentQuery()])
             ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
-            // A product that never dropped, or has no price yet, sorts last
+            // A product not in a drop, or with no price yet, sorts last
             // whichever way the list runs, rather than heading a list of
             // drops with rows that have none.
             ->orderByRaw(self::orderBy($sort))
@@ -143,7 +247,129 @@ final class ProductList extends Component
             // on two pages and another on none. The ids are UUIDv7, so this
             // also reads as newest first.
             ->orderBy('id', 'desc')
-            ->paginate();
+            // 24 fills whole rows at one, two, three and four cards across.
+            ->paginate(24);
+    }
+
+    /**
+     * In a drop, or with a deal at either shop a card names: the lowest price,
+     * or the best value it leads with.
+     *
+     * @param  EloquentQueryBuilder<Product>  $query
+     * @return EloquentQueryBuilder<Product>
+     */
+    private static function discountedAnywhere(EloquentQueryBuilder $query): EloquentQueryBuilder
+    {
+        return $query
+            ->inVisibleDrop()
+            ->orWhereHas('cheapestShop', self::dealRunningNow(...))
+            // A string column beside a uuid key: cast for PostgreSQL.
+            ->orWhereExists(self::dealRunningNow(
+                Shop::query()->select(DB::raw(1))->whereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id'),
+            ));
+    }
+
+    /**
+     * On discount at this shop itself: a deal running there, or a drop to the
+     * price there, which is the lowest price or the best value.
+     *
+     * @param  EloquentQueryBuilder<Product>  $query
+     * @return EloquentQueryBuilder<Product>
+     */
+    private static function discountedAt(EloquentQueryBuilder $query, string $host): EloquentQueryBuilder
+    {
+        return $query
+            ->whereHas('shops', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => self::dealRunningNow($shop->where('host', $host)->where('active', true)))
+            ->orWhere(fn (EloquentQueryBuilder $drop): EloquentQueryBuilder => $drop
+                ->inVisibleDrop()
+                ->where(fn (EloquentQueryBuilder $there): EloquentQueryBuilder => $there
+                    ->whereHas('cheapestShop', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $shop->where('host', $host))
+                    ->orWhereExists(Shop::query()
+                        ->select(DB::raw(1))
+                        ->whereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id')
+                        ->where('host', $host))));
+    }
+
+    /**
+     * A deal at the shop running now, in SQL: a promotion window that has
+     * started and not ended, or a bundle offer the price was read at. The
+     * same rules as PromotionWindow::isRunning() and Shop::liveBundleOffer().
+     *
+     * @param  EloquentQueryBuilder<Shop>  $shop
+     * @return EloquentQueryBuilder<Shop>
+     */
+    private static function dealRunningNow(EloquentQueryBuilder $shop): EloquentQueryBuilder
+    {
+        $now = now();
+
+        return $shop->where(fn (EloquentQueryBuilder $deal): EloquentQueryBuilder => $deal
+            ->where(fn (EloquentQueryBuilder $promotion): EloquentQueryBuilder => $promotion
+                ->where('promotion_ends_at', '>=', $now)
+                ->where(fn (EloquentQueryBuilder $started): EloquentQueryBuilder => $started
+                    ->whereNull('promotion_starts_at')
+                    ->orWhere('promotion_starts_at', '<=', $now)))
+            ->orWhere(fn (EloquentQueryBuilder $bundle): EloquentQueryBuilder => $bundle
+                ->where('bundle_quantity', '>=', 2)
+                ->where('bundle_total_price', '>=', 0.01)
+                // `* 1.0`: SQLite divides two whole numbers as integers.
+                ->whereRaw('ROUND(bundle_total_price * 1.0 / NULLIF(bundle_quantity, 0), 2) = current_price')
+                ->whereRaw('ROUND(bundle_total_price * 1.0 / NULLIF(bundle_quantity, 0), 2) < COALESCE(single_item_price, current_price)')));
+    }
+
+    /**
+     * The shops the account tracks a product at, within the category filter:
+     * on "Food & drinks", only the shops that carry one of its food products.
+     * The selected shop stays offered when the category leaves it out, or
+     * the select would show a blank value.
+     *
+     * @return list<string>
+     */
+    private function shopHosts(): array
+    {
+        $categories = ProductCategory::leavesFor($this->category);
+
+        $hosts = Shop::query()
+            ->where('active', true)
+            ->whereHas('product', fn (EloquentQueryBuilder $product): EloquentQueryBuilder => $product
+                ->where('user_id', auth()->id())
+                ->when($categories !== null, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []))
+                ->when($this->category === self::NO_CATEGORY, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('category')))
+            ->distinct()
+            ->orderBy('host')
+            ->pluck('host')
+            ->filter(fn (mixed $host): bool => is_string($host) && $host !== '')
+            ->values()
+            ->all();
+
+        if ($this->shop !== '' && ! in_array($this->shop, $hosts, strict: true)) {
+            $hosts[] = $this->shop;
+        }
+
+        return $hosts;
+    }
+
+    /**
+     * @return EloquentQueryBuilder<Product>
+     */
+    private function uncategorised(): EloquentQueryBuilder
+    {
+        return Product::query()->where('user_id', auth()->id())->whereNull('category');
+    }
+
+    /**
+     * Whether Pro would sort these products: the feature is switched on here,
+     * this account can buy Pro (the billing page's own rule), and does not
+     * have it yet. A Pro account is not sold what it already pays for.
+     */
+    private function canBuyAutoCategories(): bool
+    {
+        $user = auth()->user();
+
+        return TypeSafeClient::configured()
+            && BillingGate::isOpen()
+            && $user instanceof User
+            && $user->billing_blocked_at === null
+            && ! $user->entitlements()->allowsAutoCategories();
     }
 
     /**
@@ -184,7 +410,12 @@ final class ProductList extends Component
         return $groups;
     }
 
-    /** The sort keys a view offers, in the order they are shown. */
+    /**
+     * The sort keys the view offers. The browser checks a remembered sort
+     * against these before it applies it.
+     *
+     * @return list<string>
+     */
     public static function sortOptions(): array
     {
         return array_keys(self::SORTS);
@@ -218,20 +449,5 @@ final class ProductList extends Component
         $user = auth()->user();
 
         return ! $user instanceof User || app(PlanLimits::class)->canAddProduct($user);
-    }
-
-    /**
-     * The same string the Filament table rendered: a unit price with its label,
-     * or an em dash when no shop in view states a pack size.
-     */
-    public static function unitPriceState(?Shop $shop, Product $product): string
-    {
-        $unitPrice = $shop?->unitPrice();
-
-        if ($unitPrice === null) {
-            return '—';
-        }
-
-        return MoneyFormatter::format($unitPrice, $product->currency) . ' ' . $shop?->unitPriceLabel();
     }
 }

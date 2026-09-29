@@ -280,6 +280,8 @@
                 </div>
             </section>
         @endif
+
+        <livewire:settings.sign-out-everywhere-form />
     </x-settings.layout>
 
     @if ($canManagePasskeys)

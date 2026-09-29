@@ -2,6 +2,7 @@
 
 namespace App\Charts;
 
+use App\Support\MoneyFormatter;
 use Carbon\CarbonImmutable;
 
 /**
@@ -13,38 +14,39 @@ use Carbon\CarbonImmutable;
 final class PriceHistoryFluxChart
 {
     /**
-     * @param  array{datasets: list<array<string, mixed>>, labels: list<string>, bundleConditions?: list<?string>}  $data
-     * @return array{rows: list<array<string, mixed>>, currency: string, unitLabel: ?string, hasNotified: bool, hasBundles: bool}
+     * @param  array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>}  $data
+     * @return array{rows: list<array<string, mixed>>, currency: string, unit: ?string, unitDecimals: int, hasNotified: bool, hasBundles: bool, unitCoverage: float}
      */
     public static function fromData(array $data, string $currency): array
     {
-        $unit = self::seriesStartingWith($data['datasets'], 'Cheapest per ');
         $rows = self::holdingUntilNextChange(self::rows(
             $data['labels'],
-            self::valuesAt($data['datasets'], 0),
-            $unit['values'],
-            self::valuesForLabel($data['datasets'], 'Notified'),
-            $data['bundleConditions'] ?? [],
+            $data['price'],
+            $data['unit']['points'] ?? null,
+            $data['notified'],
+            $data['bundleConditions'],
         ));
 
         return [
             'rows' => $rows,
             'currency' => $currency,
-            'unitLabel' => $unit['label'],
+            'unit' => $data['unit']['unit'] ?? null,
+            'unitDecimals' => self::unitDecimals($rows),
             'hasNotified' => array_any($rows, fn (array $row): bool => isset($row['notified'])),
             'hasBundles' => array_any($rows, fn (array $row): bool => isset($row['bundle'])),
+            'unitCoverage' => UnitLineCoverage::of($rows),
         ];
     }
 
     /**
      * @param  list<string>  $labels
-     * @param  list<mixed>  $price
-     * @param  list<mixed>|null  $unit
-     * @param  list<mixed>|null  $notified
+     * @param  list<float|null>  $price
+     * @param  list<float|null>|null  $unit
+     * @param  list<float|null>  $notified
      * @param  list<?string>  $bundleConditions
      * @return list<array<string, mixed>>
      */
-    private static function rows(array $labels, array $price, ?array $unit, ?array $notified, array $bundleConditions): array
+    private static function rows(array $labels, array $price, ?array $unit, array $notified, array $bundleConditions): array
     {
         $rows = [];
 
@@ -60,6 +62,12 @@ final class PriceHistoryFluxChart
 
             if (is_numeric($notified[$index] ?? null)) {
                 $row['notified'] = (float) $notified[$index];
+
+                // The alert states a pack price. On the per-unit line the
+                // marker sits on that moment's unit price instead.
+                if (isset($row['unit'])) {
+                    $row['notifiedUnit'] = $row['unit'];
+                }
             }
 
             if (is_string($bundleConditions[$index] ?? null)) {
@@ -107,7 +115,7 @@ final class PriceHistoryFluxChart
 
             $hold = $row;
             $hold['date'] = $holdAt;
-            unset($hold['notified']);
+            unset($hold['notified'], $hold['notifiedUnit']);
             $expanded[] = $hold;
         }
 
@@ -124,54 +132,17 @@ final class PriceHistoryFluxChart
     }
 
     /**
-     * @param  list<array<string, mixed>>  $datasets
-     * @return list<mixed>
+     * Four decimals while every unit price is under 1, as
+     * {@see MoneyFormatter::unitPrice()} writes them: two
+     * cannot tell €0.0283 from €0.0249 a tablet.
+     *
+     * @param  list<array<string, mixed>>  $rows
      */
-    private static function valuesAt(array $datasets, int $index): array
+    private static function unitDecimals(array $rows): int
     {
-        $dataset = $datasets[$index] ?? [];
-        $data = $dataset['data'] ?? null;
+        $units = array_filter(array_column($rows, 'unit'), is_float(...));
 
-        return is_array($data) ? array_values($data) : [];
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $datasets
-     * @return array{label: ?string, values: ?list<mixed>}
-     */
-    private static function seriesStartingWith(array $datasets, string $prefix): array
-    {
-        foreach ($datasets as $dataset) {
-            $label = is_string($dataset['label'] ?? null) ? $dataset['label'] : '';
-
-            if (str_starts_with($label, $prefix)) {
-                $data = $dataset['data'] ?? null;
-
-                return [
-                    'label' => $label,
-                    'values' => is_array($data) ? array_values($data) : [],
-                ];
-            }
-        }
-
-        return ['label' => null, 'values' => null];
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $datasets
-     * @return list<mixed>|null
-     */
-    private static function valuesForLabel(array $datasets, string $label): ?array
-    {
-        foreach ($datasets as $dataset) {
-            if (($dataset['label'] ?? null) === $label) {
-                $data = $dataset['data'] ?? null;
-
-                return is_array($data) ? array_values($data) : [];
-            }
-        }
-
-        return null;
+        return $units !== [] && max($units) < 1 ? 4 : 2;
     }
 
     private static function date(string $stamp): string

@@ -2,7 +2,9 @@
 
 namespace App\PriceAdapters;
 
+use App\Enums\VariantResolution;
 use App\Support\Gtin;
+use App\Support\PackSize;
 use JsonException;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -28,6 +30,15 @@ final readonly class JsonLdAdapter implements ShopAdapter
 
         $state = new JsonLdSearchState();
         [$product, $shop] = $this->findProductAndOffer($scripts, $url, $context, $state);
+
+        // Some Shopify themes put only the selected variant in their JSON-LD.
+        // Read from here, a three-flavour page would say it sells one. The
+        // page's own variant list is the fuller account, so defer to it.
+        $shopifyVariants = ShopifyProduct::variantCount($html);
+
+        if ($shopifyVariants !== null && $shopifyVariants > 1 && $state->variantsSeen < $shopifyVariants) {
+            return ExtractionResult::skip();
+        }
 
         // Variant ambiguity wins over a weak fallback: when the page lists
         // multiple variants and the caller didn't pin one via context, ask
@@ -60,7 +71,7 @@ final readonly class JsonLdAdapter implements ShopAdapter
             return ExtractionResult::failed('jsonld_no_offer');
         }
 
-        return $this->buildSnapshot($product, $shop);
+        return $this->buildSnapshot($product, $shop, $state, $variantKey);
     }
 
     /**
@@ -117,7 +128,7 @@ final readonly class JsonLdAdapter implements ShopAdapter
      * @param  array<string, mixed>|null  $product
      * @param  array<string, mixed>       $shop
      */
-    private function buildSnapshot(?array $product, array $shop): ExtractionResult
+    private function buildSnapshot(?array $product, array $shop, JsonLdSearchState $state, ?string $variantKey): ExtractionResult
     {
         $price = JsonLdOfferPrice::price($shop);
         if ($price === null) {
@@ -135,10 +146,10 @@ final readonly class JsonLdAdapter implements ShopAdapter
         $imageUrl = JsonLdEntities::firstImageUrl($product['image'] ?? null)
             ?? JsonLdEntities::firstImageUrl($shop['image'] ?? null);
 
-        $packSize = UnitPriceSize::from($shop, $price);
+        $packSize = UnitPriceSize::from($shop, $price) ?? self::offerNameSize($shop, $title);
         [$inStock, $stockSignal] = StockAvailability::read($shop['availability'] ?? null);
 
-        return ExtractionResult::success(new ShopSnapshot(
+        $result = ExtractionResult::success(new ShopSnapshot(
             title: $title,
             imageUrl: $imageUrl,
             price: $price,
@@ -157,6 +168,57 @@ final readonly class JsonLdAdapter implements ShopAdapter
             promotionWindowAuthoritative: true,
             stockSignal: $stockSignal,
         ));
+
+        return self::withVariantCount($result, $state, $variantKey);
+    }
+
+    /**
+     * Say what the page turned out to sell, and how this one was picked.
+     *
+     * Only when the page listed variants at all. A plain Product entity says
+     * nothing about variants, and answering "one" there would state a fact
+     * this reader did not read.
+     */
+    /**
+     * The chosen offer's own name, when it states a size its product's name
+     * does not: brekz.nl names one Product without a size and each variant
+     * offer "… - 10 kg". Given whole, as {@see PackSize::parse()} finds the
+     * size in it, a multipack's count included.
+     *
+     * @param  array<string, mixed>  $offer
+     */
+    private static function offerNameSize(array $offer, string $title): ?string
+    {
+        $name = JsonLdEntities::nonEmptyString($offer['name'] ?? null);
+
+        if ($name === null || PackSize::parse($title) !== null || PackSize::parse($name) === null) {
+            return null;
+        }
+
+        return $name;
+    }
+
+    private static function withVariantCount(ExtractionResult $result, JsonLdSearchState $state, ?string $variantKey): ExtractionResult
+    {
+        $snapshot = $result->snapshot;
+        $count = $state->variantsSeen;
+
+        if ($count === 0 || ! $snapshot instanceof ShopSnapshot) {
+            return $result;
+        }
+
+        // Reaching here with more than one variant means the request named
+        // one: `extract()` answers an unnamed choice with the chooser before
+        // any snapshot is built. So there is no "took the default" answer to
+        // give, and the two named cases plus the single-variant one are
+        // exhaustive.
+        $resolution = match (true) {
+            $variantKey !== null && $state->keyMatched => VariantResolution::VariantKey,
+            $count === 1 => VariantResolution::OnlyVariant,
+            default => VariantResolution::Url,
+        };
+
+        return ExtractionResult::success($snapshot->withVariants($count, $resolution));
     }
 
     private static function crawler(string $html): Crawler

@@ -2,6 +2,7 @@
 
 use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
+use App\Livewire\Products\ProductShow;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
 
 /**
  * A drop at or past `drops.confirm_above_pct` below the reference is what one
@@ -299,7 +301,7 @@ function sizedConfirmationShop(string $host = 'shop.example.com'): Shop
     ]);
 
     $shop->forceFill([
-        'current_price' => '10.00',
+        'current_price' => '10.0000',
         'current_in_stock' => true,
         'pack_quantity' => '500.00',
         'pack_unit' => 'g',
@@ -352,5 +354,83 @@ test('a second reading at the same price confirms a large per-unit drop', functi
 
     expect($event->comparison_unit)->toBe('g')
         ->and((string) $event->new_price)->toBe('5.00')
-        ->and((string) $event->new_unit_price)->toBe('10.00');
+        ->and((string) $event->new_unit_price)->toBe('10.0000');
 });
+
+/** The product page's "confirming" note, rendered for the shop's owner. */
+function confirmingNote(Shop $shop): bool
+{
+    $product = $shop->product->refresh();
+
+    Livewire::actingAs($product->user);
+
+    return str_contains(Livewire::test(ProductShow::class, ['product' => $product])->html(), 'data-test="confirming-drop"');
+}
+
+test('the product page says a large drop is waiting for its second reading', function (): void {
+    $shop = confirmationProduct();
+
+    expect(confirmingNote($shop))->toBeFalse();
+
+    reading($shop, '40.00');
+
+    expect(confirmingNote($shop))->toBeTrue();
+});
+
+test('the confirming note goes once a second reading confirms the drop', function (): void {
+    $shop = confirmationProduct();
+
+    reading($shop, '40.00');
+    reading($shop, '40.00');
+
+    expect(PriceDropEvent::count())->toBe(1)
+        ->and(confirmingNote($shop))->toBeFalse();
+});
+
+test('the confirming note goes once a second reading clears the drop', function (): void {
+    $shop = confirmationProduct();
+
+    reading($shop, '40.00');
+    reading($shop, '100.00');
+
+    expect(confirmingNote($shop))->toBeFalse();
+});
+
+test('a failed second check keeps the confirming note', function (): void {
+    $shop = confirmationProduct();
+
+    reading($shop, '40.00');
+    reading($shop, null, ['status' => ScrapeStatus::HttpError, 'in_stock' => null]);
+
+    expect(confirmingNote($shop))->toBeTrue();
+});
+
+test('a shop joining at a large drop shows no confirming note and asks for nothing', function (): void {
+    $shop = confirmationProduct();
+    reading($shop, '100.00');
+
+    $joiner = Shop::factory()->for($shop->product()->sole())->create([
+        'url' => 'https://joiner.example.com/p/' . fake()->unique()->slug(),
+        'host' => 'joiner.example.com',
+        'currency' => 'EUR',
+        'current_price' => null,
+    ]);
+
+    reading($joiner, '40.00');
+
+    expect(confirmingNote($shop))->toBeFalse()
+        ->and(PriceDropEvent::count())->toBe(0);
+
+    Queue::assertNotPushed(CheckShopPrice::class);
+});
+
+test('a small drop or a dataset shop shows no confirming note', function (string $host, string $price): void {
+    $shop = confirmationProduct($host);
+
+    reading($shop, $price);
+
+    expect(confirmingNote($shop))->toBeFalse();
+})->with([
+    'small drop' => ['shop.example.com', '90.00'],
+    'dataset shop' => ['boodschaapje.nl', '40.00'],
+]);

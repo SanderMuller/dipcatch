@@ -59,7 +59,7 @@
                     {{ __('Sending as :name (:email)', ['name' => $user->name, 'email' => $user->email]) }}
                 </flux:text>
 
-                <flux:button type="submit" variant="primary" icon:trailing="paper-airplane" wire:loading.attr="disabled">
+                <flux:button type="submit" variant="primary" icon:trailing="paper-airplane">
                     <span wire:loading.remove wire:target="submit">{{ __('Send message') }}</span>
                     <span wire:loading wire:target="submit">{{ __('Sending…') }}</span>
                 </flux:button>

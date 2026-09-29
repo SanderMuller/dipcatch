@@ -6,6 +6,7 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use Symfony\Component\DomCrawler\Crawler;
@@ -18,16 +19,21 @@ use Symfony\Component\DomCrawler\Crawler;
  * The size sits in the offer block's subtitle (`200 Gram`), never in the
  * JSON-LD (verified 2026-09-02).
  */
-final readonly class SparAdapter implements HostSpecificAdapter, ShopAdapter
+final readonly class SparAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
     public function key(): string
     {
         return 'spar';
     }
 
+    public function ownedHosts(): array
+    {
+        return ['spar.nl'];
+    }
+
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        if (! HostUrl::matches($url, 'spar.nl')) {
+        if (! HostUrl::matchesAny($url, $this->ownedHosts())) {
             return ExtractionResult::skip();
         }
 

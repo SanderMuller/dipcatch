@@ -2,7 +2,6 @@
 
 namespace App\Health;
 
-use App\Enums\ShopHealth;
 use App\Models\Product;
 use App\Models\Shop;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
@@ -39,16 +38,10 @@ final class LastSuccessfulScrapeCheck extends Check
                 ->shortSummary('idle');
         }
 
-        // Count active offers (attached to active products) whose last
-        // successful fetch is older than the warning threshold.
+        // Only the offers the scheduler rechecks: a kept link is never read
+        // between its weekly retries, so it would always look stale.
         $staleOfferCount = $this->staleOfferQuery($this->warnAfterHours)->count();
-        $totalActiveOfferCount = Shop::query()
-            ->where('active', true)
-            ->where('health', '!=', ShopHealth::Dead->value)
-            ->whereHas('product', function (EloquentQueryBuilder $q): void {
-                $q->where('active', true);
-            })
-            ->count();
+        $totalActiveOfferCount = Shop::query()->scheduled()->count();
 
         $result = Result::make()
             ->meta([
@@ -79,11 +72,7 @@ final class LastSuccessfulScrapeCheck extends Check
     private function staleOfferQuery(int $hours): EloquentQueryBuilder
     {
         return Shop::query()
-            ->where('active', true)
-            ->where('health', '!=', ShopHealth::Dead->value)
-            ->whereHas('product', function (EloquentQueryBuilder $q): void {
-                $q->where('active', true);
-            })
+            ->scheduled()
             ->where(function (EloquentQueryBuilder $q) use ($hours): void {
                 $cutoff = now()->subHours($hours);
 

@@ -6,6 +6,7 @@ use App\Billing\PlanLimits;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\DashboardDigest;
 use App\Support\MoneyFormatter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -33,6 +34,7 @@ final class Dashboard extends Component
             'needsSecondShop' => $this->needsSecondShop($watching),
             'canAddProduct' => app(PlanLimits::class)->canAddProduct($this->user()),
             'hasAnyProduct' => $watching->isNotEmpty(),
+            'digest' => DashboardDigest::forUser($this->user()),
         ]);
     }
 
@@ -61,9 +63,13 @@ final class Dashboard extends Component
     {
         return Product::query()
             ->where('user_id', $this->user()->id)
-            ->whereNotNull('last_notified_price')
+            // As "Only discounts" on the product list: a drop the card shows a
+            // badge for, not a price that has climbed back to its reference.
+            ->inVisibleDrop()
             // One query each for the whole list rather than one per row.
             ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
+            // Biggest first: the drop worth acting on leads, not the newest.
+            ->orderByDesc(Product::liveDropPercentQuery())
             ->latest('last_notified_at')
             ->limit(10)
             ->get();
@@ -80,9 +86,12 @@ final class Dashboard extends Component
     {
         return Product::query()
             ->where('user_id', $this->user()->id)
-            ->with(['cheapestShop', 'latestPriceDropEvent'])
+            // The card's figure is resolved across the shops, so they load
+            // with the list rather than once per card.
+            ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
             ->latest('created_at')
-            ->limit(6)
+            // One row of cards at five across.
+            ->limit(5)
             ->get();
     }
 
