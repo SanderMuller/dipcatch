@@ -2,14 +2,19 @@
     {{--
         The suggestions list sits above the URL field: someone who opened
         this disclosure to paste a URL usually wants one of these instead.
-        It hides once a probe is in flight so it cannot compete with the
-        preview the user has to act on.
+        It hides while a shop's page is read and once a preview shows, so it
+        cannot invite a second add or compete with the preview.
     --}}
     @if ($state === 'idle' || $state === 'error')
-        @livewire('suggestions.shop-suggestions', ['product' => $product, 'expanded' => $expandSuggestions], key('shop-suggestions-add-' . $product->id))
+        <div wire:loading.remove.block>
+            @livewire('suggestions.shop-suggestions', ['product' => $product, 'expanded' => $expandSuggestions], key('shop-suggestions-add-' . $product->id))
+        </div>
     @endif
 
     @if ($state === 'idle' || $state === 'error')
+        {{-- Wrapped: inside a form, Livewire scopes wire:loading to that
+             form's own submit, and a suggestion's add is not one. --}}
+        <div wire:loading.remove.block>
         <form wire:submit.prevent="probe" class="space-y-3">
             <flux:input
                 id="add-shop-url"
@@ -20,16 +25,14 @@
                 placeholder="https://shop.example.com/product/123"
                 required
             />
-            <flux:button type="submit" variant="primary">
-                <span wire:loading.remove wire:target="probe">Check price</span>
-                <span wire:loading wire:target="probe">Checking…</span>
-            </flux:button>
+            <flux:button type="submit" variant="primary">Check price</flux:button>
         </form>
+        </div>
 
         {{-- No target: a suggestion's "Add" reaches this component as an
              event, not as the `probe` action, and reading the shop's page
              takes seconds either way. In this state every request is one. --}}
-        <div wire:loading class="space-y-2" data-test="add-shop-checking">
+        <div wire:loading.block class="space-y-2" data-test="add-shop-checking">
             <flux:text size="sm" class="flex items-center gap-2 text-zinc-600 dark:text-zinc-300" role="status">
                 <flux:icon.loading class="size-4" />
                 {{ __('Checking the price on the shop\'s page. This can take a few seconds.') }}

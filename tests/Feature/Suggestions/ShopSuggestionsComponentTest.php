@@ -312,3 +312,15 @@ test('dismissing tells every suggestions instance on the page to refresh', funct
         ->call('dismiss', 'spar', $row->external_id)
         ->assertDispatched('shop-suggestions-changed');
 });
+
+test('the link field and the suggestions hide while a shop\'s page is read', function (): void {
+    $product = suggestionProduct();
+    $this->actingAs($product->user()->sole());
+
+    $html = Livewire::test(AddShop::class, ['product' => $product])->html();
+
+    // Two wrappers: the suggestions, and the form. Not on the form itself,
+    // where Livewire would scope it to the form's own submit.
+    expect(substr_count($html, '<div wire:loading.remove.block>'))->toBe(2)
+        ->and($html)->not->toContain('<form wire:submit.prevent="probe" wire:loading');
+});
