@@ -138,10 +138,38 @@ return [
         // The getting-started idea is stored only above this probability.
         'min_idea_probability' => (float) env('DIPCATCH_CATEGORIES_MIN_IDEA_PROBABILITY', 0.6),
         // Quality over latency: the call runs after the response is sent.
+        // The shop check has its own, shorter timeout.
         'timeout_seconds' => (int) env('DIPCATCH_CATEGORIES_TIMEOUT', 20),
         // Paid calls per account and app-wide per day. Zero lifts a cap.
         'daily_limit_per_user' => (int) env('DIPCATCH_CATEGORIES_DAILY_LIMIT_PER_USER', 50),
         'daily_limit' => (int) env('DIPCATCH_CATEGORIES_DAILY_LIMIT', 2000),
+    ],
+
+    // The AI check that a shop sells the same product and pack, see
+    // App\Services\TypeSafe\ShopMatchCheck. Every value is a Jev yes-chance.
+    'shop_checks' => [
+        // The add-shop preview warns below this.
+        'warn_below' => (float) env('DIPCATCH_SHOP_CHECKS_WARN_BELOW', 0.5),
+        // With the check on, a suggestion whose name matched at least this
+        // well is sent to Jev. Below 0.55, the plain name-match floor, it
+        // shows only once Jev accepts it.
+        'loose_match_from' => (float) env('DIPCATCH_SHOP_CHECKS_LOOSE_MATCH_FROM', 0.35),
+        // A suggestion Jev rates below this is hidden, however well its
+        // name matched.
+        'reject_below' => (float) env('DIPCATCH_SHOP_CHECKS_REJECT_BELOW', 0.3),
+        // A suggestion whose name matched only loosely shows once Jev
+        // rates it at least this.
+        'accept_from' => (float) env('DIPCATCH_SHOP_CHECKS_ACCEPT_FROM', 0.6),
+        // A person waits for the add-shop check, so it gets a short timeout
+        // and no retry. Jev answered in under a second when measured.
+        'timeout_seconds' => (int) env('DIPCATCH_SHOP_CHECKS_TIMEOUT', 5),
+        // Candidates checked in one request for one product.
+        'max_candidates' => (int) env('DIPCATCH_SHOP_CHECKS_MAX_CANDIDATES', 10),
+        // Paid calls per account and app-wide per day, counted apart for
+        // add-shop and for suggestions, so background checks never use up
+        // the warning a person is waiting for. Zero lifts a cap.
+        'daily_limit_per_user' => (int) env('DIPCATCH_SHOP_CHECKS_DAILY_LIMIT_PER_USER', 50),
+        'daily_limit' => (int) env('DIPCATCH_SHOP_CHECKS_DAILY_LIMIT', 2000),
     ],
 
     // Price extraction chain. Order is priority — user selectors first, then

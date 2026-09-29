@@ -76,6 +76,11 @@ final readonly class Entitlements
         return $this->value('auto_categories') === true;
     }
 
+    public function allowsShopChecks(): bool
+    {
+        return $this->value('shop_checks') === true;
+    }
+
     private function number(string $key, string $fallbackKey): int
     {
         $value = $this->value($key);

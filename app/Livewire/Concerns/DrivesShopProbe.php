@@ -189,6 +189,12 @@ trait DrivesShopProbe
      */
     protected function onPreviewShown(ProbeOutcome $outcome): void {}
 
+    /**
+     * Hook for consumers that derived state from a preview, to drop it when
+     * the preview goes: a new probe, or a reset after a confirm.
+     */
+    protected function onProbeReset(): void {}
+
     private function showVariantChooser(ProbeOutcome $outcome): void
     {
         $this->state = 'variant_chooser';
@@ -361,6 +367,7 @@ trait DrivesShopProbe
         $this->adapterKey = null;
         $this->errorCode = null;
         $this->errorContext = null;
+        $this->onProbeReset();
     }
 
     private function resetProbeState(): void
@@ -383,5 +390,6 @@ trait DrivesShopProbe
         ]);
         $this->state = 'idle';
         $this->manualCurrency = $this->defaultManualCurrency();
+        $this->onProbeReset();
     }
 }

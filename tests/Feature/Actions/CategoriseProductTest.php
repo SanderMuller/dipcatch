@@ -224,6 +224,21 @@ it('stores the getting-started idea, even beside a category the person chose', f
         ->and($product->fresh()?->tracking_idea)->toBe(TrackingIdea::CoffeeTea);
 });
 
+it('does not put back an idea for a product renamed while Jev was answering', function (): void {
+    $user = proUserWantingCategories();
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Douwe Egberts Aroma Rood']);
+
+    Http::fake([TypeSafeClient::ENDPOINT => function () use ($product): PromiseInterface {
+        Product::query()->whereKey($product->id)->update(['title' => 'Pedigree Denta Stix', 'tracking_idea' => null]);
+
+        return Http::response(typesafeAnswer(['food' => 0.95, 'home' => 0.05], ['food' => ['coffee_tea' => 0.95, 'pantry' => 0.05]], ['coffee_tea' => 0.9, 'none' => 0.1]));
+    }]);
+
+    new CategoriseProduct($product->id)->handle(app(TypeSafeClient::class));
+
+    expect($product->fresh()?->tracking_idea)->toBeNull();
+});
+
 it('sends nothing once the account has spent its daily budget', function (): void {
     config()->set('dipcatch.categories.daily_limit_per_user', 1);
     fakeConfidentCoffee();

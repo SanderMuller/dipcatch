@@ -43,6 +43,8 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property bool $notify_via_push
  * @property string $timezone
  * @property bool $auto_categories
+ * @property bool $shop_checks
+ * @property CarbonImmutable|null $ai_prompts_dismissed_at
  * @property CarbonImmutable|null $digest_processed_until
  * @property CarbonImmutable|null $tracking_ideas_hidden_at
  * @property CarbonImmutable|null $timezone_detected_at
@@ -90,6 +92,8 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
             'notify_via_filament' => 'boolean',
             'notify_via_push' => 'boolean',
             'auto_categories' => 'boolean',
+            'shop_checks' => 'boolean',
+            'ai_prompts_dismissed_at' => 'datetime',
             'digest_processed_until' => 'datetime',
             'tracking_ideas_hidden_at' => 'datetime',
             'timezone_detected_at' => 'datetime',
@@ -130,6 +134,12 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
     public function wantsAutoCategories(): bool
     {
         return $this->auto_categories && $this->entitlements()->allowsAutoCategories();
+    }
+
+    /** The one guard for the AI check on a newly added shop: opted in, and the plan allows it. */
+    public function wantsShopChecks(): bool
+    {
+        return $this->shop_checks && $this->entitlements()->allowsShopChecks();
     }
 
     public function canAccessPanel(Panel $panel): bool

@@ -51,6 +51,9 @@
                                 @unless ($suggestion->trackable)
                                     · <span class="text-amber-600 dark:text-amber-400">not trackable yet</span>
                                 @endunless
+                                @if ($suggestion->checked)
+                                    · <span class="text-savings-strong" data-test="suggestion-checked">{{ __('same product, checked by AI') }}</span>
+                                @endif
                             </flux:text>
                         </div>
 

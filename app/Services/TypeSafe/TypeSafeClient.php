@@ -14,7 +14,11 @@ use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
- * Places a product in the taxonomy through TypeSafe's Jev model: one request
+ * TypeSafe's Jev model, for two jobs. `categorise()` places a product in the
+ * taxonomy; `sameProduct()` judges whether other offers sell the same product
+ * and pack.
+ *
+ * Categorising is one request
  * with a department Choice plus a leaf Choice per real department, scored by
  * `CategoryScorer`. `Other` gets no leaf question, because a Choice with one
  * option would score 1.0 and beat every real path. The same request asks
@@ -57,15 +61,74 @@ final readonly class TypeSafeClient
     }
 
     /**
+     * The chance that each candidate offer sells the same product as the
+     * tracked one, in the same pack, as one Noul question per candidate in a
+     * single request. A candidate the answer leaves out is left out here.
+     *
+     * @param  array<string, array<string, string>>  $candidates  Keyed by a caller-chosen id.
+     * @return array<string, float>
+     *
+     * @throws TypeSafeRequestFailed
+     */
+    public function sameProduct(Product $product, array $candidates): array
+    {
+        if ($candidates === []) {
+            return [];
+        }
+
+        $product->loadMissing('shops');
+
+        $questions = [];
+
+        foreach ($candidates as $key => $candidate) {
+            $questions[$key] = [
+                'type' => 'noul',
+                'instructions' => [
+                    'candidate' => $candidate,
+                    'question' => 'Does `candidate` sell the same product as the tracked product in the state, in the same pack size or in one of its `tracked_pack_sizes`, so that the prices compare like for like?',
+                ],
+                'criteria' => [
+                    'true' => 'The same product, the same variant or flavour, and the same amount per pack',
+                    'false' => 'A different product, variant, flavour, or pack size',
+                ],
+            ];
+        }
+
+        $payload = $this->send([
+            'model' => self::MODEL,
+            'state' => [...$this->state($product), 'tracked_pack_sizes' => self::trackedPackSizes($product)],
+            'questions' => $questions,
+        ], quick: true);
+
+        $answers = is_array($payload['answers'] ?? null) ? $payload['answers'] : [];
+        $chances = [];
+
+        foreach (array_keys($candidates) as $key) {
+            $answer = $answers[$key] ?? null;
+            $value = is_array($answer) ? ($answer['noul'] ?? null) : null;
+
+            if (is_numeric($value)) {
+                $chances[$key] = max(0.0, min(1.0, (float) $value));
+            }
+        }
+
+        if ($chances === []) {
+            throw new TypeSafeRequestFailed('TypeSafe answered without any same-product answer.');
+        }
+
+        return $chances;
+    }
+
+    /**
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      *
      * @throws TypeSafeRequestFailed
      */
-    private function send(array $body): array
+    private function send(array $body, bool $quick = false): array
     {
         try {
-            $response = $this->request()->post(self::ENDPOINT, $body);
+            $response = $this->request($quick)->post(self::ENDPOINT, $body);
         } catch (ConnectionException $e) {
             throw new TypeSafeRequestFailed('TypeSafe unreachable: ' . $e->getMessage(), previous: $e);
         }
@@ -84,10 +147,19 @@ final readonly class TypeSafeClient
         return $payload;
     }
 
-    private function request(): PendingRequest
+    /**
+     * A quick request is one a person waits for: a short timeout and no
+     * retry, because an unanswered check only means no warning.
+     */
+    private function request(bool $quick): PendingRequest
     {
-        return Http::withToken(self::key())
-            ->acceptJson()
+        $request = Http::withToken(self::key())->acceptJson();
+
+        if ($quick) {
+            return $request->timeout(Config::integer('dipcatch.shop_checks.timeout_seconds'));
+        }
+
+        return $request
             ->timeout(Config::integer('dipcatch.categories.timeout_seconds'))
             // One retry, and only where a second try can change the answer:
             // a dropped connection (a timeout is one), a rate limit, or a
@@ -140,6 +212,30 @@ final readonly class TypeSafeClient
             ->all();
 
         return $state;
+    }
+
+    /**
+     * Every distinct pack the product's shops sell: a product can track a
+     * 150 g and a 250 g pack side by side, and either one is a match.
+     *
+     * @return list<string>
+     */
+    public static function trackedPackSizes(Product $product): array
+    {
+        $sizes = [];
+
+        foreach ($product->shops as $shop) {
+            $size = self::packSize($shop);
+
+            if ($size !== null) {
+                $sizes[$size] = true;
+            }
+        }
+
+        $sizes = array_keys($sizes);
+        sort($sizes);
+
+        return $sizes;
     }
 
     private static function packSize(Shop $shop): ?string

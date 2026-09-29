@@ -68,6 +68,12 @@
                     <flux:callout.text>{{ $alreadyTracked }}</flux:callout.text>
                 </flux:callout>
             @endif
+            @if ($this->doubtsSameProduct())
+                <flux:callout icon="exclamation-triangle" color="amber" data-test="same-product-warning">
+                    <flux:callout.heading>{{ __('This may be a different product or pack') }}</flux:callout.heading>
+                    <flux:callout.text>{{ __('AI compared this page with the shops you already track for :product. Check the name and the pack size before you confirm.', ['product' => $product->title]) }}</flux:callout.text>
+                </flux:callout>
+            @endif
             <div class="flex items-start gap-3">
                 @if (! empty($snapshot['image_url']))
                     <img src="{{ $snapshot['image_url'] }}" alt="" class="h-20 w-20 object-cover rounded" />
@@ -130,6 +136,8 @@
                     @endif
                 </div>
             </div>
+
+            <livewire:ai-feature-prompt feature="shop_checks" wire:key="ai-prompt-add-shop" />
 
             <div class="flex gap-2">
                 <flux:button type="button" variant="primary" wire:click="confirm">

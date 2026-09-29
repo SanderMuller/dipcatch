@@ -118,3 +118,24 @@ test('save persists the automatic categories choice', function (): void {
 
     expect($user->refresh()->auto_categories)->toBeTrue();
 });
+
+test('save persists the shop-check choice, off until the person switches it on', function (): void {
+    config()->set('services.typesafe.key', 'test-key');
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    expect($user->refresh()->shop_checks)->toBeFalse();
+
+    livewire(NotificationPreferences::class)
+        ->assertSet('shop_checks', false)
+        ->set('shop_checks', true)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($user->refresh()->shop_checks)->toBeTrue()
+        ->and($user->wantsShopChecks())->toBeFalse();
+
+    subscribeUser($user);
+
+    expect($user->refresh()->wantsShopChecks())->toBeTrue();
+});

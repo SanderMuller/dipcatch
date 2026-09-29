@@ -174,6 +174,8 @@
                 </flux:callout>
             @endif
 
+            <livewire:ai-feature-prompt feature="categories" spaced />
+
             {{-- Four across leaves room for the category list. --}}
             <x-product-card.grid :columns="4">
                 @forelse ($products as $product)

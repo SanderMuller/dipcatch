@@ -150,6 +150,11 @@ final class EditProduct extends Component
             $this->product->forceFill(['suggested_category' => null]);
         }
 
+        // Jev read the old name; a renamed product may be another purchase.
+        if (trim($this->title) !== $this->product->title) {
+            $this->product->forceFill(['tracking_idea' => null]);
+        }
+
         $this->product->forceFill([
             'title' => trim($this->title),
             'image_url' => $this->blankToNull($this->imageUrl),
@@ -210,10 +215,12 @@ final class EditProduct extends Component
         }
 
         $this->suggestedCategory = $verdict->winner->value;
-        $this->product->forceFill([
-            'suggested_category' => $verdict->winner,
-            'tracking_idea' => $verdict->trackingIdea ?? $this->product->tracking_idea,
-        ])->save();
+        $this->product->forceFill(['suggested_category' => $verdict->winner])->save();
+
+        // Only onto the title Jev read, as in CategoriseProduct::store().
+        if ($verdict->trackingIdea !== null) {
+            Product::query()->whereKey($this->product->id)->where('title', $this->product->title)->update(['tracking_idea' => $verdict->trackingIdea->value]);
+        }
     }
 
     public function acceptSuggestion(): void

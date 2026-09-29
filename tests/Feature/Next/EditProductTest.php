@@ -3,6 +3,7 @@
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Enums\ShopHealth;
+use App\Enums\TrackingIdea;
 use App\Livewire\Products\EditProduct;
 use App\Livewire\Products\ProductShow;
 use App\Models\Product;
@@ -869,4 +870,18 @@ it('restates a money drop off the best pack', function (): void {
         ->assertSee('Instead of your €1.00 drop alert')
         ->call('switchToPriceAlert')
         ->assertSet('unitPriceTarget', '8');
+});
+
+it('forgets the checklist item Jev picked once the product is renamed, and keeps it otherwise', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Douwe Egberts Aroma Rood', 'tracking_idea' => TrackingIdea::CoffeeTea]);
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])->set('targetPrice', '4.00')->call('save');
+
+    expect($product->fresh()?->tracking_idea)->toBe(TrackingIdea::CoffeeTea);
+
+    livewire(EditProduct::class, ['product' => $product->fresh()])->set('title', 'Pickwick Engelse melange')->call('save');
+
+    expect($product->fresh()?->tracking_idea)->toBeNull();
 });

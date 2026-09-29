@@ -19,5 +19,7 @@ final readonly class ShopSuggestion
         public string $url,
         public float $score,
         public bool $trackable,
+        /** Jev confirmed the row sells the same product and pack. */
+        public bool $checked = false,
     ) {}
 }

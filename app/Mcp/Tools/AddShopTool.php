@@ -17,10 +17,12 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\PriceAdapters\VariantCandidate;
 use App\Services\ShopFetcher\HostFetchMemory;
+use App\Services\TypeSafe\ShopMatchCheck;
 use App\Support\PackSize;
 use App\Support\UrlNormalizer;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use Laravel\Mcp\Request;
@@ -48,6 +50,7 @@ final class AddShopTool extends Tool
         private readonly ProbeShopUrl $probe,
         private readonly ProbeReporter $reporter,
         private readonly ProductPresenter $presenter,
+        private readonly ShopMatchCheck $shopMatch,
     ) {}
 
     public function handle(Request $request): Response|ResponseFactory
@@ -139,6 +142,12 @@ final class AddShopTool extends Tool
 
         if ($mismatch !== null) {
             $preview['pack_size_note'] = $mismatch;
+        }
+
+        $sameProduct = $this->shopMatch->draft($product, ShopDraft::fromOutcome($outcome, (string) $outcome->normalizedUrl, (string) $outcome->adapterKey));
+
+        if ($sameProduct !== null && $sameProduct < Config::float('dipcatch.shop_checks.warn_below')) {
+            $preview['same_product_note'] = 'An AI check doubts that this page sells the same product in the same pack as the shops already on this product. Show the user both names and pack sizes, and add it only if they confirm it is the same.';
         }
 
         // Duplicates were only ever checked inside this product. Across

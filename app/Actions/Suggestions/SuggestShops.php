@@ -9,6 +9,7 @@ use App\Models\Shop;
 use App\Models\ShopSuggestionDismissal;
 use App\Services\Suggestions\QueryTokens;
 use App\Services\Suggestions\ShopSuggestion;
+use App\Services\TypeSafe\ShopMatchCheck;
 use App\Support\PackSize;
 use App\Support\SupermarketChains;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
@@ -17,9 +18,10 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Suggests other shops for a tracked product by matching its title and pack
- * size against the local checkjebon dataset. Read-only and stateless: the
- * dataset price is a comparison hint, and adding a suggested shop still runs
- * the normal probe.
+ * size against the local checkjebon dataset. The dataset price is a
+ * comparison hint, and adding a suggested shop still runs the normal probe.
+ * With the shop check on, Jev's stored answers filter the matches, and rows
+ * without one are sent to Jev after the response.
  *
  * See `specs/shop-suggestions.md` Section 2 for the normative rules.
  */
@@ -69,6 +71,8 @@ final class SuggestShops
     /** Shortest token still worth a `LIKE`, used when no longer one exists. */
     private const int MIN_PREFILTER_TOKEN = 2;
 
+    public function __construct(private readonly ShopMatchCheck $shopMatch) {}
+
     /**
      * @return list<ShopSuggestion>
      */
@@ -93,7 +97,17 @@ final class SuggestShops
             return [];
         }
 
-        return $this->rank($this->bestPerChain($this->candidateRows($product, $chains, $queries), $chains, $queries));
+        $verdicts = $this->shopMatch->applies($product)
+            ? SuggestionVerdicts::for($product, self::THRESHOLD)
+            : SuggestionVerdicts::off(self::THRESHOLD);
+
+        $suggestions = $this->rank($this->bestPerChain($this->candidateRows($product, $chains, $queries), $chains, $queries, $verdicts));
+
+        if ($verdicts->unchecked() !== []) {
+            VerifyShopSuggestions::afterResponseFor($product, $verdicts->unchecked());
+        }
+
+        return $suggestions;
     }
 
     /**
@@ -309,7 +323,7 @@ final class SuggestShops
      * @param  list<QueryTokens>  $queries
      * @return array<string, ShopSuggestion>
      */
-    private function bestPerChain(Collection $rows, array $chains, array $queries): array
+    private function bestPerChain(Collection $rows, array $chains, array $queries, SuggestionVerdicts $verdicts): array
     {
         $best = [];
 
@@ -323,7 +337,7 @@ final class SuggestShops
 
             $score = $this->scoreOf($row, $queries);
 
-            if ($score < self::THRESHOLD) {
+            if ($score < $verdicts->floor() || ! $verdicts->admits($chain, $row, $score)) {
                 continue;
             }
 
@@ -347,6 +361,7 @@ final class SuggestShops
                 url: $chain->productUrl($link),
                 score: $score,
                 trackable: SupermarketChains::isTrackable($chain->chain),
+                checked: $verdicts->confirmed($row),
             );
         }
 

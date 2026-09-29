@@ -44,8 +44,9 @@
         </flux:card>
 
         @if ($autoCategoriesAvailable)
-            <flux:card>
+            <flux:card id="ai-features" class="scroll-mt-24">
                 <flux:heading size="lg">{{ __('Products') }}</flux:heading>
+                <flux:text class="mt-1">{{ __('Both use AI and are off until you switch them on. DipCatch then sends the product name, its shops and their web addresses, the pack size, barcode and price to TypeSafe, our AI provider. Nothing about you.') }}</flux:text>
 
                 <div class="mt-4 space-y-4">
                     {{-- Composed by hand: `flux:switch` takes its label as a
@@ -68,6 +69,24 @@
                             data-test="auto-categories"
                         />
                         <flux:error name="auto_categories" />
+                    </flux:field>
+
+                    <flux:field variant="inline">
+                        <flux:label>
+                            {{ __('Check that a new shop sells the same product and pack') }}
+                            <flux:badge size="sm" color="zinc" class="ms-2">{{ __('Pro') }}</flux:badge>
+                        </flux:label>
+                        <flux:description>
+                            {{ $allowsShopChecks
+                                ? __('When you add a shop, AI compares it with the shops you already track and warns you about a different product or pack size. It also finds more shops that sell your products.')
+                                : __('Pro checks new shops for you. Your choice is kept, and it starts working when you upgrade.') }}
+                        </flux:description>
+                        <flux:switch
+                            wire:model="shop_checks"
+                            :disabled="! $allowsShopChecks"
+                            data-test="shop-checks"
+                        />
+                        <flux:error name="shop_checks" />
                     </flux:field>
                 </div>
             </flux:card>

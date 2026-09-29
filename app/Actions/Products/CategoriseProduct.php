@@ -115,9 +115,10 @@ final class CategoriseProduct
     public static function store(Product $product, CategoryVerdict $verdict): bool
     {
         // Not behind the category guard: the idea is Jev's alone, and a
-        // category the person chose does not make it any less true.
+        // category the person chose does not make it any less true. Only
+        // onto the title Jev read: a rename since then cleared the idea.
         if ($verdict->trackingIdea !== null) {
-            Product::query()->whereKey($product->id)->update(['tracking_idea' => $verdict->trackingIdea->value]);
+            Product::query()->whereKey($product->id)->where('title', $product->title)->update(['tracking_idea' => $verdict->trackingIdea->value]);
         }
 
         if ($verdict->category === null) {

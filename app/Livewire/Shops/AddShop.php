@@ -4,16 +4,20 @@ namespace App\Livewire\Shops;
 
 use App\Actions\Shops\AttachShop;
 use App\Actions\Shops\KeepShopAsLink;
+use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\TrackedElsewhere;
 use App\Billing\PlanLimitReached;
 use App\Enums\ProbeFailure;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\Product;
+use App\Services\TypeSafe\ShopMatchCheck;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 use InvalidArgumentException;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -29,6 +33,10 @@ final class AddShop extends Component
 
     /** Keep suggestions visible whenever the add-shop form is open. */
     public bool $expandSuggestions = true;
+
+    /** Jev's chance that the previewed shop sells the same product and pack; null when unchecked. */
+    #[Locked]
+    public ?float $sameProductChance = null;
 
     public function mount(Product $product): void
     {
@@ -53,6 +61,23 @@ final class AddShop extends Component
     protected function probeSubject(): Product
     {
         return $this->product;
+    }
+
+    protected function onPreviewShown(ProbeOutcome $outcome): void
+    {
+        $this->sameProductChance = app(ShopMatchCheck::class)->draft($this->product, $this->shopDraft());
+    }
+
+    protected function onProbeReset(): void
+    {
+        $this->sameProductChance = null;
+    }
+
+    /** Whether Jev doubts the previewed shop sells this product in this pack. */
+    public function doubtsSameProduct(): bool
+    {
+        return $this->sameProductChance !== null
+            && $this->sameProductChance < Config::float('dipcatch.shop_checks.warn_below');
     }
 
     /**

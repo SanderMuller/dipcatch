@@ -399,6 +399,7 @@
     "only if you turn on browser push; it receives the alert payloads.": "alleen als je browsermeldingen aanzet; die dienst ontvangt de inhoud van de meldingen.",
     "or :price a year": "of :price per jaar",
     "or :price each": "of :price per stuk",
+    "our AI provider, only if you switch on an AI feature in your settings (automatic categories, or the check on a new shop). It receives the product name, its shops and their web addresses, the pack size, barcode and price. Nothing about you or your account.": "onze AI-leverancier, alleen als je in je instellingen een AI-functie aanzet (automatische categorieën, of de controle bij een nieuwe winkel). Die krijgt de productnaam, de winkels en hun webadressen, de verpakkingsgrootte, de barcode en de prijs. Niets over jou of je account.",
     "per kilo": "per kilo",
     "per litre": "per liter",
     "per piece": "per stuk",
