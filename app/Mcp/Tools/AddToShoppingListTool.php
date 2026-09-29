@@ -34,7 +34,7 @@ final class AddToShoppingListTool extends Tool
     public function handle(Request $request): ResponseFactory
     {
         $validated = $request->validate([
-            'product_ids' => ['required', 'array', 'min:1', 'max:100'],
+            'product_ids' => ['required', 'array', 'min:1', 'max:1000'],
             'product_ids.*' => ['required', 'uuid'],
         ]);
 
@@ -66,7 +66,7 @@ final class AddToShoppingListTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'product_ids' => $schema->array()->items($schema->string()->format('uuid'))->min(1)->max(100)->description('From list_products.')->required(),
+            'product_ids' => $schema->array()->items($schema->string()->format('uuid'))->min(1)->max(1000)->description('From list_products.')->required(),
         ];
     }
 }
