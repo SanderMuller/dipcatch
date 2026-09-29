@@ -78,6 +78,8 @@
                         : __('Not on sale yet.');
                     $freeCtaLabel = $authed ? __('Your plan') : __('Start free');
                     $proCta = $isPro ? $proCtaLabel : ($trialDays > 0 ? __('Try Pro free') : $proCtaLabel);
+                    // The Pro column is narrow on a phone, so its header button says less.
+                    $proCtaShort = $trialDays > 0 ? __('Try free') : __('Get Pro');
                     $tick = '<svg viewBox="0 0 16 16" class="size-5 fill-savings-strong sm:size-4" aria-hidden="true"><path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>';
                     $dash = '<svg viewBox="0 0 16 16" class="size-5 fill-zinc-300 sm:size-4 dark:fill-zinc-600" aria-hidden="true"><path d="M3.75 7.25a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z" /></svg>';
                     $cell = fn (string|bool $value, bool $strong): string => match (true) {
@@ -97,8 +99,8 @@
                         __('Same-product check') => __('Pro only'),
                         __('More shops found') => __('Pro only'),
                     ];
-                    $freeButton = 'inline-flex w-full items-center justify-center rounded-full bg-paper px-3 py-2 text-sm font-medium text-ink ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
-                    $proButton = 'inline-flex w-full items-center justify-center rounded-full bg-ink px-3 py-2 text-sm font-medium text-paper hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
+                    $freeButton = 'inline-flex w-full items-center justify-center rounded-full bg-paper px-2 py-2 text-sm whitespace-nowrap sm:px-3 font-medium text-ink ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
+                    $proButton = 'inline-flex w-full items-center justify-center rounded-full bg-ink px-2 py-2 text-sm whitespace-nowrap sm:px-3 font-medium text-paper hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
                 @endphp
                 {{-- Sticky plan header, and each Pro cell says how much more you
                      get, so the value of the upgrade reads row by row. --}}
@@ -138,7 +140,9 @@
                                         <p class="text-sm font-normal text-zinc-600 dark:text-zinc-400">{{ __('or :price a year', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}</p>
                                     @endif
                                     @if ($onSale)
-                                        <a href="{{ $proCtaHref }}" class="{{ $proButton }} mt-3 max-sm:hidden">{{ $proCta }}</a>
+                                        <a href="{{ $proCtaHref }}" @class([$proButton, 'mt-3', 'max-sm:hidden' => $isPro])>
+                                            <span class="sm:hidden">{{ $proCtaShort }}</span><span class="max-sm:hidden">{{ $proCta }}</span>
+                                        </a>
                                     @endif
                                 </th>
                             </tr>
@@ -172,12 +176,13 @@
                         <tfoot>
                             <tr>
                                 <td class="pt-6 pr-4 align-top text-sm text-zinc-500 dark:text-zinc-400">{{ __('VAT included.') }}</td>
-                                <td class="px-3 pt-6 align-top sm:px-6"><a href="{{ $ctaHref }}" class="{{ $freeButton }}">{{ $freeCtaLabel }}</a></td>
+                                <td class="px-3 pt-6 align-top sm:px-6"><a href="{{ $ctaHref }}" class="{{ $freeButton }} max-sm:hidden">{{ $freeCtaLabel }}</a></td>
                                 <td class="rounded-b-2xl bg-soft-yellow/60 px-3 pt-6 pb-6 align-top sm:px-6">
+                                    {{-- On a phone the buttons sit full width under the table. --}}
                                     @if ($onSale)
-                                        <a href="{{ $proCtaHref }}" class="{{ $proButton }}">{{ $proCta }}</a>
+                                        <a href="{{ $proCtaHref }}" class="{{ $proButton }} max-sm:hidden">{{ $proCta }}</a>
                                         @if (! $isPro && \App\Billing\ProPrice::hasYearly())
-                                            <a href="{{ route('upgrade', ['interval' => 'yearly']) }}" class="mt-3 block text-center text-sm font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">{{ __('Pay yearly instead: :price', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}</a>
+                                            <a href="{{ route('upgrade', ['interval' => 'yearly']) }}" class="mt-3 block text-center text-sm max-sm:hidden font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">{{ __('Pay yearly instead: :price', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}</a>
                                         @endif
                                     @else
                                         <p class="rounded-full bg-ink/5 px-3 py-2 text-center text-sm font-medium text-zinc-500">{{ __('Coming soon') }}</p>
@@ -186,6 +191,16 @@
                             </tr>
                         </tfoot>
                     </table>
+
+                    <div class="mt-6 space-y-3 sm:hidden">
+                        @if ($onSale)
+                            <a href="{{ $proCtaHref }}" class="flex w-full items-center justify-center rounded-full bg-ink px-4 py-2.5 text-base font-medium text-paper hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{{ $proCta }}</a>
+                            @if (! $isPro && \App\Billing\ProPrice::hasYearly())
+                                <a href="{{ route('upgrade', ['interval' => 'yearly']) }}" class="block text-center text-base font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">{{ __('Pay yearly instead: :price', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}</a>
+                            @endif
+                        @endif
+                        <a href="{{ $ctaHref }}" class="flex w-full items-center justify-center rounded-full bg-paper px-4 py-2.5 text-base font-medium text-ink ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{{ $freeCtaLabel }}</a>
+                    </div>
                 </div>
 
                 <p class="mt-10 max-w-[64ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
