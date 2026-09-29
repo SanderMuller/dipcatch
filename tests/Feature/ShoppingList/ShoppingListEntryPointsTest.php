@@ -302,3 +302,23 @@ it('keeps showing open items after crossing off as many as the header holds', fu
         ->assertSeeHtml('aria-label="Put Product 1 back on the list"')
         ->assertDontSee('more');
 });
+
+it('keeps only the latest items crossed off in the header', function (): void {
+    $user = User::factory()->create();
+
+    foreach (range(1, 10) as $i) {
+        entryPointProduct($user, 'Product ' . $i, ['listed_at' => now()->subMinutes(20 - $i)]);
+    }
+
+    $this->actingAs($user);
+    $menu = livewire(HeaderMenu::class);
+
+    foreach (Product::query()->orderBy('listed_at')->get() as $product) {
+        $menu->call('toggleCrossedOff', (string) $product->id);
+    }
+
+    $menu->assertDontSeeHtml('aria-label="Put Product 1 back on the list"')
+        ->assertDontSeeHtml('aria-label="Put Product 2 back on the list"')
+        ->assertSeeHtml('aria-label="Put Product 3 back on the list"')
+        ->assertSeeHtml('aria-label="Put Product 10 back on the list"');
+});

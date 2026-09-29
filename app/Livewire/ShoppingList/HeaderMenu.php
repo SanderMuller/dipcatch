@@ -50,7 +50,8 @@ final class HeaderMenu extends Component
 
         $id = (string) $product->id;
         $this->crossedHere = $crossOff
-            ? array_values(array_unique([...$this->crossedHere, $id]))
+            // The latest few only, so the menu stays the size of a menu.
+            ? array_slice(array_values(array_unique([...array_diff($this->crossedHere, [$id]), $id])), -self::LIMIT)
             : array_values(array_diff($this->crossedHere, [$id]));
 
         $this->announceChange();
