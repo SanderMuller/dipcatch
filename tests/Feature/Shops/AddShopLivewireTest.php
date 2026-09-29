@@ -564,3 +564,30 @@ test('a product whose shops sell different packs is asked, not guessed for', fun
         ->call('probe')
         ->assertSet('state', 'variant_chooser');
 });
+
+test('the preview notes a pack size none of the tracked shops sells', function (string $name, ?string $tracked, bool $noted): void {
+    Http::fake(fakeJsonLdOffer(name: $name));
+    $product = Product::factory()->create(['currency' => 'EUR']);
+
+    if ($tracked !== null) {
+        [$quantity, $unit] = explode(' ', $tracked);
+        Shop::factory()->for($product)->create(['url' => 'https://other.example.com/p/1', 'pack_quantity' => $quantity, 'pack_unit' => $unit]);
+    }
+
+    $this->actingAs($product->user()->sole());
+
+    $preview = Livewire::test(AddShop::class, ['product' => $product->refresh()])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'preview');
+
+    $noted
+        ? $preview->assertSeeHtml('data-test="other-pack-warning"')->assertSee('This page sells 300 g. Your other shops sell 100 g.')
+        : $preview->assertDontSeeHtml('data-test="other-pack-warning"');
+})->with([
+    'another size, same unit' => ['Milka Mmmax 300 g', '100 g', true],
+    'the same size' => ['Milka Choco Biscuit 100 g', '100 g', false],
+    'another unit' => ['Milka Choco Biscuit 300 g', '12 piece', false],
+    'no tracked size' => ['Milka Mmmax 300 g', null, false],
+    'no size on the page' => ['Milka Mmmax', '100 g', false],
+]);

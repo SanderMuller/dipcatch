@@ -41,8 +41,9 @@ final readonly class QueryTokens
 
     /**
      * @param  array<string, true>  $tokens
+     * @param  PackSize|null  $size  The pack size, when one was given or parsed.
      */
-    private function __construct(public array $tokens) {}
+    private function __construct(public array $tokens, public ?PackSize $size = null) {}
 
     public static function of(string $text, ?PackSize $size = null): self
     {
@@ -52,7 +53,7 @@ final readonly class QueryTokens
             $tokens = [...$tokens, ...self::sizeTokens($size)];
         }
 
-        return new self(array_fill_keys($tokens, true));
+        return new self(array_fill_keys($tokens, true), $size);
     }
 
     /**
@@ -70,6 +71,19 @@ final readonly class QueryTokens
         $tokens = [...self::split($name), ...self::split((string) $size)];
 
         return new self(array_fill_keys($tokens, true));
+    }
+
+    /**
+     * Whether both sides name a pack size in the same unit, and the sizes
+     * differ: a 300 g bar against a 100 g one. A size in another unit, or a
+     * side without one, says nothing either way.
+     */
+    public function hasOtherSizeThan(self $other): bool
+    {
+        return $this->size instanceof PackSize
+            && $other->size instanceof PackSize
+            && $this->size->unit === $other->size->unit
+            && ! $this->size->isSameSizeAs($other->size);
     }
 
     /**

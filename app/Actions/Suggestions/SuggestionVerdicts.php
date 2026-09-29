@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Config;
 /**
  * What Jev said about one product's suggested rows, applied to the name
  * match. With the shop check on, a row that matched only loosely shows once
- * Jev confirms it, and a row Jev rejects is dropped however well it matched.
+ * Jev confirms it, a borderline match waits for Jev's answer, and a row Jev
+ * rejects is dropped however well it matched.
  * Rows Jev has not answered for yet are collected for the next check.
  */
 final class SuggestionVerdicts
@@ -87,6 +88,11 @@ final class SuggestionVerdicts
 
         if ($chance !== null && $chance < Config::float('dipcatch.shop_checks.reject_below')) {
             return false;
+        }
+
+        if ($this->checks && $chance === null) {
+            // Not answered yet: only a clear name match shows meanwhile.
+            return $score >= max($this->nameMatchFloor, Config::float('dipcatch.shop_checks.hold_below'));
         }
 
         return $score >= $this->nameMatchFloor || ($chance !== null && $chance >= Config::float('dipcatch.shop_checks.accept_from'));

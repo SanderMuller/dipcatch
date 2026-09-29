@@ -78,6 +78,11 @@
                     <flux:callout.text>{{ $alreadyTracked }}</flux:callout.text>
                 </flux:callout>
             @endif
+            @if ($otherPack = $this->otherPackNote())
+                <flux:callout icon="scale" color="amber" data-test="other-pack-warning">
+                    <flux:callout.text>{{ $otherPack }}</flux:callout.text>
+                </flux:callout>
+            @endif
             @if ($this->doubtsSameProduct())
                 <flux:callout icon="exclamation-triangle" color="amber" data-test="same-product-warning">
                     <flux:callout.heading>{{ __('This may be a different product or pack') }}</flux:callout.heading>

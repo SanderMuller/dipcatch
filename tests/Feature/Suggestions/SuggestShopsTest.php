@@ -440,3 +440,17 @@ test('the same variant under another word still matches', function (): void {
         ->and(collect(suggest($organic->refresh()))->pluck('chain')->all())->toBe(['ah'])
         ->and(collect(suggest($decaf->refresh()))->pluck('chain')->all())->toBe(['dirk']);
 });
+
+test('another pack size needs a closer name: a different 300 g bar is not a 100 g bar', function (): void {
+    seedChains();
+    // The reported case: a 100 g Milka Choco Biscuit, and AH selling only a
+    // 300 g Milka Mmmax choco-swing bar. The words overlap 0.556.
+    seedRow('ah', 'Milka Mmmax chocoladereep choco-swing biscuit', '300 g', '4.89');
+    // The same name in a bigger pack still compares per kilo.
+    seedRow('dirk', 'Milka chocoladereep choco biscuit', '300 g', '2.49');
+
+    $product = Product::factory()->create(['title' => 'Milka Choco Biscuit chocoladereep 100 g', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://chocoshop.test/p/1', 'pack_quantity' => '100.00', 'pack_unit' => 'g']);
+
+    expect(collect(suggest($product->refresh()))->pluck('chain')->all())->toBe(['dirk']);
+});

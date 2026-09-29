@@ -11,7 +11,10 @@ use App\Billing\PlanLimitReached;
 use App\Enums\ProbeFailure;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Services\TypeSafe\ShopMatchCheck;
+use App\Support\PackSize;
+use App\Support\UnitWord;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
@@ -82,6 +85,37 @@ final class AddShop extends Component
     {
         return $this->sameProductChance !== null
             && $this->sameProductChance < Config::float('dipcatch.shop_checks.warn_below');
+    }
+
+    /**
+     * A note when the previewed page sells another pack size than every shop
+     * already tracked, in the same unit: a 300 g bar where the other shops
+     * sell 100 g. Often a different product, not only a bigger pack, and it
+     * needs no AI to notice. Per-kilo prices still compare, so it is a note,
+     * not a refusal.
+     */
+    public function otherPackNote(): ?string
+    {
+        $size = $this->snapshotPackSize();
+
+        if (! $size instanceof PackSize) {
+            return null;
+        }
+
+        $tracked = $this->product->shops
+            ->map(fn (Shop $shop): ?PackSize => $shop->pack_quantity === null || $shop->pack_unit === null ? null : PackSize::of((float) $shop->pack_quantity, $shop->pack_unit))
+            ->filter(fn (?PackSize $other): bool => $other instanceof PackSize && $other->unit === $size->unit)
+            ->unique(fn (PackSize $other): string => $other->quantity . $other->unit)
+            ->values();
+
+        if ($tracked->isEmpty() || $tracked->contains(fn (PackSize $other): bool => $other->isSameSizeAs($size))) {
+            return null;
+        }
+
+        return __('This page sells :pack. Your other shops sell :others. Check it is the same product, not another one in a bigger or smaller pack.', [
+            'pack' => UnitWord::pack($size),
+            'others' => $tracked->map(fn (PackSize $other): string => UnitWord::pack($other))->implode(', '),
+        ]);
     }
 
     /**

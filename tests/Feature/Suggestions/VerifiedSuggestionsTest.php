@@ -239,3 +239,25 @@ test('an answer given before a tracked shop or pack changed counts as no answer'
 
     expect(suggestedChains($product->refresh()))->toBe(['ah']);
 });
+
+test('a borderline name match waits for Jev before it shows, and shows once Jev confirms it', function (): void {
+    seedChains();
+    // 0.556 against the Beemster product: over the name-match floor, under
+    // the hold line.
+    $borderline = seedRow('dirk', 'Beemster belegen kaas plakken', '150 g', '3.29');
+    $product = checkedBeemsterProduct();
+    Cache::put("shop-suggestions:verify:{$product->id}", true, 600);
+
+    expect(suggestedChains($product))->toBe([]);
+
+    verdict($product, $borderline, 0.9);
+
+    expect(suggestedChains($product))->toBe(['dirk']);
+});
+
+test('without the opt-in a borderline name match still shows at once', function (): void {
+    seedChains();
+    seedRow('dirk', 'Beemster belegen kaas plakken', '150 g', '3.29');
+
+    expect(suggestedChains(checkedBeemsterProduct(optedIn: false)))->toBe(['dirk']);
+});

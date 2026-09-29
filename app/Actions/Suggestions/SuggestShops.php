@@ -31,6 +31,17 @@ final class SuggestShops
     private const float THRESHOLD = 0.55;
 
     /**
+     * Taken off the overlap of a row whose pack size differs from the one
+     * it is compared against, in the same unit. The size is two of about
+     * eight tokens, so a wrong size alone barely moved the overlap: a 300 g
+     * Milka Mmmax bar scored 0.556 against a 100 g Milka bar and was offered.
+     * With this, a row of another size needs about 0.65 on its name alone.
+     * The same name in a bigger pack still reaches that (0.71 for a
+     * four-word name), since per-kilo prices compare across pack sizes.
+     */
+    private const float OTHER_SIZE_PENALTY = 0.1;
+
+    /**
      * A chain whose newest row is older than this is dropped. Matches the
      * fail threshold of `CheckjebonFreshnessCheck`: the importer keeps a
      * chain's rows when upstream serves none, so one refreshed chain must
@@ -383,7 +394,13 @@ final class SuggestShops
 
         foreach ($queries as $query) {
             if ($query->sameVariantAs($candidate)) {
-                $best = max($best, $query->overlapWith($candidate));
+                $overlap = $query->overlapWith($candidate);
+
+                if ($query->hasOtherSizeThan($candidate)) {
+                    $overlap -= self::OTHER_SIZE_PENALTY;
+                }
+
+                $best = max($best, $overlap);
             }
         }
 

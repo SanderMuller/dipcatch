@@ -160,6 +160,10 @@ return [
         // A suggestion whose name matched only loosely shows once Jev
         // rates it at least this.
         'accept_from' => (float) env('DIPCATCH_SHOP_CHECKS_ACCEPT_FROM', 0.6),
+        // With the check on, a suggestion whose name matched below this waits
+        // for Jev's answer before it shows, rather than showing until Jev
+        // rejects it. A borderline name match is where Jev is needed most.
+        'hold_below' => (float) env('DIPCATCH_SHOP_CHECKS_HOLD_BELOW', 0.7),
         // A person waits for the add-shop check, so it gets a short timeout
         // and no retry. Jev answered in under a second when measured.
         'timeout_seconds' => (int) env('DIPCATCH_SHOP_CHECKS_TIMEOUT', 5),
