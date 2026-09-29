@@ -80,12 +80,12 @@
                     $proCta = $isPro ? $proCtaLabel : ($trialDays > 0 ? __('Try Pro free') : $proCtaLabel);
                     // The Pro column is narrow on a phone, so its header button says less.
                     $proCtaShort = $trialDays > 0 ? __('Try free') : __('Get Pro');
-                    $tick = '<svg viewBox="0 0 16 16" class="size-5 fill-savings-strong sm:size-4" aria-hidden="true"><path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>';
-                    $dash = '<svg viewBox="0 0 16 16" class="size-5 fill-zinc-300 sm:size-4 dark:fill-zinc-600" aria-hidden="true"><path d="M3.75 7.25a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z" /></svg>';
+                    $tick = '<svg viewBox="0 0 16 16" class="size-5 fill-savings-strong" aria-hidden="true"><path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>';
+                    $dash = '<svg viewBox="0 0 16 16" class="size-5 fill-zinc-300 dark:fill-zinc-600" aria-hidden="true"><path d="M3.75 7.25a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z" /></svg>';
                     $cell = fn (string|bool $value, bool $strong): string => match (true) {
                         $value === true => $tick . '<span class="sr-only">' . e(__('Included')) . '</span>',
                         $value === false => $dash . '<span class="sr-only">' . e(__('Not included')) . '</span>',
-                        default => '<span class="tabular-nums ' . ($strong ? 'font-semibold text-ink' : 'text-zinc-700 dark:text-zinc-300') . '">' . e($value) . '</span>',
+                        default => '<span class="tabular-nums ' . ($strong ? 'font-semibold text-ink' : 'font-medium text-zinc-700 dark:text-zinc-300') . '">' . e($value) . '</span>',
                     };
                     // What Pro adds on a row, keyed by the row's label.
                     $gains = [
@@ -105,18 +105,18 @@
                 {{-- Sticky plan header, and each Pro cell says how much more you
                      get, so the value of the upgrade reads row by row. --}}
 
-                <div>
+                <div class="w-fit mx-auto">
                     <h1 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Free to start. Pro for everything you buy.') }}</h1>
                     <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-300">{{ __('Both plans alert you when a price drops. Pro compares every shop, checks more often, keeps every price, and can let AI help.') }}</p>
                 </div>
 
-                <div class="mt-12 max-w-5xl">
+                <div class="mt-12 max-w-3xl mx-auto">
                     <table class="w-full table-fixed border-separate border-spacing-0 text-left">
                         <caption class="sr-only">{{ __('Free and Pro compared') }}</caption>
                         <colgroup>
-                            <col class="w-[36%] sm:w-[46%]">
-                            <col class="w-[24%] sm:w-[22%]">
-                            <col class="w-[40%] sm:w-[32%]">
+                            <col class="w-[36%] sm:w-[40%]">
+                            <col class="w-[24%] sm:w-[25%]">
+                            <col class="w-[40%] sm:w-[35%]">
                         </colgroup>
                         <thead class="sticky top-16 z-10">
                             <tr>
@@ -156,12 +156,12 @@
                                 </tr>
                                 @foreach ($rows as [$label, $hint, $freeValue, $proValue])
                                     <tr>
-                                        <th scope="row" class="border-b border-ink/5 py-3.5 pr-4 text-base font-normal sm:text-sm dark:border-white/10">
-                                            <span class="text-ink">{{ $label }}</span>
+                                        <th scope="row" class="border-b border-ink/5 py-4 pr-4 text-base font-normal dark:border-white/10">
+                                            <span class="font-medium text-ink">{{ $label }}</span>
                                             <span class="mt-0.5 block text-sm text-zinc-500 max-sm:hidden dark:text-zinc-400">{{ $hint }}</span>
                                         </th>
-                                        <td class="border-b border-ink/5 px-3 py-3.5 text-base sm:px-6 sm:text-sm dark:border-white/10">{!! $cell($freeValue, false) !!}</td>
-                                        <td class="border-b border-ink/5 bg-soft-yellow/60 px-3 py-3.5 text-base sm:px-6 sm:text-sm dark:border-white/10">
+                                        <td class="border-b border-ink/5 px-3 py-4 text-base sm:px-6 sm:text-lg dark:border-white/10">{!! $cell($freeValue, false) !!}</td>
+                                        <td class="border-b border-ink/5 bg-soft-yellow/60 px-3 py-4 text-base sm:px-6 sm:text-lg dark:border-white/10">
                                             <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                                 {!! $cell($proValue, true) !!}
                                                 @isset($gains[$label])
