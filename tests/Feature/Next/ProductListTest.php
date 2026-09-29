@@ -116,6 +116,29 @@ it('sorts by the biggest drop by default, with products not in a drop last', fun
         ->assertSeeInOrder(['Big drop', 'Small drop', 'Never dropped']);
 });
 
+it('draws a line between the products in a drop and the rest, only when sorted by drop', function (): void {
+    $user = User::factory()->create();
+    $dropped = Product::factory()->create(['user_id' => $user->id, 'title' => 'Big drop', 'last_notified_price' => '6.00', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $dropped->id, 'drop_pct' => 40]);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Never dropped']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertSeeHtmlInOrder(['Big drop', 'data-test="drop-divider"', 'Never dropped'])
+        ->set('sort', 'title')
+        ->assertDontSeeHtml('data-test="drop-divider"');
+});
+
+it('draws no line when no product is in a drop', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->count(2)->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)->assertDontSeeHtml('data-test="drop-divider"');
+});
+
 it('drops a product out of the drop sort once it is no longer in a drop', function (): void {
     $user = User::factory()->create();
     $inDrop = Product::factory()->create(['user_id' => $user->id, 'title' => 'Still down 10', 'last_notified_price' => '9.00', 'last_notified_at' => now()->subDays(2)]);

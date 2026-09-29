@@ -178,7 +178,20 @@
 
             {{-- Four across leaves room for the category list. --}}
             <x-product-card.grid :columns="4">
+                {{-- Sorted by drop, the products in a drop come first. A line
+                     marks where they end, so the first product after them does
+                     not read as the next-biggest drop. --}}
+                @php($previousInDrop = false)
                 @forelse ($products as $product)
+                    @php($inDrop = ($product->activeDropPercent() ?? 0) > 0)
+                    @if ($sort === 'biggest_drop' && $previousInDrop && ! $inDrop)
+                        <li wire:key="drop-divider" class="col-span-full flex items-center gap-3 py-1" data-test="drop-divider">
+                            <span class="h-px flex-1 bg-zinc-300 dark:bg-white/15"></span>
+                            <span class="text-sm font-medium text-zinc-600 dark:text-zinc-300">{{ __('No drop right now') }}</span>
+                            <span class="h-px flex-1 bg-zinc-300 dark:bg-white/15"></span>
+                        </li>
+                    @endif
+                    @php($previousInDrop = $inDrop)
                     <li wire:key="product-{{ $product->id }}" class="min-w-0">
                         <x-product-card :product="$product" list-toggle />
                     </li>
