@@ -22,7 +22,6 @@ use App\Livewire\Products\CreateProductManual;
 use App\Livewire\Products\EditProduct;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
-use App\Livewire\Settings\NotificationPreferences;
 use App\Livewire\ShoppingList\ShoppingListPage;
 use App\Livewire\Stats\StatsPage;
 use App\Livewire\Support\SupportPage;
@@ -231,7 +230,8 @@ Route::prefix('app')
         Route::get('products/{product}.md', ProductMarkdownController::class)->whereUuid('product')->name('products.markdown');
         Route::livewire('products/{product}/edit', EditProduct::class)->whereUuid('product')->name('products.edit');
         Route::livewire('billing', BillingPage::class)->name('billing');
-        Route::livewire('notifications', NotificationPreferences::class)->name('notifications');
+        // Moved into settings; the old address keeps working for bookmarks.
+        Route::permanentRedirect('notifications', '/settings/notifications')->name('notifications');
         Route::livewire('connections', ConnectionsPage::class)->name('connections');
         Route::livewire('support', SupportPage::class)->name('support');
         Route::livewire('stats', StatsPage::class)->name('stats');

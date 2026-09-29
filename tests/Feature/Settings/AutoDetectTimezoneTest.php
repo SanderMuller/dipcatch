@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-use App\Livewire\Settings\NotificationPreferences;
+use App\Livewire\Settings\RegionalPreferences;
 use App\Models\User;
 
 use function Pest\Livewire\livewire;
@@ -92,7 +92,7 @@ test('auto-detect view emits nothing for an unauthenticated request', function (
     expect(trim($rendered))->toBeEmpty();
 });
 
-test('NotificationSettings::save() stamps timezone_detected_at so future auto-detects are no-ops', function (): void {
+test('RegionalPreferences::save() stamps timezone_detected_at so future auto-detects are no-ops', function (): void {
     $user = User::factory()->create([
         'timezone' => 'Europe/Amsterdam',
         'timezone_detected_at' => null,
@@ -100,7 +100,7 @@ test('NotificationSettings::save() stamps timezone_detected_at so future auto-de
     $this->actingAs($user);
 
     // User explicitly saves their preferences (keeping the default tz, even).
-    livewire(NotificationPreferences::class)
+    livewire(RegionalPreferences::class)
         ->set('timezone', 'Europe/Amsterdam')
         ->call('save')
         ->assertHasNoErrors();

@@ -69,7 +69,7 @@ it('links the shell navigation at every section', function (): void {
 
     $this->get(route('app.dashboard'))
         ->assertOk()->assertSee('Products')->assertSeeHtml('Plan &amp; billing')
-        ->assertSee('Notifications')
+        ->assertSee('Settings')
         ->assertSee('Connections');
 });
 

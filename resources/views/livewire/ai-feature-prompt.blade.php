@@ -3,7 +3,7 @@
         <flux:callout icon="check-circle" color="green" data-test="ai-feature-on">
             <flux:callout.text>
                 {{ $aiFeature->switchedOnText() }}
-                <flux:link :href="route('app.notifications') . '#ai-features'" wire:navigate>{{ __('Change it in settings') }}</flux:link>
+                <flux:link :href="route('product-features.edit')" wire:navigate>{{ __('Change it in settings') }}</flux:link>
             </flux:callout.text>
         </flux:callout>
     @elseif ($offered)

@@ -29,6 +29,8 @@
             </div>
         </form>
 
+        <livewire:settings.regional-preferences />
+
         @if ($this->showDeleteUser)
             <livewire:settings.delete-user-form />
         @endif

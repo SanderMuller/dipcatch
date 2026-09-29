@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Livewire\Settings\NotificationPreferences;
+use App\Livewire\Settings\RegionalPreferences;
 use App\Models\User;
 use App\Notifications\TestNotification;
 use Illuminate\Support\Facades\Notification;
@@ -14,7 +15,6 @@ test('page hydrates with the user current preferences', function (): void {
         'notify_via_email' => false,
         'notify_via_filament' => true,
         'notify_via_push' => false,
-        'default_currency' => 'USD',
     ]);
 
     $this->actingAs($user);
@@ -22,11 +22,10 @@ test('page hydrates with the user current preferences', function (): void {
     livewire(NotificationPreferences::class)
         ->assertSet('notify_via_email', false)
         ->assertSet('notify_via_filament', true)
-        ->assertSet('notify_via_push', false)
-        ->assertSet('default_currency', 'USD');
+        ->assertSet('notify_via_push', false);
 });
 
-test('save persists toggles + currency', function (): void {
+test('save persists the channel toggles', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => true,
         'notify_via_filament' => true,
@@ -39,15 +38,13 @@ test('save persists toggles + currency', function (): void {
         ->set('notify_via_email', false)
         ->set('notify_via_filament', false)
         ->set('notify_via_push', true)
-        ->set('default_currency', 'GBP')
         ->call('save')
         ->assertHasNoErrors();
 
     $user->refresh();
     expect($user->notify_via_email)->toBeFalse()
         ->and($user->notify_via_filament)->toBeFalse()
-        ->and($user->notify_via_push)->toBeTrue()
-        ->and($user->default_currency)->toBe('GBP');
+        ->and($user->notify_via_push)->toBeTrue();
 });
 
 test('test action dispatches a TestNotification to the current user', function (): void {
@@ -67,75 +64,48 @@ test('test action dispatches a TestNotification to the current user', function (
     Notification::assertSentTo($user, TestNotification::class);
 });
 
-test('the automatic categories switch is absent when no key is configured', function (): void {
+test('the regional settings live on the profile page and save there', function (): void {
+    $user = User::factory()->create(['default_currency' => 'EUR', 'timezone' => 'Europe/Amsterdam']);
+    $this->actingAs($user);
+
+    $this->get(route('profile.edit'))->assertOk()->assertSeeLivewire(RegionalPreferences::class);
+
+    livewire(RegionalPreferences::class)
+        ->assertSet('default_currency', 'EUR')
+        ->set('default_currency', 'GBP')
+        ->set('timezone', 'Europe/London')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $user->refresh();
+    expect($user->default_currency)->toBe('GBP')
+        ->and($user->timezone)->toBe('Europe/London')
+        ->and($user->timezone_detected_at)->not->toBeNull();
+});
+
+test('the old notifications address sends people to the settings tab', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $this->get('/app/notifications')->assertRedirect('/settings/notifications');
+    $this->get(route('notifications.edit'))->assertOk()->assertSee('Notifications');
+});
+
+test('the product features tab shows only where the AI features exist', function (): void {
+    $this->actingAs(User::factory()->create());
+
     config()->set('services.typesafe.key', '');
-    $this->actingAs(User::factory()->create());
+    $this->get(route('profile.edit'))->assertOk()->assertDontSeeHtml('data-test="settings-nav-product-features"');
 
-    livewire(NotificationPreferences::class)
-        ->assertDontSee('Sort new products into a category automatically');
+    config()->set('services.typesafe.key', 'test-key');
+    $this->get(route('profile.edit'))->assertOk()->assertSeeHtml('data-test="settings-nav-product-features"');
 });
 
-test('a free account sees the automatic categories switch disabled with the upgrade note', function (): void {
-    config()->set('services.typesafe.key', 'test-key');
-    $this->actingAs(User::factory()->create());
-
-    $html = livewire(NotificationPreferences::class)
-        ->assertSee('Sort new products into a category automatically')
-        ->assertSee('Pro sorts products for you. Your choice is kept, and it starts working when you upgrade.')
-        ->html();
-
-    expect($html)->toMatch('/disabled="disabled"[^>]*data-test="auto-categories"/')
-        ->toMatch('/data-test="auto-categories-pro"[^>]*>\s*Pro\s*</');
-});
-
-test('a Pro account sees the automatic categories switch enabled', function (): void {
-    config()->set('services.typesafe.key', 'test-key');
-    $user = User::factory()->create();
-    subscribeUser($user);
+test('the default currency must be a real currency code', function (): void {
+    $user = User::factory()->create(['default_currency' => 'EUR']);
     $this->actingAs($user);
 
-    $html = livewire(NotificationPreferences::class)
-        ->assertSee('Products you add from now on. Products you already track keep their category.')
-        ->assertDontSee('Pro sorts products for you.')
-        ->html();
+    livewire(RegionalPreferences::class)->set('default_currency', 'EURO')->call('save')->assertHasErrors('default_currency');
+    livewire(RegionalPreferences::class)->set('default_currency', 'gbp')->call('save')->assertHasNoErrors();
 
-    expect($html)->toMatch('/data-test="auto-categories"/')
-        ->not->toMatch('/disabled="disabled"[^>]*data-test="auto-categories"/')
-        // Marked Pro on a Pro account too, so a subscriber sees what the plan pays for.
-        ->toMatch('/data-test="auto-categories-pro"[^>]*>\s*Pro\s*</');
-});
-
-test('save persists the automatic categories choice', function (): void {
-    config()->set('services.typesafe.key', 'test-key');
-    $user = User::factory()->create(['auto_categories' => false]);
-    $this->actingAs($user);
-
-    livewire(NotificationPreferences::class)
-        ->assertSet('auto_categories', false)
-        ->set('auto_categories', true)
-        ->call('save')
-        ->assertHasNoErrors();
-
-    expect($user->refresh()->auto_categories)->toBeTrue();
-});
-
-test('save persists the shop-check choice, off until the person switches it on', function (): void {
-    config()->set('services.typesafe.key', 'test-key');
-    $user = User::factory()->create();
-    $this->actingAs($user);
-
-    expect($user->refresh()->shop_checks)->toBeFalse();
-
-    livewire(NotificationPreferences::class)
-        ->assertSet('shop_checks', false)
-        ->set('shop_checks', true)
-        ->call('save')
-        ->assertHasNoErrors();
-
-    expect($user->refresh()->shop_checks)->toBeTrue()
-        ->and($user->wantsShopChecks())->toBeFalse();
-
-    subscribeUser($user);
-
-    expect($user->refresh()->wantsShopChecks())->toBeTrue();
+    expect($user->refresh()->default_currency)->toBe('GBP');
 });

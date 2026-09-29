@@ -40,9 +40,9 @@
             ];
 
             $moreLinks = [
-                // "Notifications" read as a list of alerts you have had. The
-                // page is the settings for them.
-                ['label' => __('Notification settings'), 'href' => route('app.notifications'), 'icon' => 'bell', 'current' => request()->routeIs('app.notifications'), 'navigate' => true],
+                // Profile, notifications, product features, security and
+                // appearance share one settings page with its own side menu.
+                ['label' => __('Settings'), 'href' => route('profile.edit'), 'icon' => 'cog-6-tooth', 'current' => request()->routeIs('profile.edit', 'notifications.edit', 'product-features.edit', 'security.edit', 'appearance.edit'), 'navigate' => true],
                 // Reachable from the savings tile on the dashboard too, but a
                 // page with one subtle link into it and none out is a page a
                 // reader cannot find twice.

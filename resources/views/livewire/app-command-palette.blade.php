@@ -48,7 +48,7 @@
                         {{ __('Upgrade to Pro') }}
                     </flux:command.item>
                 @endif
-                <flux:command.item icon="bell" :href="route('app.notifications')" wire:navigate keywords="alerts email push digest price drop">
+                <flux:command.item icon="bell" :href="route('notifications.edit')" wire:navigate keywords="alerts email push digest price drop">
                     {{ __('Notification settings') }}
                 </flux:command.item>
                 <flux:command.item icon="puzzle-piece" :href="route('app.connections')" wire:navigate keywords="mcp claude chatgpt openai assistant ai agent integration connect">

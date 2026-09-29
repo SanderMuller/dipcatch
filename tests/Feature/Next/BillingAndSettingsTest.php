@@ -2,6 +2,7 @@
 
 use App\Livewire\Billing\BillingPage;
 use App\Livewire\Settings\NotificationPreferences;
+use App\Livewire\Settings\RegionalPreferences;
 use App\Models\User;
 use App\Notifications\TestNotification;
 use Illuminate\Support\Facades\Notification;
@@ -55,7 +56,7 @@ it('shows a pro account no limits', function (): void {
         ->assertSee('No limit');
 });
 
-it('round-trips notification preferences including the timezone', function (): void {
+it('round-trips notification preferences, and the timezone on the profile page', function (): void {
     $user = User::factory()->create([
         'notify_via_email' => false,
         'notify_via_filament' => false,
@@ -67,6 +68,9 @@ it('round-trips notification preferences including the timezone', function (): v
     livewire(NotificationPreferences::class)
         ->set('notify_via_email', true)
         ->set('notify_via_filament', true)
+        ->call('save');
+
+    livewire(RegionalPreferences::class)
         ->set('timezone', 'Europe/Berlin')
         ->call('save');
 
@@ -85,7 +89,7 @@ it('refuses an invalid timezone rather than storing it', function (): void {
 
     $this->actingAs($user);
 
-    livewire(NotificationPreferences::class)
+    livewire(RegionalPreferences::class)
         ->set('timezone', 'Mars/Olympus_Mons')
         ->call('save');
 
@@ -111,5 +115,5 @@ it('carries the whole push lifecycle, not just the toggle', function (): void {
     // Rebuilding only the preference would leave a saved channel that cannot
     // deliver: the permission prompt, service worker and subscription all live
     // in the shared partial.
-    $this->get(route('app.notifications'))->assertOk()->assertSeeHtml('serviceWorker')->assertSeeHtml('pushManager')->assertSeeHtml('is not supported on this device');
+    $this->get(route('notifications.edit'))->assertOk()->assertSeeHtml('serviceWorker')->assertSeeHtml('pushManager')->assertSeeHtml('is not supported on this device');
 });

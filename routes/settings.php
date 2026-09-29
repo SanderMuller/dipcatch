@@ -1,6 +1,8 @@
 <?php declare(strict_types=1);
 
 use App\Livewire\Settings\Appearance;
+use App\Livewire\Settings\NotificationPreferences;
+use App\Livewire\Settings\ProductFeatures;
 use App\Livewire\Settings\Profile;
 use App\Livewire\Settings\Security;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
@@ -15,6 +17,8 @@ Route::middleware(['auth'])->group(function (): void {
 });
 
 Route::middleware(['auth', EnsureEmailIsVerified::class])->group(function (): void {
+    Route::livewire('settings/notifications', NotificationPreferences::class)->name('notifications.edit');
+    Route::livewire('settings/product-features', ProductFeatures::class)->name('product-features.edit');
     Route::livewire('settings/appearance', Appearance::class)->name('appearance.edit');
 
     Route::livewire('settings/security', Security::class)
