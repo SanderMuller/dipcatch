@@ -141,8 +141,8 @@
                     >
                         <span class="sr-only" x-text="open ? @js(__('Close menu')) : @js(__('Menu'))">{{ __('Menu') }}</span>
                         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" class="size-5" aria-hidden="true">
-                            <path x-bind:class="open ? 'hidden' : ''" d="M3 6h14M3 10h14M3 14h14" />
-                            <path x-bind:class="open ? '' : 'hidden'" class="hidden" d="M5 5l10 10M15 5L5 15" />
+                            <path x-show="! open" d="M3 6h14M3 10h14M3 14h14" />
+                            <path x-show="open" x-cloak d="M5 5l10 10M15 5L5 15" />
                         </svg>
                     </button>
                 </div>
