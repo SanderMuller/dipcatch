@@ -3,6 +3,7 @@
 use App\Actions\Products\CategoriseProduct;
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
+use App\Enums\TrackingIdea;
 use App\Livewire\Products\CreateProductFromUrl;
 use App\Livewire\Products\CreateProductManual;
 use App\Mcp\Servers\DipCatchServer;
@@ -205,6 +206,22 @@ it('clears a stale suggestion when a confident answer places the product', funct
 
     expect($product->fresh()?->category)->toBe(ProductCategory::CoffeeTea)
         ->and($product->fresh()?->suggested_category)->toBeNull();
+});
+
+it('stores the getting-started idea, even beside a category the person chose', function (): void {
+    $user = proUserWantingCategories();
+    $product = Product::factory()->create(['user_id' => $user->id]);
+
+    Http::fake([TypeSafeClient::ENDPOINT => function () use ($product): PromiseInterface {
+        Product::query()->whereKey($product->id)->update(['category' => 'food.pantry', 'category_set_by' => 'user']);
+
+        return Http::response(typesafeAnswer(['food' => 0.95, 'home' => 0.05], ['food' => ['coffee_tea' => 0.95, 'pantry' => 0.05]], ['coffee_tea' => 0.9, 'none' => 0.1]));
+    }]);
+
+    new CategoriseProduct($product->id)->handle(app(TypeSafeClient::class));
+
+    expect($product->fresh()?->category)->toBe(ProductCategory::Pantry)
+        ->and($product->fresh()?->tracking_idea)->toBe(TrackingIdea::CoffeeTea);
 });
 
 it('sends nothing once the account has spent its daily budget', function (): void {

@@ -4,6 +4,7 @@ namespace App\Services\TypeSafe;
 
 use App\Enums\ProductCategory;
 use App\Enums\ProductDepartment;
+use App\Enums\TrackingIdea;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Log;
  * Turns one systemone answer into a verdict: every real path scored as the
  * geometric mean of its department and leaf probabilities, the best path
  * checked against the floor and the separation ratio, and `Other` judged
- * alone on the department answer.
+ * alone on the department answer. The getting-started idea rides along.
  */
 final class CategoryScorer
 {
@@ -96,7 +97,30 @@ final class CategoryScorer
             separation: $separation,
             inputTokens: $inputTokens,
             outputTokens: $outputTokens,
+            trackingIdea: self::trackingIdea($answers[TypeSafeClient::TRACKING_IDEA_QUESTION] ?? null),
         );
+    }
+
+    /**
+     * The idea Jev placed the product under, or null. Optional, unlike the
+     * category answers: the category stands on its own without it.
+     */
+    private static function trackingIdea(mixed $answer): ?TrackingIdea
+    {
+        $probabilities = is_array($answer) ? ($answer['probabilities'] ?? null) : null;
+
+        if (! is_array($probabilities) || $probabilities === []) {
+            return null;
+        }
+
+        $best = self::highest($probabilities);
+        $key = array_search($best, array_map(static fn (mixed $value): float => is_numeric($value) ? (float) $value : 0.0, $probabilities), true);
+
+        if (! is_string($key) || $best < Config::float('dipcatch.categories.min_idea_probability')) {
+            return null;
+        }
+
+        return TrackingIdea::tryFrom($key);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Services\TypeSafe;
 
 use App\Enums\ProductCategory;
+use App\Enums\TrackingIdea;
 
 /**
  * One categorisation answer. `category` is null when the guards said no;
@@ -18,6 +19,7 @@ final readonly class CategoryVerdict
         public float $separation,
         public int $inputTokens,
         public int $outputTokens,
+        public ?TrackingIdea $trackingIdea = null,
     ) {}
 
     public function stored(): bool

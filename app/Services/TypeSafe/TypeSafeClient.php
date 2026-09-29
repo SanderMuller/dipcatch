@@ -3,6 +3,7 @@
 namespace App\Services\TypeSafe;
 
 use App\Enums\ProductDepartment;
+use App\Enums\TrackingIdea;
 use App\Models\Product;
 use App\Models\Shop;
 use Illuminate\Http\Client\ConnectionException;
@@ -16,7 +17,8 @@ use Throwable;
  * Places a product in the taxonomy through TypeSafe's Jev model: one request
  * with a department Choice plus a leaf Choice per real department, scored by
  * `CategoryScorer`. `Other` gets no leaf question, because a Choice with one
- * option would score 1.0 and beat every real path.
+ * option would score 1.0 and beat every real path. The same request asks
+ * which getting-started idea the product covers.
  */
 final readonly class TypeSafeClient
 {
@@ -27,6 +29,11 @@ final readonly class TypeSafeClient
     public const string DEPARTMENT_QUESTION = 'department';
 
     public const string LEAF_QUESTION_PREFIX = 'leaf_';
+
+    public const string TRACKING_IDEA_QUESTION = 'tracking_idea';
+
+    /** The Choice option for a product no getting-started idea covers. */
+    public const string NO_TRACKING_IDEA = 'none';
 
     public static function configured(): bool
     {
@@ -194,6 +201,18 @@ final readonly class TypeSafeClient
                 'criteria' => $leaves,
             ];
         }
+
+        $ideas = [];
+
+        foreach (TrackingIdea::cases() as $idea) {
+            $ideas[$idea->value] = $idea->rubric();
+        }
+
+        $questions[self::TRACKING_IDEA_QUESTION] = [
+            'type' => 'choice',
+            'instructions' => 'Which kind of repeat purchase is this product? Pick none when it is not something a household buys again and again.',
+            'criteria' => [...$ideas, self::NO_TRACKING_IDEA => 'None of these: a one-off purchase, or a product no option above describes'],
+        ];
 
         return $questions;
     }

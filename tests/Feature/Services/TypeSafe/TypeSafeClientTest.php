@@ -2,6 +2,7 @@
 
 use App\Enums\ProductCategory;
 use App\Enums\ProductDepartment;
+use App\Enums\TrackingIdea;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Services\TypeSafe\TypeSafeClient;
@@ -172,9 +173,10 @@ it('sends the bearer token, the evidence from the cheapest shop and one leaf que
             ])
             ->and($questions)->toContain('department', 'leaf_food', 'leaf_car_travel')
             ->and($questions)->not->toContain('leaf_other')
-            ->and($questions)->toHaveCount(1 + count(ProductDepartment::real()))
+            ->and($questions)->toHaveCount(2 + count(ProductDepartment::real()))
             ->and($body['questions']['department']['criteria'])->toHaveKey('other')
-            ->and($body['questions']['leaf_pets']['criteria'])->toHaveKeys(['pet_food', 'pet_care', 'pet_accessories']);
+            ->and($body['questions']['leaf_pets']['criteria'])->toHaveKeys(['pet_food', 'pet_care', 'pet_accessories'])
+            ->and($body['questions']['tracking_idea']['criteria'])->toHaveKeys([...array_column(TrackingIdea::cases(), 'value'), 'none']);
 
         return true;
     });
@@ -264,3 +266,16 @@ it('throws when the answer carries no department probabilities', function (): vo
     expect(fn () => app(TypeSafeClient::class)->categorise(productWithShop()))
         ->toThrow(TypeSafeRequestFailed::class);
 });
+
+it('reads the getting-started idea from the same answer, above its floor only', function (?string $top, float $probability, ?TrackingIdea $expected): void {
+    config()->set('dipcatch.categories.min_idea_probability', 0.6);
+    $ideas = $top === null ? [] : [$top => $probability, 'groceries' => 1 - $probability];
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response(typesafeAnswer(['food' => 1.0], ['food' => ['coffee_tea' => 1.0]], $ideas))]);
+
+    expect(app(TypeSafeClient::class)->categorise(productWithShop())->trackingIdea)->toBe($expected);
+})->with([
+    'a clear idea' => ['coffee_tea', 0.9, TrackingIdea::CoffeeTea],
+    'below the floor' => ['coffee_tea', 0.5, null],
+    'none on top' => ['none', 0.8, null],
+    'no idea answer at all' => [null, 0.0, null],
+]);

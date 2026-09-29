@@ -132,6 +132,13 @@ test('an unknown idea is ignored', function (): void {
     expect($user->trackingIdeaMarks()->exists())->toBeFalse();
 });
 
+test('the idea Jev stored on a product ticks it, even one no word or category names', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->for($user)->create(['title' => 'Drops Air haakgaren 50 g', 'tracking_idea' => TrackingIdea::Hobby]);
+
+    expect(TrackingIdeaChecklist::for($user)->tracked)->toBe([TrackingIdea::Hobby]);
+});
+
 test('another account\'s products and marks tick nothing here', function (): void {
     $other = User::factory()->create();
     Product::factory()->for($other)->create(['title' => 'Kattenbrokjes', 'category' => ProductCategory::PetFood]);

@@ -12,7 +12,8 @@ namespace App\Enums;
  * box, a floor lamp, a perfume, a houseplant or a dashcam is not bin bags,
  * light bulbs, skincare, potting soil or AdBlue. Those tick on words only.
  * Groceries has no words: too many to list, so a free account ticks it by
- * hand.
+ * hand. An account with automatic categories also gets the idea Jev picked,
+ * stored on the product as `tracking_idea`.
  */
 enum TrackingIdea: string
 {
@@ -53,7 +54,7 @@ enum TrackingIdea: string
 
     case Garden = 'garden';
     case Car = 'car';
-    /** No category or word names a hobby, so only the person can tick it. */
+    /** No category or word names a hobby: only Jev or the person ticks it. */
     case Hobby = 'hobby';
 
     public function label(): string
@@ -92,6 +93,46 @@ enum TrackingIdea: string
             self::Garden => __('Potting soil and bird food'),
             self::Car => __('Windscreen fluid and AdBlue'),
             self::Hobby => __('Hobby supplies'),
+        };
+    }
+
+    /** What the idea covers, in English, for the Choice Jev answers. */
+    public function rubric(): string
+    {
+        return match ($this) {
+            self::Groceries => 'Everyday food from the supermarket: fresh produce, meat, fish, dairy, eggs, bread, pantry goods, snacks, frozen food',
+            self::CoffeeTea => 'Coffee beans, ground coffee, coffee pods and capsules, tea',
+            self::SoftDrinks => 'Soft drinks, juice, bottled water, sparkling water, energy drinks, iced tea',
+            self::BeerWine => 'Beer, wine, sparkling wine, spirits',
+            self::SportsNutrition => 'Protein powder, protein bars and shakes, sports supplements',
+            self::Paper => 'Toilet paper, kitchen roll, tissues',
+            self::Cleaning => 'Cleaning products for the house: all-purpose cleaner, toilet cleaner, glass cleaner, degreaser, sponges',
+            self::Laundry => 'Laundry detergent, fabric softener, laundry pods, stain remover',
+            self::Dishwasher => 'Dishwasher tablets, dishwasher salt, rinse aid, washing-up liquid',
+            self::BinBags => 'Bin bags and bin liners',
+            self::VacuumBags => 'Bags and filters for a vacuum cleaner',
+            self::Batteries => 'Disposable or rechargeable batteries, button cells',
+            self::WaterFilters => 'Water filter cartridges, descaler for a kettle or coffee machine',
+            self::LightBulbs => 'Light bulbs and LED lamps',
+            self::Candles => 'Candles, tea lights, air fresheners, scent sticks',
+            self::PrinterInk => 'Ink cartridges and toner for a printer',
+            self::DeodorantShower => 'Deodorant, shower gel, soap, hand soap',
+            self::HairCare => 'Shampoo, conditioner, hair masks and styling products',
+            self::OralCare => 'Toothpaste, toothbrushes and brush heads, mouthwash, floss',
+            self::Shaving => 'Razor blades, razors, shaving foam and gel',
+            self::Sunscreen => 'Sunscreen and after-sun',
+            self::SkincareMakeup => 'Face and body skincare, make-up',
+            self::ContactLenses => 'Contact lenses and lens solution',
+            self::Sanitary => 'Sanitary pads, tampons, panty liners, incontinence products',
+            self::VitaminsMedicine => 'Vitamins, supplements, painkillers and other over-the-counter medicine',
+            self::Nappies => 'Nappies and baby wipes',
+            self::BabyFood => 'Infant formula, follow-on milk and baby food',
+            self::PetFood => 'Food and treats for a cat, dog or other pet',
+            self::CatLitter => 'Cat litter',
+            self::FleaTreatment => 'Flea and tick treatment for a pet',
+            self::Garden => 'Potting soil, plant food, bird food',
+            self::Car => 'Windscreen washer fluid, AdBlue, car care products',
+            self::Hobby => 'Supplies used up by a hobby: craft materials, yarn, paint for art, fishing bait, model kits',
         };
     }
 

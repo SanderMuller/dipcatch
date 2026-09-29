@@ -759,9 +759,10 @@ function configureStripe(): void
  *
  * @param  array<string, float>  $departments
  * @param  array<string, array<string, float>>  $leaves
+ * @param  array<string, float>  $trackingIdea  Left out of the answer when empty.
  * @return array<string, mixed>
  */
-function typesafeAnswer(array $departments, array $leaves = []): array
+function typesafeAnswer(array $departments, array $leaves = [], array $trackingIdea = []): array
 {
     $answers = [
         'department' => ['type' => 'choice', 'choice' => array_key_first($departments), 'probabilities' => $departments, 'confidence' => 0.5],
@@ -785,6 +786,10 @@ function typesafeAnswer(array $departments, array $leaves = []): array
             'probabilities' => $probabilities,
             'confidence' => 0.5,
         ];
+    }
+
+    if ($trackingIdea !== []) {
+        $answers['tracking_idea'] = ['type' => 'choice', 'choice' => array_key_first($trackingIdea), 'probabilities' => $trackingIdea, 'confidence' => 0.5];
     }
 
     return ['model' => 'jev-latest', 'answers' => $answers, 'usage' => ['input_tokens' => 1200, 'output_tokens' => 90]];

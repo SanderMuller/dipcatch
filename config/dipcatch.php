@@ -135,6 +135,8 @@ return [
         // Winner divided by runner-up; below this the answer is a coin flip
         // and the category is left empty.
         'min_separation' => (float) env('DIPCATCH_CATEGORIES_MIN_SEPARATION', 1.5),
+        // The getting-started idea is stored only above this probability.
+        'min_idea_probability' => (float) env('DIPCATCH_CATEGORIES_MIN_IDEA_PROBABILITY', 0.6),
         // Quality over latency: the call runs after the response is sent.
         'timeout_seconds' => (int) env('DIPCATCH_CATEGORIES_TIMEOUT', 20),
         // Paid calls per account and app-wide per day. Zero lifts a cap.

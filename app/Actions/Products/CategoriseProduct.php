@@ -110,9 +110,16 @@ final class CategoriseProduct
      * below-guard winner as the suggestion the edit form offers. Both are
      * conditional on the source still being null, so an edit saved since the
      * caller's read wins. Returns whether a category was written.
+     * The getting-started idea is written either way.
      */
     public static function store(Product $product, CategoryVerdict $verdict): bool
     {
+        // Not behind the category guard: the idea is Jev's alone, and a
+        // category the person chose does not make it any less true.
+        if ($verdict->trackingIdea !== null) {
+            Product::query()->whereKey($product->id)->update(['tracking_idea' => $verdict->trackingIdea->value]);
+        }
+
         if ($verdict->category === null) {
             if ($verdict->winner !== null) {
                 Product::query()

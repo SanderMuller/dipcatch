@@ -210,7 +210,10 @@ final class EditProduct extends Component
         }
 
         $this->suggestedCategory = $verdict->winner->value;
-        $this->product->forceFill(['suggested_category' => $verdict->winner])->save();
+        $this->product->forceFill([
+            'suggested_category' => $verdict->winner,
+            'tracking_idea' => $verdict->trackingIdea ?? $this->product->tracking_idea,
+        ])->save();
     }
 
     public function acceptSuggestion(): void

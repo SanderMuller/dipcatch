@@ -31,7 +31,7 @@ final readonly class TrackingIdeaChecklist
     {
         $products = Product::query()
             ->where('user_id', $user->getKey())
-            ->get(['title', 'category']);
+            ->get(['title', 'category', 'tracking_idea']);
 
         $marks = $user->trackingIdeaMarks()
             ->get()
@@ -45,7 +45,8 @@ final readonly class TrackingIdeaChecklist
             // A tracked product outranks a hand mark: "not for me" beside a
             // product the person tracks would contradict itself.
             match (true) {
-                $products->contains(static fn (Product $product): bool => $idea->isTrackedBy((string) $product->title, $product->category)) => $tracked[] = $idea,
+                $products->contains(static fn (Product $product): bool => $product->tracking_idea === $idea
+                    || $idea->isTrackedBy((string) $product->title, $product->category)) => $tracked[] = $idea,
                 $mark === TrackingIdeaMarkState::Skipped => $skipped[] = $idea,
                 $mark === TrackingIdeaMarkState::Done => $done[] = $idea,
                 default => $open[] = $idea,
