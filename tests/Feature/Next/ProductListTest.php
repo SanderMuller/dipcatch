@@ -131,6 +131,24 @@ it('draws a line between the products in a drop and the rest, only when sorted b
         ->assertDontSeeHtml('data-test="drop-divider"');
 });
 
+it('draws the line at the top of the next page when the drops fill the page before it', function (): void {
+    $user = User::factory()->create();
+
+    foreach (range(1, 24) as $i) {
+        $dropped = Product::factory()->create(['user_id' => $user->id, 'title' => 'Drop ' . $i, 'last_notified_price' => '6.00', 'last_notified_at' => now()]);
+        PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $dropped->id, 'drop_pct' => 10 + $i]);
+    }
+
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Never dropped']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertDontSeeHtml('data-test="drop-divider"')
+        ->call('gotoPage', 2)
+        ->assertSeeHtmlInOrder(['data-test="drop-divider"', 'Never dropped']);
+});
+
 it('draws no line when no product is in a drop', function (): void {
     $user = User::factory()->create();
     Product::factory()->count(2)->create(['user_id' => $user->id]);

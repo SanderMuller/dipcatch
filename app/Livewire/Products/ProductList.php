@@ -67,6 +67,9 @@ final class ProductList extends Component
 
     private const string DEFAULT_SORT = 'biggest_drop';
 
+    /** @var list<string>|null Memo for {@see bestBuyIds()}; not public, so it lives for one request. */
+    private ?array $bestBuyIds = null;
+
     /** The sort this browser last chose, read before the first render. */
     private const string SORT_COOKIE = 'products_sort';
 
@@ -188,6 +191,7 @@ final class ProductList extends Component
 
         return view('livewire.products.product-list', [
             'products' => $this->products(),
+            'inDropCount' => $this->inDropCount(),
             'canAddProduct' => $this->canAddProduct(),
             'categoryGroups' => $this->categoryGroups(),
             'shopHosts' => $this->shopHosts(),
@@ -205,6 +209,30 @@ final class ProductList extends Component
     private function products(): LengthAwarePaginator
     {
         $sort = array_key_exists($this->sort, self::SORTS) ? $this->sort : self::DEFAULT_SORT;
+
+        return $this->filtered()
+            ->addSelect(['biggest_drop' => Product::liveDropPercentQuery()])
+            ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
+            // A product not in a drop, or with no price yet, sorts last
+            // whichever way the list runs, rather than heading a list of
+            // drops with rows that have none.
+            ->orderByRaw(self::orderBy($sort))
+            // A tie has to break the same way every time, or a row can appear
+            // on two pages and another on none. The ids are UUIDv7, so this
+            // also reads as newest first.
+            ->orderBy('id', 'desc')
+            // 24 fills whole rows at one, two, three and four cards across.
+            ->paginate(24);
+    }
+
+    /**
+     * The account's products under the list's search and filters, before
+     * sorting and paging.
+     *
+     * @return EloquentQueryBuilder<Product>
+     */
+    private function filtered(): EloquentQueryBuilder
+    {
         $categories = ProductCategory::leavesFor($this->category);
 
         return Product::query()
@@ -230,25 +258,38 @@ final class ProductList extends Component
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereIn('category', $categories ?? []),
             )
             ->when($this->category === self::NO_CATEGORY, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('category'))
-            ->when($this->bestBuyFilterOn(), fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereKey(
-                auth()->user() instanceof User ? DashboardDigest::bestBuyIds(auth()->user(), $this->shop, onOfferOnly: $this->discounted) : [],
-            ))
+            ->when($this->bestBuyFilterOn(), fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereKey($this->bestBuyIds()))
             ->when($this->shop !== '', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereHas(
                 'shops',
                 fn (EloquentQueryBuilder $shops): EloquentQueryBuilder => $shops->where('host', $this->shop)->where('active', true),
-            ))
-            ->addSelect(['biggest_drop' => Product::liveDropPercentQuery()])
-            ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
-            // A product not in a drop, or with no price yet, sorts last
-            // whichever way the list runs, rather than heading a list of
-            // drops with rows that have none.
-            ->orderByRaw(self::orderBy($sort))
-            // A tie has to break the same way every time, or a row can appear
-            // on two pages and another on none. The ids are UUIDv7, so this
-            // also reads as newest first.
-            ->orderBy('id', 'desc')
-            // 24 fills whole rows at one, two, three and four cards across.
-            ->paginate(24);
+            ));
+    }
+
+    /**
+     * The best buys at the chosen shop, read once per request: the list and
+     * the drop count both filter on them, and each read loads the account's
+     * products and shops.
+     *
+     * @return list<string>
+     */
+    private function bestBuyIds(): array
+    {
+        $user = auth()->user();
+
+        return $this->bestBuyIds ??= $user instanceof User ? DashboardDigest::bestBuyIds($user, $this->shop, onOfferOnly: $this->discounted) : [];
+    }
+
+    /**
+     * How many products in the list are in a drop, when it is sorted by
+     * drop: they come first, so the line after them goes after this many.
+     * Counted, not read off the page, so the line still shows when the
+     * drops end on the last card of a page.
+     */
+    private function inDropCount(): ?int
+    {
+        $sort = array_key_exists($this->sort, self::SORTS) ? $this->sort : self::DEFAULT_SORT;
+
+        return $sort === 'biggest_drop' ? $this->filtered()->inVisibleDrop()->count() : null;
     }
 
     /**
