@@ -46,75 +46,152 @@
 
 
             <main class="mx-auto w-full max-w-app flex-1 px-6 pt-8 pb-20 lg:px-8">
-                <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{{ __('Pricing') }}</h1>
-                <p class="mt-2 max-w-2xl text-base text-zinc-600 dark:text-zinc-300">
-                    {{ __('Track your first :count products for nothing. Pro compares every shop you like, follows up to :pro products and can sort them for you.', ['count' => $free->maxProducts(), 'pro' => $pro->maxProducts()]) }}
-                </p>
+                @php
+                    // Numbers come from the plans, never typed, so the page
+                    // cannot drift from what each plan gives.
+                    $symbol = \App\Support\MoneyFormatter::symbol(\App\Billing\ProPrice::currency());
+                    $proHistory = $pro->historyDays() === null ? __('Everything, kept') : __(':days days', ['days' => $pro->historyDays()]);
+                    // [label, what it means, Free, Pro]: true is a tick, false a dash.
+                    $sections = [
+                        __('Tracking') => [
+                            [__('Products'), __('Everything you buy again and again.'), (string) $free->maxProducts(), (string) $pro->maxProducts()],
+                            [__('Shops per product'), __('The best buy is only as good as the shops you compare.'), (string) $free->maxShopsPerProduct(), __('Unlimited')],
+                            [__('Price checks'), __('How soon a new price reaches you.'), __('Every :hours h', ['hours' => $free->recheckIntervalHours()]), __('Every :hours h', ['hours' => $pro->recheckIntervalHours()])],
+                            [__('Price per kilo, litre or piece'), __('Packs of different sizes compared fairly.'), true, true],
+                        ],
+                        __('Alerts') => [
+                            [__('Price drop alerts'), __('Email, in-app and browser push.'), true, true],
+                            [__('Alerts per hour'), __('For the days everything is on offer.'), (string) $free->notificationsHourlyLimit(), (string) $pro->notificationsHourlyLimit()],
+                            [__('Target price per kilo'), __('Any shop, any pack, at the price you set.'), false, true],
+                        ],
+                        __('History') => [
+                            [__('Price history'), __('Tells a real low from the usual offer.'), __(':days days', ['days' => $free->historyDays()]), $proHistory],
+                        ],
+                        __('AI help, off until you switch it on') => [
+                            [__('Automatic categories'), __('New products filed for you.'), false, true],
+                            [__('Same-product check'), __('A warning when a new shop sells another flavour or pack.'), false, true],
+                            [__('More shops found'), __('Other shops that sell what you track, confirmed.'), false, true],
+                        ],
+                    ];
+                    $trialNote = $onSale
+                        ? ($trialDays > 0 ? __(':days days free, then cancel any time.', ['days' => $trialDays]) : __('Cancel any time.'))
+                        : __('Not on sale yet.');
+                    $freeCtaLabel = $authed ? __('Your plan') : __('Start free');
+                    $proCta = $isPro ? $proCtaLabel : ($trialDays > 0 ? __('Try Pro free') : $proCtaLabel);
+                    $tick = '<svg viewBox="0 0 16 16" class="size-5 fill-savings-strong sm:size-4" aria-hidden="true"><path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>';
+                    $dash = '<svg viewBox="0 0 16 16" class="size-5 fill-zinc-300 sm:size-4 dark:fill-zinc-600" aria-hidden="true"><path d="M3.75 7.25a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z" /></svg>';
+                    $cell = fn (string|bool $value, bool $strong): string => match (true) {
+                        $value === true => $tick . '<span class="sr-only">' . e(__('Included')) . '</span>',
+                        $value === false => $dash . '<span class="sr-only">' . e(__('Not included')) . '</span>',
+                        default => '<span class="tabular-nums ' . ($strong ? 'font-semibold text-ink' : 'text-zinc-700 dark:text-zinc-300') . '">' . e($value) . '</span>',
+                    };
+                    // What Pro adds on a row, keyed by the row's label.
+                    $gains = [
+                        __('Products') => __(':times× more', ['times' => (int) floor($pro->maxProducts() / max(1, $free->maxProducts()))]),
+                        __('Shops per product') => __('No limit'),
+                        __('Price checks') => __(':times× as often', ['times' => (int) round($free->recheckIntervalHours() / max(1, $pro->recheckIntervalHours()))]),
+                        __('Alerts per hour') => __(':times× more', ['times' => (int) floor($pro->notificationsHourlyLimit() / max(1, $free->notificationsHourlyLimit()))]),
+                        __('Price history') => __('No limit'),
+                        __('Target price per kilo') => __('Pro only'),
+                        __('Automatic categories') => __('Pro only'),
+                        __('Same-product check') => __('Pro only'),
+                        __('More shops found') => __('Pro only'),
+                    ];
+                    $freeButton = 'inline-flex w-full items-center justify-center rounded-full bg-paper px-3 py-2 text-sm font-medium text-ink ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
+                    $proButton = 'inline-flex w-full items-center justify-center rounded-full bg-ink px-3 py-2 text-sm font-medium text-paper hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
+                @endphp
+                {{-- Sticky plan header, and each Pro cell says how much more you
+                     get, so the value of the upgrade reads row by row. --}}
 
-                <div class="mt-10 grid max-w-4xl gap-6 sm:grid-cols-2">
-                    <section class="rounded-2xl bg-paper/80 p-6 ring-1 ring-line backdrop-blur-sm">
-                        <h2 class="text-lg font-semibold">{{ __('Free') }}</h2>
-                        <p class="mt-1 text-3xl font-semibold tracking-tight">{{ \App\Support\MoneyFormatter::symbol(\App\Billing\ProPrice::currency()) }}0</p>
-                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ __('No card, no expiry.') }}</p>
-
-                        <ul class="mt-6 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-                            <li>{{ __(':count products', ['count' => $free->maxProducts()]) }}</li>
-                            <li>{{ __(':count shops per product', ['count' => $free->maxShopsPerProduct()]) }}</li>
-                            <li>{{ __('Prices checked every :hours hours', ['hours' => $free->recheckIntervalHours()]) }}</li>
-                            <li>{{ __('Price drop alerts and one email a day') }}</li>
-                            <li>{{ __(':days days of price history', ['days' => $free->historyDays()]) }}</li>
-                        </ul>
-
-                        <a href="{{ $ctaHref }}" class="mt-8 inline-flex items-center rounded-full bg-paper px-5 py-3 text-base font-medium text-ink ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:text-sm">
-                            {{ $authed ? __('Your plan') : __('Create a free account') }}
-                        </a>
-                    </section>
-
-                    <section class="rounded-2xl bg-paper p-6 shadow-xl shadow-ink/5 ring-2 ring-ink dark:shadow-none">
-                        <h2 class="text-lg font-semibold">{{ __('Pro') }}</h2>
-                        <p class="mt-1 text-3xl font-semibold tracking-tight text-brand tabular-nums">{{ $price }}<span class="text-base font-normal text-zinc-500 dark:text-zinc-400"> / {{ __('month') }}</span></p>
-                        @if (\App\Billing\ProPrice::hasYearly())
-                            <p class="mt-1 text-sm text-zinc-600 dark:text-zinc-300">{{ __('or :price a year', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}</p>
-                        @endif
-                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ __('VAT included.') }}</p>
-                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                            @if ($onSale)
-                                {{ $trialDays > 0 ? __(':days days free, cancel any time.', ['days' => $trialDays]) : __('Cancel any time.') }}
-                            @else
-                                {{ __('Not on sale yet.') }}
-                            @endif
-                        </p>
-
-                        <ul class="mt-6 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-                            <li>{{ __('Unlimited shops per product') }}</li>
-                            <li>{{ __('Up to :count products', ['count' => $pro->maxProducts()]) }}</li>
-                            <li>{{ __('New products sorted into a category automatically, once you switch it on') }}</li>
-                            <li>{{ __('A target price per kilo, litre or piece') }}</li>
-                            <li>{{ __('Full price history, kept for as long as you subscribe') }}</li>
-                            <li>{{ __('Prices checked every :hours hours', ['hours' => $pro->recheckIntervalHours()]) }}</li>
-                            <li>{{ __('More alerts per hour') }}</li>
-                        </ul>
-
-                        @if ($onSale)
-                            <a href="{{ $proCtaHref }}" class="mt-8 inline-flex items-center rounded-full bg-ink px-5 py-3 text-base font-medium text-paper shadow-md hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:text-sm dark:shadow-none">
-                                {{ $proCtaLabel }}
-                            </a>
-                            @if (! $isPro && \App\Billing\ProPrice::hasYearly())
-                                <a href="{{ route('upgrade', ['interval' => 'yearly']) }}" class="mt-3 block text-sm font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">
-                                    {{ __('Pay yearly instead: :price', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}
-                                </a>
-                            @endif
-                        @else
-                            <p class="mt-8 inline-flex items-center rounded-full bg-ink/5 px-5 py-3 text-base font-medium text-zinc-500 ring-1 ring-line sm:text-sm dark:text-zinc-400">
-                                {{ __('Coming soon') }}
-                            </p>
-                        @endif
-                    </section>
+                <div>
+                    <h1 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Free to start. Pro for everything you buy.') }}</h1>
+                    <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-300">{{ __('Both plans alert you when a price drops. Pro compares every shop, checks more often, keeps every price, and can let AI help.') }}</p>
                 </div>
 
-                <p class="mt-8 max-w-[64ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
+                <div class="mt-12 max-w-5xl">
+                    <table class="w-full table-fixed border-separate border-spacing-0 text-left">
+                        <caption class="sr-only">{{ __('Free and Pro compared') }}</caption>
+                        <colgroup>
+                            <col class="w-[40%] sm:w-[46%]">
+                            <col class="w-[25%] sm:w-[22%]">
+                            <col class="w-[35%] sm:w-[32%]">
+                        </colgroup>
+                        <thead class="sticky top-16 z-10">
+                            <tr>
+                                <td class="border-b border-ink/10 bg-canvas/90 align-bottom backdrop-blur-sm dark:border-white/10">
+                                    <p class="pb-4 text-sm text-zinc-500 max-sm:hidden dark:text-zinc-400">{{ $trialNote }}</p>
+                                </td>
+                                <th scope="col" class="border-b border-ink/10 bg-canvas/90 px-3 py-4 align-top backdrop-blur-sm sm:px-6 dark:border-white/10">
+                                    <p class="text-base font-semibold">{{ __('Free') }}</p>
+                                    <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{{ $symbol }}0</p>
+                                    <a href="{{ $ctaHref }}" class="{{ $freeButton }} mt-3 max-sm:hidden">{{ $freeCtaLabel }}</a>
+                                </th>
+                                <th scope="col" class="rounded-t-2xl border-b border-ink/10 bg-soft-yellow/90 px-3 py-4 align-top backdrop-blur-sm sm:px-6 dark:border-white/10">
+                                    <p class="flex flex-wrap items-center gap-2 text-base font-semibold">
+                                        {{ __('Pro') }}
+                                        @if ($onSale && $trialDays > 0)
+                                            <span class="rounded-full bg-savings/15 px-2 py-0.5 text-xs font-medium text-savings-strong">{{ __(':days days free', ['days' => $trialDays]) }}</span>
+                                        @endif
+                                    </p>
+                                    <p class="mt-1 flex flex-wrap items-baseline gap-x-1"><span class="text-2xl font-semibold tracking-tight text-brand tabular-nums">{{ $price }}</span><span class="text-sm font-normal text-zinc-600 dark:text-zinc-400">/ {{ __('month') }}</span></p>
+                                    @if (\App\Billing\ProPrice::hasYearly())
+                                        <p class="text-sm font-normal text-zinc-600 dark:text-zinc-400">{{ __('or :price a year', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}</p>
+                                    @endif
+                                    @if ($onSale)
+                                        <a href="{{ $proCtaHref }}" class="{{ $proButton }} mt-3 max-sm:hidden">{{ $proCta }}</a>
+                                    @endif
+                                </th>
+                            </tr>
+                        </thead>
+                        @foreach ($sections as $section => $rows)
+                            <tbody>
+                                <tr>
+                                    <th scope="colgroup" class="pt-8 pb-3 text-sm font-medium whitespace-nowrap text-brand">{{ $section }}</th>
+                                    <td></td>
+                                    <td class="bg-soft-yellow/60"></td>
+                                </tr>
+                                @foreach ($rows as [$label, $hint, $freeValue, $proValue])
+                                    <tr>
+                                        <th scope="row" class="border-b border-ink/5 py-3.5 pr-4 text-base font-normal sm:text-sm dark:border-white/10">
+                                            <span class="text-ink">{{ $label }}</span>
+                                            <span class="mt-0.5 block text-sm text-zinc-500 max-sm:hidden dark:text-zinc-400">{{ $hint }}</span>
+                                        </th>
+                                        <td class="border-b border-ink/5 px-3 py-3.5 text-base sm:px-6 sm:text-sm dark:border-white/10">{!! $cell($freeValue, false) !!}</td>
+                                        <td class="border-b border-ink/5 bg-soft-yellow/60 px-3 py-3.5 text-base sm:px-6 sm:text-sm dark:border-white/10">
+                                            <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                {!! $cell($proValue, true) !!}
+                                                @isset($gains[$label])
+                                                    <span class="rounded-full bg-savings/15 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-savings-strong">{{ $gains[$label] }}</span>
+                                                @endisset
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        @endforeach
+                        <tfoot>
+                            <tr>
+                                <td class="pt-6 pr-4 align-top text-sm text-zinc-500 dark:text-zinc-400">{{ __('VAT included.') }}</td>
+                                <td class="px-3 pt-6 align-top sm:px-6"><a href="{{ $ctaHref }}" class="{{ $freeButton }}">{{ $freeCtaLabel }}</a></td>
+                                <td class="rounded-b-2xl bg-soft-yellow/60 px-3 pt-6 pb-6 align-top sm:px-6">
+                                    @if ($onSale)
+                                        <a href="{{ $proCtaHref }}" class="{{ $proButton }}">{{ $proCta }}</a>
+                                        @if (! $isPro && \App\Billing\ProPrice::hasYearly())
+                                            <a href="{{ route('upgrade', ['interval' => 'yearly']) }}" class="mt-3 block text-center text-sm font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">{{ __('Pay yearly instead: :price', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}</a>
+                                        @endif
+                                    @else
+                                        <p class="rounded-full bg-ink/5 px-3 py-2 text-center text-sm font-medium text-zinc-500">{{ __('Coming soon') }}</p>
+                                    @endif
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <p class="mt-10 max-w-[64ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
                     {{ __('If you go back to Free, nothing you follow is deleted or stopped. You keep everything you added. You just cannot add more until you are under the free limit again.') }}
                 </p>
+
             </main>
 
             <footer class="mx-auto w-full max-w-app px-6 pb-10 lg:px-8">
