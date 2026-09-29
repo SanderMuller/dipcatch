@@ -48,3 +48,21 @@ it('points a subscriber at their plan rather than at another upgrade', function 
     $this->get(route('pricing'))
         ->assertOk()->assertSee('Your plan')->assertDontSeeHtml(route('upgrade'));
 });
+
+it('labels only the plan the account is on as its plan', function (): void {
+    configureStripe();
+
+    $pro = User::factory()->create();
+    subscribeUser($pro);
+    $this->actingAs($pro);
+
+    // The Pro header, the Pro footer and the phone button: never the Free column.
+    expect(substr_count((string) $this->get(route('pricing'))->getContent(), 'Your plan'))->toBe(3);
+
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route('pricing'))
+        ->assertOk()
+        ->assertSee('Your plan')
+        ->assertSeeHtml(route('upgrade'));
+});

@@ -77,6 +77,8 @@
                         ? ($trialDays > 0 ? __(':days days free, then cancel any time.', ['days' => $trialDays]) : __('Cancel any time.'))
                         : __('Not on sale yet.');
                     $freeCtaLabel = $authed ? __('Your plan') : __('Start free');
+                    // A Pro subscriber is not on Free, so the Free column offers no button.
+                    $showFreeCta = ! $isPro;
                     $proCta = $isPro ? $proCtaLabel : ($trialDays > 0 ? __('Try Pro free') : $proCtaLabel);
                     // The Pro column is narrow on a phone, so its header button says less.
                     $proCtaShort = $trialDays > 0 ? __('Try free') : __('Get Pro');
@@ -121,17 +123,21 @@
                         <thead class="sticky top-16 z-10">
                             <tr>
                                 <td class="border-b border-ink/10 bg-canvas/90 align-bottom backdrop-blur-sm dark:border-white/10">
-                                    <p class="pb-4 text-sm text-zinc-500 max-sm:hidden dark:text-zinc-400">{{ $trialNote }}</p>
+                                    @unless ($isPro)
+                                        <p class="pb-4 text-sm text-zinc-500 max-sm:hidden dark:text-zinc-400">{{ $trialNote }}</p>
+                                    @endunless
                                 </td>
                                 <th scope="col" class="border-b border-ink/10 bg-canvas/90 px-3 py-4 align-top backdrop-blur-sm sm:px-6 dark:border-white/10">
                                     <p class="text-base font-semibold">{{ __('Free') }}</p>
                                     <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{{ $symbol }}0</p>
-                                    <a href="{{ $ctaHref }}" class="{{ $freeButton }} mt-3 max-sm:hidden">{{ $freeCtaLabel }}</a>
+                                    @if ($showFreeCta)
+                                        <a href="{{ $ctaHref }}" class="{{ $freeButton }} mt-3 max-sm:hidden">{{ $freeCtaLabel }}</a>
+                                    @endif
                                 </th>
                                 <th scope="col" class="rounded-t-2xl border-b border-ink/10 bg-soft-yellow/90 px-3 py-4 align-top backdrop-blur-sm sm:px-6 dark:border-white/10">
                                     <p class="flex flex-wrap items-center gap-2 text-base font-semibold">
                                         {{ __('Pro') }}
-                                        @if ($onSale && $trialDays > 0)
+                                        @if ($onSale && $trialDays > 0 && ! $isPro)
                                             <span class="rounded-full bg-savings/15 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-savings-strong">{{ __(':days days free', ['days' => $trialDays]) }}</span>
                                         @endif
                                     </p>
@@ -176,7 +182,7 @@
                         <tfoot>
                             <tr>
                                 <td class="pt-6 pr-4 align-top text-sm text-zinc-500 dark:text-zinc-400">{{ __('VAT included.') }}</td>
-                                <td class="px-3 pt-6 align-top sm:px-6"><a href="{{ $ctaHref }}" class="{{ $freeButton }} max-sm:hidden">{{ $freeCtaLabel }}</a></td>
+                                <td class="px-3 pt-6 align-top sm:px-6">@if ($showFreeCta)<a href="{{ $ctaHref }}" class="{{ $freeButton }} max-sm:hidden">{{ $freeCtaLabel }}</a>@endif</td>
                                 <td class="rounded-b-2xl bg-soft-yellow/60 px-3 pt-6 pb-6 align-top sm:px-6">
                                     {{-- On a phone the buttons sit full width under the table. --}}
                                     @if ($onSale)
@@ -199,7 +205,9 @@
                                 <a href="{{ route('upgrade', ['interval' => 'yearly']) }}" class="block text-center text-base font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">{{ __('Pay yearly instead: :price', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}</a>
                             @endif
                         @endif
-                        <a href="{{ $ctaHref }}" class="flex w-full items-center justify-center rounded-full bg-paper px-4 py-2.5 text-base font-medium text-ink ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{{ $freeCtaLabel }}</a>
+                        @if ($showFreeCta)
+                            <a href="{{ $ctaHref }}" class="flex w-full items-center justify-center rounded-full bg-paper px-4 py-2.5 text-base font-medium text-ink ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{{ $freeCtaLabel }}</a>
+                        @endif
                     </div>
                 </div>
 
