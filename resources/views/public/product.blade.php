@@ -2,8 +2,8 @@
     use App\Support\Favicon;
     use App\Support\MoneyFormatter;
 
-    // The live shop behind the figure the page leads with: the best value per
-    // unit, or the lowest price when the product compares no unit.
+    // The live shop behind the figure the page leads with: the best value, or
+    // the lowest price when the product compares no unit.
     // Never a listed shop the owner page would not crown, such as a trade-only price.
     $headlineShop = $headline->shop !== null && $shops->contains($headline->shop) ? $headline->shop : null;
     $perUnit = $headline->isPerUnit() && $headlineShop !== null && $headlineShop->is($headline->shop);
@@ -126,6 +126,9 @@
                             </p>
                         @elseif ($priceLine !== null)
                             <p class="mt-3 text-4xl font-semibold tracking-tight text-brand tabular-nums"><x-shop-price :shop="$headlineShop" /></p>
+                            @if ($headlineShop !== null && ($unitLine = $headline->unitLine()))
+                                <p class="mt-1 text-sm text-zinc-500 tabular-nums dark:text-zinc-400" data-test="public-unit-line">{{ $unitLine }}</p>
+                            @endif
                             @if ($headlineBundleLabel !== null)
                                 <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{{ $headlineBundleLabel }}</p>
                             @endif

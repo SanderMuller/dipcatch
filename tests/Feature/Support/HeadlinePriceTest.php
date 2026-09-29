@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\PriceDisplay;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Support\HeadlinePrice;
@@ -86,6 +87,8 @@ it('states no percentage when the lowest-price shop is outside the comparison', 
     // A box of twelve on a product compared per kilo: excluded, so it has no
     // unit price to set against the best value. Its own size still describes it.
     $product = Product::factory()->create(['currency' => 'EUR']);
+    // Per unit on purpose: this test is about the per-unit headline.
+    $product->forceFill(['price_display' => PriceDisplay::Unit])->save();
     headlineShop($product, 'ah.nl', '4.99', '660.00', 'g');
     headlineShop($product, 'jumbo.com', '5.49', '660.00', 'g');
     headlineShop($product, 'fitnesscandy.nl', '3.00', '12.00', 'piece');
@@ -121,4 +124,76 @@ it('keeps the last recorded price for a product with nothing to buy now', functi
 
     expect($headline->shop)->toBeNull()
         ->and($headline->text())->toBe('€4.79');
+});
+
+it('leads with the pack price while every shop sells the same pack, and states the unit price beneath', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    headlineShop($product, 'ah.nl', '3.99', '400.00', 'g');
+    headlineShop($product, 'jumbo.com', '4.29', '400.00', 'g');
+
+    $headline = headlineOf($product);
+
+    expect($headline->isPerUnit())->toBeFalse()
+        ->and($headline->text())->toBe('€3.99')
+        ->and($headline->shop?->host)->toBe('ah.nl')
+        ->and($headline->unitLine())->toBe('400 g · €9.98 /kg');
+});
+
+it('leads per unit once the shops sell different packs', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    headlineShop($product, 'ah.nl', '3.49', '150.00', 'g');
+    headlineShop($product, 'jumbo.com', '4.99', '250.00', 'g');
+
+    $headline = headlineOf($product);
+
+    expect($headline->isPerUnit())->toBeTrue()
+        ->and($headline->shop?->host)->toBe('jumbo.com')
+        ->and($headline->unitLine())->toBeNull();
+});
+
+it('follows the person\'s choice either way, and falls back to the pack price when nothing compares per unit', function (): void {
+    $different = Product::factory()->create(['currency' => 'EUR', 'price_display' => PriceDisplay::Pack]);
+    headlineShop($different, 'ah.nl', '3.49', '150.00', 'g');
+    headlineShop($different, 'jumbo.com', '4.99', '250.00', 'g');
+
+    $same = Product::factory()->create(['currency' => 'EUR', 'price_display' => PriceDisplay::Unit]);
+    headlineShop($same, 'ah.nl', '3.99', '400.00', 'g');
+
+    $noSize = Product::factory()->create(['currency' => 'EUR', 'price_display' => PriceDisplay::Unit]);
+    headlineShop($noSize, 'ah.nl', '3.99', null, null);
+
+    expect(headlineOf($different)->isPerUnit())->toBeFalse()
+        ->and(headlineOf($different)->text())->toBe('€3.49')
+        ->and(headlineOf($same)->isPerUnit())->toBeTrue()
+        ->and(headlineOf($same)->text())->toBe('€9.98 /kg')
+        ->and(headlineOf($noSize)->isPerUnit())->toBeFalse()
+        ->and(headlineOf($noSize)->unitLine())->toBeNull();
+});
+
+it('leads with the best value\'s pack price when a shop outside the comparison is cheaper to buy', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    headlineShop($product, 'ah.nl', '4.99', '660.00', 'g');
+    headlineShop($product, 'jumbo.com', '5.49', '660.00', 'g');
+    headlineShop($product, 'fitnesscandy.nl', '3.00', '12.00', 'piece');
+
+    $headline = headlineOf($product);
+
+    expect($headline->isPerUnit())->toBeFalse()
+        ->and($headline->shop?->host)->toBe('ah.nl')
+        ->and($headline->text())->toBe('€4.99')
+        ->and($headline->unitLine())->toBe('660 g · €7.56 /kg')
+        ->and($headline->lowestShop?->host)->toBe('fitnesscandy.nl')
+        ->and($headline->comparesPerUnit())->toBeTrue()
+        ->and($headline->comparisonUnit())->toBe('g');
+});
+
+it('does not lead with a cheaper shop whose size is only estimated, nor print that size as fact', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    headlineShop($product, 'ah.nl', '3.99', '400.00', 'g');
+    headlineShop($product, 'jumbo.com', '3.50', null, null);
+
+    $headline = headlineOf($product);
+
+    expect($headline->shop?->host)->toBe('ah.nl')
+        ->and($headline->unitLine())->toBe('400 g · €9.98 /kg');
 });

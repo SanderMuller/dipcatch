@@ -104,6 +104,10 @@ final readonly class ProductMarkdown
         } else {
             $lines = [...$lines, '', '## ' . __('Best price now'), ''];
             $lines[] = self::sharedPrice($headlineShop) . ' ' . __('at') . ' ' . self::link($headlineShop);
+
+            if (($unitLine = $headline->unitLine()) !== null) {
+                $lines = [...$lines, '', $unitLine];
+            }
         }
 
         $lines[] = '';
@@ -142,9 +146,11 @@ final readonly class ProductMarkdown
         $shop = $headline->shop;
 
         if (! $headline->isPerUnit()) {
+            $unitLine = $headline->unitLine();
+
             return ['', '## ' . __('Best price now'), '', $shop === null
                 ? $headline->text()
-                : self::price($shop) . ' ' . __('at') . ' ' . self::link($shop)];
+                : self::price($shop) . ' ' . __('at') . ' ' . self::link($shop), ...($unitLine === null ? [] : ['', $unitLine])];
         }
 
         $lines = ['', '## ' . __('Best value'), ''];

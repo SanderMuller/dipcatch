@@ -4,6 +4,7 @@ namespace App\Livewire\Products;
 
 use App\Actions\Products\CategoriseProduct;
 use App\Enums\CategorySource;
+use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
 use App\Models\Product;
 use App\Models\Shop;
@@ -51,6 +52,9 @@ final class EditProduct extends Component
 
     public bool $active = true;
 
+    /** `pack`, `unit`, or empty for the automatic choice. */
+    public string $priceDisplay = '';
+
     /** A `ProductCategory` value, or empty for no category. */
     public string $category = '';
 
@@ -84,6 +88,7 @@ final class EditProduct extends Component
         // The column keeps four decimals, which the form would show as 7.0000.
         $this->unitPriceTarget = $product->unit_price_target === null ? null : Numeric::trimmed((string) $product->unit_price_target);
         $this->active = $product->active;
+        $this->priceDisplay = $product->price_display->value ?? '';
         $this->category = $product->category->value ?? '';
         $this->loadedCategory = $this->category;
         $this->suggestedCategory = $this->category === '' ? ($product->suggested_category->value ?? null) : null;
@@ -109,6 +114,7 @@ final class EditProduct extends Component
             // value cannot be set at all.
             'unitPriceTarget' => FluentRule::numeric('Target price per kilo, litre or piece')->nullable()->min(0.0001),
             'category' => FluentRule::string('Category')->nullable()->in(ProductCategory::values()),
+            'priceDisplay' => FluentRule::string('Show the price as')->nullable()->in(PriceDisplay::class),
         ];
     }
 
@@ -167,6 +173,7 @@ final class EditProduct extends Component
             // not silently throw the number away.
             'unit_price_target' => $this->blankToNull($this->unitPriceTarget),
             'active' => $this->active,
+            'price_display' => PriceDisplay::tryFrom($this->priceDisplay),
         ])->save();
 
         $this->redirectRoute('app.products.show', $this->product, navigate: true);
@@ -291,6 +298,7 @@ final class EditProduct extends Component
                 ? $guide->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs, $packChoices)
                 : null,
             'unitHistory' => $guide->history(),
+            'comparisonUnit' => $this->product->comparablePacks()->unit(),
             ...$this->alertAnchors(),
         ]);
     }

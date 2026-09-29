@@ -28,8 +28,9 @@ final readonly class ProductPresenter
             'title' => $product->title,
             'currency' => $product->currency,
             // The figure the app leads with, so an assistant states the one a
-            // person sees: the best value per unit while the product compares
-            // per unit, else the lowest pack price.
+            // person sees: per unit once the shops sell different packs or the
+            // person chose it, else the pack price. `best_value_unit_price`
+            // below keeps the per-unit figure either way.
             'headline_price' => $headline->isPerUnit() ? $headline->unitPrice() : $headline->packPrice(),
             'headline_unit' => $headline->unit,
             'headline_price_basis' => $headline->isPerUnit() ? 'unit' : 'pack',

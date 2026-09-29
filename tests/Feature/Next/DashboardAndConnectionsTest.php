@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\PriceDisplay;
 use App\Livewire\Connections\ConnectionsPage;
 use App\Livewire\Dashboard;
 use App\Models\PriceDropEvent;
@@ -110,6 +111,8 @@ it('discloses bundle terms beside dashboard effective prices', function (): void
         'last_notified_price' => '2.75',
         'last_notified_at' => now(),
     ]);
+    // Per unit on purpose: this test is about the per-unit headline.
+    $product->forceFill(['price_display' => PriceDisplay::Unit])->save();
     $shop = Shop::factory()->for($product)->create([
         'url' => 'https://jumbo.com/producten/fanta-cassis',
         'current_price' => '2.00',

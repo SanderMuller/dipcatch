@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Actions\Drops\DetectDrop;
 use App\Enums\CategorySource;
+use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
 use App\Enums\ShopHealth;
 use App\Enums\TrackingIdea;
@@ -32,6 +33,7 @@ use Illuminate\Support\Facades\DB;
  * @property CategorySource|null $category_set_by
  * @property ProductCategory|null $suggested_category
  * @property TrackingIdea|null $tracking_idea
+ * @property PriceDisplay|null $price_display
  * @property CarbonImmutable|null $history_kept_from
  * @property CarbonImmutable|null $listed_at
  * @property CarbonImmutable|null $list_checked_at
@@ -92,6 +94,7 @@ final class Product extends Model
             'category_set_by' => CategorySource::class,
             'suggested_category' => ProductCategory::class,
             'tracking_idea' => TrackingIdea::class,
+            'price_display' => PriceDisplay::class,
         ];
     }
 

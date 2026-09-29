@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Enums\PackExclusion;
+use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
@@ -72,6 +73,8 @@ it('links each tracked shop to a prefilled problem report', function (): void {
 it('discloses bundle terms in headline and shop row', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user, cheapestPrice: '2.00');
+    // Per unit on purpose: this test is about the per-unit headline.
+    $product->forceFill(['price_display' => PriceDisplay::Unit])->save();
     $shop = Shop::factory()->for($product)->create([
         'url' => 'https://jumbo.com/p/fanta',
         'current_price' => '2.00',
@@ -101,6 +104,8 @@ it('discloses bundle terms in headline and shop row', function (): void {
 it('shows how far a deal puts the best value below the regular price', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user, cheapestPrice: '2.00');
+    // Per unit on purpose: this test is about the per-unit headline.
+    $product->forceFill(['price_display' => PriceDisplay::Unit])->save();
     $shop = Shop::factory()->for($product)->create([
         'url' => 'https://jumbo.com/p/fanta',
         'current_price' => '2.00',
@@ -922,6 +927,8 @@ it('leads with the pack price when no shop states a pack size', function (): voi
 it('leads each shop row with its price per unit, and an excluded shop with its reason', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user);
+    // Per unit on purpose: this test is about the per-unit headline.
+    $product->forceFill(['price_display' => PriceDisplay::Unit])->save();
     Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
     Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '5.49', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
     Shop::factory()->for($product)->create(['url' => 'https://fitnesscandy.nl/p/1', 'current_price' => '3.00', 'pack_quantity' => '12.00', 'pack_unit' => 'piece']);

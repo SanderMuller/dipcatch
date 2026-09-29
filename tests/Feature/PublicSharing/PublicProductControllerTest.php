@@ -2,6 +2,7 @@
 
 use App\Enums\ConsumerPriceIssue;
 use App\Enums\PackExclusion;
+use App\Enums\PriceDisplay;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
@@ -43,6 +44,8 @@ test('happy path: valid slug renders product summary + shop list', function (): 
 
 test('bundle price always shows quantity total and single-item price', function (): void {
     $product = makeSharedProduct(['cheapest_price' => '2.00']);
+    // Per unit on purpose: this test is about the per-unit headline.
+    $product->forceFill(['price_display' => PriceDisplay::Unit])->save();
     Shop::factory()->for($product)->create([
         'url' => 'https://jumbo.com/p/fanta',
         'current_price' => '2.00',
@@ -577,6 +580,8 @@ test('an estimated size is marked on the public page', function (): void {
 
 test('a trade-only price wins neither answer on the public page', function (): void {
     $product = makeSharedProduct();
+    // Per unit on purpose: this test is about the per-unit headline.
+    $product->forceFill(['price_display' => PriceDisplay::Unit])->save();
     Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/chips', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
     Shop::factory()->for($product)->create([
         'url' => 'https://wholesale.test/p/chips',
@@ -615,6 +620,8 @@ test('sold-out sized shops still give the public page its unit', function (): vo
 
 test('the public chart plots the best value per unit, and falls back to the pack price for a history in another unit', function (): void {
     $perKilo = makeSharedProduct();
+    // Per unit on purpose: this test is about the per-unit headline.
+    $perKilo->forceFill(['price_display' => PriceDisplay::Unit])->save();
     $shop = Shop::factory()->for($perKilo)->create(['url' => 'https://ah.nl/p/chips', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
     ProductCheapestHistory::factory()->for($perKilo)->create(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'started_at' => now()->subDays(5), 'ended_at' => null]);
 
@@ -624,6 +631,7 @@ test('the public chart plots the best value per unit, and falls back to the pack
 
     $perKilo->forceFill(['share_slug' => null])->save();
     $perPiece = makeSharedProduct();
+    $perPiece->forceFill(['price_display' => PriceDisplay::Unit])->save();
     $pieces = Shop::factory()->for($perPiece)->create(['url' => 'https://ah.nl/p/bars', 'current_price' => '4.99', 'pack_quantity' => '12.00', 'pack_unit' => 'piece']);
     ProductCheapestHistory::factory()->for($perPiece)->create(['cheapest_shop_id' => $pieces->id, 'cheapest_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g', 'started_at' => now()->subDays(5), 'ended_at' => null]);
 
@@ -700,4 +708,18 @@ test('shows only a picture one of the shops reported, never an address the owner
         ->assertOk()
         ->assertSeeHtml('<meta property="og:image" content="https://static.shop.example/headphones.png">')
         ->assertSeeHtml('referrerpolicy="no-referrer"');
+});
+
+test('a pack-price headline still marks the best value and states the price per unit', function (): void {
+    $product = makeSharedProduct(['cheapest_price' => '3.99']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/pizza', 'current_price' => '3.99', 'pack_quantity' => '400.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/pizza', 'current_price' => '4.29', 'pack_quantity' => '400.00', 'pack_unit' => 'g']);
+    $product->recomputeCheapestShop();
+
+    $this->get('/p/' . str_repeat('a', 32))
+        ->assertOk()
+        ->assertSeeHtml('data-test="public-unit-line"')
+        ->assertSee('400 g · €9.98 /kg')
+        ->assertSee('Best value')
+        ->assertSee('Cheapest across 2 shops tracked.');
 });

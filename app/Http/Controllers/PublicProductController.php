@@ -40,12 +40,12 @@ final class PublicProductController extends Controller
                 'product' => $product,
                 'image' => $this->publicImage($product),
                 'shops' => $shops,
-                'chart' => $this->chartPayload($product, $headline->unit),
+                'chart' => $this->chartPayload($product, $headline->comparisonUnit()),
                 'headline' => $headline,
                 'packs' => $headline->packs,
                 // The two answers the app gives, on the app's own rules: the
                 // per-unit winner, and the smallest outlay.
-                'bestValueShopId' => $headline->isPerUnit() ? $headline->shop?->id : null,
+                'bestValueShopId' => $headline->bestValue?->id,
                 'lowestShopId' => $headline->lowestShop->id ?? $headline->shop?->id,
             ])
             ->header('X-Robots-Tag', 'noindex, nofollow');
@@ -79,7 +79,7 @@ final class PublicProductController extends Controller
     {
         /** @var Product $product */
         $product = Product::query()
-            ->select(['id', 'title', 'image_url', 'currency', 'cheapest_price', 'share_slug'])
+            ->select(['id', 'title', 'image_url', 'currency', 'cheapest_price', 'share_slug', 'price_display'])
             ->where('share_slug', $slug)
             ->firstOrFail();
 

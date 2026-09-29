@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Enums\CategorySource;
+use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
 use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
@@ -245,6 +246,8 @@ it('shows the cheapest price and each shop that sells it', function (): void {
 it('discloses bundle quantity beside the effective price', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'cheapest_price' => '2.00']);
+    // Per unit on purpose: this test is about the per-unit headline.
+    $product->forceFill(['price_display' => PriceDisplay::Unit])->save();
     $shop = Shop::factory()->for($product)->create([
         'current_price' => '2.00',
         'single_item_price' => '2.85',
@@ -471,8 +474,11 @@ it('states a per-unit drop in its unit, not beside a pack price it was not measu
 
     $card = withoutCardDetails(livewire(ProductList::class)->html());
 
+    // A pack headline now: the per-unit drop states its old figure beside
+    // the price per kilo, never as a struck pack price.
     expect($card)->not->toContain('<del')
-        ->toMatch('/€8\.45 \/kg.*Was €12\.50 \/kg/s')
+        ->toContain('€1.69')
+        ->toMatch('/200 g · €8\.45 \/kg.*· was €12\.50 \/kg/s')
         ->not->toContain('€6.25');
 });
 
@@ -481,6 +487,8 @@ it('shows no drop for a pack-price alert on a product that now compares per unit
     // Alerted on the pack price before the product had a pack size; now it
     // leads per kilo, and "Was €2.19" beside "€8.45 /kg" would compare two things.
     $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Crisps', 'cheapest_price' => '1.69', 'last_notified_price' => '1.69', 'last_notified_at' => now()]);
+    // Per unit on purpose: this test is about the per-unit headline.
+    $product->forceFill(['price_display' => PriceDisplay::Unit])->save();
     Shop::factory()->for($product)->create(['current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
     $product->forceFill(['best_value_price' => '1.69', 'best_value_pack_quantity' => '200.00', 'best_value_pack_unit' => 'g'])->save();
     PriceDropEvent::factory()->create([
@@ -765,6 +773,8 @@ it('names the deal of the lowest-price shop in its note', function (): void {
 it('shows the full discount and every shop on hover', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'title' => 'Crisps', 'last_notified_price' => '8.45', 'last_notified_at' => now()]);
+    // Per unit on purpose: this test is about the per-unit headline.
+    $product->forceFill(['price_display' => PriceDisplay::Unit])->save();
     Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
     Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '2.00', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'single_item_price' => '2.85', 'bundle_quantity' => 2, 'bundle_total_price' => '4.00']);
     Shop::factory()->for($product)->create(['url' => 'https://plus.nl/p/1', 'current_price' => '2.29', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'current_in_stock' => false]);

@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Drops\DetectTargetPrice;
+use App\Enums\PriceDisplay;
 use App\Mcp\Servers\DipCatchServer;
 use App\Mcp\Tools\SetThresholdTool;
 use App\Models\Product;
@@ -309,6 +310,24 @@ test('the alert leads with the pack price that fired and names a better buy per 
         return $notification->toWebPush($user)->toArray()['body']
                 === 'Crisps is €1.69 for 200 g at ah.nl · your target €1.75 · €8.45 /kg · better value €5.38 /kg at lidl.nl'
             && $payload['unit_price'] === '8.4500'
+            && $payload['unit'] === 'g'
+            && $payload['better_value_host'] === 'lidl.nl';
+    });
+});
+
+test('the alert keeps the price per unit and the better buy when the product leads with its pack price', function (): void {
+    $user = User::factory()->create(['notify_via_filament' => true]);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Crisps', 'target_price' => '1.75', 'price_display' => PriceDisplay::Pack]);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://lidl.nl/p/1', 'current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g']);
+    $product->recomputeCheapestShop();
+
+    app(DetectTargetPrice::class)($product->refresh());
+
+    Notification::assertSentTo($user, TargetPriceNotification::class, function (TargetPriceNotification $notification) use ($user): bool {
+        $payload = $notification->toDatabase($user);
+
+        return $payload['unit_price'] === '8.4500'
             && $payload['unit'] === 'g'
             && $payload['better_value_host'] === 'lidl.nl';
     });

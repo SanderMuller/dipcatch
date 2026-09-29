@@ -66,13 +66,14 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
         // and the dearest per kilo.
         $headline = HeadlinePrice::of($product);
         $packSize = $headline->packs->for($shop)->size ?? $shop->packSize();
-        $betterValue = $headline->isPerUnit() && $headline->shop?->isNot($shop) === true ? $headline->shop : null;
+        // Whichever price the product leads with: the comparison stays per unit.
+        $betterValue = $headline->bestValue?->isNot($shop) === true ? $headline->bestValue : null;
         // A figure per unit only on a size the shop's own page states, while
         // the product compares per unit at all: an estimated size is not a fact.
-        $comparable = $headline->isPerUnit() && $headline->packs->for($shop)?->canWin() === true;
+        $comparable = $headline->comparesPerUnit() && $headline->packs->for($shop)?->canWin() === true;
         // The unit also names the better-value figure, so it is kept whenever
         // the product compares per unit.
-        $this->snapshotUnit = $headline->unit;
+        $this->snapshotUnit = $headline->comparisonUnit();
         $this->snapshotUnitPrice = $comparable ? $headline->packs->unitPriceOf($shop) : null;
         $this->snapshotTargetPrice = $product->target_price === null ? null : (string) $product->target_price;
         $this->snapshotPackQuantity = $packSize === null ? null : (string) $packSize->quantity;

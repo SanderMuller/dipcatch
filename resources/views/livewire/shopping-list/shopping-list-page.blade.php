@@ -117,6 +117,7 @@
                             @php($product = $item['product'])
                             @php($deal = \App\Support\PromotionLabel::runningDeal($item['shop']))
                             @php($packLine = $item['shop'] === null || ! $item['headline']->isPerUnit() ? null : $item['headline']->packLine())
+                            @php($unitLine = $item['shop'] === null ? null : $item['headline']->unitLine())
                             <li
                                 wire:key="shopping-item-{{ $product->id }}"
                                 @class([
@@ -157,10 +158,12 @@
                                             >{{ __('Go to :host too', ['host' => $item['skippedBest']->host]) }}</button>
                                         </p>
                                     @endif
-                                    @if (! $item['crossedOff'] && ($packLine !== null || $deal !== null))
+                                    @if (! $item['crossedOff'] && ($packLine !== null || $unitLine !== null || $deal !== null))
                                         <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-500 dark:text-zinc-400 print:text-[9pt] print:text-zinc-700">
                                             @if ($packLine !== null)
                                                 <span class="tabular-nums">{{ \App\Support\PackLine::format($packLine->price, $packLine->shop->currency, $packLine->size) }}</span>
+                                            @elseif ($unitLine !== null)
+                                                <span class="tabular-nums">{{ $unitLine }}</span>
                                             @endif
                                             @if ($deal !== null)
                                                 <span class="rounded-full bg-savings/10 px-1.5 py-px font-medium text-savings-strong print:bg-transparent print:p-0 print:font-semibold print:text-black">{{ $deal }}</span>

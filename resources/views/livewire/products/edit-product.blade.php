@@ -65,6 +65,17 @@
                     </div>
                 @endif
 
+                {{-- Only when a price per unit exists to show. Without a pack
+                     size on any shop there is nothing to choose between. --}}
+                @if ($comparisonUnit !== null)
+                    <flux:select wire:model="priceDisplay" :label="__('Show the price as')" data-test="product-price-display"
+                        :description="__('Shops are always compared on the price :unit.', ['unit' => \App\Support\UnitWord::forCode($comparisonUnit)])">
+                        <flux:select.option value="">{{ __('Automatic: the pack price, or the price :unit once the shops sell different packs', ['unit' => \App\Support\UnitWord::forCode($comparisonUnit)]) }}</flux:select.option>
+                        <flux:select.option value="pack">{{ __('The pack price') }}</flux:select.option>
+                        <flux:select.option value="unit">{{ __('The price :unit', ['unit' => \App\Support\UnitWord::forCode($comparisonUnit)]) }}</flux:select.option>
+                    </flux:select>
+                @endif
+
                 <flux:input wire:model="imageUrl" :label="__('Image URL')" type="url" placeholder="https://…" />
 
                 @if ($shopImages !== [])

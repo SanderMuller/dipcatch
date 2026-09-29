@@ -94,6 +94,9 @@
                                 @if ($headline->isPerUnit())
                                     <x-pack-line :line="$headline->packLine()" :bundle="false" />
                                     <span aria-hidden="true">·</span>
+                                @elseif ($unitLine = $headline->unitLine())
+                                    <span class="tabular-nums" data-test="headline-unit-line">{{ $unitLine }}</span>
+                                    <span aria-hidden="true">·</span>
                                 @endif
                                 <x-shop-link :shop="$headlineShop" />
                             </dd>
@@ -276,9 +279,9 @@
                                             @else
                                                 <x-shop-unit-price :shop="$shop" :packs="$packs" />
                                             @endif
-                                            {{-- The shop the headline above names, marked in the row so
-                                                 the table and the card never disagree. --}}
-                                            @if ($headline->isPerUnit() && $headlineShop?->id === $shop->id && $shops->count() > 1)
+                                            {{-- The per-unit winner, marked in the row whichever price the
+                                                 headline leads with: the table is sorted per unit. --}}
+                                            @if ($headline->bestValue?->id === $shop->id && $shops->count() > 1)
                                                 <span class="rounded-full bg-savings/10 px-2 py-0.5 text-xs font-medium text-savings-strong" data-test="best-value-chip">{{ __('Best value') }}</span>
                                             @endif
                                         </div>

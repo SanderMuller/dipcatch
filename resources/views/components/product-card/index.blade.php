@@ -99,6 +99,14 @@
             <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">
                 <x-pack-line :line="$packLine" :bundle="false" />@if ($regularUnit = $headline->regularUnitPrice()) · {{ __('regular') }} <del title="{{ __('Regular price') }}" class="decoration-1">{{ \App\Support\MoneyFormatter::unitPrice($regularUnit, $headline->currency()) }} {{ \App\Support\UnitWord::labelFor($headline->unit) }}</del>@endif
             </flux:text>
+        @elseif ($unitLine = $headline->unitLine())
+            {{-- Under a pack price, what it comes to per kilo, litre or piece.
+                 A drop measured per unit states its old figure here, in its
+                 own unit: its old pack price may be another pack's. --}}
+            @php($unitDrop = $product->activeDropPercent() > 0 ? $product->activeDrop() : null)
+            <flux:text size="sm" class="text-zinc-500 tabular-nums dark:text-zinc-400" data-test="card-unit-line">
+                {{ $unitLine }}@if ($unitDrop?->comparison_unit !== null && $unitDrop->comparison_unit === $headline->packs->unit() && $unitDrop->reference_unit_price !== null) · {{ __('was :price', ['price' => \App\Support\MoneyFormatter::unitPrice((string) $unitDrop->reference_unit_price, $unitDrop->currency) . ' ' . \App\Support\UnitWord::labelFor($unitDrop->comparison_unit)]) }}@endif
+            </flux:text>
         @endif
 
         {{-- The deal behind the figure, in the shop's words: a bundle, or a

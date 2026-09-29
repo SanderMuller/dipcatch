@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Enums\CategorySource;
+use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
 use App\Enums\ShopHealth;
 use App\Enums\TrackingIdea;
@@ -884,4 +885,35 @@ it('forgets the checklist item Jev picked once the product is renamed, and keeps
     livewire(EditProduct::class, ['product' => $product->fresh()])->set('title', 'Pickwick Engelse melange')->call('save');
 
     expect($product->fresh()?->tracking_idea)->toBeNull();
+});
+
+it('saves how the price shows, and offers the choice only when a price per unit exists', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id]);
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product])->assertDontSeeHtml('data-test="product-price-display"');
+
+    Shop::factory()->for($product)->create(['current_price' => '3.99', 'pack_quantity' => '400.00', 'pack_unit' => 'g']);
+
+    livewire(EditProduct::class, ['product' => $product->fresh()])
+        ->assertSeeHtml('data-test="product-price-display"')
+        ->assertSee('The price per kilo')
+        ->set('priceDisplay', 'unit')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($product->fresh()?->price_display)->toBe(PriceDisplay::Unit);
+
+    livewire(EditProduct::class, ['product' => $product->fresh()])
+        ->assertSet('priceDisplay', 'unit')
+        ->set('priceDisplay', '')
+        ->call('save');
+
+    expect($product->fresh()?->price_display)->toBeNull();
+
+    livewire(EditProduct::class, ['product' => $product->fresh()])
+        ->set('priceDisplay', 'sideways')
+        ->call('save')
+        ->assertHasErrors('priceDisplay');
 });

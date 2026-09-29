@@ -169,3 +169,13 @@ it('prints a title as text, not as a link or other markup', function (): void {
         ->toStartWith("# \\[Click here\\]\\(https://evil.test\\) \\*now\\* \\\\ \\#1\n")
         ->not->toContain('[Click here](');
 });
+
+it('states the pack and its price per unit under a pack-price headline', function (): void {
+    $user = User::factory()->create();
+    $product = markdownProduct($user, 'Pizza');
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '3.99', 'pack_quantity' => '400.00', 'pack_unit' => 'g', 'current_in_stock' => true]);
+    $product->recomputeCheapestShop();
+
+    expect($this->actingAs($user)->get(route('app.products.markdown', $product))->getContent())
+        ->toContain("## Best price now\n\n€3.99 at [ah.nl](<https://ah.nl/p/1>)\n\n400 g · €9.98 /kg");
+});
