@@ -11,6 +11,7 @@ use App\Billing\PlanLimits;
 use App\Charts\PriceHistorySeries;
 use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
+use App\Livewire\ShoppingList\HeaderMenu;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -172,6 +173,10 @@ final class ProductShow extends Component
     #[On('shop-added')]
     public function refreshShops(): void {}
 
+    /** A change made in the header menu; Livewire rehydrates `$product` from the row. */
+    #[On('shopping-list-changed')]
+    public function refreshList(): void {}
+
     public function togglePaused(): void
     {
         $this->authorize('update', $this->product);
@@ -196,7 +201,7 @@ final class ProductShow extends Component
             Flux::toast(text: __('Added to your shopping list.'));
         }
 
-        $this->dispatch('shopping-list-changed');
+        $this->dispatch('shopping-list-changed')->to(HeaderMenu::class);
     }
 
     /**

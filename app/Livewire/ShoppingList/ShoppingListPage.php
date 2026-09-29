@@ -8,6 +8,7 @@ use App\Support\ShoppingList;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -30,6 +31,10 @@ final class ShoppingListPage extends Component
     #[Url(except: [])]
     public array $skip = [];
 
+    /** A change made in the header menu. */
+    #[On('shopping-list-changed')]
+    public function refreshList(): void {}
+
     public function toggleShop(mixed $host): void
     {
         if (! is_string($host) || $host === '' || mb_strlen($host) > 255) {
@@ -49,7 +54,7 @@ final class ShoppingListPage extends Component
 
         $product->setCrossedOff(crossedOff: ! $product->isCrossedOff());
 
-        $this->dispatch('shopping-list-changed');
+        $this->dispatch('shopping-list-changed')->to(HeaderMenu::class);
     }
 
     public function remove(mixed $productId): void
@@ -58,7 +63,7 @@ final class ShoppingListPage extends Component
         $product->removeFromShoppingList();
 
         Flux::toast(text: __(':title is off the list.', ['title' => $product->title]));
-        $this->dispatch('shopping-list-changed');
+        $this->dispatch('shopping-list-changed')->to(HeaderMenu::class);
     }
 
     public function clearCrossedOff(): void
@@ -69,7 +74,7 @@ final class ShoppingListPage extends Component
         // Closed only once the clear went through; the trigger it came from is
         // gone, so focus goes to the heading.
         $this->js("\$flux.modal('clear-crossed-off').close(); document.getElementById('shopping-list-heading')?.focus()");
-        $this->dispatch('shopping-list-changed');
+        $this->dispatch('shopping-list-changed')->to(HeaderMenu::class);
     }
 
     public function render(): View

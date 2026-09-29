@@ -7,6 +7,7 @@ use App\Billing\PlanLimits;
 use App\Billing\ProPrice;
 use App\Enums\ProductCategory;
 use App\Enums\ProductDepartment;
+use App\Livewire\ShoppingList\HeaderMenu;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -20,6 +21,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -169,6 +171,10 @@ final class ProductList extends Component
         }
     }
 
+    /** A change made in the header menu, so a card does not say "On list" for a removed product. */
+    #[On('shopping-list-changed')]
+    public function refreshList(): void {}
+
     /**
      * The card's shopping-list button. Only this account's products: a value
      * that is not a UUID answers 404 before any query, as Postgres would
@@ -191,7 +197,7 @@ final class ProductList extends Component
             Flux::toast(text: __(':title is on your shopping list.', ['title' => $product->title]));
         }
 
-        $this->dispatch('shopping-list-changed');
+        $this->dispatch('shopping-list-changed')->to(HeaderMenu::class);
     }
 
     public function render(): View

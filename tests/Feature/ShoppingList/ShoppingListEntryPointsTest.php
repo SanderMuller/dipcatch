@@ -4,6 +4,7 @@ use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\ShoppingList\HeaderMenu;
+use App\Livewire\ShoppingList\ShoppingListPage;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -220,4 +221,62 @@ it('keeps the dashboard cards to a plain label, with no list button', function (
     $this->actingAs($user);
 
     livewire(Dashboard::class)->assertDontSeeHtml('data-test="card-list-toggle"');
+});
+
+it('crosses an item off from the header and keeps it there to undo', function (): void {
+    $user = User::factory()->create();
+    $coffee = entryPointProduct($user, 'Coffee', ['listed_at' => now()]);
+
+    $this->actingAs($user);
+
+    $menu = livewire(HeaderMenu::class)
+        ->call('toggleCrossedOff', (string) $coffee->id)
+        ->assertDispatched('shopping-list-changed')
+        ->assertSee('Coffee')
+        ->assertSeeHtml('aria-label="Put Coffee back on the list"')
+        ->assertDontSeeHtml('data-test="shopping-list-badge"');
+
+    expect($coffee->refresh()->isCrossedOff())->toBeTrue();
+
+    $menu->call('toggleCrossedOff', (string) $coffee->id)
+        ->assertSeeHtml('aria-label="Cross off Coffee"')
+        ->assertSeeHtml('data-test="shopping-list-badge"');
+
+    expect($coffee->refresh()->isCrossedOff())->toBeFalse();
+});
+
+it('removes an item from the header', function (): void {
+    $user = User::factory()->create();
+    $coffee = entryPointProduct($user, 'Coffee', ['listed_at' => now()]);
+
+    $this->actingAs($user);
+
+    livewire(HeaderMenu::class)
+        ->call('remove', (string) $coffee->id)
+        ->assertDispatched('shopping-list-changed')
+        ->assertSee('Nothing on your list yet.');
+
+    expect($coffee->refresh()->isOnShoppingList())->toBeFalse();
+});
+
+it('will not change another account\'s list from the header', function (string $action): void {
+    $theirs = Product::factory()->listed()->create();
+
+    $this->actingAs(User::factory()->create());
+
+    livewire(HeaderMenu::class)->call($action, (string) $theirs->id)->assertNotFound();
+    livewire(HeaderMenu::class)->call($action, 'not-a-uuid')->assertNotFound();
+
+    expect($theirs->refresh()->isOnShoppingList())->toBeTrue()
+        ->and($theirs->isCrossedOff())->toBeFalse();
+})->with(['toggleCrossedOff', 'remove']);
+
+it('updates the list page when the header changes the list', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $page = livewire(ShoppingListPage::class)->assertDontSee('Coffee');
+    entryPointProduct($user, 'Coffee', ['listed_at' => now()]);
+
+    $page->dispatch('shopping-list-changed')->assertSee('Coffee');
 });

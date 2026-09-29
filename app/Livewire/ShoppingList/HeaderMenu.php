@@ -2,12 +2,17 @@
 
 namespace App\Livewire\ShoppingList;
 
+use App\Livewire\Products\ProductList;
+use App\Livewire\Products\ProductShow;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Support\HeadlinePrice;
 use App\Support\ShoppingList;
+use Flux\Flux;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -22,11 +27,54 @@ final class HeaderMenu extends Component
     private const int LIMIT = 8;
 
     /**
+     * Items crossed off from this menu. They stay in it, struck through, so a
+     * mis-tap can be undone where it happened; the next page starts without.
+     *
+     * @var list<string>
+     */
+    public array $crossedHere = [];
+
+    /**
      * Another tab and a price check change the list too; the poll in the
      * view catches those. This catches the changes made on this page.
      */
     #[On('shopping-list-changed')]
     public function refreshList(): void {}
+
+    public function toggleCrossedOff(mixed $productId): void
+    {
+        $product = $this->ownProduct($productId);
+        $crossOff = ! $product->isCrossedOff();
+
+        $product->setCrossedOff($crossOff);
+
+        $id = (string) $product->id;
+        $this->crossedHere = $crossOff
+            ? array_values(array_unique([...$this->crossedHere, $id]))
+            : array_values(array_diff($this->crossedHere, [$id]));
+
+        $this->announceChange();
+    }
+
+    public function remove(mixed $productId): void
+    {
+        $product = $this->ownProduct($productId);
+        $product->removeFromShoppingList();
+
+        Flux::toast(text: __(':title is off the list.', ['title' => $product->title]));
+        $this->announceChange();
+    }
+
+    /**
+     * To the pages that show the list, not to this component: a listener
+     * here would render the menu a second time for its own change.
+     */
+    private function announceChange(): void
+    {
+        foreach ([ShoppingListPage::class, ProductList::class, ProductShow::class] as $page) {
+            $this->dispatch('shopping-list-changed')->to($page);
+        }
+    }
 
     public function render(): View
     {
@@ -36,7 +84,7 @@ final class HeaderMenu extends Component
         return view('livewire.shopping-list.header-menu', [
             'listedCount' => $counts['listed'],
             'openCount' => $counts['open'],
-            'items' => $counts['open'] === 0 ? [] : $this->items($user),
+            'items' => $counts['open'] === 0 && $this->crossedHere === [] ? [] : $this->items($user),
         ]);
     }
 
@@ -78,7 +126,9 @@ final class HeaderMenu extends Component
         $products = Product::query()
             ->where('user_id', $user->id)
             ->onShoppingList()
-            ->whereNull('list_checked_at')
+            ->where(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query
+                ->whereNull('list_checked_at')
+                ->orWhereIn('id', array_filter($this->crossedHere, Str::isUuid(...))))
             ->with(['cheapestShop', 'shops'])
             ->orderBy('listed_at')
             ->orderBy('id')
@@ -86,6 +136,17 @@ final class HeaderMenu extends Component
             ->get();
 
         return array_values($products->map(fn (Product $product): array => ShoppingList::item($product))->all());
+    }
+
+    /**
+     * Only this account's products: a value that is not a UUID answers 404
+     * before any query, as Postgres would reject it in a uuid comparison.
+     */
+    private function ownProduct(mixed $productId): Product
+    {
+        abort_unless(is_string($productId) && Str::isUuid($productId), 404);
+
+        return $this->user()->products()->findOrFail($productId);
     }
 
     private function user(): User

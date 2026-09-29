@@ -19,29 +19,54 @@
                 <flux:text class="text-zinc-500">{{ __('Nothing on your list yet.') }}</flux:text>
                 <flux:text size="sm" class="text-zinc-500">{{ __('Add products from their page with Add to shopping list.') }}</flux:text>
             </div>
-        @elseif ($openCount === 0)
-            <div class="px-3 py-6 text-center">
-                <flux:text class="text-zinc-500">{{ __('Everything is crossed off.') }}</flux:text>
-            </div>
         @else
+            @if ($openCount === 0)
+                <div @class(['px-3 text-center', 'py-6' => $items === [], 'py-2' => $items !== []])>
+                    <flux:text class="text-zinc-500">{{ __('Everything is crossed off.') }}</flux:text>
+                </div>
+            @endif
+
+            {{-- The row is not one menu item: the checkbox and the remove button
+                 act here, and only the product opens its page. --}}
             @foreach ($items as $item)
-                <flux:menu.item :href="route('app.products.show', $item['product'])" wire:navigate class="!h-auto !items-center gap-3 py-2" wire:key="shopping-menu-{{ $item['product']->id }}">
-                    <x-product-thumb :product="$item['product']" size="size-10" />
-                    <div class="grid min-w-0 gap-0.5">
-                        <flux:text class="truncate font-medium">{{ $item['product']->title }}</flux:text>
-                        <flux:text size="sm" class="truncate text-zinc-500">
-                            @if ($item['shop'] === null)
-                                {{ __('No shop sells this now') }}
-                            @else
-                                {{ $item['headline']->text() }} · {{ $item['shop']->host }}
-                            @endif
-                        </flux:text>
-                    </div>
-                </flux:menu.item>
+                @php($product = $item['product'])
+                <div class="flex items-center gap-1 rounded-md" wire:key="shopping-menu-{{ $product->id }}" data-test="shopping-menu-item">
+                    <input
+                        type="checkbox"
+                        class="ms-2 size-4 shrink-0 cursor-pointer rounded border-zinc-300 text-brand focus:ring-brand dark:border-zinc-600 dark:bg-zinc-800"
+                        @checked($item['crossedOff'])
+                        wire:click="toggleCrossedOff('{{ $product->id }}')"
+                        aria-label="{{ $item['crossedOff'] ? __('Put :title back on the list', ['title' => $product->title]) : __('Cross off :title', ['title' => $product->title]) }}"
+                        data-test="shopping-menu-cross-off"
+                    />
+                    <flux:menu.item :href="route('app.products.show', $product)" wire:navigate class="min-w-0 flex-1 !h-auto !items-center gap-3 py-2">
+                        <x-product-thumb :product="$product" size="size-10" @class(['opacity-50 grayscale' => $item['crossedOff']]) />
+                        <div class="grid min-w-0 gap-0.5">
+                            <flux:text @class(['truncate font-medium', 'text-zinc-500 line-through' => $item['crossedOff']])>{{ $product->title }}</flux:text>
+                            <flux:text size="sm" class="truncate text-zinc-500">
+                                @if ($item['shop'] === null)
+                                    {{ __('No shop sells this now') }}
+                                @else
+                                    {{ $item['headline']->text() }} · {{ $item['shop']->host }}
+                                @endif
+                            </flux:text>
+                        </div>
+                    </flux:menu.item>
+                    <flux:button
+                        size="xs"
+                        variant="ghost"
+                        icon="x-mark"
+                        class="me-1 shrink-0"
+                        wire:click="remove('{{ $product->id }}')"
+                        aria-label="{{ __('Remove :title from shopping list', ['title' => $product->title]) }}"
+                        data-test="shopping-menu-remove"
+                    />
+                </div>
             @endforeach
 
-            @if ($openCount > count($items))
-                <flux:text size="sm" class="px-3 py-1 text-zinc-500">{{ __('and :count more', ['count' => $openCount - count($items)]) }}</flux:text>
+            @php($openShown = count(array_filter($items, fn (array $item): bool => ! $item['crossedOff'])))
+            @if ($openCount > $openShown)
+                <flux:text size="sm" class="px-3 py-1 text-zinc-500">{{ __('and :count more', ['count' => $openCount - $openShown]) }}</flux:text>
             @endif
         @endif
 
