@@ -1047,3 +1047,19 @@ it('picks the variant matching the product pack and says which others the page s
 
     expect($product->shops()->where('variant_key', 'kip-10')->exists())->toBeTrue();
 });
+
+it('spends a draft on its first confirm, so a replay writes nothing', function (): void {
+    $me = User::factory()->create();
+    $draft = DraftToken::issue($me, ['title' => 'Coffee 500 g', 'price' => '2.00', 'currency' => 'EUR', 'in_stock' => true], 'https://ah.nl/p/coffee', 'ah', variantKey: null);
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $draft, 'confirm' => true])
+        ->assertOk();
+
+    DipCatchServer::actingAs($me)
+        ->tool(CreateProductTool::class, ['draft' => $draft, 'confirm' => true])
+        ->assertHasErrors()
+        ->assertSee('already used');
+
+    expect($me->products()->count())->toBe(1);
+});
