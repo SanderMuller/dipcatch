@@ -74,8 +74,16 @@
                                     variant="primary"
                                     wire:click="accept({{ \Illuminate\Support\Js::from($suggestion->url) }})"
                                     wire:loading.attr="disabled"
+                                    x-on:click="$el.dataset.adding = 'true'"
+                                    x-on:shop-probe-finished.window="delete $el.dataset.adding"
+                                    class="data-adding:pointer-events-none"
                                 >
-                                    Add
+                                    {{-- The click only hands the link to the add-shop form,
+                                         which then reads the shop's page. Say so on the
+                                         button at once, so it never looks like nothing
+                                         happened. --}}
+                                    <span class="in-data-adding:hidden">Add</span>
+                                    <span class="hidden items-center gap-1 in-data-adding:inline-flex"><flux:icon.loading class="size-3" /> Adding…</span>
                                 </flux:button>
                             @else
                                 <flux:button size="xs" disabled title="This shop cannot be price-checked yet.">

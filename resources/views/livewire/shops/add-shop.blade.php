@@ -26,9 +26,16 @@
             </flux:button>
         </form>
 
-        <div wire:loading wire:target="probe" class="space-y-2" aria-hidden="true">
-            <flux:skeleton animate="pulse" class="h-4 w-2/3" />
-            <flux:skeleton animate="pulse" class="h-20 w-full" />
+        {{-- No target: a suggestion's "Add" reaches this component as an
+             event, not as the `probe` action, and reading the shop's page
+             takes seconds either way. In this state every request is one. --}}
+        <div wire:loading class="space-y-2" data-test="add-shop-checking">
+            <flux:text size="sm" class="flex items-center gap-2 text-zinc-600 dark:text-zinc-300" role="status">
+                <flux:icon.loading class="size-4" />
+                {{ __('Checking the price on the shop\'s page. This can take a few seconds.') }}
+            </flux:text>
+            <flux:skeleton animate="pulse" class="h-4 w-2/3" aria-hidden="true" />
+            <flux:skeleton animate="pulse" class="h-20 w-full" aria-hidden="true" />
         </div>
     @endif
 

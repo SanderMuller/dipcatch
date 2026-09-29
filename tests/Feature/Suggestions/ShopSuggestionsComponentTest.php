@@ -100,7 +100,24 @@ test('the add-shop component probes a suggested url and shows the preview', func
     Livewire::test(AddShop::class, ['product' => $product])
         ->call('useSuggestion', 'https://shop.example.com/p/1')
         ->assertSet('state', 'preview')
-        ->assertSet('snapshot.price', '50.00');
+        ->assertSet('snapshot.price', '50.00')
+        // Tells the suggestion's button to stop saying "Adding…".
+        ->assertDispatched('shop-probe-finished');
+});
+
+test('the add button says it is adding the moment it is clicked, and the form says it is checking', function (): void {
+    seedRow('spar', 'Beemster Extra belegen 48+ plakken', '150 g', '3.69', link: 'beemster-spar-1/');
+
+    $product = suggestionProduct();
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(ShopSuggestions::class, ['product' => $product])
+        ->assertSeeHtml('x-on:click="$el.dataset.adding = \'true\'"')
+        ->assertSeeHtml('Adding…');
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->assertSeeHtml('data-test="add-shop-checking"')
+        ->assertSee("Checking the price on the shop's page.");
 });
 
 test('dismissing a suggestion persists and removes it from the list', function (): void {

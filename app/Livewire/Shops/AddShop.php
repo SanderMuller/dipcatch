@@ -56,6 +56,10 @@ final class AddShop extends Component
         $this->url = $url;
 
         $this->runProbe($probe);
+
+        // Whatever the probe answered, the suggestion's button stops saying
+        // "Adding…"; the form now shows the preview or the error.
+        $this->dispatch('shop-probe-finished');
     }
 
     protected function probeSubject(): Product
