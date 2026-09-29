@@ -18,7 +18,9 @@
 
     <flux:modal name="app-command" variant="bare" class="my-[12vh] max-h-screen w-full max-w-[30rem] overflow-y-hidden">
         <flux:command class="inline-flex max-h-[76vh] flex-col border-none shadow-lg">
-            <flux:command.input :placeholder="__('Search pages and recent products…')" closable autocomplete="off" data-1p-ignore />
+            {{-- Pages filter in the browser. Products are searched on the server
+                 as you type, so an old product is found too. --}}
+            <flux:command.input :placeholder="__('Search pages and products…')" wire:model.live.debounce.250ms="search" closable autocomplete="off" data-1p-ignore />
             <flux:command.items>
                 <flux:command.item icon="home" :href="route('app.dashboard')" wire:navigate keywords="home overview start trips week">
                     {{ __('Dashboard') }}
@@ -57,6 +59,9 @@
                         :href="route('app.products.show', $product)"
                         wire:navigate
                         wire:key="command-product-{{ $product->id }}"
+                        {{-- The server already matched these; the browser's
+                             text filter would hide a shop or category match. --}}
+                        filter="manual"
                     >
                         {{ Str::limit($product->title, 48) }}
                     </flux:command.item>
