@@ -241,5 +241,5 @@ it('renders an empty history on a long range without failing', function (): void
     $data = chartFor($product, 'all')->data();
 
     expect($data['labels'])->toBeEmpty()
-        ->and($data['price'])->toBe([]);
+        ->and($data['price'])->toBeEmpty();
 });

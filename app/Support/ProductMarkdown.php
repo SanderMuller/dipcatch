@@ -228,7 +228,7 @@ final readonly class ProductMarkdown
 
         return match (true) {
             $shop->isReference() => (string) $shop->kind->note(),
-            $shop->notAConsumerPriceReason() !== null => (string) $shop->notAConsumerPriceReason(),
+            $shop->notAConsumerPriceReason() !== null => $shop->notAConsumerPriceReason(),
             ! $packs->hasComparisonUnit() => '—',
             $pack !== null && $pack->isExcluded() => (string) $pack->reason(),
             $unitPrice !== null => MoneyFormatter::unitPrice($unitPrice, $shop->currency) . ' ' . $pack?->size?->label()

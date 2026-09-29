@@ -8,7 +8,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 /**
@@ -58,7 +58,7 @@ final readonly class DashboardDigest
             failing: self::failing($user),
             singleShop: array_values(self::activeProducts($user)
                 ->has('shops', '=', 1)
-                ->whereHas('shops', fn (Builder $shop): Builder => $shop->where('active', true))
+                ->whereHas('shops', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $shop->where('active', true))
                 ->latest()
                 ->limit(self::ATTENTION)
                 ->get()
@@ -114,22 +114,22 @@ final readonly class DashboardDigest
     }
 
     /**
-     * @return Builder<Product>
+     * @return EloquentQueryBuilder<Product>
      */
-    private static function activeProducts(User $user): Builder
+    private static function activeProducts(User $user): EloquentQueryBuilder
     {
         return Product::query()->where('user_id', $user->id)->where('active', true);
     }
 
     /**
-     * @return Builder<Shop>
+     * @return EloquentQueryBuilder<Shop>
      */
-    private static function shopsOf(User $user): Builder
+    private static function shopsOf(User $user): EloquentQueryBuilder
     {
         return Shop::query()
             ->tracked()
             ->where('active', true)
-            ->whereHas('product', fn (Builder $product): Builder => $product->where('user_id', $user->id)->where('active', true));
+            ->whereHas('product', fn (EloquentQueryBuilder $product): EloquentQueryBuilder => $product->where('user_id', $user->id)->where('active', true));
     }
 
     /**
@@ -187,7 +187,7 @@ final readonly class DashboardDigest
             $byHost[$shop->host][] = [
                 'product' => $product,
                 'shop' => $shop,
-                'onOffer' => in_array($product->id, $inDrop, true) || PromotionLabel::runningDeal($shop) !== null,
+                'onOffer' => in_array($product->id, $inDrop, strict: true) || PromotionLabel::runningDeal($shop) !== null,
             ];
         }
 
@@ -202,9 +202,9 @@ final readonly class DashboardDigest
         $shops = self::shopsOf($user)
             ->where('promotion_ends_at', '>', $now)
             ->where('promotion_ends_at', '<=', $now->addDays(self::ENDING_WITHIN_DAYS))
-            ->where(fn (Builder $started): Builder => $started->whereNull('promotion_starts_at')->orWhere('promotion_starts_at', '<=', $now))
+            ->where(fn (EloquentQueryBuilder $started): EloquentQueryBuilder => $started->whereNull('promotion_starts_at')->orWhere('promotion_starts_at', '<=', $now))
             ->whereNotNull('current_price')
-            ->where(fn (Builder $stock): Builder => $stock->whereNull('current_in_stock')->orWhere('current_in_stock', true))
+            ->where(fn (EloquentQueryBuilder $stock): EloquentQueryBuilder => $stock->whereNull('current_in_stock')->orWhere('current_in_stock', true))
             ->oldest('promotion_ends_at')
             ->with('product.shops')
             // Room for the rarer rows only the full eligibility check leaves out.

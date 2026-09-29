@@ -127,9 +127,9 @@ it('stores no pack size on a drop measured on pack prices', function (): void {
 
     $event = PriceDropEvent::query()->where('product_id', $product->id)->sole();
 
-    expect($event->comparison_unit)->toBeNull();
-    expect($event->pack_quantity)->toBeNull();
-    expect($event->pack_unit)->toBeNull();
+    expect($event->comparison_unit)->toBeNull()
+        ->and($event->pack_quantity)->toBeNull()
+        ->and($event->pack_unit)->toBeNull();
 });
 
 it('measures a fall on a product priced by the piece', function (): void {

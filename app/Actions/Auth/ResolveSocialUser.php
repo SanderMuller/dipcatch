@@ -19,9 +19,9 @@ use Laravel\Socialite\AbstractUser as SocialiteUser;
  * DipCatch account owns the same address, or nobody does and the account is
  * new.
  */
-final class ResolveSocialUser
+final readonly class ResolveSocialUser
 {
-    public function __construct(private readonly ClaimUnverifiedAccount $claimUnverifiedAccount) {}
+    public function __construct(private ClaimUnverifiedAccount $claimUnverifiedAccount) {}
 
     public function __invoke(SocialProvider $provider, SocialiteUser $socialiteUser, ?string $acceptLanguage = null): User
     {

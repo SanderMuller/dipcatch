@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\McpOauthDiscoveryController;
 use App\Mcp\Servers\DipCatchServer;
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Support\Facades\Route;
 use Laravel\Mcp\Facades\Mcp;
 
@@ -26,4 +27,4 @@ Mcp::web('/mcp', DipCatchServer::class)
     //
     // `verified`: a token issued to an account that never proved its address
     // must not reach the tools — see RequireVerifiedEmailToAddCredentials.
-    ->middleware(['auth:api', 'verified', 'scopes:mcp:use', 'throttle:mcp']);
+    ->middleware(['auth:api', EnsureEmailIsVerified::class, 'scopes:mcp:use', 'throttle:mcp']);

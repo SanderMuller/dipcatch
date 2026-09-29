@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
 
 /**
  * A drop at or past `drops.confirm_above_pct` below the reference is what one
@@ -361,9 +362,9 @@ function confirmingNote(Shop $shop): bool
 {
     $product = $shop->product->refresh();
 
-    Livewire\Livewire::actingAs($product->user);
+    Livewire::actingAs($product->user);
 
-    return str_contains(Livewire\Livewire::test(ProductShow::class, ['product' => $product])->html(), 'data-test="confirming-drop"');
+    return str_contains(Livewire::test(ProductShow::class, ['product' => $product])->html(), 'data-test="confirming-drop"');
 }
 
 test('the product page says a large drop is waiting for its second reading', function (): void {

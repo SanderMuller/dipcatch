@@ -9,11 +9,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
 
-final class ResetUserPassword implements ResetsUserPasswords
+final readonly class ResetUserPassword implements ResetsUserPasswords
 {
     use PasswordValidationRules;
 
-    public function __construct(private readonly ClaimUnverifiedAccount $claimUnverifiedAccount) {}
+    public function __construct(private ClaimUnverifiedAccount $claimUnverifiedAccount) {}
 
     /**
      * Validate and reset the user's forgotten password.

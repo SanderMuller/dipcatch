@@ -5,6 +5,7 @@ use App\Livewire\Products\ProductShow;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Livewire\Livewire;
 
 function markdownProduct(User $user, string $title = 'Coffee beans'): Product
 {
@@ -138,8 +139,8 @@ it('lists the best value first, above a cheaper shop that cannot win', function 
 
     expect($best)->toBeLessThan($soldOut);
 
-    Livewire\Livewire::actingAs($user);
-    $page = Livewire\Livewire::test(ProductShow::class, ['product' => $product])->html();
+    Livewire::actingAs($user);
+    $page = Livewire::test(ProductShow::class, ['product' => $product])->html();
     [$best, $soldOut] = positionsOf(substr($page, (int) strpos($page, 'Price read')), 'ah.nl', 'soldout.nl');
 
     expect($best)->toBeLessThan($soldOut);

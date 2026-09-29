@@ -520,11 +520,7 @@ it('charts the best value per unit first, with the pack price one switch away', 
 
     livewire(ProductShow::class, ['product' => $product])
         ->assertSee("x-data=\"{ basis: 'unit' }\"", escape: false)
-        ->assertSee('Price over time')
-        ->assertSeeInOrder(['Price per piece, at the shop that is the best value.', 'Price per pack, at the shop with the lowest price.'])
-        ->assertSee('data-test="price-history-basis"', escape: false)
-        ->assertSee('data-test="price-history-chart-unit"', escape: false)
-        ->assertSee('data-test="price-history-chart-price"', escape: false);
+        ->assertSee('Price over time')->assertSeeInOrder(['Price per piece, at the shop that is the best value.', 'Price per pack, at the shop with the lowest price.'])->assertSeeHtml('data-test="price-history-basis"')->assertSeeHtml('data-test="price-history-chart-unit"')->assertSeeHtml('data-test="price-history-chart-price"');
 });
 
 it('opens on the pack price when the current price has no pack size', function (): void {

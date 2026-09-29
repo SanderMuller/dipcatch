@@ -419,7 +419,7 @@ test('the vegan row is not offered for the plain product either', function (): v
     $product = Product::factory()->create(['title' => 'Dr. Oetker Ristorante pizza salame', 'currency' => 'EUR']);
     Shop::factory()->for($product)->create(['url' => 'https://pizzashop.test/p/1', 'pack_quantity' => '320.00', 'pack_unit' => 'g']);
 
-    expect(suggest($product->refresh()))->toBe([]);
+    expect(suggest($product->refresh()))->toBeEmpty();
 });
 
 test('the same variant under another word still matches', function (): void {

@@ -137,7 +137,7 @@ final readonly class PriceHistorySeries
         }
 
         arsort($units);
-        $unit = (string) array_key_first($units);
+        $unit = array_key_first($units);
 
         $points = [];
 

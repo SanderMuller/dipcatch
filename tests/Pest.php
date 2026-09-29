@@ -100,7 +100,7 @@ function firstPartyConfigFiles(): array
 
     // Off `__DIR__`, not `config_path()`: a dataset reads this before the
     // app boots.
-    $files = array_map(basename(...), glob(dirname(__DIR__) . '/config/*.php') ?: []);
+    $files = array_map(basename(...), glob(__DIR__ . '/../config/*.php') ?: []);
 
     return array_values(array_diff($files, $shipped));
 }

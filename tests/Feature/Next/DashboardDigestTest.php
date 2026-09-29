@@ -42,7 +42,7 @@ it('leaves out a product whose cheapest shop no longer sells it', function (): v
     $product->refresh()->recomputeCheapestShop();
     $product->shops()->update(['current_in_stock' => false]);
 
-    expect(DashboardDigest::forUser($user)->trips)->toBe([]);
+    expect(DashboardDigest::forUser($user)->trips)->toBeEmpty();
 });
 
 it('lists a deal that ends within a week, and not one that ends later or cannot be bought', function (): void {

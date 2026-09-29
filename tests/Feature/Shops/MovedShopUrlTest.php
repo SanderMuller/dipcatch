@@ -128,13 +128,13 @@ it('keeps the stored address when the page it moved to could not be read', funct
 it('never stores a move over a URL someone changed while the page was fetched', function (): void {
     $shop = Shop::factory()->create(['url' => 'https://shop.test/repointed', 'currency' => 'EUR']);
 
-    expect(MovedShopUrl::updates($shop, 'https://shop.test/old', 'https://shop.test/new'))->toBe([]);
+    expect(MovedShopUrl::updates($shop, 'https://shop.test/old', 'https://shop.test/new'))->toBeEmpty();
 });
 
 it('keeps the stored address when the move drops one of two repeated parameters', function (): void {
     $shop = Shop::factory()->create(['url' => 'https://shop.test/p?variant=1&variant=2', 'currency' => 'EUR']);
 
-    expect(MovedShopUrl::updates($shop, $shop->url, 'https://shop.test/q?variant=2'))->toBe([]);
+    expect(MovedShopUrl::updates($shop, $shop->url, 'https://shop.test/q?variant=2'))->toBeEmpty();
 });
 
 it('adds a shop at the address its page moved to for good', function (): void {

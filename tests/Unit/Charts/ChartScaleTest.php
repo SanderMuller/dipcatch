@@ -27,5 +27,5 @@ it('leaves room below a price that never moved', function (): void {
 
 it('never starts below zero, and has no ticks without prices', function (): void {
     expect(ChartScale::ticks([0.01, 0.5])[0])->toBe(0.0)
-        ->and(ChartScale::ticks([]))->toBe([]);
+        ->and(ChartScale::ticks([]))->toBeEmpty();
 });

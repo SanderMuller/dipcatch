@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Laravel\Cashier\Subscription;
 
 /**
  * The three places that decide whether an account is Pro. `ProUsers` warns in
@@ -176,23 +177,23 @@ it('labels each account by the branch that decided its plan', function (Closure 
         ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
     ],
     'canceled row whose own trial still runs' => [
-        fn (User $user) => subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subDay(), trialEndsAt: CarbonImmutable::now()->addDays(10)),
+        fn (User $user): Subscription => subscribeUser($user, 'canceled', endsAt: CarbonImmutable::now()->subDay(), trialEndsAt: CarbonImmutable::now()->addDays(10)),
         ['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false],
     ],
     'live trialing row' => [
-        fn (User $user) => subscribeUser($user, 'trialing', trialEndsAt: CarbonImmutable::now()->addDays(5)),
+        fn (User $user): Subscription => subscribeUser($user, 'trialing', trialEndsAt: CarbonImmutable::now()->addDays(5)),
         ['plan' => true, 'sql' => true, 'label' => 'Trial', 'comped' => false],
     ],
     'live row cancelling at period end' => [
-        fn (User $user) => subscribeUser($user, 'active', endsAt: CarbonImmutable::now()->addDays(5)),
+        fn (User $user): Subscription => subscribeUser($user, 'active', endsAt: CarbonImmutable::now()->addDays(5)),
         ['plan' => true, 'sql' => true, 'label' => 'Cancelling', 'comped' => false],
     ],
     'past due row in dunning' => [
-        fn (User $user) => subscribeUser($user, 'past_due'),
+        fn (User $user): Subscription => subscribeUser($user, 'past_due'),
         ['plan' => true, 'sql' => true, 'label' => 'Past due', 'comped' => false],
     ],
     'incomplete row inside its trial' => [
-        fn (User $user) => subscribeUser($user, 'incomplete', trialEndsAt: CarbonImmutable::now()->addDays(10)),
+        fn (User $user): Subscription => subscribeUser($user, 'incomplete', trialEndsAt: CarbonImmutable::now()->addDays(10)),
         ['plan' => false, 'sql' => false, 'label' => 'Free', 'comped' => false],
     ],
     // A trial granted on the account, for example to win back an
@@ -276,7 +277,7 @@ it('dates each account by the branch that decided its plan', function (Closure $
         null,
     ],
     'live row cancelling at period end' => [
-        fn (User $user) => subscribeUser($user, 'active', endsAt: CarbonImmutable::parse('2026-02-01')),
+        fn (User $user): Subscription => subscribeUser($user, 'active', endsAt: CarbonImmutable::parse('2026-02-01')),
         '1 Feb 2026',
     ],
 ]);

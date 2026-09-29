@@ -16,7 +16,7 @@ use Closure;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -161,9 +161,9 @@ final class Product extends Model
      * back; the alert's own figure only when no price is known. Nothing for an
      * alert on pack prices once the product compares per unit.
      *
-     * @return EloquentBuilder<PriceDropEvent>
+     * @return EloquentQueryBuilder<PriceDropEvent>
      */
-    public static function liveDropPercentQuery(): EloquentBuilder
+    public static function liveDropPercentQuery(): EloquentQueryBuilder
     {
         return PriceDropEvent::query()
             // Real division throughout (`* 1.0`, `100.0`): SQLite stores a
@@ -194,10 +194,10 @@ final class Product extends Model
     }
 
     /**
-     * @param  EloquentBuilder<$this>  $query
+     * @param  EloquentQueryBuilder<$this>  $query
      */
     #[Scope]
-    protected function onShoppingList(EloquentBuilder $query): void
+    protected function onShoppingList(EloquentQueryBuilder $query): void
     {
         $query->whereNotNull('listed_at');
     }
@@ -218,7 +218,7 @@ final class Product extends Model
      */
     public function addToShoppingList(): void
     {
-        $this->writeListColumns(fn (EloquentBuilder $query): int => $query->update(['listed_at' => now(), 'list_checked_at' => null]));
+        $this->writeListColumns(fn (EloquentQueryBuilder $query): int => $query->update(['listed_at' => now(), 'list_checked_at' => null]));
     }
 
     /**
@@ -227,12 +227,12 @@ final class Product extends Model
      */
     public function setCrossedOff(bool $crossedOff): void
     {
-        $this->writeListColumns(fn (EloquentBuilder $query): int => $query->onShoppingList()->update(['list_checked_at' => $crossedOff ? now() : null]));
+        $this->writeListColumns(fn (EloquentQueryBuilder $query): int => $query->onShoppingList()->update(['list_checked_at' => $crossedOff ? now() : null]));
     }
 
     public function removeFromShoppingList(): void
     {
-        $this->writeListColumns(fn (EloquentBuilder $query): int => $query->update(['listed_at' => null, 'list_checked_at' => null]));
+        $this->writeListColumns(fn (EloquentQueryBuilder $query): int => $query->update(['listed_at' => null, 'list_checked_at' => null]));
     }
 
     /**
@@ -248,7 +248,7 @@ final class Product extends Model
     }
 
     /**
-     * @param  Closure(EloquentBuilder<self>): int  $write
+     * @param  Closure(EloquentQueryBuilder<self>): int  $write
      */
     private function writeListColumns(Closure $write): void
     {
@@ -262,10 +262,10 @@ final class Product extends Model
      * a percent, as the badge rounds it. The latch alone also holds a price
      * that has climbed back to where it was.
      *
-     * @param  EloquentBuilder<$this>  $query
+     * @param EloquentQueryBuilder<$this> $query
      */
     #[Scope]
-    protected function inVisibleDrop(EloquentBuilder $query): void
+    protected function inVisibleDrop(EloquentQueryBuilder $query): void
     {
         // A literal, not a binding: SQLite (the local database) receives a
         // bound float as text, and there no number compares >= a text value.
