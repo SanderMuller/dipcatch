@@ -20,28 +20,34 @@
         <flux:command class="inline-flex max-h-[76vh] flex-col border-none shadow-lg">
             <flux:command.input :placeholder="__('Search pages and recent products…')" closable autocomplete="off" data-1p-ignore />
             <flux:command.items>
-                <flux:command.item icon="home" :href="route('app.dashboard')" wire:navigate>
+                <flux:command.item icon="home" :href="route('app.dashboard')" wire:navigate keywords="home overview start trips week">
                     {{ __('Dashboard') }}
                 </flux:command.item>
-                <flux:command.item icon="shopping-bag" :href="route('app.products.index')" wire:navigate>
+                <flux:command.item icon="shopping-bag" :href="route('app.products.index')" wire:navigate keywords="tracked list all watch">
                     {{ __('Products') }}
                 </flux:command.item>
-                <flux:command.item icon="plus" :href="route('app.products.create')" wire:navigate>
+                <flux:command.item icon="list-bullet" :href="route('app.shopping-list')" wire:navigate keywords="groceries boodschappen buy print">
+                    {{ __('Shopping list') }}
+                </flux:command.item>
+                <flux:command.item icon="chart-bar" :href="route('app.stats')" wire:navigate keywords="savings statistics chart history month alerts sent">
+                    {{ __('Stats') }}
+                </flux:command.item>
+                <flux:command.item icon="plus" :href="route('app.products.create')" wire:navigate keywords="add new product link url watch follow">
                     {{ __('Track a product') }}
                 </flux:command.item>
-                <flux:command.item icon="credit-card" :href="route('app.billing')" wire:navigate>
+                <flux:command.item icon="credit-card" :href="route('app.billing')" wire:navigate keywords="pro upgrade subscription payment invoice stripe plan price">
                     {{ __('Plan & billing') }}
                 </flux:command.item>
-                <flux:command.item icon="bell" :href="route('app.notifications')" wire:navigate>
+                <flux:command.item icon="bell" :href="route('app.notifications')" wire:navigate keywords="alerts email push digest price drop">
                     {{ __('Notification settings') }}
                 </flux:command.item>
-                <flux:command.item icon="puzzle-piece" :href="route('app.connections')" wire:navigate>
+                <flux:command.item icon="puzzle-piece" :href="route('app.connections')" wire:navigate keywords="mcp claude chatgpt openai assistant ai agent integration connect">
                     {{ __('Connections') }}
                 </flux:command.item>
-                <flux:command.item icon="lifebuoy" :href="route('app.support')" wire:navigate>
+                <flux:command.item icon="lifebuoy" :href="route('app.support')" wire:navigate keywords="help contact question bug problem feedback">
                     {{ __('Support') }}
                 </flux:command.item>
-                <flux:command.item icon="cog-6-tooth" :href="route('profile.edit')" wire:navigate>
+                <flux:command.item icon="cog-6-tooth" :href="route('profile.edit')" wire:navigate keywords="profile account password email security two-factor passkey appearance dark mode">
                     {{ __('Settings') }}
                 </flux:command.item>
 
