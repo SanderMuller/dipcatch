@@ -54,7 +54,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property CarbonImmutable $updated_at
  * @property-read EloquentCollection<int, SocialAccount> $socialAccounts
  */
-#[Fillable(['name', 'email', 'password', 'is_admin', 'timezone'])]
+#[Fillable(['name', 'email', 'password', 'timezone'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 final class User extends Authenticatable implements FilamentUser, MustVerifyEmail, OAuthenticatable, PasskeyUser
 {

@@ -121,3 +121,13 @@ test('social_accounts refuses one user linking the same provider twice', functio
         'provider' => SocialProvider::Google,
     ]))->toThrow(QueryException::class);
 });
+
+it('never takes is_admin from mass assignment', function (): void {
+    $user = User::create(['name' => 'Someone', 'email' => 'someone@example.test', 'password' => 'secret-password', 'is_admin' => true]);
+
+    expect($user->refresh()->is_admin)->toBeFalse();
+
+    $user->update(['is_admin' => true]);
+
+    expect($user->refresh()->is_admin)->toBeFalse();
+});
