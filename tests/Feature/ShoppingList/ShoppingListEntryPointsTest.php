@@ -280,3 +280,25 @@ it('updates the list page when the header changes the list', function (): void {
 
     $page->dispatch('shopping-list-changed')->assertSee('Coffee');
 });
+
+it('keeps showing open items after crossing off as many as the header holds', function (): void {
+    $user = User::factory()->create();
+    $products = [];
+
+    foreach (range(1, 10) as $i) {
+        $products[] = entryPointProduct($user, 'Product ' . $i, ['listed_at' => now()->subMinutes(20 - $i)]);
+    }
+
+    $this->actingAs($user);
+
+    $menu = livewire(HeaderMenu::class);
+
+    foreach (array_slice($products, 0, 8) as $product) {
+        $menu->call('toggleCrossedOff', (string) $product->id);
+    }
+
+    $menu->assertSee('Product 9')
+        ->assertSee('Product 10')
+        ->assertSeeHtml('aria-label="Put Product 1 back on the list"')
+        ->assertDontSee('more');
+});

@@ -123,19 +123,21 @@ final class HeaderMenu extends Component
      */
     private function items(User $user): array
     {
-        $products = Product::query()
+        $listed = fn (): EloquentQueryBuilder => Product::query()
             ->where('user_id', $user->id)
             ->onShoppingList()
-            ->where(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query
-                ->whereNull('list_checked_at')
-                ->orWhereIn('id', array_filter($this->crossedHere, Str::isUuid(...))))
-            ->with(['cheapestShop', 'shops'])
-            ->orderBy('listed_at')
-            ->orderBy('id')
-            ->limit(self::LIMIT)
-            ->get();
+            ->with(['cheapestShop', 'shops']);
 
-        return array_values($products->map(fn (Product $product): array => ShoppingList::item($product))->all());
+        $open = $listed()->whereNull('list_checked_at')->orderBy('listed_at')->orderBy('id')->limit(self::LIMIT)->get();
+
+        // Read apart from the open items, so they never take an open item's place.
+        $crossedHere = array_values(array_filter($this->crossedHere, Str::isUuid(...)));
+        $crossed = $crossedHere === [] ? [] : $listed()->whereNotNull('list_checked_at')->whereIn('id', $crossedHere)->get()->all();
+
+        $products = [...$open->all(), ...$crossed];
+        usort($products, fn (Product $a, Product $b): int => [$a->listed_at?->getTimestamp(), (string) $a->id] <=> [$b->listed_at?->getTimestamp(), (string) $b->id]);
+
+        return array_map(fn (Product $product): array => ShoppingList::item($product), $products);
     }
 
     /**
