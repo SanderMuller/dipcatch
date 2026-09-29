@@ -114,9 +114,9 @@
                     <table class="w-full table-fixed border-separate border-spacing-0 text-left">
                         <caption class="sr-only">{{ __('Free and Pro compared') }}</caption>
                         <colgroup>
-                            <col class="w-[40%] sm:w-[46%]">
-                            <col class="w-[25%] sm:w-[22%]">
-                            <col class="w-[35%] sm:w-[32%]">
+                            <col class="w-[36%] sm:w-[46%]">
+                            <col class="w-[24%] sm:w-[22%]">
+                            <col class="w-[40%] sm:w-[32%]">
                         </colgroup>
                         <thead class="sticky top-16 z-10">
                             <tr>
@@ -132,7 +132,7 @@
                                     <p class="flex flex-wrap items-center gap-2 text-base font-semibold">
                                         {{ __('Pro') }}
                                         @if ($onSale && $trialDays > 0)
-                                            <span class="rounded-full bg-savings/15 px-2 py-0.5 text-xs font-medium text-savings-strong">{{ __(':days days free', ['days' => $trialDays]) }}</span>
+                                            <span class="rounded-full bg-savings/15 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-savings-strong">{{ __(':days days free', ['days' => $trialDays]) }}</span>
                                         @endif
                                     </p>
                                     <p class="mt-1 flex flex-wrap items-baseline gap-x-1"><span class="text-2xl font-semibold tracking-tight text-brand tabular-nums">{{ $price }}</span><span class="text-sm font-normal text-zinc-600 dark:text-zinc-400">/ {{ __('month') }}</span></p>
