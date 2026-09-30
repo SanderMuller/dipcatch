@@ -103,43 +103,53 @@
         </section>
     @endif
 
-    @if ($digest->endingSoon !== [] || $digest->failing !== [] || $digest->singleShop !== [])
-        <section class="mt-8" data-test="worth-a-look">
-            <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ __('Worth a look') }}</flux:heading>
-            <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('Deals about to stop, and products DipCatch cannot follow well.') }}</flux:text>
+    @php($worthALook = $digest->endingSoon !== [] || $digest->failing !== [] || $digest->singleShop !== [])
+    @if ($worthALook || $hasAnyProduct)
+        {{-- Side by side from lg: both lists are short, and one alone runs the full width. --}}
+        <div @class(['mt-8 grid items-start gap-8', 'lg:grid-cols-2' => $worthALook && $hasAnyProduct])>
+            @if ($worthALook)
+                <section class="min-w-0" data-test="worth-a-look">
+                    <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ __('Worth a look') }}</flux:heading>
+                    <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('Deals about to stop, and products DipCatch cannot follow well.') }}</flux:text>
 
-            <flux:card class="mt-4 p-0!">
-                <ul role="list" class="divide-y divide-ink/5">
-                    @foreach ($digest->endingSoon as $row)
-                        <li class="flex items-start gap-3 px-4 py-3" wire:key="list-ending-{{ $row['shop']->id }}">
-                            <span class="mt-2 size-2 shrink-0 rounded-full bg-chart-line"></span>
-                            <div class="min-w-0 flex-1">
-                                <a href="{{ route('app.products.show', $row['product']) }}" wire:navigate class="block truncate font-medium underline-offset-4 hover:underline">{{ $row['product']->title }}</a>
-                                <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Deal at :shop ends :when', ['shop' => $row['shop']->host, 'when' => $row['endsAt']->diffForHumans()]) }}</p>
-                            </div>
-                        </li>
-                    @endforeach
-                    @foreach ($digest->failing as $row)
-                        <li class="flex items-start gap-3 px-4 py-3" wire:key="list-failing-{{ $row['shop']->id }}">
-                            <span class="mt-2 size-2 shrink-0 rounded-full bg-alert"></span>
-                            <div class="min-w-0 flex-1">
-                                <a href="{{ route('app.products.show', $row['product']) }}" wire:navigate class="block truncate font-medium underline-offset-4 hover:underline">{{ $row['product']->title }}</a>
-                                <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('DipCatch cannot read :shop right now. The page may have moved.', ['shop' => $row['shop']->host]) }}</p>
-                            </div>
-                        </li>
-                    @endforeach
-                    @foreach ($digest->singleShop as $product)
-                        <li class="flex items-start gap-3 px-4 py-3" wire:key="list-single-{{ $product->id }}">
-                            <span class="mt-2 size-2 shrink-0 rounded-full bg-zinc-400"></span>
-                            <div class="min-w-0 flex-1">
-                                <a href="{{ route('app.products.show', $product) }}" wire:navigate class="block truncate font-medium underline-offset-4 hover:underline">{{ $product->title }}</a>
-                                <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Tracked at one shop only.') }} <a href="{{ route('app.products.show', [$product, 'add-shop' => 1]) }}" wire:navigate class="font-medium text-brand">{{ __('Add a shop') }}</a></p>
-                            </div>
-                        </li>
-                    @endforeach
-                </ul>
-            </flux:card>
-        </section>
+                    <flux:card class="mt-4 p-0!">
+                        <ul role="list" class="divide-y divide-ink/5">
+                            @foreach ($digest->endingSoon as $row)
+                                <li class="flex items-start gap-3 px-4 py-3" wire:key="list-ending-{{ $row['shop']->id }}">
+                                    <span class="mt-2 size-2 shrink-0 rounded-full bg-chart-line"></span>
+                                    <div class="min-w-0 flex-1">
+                                        <a href="{{ route('app.products.show', $row['product']) }}" wire:navigate class="block truncate font-medium underline-offset-4 hover:underline">{{ $row['product']->title }}</a>
+                                        <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Deal at :shop ends :when', ['shop' => $row['shop']->host, 'when' => $row['endsAt']->diffForHumans()]) }}</p>
+                                    </div>
+                                </li>
+                            @endforeach
+                            @foreach ($digest->failing as $row)
+                                <li class="flex items-start gap-3 px-4 py-3" wire:key="list-failing-{{ $row['shop']->id }}">
+                                    <span class="mt-2 size-2 shrink-0 rounded-full bg-alert"></span>
+                                    <div class="min-w-0 flex-1">
+                                        <a href="{{ route('app.products.show', $row['product']) }}" wire:navigate class="block truncate font-medium underline-offset-4 hover:underline">{{ $row['product']->title }}</a>
+                                        <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('DipCatch cannot read :shop right now. The page may have moved.', ['shop' => $row['shop']->host]) }}</p>
+                                    </div>
+                                </li>
+                            @endforeach
+                            @foreach ($digest->singleShop as $product)
+                                <li class="flex items-start gap-3 px-4 py-3" wire:key="list-single-{{ $product->id }}">
+                                    <span class="mt-2 size-2 shrink-0 rounded-full bg-zinc-400"></span>
+                                    <div class="min-w-0 flex-1">
+                                        <a href="{{ route('app.products.show', $product) }}" wire:navigate class="block truncate font-medium underline-offset-4 hover:underline">{{ $product->title }}</a>
+                                        <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ __('Tracked at one shop only.') }} <a href="{{ route('app.products.show', [$product, 'add-shop' => 1]) }}" wire:navigate class="font-medium text-brand">{{ __('Add a shop') }}</a></p>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </flux:card>
+                </section>
+            @endif
+
+            @if ($hasAnyProduct)
+                <livewire:dashboard-suggested-shops />
+            @endif
+        </div>
     @endif
 
     <section class="mt-8">

@@ -85,17 +85,21 @@ final class SuggestShops
     public function __construct(private readonly ShopMatchCheck $shopMatch) {}
 
     /**
+     * Pass `$verify` false where the suggestions are only listed, such as the
+     * dashboard across many products: rows Jev has not answered stay
+     * unanswered instead of spending a paid check on every visit.
+     *
      * @return list<ShopSuggestion>
      */
-    public function __invoke(Product $product): array
+    public function __invoke(Product $product, bool $verify = true): array
     {
-        return $this->memo[$product->id] ??= $this->compute($product);
+        return $this->memo[$product->id] ??= $this->compute($product, $verify);
     }
 
     /**
      * @return list<ShopSuggestion>
      */
-    private function compute(Product $product): array
+    private function compute(Product $product, bool $verify): array
     {
         if (strcasecmp($product->currency, 'EUR') !== 0) {
             return [];
@@ -114,7 +118,7 @@ final class SuggestShops
 
         $suggestions = $this->rank($this->bestPerChain($this->candidateRows($product, $chains, $queries), $chains, $queries, $verdicts));
 
-        if ($verdicts->unchecked() !== []) {
+        if ($verify && $verdicts->unchecked() !== []) {
             VerifyShopSuggestions::afterResponseFor($product, $verdicts->unchecked());
         }
 

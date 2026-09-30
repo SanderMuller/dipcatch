@@ -190,6 +190,8 @@ final class WebShopFinding extends Model
     {
         return [
             'status' => WebFindingStatus::class,
+            'page_pack_quantity' => 'decimal:3',
+            'page_price' => 'decimal:2',
             'first_chance' => 'float',
             'second_chance' => 'float',
             'checked_gtins' => 'array',
