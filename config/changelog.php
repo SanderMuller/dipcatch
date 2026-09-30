@@ -38,8 +38,8 @@ return [
         [
             'date' => '2026-09-30',
             'category' => 'feature',
-            'title' => 'Check a shop\'s "was" price',
-            'body' => 'Some shops show a "was" price next to a deal. When DipCatch saw a lower price at that shop in the 30 days before, the product page shows that lowest price next to the shop\'s claim.',
+            'title' => 'Is that "was" price real?',
+            'body' => 'A shop can show a deal as "was €12.99, now €9.99" while the product already cost €9.99 last week. When DipCatch saw a lower price at that shop in the 30 days before a deal, the product page now tells you, right under the deal: "Shop says it was €12.99. Lowest here in the 30 days before: €9.99."',
         ],
         [
             'date' => '2026-09-30',
