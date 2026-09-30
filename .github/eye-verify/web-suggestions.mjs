@@ -50,7 +50,7 @@ const panel = () => page.locator('[wire\\:name="suggestions.shop-suggestions"]')
     await page.goto(`${BASE}/app/products/${fixture.productId}`, { waitUntil: 'networkidle' });
     const running = panel().locator('[data-test="web-discovery-running"]');
     checker.check('the panel says it is looking while discovery is queued', await running.isVisible(), await panel().innerText());
-    checker.check('the panel does not claim no shops were found', ! (await panel().innerText()).includes('No other shops found'));
+    checker.check('the panel does not say it has no suggestions', ! (await panel().innerText()).includes('No shop suggestions for this product'));
     checker.check('the panel polls while discovery runs', (await panel().getAttribute('wire:poll.visible.15s')) !== null);
     await page.screenshot({ path: path.join(ART, 'web-suggestions-looking.png') });
 }
@@ -73,9 +73,10 @@ const panel = () => page.locator('[wire\\:name="suggestions.shop-suggestions"]')
     checker.check('the row names the shop and the page title', text.includes('koffiehenk.nl') && text.includes('Douwe Egberts Aroma Rood 1 kilo bonen'), text);
     checker.check('the row gives the unit price and the checked price with its date', text.includes('€17.49 /kg') && text.includes('€17.49 for 1 kg when checked on'), text);
     checker.check('the row says it was checked by AI', text.includes('same product, checked by AI'), text);
-    checker.check('Add and Hide are there', await row.locator('[data-test="web-suggestion-add"]').isVisible() && await row.locator('[data-test="web-suggestion-hide"]').isVisible());
+    checker.check('Add and Hide are there', await row.locator('[data-test="web-suggestion-add"]').isVisible() && await row.locator('[data-test="web-suggestion-hide-menu"]').isVisible());
     await page.screenshot({ path: path.join(ART, 'web-suggestions-row.png') });
 
+    await row.locator('[data-test="web-suggestion-hide-menu"]').click();
     await row.locator('[data-test="web-suggestion-hide"]').click();
     const gone = await panel().locator('[data-test="web-suggestion"]').waitFor({ state: 'detached', timeout: 5000 }).then(() => true).catch(() => false);
     checker.check('Hide removes the row', gone);

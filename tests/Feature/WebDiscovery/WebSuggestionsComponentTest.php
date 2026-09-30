@@ -207,10 +207,10 @@ it('says no other shops were found only once discovery is done, and counts both 
     $this->actingAs($product->user()->sole());
 
     WebDiscovery::markQueued($product);
-    Livewire::test(ShopSuggestions::class, ['product' => $product])->assertDontSee('No other shops found');
+    Livewire::test(ShopSuggestions::class, ['product' => $product, 'explainEmpty' => true])->assertDontSee('No shop suggestions for this product');
 
     WebDiscovery::mark($product, WebDiscoveryState::Done);
-    Livewire::test(ShopSuggestions::class, ['product' => $product])->assertSee('No other shops found');
+    Livewire::test(ShopSuggestions::class, ['product' => $product, 'explainEmpty' => true])->assertSee('No shop suggestions for this product');
 
     seedRow('spar', 'Douwe Egberts Aroma Rood bonen 1 kg', '1 kg', '17.99', link: 'de-aroma-rood/');
     proposedFinding($product, 'koffiehenk.nl');

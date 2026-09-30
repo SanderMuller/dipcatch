@@ -130,6 +130,14 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
         return $this->hasMany(TrackingIdeaMark::class);
     }
 
+    /**
+     * @return HasMany<HiddenShop, $this>
+     */
+    public function hiddenShops(): HasMany
+    {
+        return $this->hasMany(HiddenShop::class);
+    }
+
     /** The one guard for automatic categories: opted in, and the plan allows it. */
     public function wantsAutoCategories(): bool
     {

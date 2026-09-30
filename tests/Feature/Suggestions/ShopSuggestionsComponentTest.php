@@ -140,9 +140,21 @@ test('it says so when the catalogue holds no match for this product', function (
     $product = suggestionProduct();
     $this->actingAs($product->user()->sole());
 
-    Livewire::test(ShopSuggestions::class, ['product' => $product])
+    Livewire::test(ShopSuggestions::class, ['product' => $product, 'explainEmpty' => true])
         ->assertDontSee('Also sold at')
-        ->assertSee('No other shops found');
+        ->assertSee('No shop suggestions for this product');
+});
+
+test('the copy under the section heading stays silent when nothing matches; the add-shop form says it', function (): void {
+    seedRow('spar', 'Something else entirely', '1 l', '2.00', link: 'other-1');
+
+    $product = suggestionProduct();
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(ShopSuggestions::class, ['product' => $product])
+        ->assertDontSee('No shop suggestions for this product');
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->assertSee('No shop suggestions for this product');
 });
 
 test('it stays silent when every chain is stale — that is not an answer about this product', function (): void {
@@ -151,18 +163,18 @@ test('it stays silent when every chain is stale — that is not an answer about 
     $product = suggestionProduct();
     $this->actingAs($product->user()->sole());
 
-    Livewire::test(ShopSuggestions::class, ['product' => $product])
+    Livewire::test(ShopSuggestions::class, ['product' => $product, 'explainEmpty' => true])
         ->assertDontSee('Also sold at')
-        ->assertDontSee('No other shops found');
+        ->assertDontSee('No shop suggestions for this product');
 });
 
 test('it stays silent when the catalogue itself is empty', function (): void {
     $product = suggestionProduct();
     $this->actingAs($product->user()->sole());
 
-    Livewire::test(ShopSuggestions::class, ['product' => $product])
+    Livewire::test(ShopSuggestions::class, ['product' => $product, 'explainEmpty' => true])
         ->assertDontSee('Also sold at')
-        ->assertDontSee('No other shops found');
+        ->assertDontSee('No shop suggestions for this product');
 });
 
 test('accepting several suggestions in a row hits the per-user probe budget', function (): void {

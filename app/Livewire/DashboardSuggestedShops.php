@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\HidesShops;
 use App\Models\User;
 use App\Support\DashboardSuggestions;
 use Illuminate\Contracts\View\View;
@@ -15,6 +16,8 @@ use Livewire\Component;
 #[Lazy]
 final class DashboardSuggestedShops extends Component
 {
+    use HidesShops;
+
     public function placeholder(): View
     {
         return view('livewire.dashboard-suggested-shops-placeholder');

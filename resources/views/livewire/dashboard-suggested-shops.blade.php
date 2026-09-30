@@ -1,4 +1,4 @@
-<section class="min-w-0" data-test="suggested-shops">
+<section class="min-w-0" x-data="{ hideHost: '', hideLabel: '' }" data-test="suggested-shops">
     <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ __('Add suggested shops to your products') }}</flux:heading>
     <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">
         {{ $aiChecked
@@ -46,13 +46,15 @@
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium" title="{{ $row['name'] }}">{{ $row['shop'] }}</p>
                                         @php($priceSource = $row['checkedOn'] !== null ? __('Price when checked on :date', ['date' => $row['checkedOn']->isoFormat('D MMM')]) : __('Regular price from the daily dataset'))
-                                        <p class="truncate text-sm text-zinc-500 tabular-nums dark:text-zinc-400" title="{{ $priceSource }}">
-                                            {{ implode(' · ', array_filter([$row['unitPrice'], $row['packPrice']])) }}<span class="sr-only">. {{ $priceSource }}</span>
-                                        </p>
+                                        <div class="flex min-w-0 items-center gap-2">
+                                            <p class="truncate text-sm text-zinc-500 tabular-nums dark:text-zinc-400" title="{{ $priceSource }}">
+                                                {{ implode(' · ', array_filter([$row['unitPrice'], $row['packPrice']])) }}<span class="sr-only">. {{ $priceSource }}</span>
+                                            </p>
+                                            @if ($badge !== null)
+                                                <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {{ $badge[1] }}">{{ $badge[0] }}</span>
+                                            @endif
+                                        </div>
                                     </div>
-                                    @if ($badge !== null)
-                                        <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {{ $badge[1] }}">{{ $badge[0] }}</span>
-                                    @endif
                                     <flux:button
                                         size="sm"
                                         variant="ghost"
@@ -64,7 +66,9 @@
                                         :aria-label="__('Open :shop in a new tab to check the product', ['shop' => $row['shop']])"
                                         :tooltip="__('Open the shop page')"
                                         data-test="suggested-shop-open"
-                                    />
+                                    >
+                                        <span class="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+                                    </flux:button>
                                     <flux:button
                                         size="sm"
                                         square
@@ -74,7 +78,19 @@
                                         :aria-label="__('Add :shop to :product', ['shop' => $row['shop'], 'product' => $product->title])"
                                         :tooltip="__('Add this shop')"
                                         data-test="suggested-shop-add"
-                                    />
+                                    >
+                                        <span class="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+                                    </flux:button>
+                                    <flux:dropdown position="bottom" align="end">
+                                        <flux:button size="sm" variant="ghost" square icon="ellipsis-horizontal" :aria-label="__('Options for :shop', ['shop' => $row['shop']])" data-test="suggested-shop-more">
+                                            <span class="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+                                        </flux:button>
+                                        <flux:menu>
+                                            <flux:menu.item icon="eye-slash" x-on:click="hideHost = {{ \Illuminate\Support\Js::from($row['host']) }}; hideLabel = {{ \Illuminate\Support\Js::from($row['shop']) }}; $flux.modal({{ \Illuminate\Support\Js::from('hide-shop-' . $this->getId()) }}).show()" data-test="suggested-shop-hide">
+                                                {{ __('Don’t suggest :shop', ['shop' => $row['shop']]) }}
+                                            </flux:menu.item>
+                                        </flux:menu>
+                                    </flux:dropdown>
                                 </li>
                             @endforeach
                         </ul>
@@ -82,5 +98,7 @@
                 @endforeach
             </ul>
         </div>
+
+        <x-hide-shop-confirm :name="'hide-shop-' . $this->getId()" />
     @endif
 </section>

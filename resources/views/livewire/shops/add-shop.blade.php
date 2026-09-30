@@ -7,7 +7,7 @@
     --}}
     @if ($state === 'idle' || $state === 'error')
         <div wire:loading.remove.block>
-            @livewire('suggestions.shop-suggestions', ['product' => $product, 'expanded' => $expandSuggestions], key('shop-suggestions-add-' . $product->id))
+            @livewire('suggestions.shop-suggestions', ['product' => $product, 'expanded' => $expandSuggestions, 'explainEmpty' => true], key('shop-suggestions-add-' . $product->id))
         </div>
     @endif
 

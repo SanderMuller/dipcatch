@@ -4,6 +4,7 @@ namespace App\Actions\Suggestions;
 
 use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
+use App\Models\HiddenShop;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\ShopSuggestionDismissal;
@@ -125,6 +126,12 @@ final class SuggestShops
         return $suggestions;
     }
 
+    /** After a shop is hidden, every product's suggestions in this request are stale. */
+    public function forgetSuggestions(): void
+    {
+        $this->memo = [];
+    }
+
     /**
      * Whether the catalogue can answer at all: at least one chain inside the
      * freshness window. A surface uses this to tell "nothing matched" from
@@ -154,7 +161,7 @@ final class SuggestShops
 
     /**
      * Chains with rows inside the freshness window that the product does not
-     * already track, keyed by chain.
+     * already track and its owner has not hidden, keyed by chain.
      *
      * @return array<string, CheckjebonChain>
      */
@@ -166,13 +173,13 @@ final class SuggestShops
             ->values()
             ->all();
 
-        return array_filter(
+        return HiddenShop::withoutHiddenChains($product->user, array_filter(
             $this->freshChains(),
             static fn (CheckjebonChain $chain): bool => array_intersect(
                 SupermarketChains::hosts($chain->chain, $chain->base_url),
                 $trackedHosts,
             ) === [],
-        );
+        ));
     }
 
     /**

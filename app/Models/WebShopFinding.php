@@ -95,7 +95,8 @@ final class WebShopFinding extends Model
 
     /**
      * The suggestions to show for a product: proposed, not hidden, checked
-     * against the product as it is now, and at a shop it does not track yet.
+     * against the product as it is now, and at a shop it does not track yet
+     * and its owner did not hide.
      *
      * @return EloquentCollection<int, self>
      */
@@ -104,6 +105,7 @@ final class WebShopFinding extends Model
         $product->loadMissing('shops');
         $trackedHosts = array_values($product->shops->map(static fn (Shop $shop): string => $shop->host)->all());
         $trackedGtins = self::trackedGtins($product);
+        $hidden = HiddenShop::hostsOf($product->user);
 
         return self::query()
             ->where('product_id', $product->id)
@@ -113,21 +115,24 @@ final class WebShopFinding extends Model
             ->orderByDesc('second_chance')
             ->orderBy('id')
             ->get()
-            ->filter(fn (self $finding): bool => $finding->isShowable($trackedHosts, $trackedGtins))
+            ->filter(fn (self $finding): bool => $finding->isShowable($trackedHosts, $trackedGtins, $hidden))
             ->values();
     }
 
     /**
      * @param  list<string>  $trackedHosts
      * @param  list<string>  $trackedGtins
+     * @param  list<string>  $hiddenHosts
      */
-    private function isShowable(array $trackedHosts, array $trackedGtins): bool
+    private function isShowable(array $trackedHosts, array $trackedGtins, array $hiddenHosts): bool
     {
         $atTrackedShop = in_array($this->addHost(), $trackedHosts, strict: true)
             || ($this->served_host !== null && in_array($this->served_host, $trackedHosts, strict: true));
         $barcodeGone = $this->matched_gtin !== null && ! in_array($this->matched_gtin, $trackedGtins, strict: true);
 
-        return ! $atTrackedShop && ! $barcodeGone && ! $this->hasStaleGtins($trackedGtins);
+        $hidden = HiddenShop::covers($hiddenHosts, $this->addHost()) || ($this->served_host !== null && HiddenShop::covers($hiddenHosts, $this->served_host));
+
+        return ! $atTrackedShop && ! $barcodeGone && ! $hidden && ! $this->hasStaleGtins($trackedGtins);
     }
 
     /**

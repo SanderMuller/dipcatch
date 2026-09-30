@@ -2,11 +2,12 @@
 
 namespace App\Services\ShopDiscovery;
 
+use App\Models\HiddenShop;
 use App\Models\Product;
 use App\Models\WebSearch;
 use App\Models\WebShopFinding;
+use App\Support\NotAShop;
 use App\Support\UrlNormalizer;
-use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
 
 final class WebResultFilter
@@ -16,8 +17,9 @@ final class WebResultFilter
      */
     public static function keep(Product $product, WebSearch $search): array
     {
-        $product->loadMissing('shops');
+        $product->loadMissing(['shops', 'user']);
         $tracked = $product->shops->pluck('host')->all();
+        $hidden = HiddenShop::hostsOf($product->user);
         $dismissed = WebShopFinding::query()
             ->where('product_id', $product->id)
             ->whereNotNull('dismissed_at')
@@ -37,7 +39,7 @@ final class WebResultFilter
             $hash = UrlNormalizer::hash($normalized);
 
             // Results come best first, so the first one per host is its best.
-            if ($host === '' || isset($kept[$host]) || in_array($host, $tracked, strict: true) || self::isNotAShop($host) || in_array($hash, $dismissed, strict: true)) {
+            if ($host === '' || isset($kept[$host]) || in_array($host, $tracked, strict: true) || self::isNotAShop($host) || HiddenShop::covers($hidden, $host) || in_array($hash, $dismissed, strict: true)) {
                 continue;
             }
 
@@ -49,9 +51,6 @@ final class WebResultFilter
 
     public static function isNotAShop(string $host): bool
     {
-        /** @var list<string> $blocked */
-        $blocked = Config::array('dipcatch.web_discovery.not_a_shop');
-
-        return array_any($blocked, static fn (string $entry): bool => $host === $entry || str_ends_with($host, ".{$entry}"));
+        return NotAShop::covers($host);
     }
 }

@@ -86,7 +86,7 @@ A search older than `web_discovery.search_max_age_days` is repeated on the next 
 | `read_at` | timestamp, nullable | When the page read succeeded |
 | `second_chance` | float, nullable | |
 | `status` | string | See 3.4 |
-| `failure` | string, nullable | Why the finding stopped: a `ProbeFailure` value, a probe state (`duplicate`, `ambiguous`), `incomplete_probe`, `read_cap`, `tracked_host`, `not_a_shop`, `not_a_consumer_price` or `worker_failed: {exception}` |
+| `failure` | string, nullable | Why the finding stopped: a `ProbeFailure` value, a probe state (`duplicate`, `ambiguous`), `incomplete_probe`, `read_cap`, `tracked_host`, `not_a_shop`, `hidden_shop` (the owner chose Don’t suggest for it), `not_a_consumer_price` or `worker_failed: {exception}` |
 | `attempts` | unsigned tinyint | Page reads tried |
 | `next_attempt_at` | timestamp, nullable | When a retried read may run |
 | `fingerprint` | string(64) | See below |
@@ -202,7 +202,7 @@ After `ReadWebFinding` reaches a final status for its finding (`read` with no re
 
 `ShopSuggestions` (`app/Livewire/Suggestions/ShopSuggestions.php`) reads the `proposed`, undismissed findings with the current fingerprint and no stale `checked_gtins` for the product, whose `add_url` host and `served_host` the product does not track yet, and, for a barcode-shortcut proposal, whose `matched_gtin` a tracked shop still carries, while the owner still passes the gate. It shows them after the checkjebon rows.
 
-The view (`resources/views/livewire/suggestions/shop-suggestions.blade.php`) decides its empty state and its accordion count from the checkjebon rows alone today. Both take the web rows into account: "No other shops found" shows only when both lists are empty and discovery is not unfinished, and web rows show even when the dataset is unusable or the product is not in euros (`SuggestShops` returns nothing then).
+The view (`resources/views/livewire/suggestions/shop-suggestions.blade.php`) decides its empty state and its accordion count from the checkjebon rows alone today. Both take the web rows into account: "No shop suggestions for this product right now" shows only when both lists are empty and discovery is not unfinished, and web rows show even when the dataset is unusable or the product is not in euros (`SuggestShops` returns nothing then).
 
 - Label: the host with its favicon, the page title, the pack size.
 - Price: "€x when checked on {date}", plus the unit price when there is a pack size. Never shown as a live price. The dataset rows carry a "dataset price" label; the web rows need their own wording.
@@ -316,7 +316,7 @@ The view (`resources/views/livewire/suggestions/shop-suggestions.blade.php`) dec
 - [x] "Looking for more shops…" state with a bounded `wire:poll` while discovery is unfinished.
 - [x] Copy for "€x when checked on {date}" — English only; `nl.json` holds marketing keys only.
 - [x] Empty state and accordion count from both lists; web rows shown when the dataset is unusable.
-- [x] Tests — shown only when proposed, current fingerprint, undismissed and gated; tracked host hidden; adding one web shop keeps the others; "No other shops found" only when both lists are empty; Add dispatches `suggest-shop` with the final URL; Hide refreshes both instances; a finding of another product, and a tampered product id, answer 404; polling stops when nothing is unfinished.
+- [x] Tests — shown only when proposed, current fingerprint, undismissed and gated; tracked host hidden; adding one web shop keeps the others; "No shop suggestions for this product right now" only when both lists are empty; Add dispatches `suggest-shop` with the final URL; Hide refreshes both instances; a finding of another product, and a tampered product id, answer 404; polling stops when nothing is unfinished.
 - [x] Eye-verify the product page panel and the add-shop form with a seeded proposed finding, and a finding that turns `proposed` while the panel is open.
 
 ### Phase 6: Remove the prototype (Priority: MEDIUM)

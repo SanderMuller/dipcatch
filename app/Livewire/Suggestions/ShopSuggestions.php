@@ -4,6 +4,7 @@ namespace App\Livewire\Suggestions;
 
 use App\Actions\Suggestions\SuggestShops;
 use App\Enums\WebDiscoveryState;
+use App\Livewire\Concerns\HidesShops;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\WebDiscovery;
@@ -23,6 +24,8 @@ use Livewire\Component;
  */
 final class ShopSuggestions extends Component
 {
+    use HidesShops;
+
     public string $productId;
 
     /**
@@ -32,16 +35,25 @@ final class ShopSuggestions extends Component
      */
     public bool $expanded = false;
 
+    /**
+     * Whether an empty list says so. Only the copy inside the add-shop form
+     * does: someone who opened it is looking for a shop, while under the
+     * section heading the line reads like a finding about every shop.
+     */
+    #[Locked]
+    public bool $explainEmpty = false;
+
     /** When the panel mounted, so polling for web suggestions stops in time. */
     #[Locked]
     public int $mountedAt = 0;
 
-    public function mount(Product $product, bool $expanded = false): void
+    public function mount(Product $product, bool $expanded = false, bool $explainEmpty = false): void
     {
         Gate::authorize('view', $product);
 
         $this->productId = (string) $product->id;
         $this->expanded = $expanded;
+        $this->explainEmpty = $explainEmpty;
         $this->mountedAt = now()->getTimestamp();
     }
 

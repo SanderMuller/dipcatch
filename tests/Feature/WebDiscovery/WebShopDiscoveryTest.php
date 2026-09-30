@@ -5,6 +5,7 @@ use App\Enums\WebFindingStatus;
 use App\Jobs\CheckWebFindings;
 use App\Jobs\DiscoverWebShops;
 use App\Jobs\ReadWebFinding;
+use App\Models\HiddenShop;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -291,6 +292,27 @@ it('rejects a page that redirects to a shop the product tracks', function (): vo
     expect(findingAt($product, 'a.test')->status)->toBe(WebFindingStatus::Rejected)
         ->and(findingAt($product, 'a.test')->failure)->toBe('tracked_host')
         ->and(findingAt($product, 'a.test')->served_host)->toBe('tracked.test');
+});
+
+it('skips a shop its owner hid, in the search results and after a redirect', function (): void {
+    $product = discoveryProduct();
+    $owner = $product->user()->sole();
+    HiddenShop::hide($owner, 'hidden.test');
+    HiddenShop::hide($owner, 'moved.test');
+    fakeDiscovery(
+        [['title' => 'Coffee beans', 'link' => 'https://www.hidden.test/p'], ['title' => 'Coffee beans', 'link' => 'https://a.test/p']],
+        [
+            'https://a.test/p' => Http::response('', 302, ['Location' => 'https://shop.moved.test/other']),
+            'https://shop.moved.test/robots.txt' => Http::response('', 404),
+            'https://shop.moved.test/other' => htmlPage(discoveryPage('Coffee beans')),
+        ],
+    );
+
+    discover($product);
+
+    expect(WebShopFinding::query()->where('host', 'hidden.test')->exists())->toBeFalse()
+        ->and(findingAt($product, 'a.test')->status)->toBe(WebFindingStatus::Rejected)
+        ->and(findingAt($product, 'a.test')->failure)->toBe('hidden_shop');
 });
 
 it('proposes a page with the tracked barcode without a second Jev call', function (): void {

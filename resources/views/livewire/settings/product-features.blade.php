@@ -53,5 +53,8 @@
         @else
             <flux:text data-test="product-features-unavailable">{{ __('These features are not available right now.') }}</flux:text>
         @endif
+
+        {{-- Not an AI feature, so it shows whether or not the AI is available. --}}
+        <livewire:settings.hidden-shops />
     </x-settings.layout>
 </section>

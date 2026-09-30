@@ -1,5 +1,5 @@
 {{-- `.visible`: the copy inside the closed add-shop form does not poll. --}}
-<div @if ($pollSeconds !== null) wire:poll.visible.{{ $pollSeconds }}s @endif>
+<div x-data="{ hideHost: '', hideLabel: '' }" @if ($pollSeconds !== null) wire:poll.visible.{{ $pollSeconds }}s @endif>
     @php($total = count($suggestions) + $webSuggestions->count())
 
     {{-- Present from the first render, so a screen reader hears the search
@@ -12,9 +12,9 @@
         @endif
     </p>
 
-    @if ($total === 0 && ! $discovering && $datasetIsUsable)
+    @if ($explainEmpty && $total === 0 && ! $discovering && $datasetIsUsable)
         <flux:text size="sm" class="text-zinc-500">
-            No other shops found for this product.
+            No shop suggestions for this product right now.
         </flux:text>
     @endif
 
@@ -105,13 +105,19 @@
                                 </flux:button>
                             @endif
 
-                            <flux:button
-                                size="xs"
-                                variant="ghost"
-                                wire:click="dismiss({{ \Illuminate\Support\Js::from($suggestion->chain) }}, {{ \Illuminate\Support\Js::from($suggestion->externalId) }})"
-                            >
-                                Hide
-                            </flux:button>
+                            <flux:dropdown position="bottom" align="end">
+                                <flux:button size="xs" variant="ghost" icon:trailing="chevron-down" data-test="suggestion-hide-menu">
+                                    {{ __('Hide') }}<span class="sr-only"> {{ $suggestion->chainLabel }}</span>
+                                </flux:button>
+                                <flux:menu>
+                                    <flux:menu.item icon="x-mark" wire:click="dismiss({{ \Illuminate\Support\Js::from($suggestion->chain) }}, {{ \Illuminate\Support\Js::from($suggestion->externalId) }})" data-test="suggestion-hide">
+                                        {{ __('Hide for this product') }}
+                                    </flux:menu.item>
+                                    <flux:menu.item icon="eye-slash" x-on:click="hideHost = {{ \Illuminate\Support\Js::from($host) }}; hideLabel = {{ \Illuminate\Support\Js::from(\App\Models\HiddenShop::displayName($suggestion->chainLabel)) }}; $flux.modal({{ \Illuminate\Support\Js::from('hide-shop-' . $this->getId()) }}).show()" data-test="suggestion-hide-shop">
+                                        {{ __('Don’t suggest :shop', ['shop' => \App\Models\HiddenShop::displayName($suggestion->chainLabel)]) }}
+                                    </flux:menu.item>
+                                </flux:menu>
+                            </flux:dropdown>
                         </div>
                     </li>
                 @endforeach
@@ -169,9 +175,19 @@
                                     <span class="sr-only"> {{ $webHost }}</span>
                                 </flux:button>
 
-                                <flux:button size="xs" variant="ghost" wire:click="dismissWeb({{ $finding->id }})" data-test="web-suggestion-hide">
-                                    Hide<span class="sr-only"> {{ $webHost }}</span>
-                                </flux:button>
+                                <flux:dropdown position="bottom" align="end">
+                                    <flux:button size="xs" variant="ghost" icon:trailing="chevron-down" data-test="web-suggestion-hide-menu">
+                                        {{ __('Hide') }}<span class="sr-only"> {{ $webHost }}</span>
+                                    </flux:button>
+                                    <flux:menu>
+                                        <flux:menu.item icon="x-mark" wire:click="dismissWeb({{ $finding->id }})" data-test="web-suggestion-hide">
+                                            {{ __('Hide for this product') }}
+                                        </flux:menu.item>
+                                        <flux:menu.item icon="eye-slash" x-on:click="hideHost = {{ \Illuminate\Support\Js::from($webHost) }}; hideLabel = {{ \Illuminate\Support\Js::from($webHost) }}; $flux.modal({{ \Illuminate\Support\Js::from('hide-shop-' . $this->getId()) }}).show()" data-test="web-suggestion-hide-shop">
+                                            {{ __('Don’t suggest :shop', ['shop' => $webHost]) }}
+                                        </flux:menu.item>
+                                    </flux:menu>
+                                </flux:dropdown>
                             </div>
                         </li>
                     @endforeach
@@ -182,6 +198,8 @@
             </flux:accordion.item>
         </flux:accordion>
     @endif
+
+    <x-hide-shop-confirm :name="'hide-shop-' . $this->getId()" />
 
     {{-- Outside the disclosure, so it shows while the disclosure is closed. --}}
     @if ($discovering)

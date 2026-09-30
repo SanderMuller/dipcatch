@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Actions\Suggestions\SuggestShops;
 use App\Enums\WebFindingStatus;
+use App\Models\HiddenShop;
 use App\Models\Product;
 use App\Models\ShopSuggestionVerdict;
 use App\Models\User;
@@ -105,6 +106,7 @@ final readonly class DashboardSuggestions
             ->whereIn('product_id', $eligible)
             ->where('status', WebFindingStatus::Proposed)
             ->whereNull('dismissed_at')
+            ->whereNotIn('host', HiddenShop::hostsOf($user))
             ->groupBy('product_id')
             ->selectRaw('product_id, max(second_chance) as chance')
             ->pluck('chance', 'product_id')
@@ -169,7 +171,7 @@ final readonly class DashboardSuggestions
 
         return [
             'product' => $product,
-            'shop' => $suggestion->chainLabel,
+            'shop' => HiddenShop::displayName($suggestion->chainLabel),
             'host' => UrlNormalizer::normalizeHost((string) parse_url($suggestion->url, PHP_URL_HOST)),
             'url' => $suggestion->url,
             'name' => $suggestion->name,

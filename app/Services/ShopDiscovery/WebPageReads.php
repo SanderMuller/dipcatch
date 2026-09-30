@@ -7,6 +7,7 @@ use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\ShopDraft;
 use App\Enums\ProbeFailure;
 use App\Enums\WebFindingStatus;
+use App\Models\HiddenShop;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\WebDiscovery;
@@ -120,10 +121,12 @@ final readonly class WebPageReads
     private static function rejection(Product $product, string $addHost, string $servedHost, ShopDraft $draft): ?array
     {
         $tracked = $product->shops->pluck('host')->all();
+        $hidden = HiddenShop::hostsOf($product->user);
 
         $failure = match (true) {
             in_array($addHost, $tracked, strict: true) || in_array($servedHost, $tracked, strict: true) => 'tracked_host',
             WebResultFilter::isNotAShop($addHost) || WebResultFilter::isNotAShop($servedHost) => 'not_a_shop',
+            HiddenShop::covers($hidden, $addHost) || HiddenShop::covers($hidden, $servedHost) => 'hidden_shop',
             $draft->consumerPriceIssue !== null => 'not_a_consumer_price',
             default => null,
         };
