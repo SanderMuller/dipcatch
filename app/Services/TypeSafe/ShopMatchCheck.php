@@ -61,21 +61,23 @@ final readonly class ShopMatchCheck
      * @param  array<string, array<string, string>>  $candidates
      * @return array<string, float>
      */
-    public function ask(Product $product, ShopCheckPurpose $purpose, array $candidates): array
+    public function ask(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true): array
     {
         $user = $product->user;
 
         if ($user === null || ! $this->budget->allowsShopCheck($user, $purpose)) {
-            Log::info('Same-product check skipped: the daily budget is spent.', ['product_id' => $product->id]);
+            Log::info('Same-product check skipped: the daily budget is spent.', ['product_id' => $product->id, 'purpose' => $purpose->value]);
 
             return [];
         }
 
         try {
-            return $this->client->sameProduct($product, $candidates);
+            return $this->client->sameProduct($product, $candidates, $quick);
         } catch (TypeSafeRequestFailed $e) {
-            Log::warning('Same-product check failed; the shop goes unchecked.', [
+            Log::warning('Same-product check failed; the candidates go unchecked.', [
                 'product_id' => $product->id,
+                'purpose' => $purpose->value,
+                'status' => $e->status,
                 'error' => $e->getMessage(),
                 'exception' => $e,
             ]);
@@ -87,11 +89,20 @@ final readonly class ShopMatchCheck
     /**
      * @return array<string, string>
      */
-    public static function candidate(string $shop, ?string $title, ?string $packSize, ?string $price, ?string $gtin = null): array
-    {
+    public static function candidate(
+        string $shop,
+        ?string $title,
+        ?string $packSize,
+        ?string $price,
+        ?string $gtin = null,
+        ?string $snippet = null,
+        ?string $listingTitle = null,
+    ): array {
         $fields = [];
 
-        foreach (['shop' => $shop, 'title' => $title, 'pack_size' => $packSize, 'price' => $price, 'gtin' => $gtin] as $field => $value) {
+        // `listing_title` is a search result's title beside the page's own:
+        // a page title often drops the pack size the listing states.
+        foreach (['shop' => $shop, 'title' => $title, 'pack_size' => $packSize, 'price' => $price, 'gtin' => $gtin, 'snippet' => $snippet, 'listing_title' => $listingTitle] as $field => $value) {
             if ($value !== null && $value !== '') {
                 $fields[$field] = $value;
             }
@@ -100,7 +111,7 @@ final readonly class ShopMatchCheck
         return $fields;
     }
 
-    private static function packLabel(PackSize $packSize): string
+    public static function packLabel(PackSize $packSize): string
     {
         return rtrim(rtrim(number_format($packSize->quantity, 2, '.', ''), '0'), '.') . " {$packSize->unit}";
     }

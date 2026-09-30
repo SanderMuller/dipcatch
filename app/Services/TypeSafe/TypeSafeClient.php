@@ -65,12 +65,15 @@ final readonly class TypeSafeClient
      * tracked one, in the same pack, as one Noul question per candidate in a
      * single request. A candidate the answer leaves out is left out here.
      *
+     * Pass `$quick` false for the longer timeout and the retry; see
+     * `request()`.
+     *
      * @param  array<string, array<string, string>>  $candidates  Keyed by a caller-chosen id.
      * @return array<string, float>
      *
      * @throws TypeSafeRequestFailed
      */
-    public function sameProduct(Product $product, array $candidates): array
+    public function sameProduct(Product $product, array $candidates, bool $quick = true): array
     {
         if ($candidates === []) {
             return [];
@@ -98,7 +101,7 @@ final readonly class TypeSafeClient
             'model' => self::MODEL,
             'state' => [...$this->state($product), 'tracked_pack_sizes' => self::trackedPackSizes($product)],
             'questions' => $questions,
-        ], quick: true);
+        ], quick: $quick);
 
         $answers = is_array($payload['answers'] ?? null) ? $payload['answers'] : [];
         $chances = [];

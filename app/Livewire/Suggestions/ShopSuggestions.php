@@ -3,16 +3,23 @@
 namespace App\Livewire\Suggestions;
 
 use App\Actions\Suggestions\SuggestShops;
+use App\Enums\WebDiscoveryState;
 use App\Models\Product;
+use App\Models\User;
+use App\Models\WebDiscovery;
+use App\Models\WebShopFinding;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
- * Lists the other shops that sell a tracked product, matched against the
- * local checkjebon dataset. Accepting one hands its URL to `AddShop`, which
- * probes it and shows the normal preview - the dataset price is never stored.
+ * Lists other shops that sell a tracked product: from the local checkjebon
+ * dataset, and from web discovery (specs/web-shop-discovery.md). Accept hands
+ * the URL to `AddShop`, which probes it again; no suggested price is stored.
  */
 final class ShopSuggestions extends Component
 {
@@ -25,12 +32,17 @@ final class ShopSuggestions extends Component
      */
     public bool $expanded = false;
 
+    /** When the panel mounted, so polling for web suggestions stops in time. */
+    #[Locked]
+    public int $mountedAt = 0;
+
     public function mount(Product $product, bool $expanded = false): void
     {
         Gate::authorize('view', $product);
 
         $this->productId = (string) $product->id;
         $this->expanded = $expanded;
+        $this->mountedAt = now()->getTimestamp();
     }
 
     public function accept(string $url): void
@@ -56,6 +68,20 @@ final class ShopSuggestions extends Component
     }
 
     /**
+     * Hides one web suggestion, on this product only: a finding id of another
+     * product answers 404.
+     */
+    public function dismissWeb(int $findingId): void
+    {
+        WebShopFinding::query()
+            ->where('product_id', $this->product()->id)
+            ->findOrFail($findingId)
+            ->update(['dismissed_at' => now()]);
+
+        $this->dispatch('shop-suggestions-changed');
+    }
+
+    /**
      * Adding or removing a shop changes which chains are already tracked, so
      * the list is stale until the component re-renders. The listener needs no
      * body: `render()` recomputes the suggestions.
@@ -67,14 +93,36 @@ final class ShopSuggestions extends Component
 
     public function render(SuggestShops $suggest): View
     {
+        $product = $this->product();
+        $webShown = $product->user instanceof User && $product->user->wantsShopChecks();
+        $discovering = $webShown && self::discovering($product);
+
         return view('livewire.suggestions.shop-suggestions', [
-            'suggestions' => $suggest($this->product()),
+            'suggestions' => $suggest($product),
+            'webSuggestions' => $webShown ? WebShopFinding::shownFor($product) : new EloquentCollection(),
+            'discovering' => $discovering,
+            // A queued job cannot send the browser an event, so an open panel
+            // polls while discovery runs, for a bounded time.
+            'pollSeconds' => $discovering && now()->getTimestamp() - $this->mountedAt < Config::integer('dipcatch.web_discovery.poll_for_seconds')
+                ? Config::integer('dipcatch.web_discovery.poll_seconds')
+                : null,
             // Distinguish "nothing matched" from "nothing to match against":
             // an empty or stale catalogue is an operational problem, not an
             // answer, so the panel stays silent rather than claiming no shop
             // sells this product.
             'datasetIsUsable' => $suggest->hasUsableCatalogue(),
         ]);
+    }
+
+    private static function discovering(Product $product): bool
+    {
+        $state = WebDiscovery::query()->whereKey($product->id)->first()?->state;
+
+        if ($state === WebDiscoveryState::Queued || $state === WebDiscoveryState::Running) {
+            return true;
+        }
+
+        return WebShopFinding::query()->where('product_id', $product->id)->current($product)->whereNull('dismissed_at')->unfinished()->exists();
     }
 
     /**

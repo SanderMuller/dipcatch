@@ -9,6 +9,7 @@ use App\Billing\PlanLimits;
 use App\Enums\CategorySource;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\ShopDiscovery\WebShopDiscovery;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -20,6 +21,7 @@ final readonly class CreateProductWithShop
     public function __construct(
         private PlanLimits $limits,
         private AttachShop $attachShop,
+        private WebShopDiscovery $webShops,
     ) {}
 
     /**
@@ -49,6 +51,7 @@ final readonly class CreateProductWithShop
         });
 
         CategoriseProduct::afterResponseFor($created);
+        $this->webShops->queue($created->load(['user', 'shops']));
 
         return $created;
     }

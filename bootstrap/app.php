@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Console\Commands\CategoriseProductsCommand;
+use App\Console\Commands\DiscoverWebShopsCommand;
 use App\Console\Commands\DispatchDailyDigestsCommand;
 use App\Console\Commands\PruneOldChecksCommand;
 use App\Console\Commands\RecheckActiveShopsCommand;
@@ -65,6 +66,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->command(CategoriseProductsCommand::class)
             ->dailyAt('04:30')
+            ->timezone('Europe/Amsterdam')
+            ->withoutOverlapping()
+            ->onOneServer();
+
+        $schedule->command(DiscoverWebShopsCommand::class)
+            ->dailyAt('04:40')
             ->timezone('Europe/Amsterdam')
             ->withoutOverlapping()
             ->onOneServer();

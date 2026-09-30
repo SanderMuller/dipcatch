@@ -235,7 +235,7 @@ test('the command palette search is ignored by password managers', function (): 
 
     $input = ignoredSearchInput(
         Livewire::test(AppCommandPalette::class)->html(),
-        'Search pages and recent products…',
+        'Search pages and products…',
     );
 
     expect($input->getAttribute('autocomplete'))->toBe('off');

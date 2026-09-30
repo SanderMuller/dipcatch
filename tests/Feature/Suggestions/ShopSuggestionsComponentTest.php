@@ -207,6 +207,7 @@ test('another user cannot dismiss or accept by tampering with the product id', f
 })->with([
     ['dismiss', ['spar', 'beemster-spar-1/']],
     ['accept', ['https://www.spar.nl/beemster-spar-1/']],
+    ['dismissWeb', [1]],
 ]);
 
 test('add-shop refuses a probe or confirm for another user\'s product', function (string $method): void {

@@ -158,7 +158,7 @@ return [
         // name matched.
         'reject_below' => (float) env('DIPCATCH_SHOP_CHECKS_REJECT_BELOW', 0.3),
         // A suggestion whose name matched only loosely shows once Jev
-        // rates it at least this.
+        // rates it at least this. Web discovery proposes a page from it too.
         'accept_from' => (float) env('DIPCATCH_SHOP_CHECKS_ACCEPT_FROM', 0.6),
         // With the check on, a suggestion whose name matched below this waits
         // for Jev's answer before it shows, rather than showing until Jev
@@ -169,11 +169,46 @@ return [
         'timeout_seconds' => (int) env('DIPCATCH_SHOP_CHECKS_TIMEOUT', 5),
         // Candidates checked in one request for one product.
         'max_candidates' => (int) env('DIPCATCH_SHOP_CHECKS_MAX_CANDIDATES', 10),
-        // Paid calls per account and app-wide per day, counted apart for
-        // add-shop and for suggestions, so background checks never use up
-        // the warning a person is waiting for. Zero lifts a cap.
+        // Paid calls per account and app-wide per day, counted apart for each
+        // ShopCheckPurpose (add-shop, suggestions, and web discovery's two
+        // checks), so background checks never use up the warning a person
+        // is waiting for. Zero lifts a cap.
         'daily_limit_per_user' => (int) env('DIPCATCH_SHOP_CHECKS_DAILY_LIMIT_PER_USER', 50),
         'daily_limit' => (int) env('DIPCATCH_SHOP_CHECKS_DAILY_LIMIT', 2000),
+    ],
+
+    // More shops for a tracked product from a web search, checked twice by
+    // Jev with a page read in between. See specs/web-shop-discovery.md.
+    'web_discovery' => [
+        // Nothing runs without a Serper key either.
+        'enabled' => (bool) env('DIPCATCH_WEB_DISCOVERY_ENABLED', true),
+        'results_per_search' => (int) env('DIPCATCH_WEB_DISCOVERY_RESULTS', 10),
+        'country' => (string) env('DIPCATCH_WEB_DISCOVERY_COUNTRY', 'nl'),
+        'language' => (string) env('DIPCATCH_WEB_DISCOVERY_LANGUAGE', 'nl'),
+        // A result whose title and snippet Jev rates at least this is read.
+        'read_from' => (float) env('DIPCATCH_WEB_DISCOVERY_READ_FROM', 0.3),
+        'max_reads_per_product' => (int) env('DIPCATCH_WEB_DISCOVERY_MAX_READS', 8),
+        // Reads of one page when the shop rate-limits or fails for a while,
+        // the delay when the shop names none, and the cap on any delay.
+        'read_attempts' => (int) env('DIPCATCH_WEB_DISCOVERY_READ_ATTEMPTS', 3),
+        'retry_fallback_seconds' => (int) env('DIPCATCH_WEB_DISCOVERY_RETRY_FALLBACK', 60),
+        'retry_max_seconds' => (int) env('DIPCATCH_WEB_DISCOVERY_RETRY_MAX', 900),
+        // How often, and how long, an open suggestions panel polls while
+        // discovery is unfinished.
+        'poll_seconds' => (int) env('DIPCATCH_WEB_DISCOVERY_POLL_SECONDS', 15),
+        'poll_for_seconds' => (int) env('DIPCATCH_WEB_DISCOVERY_POLL_FOR', 300),
+        'search_max_age_days' => (int) env('DIPCATCH_WEB_DISCOVERY_SEARCH_MAX_AGE_DAYS', 90),
+        // Paid searches app-wide per day. Zero or less lifts the cap.
+        'daily_search_limit' => (int) env('DIPCATCH_WEB_DISCOVERY_DAILY_SEARCH_LIMIT', 300),
+        // Hosts that are not a shop a consumer orders from: comparison and
+        // review sites, social media, rental and wholesale.
+        'not_a_shop' => [
+            'wikipedia.org', 'youtube.com', 'facebook.com', 'instagram.com', 'pinterest.com', 'reddit.com', 'tiktok.com', 'x.com', 'twitter.com',
+            'tweakers.net', 'beslist.nl', 'kieskeurig.nl', 'vergelijk.nl', 'idealo.nl', 'idealo.de', 'google.com', 'google.nl', 'trustpilot.com',
+            'kassa.bnnvara.nl', 'consumentenbond.nl', 'folders.nl', 'reclamefolder.nl', 'myshopi.com', 'openfoodfacts.org', 'voedingscentrum.nl',
+            'supermarktscanner.nl', 'fatsecret.nl', 'beeradvocate.com', 'techradar.com',
+            'kisteman-events.nl', 'partyverhuren.nl', 'bidfood.nl', 'makro.nl',
+        ],
     ],
 
     // Price extraction chain. Order is priority — user selectors first, then

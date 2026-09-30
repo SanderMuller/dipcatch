@@ -10,4 +10,13 @@ enum ShopCheckPurpose: string
 
     /** The shop suggestions, checked after the response. */
     case Suggestions = 'suggestions';
+
+    /** The first check of a web search result, on its title and snippet. */
+    case WebDiscovery = 'web-discovery';
+
+    /**
+     * The second check of a web search result, on the page read. Counted
+     * apart, so first checks never use up the checks that finish a product.
+     */
+    case WebDiscoveryConfirm = 'web-discovery-confirm';
 }

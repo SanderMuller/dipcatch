@@ -1,11 +1,24 @@
-<div>
-    @if ($suggestions === [] && $datasetIsUsable)
+{{-- `.visible`: the copy inside the closed add-shop form does not poll. --}}
+<div @if ($pollSeconds !== null) wire:poll.visible.{{ $pollSeconds }}s @endif>
+    @php($total = count($suggestions) + $webSuggestions->count())
+
+    {{-- Present from the first render, so a screen reader hears the search
+         start and end; a region added with its text is not announced. --}}
+    <p role="status" class="sr-only" data-test="web-discovery-status">
+        @if ($discovering)
+            {{ __('Looking for more shops…') }}
+        @elseif ($webSuggestions->isNotEmpty())
+            {{ trans_choice('Found :count more shop on the web.|Found :count more shops on the web.', $webSuggestions->count(), ['count' => $webSuggestions->count()]) }}
+        @endif
+    </p>
+
+    @if ($total === 0 && ! $discovering && $datasetIsUsable)
         <flux:text size="sm" class="text-zinc-500">
             No other shops found for this product.
         </flux:text>
     @endif
 
-    @if ($suggestions !== [])
+    @if ($total > 0)
         {{--
             A disclosure rather than an open panel: these are shops the user
             has not chosen, and open they push the shops actually tracked —
@@ -16,9 +29,10 @@
             <flux:accordion.item :expanded="$expanded">
                 <flux:accordion.heading>
                     Also sold at
-                    <flux:badge size="sm" class="ms-2">{{ count($suggestions) }}</flux:badge>
+                    <flux:badge size="sm" class="ms-2">{{ $total }}</flux:badge>
                 </flux:accordion.heading>
                 <flux:accordion.content>
+            @if ($suggestions !== [])
             <flux:text size="sm" class="text-zinc-500">
                 Matched on name and pack size. These prices come from a daily list. DipCatch checks the shop itself once you add it.
             </flux:text>
@@ -102,8 +116,77 @@
                     </li>
                 @endforeach
             </ul>
+            @endif
+
+            @if ($webSuggestions->isNotEmpty())
+                <flux:text size="sm" @class(['text-zinc-500 dark:text-zinc-400', 'mt-4' => $suggestions !== []])>
+                    {{ __('Found on the web and checked by AI against the page itself. DipCatch checks the price again once you add the shop.') }}
+                </flux:text>
+
+                <ul class="mt-3 divide-y divide-zinc-100 dark:divide-white/5" data-test="web-suggestions">
+                    @foreach ($webSuggestions as $finding)
+                        @php($webHost = $finding->addHost())
+                        @php($webSize = $finding->page_pack_quantity !== null && $finding->page_pack_unit !== null ? \App\Support\PackSize::of((float) $finding->page_pack_quantity, $finding->page_pack_unit) : null)
+                        @php($webCurrency = $finding->page_currency ?? 'EUR')
+                        @php($webUnitPrice = $finding->page_price !== null ? $webSize?->unitPriceFor($finding->page_price) : null)
+                        <li class="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5" wire:key="web-suggestion-{{ $finding->id }}" data-test="web-suggestion">
+                            <img src="{{ \App\Support\Favicon::url($webHost) }}" alt="" loading="lazy" class="size-5 shrink-0 rounded" />
+
+                            <div class="min-w-0 flex-1">
+                                <flux:text class="truncate font-medium">
+                                    {{ $webHost }}
+                                    <span class="font-normal text-zinc-500 dark:text-zinc-400">— {{ $finding->page_title ?? $finding->search_title }}</span>
+                                </flux:text>
+                                <flux:text size="sm" class="text-zinc-500 tabular-nums dark:text-zinc-400" data-test="web-suggestion-price">
+                                    @if ($webUnitPrice !== null)
+                                        <span class="font-medium text-zinc-700 dark:text-zinc-300">{{ \App\Support\MoneyFormatter::unitPrice($webUnitPrice, $webCurrency) }} {{ $webSize->label() }}</span> ·
+                                    @endif
+                                    @if ($finding->page_price !== null)
+                                        {{ __(':price when checked on :date', ['price' => \App\Support\PackLine::format($finding->page_price, $webCurrency, $webSize), 'date' => ($finding->read_at ?? $finding->checked_at)?->isoFormat('D MMM')]) }} ·
+                                    @endif
+                                    {{-- A barcode match skips the second AI check, so it says so. --}}
+                                    <span class="text-savings-strong">{{ $finding->matched_gtin !== null ? __('same barcode as your product') : __('same product, checked by AI') }}</span>
+                                </flux:text>
+                            </div>
+
+                            <div class="flex w-full shrink-0 items-center gap-2 pl-8 sm:w-auto sm:pl-0">
+                                <flux:button size="xs" :href="$finding->add_url ?? $finding->url" target="_blank" rel="noopener noreferrer">
+                                    Open<span class="sr-only"> {{ $webHost }} {{ __('(opens in a new tab)') }}</span>
+                                </flux:button>
+
+                                <flux:button
+                                    size="xs"
+                                    variant="primary"
+                                    wire:click="accept({{ \Illuminate\Support\Js::from($finding->add_url ?? $finding->url) }})"
+                                    wire:loading.attr="disabled"
+                                    x-on:click="$el.dataset.adding = 'true'"
+                                    x-on:shop-probe-finished.window="delete $el.dataset.adding"
+                                    class="data-adding:pointer-events-none"
+                                    data-test="web-suggestion-add"
+                                >
+                                    <span class="in-data-adding:hidden">Add</span>
+                                    <span class="hidden items-center gap-1 in-data-adding:inline-flex"><flux:icon.loading class="size-3" /> Adding…</span>
+                                    <span class="sr-only"> {{ $webHost }}</span>
+                                </flux:button>
+
+                                <flux:button size="xs" variant="ghost" wire:click="dismissWeb({{ $finding->id }})" data-test="web-suggestion-hide">
+                                    Hide<span class="sr-only"> {{ $webHost }}</span>
+                                </flux:button>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+
                 </flux:accordion.content>
             </flux:accordion.item>
         </flux:accordion>
+    @endif
+
+    {{-- Outside the disclosure, so it shows while the disclosure is closed. --}}
+    @if ($discovering)
+        <flux:text size="sm" @class(['text-zinc-500 dark:text-zinc-400', 'mt-2' => $total > 0]) aria-hidden="true" data-test="web-discovery-running">
+            {{ __('Looking for more shops…') }}
+        </flux:text>
     @endif
 </div>

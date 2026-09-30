@@ -56,6 +56,12 @@ return [
         'key' => (string) env('TYPESAFE_API_KEY', ''),
     ],
 
+    // Serper, Google results over an API: finds more shops for a tracked
+    // product by its name. An empty key switches web shop discovery off.
+    'serper' => [
+        'key' => (string) env('SERPER_API_KEY', ''),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
