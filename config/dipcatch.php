@@ -200,15 +200,20 @@ return [
         'search_max_age_days' => (int) env('DIPCATCH_WEB_DISCOVERY_SEARCH_MAX_AGE_DAYS', 90),
         // Paid searches app-wide per day. Zero or less lifts the cap.
         'daily_search_limit' => (int) env('DIPCATCH_WEB_DISCOVERY_DAILY_SEARCH_LIMIT', 300),
-        // Hosts that are not a shop a consumer orders from: comparison and
-        // review sites, social media, rental and wholesale.
-        'not_a_shop' => [
-            'wikipedia.org', 'youtube.com', 'facebook.com', 'instagram.com', 'pinterest.com', 'reddit.com', 'tiktok.com', 'x.com', 'twitter.com',
-            'tweakers.net', 'beslist.nl', 'kieskeurig.nl', 'vergelijk.nl', 'idealo.nl', 'idealo.de', 'google.com', 'google.nl', 'trustpilot.com',
-            'kassa.bnnvara.nl', 'consumentenbond.nl', 'folders.nl', 'reclamefolder.nl', 'myshopi.com', 'openfoodfacts.org', 'voedingscentrum.nl',
-            'supermarktscanner.nl', 'fatsecret.nl', 'beeradvocate.com', 'techradar.com',
-            'kisteman-events.nl', 'partyverhuren.nl', 'bidfood.nl', 'makro.nl',
-        ],
+    ],
+
+    // Hosts that are not a shop a consumer orders from: comparison and review
+    // sites, social media, rental and wholesale. A pasted link on one is
+    // refused, and web discovery skips it. bcc.nl and maxict.nl are bankrupt
+    // shops turned into comparison sites: their pages carry another shop's
+    // lowest price as if it were their own (read 2026-09-30).
+    'not_a_shop' => [
+        'wikipedia.org', 'youtube.com', 'facebook.com', 'instagram.com', 'pinterest.com', 'reddit.com', 'tiktok.com', 'x.com', 'twitter.com',
+        'tweakers.net', 'beslist.nl', 'kieskeurig.nl', 'vergelijk.nl', 'idealo.nl', 'idealo.de', 'google.com', 'google.nl', 'trustpilot.com',
+        'kassa.bnnvara.nl', 'consumentenbond.nl', 'folders.nl', 'reclamefolder.nl', 'myshopi.com', 'openfoodfacts.org', 'voedingscentrum.nl',
+        'supermarktscanner.nl', 'fatsecret.nl', 'beeradvocate.com', 'techradar.com',
+        'kisteman-events.nl', 'partyverhuren.nl', 'bidfood.nl', 'makro.nl',
+        'bcc.nl', 'maxict.nl',
     ],
 
     // Price extraction chain. Order is priority — user selectors first, then
