@@ -1,0 +1,46 @@
+{
+  "features": [
+    {
+      "kicker": "Shopping list",
+      "headline": ["Add it to", "your list."],
+      "accent": "list.",
+      "sub": "Example entry: shows the button, notification and list moments. Do not render to public.",
+      "moment": {
+        "kind": "button",
+        "product": {"title": "Pepperoni pizza", "art": "pizza", "shop": "dirk.nl", "price": "€1.89"},
+        "button": "Add to shopping list",
+        "done": "On your list"
+      }
+    },
+    {
+      "kicker": "Alerts",
+      "headline": ["Hear it the", "moment it", "drops."],
+      "accent": "drops.",
+      "sub": "A push and a ping in the app, as soon as we see the drop.",
+      "moment": {
+        "kind": "notification",
+        "title": "Price drop: Pepperoni pizza",
+        "body": "Pepperoni pizza is now €4.34 /kg (€1.89 for 435 g) at dirk.nl"
+      }
+    },
+    {
+      "kicker": "Products",
+      "headline": ["Every shop,", "one list."],
+      "accent": "list.",
+      "sub": "Sorted by the real price per kilo.",
+      "moment": {
+        "kind": "list",
+        "title": "Shop comparison",
+        "badge": "Best value",
+        "rows": [
+          {"label": "dirk.nl", "value": "€4.34 /kg", "shop": "dirk.nl"},
+          {"label": "jumbo.com", "value": "€11.38 /kg", "shop": "jumbo.com"},
+          {"label": "ah.nl", "value": "€11.47 /kg", "shop": "ah.nl"},
+          {"label": "spar.nl", "value": "€12.62 /kg", "shop": "spar.nl"}
+        ]
+      }
+    }
+  ],
+  "where": "Products › Shop comparison",
+  "music": false
+}

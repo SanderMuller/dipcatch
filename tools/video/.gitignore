@@ -1,0 +1,5 @@
+node_modules/
+out/
+# Music is licensed for our own videos only (Mixkit terms 9.4): never commit it.
+public/*.m4a
+public/*.mp3
