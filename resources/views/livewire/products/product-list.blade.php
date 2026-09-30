@@ -172,7 +172,7 @@
             @if ($showAutoCategoriesPromo)
                 <flux:callout icon="sparkles" color="amber" class="mb-6" data-test="auto-categories-promo">
                     <flux:callout.heading>{{ __('Let Pro sort your products') }}</flux:callout.heading>
-                    <flux:callout.text>{{ __('With Pro, switch on automatic categories in your settings and DipCatch sorts the products you add. Pro also suggests a category for the products already here.') }}</flux:callout.text>
+                    <flux:callout.text>{{ __('With Pro, switch on automatic categories in your settings and DipCatch sorts your products, the ones already here too.') }}</flux:callout.text>
                     <x-slot name="actions">
                         <flux:button size="sm" variant="primary" :href="route('upgrade')">{{ $promoOffersTrial ? __('Try Pro') : __('Get Pro') }}</flux:button>
                     </x-slot>

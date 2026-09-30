@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Enums\AiFeature;
+use App\Jobs\CategoriseExistingProduct;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -42,8 +43,13 @@ final class AiFeaturePrompt extends Component
             return;
         }
 
+        $wasOn = $feature->isOn($user);
         $user->forceFill([$feature->column() => true])->save();
         $this->switchedOn = true;
+
+        if ($feature === AiFeature::Categories && ! $wasOn) {
+            CategoriseExistingProduct::queueFor($user);
+        }
     }
 
     public function dismiss(): void

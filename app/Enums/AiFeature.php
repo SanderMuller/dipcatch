@@ -27,7 +27,7 @@ enum AiFeature: string
     public function promptHeading(): string
     {
         return match ($this) {
-            self::Categories => __('Sort new products into categories with AI'),
+            self::Categories => __('Sort your products into categories with AI'),
             self::ShopChecks => __('Let AI check that a shop sells the same product'),
         };
     }
@@ -35,7 +35,7 @@ enum AiFeature: string
     public function promptText(): string
     {
         return match ($this) {
-            self::Categories => __('Your plan includes it. DipCatch then places each product you add in a category, so you can filter your list. It is off until you switch it on.'),
+            self::Categories => __('Your plan includes it. DipCatch then places your products in a category, the ones already here and each one you add, so you can filter your list. It is off until you switch it on.'),
             self::ShopChecks => __('Your plan includes it. DipCatch then warns you when a new shop sells a different product or pack, and finds more shops that sell yours. It is off until you switch it on.'),
         };
     }
@@ -43,7 +43,7 @@ enum AiFeature: string
     public function switchedOnText(): string
     {
         return match ($this) {
-            self::Categories => __('Switched on. DipCatch sorts the products you add from now on.'),
+            self::Categories => __('Switched on. DipCatch is sorting the products without a category now, and each one you add.'),
             self::ShopChecks => __('Switched on. DipCatch checks the next shop you add.'),
         };
     }

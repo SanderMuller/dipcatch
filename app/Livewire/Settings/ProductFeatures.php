@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Jobs\CategoriseExistingProduct;
 use App\Models\User;
 use App\Services\TypeSafe\TypeSafeClient;
 use Flux\Flux;
@@ -31,12 +32,20 @@ final class ProductFeatures extends Component
 
     public function save(): void
     {
-        $this->user()->forceFill([
+        $user = $this->user();
+        $switchedOnCategories = $this->auto_categories && ! $user->auto_categories;
+
+        $user->forceFill([
             'auto_categories' => $this->auto_categories,
             'shop_checks' => $this->shop_checks,
         ])->save();
 
-        Flux::toast(variant: 'success', text: __('Saved.'));
+        // Sorts the products already here now, rather than at the nightly run.
+        $queued = $switchedOnCategories ? CategoriseExistingProduct::queueFor($user) : 0;
+
+        Flux::toast(variant: 'success', text: $queued > 0
+            ? __('Saved. DipCatch is sorting your products without a category now.')
+            : __('Saved.'));
     }
 
     public function render(): View

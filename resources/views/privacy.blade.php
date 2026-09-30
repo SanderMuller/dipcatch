@@ -46,6 +46,7 @@
                             <li><strong>{{ __('Tracked products') }}:</strong> {{ __('the product links you paste, the titles, images and prices we read from those pages, the price history, and any private notes you add.') }}</li>
                             <li><strong>{{ __('Alerts') }}:</strong> {{ __('which price drops we told you about, and when.') }}</li>
                             <li><strong>{{ __('Hidden shops') }}:</strong> {{ __('the shops you chose not to have suggested.') }}</li>
+                            <li><strong>{{ __('Pages we could not read') }}:</strong> {{ __('when you try to add a shop page DipCatch cannot read, its web address, why it failed and who tried it last, so we can make that shop work. We keep it for six months after the last try.') }}</li>
                             <li><strong>{{ __('Searches without results') }}:</strong> {{ __('when a search in the app finds nothing, the words you searched for and how often, so we can see what is missing. We keep them for six months after the last such search.') }}</li>
                             <li><strong>{{ __('Technical') }}:</strong> {{ __('a session cookie to keep you signed in, and short-lived rate-limit counters keyed on your IP address to protect the shops we read prices from and this service.') }}</li>
                         </ul>

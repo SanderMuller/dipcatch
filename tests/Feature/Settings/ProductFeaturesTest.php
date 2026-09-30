@@ -34,7 +34,7 @@ test('a Pro account sees the automatic categories switch enabled', function (): 
     $this->actingAs($user);
 
     $html = livewire(ProductFeatures::class)
-        ->assertSee('Products you add from now on. Products you already track keep their category.')
+        ->assertSee('Products you add, and the ones already here without a category. A category you chose yourself is never changed.')
         ->assertDontSee('Pro sorts products for you.')
         ->html();
 

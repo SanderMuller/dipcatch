@@ -15,6 +15,7 @@ use App\Mcp\Support\DraftFailure;
 use App\Mcp\Support\DraftToken;
 use App\Mcp\Support\ProbeReporter;
 use App\Mcp\Support\ProductPresenter;
+use App\Models\FailedShopPage;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Validation\Rule;
@@ -168,6 +169,9 @@ final class CreateProductTool extends Tool
 
     private function runProbe(string $url, Request $request, ?string $variantKey): ProbeOutcome
     {
-        return ($this->probe)(null, $url, $this->user($request), [], null, $variantKey);
+        $outcome = ($this->probe)(null, $url, $this->user($request), [], null, $variantKey);
+        FailedShopPage::recordOutcome($url, $outcome, $this->user($request));
+
+        return $outcome;
     }
 }

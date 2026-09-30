@@ -251,6 +251,7 @@
     "Our crawler identifies itself, reads robots.txt and honours it. Do not ask us to point it at something that forbids it.": "Onze crawler maakt zich bekend, leest robots.txt en houdt zich eraan. Vraag ons niet hem te richten op iets dat dat verbiedt.",
     "Packs of different sizes compared fairly.": "Verpakkingen van verschillende grootte eerlijk vergeleken.",
     "Page not found": "Pagina niet gevonden",
+    "Pages we could not read": "Pagina’s die we niet konden lezen",
     "Paste a link from almost any webshop and it works. These are the ones we check most often.": "Plak een link van bijna elke webshop en het werkt. Deze winkels controleren we het vaakst.",
     "Paste a pet-shop or supermarket link. Most shops work. We set up Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, bol.com, Amazon, Albert Heijn and Jumbo ourselves. Many smaller pet shops work straight from what is on the page.": "Plak een dierenwinkel- of supermarktlink. De meeste winkels werken. Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, bol.com, Amazon, Albert Heijn en Jumbo zijn het zekerst. Veel kleinere dierenwinkels werken gewoon vanaf wat er op de pagina staat.",
     "Paste a product link": "Plak een productlink",
@@ -506,6 +507,7 @@
     "vacuum and water filters": "stofzuiger- en waterfilters",
     "we fetch product pages from the shops you track. Those requests come from our servers, not from you, and carry nothing about you.": "we halen productpagina’s op bij de winkels die je volgt. Die verzoeken komen van onze servers, niet van jou, en bevatten niets over jou.",
     "when a search in the app finds nothing, the words you searched for and how often, so we can see what is missing. We keep them for six months after the last such search.": "als een zoekopdracht in de app niets vindt, de woorden waarop je zocht en hoe vaak, zodat we zien wat er ontbreekt. We bewaren ze tot zes maanden na de laatste keer.",
+    "when you try to add a shop page DipCatch cannot read, its web address, why it failed and who tried it last, so we can make that shop work. We keep it for six months after the last try.": "als je een winkelpagina probeert toe te voegen die DipCatch niet kan lezen, het webadres, waarom het misging en wie het als laatste probeerde, zodat we die winkel kunnen laten werken. We bewaren het tot zes maanden na de laatste poging.",
     "which price drops we told you about, and when.": "welke prijsdalingen we je hebben gemeld, en wanneer.",
     "your name, email address, a hashed password, your timezone and default currency, and your notification preferences. Optional: two-factor secrets, passkeys, browser-push subscriptions, and a link to your Google or Apple account — all of which you turn on yourself.": "je naam, e-mailadres, een gehasht wachtwoord, je tijdzone en standaardvaluta, en je meldingsvoorkeuren. Optioneel: tweefactorsleutels, passkeys, browsermeldingen, en een koppeling met je Google- of Apple-account — allemaal dingen die je zelf aanzet.",
     "your weekly groceries": "je wekelijkse boodschappen"

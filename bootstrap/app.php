@@ -11,6 +11,7 @@ use App\Console\Commands\RunAdapterCanaryCommand;
 use App\Http\Middleware\RequireVerifiedEmailToAddCredentials;
 use App\Http\Middleware\SecurityHeaders;
 use App\Models\EmptySearch;
+use App\Models\FailedShopPage;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Console\PruneCommand;
 use Illuminate\Database\QueryException;
@@ -43,8 +44,9 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->onOneServer();
 
-        // Searches without results are kept six months after the last one.
-        $schedule->command(PruneCommand::class, ['--model' => [EmptySearch::class]])
+        // Searches without results and pages we could not read are kept six
+        // months after the last one.
+        $schedule->command(PruneCommand::class, ['--model' => [EmptySearch::class, FailedShopPage::class]])
             ->dailyAt('03:50')
             ->timezone('Europe/Amsterdam')
             ->onOneServer();

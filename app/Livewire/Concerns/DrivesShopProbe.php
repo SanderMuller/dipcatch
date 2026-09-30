@@ -5,6 +5,7 @@ namespace App\Livewire\Concerns;
 use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\ShopDraft;
+use App\Models\FailedShopPage;
 use App\Models\Product;
 use App\Models\User;
 use App\PriceAdapters\ShopSnapshot;
@@ -167,11 +168,13 @@ trait DrivesShopProbe
         // Rebuilt as a constant array of narrowed values: the probe's
         // `$selectors` is a sealed shape, and reading a trait parameter gives
         // no shape back, so each key is checked rather than assumed.
-        $outcome = $probe($this->probeSubject(), $url, $actor, [
+        $selectors = [
             'price' => self::selector($selectors, 'price'),
             'title' => self::selector($selectors, 'title'),
             'image' => self::selector($selectors, 'image'),
-        ], $currency, $variantKey);
+        ];
+        $outcome = $probe($this->probeSubject(), $url, $actor, $selectors, $currency, $variantKey);
+        FailedShopPage::recordOutcome($url, $outcome, $actor, $selectors);
 
         match (true) {
             $outcome->isSuccess() => $this->showPreview($outcome),

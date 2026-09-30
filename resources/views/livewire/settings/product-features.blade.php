@@ -19,7 +19,7 @@
                     </flux:label>
                     <flux:description>
                         {{ $allowsAutoCategories
-                            ? __('Products you add from now on. Products you already track keep their category.')
+                            ? __('Products you add, and the ones already here without a category. A category you chose yourself is never changed.')
                             : __('Pro sorts products for you. Your choice is kept, and it starts working when you upgrade.') }}
                     </flux:description>
                     <flux:switch

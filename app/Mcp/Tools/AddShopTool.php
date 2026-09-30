@@ -13,6 +13,7 @@ use App\Mcp\Support\DraftFailure;
 use App\Mcp\Support\DraftToken;
 use App\Mcp\Support\ProbeReporter;
 use App\Mcp\Support\ProductPresenter;
+use App\Models\FailedShopPage;
 use App\Models\Product;
 use App\Models\Shop;
 use App\PriceAdapters\VariantCandidate;
@@ -120,6 +121,7 @@ final class AddShopTool extends Tool
         // With the product, so a URL already on it comes back as a duplicate
         // before anything is fetched.
         $outcome = ($this->probe)($product, $this->str($validated, 'url'), $this->user($request), [], null, $variantKey);
+        FailedShopPage::recordOutcome($this->str($validated, 'url'), $outcome, $this->user($request));
 
         if (! $outcome->isSuccess()) {
             return $this->reporter->explain($outcome);
