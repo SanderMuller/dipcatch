@@ -128,6 +128,7 @@ final readonly class ProbeReporter
             // Without this the default fired, which tells a caller to try a
             // direct product URL — the one retry that can never work here.
             ProbeFailure::ShopNotServable => 'That shop builds its prices in the browser, so its pages carry no price to read. It cannot be tracked, and another URL from the same shop will not help.',
+            ProbeFailure::NotAShop => 'This is a comparison site, not a shop. Paste the link of the shop that sells it.',
             ProbeFailure::TemporaryFailure, ProbeFailure::HttpError => self::persistent($context)
                 ? 'That shop has not answered DipCatch on its last ' . self::failures($context) . ' requests. This is not a passing fault, so another attempt now will fail too.'
                 : 'The shop did not answer. Try again shortly.' . self::streak($context),

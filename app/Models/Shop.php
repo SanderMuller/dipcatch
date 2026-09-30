@@ -53,6 +53,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $retried_at When a reference shop was last asked again.
  * @property ConsumerPriceIssue|null $consumer_price_issue Why this is not a price a shopper can pay.
  * @property string|null $consumer_price_note The words the page used to say so.
+ * @property string|null $claimed_regular_price The price the shop says it charged before the discount.
  */
 #[Unguarded]
 final class Shop extends Model
@@ -71,6 +72,7 @@ final class Shop extends Model
             'single_item_price' => 'decimal:2',
             'bundle_quantity' => 'integer',
             'bundle_total_price' => 'decimal:2',
+            'claimed_regular_price' => 'decimal:2',
             'pack_quantity' => 'decimal:2',
             'conditional_price' => 'decimal:2',
             'conditional_starts_at' => 'datetime',
@@ -160,6 +162,8 @@ final class Shop extends Model
             'promotion_starts_at' => null,
             'promotion_ends_at' => null,
             'promotion_label' => null,
+            // The claim was about the old page's discount.
+            'claimed_regular_price' => null,
             // Nothing has read the URL this offer now points at. Keeping the
             // old timestamps showed a "Last read" and a "Last checked" that
             // belonged to the previous page, and let the offer coast on the

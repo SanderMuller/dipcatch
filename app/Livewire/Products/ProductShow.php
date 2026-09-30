@@ -17,6 +17,7 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Services\Drops\LargeDropConfirmation;
 use App\Support\AlertRules;
+use App\Support\PriceBeforeDiscount;
 use App\Support\UrlNormalizer;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
@@ -315,14 +316,17 @@ final class ProductShow extends Component
 
     public function render(): View
     {
+        $shops = $this->product->comparablePacks()->tableOrder(
+            $this->product->shops()->orderBy('current_price')->get(),
+            $this->product->eligibleShops(),
+        );
+
         return view('livewire.products.product-show', [
             'chart' => new PriceHistorySeries($this->product, $this->range)->fluxChart(),
             'ranges' => HistoryWindow::filters($this->historyDays()),
             'historyNotice' => $this->historyNotice(),
-            'shops' => $this->product->comparablePacks()->tableOrder(
-                $this->product->shops()->orderBy('current_price')->get(),
-                $this->product->eligibleShops(),
-            ),
+            'shops' => $shops,
+            'discountChecks' => PriceBeforeDiscount::forShops($this->product, $shops),
             'shareUrl' => $this->product->publicShareUrl(),
             'canAddShop' => app(PlanLimits::class)->canAddShop($this->product),
             'shopLimit' => $this->product->user?->entitlements()->maxShopsPerProduct(),

@@ -1,6 +1,9 @@
 @props([
     'shop',
     'showSource' => true,
+    // A {@see \App\Support\DiscountCheck}: the product page passes one, the
+    // product cards never do.
+    'beforeDiscount' => null,
 ])
 
 @php
@@ -16,7 +19,7 @@
         : 'bg-amber-50/70 ring-amber-900/10 dark:bg-amber-950/25 dark:ring-amber-200/10';
 @endphp
 
-@if ($bundle !== null || $window !== null)
+@if ($bundle !== null || $window !== null || $beforeDiscount !== null)
     <div {{ $attributes->class("space-y-2 rounded-lg p-3 ring-1 {$surfaceClasses}") }}>
         @if ($isUpcoming)
             {{-- Announced, not running: say what it gives, at which shop and
@@ -80,6 +83,18 @@
                     @endif
                 </p>
             </div>
+        @endif
+
+        @if ($beforeDiscount !== null)
+            <p @class([
+                'text-base text-zinc-600 tabular-nums sm:text-sm dark:text-zinc-300',
+                'border-t border-amber-900/10 pt-2 dark:border-amber-200/10' => $bundle !== null || $window !== null,
+            ]) data-test="discount-check">
+                {{ __('Shop says it was :claimed. Lowest here in the 30 days before: :lowest.', [
+                    'claimed' => \App\Support\MoneyFormatter::format($beforeDiscount->claimedRegularPrice, $beforeDiscount->currency),
+                    'lowest' => \App\Support\MoneyFormatter::format($beforeDiscount->lowestBefore, $beforeDiscount->currency),
+                ]) }}
+            </p>
         @endif
     </div>
 @endif

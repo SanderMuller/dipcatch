@@ -16,7 +16,7 @@ test('matches www.petsplace.nl via normalized host', function (): void {
     $json = json_encode([
         '@type' => 'Product',
         'name' => 'Trixie Mini Mover',
-        'offers' => ['@type' => 'Shop', 'price' => '19.99', 'priceCurrency' => 'EUR'],
+        'offers' => ['@type' => 'Offer', 'price' => '19.99', 'priceCurrency' => 'EUR'],
     ], JSON_THROW_ON_ERROR);
 
     $result = $this->adapter->extract('https://www.petsplace.nl/trixie-mini-mover', withJsonLd($json));
@@ -30,7 +30,7 @@ test('delegates to JsonLdAdapter on the happy path', function (): void {
         '@type' => 'Product',
         'name' => 'Trixie Mini Mover',
         'offers' => [
-            '@type' => 'Shop',
+            '@type' => 'Offer',
             'price' => '19.99',
             'priceCurrency' => 'EUR',
             'availability' => 'https://schema.org/InStock',

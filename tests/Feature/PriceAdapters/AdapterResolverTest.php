@@ -285,7 +285,7 @@ test('the production chain uses Welkoop current price, not JSON-LD list price', 
     $json = json_encode([
         '@type' => 'Product',
         'name' => 'Royal Canin Kitten',
-        'offers' => ['@type' => 'Shop', 'price' => '31.50', 'priceCurrency' => 'EUR'],
+        'offers' => ['@type' => 'Offer', 'price' => '31.50', 'priceCurrency' => 'EUR'],
     ], JSON_THROW_ON_ERROR);
 
     $html = withJsonLd($json)

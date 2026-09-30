@@ -5,7 +5,9 @@ namespace App\Jobs;
 use App\Actions\Drops\DetectTargetPrice;
 use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Actions\Shops\CheckOutcome;
+use App\Actions\Shops\RegularPriceClaim;
 use App\Actions\Shops\ResolvedBundlePricing;
+use App\Enums\ConsumerPriceIssue;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Models\PriceCheck;
@@ -302,7 +304,20 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 windowAuthoritative: $snapshot->promotionWindowAuthoritative ?? false,
             );
 
+            // Carried-over prices say nothing about this page, so the claim
+            // is judged against the price just read.
+            $claim = RegularPriceClaim::kept(
+                $snapshot?->claimedRegularPrice,
+                $pricing->inherited ? $snapshot?->price : ($pricing->singleItemPrice ?? $pricing->trackedPrice),
+                bundleApplies: ! $pricing->inherited && $pricing->appliedOffer !== null,
+            );
+
             if ($succeeded) {
+                // A reader without the concept leaves the stored claim alone.
+                if ($snapshot->claimAuthoritative) {
+                    $updates['claimed_regular_price'] = $claim;
+                }
+
                 $updates += $pricing->shopUpdates() + [
                     // Unknown stays unknown: coercing it to true is what
                     // reported a sold-out product as available.
@@ -375,7 +390,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'status' => $status,
                 'error' => $outcome->error,
                 'checked_at' => $now,
-            ]);
+            ] + self::claimEvidence($succeeded ? $snapshot : null, $claim, $pricing->inherited));
 
             $locked->forceFill($updates)->save();
 
@@ -393,6 +408,27 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 app(DetectTargetPrice::class)($product);
             }
         });
+    }
+
+    /**
+     * What the discount check reads from this reading: the claim, the seller,
+     * and whether the reading can stand as evidence at all.
+     *
+     * @return array{claimed_regular_price: ?string, seller: ?string, claim_read: ?bool, shelf_inherited: ?bool, consumer_price_issue: ?ConsumerPriceIssue}
+     */
+    private static function claimEvidence(?ShopSnapshot $snapshot, ?string $claim, bool $inherited): array
+    {
+        if (! $snapshot instanceof ShopSnapshot) {
+            return ['claimed_regular_price' => null, 'seller' => null, 'claim_read' => null, 'shelf_inherited' => null, 'consumer_price_issue' => null];
+        }
+
+        return [
+            'claimed_regular_price' => $snapshot->claimAuthoritative ? $claim : null,
+            'seller' => $snapshot->seller,
+            'claim_read' => $snapshot->claimAuthoritative,
+            'shelf_inherited' => $inherited,
+            'consumer_price_issue' => $snapshot->consumerPriceIssue,
+        ];
     }
 
     /**

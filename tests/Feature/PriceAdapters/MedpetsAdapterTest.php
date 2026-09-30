@@ -27,7 +27,7 @@ test('delegates to JsonLdAdapter on the happy path', function (): void {
         '@type' => 'Product',
         'name' => '4lazylegs Hondendraagzak',
         'offers' => [
-            '@type' => 'Shop',
+            '@type' => 'Offer',
             'price' => '38.60',
             'priceCurrency' => 'EUR',
             'availability' => 'https://schema.org/InStock',

@@ -21,6 +21,8 @@ final readonly class ResolvedBundlePricing
         public ?BundleOffer $offer,
         public ?BundleOffer $appliedOffer,
         public array $promotionUpdates,
+        /** True when the prices were carried over from an earlier check, not read now. */
+        public bool $inherited = false,
     ) {}
 
     public static function merge(
@@ -49,6 +51,7 @@ final readonly class ResolvedBundlePricing
                 offer: $storedOffer,
                 appliedOffer: $storedOffer->isTrackedAt($trackedPrice) ? $storedOffer : null,
                 promotionUpdates: [],
+                inherited: true,
             );
         }
 

@@ -17,6 +17,17 @@ final class JsonLdSearchState
     /** @var array<string, mixed>|null */
     public ?array $productGroup = null;
 
+    /**
+     * A top-level AggregateOffer, then a top-level Offer. Used only when no
+     * Product or ProductGroup on the page supplied an offer.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $standaloneAggregateOffer = null;
+
+    /** @var array<string, mixed>|null */
+    public ?array $standaloneOffer = null;
+
     /** @var list<VariantCandidate> Built from `hasVariant` entries; surfaces the chooser when >1 and none URL-match. */
     public array $variants = [];
 
@@ -127,6 +138,6 @@ final class JsonLdSearchState
             $shop = JsonLdEntities::pickOfferFromProduct($this->productGroup['offers']);
         }
 
-        return [$product, $shop];
+        return [$product, $shop ?? $this->standaloneAggregateOffer ?? $this->standaloneOffer];
     }
 }

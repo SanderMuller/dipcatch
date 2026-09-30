@@ -68,10 +68,22 @@ final readonly class JsonLdAdapter implements ShopAdapter
                 return ExtractionResult::skip();
             }
 
+            if (JsonLdTypeForms::namesProductOnlyByUrl($state->product ?? $state->productGroup ?? [])) {
+                return ExtractionResult::skip();
+            }
+
             return ExtractionResult::failed('jsonld_no_offer');
         }
 
-        return $this->buildSnapshot($product, $shop, $state, $variantKey);
+        $result = $this->buildSnapshot($product, $shop, $state, $variantKey);
+
+        // A full-URL Product whose offer cannot be read was ignored before
+        // `typesOf()` read that form: let the next reader have the page.
+        if ($result->isFailed() && $product !== null && JsonLdTypeForms::namesProductOnlyByUrl($product)) {
+            return ExtractionResult::skip();
+        }
+
+        return $result;
     }
 
     /**
@@ -80,6 +92,7 @@ final readonly class JsonLdAdapter implements ShopAdapter
     private function findProductAndOffer(Crawler $scripts, string $url, ?AdapterContext $context, JsonLdSearchState $state): array
     {
         $searcher = new JsonLdEntitySearcher();
+        $actionObjects = [];
 
         foreach ($scripts as $node) {
             $decoded = $this->decodeScript($node->textContent);
@@ -91,14 +104,31 @@ final readonly class JsonLdAdapter implements ShopAdapter
                 $searcher->consider($entity, $url, $context, $state);
             }
 
-            if ($state->shop === null && $state->product !== null && isset($state->product['offers'])) {
-                $state->shop = JsonLdEntities::pickOfferFromProduct($state->product['offers']);
+            array_push($actionObjects, ...JsonLdTypeForms::actionObjects($decoded));
+            self::pickProductOffer($state);
+        }
+
+        // A Product stated only inside an Action gets its turn once the page's
+        // own entities have not answered the request, so a page repeating its
+        // Product there reads as before and cannot tie with itself.
+        if (! $state->identified()) {
+            foreach ($actionObjects as $object) {
+                $searcher->consider($object, $url, $context, $state);
             }
+
+            self::pickProductOffer($state);
         }
 
         $searcher->finish($state);
 
         return $state->fallback();
+    }
+
+    private static function pickProductOffer(JsonLdSearchState $state): void
+    {
+        if ($state->shop === null && $state->product !== null && isset($state->product['offers'])) {
+            $state->shop = JsonLdEntities::pickOfferFromProduct($state->product['offers']);
+        }
     }
 
     /**
@@ -167,6 +197,10 @@ final readonly class JsonLdAdapter implements ShopAdapter
             // too: an offer that no longer states an end date has none.
             promotionWindowAuthoritative: true,
             stockSignal: $stockSignal,
+            claimedRegularPrice: JsonLdOfferPrice::claimedRegularPrice($shop, $currency),
+            // The offer supplied the price, so it also speaks for a claim.
+            claimAuthoritative: true,
+            seller: JsonLdOfferPrice::seller($shop),
         ));
 
         return self::withVariantCount($result, $state, $variantKey);

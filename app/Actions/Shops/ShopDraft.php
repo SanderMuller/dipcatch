@@ -52,7 +52,25 @@ final readonly class ShopDraft
         public ?ConsumerPriceIssue $consumerPriceIssue = null,
         /** The words the page used to say so. */
         public ?string $consumerPriceNote = null,
+        /** The price the page says the shop charged before the discount. */
+        public ?string $claimedRegularPrice = null,
+        /** True when the reader can state a claim, so a null claim means none. */
+        public bool $claimRead = false,
+        /** The marketplace seller the page named. */
+        public ?string $seller = null,
     ) {}
+
+    /** The claim the first reading keeps: see {@see RegularPriceClaim}. */
+    public function keptClaim(): ?string
+    {
+        $shelfPrice = $this->singleItemPrice ?? $this->price;
+
+        return RegularPriceClaim::kept(
+            $this->claimedRegularPrice,
+            $shelfPrice,
+            bundleApplies: $this->bundleOffer?->appliesTo($shelfPrice, $this->promotionWindow) === true,
+        );
+    }
 
     public function trackedPrice(): string
     {
@@ -100,6 +118,9 @@ final readonly class ShopDraft
             'consumer_price_note' => $snapshot->consumerPriceNote,
             'variants_on_page' => $snapshot->variantsOnPage,
             'variant_note' => $snapshot->variantNote(),
+            'claimed_regular_price' => $snapshot->claimedRegularPrice,
+            'claim_read' => $snapshot->claimAuthoritative,
+            'seller' => $snapshot->seller,
         ];
     }
 
@@ -176,6 +197,9 @@ final readonly class ShopDraft
             titleOverride: $titleOverride,
             consumerPriceIssue: ConsumerPriceIssue::tryFrom(self::string($snapshot, 'consumer_price_issue') ?? ''),
             consumerPriceNote: self::string($snapshot, 'consumer_price_note'),
+            claimedRegularPrice: self::string($snapshot, 'claimed_regular_price'),
+            claimRead: ($snapshot['claim_read'] ?? false) === true,
+            seller: self::string($snapshot, 'seller'),
         );
     }
 

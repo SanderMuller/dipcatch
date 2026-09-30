@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ConsumerPriceIssue;
 use App\Enums\ScrapeStatus;
 use App\PriceAdapters\BundleOffer;
 use Carbon\CarbonImmutable;
@@ -26,6 +27,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ScrapeStatus $status
  * @property string|null $error
  * @property CarbonImmutable $checked_at
+ * @property string|null $claimed_regular_price The price the page said it charged before the discount.
+ * @property string|null $seller The marketplace seller the page named for the offer.
+ * @property bool|null $claim_read True when the reader can state a claim, so null means the page stated none.
+ * @property bool|null $shelf_inherited True when the prices were carried over from an earlier reading.
+ * @property ConsumerPriceIssue|null $consumer_price_issue Why this price is not one a shopper can pay.
  * @property-read Shop $shop
  */
 #[WithoutTimestamps]
@@ -45,6 +51,10 @@ final class PriceCheck extends Model
             'single_item_price' => 'decimal:2',
             'bundle_quantity' => 'integer',
             'bundle_total_price' => 'decimal:2',
+            'claimed_regular_price' => 'decimal:2',
+            'claim_read' => 'boolean',
+            'shelf_inherited' => 'boolean',
+            'consumer_price_issue' => ConsumerPriceIssue::class,
             'in_stock' => 'boolean',
             'checked_at' => 'datetime',
             'status' => ScrapeStatus::class,

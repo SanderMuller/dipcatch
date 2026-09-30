@@ -52,6 +52,13 @@ enum ProbeFailure: string
     case ShopNotServable = 'shop_not_servable';
 
     /**
+     * A comparison site, social network or wholesaler, not a shop a consumer
+     * orders from (`dipcatch.not_a_shop`). A comparison page states another
+     * shop's lowest price as its own, so it is refused rather than kept.
+     */
+    case NotAShop = 'not_a_shop';
+
+    /**
      * Whether this wall is one worth keeping the URL behind.
      *
      * A page that cannot be read today is still a page that sells the thing,
@@ -72,7 +79,7 @@ enum ProbeFailure: string
             self::Blocked, self::RobotsDisallowed, self::TemporaryFailure,
             self::HttpError, self::ExtractionFailed, self::ShopNotServable => true,
             self::InvalidUrl, self::ProbeRateLimited, self::LocalThrottle,
-            self::HostRateLimited, self::CurrencyMismatch, self::NotInDataset => false,
+            self::HostRateLimited, self::CurrencyMismatch, self::NotInDataset, self::NotAShop => false,
         };
     }
 }

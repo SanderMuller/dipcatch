@@ -239,6 +239,10 @@ final readonly class AhApiSource
             promotionWindowAuthoritative: array_key_exists('isBonus', $card),
             bundleOffer: $bundleOffer,
             bundleOfferAuthoritative: array_key_exists('isBonus', $card),
+            // A bonus that has not started is priced at the price before it,
+            // so it claims nothing yet.
+            claimedRegularPrice: $upcoming ? null : $priceBeforeBonus,
+            claimAuthoritative: true,
         );
     }
 

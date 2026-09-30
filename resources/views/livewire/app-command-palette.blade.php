@@ -4,7 +4,7 @@
     <flux:modal.trigger name="app-command" shortcut="cmd.k">
         <button
             type="button"
-            class="hidden w-full items-center gap-3 rounded-full bg-white/70 px-4 py-2 text-start text-sm text-zinc-500 ring-1 ring-zinc-900/5 transition hover:bg-white sm:flex dark:bg-zinc-900/70 dark:text-zinc-400 dark:ring-white/10 dark:hover:bg-zinc-900"
+            class="hidden w-full items-center gap-3 rounded-full bg-white/70 px-5 py-2.5 text-start text-[0.9375rem] text-zinc-500 ring-1 ring-zinc-900/5 transition hover:bg-white sm:flex dark:bg-zinc-900/70 dark:text-zinc-400 dark:ring-white/10 dark:hover:bg-zinc-900"
             data-test="app-search-bar"
         >
             <flux:icon.magnifying-glass class="size-5 shrink-0" />

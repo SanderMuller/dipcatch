@@ -44,6 +44,8 @@ Implementation-ready specs. Build order = file order below. Each spec ends with 
 - **[shopping-list.md](shopping-list.md)** — one shopping list per account across all shops: add from the product page, an "On list" pill on cards, a list icon beside the bell, and a full list grouped by each product's best-buy shop with cross-off, "Clear crossed off" and print.
 - **[web-shop-discovery.md](web-shop-discovery.md)** — more shops for a tracked product from a Google search (Serper), a Jev check on each result, a page read, and a second Jev check; the pages that pass show in the existing suggestions list. Pro with shop checks on. Spec'd 2026-09-30 from a prototype run on 20 products.
 
+- **[category-expansion.md](category-expansion.md)** — electronics, DIY and toys: four JSON-LD reader fixes (`isOfferType`, Product inside an Action, full-URL `@type`, strikethrough specs), comparison sites refused at paste (bcc.nl, maxict.nl), the shop's claimed "was" price, a discount check against our own 30-day low, three landing pages with seven thin host adapters, and a decision per blocked shop. Spec'd 2026-09-30.
+
 - **[chatgpt-plugin-directory.md](chatgpt-plugin-directory.md)** — list DipCatch in the ChatGPT Plugins Directory: MCP tool annotations, OpenAI domain-challenge endpoint, Connections Connect/Install buttons and copy, privacy text for connected assistants. Claude gets an install link; ChatGPT Free cannot paste `/mcp`.
 
 - ~~`adapter-canary.md`~~ — ✅ shipped 2026-09-18 (one known URL per host adapter, fetched daily; the canary command and its health check share `CanaryEntries`).

@@ -86,7 +86,7 @@ test('the add-shop component probes a suggested url and shows the preview', func
             '@type' => 'Product',
             'name' => 'Demo Item',
             'offers' => [
-                '@type' => 'Shop',
+                '@type' => 'Offer',
                 'price' => '50.00',
                 'priceCurrency' => 'EUR',
                 'availability' => 'https://schema.org/InStock',
@@ -243,7 +243,7 @@ test('the add-shop disclosure lists suggestions while idle and hides them during
             '@type' => 'Product',
             'name' => 'Demo Item',
             'offers' => [
-                '@type' => 'Shop',
+                '@type' => 'Offer',
                 'price' => '50.00',
                 'priceCurrency' => 'EUR',
                 'availability' => 'https://schema.org/InStock',
@@ -272,7 +272,7 @@ test('the suggestions list stays expanded once a shop is added', function (): vo
             '@type' => 'Product',
             'name' => 'Demo Item',
             'offers' => [
-                '@type' => 'Shop',
+                '@type' => 'Offer',
                 'price' => '50.00',
                 'priceCurrency' => 'EUR',
                 'availability' => 'https://schema.org/InStock',

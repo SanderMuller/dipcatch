@@ -58,11 +58,7 @@ final class JsonLdEntities
     {
         $type = $entity['@type'] ?? null;
 
-        if (is_array($type)) {
-            return array_values($type);
-        }
-
-        return [$type];
+        return array_map(JsonLdTypeForms::short(...), is_array($type) ? array_values($type) : [$type]);
     }
 
     /**
@@ -70,7 +66,7 @@ final class JsonLdEntities
      */
     public static function isOfferType(array $types): bool
     {
-        return in_array('Shop', $types, strict: true) || in_array('AggregateOffer', $types, strict: true);
+        return in_array('Offer', $types, strict: true) || in_array('AggregateOffer', $types, strict: true);
     }
 
     /**

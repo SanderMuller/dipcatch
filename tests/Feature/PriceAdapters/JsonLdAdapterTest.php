@@ -19,7 +19,7 @@ test('extracts basic Product + Shop', function (): void {
         'name' => 'Sony WH-1000XM5',
         'image' => 'https://shop.test/img.jpg',
         'offers' => [
-            '@type' => 'Shop',
+            '@type' => 'Offer',
             'price' => '289.00',
             'priceCurrency' => 'EUR',
             'availability' => 'https://schema.org/InStock',
@@ -60,8 +60,8 @@ test('handles array of Offers', function (): void {
         '@type' => 'Product',
         'name' => 'Demo',
         'offers' => [
-            ['@type' => 'Shop', 'price' => '50.00', 'priceCurrency' => 'EUR'],
-            ['@type' => 'Shop', 'price' => '40.00', 'priceCurrency' => 'EUR'],
+            ['@type' => 'Offer', 'price' => '50.00', 'priceCurrency' => 'EUR'],
+            ['@type' => 'Offer', 'price' => '40.00', 'priceCurrency' => 'EUR'],
         ],
     ], JSON_THROW_ON_ERROR);
 
@@ -79,7 +79,7 @@ test('handles top-level @graph', function (): void {
             [
                 '@type' => 'Product',
                 'name' => 'Widget',
-                'offers' => ['@type' => 'Shop', 'price' => '12.99', 'priceCurrency' => 'USD'],
+                'offers' => ['@type' => 'Offer', 'price' => '12.99', 'priceCurrency' => 'USD'],
             ],
         ],
     ], JSON_THROW_ON_ERROR);
@@ -95,7 +95,7 @@ test('handles price as a number (not string)', function (): void {
     $json = json_encode([
         '@type' => 'Product',
         'name' => 'Numeric',
-        'offers' => ['@type' => 'Shop', 'price' => 99.99, 'priceCurrency' => 'GBP'],
+        'offers' => ['@type' => 'Offer', 'price' => 99.99, 'priceCurrency' => 'GBP'],
     ], JSON_THROW_ON_ERROR);
 
     $result = new JsonLdAdapter()->extract('https://x.test', withJsonLd($json));
@@ -108,7 +108,7 @@ test('handles price nested under priceSpecification.price', function (): void {
         '@type' => 'Product',
         'name' => 'Nested',
         'offers' => [
-            '@type' => 'Shop',
+            '@type' => 'Offer',
             'priceSpecification' => [
                 'price' => 45.50,
                 'priceCurrency' => 'EUR',
@@ -129,7 +129,7 @@ test('OutOfStock availability translates to in_stock=false', function (): void {
         '@type' => 'Product',
         'name' => 'Sold out',
         'offers' => [
-            '@type' => 'Shop',
+            '@type' => 'Offer',
             'price' => '10.00',
             'priceCurrency' => 'EUR',
             'availability' => 'http://schema.org/OutOfStock',
@@ -178,7 +178,7 @@ test('multiple ld+json scripts: first valid Shop wins', function (): void {
     $product = json_encode([
         '@type' => 'Product',
         'name' => 'Late',
-        'offers' => ['@type' => 'Shop', 'price' => '15.00', 'priceCurrency' => 'EUR'],
+        'offers' => ['@type' => 'Offer', 'price' => '15.00', 'priceCurrency' => 'EUR'],
     ]);
 
     $html = '<html><head>'
@@ -195,7 +195,7 @@ test('normalizes European decimal separator', function (): void {
     $json = json_encode([
         '@type' => 'Product',
         'name' => 'Euro',
-        'offers' => ['@type' => 'Shop', 'price' => '1.299,99', 'priceCurrency' => 'EUR'],
+        'offers' => ['@type' => 'Offer', 'price' => '1.299,99', 'priceCurrency' => 'EUR'],
     ], JSON_THROW_ON_ERROR);
 
     $result = new JsonLdAdapter()->extract('https://x.test', withJsonLd($json));
@@ -208,7 +208,7 @@ test('image as schema.org ImageObject resolves to url', function (): void {
         '@type' => 'Product',
         'name' => 'ImageObject',
         'image' => ['@type' => 'ImageObject', 'url' => 'https://shop.test/x.jpg'],
-        'offers' => ['@type' => 'Shop', 'price' => '1.00', 'priceCurrency' => 'EUR'],
+        'offers' => ['@type' => 'Offer', 'price' => '1.00', 'priceCurrency' => 'EUR'],
     ], JSON_THROW_ON_ERROR);
 
     $result = new JsonLdAdapter()->extract('https://x.test', withJsonLd($json));
@@ -227,13 +227,13 @@ test('matches the requested URL among ProductGroup variants', function (): void 
                 '@type' => 'Product',
                 'name' => 'Feliway 1-pack',
                 'url' => 'https://shop.test/p/one-pack/9200000051357004/',
-                'offers' => ['@type' => 'Shop', 'price' => '24.99', 'priceCurrency' => 'EUR', 'availability' => 'InStock'],
+                'offers' => ['@type' => 'Offer', 'price' => '24.99', 'priceCurrency' => 'EUR', 'availability' => 'InStock'],
             ],
             [
                 '@type' => 'Product',
                 'name' => 'Feliway 3-pack',
                 'url' => $variantUrl,
-                'offers' => ['@type' => 'Shop', 'price' => '52.86', 'priceCurrency' => 'EUR', 'availability' => 'InStock'],
+                'offers' => ['@type' => 'Offer', 'price' => '52.86', 'priceCurrency' => 'EUR', 'availability' => 'InStock'],
             ],
         ],
         'offers' => ['@type' => 'AggregateOffer', 'lowPrice' => '24.99', 'priceCurrency' => 'EUR'],
@@ -256,7 +256,7 @@ test('falls back to ProductGroup AggregateOffer lowPrice when no variant url mat
                 '@type' => 'Product',
                 'name' => 'A',
                 'url' => 'https://shop.test/p/a/',
-                'offers' => ['@type' => 'Shop', 'price' => '15.00', 'priceCurrency' => 'EUR'],
+                'offers' => ['@type' => 'Offer', 'price' => '15.00', 'priceCurrency' => 'EUR'],
             ],
         ],
         'offers' => ['@type' => 'AggregateOffer', 'lowPrice' => '15.00', 'priceCurrency' => 'EUR'],

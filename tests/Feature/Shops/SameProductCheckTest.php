@@ -114,7 +114,7 @@ test('nothing is sent without the opt-in, on the free plan, or for a product wit
 
 test('a shared barcode settles the check without a paid call', function (): void {
     $product = productWithShopChecks();
-    $json = json_encode(['@type' => 'Product', 'name' => 'Whiskas multipack', 'gtin13' => '8711000530450', 'offers' => ['@type' => 'Shop', 'price' => '4.99', 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock']], JSON_THROW_ON_ERROR);
+    $json = json_encode(['@type' => 'Product', 'name' => 'Whiskas multipack', 'gtin13' => '8711000530450', 'offers' => ['@type' => 'Offer', 'price' => '4.99', 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock']], JSON_THROW_ON_ERROR);
     Http::fake([
         'https://shop.example.com/robots.txt' => Http::response('', 404),
         'https://shop.example.com/p/1' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),

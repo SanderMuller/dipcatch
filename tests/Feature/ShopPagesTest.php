@@ -55,13 +55,23 @@ it('links Amazon UK and US shops to groceries, coffee and filters', function (st
     expect($slugs)->toBe(['groceries', 'coffee', 'filters']);
 })->with(['amazon-com', 'amazon-co-uk']);
 
-it('links Amazon.nl to groceries, pet food, coffee, filters and beauty', function (): void {
+it('links Amazon.nl to groceries, pet food, coffee, filters, beauty, electronics, toys and DIY', function (): void {
     $shop = ShopPages::find('amazon-nl');
 
     $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
 
-    expect($slugs)->toBe(['groceries', 'pet-food', 'coffee', 'filters', 'beauty']);
+    expect($slugs)->toBe(['groceries', 'pet-food', 'coffee', 'filters', 'beauty', 'electronics', 'toys', 'diy']);
 });
+
+it('links the new category shops to their own page', function (string $slug, array $expected): void {
+    $shop = ShopPages::find($slug);
+
+    expect(array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []))->toBe($expected);
+})->with([
+    'MediaMarkt' => ['mediamarkt-nl', ['electronics']],
+    'Intertoys' => ['intertoys-nl', ['toys']],
+    'Hubo' => ['hubo-nl', ['diy']],
+]);
 
 it('links The Ordinary, Lookfantastic, Cult Beauty and Ulta to the beauty category only', function (string $slug): void {
     $shop = ShopPages::find($slug);
@@ -305,6 +315,15 @@ it('lists the shops it cannot read below the supported ones, without a page of t
     $this->get('/shops/etos-nl')->assertRedirect(route('shops'))->assertStatus(301);
     $this->get('/shops/walmart-com?lang=nl')->assertRedirect(route('shops', ['lang' => 'nl']));
     expect(array_column(SupportedShops::rows(), 'host'))->not->toContain('etos.nl')->not->toContain('walmart.com');
+});
+
+it('lists the shops that refused production reads on 2026-09-30 as unreadable', function (): void {
+    $response = $this->get(route('shops'))->assertOk();
+
+    foreach (['praxis.nl', 'babypark.nl', 'dreamland.nl', 'gamma.nl', 'karwei.nl', 'azerty.nl', 'action.com', 'debijenkorf.nl', 'lego.com'] as $host) {
+        $response->assertSeeHtml($host);
+        expect(array_column(SupportedShops::unsupported(), 'host'))->toContain($host);
+    }
 });
 
 it('never lists a shop as both supported and unreadable', function (): void {

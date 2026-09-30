@@ -69,7 +69,7 @@ test('delegates to JsonLdAdapter when the page exposes schema.org markup', funct
         '@type' => 'Product',
         'name' => 'Echo Dot',
         'offers' => [
-            '@type' => 'Shop',
+            '@type' => 'Offer',
             'price' => '49.99',
             'priceCurrency' => 'USD',
             'availability' => 'https://schema.org/InStock',

@@ -40,6 +40,9 @@ return [
         'dierapotheker.nl', 'petsplace.nl', 'medpets.nl', 'welkoop.nl',
         'petsathome.com', 'theordinary.com',
         'lookfantastic.com', 'cultbeauty.com', 'ulta.com',
+        'mediamarkt.nl', 'expert.nl', 'megekko.nl',
+        'intertoys.nl', 'prenatal.nl',
+        'hubo.nl', 'toolstation.nl',
     ],
 
     /**
@@ -60,6 +63,14 @@ return [
         // The page loads, but the price comes from a separate API after it
         // opens; the served HTML holds none, 2026-09-25.
         'target.com',
+        // HTTP 403 to DipCatch's fetcher from production, while a browser
+        // gets the page, 2026-09-30.
+        'praxis.nl', 'babypark.nl', 'dreamland.nl',
+        // Bot check for every automated request (Vercel), HTTP 429 from
+        // production, 2026-09-30.
+        'gamma.nl', 'karwei.nl',
+        // Challenge page and HTTP 403 from production, 2026-09-30.
+        'azerty.nl', 'action.com', 'debijenkorf.nl', 'lego.com',
     ],
 
     /**
@@ -110,6 +121,22 @@ return [
         'superdrug.com' => 'Superdrug',
         'notino.nl' => 'Notino',
         'target.com' => 'Target',
+        'mediamarkt.nl' => 'MediaMarkt',
+        'expert.nl' => 'Expert',
+        'megekko.nl' => 'Megekko',
+        'intertoys.nl' => 'Intertoys',
+        'prenatal.nl' => 'Prénatal',
+        'hubo.nl' => 'Hubo',
+        'toolstation.nl' => 'Toolstation',
+        'praxis.nl' => 'Praxis',
+        'babypark.nl' => 'Babypark',
+        'dreamland.nl' => 'Dreamland',
+        'gamma.nl' => 'Gamma',
+        'karwei.nl' => 'Karwei',
+        'azerty.nl' => 'Azerty',
+        'action.com' => 'Action',
+        'debijenkorf.nl' => 'de Bijenkorf',
+        'lego.com' => 'LEGO',
     ],
 
     /**
@@ -153,6 +180,9 @@ return [
             'bol.com', 'amazon.nl',
             'ah.nl', 'jumbo.com',
         ],
+        'electronics' => ['mediamarkt.nl', 'expert.nl', 'megekko.nl', 'bol.com', 'amazon.nl'],
+        'toys' => ['intertoys.nl', 'prenatal.nl', 'bol.com', 'amazon.nl'],
+        'diy' => ['hubo.nl', 'toolstation.nl', 'bol.com', 'amazon.nl'],
     ],
 
 ];

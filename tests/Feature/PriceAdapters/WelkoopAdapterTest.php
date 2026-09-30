@@ -17,7 +17,7 @@ test('reads the current price, not the JSON-LD list price', function (): void {
         '@type' => 'Product',
         'name' => 'Royal Canin Kitten',
         'image' => 'https://www.welkoop.nl/kitten.jpg',
-        'offers' => ['@type' => 'Shop', 'price' => '31.50', 'priceCurrency' => 'EUR'],
+        'offers' => ['@type' => 'Offer', 'price' => '31.50', 'priceCurrency' => 'EUR'],
     ], JSON_THROW_ON_ERROR);
 
     $html = withJsonLd($json)
@@ -38,7 +38,7 @@ test('fails when the current-price label is missing, even if JSON-LD has a list 
     $json = json_encode([
         '@type' => 'Product',
         'name' => 'Royal Canin Kitten',
-        'offers' => ['@type' => 'Shop', 'price' => '31.50', 'priceCurrency' => 'EUR'],
+        'offers' => ['@type' => 'Offer', 'price' => '31.50', 'priceCurrency' => 'EUR'],
     ], JSON_THROW_ON_ERROR);
 
     $result = $this->adapter->extract('https://welkoop.nl/kitten', withJsonLd($json));

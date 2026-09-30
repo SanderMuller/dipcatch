@@ -23,6 +23,7 @@ use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Iso4217;
 use App\Support\MovedShopUrl;
+use App\Support\NotAShop;
 use App\Support\UnservableShops;
 use App\Support\UrlNormalizer;
 use InvalidArgumentException;
@@ -85,9 +86,9 @@ final readonly class ProbeShopUrl
         // per-user probe budget consumed (bulk-adding must not throttle).
         $host = UrlNormalizer::normalizeHost((string) parse_url($normalizedUrl, PHP_URL_HOST));
 
-        $unservable = UnservableShops::reasonFor($host);
-        if ($unservable !== null) {
-            return ProbeOutcome::failed(ProbeFailure::ShopNotServable, ['reason' => $unservable]);
+        $refused = self::refusedHost($host);
+        if ($refused instanceof ProbeOutcome) {
+            return $refused;
         }
 
         $local = $this->resolveFromLocalSources($product, $normalizedUrl, $host);
@@ -362,5 +363,20 @@ final readonly class ProbeShopUrl
             'failures' => $this->memory->count($host, $kind),
             'persistent' => $this->memory->isPersistent($host, $kind),
         ];
+    }
+
+    /**
+     * A host refused before anything is fetched: a shop whose pages hold no
+     * price the server can read, or a site that is not a shop at all.
+     */
+    private static function refusedHost(string $host): ?ProbeOutcome
+    {
+        $unservable = UnservableShops::reasonFor($host);
+
+        if ($unservable !== null) {
+            return ProbeOutcome::failed(ProbeFailure::ShopNotServable, ['reason' => $unservable]);
+        }
+
+        return NotAShop::covers($host) ? ProbeOutcome::failed(ProbeFailure::NotAShop) : null;
     }
 }

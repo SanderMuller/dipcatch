@@ -176,11 +176,7 @@ function withJsonLd(string $jsonLd): string
 }
 
 /**
- * Build a single-Product JSON-LD page wrapped in HTML. The offer-block uses
- * `@type => Shop` for historical reasons; the JsonLdAdapter tolerates it, so
- * existing tests rely on that exact body. Fixing to schema.org's `Offer`
- * is a separate follow-up — would change the JSON-LD shape the adapter
- * parses.
+ * Build a single-Product JSON-LD page wrapped in HTML.
  */
 function jsonLdPage(string $price = '50.00', string $currency = 'EUR', string $title = 'Test Item'): string
 {
@@ -189,7 +185,7 @@ function jsonLdPage(string $price = '50.00', string $currency = 'EUR', string $t
         '@type' => 'Product',
         'name' => $title,
         'offers' => [
-            '@type' => 'Shop',
+            '@type' => 'Offer',
             'price' => $price,
             'priceCurrency' => $currency,
             'availability' => 'https://schema.org/InStock',
@@ -701,7 +697,7 @@ function fakeJsonLdOffer(string $url = 'https://shop.example.com/p/1', string $p
         'name' => $name,
         'image' => 'https://shop.example.com/img.jpg',
         'offers' => [
-            '@type' => 'Shop',
+            '@type' => 'Offer',
             'price' => $price,
             'priceCurrency' => $currency,
             'availability' => 'https://schema.org/InStock',

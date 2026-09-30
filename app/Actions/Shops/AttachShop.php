@@ -70,6 +70,11 @@ final readonly class AttachShop
             'in_stock' => $draft->inStock,
             'status' => ScrapeStatus::Ok->value,
             'checked_at' => now(),
+            'claimed_regular_price' => $draft->claimRead ? $draft->keptClaim() : null,
+            'seller' => $draft->seller,
+            'claim_read' => $draft->claimRead,
+            'shelf_inherited' => false,
+            'consumer_price_issue' => $draft->consumerPriceIssue,
         ]);
 
         // With the triggering id, not bare: drop detection reads it.
@@ -106,6 +111,7 @@ final readonly class AttachShop
             'current_in_stock' => $draft->inStock,
             'consumer_price_issue' => $draft->consumerPriceIssue,
             'consumer_price_note' => $draft->consumerPriceNote,
+            'claimed_regular_price' => $draft->claimRead ? $draft->keptClaim() : null,
             'last_checked_at' => now(),
             'last_success_at' => now(),
             'last_status' => ScrapeStatus::Ok->value,

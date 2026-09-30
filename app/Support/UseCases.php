@@ -214,6 +214,66 @@ final class UseCases
                     ['q' => __('What if the same cream is cheaper as a pump bottle?'), 'a' => __('Follow both and let the price per kilo decide. A 454 g tub and a 454 g pump are the same cream at a different price each, and DipCatch shows both.')],
                 ],
             ],
+            'electronics' => [
+                'heading' => __('Price alerts for electronics'),
+                'label' => __('electronics'),
+                'description' => __('Follow headphones, laptops, SSDs and kitchen appliances at MediaMarkt, Expert, Megekko, bol.com and Amazon.nl. DipCatch keeps the price history and tells you when a price really drops.'),
+                'intro' => __('Electronics prices move with launches, sales weeks and rival shops. A "was" price on the page does not say what the shop charged last month. DipCatch reads the price every day, keeps the history, and tells you when a product reaches the price you want.'),
+                'example' => __('A pair of wireless earbuds is €99.95 at mediamarkt.nl, and the page shows "was €129". DipCatch read €94 there two weeks before the offer, so the product page says so beside the claim. Set €89 as your price and you hear about it the day any of your shops gets there.'),
+                'tips' => [
+                    __('Track the exact model and colour you want. A price for "AirPods" is a price for four different products.'),
+                    __('Add two or three shops. Electronics shops follow each other, so the first one to drop tells you the round has started.'),
+                    __('Set a price you would pay today. Waiting for the lowest price ever can mean waiting past the model you wanted.'),
+                ],
+                'faq' => [
+                    ['q' => __('Which electronics shops work?'), 'a' => __('Paste a product link. We set up MediaMarkt, Expert, Megekko, bol.com and Amazon.nl ourselves. Other webshops often work as well, Coolblue among them, and you see what we found before you save it.')],
+                    ['q' => __('Is the "was" price on the page a real discount?'), 'a' => __('By law, a shop must measure a discount from its own lowest price in the 30 days before it. When DipCatch has read the shop through those 30 days, the product page puts that lowest price beside the claim, so you can judge it yourself.')],
+                    ['q' => __('Does it show the price history?'), 'a' => __('Yes. Every product has a chart of its lowest price over time, across the shops you follow. The free plan shows 90 days, Pro keeps everything.')],
+                    ['q' => __('What about marketplace sellers on MediaMarkt and bol.com?'), 'a' => __('DipCatch reads the offer the page shows, which can be a partner seller. It notes the seller where the page names one, and a different seller’s price is never used to judge another seller’s discount.')],
+                    ['q' => __('How often are prices checked?'), 'a' => __('Once when you add the link, then once a day on the free plan and every six hours on Pro.')],
+                    ['q' => __('Can I follow a product that is sold out?'), 'a' => __('Yes. DipCatch keeps checking, and the product page says whether it was in stock the last time we looked.')],
+                ],
+            ],
+            'toys' => [
+                'heading' => __('Price alerts for toys and baby gear'),
+                'label' => __('toys and baby gear'),
+                'description' => __('Follow LEGO sets, games, dummies and nappies at Intertoys, Prénatal, bol.com and Amazon.nl. DipCatch tells you when a price drops before Sinterklaas and the holidays.'),
+                'intro' => __('Toy prices change through the year, and the list for Sinterklaas is usually known in October. Put the wish list in DipCatch early. It watches every item at the shops you choose and tells you when one reaches your price.'),
+                'example' => __('A LEGO City bus is €24.99 at intertoys.nl and €29.99 at bol.com. Set €22 as your price in October, and you hear about it the week one of them gets there, not after the presents are bought.'),
+                'tips' => [
+                    __('Add the wish list early. A price you wait for needs time to come.'),
+                    __('Track the set number, not the theme. "LEGO 60407" is one product; "LEGO City" is a shelf.'),
+                    __('For nappies and wipes, compare per piece. A big box is not always cheaper per nappy.'),
+                ],
+                'faq' => [
+                    ['q' => __('Which toy and baby shops work?'), 'a' => __('Paste a product link. We set up Intertoys, Prénatal, bol.com and Amazon.nl ourselves. LEGO.com and Dreamland refuse our reader for now. Other webshops often work as well, and you see what we found before you save it.')],
+                    ['q' => __('When are toys cheapest?'), 'a' => __('It differs per kind of toy, and it is rarely the week before Sinterklaas. That is why DipCatch watches every day instead of guessing a date.')],
+                    ['q' => __('Is the "was" price on the page a real discount?'), 'a' => __('When DipCatch has read a shop through the 30 days before an offer, the product page puts the lowest price it saw there beside the claim.')],
+                    ['q' => __('Does it compare nappies per piece?'), 'a' => __('Yes, where the page says how many are in the pack. DipCatch then shows the price per piece, so a box of 40 and a box of 120 line up honestly.')],
+                    ['q' => __('How many products can I follow?'), 'a' => __('Twenty on the free plan, which is a long wish list. Pro follows up to 250.')],
+                    ['q' => __('Can I follow a set that is sold out?'), 'a' => __('Yes. DipCatch keeps checking, and the product page says whether it was in stock the last time we looked.')],
+                ],
+            ],
+            'diy' => [
+                'heading' => __('Price alerts for DIY and tools'),
+                'label' => __('DIY and tools'),
+                'description' => __('Follow paint, screws, drills and garden tools at Hubo, Toolstation, bol.com and Amazon.nl. DipCatch compares paint per litre, screws per piece where the page gives the count, and tells you when a price drops.'),
+                'intro' => __('DIY stores run promotions in waves, and the same tin of paint or box of screws can cost a quarter more at the next shop. DipCatch reads the price every day and, where the page states the size, does the sum per litre or per piece, so you know which shop and which week.'),
+                'example' => __('A 10 litre tin of wall paint is €23.09 at hubo.nl, which is €2.31 per litre. A 5 litre tin elsewhere at €14.99 is €3.00 per litre. DipCatch shows both per litre, so the bigger tin wins on the page and not only in your head.'),
+                'tips' => [
+                    __('Track the size you use. A 2.5 litre tin and a 10 litre tin are two products, and the price per litre decides.'),
+                    __('Add a project list before you start. Paint, filler and screws for one room are worth watching for a few weeks.'),
+                    __('For tools, track the kit you want, battery included or not. The same drill without a battery is a different price.'),
+                ],
+                'faq' => [
+                    ['q' => __('Which DIY shops work?'), 'a' => __('Paste a product link. We set up Hubo, Toolstation, bol.com and Amazon.nl ourselves. Gamma, Karwei and Praxis refuse our reader for now, so they are not in the list. Other webshops often work as well, and you see what we found before you save it.')],
+                    ['q' => __('Does it compare paint per litre?'), 'a' => __('Yes, where the page says how much is in the tin. For screws and plugs DipCatch shows the price per piece when the page states how many are in the box.')],
+                    ['q' => __('Are the prices incl. VAT?'), 'a' => __('DipCatch compares the price a consumer pays. A shop that shows only a price excl. VAT is marked on the product page and left out of the comparison.')],
+                    ['q' => __('Is the "was" price on the page a real discount?'), 'a' => __('When DipCatch has read a shop through the 30 days before an offer, the product page puts the lowest price it saw there beside the claim.')],
+                    ['q' => __('Do loyalty-card prices count?'), 'a' => __('No. DipCatch reads the price anyone can pay on the product page. A price that needs a card or an account is not on the page it reads.')],
+                    ['q' => __('How often are prices checked?'), 'a' => __('Once when you add the link, then once a day on the free plan and every six hours on Pro.')],
+                ],
+            ],
         ];
     }
 }

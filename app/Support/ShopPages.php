@@ -162,6 +162,13 @@ final class ShopPages
             'lookfantastic.com' => __('Lookfantastic puts every size of a product on one page. DipCatch reads the size that is in your link.'),
             'cultbeauty.com' => __('Cult Beauty sets prices per country. DipCatch reads the currency the page shows, pounds, euros or dollars, for the size in your link.'),
             'ulta.com' => __('Ulta is read in US dollars, at the price on the product page for the size in your link.'),
+            'mediamarkt.nl' => __('MediaMarkt names a seller for each offer. DipCatch reads the offer on the product page, whether MediaMarkt or a partner sells it.'),
+            'expert.nl' => __('DipCatch reads the Expert price from the product data on the page, in euros, with the stock beside it.'),
+            'megekko.nl' => __('Megekko states its price in the product data of every page. DipCatch reads it there, so a new layout does not stop it.'),
+            'intertoys.nl' => __('Intertoys often shows an offer price beside the old one. DipCatch reads the price you pay, and whether the set is in stock.'),
+            'prenatal.nl' => __('Prénatal writes its product data in a longer form than most shops. DipCatch reads it all the same, stock included.'),
+            'hubo.nl' => __('Hubo is read from the product data on the page. A tin of paint names its size in the title, so DipCatch compares it per litre.'),
+            'toolstation.nl' => __('Toolstation shows prices incl. and excl. VAT. DipCatch reads the price incl. VAT, the one a consumer pays.'),
             default => __('We know :shop well, so the price comes straight off the product page, including its offers.', ['shop' => $name]),
         };
     }

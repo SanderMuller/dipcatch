@@ -58,6 +58,9 @@
     @case('shop_not_servable')
         This shop builds its prices in the browser, so there is nothing for DipCatch to read on the page. It cannot be tracked.
         @break
+    @case('not_a_shop')
+        This is a comparison site, not a shop. Paste the link of the shop that sells it.
+        @break
     @case('not_in_dataset')
         @php $njReason = $errorContext['reason'] ?? null; @endphp
         @if ($njReason === 'unrecognized_url')

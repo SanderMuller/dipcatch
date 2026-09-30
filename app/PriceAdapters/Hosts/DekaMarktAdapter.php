@@ -71,6 +71,7 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
 
         $prices = [];
         $windows = [];
+        $claim = null;
 
         foreach ($priceRecords as $record) {
             $candidate = PriceNormalizer::fromMixed(self::currentPrice($data, $record));
@@ -80,6 +81,9 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
                 // Only the offer branch has a window: the shelf price is not
                 // a promotion, and last week's dates would label it as one.
                 $windows[] = self::offerApplies($data, $record) ? self::window($data, $record) : null;
+                // While an offer runs, the normal price is the price the shop
+                // says it charged before it.
+                $claim ??= self::offerApplies($data, $record) ? PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'normalPrice')) : null;
             }
         }
 
@@ -115,6 +119,8 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
             packSizeAuthoritative: true,
             promotionWindow: $window,
             promotionWindowAuthoritative: true,
+            claimedRegularPrice: $claim,
+            claimAuthoritative: true,
         ));
     }
 

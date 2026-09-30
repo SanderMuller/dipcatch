@@ -86,6 +86,20 @@ final readonly class ShopSnapshot
         public ?int $variantsOnPage = null,
         /** How this variant was picked, when there was a pick to make. */
         public ?VariantResolution $variantResolution = null,
+        /**
+         * The price the page says the shop charged before this discount: a
+         * struck-through price, never a recommended one (`ListPrice`).
+         */
+        public ?string $claimedRegularPrice = null,
+        /**
+         * True when the reader can state a claim at all, so a null claim
+         * means "the page stated none". A reader without the concept leaves
+         * the stored claim alone and its reading is no evidence for the
+         * discount check.
+         */
+        public bool $claimAuthoritative = false,
+        /** The marketplace seller the page named for this offer. */
+        public ?string $seller = null,
     ) {}
 
     public function trackedPrice(): string

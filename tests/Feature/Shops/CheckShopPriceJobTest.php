@@ -30,7 +30,7 @@ function fakeJsonLdResponse(string $host, string $path, string $price = '60.00',
         '@type' => 'Product',
         'name' => $name,
         'offers' => [
-            '@type' => 'Shop',
+            '@type' => 'Offer',
             'price' => $price,
             'priceCurrency' => $currency,
             'availability' => 'https://schema.org/InStock',
@@ -806,7 +806,7 @@ test('a check records that the page quotes its price without VAT', function (): 
     $json = json_encode([
         '@type' => 'Product',
         'name' => 'Dolce Gusto Lungo XL 90 cups',
-        'offers' => ['@type' => 'Shop', 'price' => '21.15', 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock'],
+        'offers' => ['@type' => 'Offer', 'price' => '21.15', 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock'],
     ], JSON_THROW_ON_ERROR);
 
     Http::fake([

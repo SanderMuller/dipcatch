@@ -63,12 +63,12 @@
             x-on:keydown.escape.window="open = false"
             class="sticky top-0 z-50 border-b border-zinc-900/5 bg-amber-50/80 backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/80 print:hidden"
         >
-            <div class="mx-auto flex w-full max-w-app items-center gap-3 px-4 py-3 sm:px-6 lg:gap-6 lg:px-8">
+            <div class="mx-auto flex w-full max-w-app items-center gap-3 px-4 py-3.5 sm:px-6 lg:gap-6 lg:px-8">
                 <a href="{{ route('app.dashboard') }}" wire:navigate aria-label="{{ __('Dashboard') }}" @if ($dashboardIsCurrent) aria-current="page" @endif class="flex shrink-0 items-center gap-2 font-semibold">
-                    <span class="flex aspect-square size-8 items-center justify-center rounded-xl bg-white p-0.5 dark:bg-white">
-                        <x-app-logo-icon class="size-7" />
+                    <span class="flex aspect-square size-10 items-center justify-center rounded-xl bg-white p-0.5 dark:bg-white">
+                        <x-app-logo-icon class="size-9" />
                     </span>
-                    <span class="hidden sm:inline">{{ config('app.name') }}</span>
+                    <span class="hidden text-lg sm:inline">{{ config('app.name') }}</span>
                 </a>
 
                 <nav class="hidden items-center gap-1 lg:flex" aria-label="{{ __('Main') }}">
@@ -82,7 +82,7 @@
                                  fill alone barely read. Hover is a soft tint instead, so
                                  the two states differ in kind, not only in amount. --}}
                             @class([
-                                'rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap',
+                                'rounded-full px-3.5 py-2 text-[0.9375rem] font-medium whitespace-nowrap',
                                 'bg-white text-zinc-900 ring-1 shadow-sm ring-zinc-950/10 dark:bg-zinc-800 dark:text-white dark:shadow-none dark:ring-white/10' => $link['current'],
                                 'text-zinc-600 hover:bg-zinc-950/5 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100' => ! $link['current'],
                             ])
@@ -93,7 +93,7 @@
                         <button
                             type="button"
                             @class([
-                                'flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap',
+                                'flex items-center gap-1 rounded-full px-3.5 py-2 text-[0.9375rem] font-medium whitespace-nowrap',
                                 'bg-white text-zinc-900 ring-1 shadow-sm ring-zinc-950/10 dark:bg-zinc-800 dark:text-white dark:shadow-none dark:ring-white/10' => $moreIsCurrent,
                                 'text-zinc-600 hover:bg-zinc-950/5 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100' => ! $moreIsCurrent,
                             ])

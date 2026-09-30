@@ -24,7 +24,7 @@ test('matches www.bol.com via normalized host', function (): void {
     $json = json_encode([
         '@type' => 'Product',
         'name' => 'Test',
-        'offers' => ['@type' => 'Shop', 'price' => '50.00', 'priceCurrency' => 'EUR'],
+        'offers' => ['@type' => 'Offer', 'price' => '50.00', 'priceCurrency' => 'EUR'],
     ], JSON_THROW_ON_ERROR);
 
     $result = $this->adapter->extract('https://www.bol.com/p/1', withJsonLd($json));
@@ -38,7 +38,7 @@ test('delegates to JsonLdAdapter on the happy path', function (): void {
         '@type' => 'Product',
         'name' => 'Sony WH-1000XM5',
         'offers' => [
-            '@type' => 'Shop',
+            '@type' => 'Offer',
             'price' => '289.99',
             'priceCurrency' => 'EUR',
             'availability' => 'https://schema.org/InStock',

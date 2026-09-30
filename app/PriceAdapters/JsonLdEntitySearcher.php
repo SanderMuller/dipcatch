@@ -43,8 +43,13 @@ final readonly class JsonLdEntitySearcher
             self::scanVariants($entity, $url, $variantKey, $state);
         }
 
-        if ($state->shop === null && JsonLdEntities::isOfferType($types)) {
-            $state->shop = $entity;
+        // Held apart so it can never displace the Product's own offer: a
+        // top-level Offer is as likely a shipping or site-wide offer. An
+        // AggregateOffer describes the product's price range, so it goes first.
+        if (in_array('AggregateOffer', $types, strict: true)) {
+            $state->standaloneAggregateOffer ??= $entity;
+        } elseif (JsonLdEntities::isOfferType($types)) {
+            $state->standaloneOffer ??= $entity;
         }
     }
 
@@ -86,7 +91,12 @@ final readonly class JsonLdEntitySearcher
         // An entity with no usable offer answers nothing here, not even the
         // key — {@see self::scanVariants()} rules the other way.
         if ($evaluation->match === null) {
-            $state->product ??= $entity;
+            // A full-URL type with no usable offer was invisible before
+            // `typesOf()` read that form, so it must not hold the fallback
+            // slot a later readable Product needs.
+            if (! JsonLdTypeForms::namesProductOnlyByUrl($entity) || self::hasReadableOffer($entity)) {
+                $state->product ??= $entity;
+            }
 
             return;
         }
@@ -250,5 +260,15 @@ final readonly class JsonLdEntitySearcher
         // A variant naming none of them is rare enough to be worth a key that
         // at least tells two entries apart on the page it was read from.
         return $stable === [] ? $variant : $stable;
+    }
+
+    /**
+     * @param  array<string, mixed>  $entity
+     */
+    private static function hasReadableOffer(array $entity): bool
+    {
+        $offer = JsonLdEntities::pickOfferFromProduct($entity['offers'] ?? null);
+
+        return $offer !== null && JsonLdOfferPrice::price($offer) !== null && JsonLdOfferPrice::currency($offer) !== null;
     }
 }

@@ -8,15 +8,22 @@ use App\PriceAdapters\Hosts\DekaMarktAdapter;
 use App\PriceAdapters\Hosts\DierapothekerAdapter;
 use App\PriceAdapters\Hosts\DirkAdapter;
 use App\PriceAdapters\Hosts\EtosAdapter;
+use App\PriceAdapters\Hosts\ExpertAdapter;
+use App\PriceAdapters\Hosts\HuboAdapter;
+use App\PriceAdapters\Hosts\IntertoysAdapter;
 use App\PriceAdapters\Hosts\JumboAdapter;
 use App\PriceAdapters\Hosts\LidlAdapter;
 use App\PriceAdapters\Hosts\LookfantasticAdapter;
+use App\PriceAdapters\Hosts\MediaMarktAdapter;
 use App\PriceAdapters\Hosts\MedpetsAdapter;
+use App\PriceAdapters\Hosts\MegekkoAdapter;
 use App\PriceAdapters\Hosts\OrdinaryAdapter;
 use App\PriceAdapters\Hosts\PetsAtHomeAdapter;
 use App\PriceAdapters\Hosts\PetsPlaceAdapter;
 use App\PriceAdapters\Hosts\PoieszAdapter;
+use App\PriceAdapters\Hosts\PrenatalAdapter;
 use App\PriceAdapters\Hosts\SparAdapter;
+use App\PriceAdapters\Hosts\ToolstationAdapter;
 use App\PriceAdapters\Hosts\UltaAdapter;
 use App\PriceAdapters\Hosts\VomarAdapter;
 use App\PriceAdapters\Hosts\WalmartAdapter;
@@ -241,6 +248,15 @@ return [
         WalmartAdapter::class,
         WelkoopAdapter::class,
         ZooplusAdapter::class,
+        // Marketed shops read through the structured-data chain; see
+        // StructuredDataHostAdapter.
+        ExpertAdapter::class,
+        HuboAdapter::class,
+        IntertoysAdapter::class,
+        MediaMarktAdapter::class,
+        MegekkoAdapter::class,
+        PrenatalAdapter::class,
+        ToolstationAdapter::class,
         JsonLdAdapter::class,
         ShopifyAdapter::class,
         MicrodataAdapter::class,
