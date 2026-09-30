@@ -8,6 +8,7 @@ use App\Models\Shop;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -591,3 +592,147 @@ test('the preview notes a pack size none of the tracked shops sells', function (
     'no tracked size' => ['Milka Mmmax 300 g', null, false],
     'no size on the page' => ['Milka Mmmax', '100 g', false],
 ]);
+
+test('the preview puts the page beside the product, with a large photo and a link to the page', function (): void {
+    Http::fake(fakeJsonLdOffer());
+    $product = Product::factory()->create(['currency' => 'EUR', 'title' => 'Tracked coffee beans']);
+    Shop::factory()->for($product)->create(['url' => 'https://other.example.com/p/1', 'pack_quantity' => 500, 'pack_unit' => 'g']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product->refresh()])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'preview')
+        ->assertSeeHtml('href="https://shop.example.com/p/1" target="_blank" rel="noopener noreferrer"')
+        ->assertSee('Open the page on shop.example.com')
+        ->assertSeeHtml('src="https://shop.example.com/img.jpg"')
+        ->assertSeeHtml('data-test="preview-photo-dialog"')
+        ->assertSeeHtml('data-test="preview-tracked"')
+        ->assertSeeText('Tracked coffee beans')
+        ->assertSee('other.example.com · 500 g');
+});
+
+test('the preview says when the page has the barcode of a tracked shop', function (?string $pageGtin, ?string $shopGtin, bool $shown): void {
+    $json = json_encode(array_filter([
+        '@type' => 'Product',
+        'name' => 'Demo Item',
+        'gtin13' => $pageGtin,
+        'offers' => ['@type' => 'Offer', 'price' => '50.00', 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock'],
+    ]), JSON_THROW_ON_ERROR);
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://other.example.com/p/1', 'gtin' => $shopGtin]);
+    $this->actingAs($product->user()->sole());
+
+    $preview = Livewire::test(AddShop::class, ['product' => $product->refresh()])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'preview');
+
+    $shown
+        ? $preview->assertSee('Same barcode as other.example.com')
+        : $preview->assertDontSeeHtml('data-test="signal-barcode"');
+})->with([
+    'the same barcode' => ['4006381333931', '4006381333931', true],
+    'another barcode' => ['5901234123457', '4006381333931', false],
+    'no barcode on either side' => [null, null, false],
+]);
+
+test('the preview never links to a page that is not http(s)', function (): void {
+    Http::fake(fakeJsonLdOffer());
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->set('normalizedUrl', 'javascript:alert(1)')
+        ->assertDontSeeHtml('javascript:alert(1)')
+        ->assertDontSeeHtml('data-test="preview-open-page"');
+});
+
+test('the client cannot change the preview photos', function (): void {
+    Http::fake(fakeJsonLdOffer());
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->set('imageUrls', ['https://evil.test/x.jpg']);
+})->throws(CannotUpdateLockedPropertyException::class);
+
+test('the preview says when the page sells the pack a tracked shop sells', function (): void {
+    Http::fake(fakeJsonLdOffer(name: 'Milka Choco Biscuit 100 g'));
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://other.example.com/p/1', 'pack_quantity' => 100, 'pack_unit' => 'g']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product->refresh()])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSee('Same pack as your other shops')
+        ->assertDontSeeHtml('data-test="other-pack-warning"');
+});
+
+test('the preview marks the words the page title and the product title do not share', function (): void {
+    Http::fake(fakeJsonLdOffer(name: 'HiPRO Protein Drink Mango 300ml'));
+    $product = Product::factory()->create(['currency' => 'EUR', 'title' => 'HiPRO Protein Drink Vanille 300 ml']);
+    Shop::factory()->for($product)->create(['url' => 'https://other.example.com/p/1']);
+    $this->actingAs($product->user()->sole());
+
+    $html = Livewire::test(AddShop::class, ['product' => $product->refresh()])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->html();
+
+    preg_match_all('/data-test="title-diff-word">([^<]+)</', $html, $marked);
+
+    expect($marked[1])->toBe(['Mango', 'Vanille']);
+});
+
+test('the preview offers every photo the page lists, the main one first', function (): void {
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => 'Demo Item',
+        'image' => ['/img/front.jpg', 'https://cdn.example.com/back.jpg', 'javascript:alert(1)', '/img/front.jpg'],
+        'offers' => ['@type' => 'Offer', 'price' => '50.00', 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock'],
+    ], JSON_THROW_ON_ERROR);
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('imageUrls', ['https://shop.example.com/img/front.jpg', 'https://cdn.example.com/back.jpg'])
+        ->assertSee('2 photos')
+        ->assertDontSeeHtml('javascript:alert(1)');
+});
+
+test('the preview offers eight photos at most', function (): void {
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => 'Demo Item',
+        'image' => array_map(static fn (int $i): string => "https://cdn.example.com/{$i}.jpg", range(1, 10)),
+        'offers' => ['@type' => 'Offer', 'price' => '50.00', 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock'],
+    ], JSON_THROW_ON_ERROR);
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(withJsonLd($json), 200, ['Content-Type' => 'text/html']),
+    ]);
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $this->actingAs($product->user()->sole());
+
+    $preview = Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe');
+
+    expect($preview->get('imageUrls'))->toHaveCount(8)->and($preview->get('imageUrls')[0])->toBe('https://cdn.example.com/1.jpg');
+});

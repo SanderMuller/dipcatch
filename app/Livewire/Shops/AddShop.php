@@ -13,6 +13,7 @@ use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Services\TypeSafe\ShopMatchCheck;
+use App\Support\Gtin;
 use App\Support\PackSize;
 use App\Support\UnitWord;
 use Filament\Notifications\Notification;
@@ -97,25 +98,66 @@ final class AddShop extends Component
     public function otherPackNote(): ?string
     {
         $size = $this->snapshotPackSize();
+        $tracked = $this->trackedPackSizesInPageUnit();
 
-        if (! $size instanceof PackSize) {
-            return null;
-        }
-
-        $tracked = $this->product->shops
-            ->map(fn (Shop $shop): ?PackSize => $shop->pack_quantity === null || $shop->pack_unit === null ? null : PackSize::of((float) $shop->pack_quantity, $shop->pack_unit))
-            ->filter(fn (?PackSize $other): bool => $other instanceof PackSize && $other->unit === $size->unit)
-            ->unique(fn (PackSize $other): string => $other->quantity . $other->unit)
-            ->values();
-
-        if ($tracked->isEmpty() || $tracked->contains(fn (PackSize $other): bool => $other->isSameSizeAs($size))) {
+        if (! $size instanceof PackSize || $tracked === [] || $this->sellsTrackedPack()) {
             return null;
         }
 
         return __('This page sells :pack. Your other shops sell :others. Check it is the same product, not another one in a bigger or smaller pack.', [
             'pack' => UnitWord::pack($size),
-            'others' => $tracked->map(fn (PackSize $other): string => UnitWord::pack($other))->implode(', '),
+            'others' => implode(', ', array_map(UnitWord::pack(...), $tracked)),
         ]);
+    }
+
+    public function sellsTrackedPack(): bool
+    {
+        $size = $this->snapshotPackSize();
+
+        return $size instanceof PackSize
+            && array_any($this->trackedPackSizesInPageUnit(), fn (PackSize $other): bool => $other->isSameSizeAs($size));
+    }
+
+    public function barcodeMatchHost(): ?string
+    {
+        $gtin = Gtin::normalize($this->snapshot['gtin'] ?? null);
+
+        if ($gtin === null) {
+            return null;
+        }
+
+        $match = $this->product->shops->first(fn (Shop $shop): bool => Gtin::normalize($shop->gtin) === $gtin);
+
+        return $match instanceof Shop ? $match->host : null;
+    }
+
+    /** A barcode match settles the check without the AI (chance 1.0), so its own badge says it instead. */
+    public function sameProductPercent(): ?int
+    {
+        if ($this->sameProductChance === null || $this->doubtsSameProduct() || $this->barcodeMatchHost() !== null) {
+            return null;
+        }
+
+        return (int) round($this->sameProductChance * 100);
+    }
+
+    /**
+     * @return list<PackSize>
+     */
+    private function trackedPackSizesInPageUnit(): array
+    {
+        $size = $this->snapshotPackSize();
+
+        if (! $size instanceof PackSize) {
+            return [];
+        }
+
+        return $this->product->shops
+            ->map(fn (Shop $shop): ?PackSize => $shop->packSize())
+            ->filter(fn (?PackSize $other): bool => $other instanceof PackSize && $other->unit === $size->unit)
+            ->unique(fn (PackSize $other): string => $other->quantity . $other->unit)
+            ->values()
+            ->all();
     }
 
     /**

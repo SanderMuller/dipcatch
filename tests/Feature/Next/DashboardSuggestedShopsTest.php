@@ -218,3 +218,20 @@ it('shows at most eight shops', function (): void {
 
     expect(suggestedShopRows($user))->toHaveCount(8);
 });
+
+it('compares a suggested shop with the product side by side, marking the words the names do not share', function (): void {
+    $user = User::factory()->create(['shop_checks' => true]);
+    subscribeUser($user);
+    $coffee = dashboardProduct($user, 'Douwe Egberts Aroma Rood bonen');
+    // The page's name for it: "Douwe Egberts Aroma Rood bonen at koffie.test".
+    dashboardWebFinding($coffee, 'koffie.test', 0.9);
+    $this->actingAs($user);
+
+    $html = Livewire::withoutLazyLoading()->test(DashboardSuggestedShops::class)->html();
+    $panel = (string) strstr($html, 'data-test="suggested-shop-comparison"');
+    preg_match_all('/data-test="title-diff-word">([^<]+)</', $panel, $marked);
+
+    expect($html)->toContain('data-test="suggested-shop-compare"')
+        ->and($panel)->toContain('https://koffie.test/p/1')->toContain('tracked.test · 150 g')
+        ->and($marked[1])->toBe(['at', 'koffie.test']);
+});

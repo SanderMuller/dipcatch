@@ -63,6 +63,19 @@ test('probe success prefills title and image, and suggests the tier-default thre
         ->assertSet('existingTrackedProduct', null);
 });
 
+test('the preview shows the photo large and links to the page it reads', function (): void {
+    Http::fake(fakeCreateFlowOffer());
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateProductFromUrl::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSet('state', 'preview')
+        ->assertSeeHtml('href="https://shop.example.com/p/1" target="_blank" rel="noopener noreferrer"')
+        ->assertSee('Open the page on shop.example.com')
+        ->assertSeeHtml('data-test="preview-image"');
+});
+
 test('the prefilled title has the shop name and buying word taken off', function (): void {
     // Cleaning lives in the draft, so the web preview gets it as well as the
     // MCP tools. What the page calls itself is written for search engines.

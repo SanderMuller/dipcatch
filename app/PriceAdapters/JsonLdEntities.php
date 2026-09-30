@@ -129,6 +129,20 @@ final class JsonLdEntities
     }
 
     /**
+     * @return list<string>
+     */
+    public static function imageUrls(mixed $value): array
+    {
+        if (is_array($value) && array_is_list($value)) {
+            return array_values(array_filter(array_map(self::firstImageUrl(...), $value)));
+        }
+
+        $url = self::firstImageUrl($value);
+
+        return $url === null ? [] : [$url];
+    }
+
+    /**
      * JSON-LD lives inside a `<script>`, so the HTML parser never decodes it:
      * shops that HTML-escape their own data hand over a name like
      * `Lay&#39;s chips naturel` (spar.nl, verified 2026-09-02), which would

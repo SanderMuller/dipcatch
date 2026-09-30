@@ -100,6 +100,13 @@ final readonly class ShopSnapshot
         public bool $claimAuthoritative = false,
         /** The marketplace seller the page named for this offer. */
         public ?string $seller = null,
+        /**
+         * Every photo the page lists, `imageUrl` first. Empty for a reader
+         * that reads only `imageUrl`, so a caller merges the two.
+         *
+         * @var list<string>
+         */
+        public array $imageUrls = [],
     ) {}
 
     public function trackedPrice(): string

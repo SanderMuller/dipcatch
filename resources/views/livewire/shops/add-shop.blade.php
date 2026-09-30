@@ -89,72 +89,109 @@
                     <flux:callout.text>{{ __('AI compared this page with the shops you already track for :product. Check the name and the pack size before you confirm.', ['product' => $product->title]) }}</flux:callout.text>
                 </flux:callout>
             @endif
-            <div class="flex items-start gap-3">
-                @if (! empty($snapshot['image_url']))
-                    <img src="{{ $snapshot['image_url'] }}" alt="" class="h-20 w-20 object-cover rounded" />
-                @endif
-                <div class="flex-1">
-                    <div class="flex items-center gap-1.5 text-sm text-zinc-500">
-                        <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
-                        {{ $host }}
-                    </div>
-                    <flux:heading>{{ $snapshot['title'] }}</flux:heading>
-                    {{-- Per unit first when the page states a pack size: the figure
-                         shops are compared on. The pack price follows beneath. --}}
-                    <div class="mt-1 text-lg font-semibold tabular-nums" data-test="preview-price">
-                        @if ($previewUnitPrice !== null)
-                            {{ $previewUnitPrice }}
-                            @if ($hasLivePreviewBundle && $previewRegularUnitPrice !== null)
-                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ $previewRegularUnitPrice }}</del>
+            @php($pageUrl = $this->previewPageUrl())
+            {{-- A container query, not a breakpoint: the form sits in a narrow column on a wide screen. --}}
+            <div class="@container">
+                <div class="grid gap-4 @xl:grid-cols-[minmax(0,1fr)_13rem]" data-test="preview-compare">
+                    <div class="flex flex-col gap-4 @sm:flex-row @sm:items-start">
+                        <x-preview-page-image :images="$imageUrls" :href="$pageUrl" :host="$host" :name="'preview-photos-' . $this->getId()" />
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5 text-sm text-zinc-500">
+                                <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
+                                {{ $host }}
+                            </div>
+                            <flux:heading><x-title-diff :title="(string) $snapshot['title']" :other="$product->title" data-test="preview-page-title" /></flux:heading>
+                            <x-open-page-link :href="$pageUrl" :host="$host" class="mt-1" data-test="preview-open-page" />
+                            {{-- Per unit first when the page states a pack size: the figure
+                                 shops are compared on. The pack price follows beneath. --}}
+                            <div class="mt-1 text-lg font-semibold tabular-nums" data-test="preview-price">
+                                @if ($previewUnitPrice !== null)
+                                    {{ $previewUnitPrice }}
+                                    @if ($hasLivePreviewBundle && $previewRegularUnitPrice !== null)
+                                        <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ $previewRegularUnitPrice }}</del>
+                                    @endif
+                                @else
+                                    {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
+                                    @if ($hasLivePreviewBundle && $previewRegularPrice !== null)
+                                        <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
+                                    @endif
+                                @endif
+                                @if (($snapshot['in_stock'] ?? null) === false)
+                                    <flux:badge color="amber" size="sm" class="ms-2">Out of stock</flux:badge>
+                                @elseif (($snapshot['in_stock'] ?? null) === null)
+                                    <flux:badge color="zinc" size="sm" class="ms-2">Stock unknown</flux:badge>
+                                @endif
+                            </div>
+                            @php($variantNote = is_string($snapshot['variant_note'] ?? null) ? $snapshot['variant_note'] : null)
+                            @if ($variantNote !== null)
+                                {{-- Which of the page's variants this price belongs to. A
+                                     page selling three flavours used to preview one price
+                                     with nothing saying the other two existed. --}}
+                                <flux:text size="sm" class="mt-1 text-zinc-500">{{ $variantNote }}</flux:text>
                             @endif
-                        @else
-                            {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}
-                            @if ($hasLivePreviewBundle && $previewRegularPrice !== null)
-                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
+                            @if ($variantPicked)
+                                <div class="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-zinc-500" data-test="picked-variant">
+                                    <span>{{ __('This page sells several packs. DipCatch picked the one that matches this product\'s size.') }}</span>
+                                    <flux:button variant="ghost" size="xs" wire:click="chooseAnotherVariant">{{ __('Choose another') }}</flux:button>
+                                </div>
                             @endif
-                        @endif
-                        @if (($snapshot['in_stock'] ?? null) === false)
-                            <flux:badge color="amber" size="sm" class="ms-2">Out of stock</flux:badge>
-                        @elseif (($snapshot['in_stock'] ?? null) === null)
-                            <flux:badge color="zinc" size="sm" class="ms-2">Stock unknown</flux:badge>
-                        @endif
-                    </div>
-                    @php($variantNote = is_string($snapshot['variant_note'] ?? null) ? $snapshot['variant_note'] : null)
-                    @if ($variantNote !== null)
-                        {{-- Which of the page's variants this price belongs to. A
-                             page selling three flavours used to preview one price
-                             with nothing saying the other two existed. --}}
-                        <flux:text size="sm" class="mt-1 text-zinc-500">{{ $variantNote }}</flux:text>
-                    @endif
-                    @if ($variantPicked)
-                        <div class="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-zinc-500" data-test="picked-variant">
-                            <span>{{ __('This page sells several packs. DipCatch picked the one that matches this product\'s size.') }}</span>
-                            <flux:button variant="ghost" size="xs" wire:click="chooseAnotherVariant">{{ __('Choose another') }}</flux:button>
+                            @if ($bundleLabel)
+                                <flux:text size="sm" class="mt-1 text-zinc-500">{{ $bundleLabel }}</flux:text>
+                            @endif
+                            @if ($previewUnitPrice !== null)
+                                <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500" data-test="preview-pack">
+                                    {{ \App\Support\PackLine::format($snapshot['price'], $snapshot['currency'], $previewPackSize) }}
+                                    @if ($hasLivePreviewBundle && $previewRegularPrice !== null)
+                                        <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
+                                    @endif
+                                </flux:text>
+                            @endif
+                            @if ($adapterKey === 'user-selector')
+                                <flux:text size="sm" class="mt-1 text-zinc-500">Extracted via manual selector.</flux:text>
+                            @endif
+                            @if ($adapterKey === 'checkjebon')
+                                <flux:text size="sm" class="mt-1 text-zinc-500">Daily price via checkjebon.nl. No product image available.</flux:text>
+                            @endif
                         </div>
-                    @endif
-                    @if ($bundleLabel)
-                        <flux:text size="sm" class="mt-1 text-zinc-500">{{ $bundleLabel }}</flux:text>
-                    @endif
-                    @if ($previewUnitPrice !== null)
-                        <flux:text size="sm" class="mt-1 tabular-nums text-zinc-500" data-test="preview-pack">
-                            {{ \App\Support\PackLine::format($snapshot['price'], $snapshot['currency'], $previewPackSize) }}
-                            @if ($hasLivePreviewBundle && $previewRegularPrice !== null)
-                                <del title="{{ __('Regular price') }}" class="ms-1 text-zinc-400 dark:text-zinc-500">{{ \App\Support\MoneyFormatter::format($previewRegularPrice, $snapshot['currency']) }}</del>
-                            @endif
-                        </flux:text>
-                    @endif
-                    @if ($adapterKey === 'user-selector')
-                        <flux:text size="sm" class="mt-1 text-zinc-500">Extracted via manual selector.</flux:text>
-                    @endif
-                    @if ($adapterKey === 'checkjebon')
-                        <flux:text size="sm" class="mt-1 text-zinc-500">Daily price via checkjebon.nl. No product image available.</flux:text>
-                    @endif
+                    </div>
+
+                    <div class="rounded-xl bg-zinc-50 p-3 ring-1 ring-line dark:bg-white/5" data-test="preview-tracked">
+                        <p class="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">{{ __('Your product') }}</p>
+                        <div class="mt-2 flex items-start gap-3 @xl:flex-col">
+                            <x-product-thumb :product="$product" size="size-20 @xl:size-24" />
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-zinc-900 dark:text-white"><x-title-diff :title="$product->title" :other="(string) $snapshot['title']" data-test="preview-product-title" /></p>
+                                <ul class="mt-1 space-y-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+                                    @foreach ($product->shops as $trackedShop)
+                                        @php($trackedPack = $trackedShop->packSize())
+                                        <li class="truncate">{{ $trackedPack === null ? $trackedShop->host : $trackedShop->host . ' · ' . \App\Support\UnitWord::pack($trackedPack) }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            @php($barcodeHost = $this->barcodeMatchHost())
+            @php($matchPercent = $this->sameProductPercent())
+            @if ($barcodeHost !== null || $this->sellsTrackedPack() || $matchPercent !== null)
+                <div class="flex flex-wrap gap-2" data-test="preview-signals">
+                    @if ($barcodeHost !== null)
+                        <flux:badge size="sm" color="green" icon="check" data-test="signal-barcode">{{ __('Same barcode as :shop', ['shop' => $barcodeHost]) }}</flux:badge>
+                    @endif
+                    @if ($this->sellsTrackedPack())
+                        <flux:badge size="sm" color="green" icon="check" data-test="signal-pack">{{ __('Same pack as your other shops') }}</flux:badge>
+                    @endif
+                    @if ($matchPercent !== null)
+                        <flux:badge size="sm" color="green" icon="sparkles" data-test="signal-ai">{{ __('AI check: :percent% match', ['percent' => $matchPercent]) }}</flux:badge>
+                    @endif
+                </div>
+            @endif
+
             <livewire:ai-feature-prompt feature="shop_checks" wire:key="ai-prompt-add-shop" />
 
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
                 <flux:button type="button" variant="primary" wire:click="confirm">
                     Confirm: same product
                 </flux:button>

@@ -201,6 +201,7 @@ final readonly class JsonLdAdapter implements ShopAdapter
             // The offer supplied the price, so it also speaks for a claim.
             claimAuthoritative: true,
             seller: JsonLdOfferPrice::seller($shop),
+            imageUrls: [...JsonLdEntities::imageUrls($product['image'] ?? null), ...JsonLdEntities::imageUrls($shop['image'] ?? null)],
         ));
 
         return self::withVariantCount($result, $state, $variantKey);

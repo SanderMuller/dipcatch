@@ -58,6 +58,7 @@ test('the add-shop preview warns when Jev doubts the page sells the same product
         ->assertSet('state', 'preview')
         ->assertSet('sameProductChance', 0.12)
         ->assertSeeHtml('data-test="same-product-warning"')
+        ->assertDontSeeHtml('data-test="signal-ai"')
         ->call('cancel')
         ->assertSet('sameProductChance', null)
         ->assertDontSeeHtml('data-test="same-product-warning"');
@@ -107,7 +108,8 @@ test('nothing is sent without the opt-in, on the free plan, or for a product wit
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
-        ->assertSet('sameProductChance', null);
+        ->assertSet('sameProductChance', null)
+        ->assertDontSeeHtml('data-test="signal-ai"');
 
     Http::assertNotSent(fn (Request $request): bool => $request->url() === TypeSafeClient::ENDPOINT);
 })->with(['opted out', 'free plan', 'no shop yet']);
@@ -125,7 +127,10 @@ test('a shared barcode settles the check without a paid call', function (): void
     Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
-        ->assertSet('sameProductChance', 1.0);
+        ->assertSet('sameProductChance', 1.0)
+        ->assertSeeHtml('data-test="signal-barcode"')
+        // No AI ran, so the preview does not credit one.
+        ->assertDontSeeHtml('data-test="signal-ai"');
 
     Http::assertNotSent(fn (Request $request): bool => $request->url() === TypeSafeClient::ENDPOINT);
 });
@@ -180,4 +185,16 @@ test('the add-shop preview offers the check to a Pro account that has it off', f
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSeeLivewire(AiFeaturePrompt::class);
+});
+
+test('the add-shop preview shows the AI check\'s match when it finds the same product', function (): void {
+    Http::fake(fakeJsonLdOffer(name: 'Whiskas Adult Zalm 4 x 85 g') + [TypeSafeClient::ENDPOINT => Http::response(sameProductAnswer(0.93))]);
+    $product = productWithShopChecks();
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(AddShop::class, ['product' => $product])
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->assertSee('AI check: 93% match')
+        ->assertDontSeeHtml('data-test="same-product-warning"');
 });

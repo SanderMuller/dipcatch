@@ -11,7 +11,9 @@ use App\Models\User;
 use App\PriceAdapters\ShopSnapshot;
 use App\PriceAdapters\VariantCandidate;
 use App\Support\BundlePriceLabel;
+use App\Support\ImageUrl;
 use App\Support\PackSize;
+use Livewire\Attributes\Locked;
 
 /**
  * Probe-driving state machine shared by the Add-Shop form (existing
@@ -30,6 +32,10 @@ trait DrivesShopProbe
 
     /** @var array<string, mixed>|null Snapshot data after a successful probe. */
     public ?array $snapshot = null;
+
+    /** @var list<string> The page's product photos for the preview, main one first. */
+    #[Locked]
+    public array $imageUrls = [];
 
     public ?string $normalizedUrl = null;
 
@@ -238,6 +244,12 @@ trait DrivesShopProbe
         );
     }
 
+    /** The URL Confirm saves. Http(s) only: `normalizedUrl` is a public property the client can send back. */
+    public function previewPageUrl(): ?string
+    {
+        return ImageUrl::safe($this->normalizedUrl);
+    }
+
     /**
      * The preview templates show the pack size before anything is written.
      * Read off the draft, so there is one parse rather than two.
@@ -318,6 +330,7 @@ trait DrivesShopProbe
 
         $this->state = 'preview';
         $this->snapshot = ShopDraft::flatten($outcome);
+        $this->imageUrls = ShopDraft::imageUrls($outcome);
         $this->normalizedUrl = $outcome->normalizedUrl;
         $this->host = $outcome->host;
         $this->adapterKey = $outcome->adapterKey;
@@ -365,6 +378,7 @@ trait DrivesShopProbe
     private function resetPreview(): void
     {
         $this->snapshot = null;
+        $this->imageUrls = [];
         $this->normalizedUrl = null;
         $this->host = null;
         $this->adapterKey = null;
@@ -379,6 +393,7 @@ trait DrivesShopProbe
             'url',
             'state',
             'snapshot',
+            'imageUrls',
             'normalizedUrl',
             'host',
             'adapterKey',

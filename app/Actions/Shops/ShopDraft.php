@@ -23,6 +23,9 @@ use Throwable;
  */
 final readonly class ShopDraft
 {
+    /** The photos a preview offers at most. */
+    private const int PREVIEW_PHOTOS = 8;
+
     public function __construct(
         public string $url,
         public string $adapterKey,
@@ -79,6 +82,33 @@ final readonly class ShopDraft
         return $this->bundleOffer?->appliesTo($singleItemPrice, $this->promotionWindow) === true
             ? $this->bundleOffer->effectiveUnitPrice()
             : $singleItemPrice;
+    }
+
+    /**
+     * Not in {@see flatten()}: nothing is written from these, and the MCP tools
+     * pass that array on as it is.
+     *
+     * @return list<string>
+     */
+    public static function imageUrls(ProbeOutcome $outcome): array
+    {
+        $snapshot = $outcome->snapshot;
+
+        if (! $snapshot instanceof ShopSnapshot) {
+            return [];
+        }
+
+        $urls = [];
+
+        foreach ([$snapshot->imageUrl, ...$snapshot->imageUrls] as $candidate) {
+            $url = ImageUrl::safe(ImageUrl::absolute($candidate, $outcome->normalizedUrl ?? ''));
+
+            if ($url !== null && ! in_array($url, $urls, strict: true)) {
+                $urls[] = $url;
+            }
+        }
+
+        return array_slice($urls, 0, self::PREVIEW_PHOTOS);
     }
 
     /**

@@ -30,6 +30,13 @@ return [
     'entries' => [
         [
             'date' => '2026-09-30',
+            'category' => 'feature',
+            'title' => 'Check a shop page before you add it',
+            'body' => "When you add a shop, the preview now shows the page next to the product you already track. Hover the photo to zoom in, or click it to see every photo on the page at full size.\n\nDipCatch highlights the words that differ between the two names, and a green badge says when the barcode or the pack matches. Suggested shops on the dashboard get the same side-by-side view.",
+            'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],
+        ],
+        [
+            'date' => '2026-09-30',
             'category' => 'shop',
             'title' => 'Seven new shops for electronics, DIY and toys',
             'body' => 'DipCatch now reads MediaMarkt, Expert, Megekko, Intertoys, Prénatal, Hubo and Toolstation. Paste a product link from any of them to start tracking it.',

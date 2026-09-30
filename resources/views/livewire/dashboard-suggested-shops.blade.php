@@ -41,56 +41,108 @@
                         <ul role="list" class="mt-3 divide-y divide-ink/5 border-t border-ink/5 dark:divide-white/5 dark:border-white/5">
                             @foreach ($productRows as $row)
                                 @php($badge = $match($row))
-                                <li class="flex items-center gap-2 pt-2.5 not-last:pb-2.5" wire:key="suggested-{{ $product->id }}-{{ $row['host'] }}" data-test="suggested-shop">
-                                    <img src="{{ \App\Support\Favicon::url($row['host']) }}" alt="" loading="lazy" class="size-5 shrink-0 rounded" />
-                                    <div class="min-w-0 flex-1">
-                                        <p class="truncate text-sm font-medium" title="{{ $row['name'] }}">{{ $row['shop'] }}</p>
-                                        @php($priceSource = $row['checkedOn'] !== null ? __('Price when checked on :date', ['date' => $row['checkedOn']->isoFormat('D MMM')]) : __('Regular price from the daily dataset'))
-                                        <div class="flex min-w-0 items-center gap-2">
-                                            <p class="truncate text-sm text-zinc-500 tabular-nums dark:text-zinc-400" title="{{ $priceSource }}">
-                                                {{ implode(' · ', array_filter([$row['unitPrice'], $row['packPrice']])) }}<span class="sr-only">. {{ $priceSource }}</span>
-                                            </p>
-                                            @if ($badge !== null)
-                                                <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {{ $badge[1] }}">{{ $badge[0] }}</span>
-                                            @endif
+                                <li class="pt-2.5 not-last:pb-2.5" wire:key="suggested-{{ $product->id }}-{{ $row['host'] }}" data-test="suggested-shop">
+                                    <div class="flex items-center gap-2">
+                                        <img src="{{ \App\Support\Favicon::url($row['host']) }}" alt="" loading="lazy" class="size-5 shrink-0 rounded" />
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-medium" title="{{ $row['name'] }}">{{ $row['shop'] }}</p>
+                                            @php($priceSource = $row['checkedOn'] !== null ? __('Price when checked on :date', ['date' => $row['checkedOn']->isoFormat('D MMM')]) : __('Regular price from the daily dataset'))
+                                            <div class="flex min-w-0 items-center gap-2">
+                                                <p class="truncate text-sm text-zinc-500 tabular-nums dark:text-zinc-400" title="{{ $priceSource }}">
+                                                    {{ implode(' · ', array_filter([$row['unitPrice'], $row['packPrice']])) }}<span class="sr-only">. {{ $priceSource }}</span>
+                                                </p>
+                                                @if ($badge !== null)
+                                                    <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {{ $badge[1] }}">{{ $badge[0] }}</span>
+                                                @endif
+                                            </div>
                                         </div>
-                                    </div>
-                                    <flux:button
-                                        size="sm"
-                                        variant="ghost"
-                                        square
-                                        icon="arrow-top-right-on-square"
-                                        :href="$row['url']"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        :aria-label="__('Open :shop in a new tab to check the product', ['shop' => $row['shop']])"
-                                        :tooltip="__('Open the shop page')"
-                                        data-test="suggested-shop-open"
-                                    >
-                                        <span class="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden" aria-hidden="true"></span>
-                                    </flux:button>
-                                    <flux:button
-                                        size="sm"
-                                        square
-                                        icon="plus"
-                                        :href="route('app.products.show', [$product, 'add-shop' => 1])"
-                                        wire:navigate
-                                        :aria-label="__('Add :shop to :product', ['shop' => $row['shop'], 'product' => $product->title])"
-                                        :tooltip="__('Add this shop')"
-                                        data-test="suggested-shop-add"
-                                    >
-                                        <span class="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden" aria-hidden="true"></span>
-                                    </flux:button>
-                                    <flux:dropdown position="bottom" align="end">
-                                        <flux:button size="sm" variant="ghost" square icon="ellipsis-horizontal" :aria-label="__('Options for :shop', ['shop' => $row['shop']])" data-test="suggested-shop-more">
+                                        @php($compareModal = 'compare-' . $product->id . '-' . \Illuminate\Support\Str::slug($row['host']))
+                                        <flux:modal.trigger :name="$compareModal">
+                                            <flux:button
+                                                size="sm"
+                                                variant="ghost"
+                                                square
+                                                icon="arrows-right-left"
+                                                :aria-label="__('Compare :shop with :product', ['shop' => $row['shop'], 'product' => $product->title])"
+                                                :tooltip="__('Compare side by side')"
+                                                data-test="suggested-shop-compare"
+                                            >
+                                                <span class="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+                                            </flux:button>
+                                        </flux:modal.trigger>
+                                        <flux:button
+                                            size="sm"
+                                            variant="ghost"
+                                            square
+                                            icon="arrow-top-right-on-square"
+                                            :href="$row['url']"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            :aria-label="__('Open :shop in a new tab to check the product', ['shop' => $row['shop']])"
+                                            :tooltip="__('Open the shop page')"
+                                            data-test="suggested-shop-open"
+                                        >
                                             <span class="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden" aria-hidden="true"></span>
                                         </flux:button>
-                                        <flux:menu>
-                                            <flux:menu.item icon="eye-slash" x-on:click="hideHost = {{ \Illuminate\Support\Js::from($row['host']) }}; hideLabel = {{ \Illuminate\Support\Js::from($row['shop']) }}; $flux.modal({{ \Illuminate\Support\Js::from('hide-shop-' . $this->getId()) }}).show()" data-test="suggested-shop-hide">
-                                                {{ __('Don’t suggest :shop', ['shop' => $row['shop']]) }}
-                                            </flux:menu.item>
-                                        </flux:menu>
-                                    </flux:dropdown>
+                                        <flux:button
+                                            size="sm"
+                                            square
+                                            icon="plus"
+                                            :href="route('app.products.show', [$product, 'add-shop' => 1])"
+                                            wire:navigate
+                                            :aria-label="__('Add :shop to :product', ['shop' => $row['shop'], 'product' => $product->title])"
+                                            :tooltip="__('Add this shop')"
+                                            data-test="suggested-shop-add"
+                                        >
+                                            <span class="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+                                        </flux:button>
+                                        <flux:dropdown position="bottom" align="end">
+                                            <flux:button size="sm" variant="ghost" square icon="ellipsis-horizontal" :aria-label="__('Options for :shop', ['shop' => $row['shop']])" data-test="suggested-shop-more">
+                                                <span class="absolute top-1/2 left-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+                                            </flux:button>
+                                            <flux:menu>
+                                                <flux:menu.item icon="eye-slash" x-on:click="hideHost = {{ \Illuminate\Support\Js::from($row['host']) }}; hideLabel = {{ \Illuminate\Support\Js::from($row['shop']) }}; $flux.modal({{ \Illuminate\Support\Js::from('hide-shop-' . $this->getId()) }}).show()" data-test="suggested-shop-hide">
+                                                    {{ __('Don’t suggest :shop', ['shop' => $row['shop']]) }}
+                                                </flux:menu.item>
+                                            </flux:menu>
+                                        </flux:dropdown>
+                                    </div>
+
+                                    {{-- A dialog: a dashboard card is too narrow for two columns. No <li>
+                                         inside: suggestedShopRows() in the tests reads a row up to its </li>. --}}
+                                    <flux:modal :name="$compareModal" class="w-full md:max-w-2xl">
+                                        <flux:heading size="lg" level="2">{{ __('Is this the same product?') }}</flux:heading>
+                                        <div class="mt-4 grid gap-3 sm:grid-cols-2" data-test="suggested-shop-comparison">
+                                            <div class="rounded-xl bg-white p-3 ring-1 ring-ink/10 dark:bg-white/5 dark:ring-white/10">
+                                                <p class="flex items-center gap-1.5 text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
+                                                    <img src="{{ \App\Support\Favicon::url($row['host']) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
+                                                    {{ $row['shop'] }}
+                                                </p>
+                                                <p class="mt-2 text-sm font-medium"><x-title-diff :title="$row['name']" :other="$product->title" /></p>
+                                                <p class="mt-1 text-sm text-zinc-500 tabular-nums dark:text-zinc-400">{{ implode(' · ', array_filter([$row['unitPrice'], $row['packPrice']])) }}</p>
+                                                @if ($badge !== null)
+                                                    <span class="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium {{ $badge[1] }}">{{ $badge[0] }}</span>
+                                                @endif
+                                                <div class="mt-3 flex flex-wrap items-center gap-2">
+                                                    <flux:button size="sm" icon:trailing="arrow-top-right-on-square" :href="$row['url']" target="_blank" rel="noopener noreferrer">{{ __('Open the page') }}</flux:button>
+                                                    <flux:button size="sm" variant="primary" icon="plus" :href="route('app.products.show', [$product, 'add-shop' => 1])" wire:navigate>{{ __('Add this shop') }}</flux:button>
+                                                </div>
+                                            </div>
+                                            <div class="rounded-xl bg-zinc-50 p-3 ring-1 ring-ink/10 dark:bg-white/5 dark:ring-white/10">
+                                                <p class="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">{{ __('Your product') }}</p>
+                                                <div class="mt-2 flex items-start gap-3">
+                                                    <x-product-thumb :product="$product" size="size-16" />
+                                                    <div class="min-w-0">
+                                                        <p class="text-sm font-medium"><x-title-diff :title="$product->title" :other="$row['name']" /></p>
+                                                        @foreach ($product->shops as $trackedShop)
+                                                            @php($trackedPack = $trackedShop->packSize())
+                                                            <p class="truncate text-sm text-zinc-500 dark:text-zinc-400">{{ $trackedPack === null ? $trackedShop->host : $trackedShop->host . ' · ' . \App\Support\UnitWord::pack($trackedPack) }}</p>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </flux:modal>
                                 </li>
                             @endforeach
                         </ul>

@@ -105,15 +105,18 @@
                 </flux:callout>
             @endif
 
-            <div class="flex items-start gap-3">
-                @if (! empty($snapshot['image_url']))
-                    <img src="{{ $snapshot['image_url'] }}" alt="" class="h-20 w-20 rounded object-cover" />
-                @endif
-                <div class="flex-1">
+            @php($pageUrl = $this->previewPageUrl())
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <x-preview-page-image :images="$imageUrls" :href="$pageUrl" :host="$host" :name="'preview-photos-' . $this->getId()" />
+                <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-1.5 text-sm text-zinc-500">
                         <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
                         {{ $host }}
                     </div>
+                    @if (is_string($snapshot['title'] ?? null) && $snapshot['title'] !== '')
+                        <flux:heading data-test="preview-title">{{ $snapshot['title'] }}</flux:heading>
+                    @endif
+                    <x-open-page-link :href="$pageUrl" :host="$host" class="mt-1" data-test="preview-open-page" />
                     {{-- Per unit first when the page states a pack size: the figure
                          shops are compared on. The pack price follows beneath. --}}
                     <div class="mt-1 text-lg font-semibold tabular-nums" data-test="preview-price">
