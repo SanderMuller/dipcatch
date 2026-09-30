@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Models\Product;
 use App\Models\WebDiscovery;
 use App\Services\ShopDiscovery\WebShopDiscovery;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Timeout;
@@ -18,12 +18,18 @@ use Illuminate\Queue\Attributes\Tries;
  */
 #[Tries(1)]
 #[Timeout(75)]
-final class DiscoverWebShops implements ShouldBeUnique, ShouldQueue
+final class DiscoverWebShops implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Queueable;
 
     public function __construct(public string $productId) {}
 
+    /**
+     * Unique while queued only: a product changed during a run queues the
+     * next run instead of being swallowed by the running one's lock. Every
+     * step checks the findings' state before it writes, so a second run
+     * does no harm.
+     */
     public function uniqueId(): string
     {
         return "discover-web-shops:{$this->productId}";

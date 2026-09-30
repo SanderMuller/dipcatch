@@ -16,6 +16,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Services\Drops\LargeDropConfirmation;
+use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Support\AlertRules;
 use App\Support\PriceBeforeDiscount;
 use App\Support\UrlNormalizer;
@@ -312,6 +313,11 @@ final class ProductShow extends Component
         // The cheapest offer is a derived column; removing a shop can change it.
         $this->product->refresh()->recomputeCheapestShop();
         $this->product->refresh();
+
+        app(WebShopDiscovery::class)->requeueIfStale($this->product);
+        // The suggestions panel is a child component: without the event it
+        // keeps listing the old suggestions and does not poll the new run.
+        $this->dispatch('shop-removed');
     }
 
     public function render(): View

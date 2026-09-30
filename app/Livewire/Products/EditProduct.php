@@ -8,6 +8,7 @@ use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
@@ -175,6 +176,9 @@ final class EditProduct extends Component
             'active' => $this->active,
             'price_display' => PriceDisplay::tryFrom($this->priceDisplay),
         ])->save();
+
+        // A new title changes what the web suggestions were checked against.
+        app(WebShopDiscovery::class)->requeueIfStale($this->product);
 
         $this->redirectRoute('app.products.show', $this->product, navigate: true);
     }

@@ -715,3 +715,27 @@ it('releases the read job for the delay the shop asks', function (): void {
 
     $job->assertReleased(delay: 120);
 });
+
+it('starts stale findings over from the stored search when no new search can be made', function (): void {
+    config()->set('dipcatch.web_discovery.daily_search_limit', 1);
+    $product = discoveryProduct();
+    fakeDiscovery(
+        [['title' => 'Coffee beans 1kg — Koffiehenk', 'link' => 'https://koffiehenk.test/coffee-1kg', 'snippet' => 'Beans in a 1 kg bag']],
+        ['https://koffiehenk.test/coffee-1kg' => htmlPage(discoveryPage('Coffee beans'))],
+    );
+    discover($product);
+
+    // A shop in another pack size makes every finding stale, and the stored
+    // search now counts as old, with the day's one search already spent.
+    Shop::factory()->for($product)->create(['url' => 'https://other.test/p/1', 'host' => 'other.test', 'pack_quantity' => '500.00', 'pack_unit' => 'g']);
+    config()->set('dipcatch.web_discovery.search_max_age_days', 0);
+    $this->travel(1)->minutes();
+
+    discover($product);
+
+    $finding = findingAt($product, 'koffiehenk.test');
+
+    expect($finding->fingerprint)->toBe(WebShopFinding::fingerprintFor($product->refresh()->load('shops')))
+        ->and($finding->status)->toBe(WebFindingStatus::Proposed)
+        ->and(serperCalls())->toBe(1);
+});

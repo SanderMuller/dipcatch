@@ -101,7 +101,12 @@ final class ShopSuggestions extends Component
     #[On('shop-added')]
     #[On('shop-removed')]
     #[On('shop-suggestions-changed')]
-    public function refreshSuggestions(): void {}
+    public function refreshSuggestions(): void
+    {
+        // A new shop can start the web suggestions over, so the panel polls
+        // again for the full window rather than from when it first opened.
+        $this->mountedAt = now()->getTimestamp();
+    }
 
     public function render(SuggestShops $suggest): View
     {

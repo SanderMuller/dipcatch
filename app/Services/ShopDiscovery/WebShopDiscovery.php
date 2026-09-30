@@ -55,6 +55,28 @@ final readonly class WebShopDiscovery
         return true;
     }
 
+    /**
+     * Re-checks the findings at once when a new shop or title left them
+     * stale, instead of on the next nightly run. A shop in a new pack size
+     * changes the fingerprint, which hides every finding until it is checked
+     * against that size; waiting for the night left the list empty all day.
+     * The stored search is reused, so no paid search is made.
+     */
+    public function requeueIfStale(Product $product): bool
+    {
+        $product->unsetRelation('shops');
+        $fingerprint = WebShopFinding::fingerprintFor($product);
+        $gtins = WebShopFinding::trackedGtins($product);
+
+        $stale = WebShopFinding::query()
+            ->where('product_id', $product->id)
+            ->whereNull('dismissed_at')
+            ->get()
+            ->contains(static fn (WebShopFinding $finding): bool => $finding->fingerprint !== $fingerprint || $finding->hasStaleGtins($gtins));
+
+        return $stale && $this->queue($product);
+    }
+
     public function discover(Product $product): void
     {
         if (! $this->runsFor($product)) {
@@ -64,10 +86,12 @@ final readonly class WebShopDiscovery
         }
 
         WebDiscovery::mark($product, WebDiscoveryState::Running);
-        $search = $this->searches->forQuery($product->title);
+        // Without a new search (the day's searches spent, or the provider
+        // down) the stored one still lets stale findings start over.
+        $search = $this->searches->forQuery($product->title)
+            ?? WebDiscovery::query()->find($product->id)?->search;
 
-        // Without a search (the day's searches spent, or the provider down)
-        // the findings stored before still go on.
+        // The findings stored before still go on.
         if ($search instanceof WebSearch) {
             $kept = WebResultFilter::keep($product, $search);
             $this->startOver($product, $search, $kept);

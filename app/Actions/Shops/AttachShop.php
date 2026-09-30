@@ -9,6 +9,7 @@ use App\Enums\ScrapeStatus;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Services\ShopDiscovery\WebShopDiscovery;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -22,6 +23,7 @@ final readonly class AttachShop
     public function __construct(
         private PlanLimits $limits,
         private BorrowShopImage $borrowImage,
+        private WebShopDiscovery $webShops,
     ) {}
 
     /**
@@ -29,13 +31,19 @@ final readonly class AttachShop
      */
     public function __invoke(Product $product, ShopDraft $draft): Shop
     {
-        return DB::transaction(function () use ($product, $draft): Shop {
+        $shop = DB::transaction(function () use ($product, $draft): Shop {
             // Guard first: the limit has to bite before a row exists, and the
             // guard locks the owner row so two racing requests serialise.
             $this->limits->guardShop($product);
 
             return $this->record($product, $draft);
         });
+
+        // A shop in a new pack size hides the web suggestions until they are
+        // checked against it.
+        $this->webShops->requeueIfStale($product);
+
+        return $shop;
     }
 
     /**
