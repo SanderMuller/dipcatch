@@ -82,6 +82,12 @@ final readonly class JsonLdEntitySearcher
      */
     private static function weigh(array $entity, string $url, ?string $variantKey, JsonLdSearchState $state): void
     {
+        // A full-URL type was invisible before `typesOf()` read that form, so
+        // one without a readable offer must not take part now either.
+        if (JsonLdTypeForms::namesProductOnlyByUrl($entity) && ! self::hasReadableOffer($entity)) {
+            return;
+        }
+
         if (JsonLdOfferVariants::weigh($entity, $url, $variantKey, $state)) {
             return;
         }
@@ -91,12 +97,7 @@ final readonly class JsonLdEntitySearcher
         // An entity with no usable offer answers nothing here, not even the
         // key — {@see self::scanVariants()} rules the other way.
         if ($evaluation->match === null) {
-            // A full-URL type with no usable offer was invisible before
-            // `typesOf()` read that form, so it must not hold the fallback
-            // slot a later readable Product needs.
-            if (! JsonLdTypeForms::namesProductOnlyByUrl($entity) || self::hasReadableOffer($entity)) {
-                $state->product ??= $entity;
-            }
+            $state->product ??= $entity;
 
             return;
         }

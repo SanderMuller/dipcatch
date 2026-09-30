@@ -202,6 +202,15 @@ test('a gap inside a run longer than three months shows no line', function (): v
     expect(discountFor($shop))->toBeNull();
 });
 
+test('a gap older than three months cannot move a long run, so the line still shows', function (): void {
+    $shop = discountShop();
+    readDaily($shop, 170, 161, '100.00');
+    readDaily($shop, 160, 141, '80.00', claim: '100.00');
+    readDaily($shop, 134, 0, '80.00', claim: '100.00');
+
+    expect(discountFor($shop)?->lowestBefore)->toBe('80.00');
+});
+
 test('today\'s reading must be evidence too', function (array $noEvidence): void {
     $shop = discountShop();
     readDaily($shop, 60, 8, '80.00');

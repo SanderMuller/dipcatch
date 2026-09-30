@@ -233,3 +233,13 @@ test('a full-URL Product with an unreadable offer does not hide a later readable
 
     expect(new JsonLdAdapter()->extract('https://shop.test/p/1', $html)->snapshot?->price)->toBe('89.00');
 });
+
+test('an unreadable full-URL Product naming the page does not hide a readable Product at the same URL', function (): void {
+    $url = 'https://shop.test/p/drill';
+    $html = ldPage([
+        ['@context' => 'https://schema.org', '@type' => 'https://schema.org/Product', 'name' => 'Drill', 'url' => $url, 'offers' => ['@type' => 'Offer', 'priceCurrency' => 'EUR']],
+        ['@context' => 'https://schema.org', '@type' => 'Product', 'name' => 'Drill', 'url' => $url, 'offers' => ['@type' => 'Offer', 'price' => '89.00', 'priceCurrency' => 'EUR']],
+    ]);
+
+    expect(new JsonLdAdapter()->extract($url, $html)->snapshot?->price)->toBe('89.00');
+});

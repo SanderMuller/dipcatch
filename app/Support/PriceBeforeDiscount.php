@@ -98,14 +98,17 @@ final class PriceBeforeDiscount
             return null;
         }
         $runStart = self::runStart($evidence, $claim);
+        $cap = $now->subMonthsNoOverflow(self::RUN_MONTHS);
         // A run past ACM's three months has outlived the progressive-discount
         // exception, so its window becomes the 30 days before now.
-        $windowEnd = $runStart->lessThan($now->subMonthsNoOverflow(self::RUN_MONTHS)) ? $now : $runStart;
+        $overCap = $runStart->lessThan($cap);
+        $windowEnd = $overCap ? $now : $runStart;
         $windowStart = $windowEnd->subDays(self::WINDOW_DAYS);
 
-        // Coverage runs from the earlier of the window and the run, so a gap
-        // that could hide a rise inside a long run counts too.
-        if (! self::covered($evidence, $windowStart->min($runStart), $now)) {
+        // For a long run, coverage also spans back to the cap: a gap there
+        // could hide a rise that starts the run inside the three months. A
+        // gap older than the cap cannot, so history before it is not needed.
+        if (! self::covered($evidence, $overCap ? $windowStart->min($cap) : $windowStart, $now)) {
             return null;
         }
 
