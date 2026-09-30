@@ -2,6 +2,7 @@
 
 use App\Enums\ProductCategory;
 use App\Livewire\AppCommandPalette;
+use App\Models\EmptySearch;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -111,4 +112,73 @@ it('offers Upgrade to Pro only to a free account while Pro is on sale', function
     $this->actingAs(User::factory()->create());
 
     livewire(AppCommandPalette::class)->assertDontSee('Upgrade to Pro');
+});
+
+it('focuses the search field when the palette opens, so you can type at once', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    // The modal focuses the element marked autofocus; without it focus stays on the page.
+    expect(livewire(AppCommandPalette::class)->html())
+        ->toMatch('/<input[^>]*placeholder="Search pages and products…"[^>]*\sautofocus/');
+});
+
+it('records a search that found nothing, once per person and term, counting repeats', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Arabica beans']);
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)
+        ->call('logEmptySearch', '  Stroop   Wafel ')
+        ->call('logEmptySearch', 'stroop wafel');
+
+    expect(EmptySearch::query()->sole()->only(['user_id', 'term', 'times']))->toBe(['user_id' => $user->id, 'term' => 'stroop wafel', 'times' => 2]);
+});
+
+it('does not record a search that matches a product by title or shop, or one too short to mean much', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Arabica beans']);
+    Shop::factory()->for($product)->create(['url' => 'https://beanshop.test/p/1']);
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)
+        ->call('logEmptySearch', 'arabica')
+        ->call('logEmptySearch', 'beanshop')
+        ->call('logEmptySearch', 'zz');
+
+    expect(EmptySearch::query()->count())->toBe(0);
+});
+
+it('stops recording after thirty empty searches a minute', function (): void {
+    $this->actingAs(User::factory()->create());
+    $palette = livewire(AppCommandPalette::class);
+
+    foreach (range(1, 35) as $index) {
+        $palette->call('logEmptySearch', "nothing {$index}");
+    }
+
+    expect(EmptySearch::query()->count())->toBe(30);
+});
+
+it('forgets an empty search six months after it was last searched', function (): void {
+    $user = User::factory()->create();
+    EmptySearch::record($user, 'old search');
+    EmptySearch::query()->update(['last_searched_at' => now()->subMonths(7)]);
+    EmptySearch::record($user, 'recent search');
+
+    $this->artisan('model:prune', ['--model' => [EmptySearch::class]]);
+
+    expect(EmptySearch::query()->pluck('term')->all())->toBe(['recent search']);
+});
+
+it('shows a product with its photo, best price and shop', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Arabica beans']);
+    Shop::factory()->for($product)->create(['url' => 'https://beans.test/p/1', 'current_price' => '4.99', 'currency' => 'EUR']);
+    $product->refresh()->recomputeCheapestShop();
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)
+        ->set('search', 'arabica')
+        ->assertSeeHtml('data-test="command-product"')
+        ->assertSeeText('€4.99 · beans.test');
 });

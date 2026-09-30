@@ -10,7 +10,9 @@ use App\Console\Commands\RetryReferenceShopsCommand;
 use App\Console\Commands\RunAdapterCanaryCommand;
 use App\Http\Middleware\RequireVerifiedEmailToAddCredentials;
 use App\Http\Middleware\SecurityHeaders;
+use App\Models\EmptySearch;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\Console\PruneCommand;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -39,6 +41,12 @@ return Application::configure(basePath: dirname(__DIR__))
             ->dailyAt('07:30')
             ->timezone('Europe/Amsterdam')
             ->withoutOverlapping()
+            ->onOneServer();
+
+        // Searches without results are kept six months after the last one.
+        $schedule->command(PruneCommand::class, ['--model' => [EmptySearch::class]])
+            ->dailyAt('03:50')
+            ->timezone('Europe/Amsterdam')
             ->onOneServer();
 
         $schedule->command(RunAdapterCanaryCommand::class)

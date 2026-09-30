@@ -17,11 +17,34 @@
     </flux:modal.trigger>
 
     <flux:modal name="app-command" variant="bare" class="my-[12vh] max-h-screen w-full max-w-[30rem] overflow-y-hidden">
-        <flux:command class="inline-flex max-h-[76vh] flex-col border-none shadow-lg">
+        <flux:command class="inline-flex max-h-[76vh] flex-col border-none shadow-lg" x-data="{ noMatches: false }">
             {{-- Pages filter in the browser. Products are searched on the server
                  as you type, so an old product is found too. --}}
-            <flux:command.input :placeholder="__('Search pages and products…')" wire:model.live.debounce.250ms="search" closable autocomplete="off" data-1p-ignore />
-            <flux:command.items>
+            <flux:command.input :placeholder="__('Search pages and products…')" wire:model.live.debounce.250ms="search" closable autofocus autocomplete="off" data-1p-ignore />
+            {{-- `flux:command.items` itself, without its fixed "No results found":
+                 Flux decides that line on typing, before the products arrive
+                 from the server. The observer follows the options shown, and a
+                 search that stays empty for a moment is logged, once per term
+                 per page; the server checks the products again. --}}
+            <ui-options
+                class="overflow-y-auto overscroll-y-none bg-white p-[.3125rem] dark:bg-zinc-700"
+                data-flux-command-items
+                x-data="{ logged: new Set(), timer: null }"
+                x-init="
+                    new MutationObserver(() => {
+                        noMatches = ! [...$el.querySelectorAll('ui-option')].some((option) => ! option.hasAttribute('data-hidden'));
+                        clearTimeout(timer);
+                        timer = setTimeout(() => {
+                            const term = ($wire.search ?? '').trim().toLowerCase();
+
+                            if (noMatches && term.length >= 3 && ! logged.has(term)) {
+                                logged.add(term);
+                                $wire.logEmptySearch(term);
+                            }
+                        }, 1500);
+                    }).observe($el, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-hidden'] });
+                "
+            >
                 <flux:command.item icon="home" :href="route('app.dashboard')" wire:navigate keywords="home overview start trips week">
                     {{ __('Dashboard') }}
                 </flux:command.item>
@@ -70,20 +93,41 @@
                     {{ __('Supported shops') }}
                 </flux:command.item>
 
-                @foreach ($products as $product)
+                @foreach ($products as ['product' => $product, 'headline' => $headline])
+                    @php($shop = $headline->buyableShop())
                     <flux:command.item
-                        icon="shopping-bag"
                         :href="route('app.products.show', $product)"
                         wire:navigate
                         wire:key="command-product-{{ $product->id }}"
                         {{-- The server already matched these; the browser's
                              text filter would hide a shop or category match. --}}
                         filter="manual"
+                        class="h-auto! gap-3 py-2"
+                        data-test="command-product"
                     >
-                        {{ Str::limit($product->title, 48) }}
+                        {{-- As the shopping list and the bell show a product. --}}
+                        <x-product-thumb :product="$product" size="size-10" />
+                        <div class="grid min-w-0 gap-0.5">
+                            <span class="truncate">{{ $product->title }}</span>
+                            <span class="truncate text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                                {{ $shop === null ? __('No shop sells this now') : $headline->text() . ' · ' . $shop->host }}
+                            </span>
+                        </div>
                     </flux:command.item>
                 @endforeach
-            </flux:command.items>
+
+                {{-- Flux's list expects its empty line to exist; ours is below the list. --}}
+                <ui-option-empty class="hidden"></ui-option-empty>
+            </ui-options>
+
+            {{-- A suggestion, not a result: outside the list, which may only hold
+                 options, and announced when it appears. --}}
+            <div aria-live="polite" class="bg-white dark:bg-zinc-700">
+                <p x-show="noMatches" x-cloak class="px-3 pb-3 pt-1 text-center text-sm text-zinc-500 dark:text-zinc-400" data-test="command-empty">
+                    {{ __('Not finding what you’re looking for?') }}
+                    <a href="{{ route('app.support') }}" wire:navigate class="font-medium text-brand underline-offset-4 hover:underline" data-test="command-empty-support">{{ __('Let us know') }}</a>
+                </p>
+            </div>
         </flux:command>
     </flux:modal>
 </div>
