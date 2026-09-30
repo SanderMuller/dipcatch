@@ -1,0 +1,44 @@
+{
+  "features": [
+    {
+      "kicker": "Products",
+      "headline": [
+        "Put it on",
+        "your list."
+      ],
+      "accent": "list.",
+      "sub": "Press the list icon on a product card. The card then says On list.",
+      "moment": {
+        "kind": "screens",
+        "capture": "shopping-list-add"
+      }
+    },
+    {
+      "kicker": "Shopping list",
+      "headline": [
+        "Grouped by",
+        "shop."
+      ],
+      "accent": "shop.",
+      "sub": "Products sit under the shop with the best buy. Skip a shop, and they move.",
+      "moment": {
+        "kind": "screens",
+        "capture": "shopping-list-skip"
+      }
+    },
+    {
+      "kicker": "Shopping list",
+      "headline": [
+        "Tick it off."
+      ],
+      "accent": "off.",
+      "sub": "Cross items off as you shop. They move to the bottom of the list.",
+      "moment": {
+        "kind": "screens",
+        "capture": "shopping-list-tick"
+      }
+    }
+  ],
+  "where": "List icon in the header › Open shopping list",
+  "music": true
+}

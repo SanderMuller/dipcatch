@@ -50,6 +50,7 @@
                 ['label' => __('Plan & billing'), 'href' => route('app.billing'), 'icon' => 'credit-card', 'current' => request()->routeIs('app.billing'), 'navigate' => true],
                 ['label' => __('Connections'), 'href' => route('app.connections'), 'icon' => 'puzzle-piece', 'current' => request()->routeIs('app.connections'), 'navigate' => true],
                 ['label' => __('Support'), 'href' => route('app.support'), 'icon' => 'lifebuoy', 'current' => request()->routeIs('app.support'), 'navigate' => true],
+                ['label' => __("What's new"), 'href' => route('app.changelog'), 'icon' => 'sparkles', 'current' => request()->routeIs('app.changelog'), 'navigate' => true],
                 // Back to the marketing site. No wire:navigate: the marketing
                 // pages use their own layout, so a full page load is correct.
                 ['label' => __('Home page'), 'href' => route('home'), 'icon' => 'globe-alt', 'current' => false, 'navigate' => false, 'test' => 'home-page-nav'],

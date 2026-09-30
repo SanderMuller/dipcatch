@@ -15,6 +15,7 @@ use App\Http\Controllers\SocialLoginController;
 use App\Http\Controllers\UseCasePageController;
 use App\Http\Middleware\MarketingLocale;
 use App\Livewire\Billing\BillingPage;
+use App\Livewire\Changelog\ChangelogPage;
 use App\Livewire\Connections\ConnectionsPage;
 use App\Livewire\Dashboard;
 use App\Livewire\Products\CreateProductFromUrl;
@@ -234,6 +235,7 @@ Route::prefix('app')
         Route::permanentRedirect('notifications', '/settings/notifications')->name('notifications');
         Route::livewire('connections', ConnectionsPage::class)->name('connections');
         Route::livewire('support', SupportPage::class)->name('support');
+        Route::livewire('changelog', ChangelogPage::class)->name('changelog');
         Route::livewire('stats', StatsPage::class)->name('stats');
         Route::livewire('shopping-list', ShoppingListPage::class)->name('shopping-list');
     });

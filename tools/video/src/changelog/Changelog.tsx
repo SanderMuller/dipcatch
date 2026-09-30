@@ -7,7 +7,7 @@ import {Background, FeatureLayout, Headline, Kicker, SubLine, type Word} from '.
 import {Logo} from '../components/Logo';
 import {pushBlur} from '../components/PushBlur';
 import {ramp, useFrame} from '../time';
-import {MomentView} from './moments';
+import {MomentView, SCREENS_WIDTH} from './moments';
 import {END, FEATURE, INTRO, T, totalFrames} from './timeline';
 import type {Entry, Feature} from './types';
 
@@ -32,7 +32,8 @@ const headlineWords = (feature: Feature): Word[][] =>
 const FeatureScene: React.FC<{feature: Feature; index: number; of: number}> = ({feature, index, of}) => (
 	<FeatureLayout
 		seed={22 + index}
-		visualWidth={feature.moment.kind === 'notification' ? 560 : 900}
+		visualWidth={feature.moment.kind === 'notification' ? 560 : feature.moment.kind === 'screens' ? SCREENS_WIDTH : 900}
+		textWidth={feature.moment.kind === 'screens' ? 660 : undefined}
 		text={
 			<>
 				<Kicker index={of > 1 ? String(index + 1).padStart(2, '0') : 'New'} label={feature.kicker} />

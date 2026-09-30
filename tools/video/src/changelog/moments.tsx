@@ -1,11 +1,11 @@
 import React from 'react';
-import {spring, useVideoConfig} from 'remotion';
+import {Img, spring, staticFile, useVideoConfig} from 'remotion';
 import {C, font} from '../brand';
 import {Badge, Button, Card, Cursor, ShopIcon} from '../components/ui';
 import {LogoMark} from '../components/Logo';
 import {ProductArt} from '../components/ProductArt';
 import {mix, ramp, useFrame} from '../time';
-import type {Moment} from './types';
+import type {Moment, ScreenStep} from './types';
 
 // Every moment acts on the same beat: the cursor lands at ACT, the result settles by ACT + 20.
 const ACT = 40;
@@ -200,6 +200,96 @@ const ListMoment: React.FC<{m: Extract<Moment, {kind: 'list'}>}> = ({m}) => {
 	);
 };
 
+export const SCREENS_WIDTH = 980;
+const SCREENS_HEIGHT = 640;
+// Each next state lands this many (slowed) frames after the one before.
+const STEP = 55;
+
+/**
+ * Real captures. The camera frames a step's focus; the cursor clicks the
+ * control, the next capture fades in, and the camera moves to its focus.
+ * Images and cursor share one box, so the scene's tilt moves them together.
+ */
+const ScreensMoment: React.FC<{m: Extract<Moment, {kind: 'screens'}>}> = ({m}) => {
+	const frame = useFrame();
+	const steps = m.steps as ScreenStep[];
+	const clickAt = (i: number) => ACT + i * STEP;
+	const fadeIn = (i: number) => ramp(frame, clickAt(i - 1) + 5, clickAt(i - 1) + 13);
+	const moveTo = (i: number, f: number) => ramp(f, clickAt(i - 1) + 9, clickAt(i - 1) + 36);
+
+	const camera = (f: number) => {
+		let focus = steps[0].focus;
+		for (let i = 1; i < steps.length; i++) {
+			const t = moveTo(i, f);
+			const next = steps[i].focus;
+			focus = {x: mix(focus.x, next.x, t), y: mix(focus.y, next.y, t), w: mix(focus.w, next.w, t), h: mix(focus.h, next.h, t)};
+		}
+		// A slow push-in, so a held state does not read as a frozen frame.
+		const scale = Math.min(SCREENS_WIDTH / focus.w, SCREENS_HEIGHT / focus.h) * mix(1, 1.03, ramp(f, 0, 130));
+		return {scale, x: SCREENS_WIDTH / 2 - (focus.x + focus.w / 2) * scale, y: SCREENS_HEIGHT / 2 - (focus.y + focus.h / 2) * scale};
+	};
+
+	const now = camera(frame);
+	// Where a click lands on screen, with the camera as it stands at that click.
+	const onScreen = (i: number) => {
+		const cam = camera(clickAt(i));
+		const click = steps[i].click as {x: number; y: number};
+		return {x: click.x * cam.scale + cam.x, y: click.y * cam.scale + cam.y};
+	};
+
+	const points: {f: number; x: number; y: number; click?: boolean}[] = [{f: 8, x: SCREENS_WIDTH * 0.72, y: SCREENS_HEIGHT * 0.95}];
+	steps.slice(0, -1).forEach((_, i) => {
+		const at = onScreen(i);
+		points.push({f: clickAt(i) - 12, x: at.x, y: at.y}, {f: clickAt(i), x: at.x, y: at.y, click: true});
+	});
+	// Off the control and off the text once the result shows: the focus
+	// padding in the bottom-right corner is empty page.
+	points.push({f: clickAt(steps.length - 2) + 36, x: SCREENS_WIDTH - 50, y: SCREENS_HEIGHT - 28});
+
+	return (
+		<div style={{position: 'relative', width: SCREENS_WIDTH, height: SCREENS_HEIGHT}}>
+			<Card pad={0} style={{position: 'relative', width: SCREENS_WIDTH, height: SCREENS_HEIGHT, overflow: 'hidden', background: C.canvas}}>
+				<div style={{position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', transform: `translate(${now.x}px, ${now.y}px) scale(${now.scale})`}}>
+					{steps.map((step, i) => (
+						<Img
+							key={step.src}
+							src={staticFile(step.src)}
+							style={{position: 'absolute', left: 0, top: 0, width: step.width, height: step.height, opacity: i === 0 ? 1 : fadeIn(i)}}
+						/>
+					))}
+					{steps.map((step, i) => {
+						if (step.highlight === undefined || i === 0) {
+							return null;
+						}
+						// Rings what changed once the camera has arrived. Sized in screen pixels, not capture pixels.
+						const ring = ramp(frame, clickAt(i - 1) + 30, clickAt(i - 1) + 42);
+						const {x, y, w, h} = step.highlight;
+						const grow = 6 / now.scale;
+						return (
+							<div
+								key={`ring-${step.src}`}
+								style={{
+									position: 'absolute',
+									left: x - grow,
+									top: y - grow,
+									width: w + grow * 2,
+									height: h + grow * 2,
+									borderRadius: 12 / now.scale,
+									border: `${3 / now.scale}px solid ${C.blue}`,
+									boxShadow: `0 0 0 ${6 / now.scale}px rgba(53, 84, 255, 0.15)`,
+									opacity: ring,
+									transform: `scale(${mix(1.06, 1, ring)})`,
+								}}
+							/>
+						);
+					})}
+				</div>
+			</Card>
+			<Cursor appear={8} points={points} />
+		</div>
+	);
+};
+
 export const MomentView: React.FC<{moment: Moment}> = ({moment}) => {
 	switch (moment.kind) {
 		case 'filter':
@@ -210,5 +300,7 @@ export const MomentView: React.FC<{moment: Moment}> = ({moment}) => {
 			return <NotificationMoment m={moment} />;
 		case 'list':
 			return <ListMoment m={moment} />;
+		case 'screens':
+			return <ScreensMoment m={moment} />;
 	}
 };

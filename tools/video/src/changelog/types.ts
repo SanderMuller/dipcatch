@@ -35,12 +35,35 @@ export type Moment =
 			body: string;
 	  }
 	| {
+			/**
+			 * Real app captures, state by state: zooms to each step's focus and
+			 * clicks where the next state comes from. `capture` names a folder
+			 * under public/captures/ that tools/changelog-media/capture-screens.mjs
+			 * wrote; `steps` is read from its steps.json when the video renders.
+			 */
+			kind: 'screens';
+			capture: string;
+			steps?: ScreenStep[];
+	  }
+	| {
 			/** Rows build up one by one, the first one gets a badge. */
 			kind: 'list';
 			title: string;
 			rows: {label: string; value: string; shop?: string}[];
 			badge: string;
 	  };
+
+/** One captured state. Every coordinate is in CSS pixels of the full-page capture. */
+export type ScreenStep = {
+	src: string;
+	width: number;
+	height: number;
+	focus: {x: number; y: number; w: number; h: number};
+	/** The control the next state comes from. */
+	click?: {x: number; y: number};
+	/** The part that changed, ringed once the step shows. */
+	highlight?: {x: number; y: number; w: number; h: number};
+};
 
 export type Feature = {
 	/** The page or area: "Products", "Dashboard". At most 24 characters. */

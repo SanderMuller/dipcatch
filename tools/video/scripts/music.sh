@@ -16,8 +16,9 @@ if [ ! -f "$SOURCE" ]; then
 	exit 1
 fi
 
-# The track lifts at 12.1 s. Starting at 10.5 s lands the lift on the first feature scene (frame 48, 1.6 s).
-START=10.5
+# The track lifts at 12.1 s. START = 12.1 - (INTRO - T) / 30 lands the lift on the
+# first feature scene: frame 78, 2.6 s, with INTRO 90 and T 12 in src/changelog/timeline.ts.
+START=9.5
 LENGTH=40
 
 LUFS=$(ffmpeg -hide_banner -ss "$START" -t "$LENGTH" -i "$SOURCE" -af ebur128 -f null - 2>&1 | awk '/I:/ {value=$2} END {print value}')

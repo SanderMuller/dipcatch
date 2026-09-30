@@ -1,9 +1,11 @@
-import type {Entry} from './types';
+import {staticFile} from 'remotion';
+import type {Entry, ScreenStep} from './types';
 
 // Fixed timing: an entry never chooses its own. Frames at 30 fps.
 export const FPS = 30;
 export const T = 12;
-export const INTRO = 60;
+// Long enough to read "New in dipcatch" before the first feature pushes in.
+export const INTRO = 90;
 export const FEATURE = 150;
 export const END = 90;
 
@@ -51,3 +53,33 @@ export const validate = (entry: Entry): void => {
 		throw new Error(`The entry does not fit the template:\n- ${problems.join('\n- ')}`);
 	}
 };
+
+/**
+ * Reads each `screens` moment's steps from its capture folder, so the entry
+ * JSON names the capture and the coordinates come from the page itself.
+ */
+export const resolveCaptures = async (entry: Entry): Promise<Entry> => ({
+	...entry,
+	features: await Promise.all(
+		entry.features.map(async (feature) => {
+			if (feature.moment.kind !== 'screens') {
+				return feature;
+			}
+
+			const url = staticFile(`captures/${feature.moment.capture}/steps.json`);
+			const response = await fetch(url);
+
+			if (!response.ok) {
+				throw new Error(`No capture at public/captures/${feature.moment.capture}/steps.json: run tools/changelog-media/capture-screens.mjs`);
+			}
+
+			const {steps} = (await response.json()) as {steps: ScreenStep[]};
+
+			if (steps.length < 2 || steps.slice(0, -1).some((step) => step.click === undefined)) {
+				throw new Error(`Capture ${feature.moment.capture}: needs two or more steps, and a click on every step but the last`);
+			}
+
+			return {...feature, moment: {...feature.moment, steps}};
+		}),
+	),
+});

@@ -2,24 +2,19 @@
   "features": [
     {
       "kicker": "Products",
-      "headline": ["See your best", "buys per shop."],
+      "headline": ["Pick a shop."],
       "accent": "shop.",
-      "sub": "Pick a shop, switch on Best buys here, and see what to buy there.",
-      "moment": {
-        "kind": "filter",
-        "title": "Products at ah.nl",
-        "toggle": "Best buys here",
-        "items": [
-          {"title": "Pepperoni pizza", "art": "pizza", "shop": "ah.nl", "price": "€4.34 /kg", "keep": true},
-          {"title": "Coffee beans 1 kg", "art": "coffee", "shop": "jumbo.com", "price": "€11.99 /kg", "keep": false},
-          {"title": "Laundry gel 2 L", "art": "laundry", "shop": "ah.nl", "price": "€4.10 /l", "keep": true},
-          {"title": "Cat food 12 × 85 g", "art": "catfood", "shop": "bol.com", "price": "€7.35 /kg", "keep": false},
-          {"title": "Whitening toothpaste", "art": "toothpaste", "shop": "ah.nl", "price": "€48.67 /l", "keep": true},
-          {"title": "Protein bars 12 ×", "art": "bars", "shop": "etos.nl", "price": "€33.32 /kg", "keep": false}
-        ]
-      }
+      "sub": "Choose a shop under Shops. The Best buys here switch shows up.",
+      "moment": {"kind": "screens", "capture": "best-buys-shop"}
+    },
+    {
+      "kicker": "Products",
+      "headline": ["See its best", "buys."],
+      "accent": "buys.",
+      "sub": "Switch it on to keep the products whose best buy is at that shop.",
+      "moment": {"kind": "screens", "capture": "best-buys-switch"}
     }
   ],
-  "where": "Dashboard › Where to shop this week",
+  "where": "Products › Shops › Best buys here",
   "music": true
 }

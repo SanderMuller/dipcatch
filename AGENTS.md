@@ -13,6 +13,16 @@ vendor/bin/pest --filter=testName
 
 ---
 
+## In-App Changelog — Check Before Every Push to Main
+
+Before you push to `main`, run the `changelog` skill over the commits you are about to push. It decides whether they earn an entry in `config/changelog.php`, the "What's new" page users read, and writes the entry if they do.
+
+- Add an entry only for a change a user notices: a new feature, a new or dropped shop, a Pro change, or a fix to something users hit. Skip refactors, tests, tooling, review follow-ups and small polish. Most pushes add nothing.
+- Write every entry in three passes: draft, simplify, then the `humanizer` skill. English only.
+- Commit the entry with the change, or as its own commit in the same push.
+
+---
+
 ## Parallel Agents — Per-Clone Test Database
 
 `phpunit.xml.dist` pins `DB_DATABASE=dipcatch_test`, and every clone of this repository on one machine shares it. Two agents running the suite at once both `migrate:fresh`-wipe that database, and each corrupts the other mid-run. The signature is errors that walk the schema as it is rebuilt — `relation "users" does not exist`, then a missing column, then a different missing column — with a different set of tests failing every run. It is not a defect in the code under test.
@@ -88,6 +98,8 @@ substitution runs the whole suite.
 When you need to document a user-facing change for a release, write it to `RELEASE_NOTES_<version>.md` at the repo root (already gitignored via the `RELEASE_NOTES*.md` pattern). The CI release job picks it up and promotes it into `CHANGELOG.md` as part of the tag flow.
 
 If you find yourself editing `CHANGELOG.md` directly, stop — it will be overwritten.
+
+The "What's new" page users read in the app is a separate log in `config/changelog.php`, owned by the `changelog` skill.
 
 ---
 

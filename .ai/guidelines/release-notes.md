@@ -5,3 +5,5 @@
 When you need to document a user-facing change for a release, write it to `RELEASE_NOTES_<version>.md` at the repo root (already gitignored via the `RELEASE_NOTES*.md` pattern). The CI release job picks it up and promotes it into `CHANGELOG.md` as part of the tag flow.
 
 If you find yourself editing `CHANGELOG.md` directly, stop — it will be overwritten.
+
+The "What's new" page users read in the app is a separate log in `config/changelog.php`, owned by the `changelog` skill.
