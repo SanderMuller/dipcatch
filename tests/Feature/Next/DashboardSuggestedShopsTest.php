@@ -285,3 +285,24 @@ it('serves a cached list that holds a checked date, under a store that refuses t
         // The second read comes from the cache.
         ->and(suggestedShopRows($user)[0])->toContain('koffie.test');
 });
+
+it('lists again as soon as a shop is added, a web suggestion dismissed, or a product paused', function (): void {
+    $user = User::factory()->create(['shop_checks' => true]);
+    subscribeUser($user);
+    $cheese = dashboardProduct($user, 'Beemster Extra belegen 48+ plakken');
+    seedRow('ah', 'Beemster Extra belegen 48+ plakken', '150 g', '3.49', link: 'beemster-ah');
+    seedRow('spar', 'Beemster Extra belegen 48+ plakken', '150 g', '3.69', link: 'beemster-spar');
+    $coffee = dashboardProduct($user, 'Douwe Egberts Aroma Rood bonen');
+    dashboardWebFinding($coffee, 'koffie.test', 0.9);
+
+    expect(suggestedShopRows($user))->toHaveCount(3);
+
+    Shop::factory()->for($cheese)->create(['url' => 'https://www.ah.nl/producten/product/beemster-ah', 'pack_quantity' => '150.00', 'pack_unit' => 'g']);
+    expect(collect(suggestedShopRows($user))->contains(fn (string $row): bool => str_contains($row, 'AH')))->toBeFalse();
+
+    WebShopFinding::query()->where('product_id', $coffee->id)->update(['dismissed_at' => now()]);
+    expect(collect(suggestedShopRows($user))->contains(fn (string $row): bool => str_contains($row, 'koffie.test')))->toBeFalse();
+
+    $cheese->update(['active' => false]);
+    expect(suggestedShopRows($user))->toBe([]);
+});

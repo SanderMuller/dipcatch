@@ -22,11 +22,10 @@ use Illuminate\Support\Facades\DB;
  * the AI shop check, the most likely matches come first; without it, any
  * suggestion, closest name first.
  *
- * Matching the daily dataset costs tens of milliseconds a product, so only
- * a few products are matched per render: with the AI check, the ones with
- * the most likely stored matches, then those tracked at the fewest shops.
- * A product with nothing left to add gives up its place to the next one, up
- * to a fixed number of products matched. Listing sends nothing to Jev; a
+ * Matching costs a catalogue scan per product, so at most {@see MATCHED}
+ * products are matched (with the AI check, the ones with the most likely
+ * stored matches first, then those tracked at the fewest shops) and the
+ * rows are cached ({@see forUser()}). Listing sends nothing to Jev; a
  * product's own page asks for its answers.
  */
 final readonly class DashboardSuggestions
@@ -51,10 +50,10 @@ final readonly class DashboardSuggestions
 
     /**
      * The rows for the dashboard, kept for a few minutes: matching costs a
-     * catalogue scan per product, and the dataset changes once a day. The
-     * key changes as soon as anything the rows depend on does (a shop
-     * added, a shop hidden or shown again, a suggestion dismissed), so the
-     * cache never shows what the account just changed.
+     * catalogue scan per product. The key changes when the account adds or
+     * removes a shop, pauses a product, hides or shows a shop, dismisses a
+     * suggestion, or switches the AI check. Other changes (a title edit, a
+     * new AI answer) show within {@see CACHE_MINUTES} minutes.
      *
      * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}>
      */
@@ -71,6 +70,8 @@ final readonly class DashboardSuggestions
         $products = Product::query()
             ->with(['user', 'shops', 'cheapestShop'])
             ->whereKey(array_column($cached, 'product'))
+            ->where('user_id', $user->id)
+            ->where('active', true)
             ->get()
             ->keyBy('id');
 
@@ -87,22 +88,21 @@ final readonly class DashboardSuggestions
         return $rows;
     }
 
-    /**
-     * What the rows depend on, in one cheap read: the account's products and
-     * shops, its hidden shops, its dismissed suggestions and its AI setting.
-     */
+    /** The parts of the account the cache key follows. */
     private static function cacheKey(User $user): string
     {
         $shops = DB::table('shops')
             ->join('products', 'products.id', '=', 'shops.product_id')
             ->where('products.user_id', $user->id)
-            ->selectRaw('count(*) as shop_count, max(shops.created_at) as last_shop, count(distinct products.id) as product_count')
+            ->selectRaw('count(*) as shop_count, max(shops.created_at) as last_shop, count(distinct case when products.active then products.id end) as active_products')
             ->first();
+        $products = Product::query()->where('user_id', $user->id)->select('id');
 
         $fingerprint = [
             (array) $shops,
             HiddenShop::query()->where('user_id', $user->id)->orderBy('id')->pluck('id')->all(),
-            ShopSuggestionDismissal::query()->whereIn('product_id', Product::query()->where('user_id', $user->id)->select('id'))->max('id'),
+            ShopSuggestionDismissal::query()->whereIn('product_id', $products)->max('id'),
+            WebShopFinding::query()->whereIn('product_id', $products)->whereNotNull('dismissed_at')->count(),
             $user->wantsShopChecks(),
         ];
 
@@ -121,7 +121,7 @@ final readonly class DashboardSuggestions
             ->with(['user', 'shops', 'cheapestShop'])
             ->whereKey($ids)
             ->get()
-            ->sortBy(static fn (Product $product): int|false => array_search($product->id, $ids, true));
+            ->sortBy(static fn (Product $product): int|false => array_search($product->id, $ids, strict: true));
 
         $chances = $aiChecked ? self::storedChances($ids) : [];
         $rows = [];
@@ -147,8 +147,8 @@ final readonly class DashboardSuggestions
     }
 
     /**
-     * One row per shop for a product: the dataset and the web can both find
-     * it, and the surer one is kept.
+     * One row per shop for a product, the surer of the dataset and the web
+     * row, at most {@see ROWS_PER_PRODUCT}, most likely first.
      *
      * @param  array<string, float>  $chances
      * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}>

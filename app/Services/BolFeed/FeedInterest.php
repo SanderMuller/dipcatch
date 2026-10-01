@@ -11,12 +11,11 @@ use App\Support\Gtin;
 /**
  * Which rows of bol.com's product feed could ever become a suggestion, so
  * the import keeps those and drops the millions of others: a row whose
- * barcode a tracked shop reports, or whose title passes the same word
- * prefilter a tracked product's suggestions use
- * ({@see QueryTokens::prefilter()}) and then scores high enough to be
+ * barcode a tracked shop reports, or whose title holds, as whole words,
+ * the prefilter words of a tracked product's query
+ * ({@see QueryTokens::prefilterNeedles()}) and then scores high enough to be
  * offered ({@see SuggestShops::couldOffer()}). Built once per import from
- * every active product, so a product added today is covered from the next
- * import.
+ * every active product.
  */
 final readonly class FeedInterest
 {

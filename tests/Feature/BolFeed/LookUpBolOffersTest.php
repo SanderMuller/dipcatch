@@ -1,10 +1,13 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\AttachShop;
+use App\Actions\Shops\ShopDraft;
 use App\Actions\Suggestions\SuggestShops;
 use App\Jobs\LookUpBolOffers;
 use App\Models\CheckjebonPrice;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Services\BolApi\BolApiFailed;
 use App\Services\BolApi\BolCatalogClient;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -16,7 +19,8 @@ beforeEach(function (): void {
     Http::preventStrayRequests();
 });
 
-/** A bol.com Catalog API answer for one product with its best offer. */
+/** A bol.com Catalog API answer for one product with its best offer.
+ * @return array<string, string|array<string, float|string>> */
 function bolProductJson(string $ean, string $title, string $id, float $price): array
 {
     $slug = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $title));
@@ -103,4 +107,70 @@ it('is queued for a product only with API credentials', function (): void {
     Queue::fake();
     LookUpBolOffers::dispatchFor($product);
     Queue::assertNothingPushed();
+});
+
+it('logs in again once when bol rejects a cached token', function (): void {
+    $product = Product::factory()->create(['title' => 'Sensodyne Rapid relief', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://drogist.test/p/1', 'gtin' => '5054563110503']);
+    Http::fake([
+        'login.bol.com/*' => Http::response(['access_token' => 'token', 'expires_in' => 299]),
+        'api.bol.com/*' => Http::sequence()
+            ->push(['title' => 'Unauthorized'], 401)
+            ->push(bolProductJson('5054563110503', 'Sensodyne Tandpasta Rapid Relief 75ml', '9200000077118993', 8.81)),
+    ]);
+
+    runBolLookup($product);
+
+    expect(CheckjebonPrice::query()->where('supermarket', 'bol')->count())->toBe(1);
+    // Login, refused lookup, login again, lookup.
+    Http::assertSentCount(4);
+});
+
+it('gives up when bol refuses a fresh token too, instead of logging in forever', function (): void {
+    $product = Product::factory()->create(['title' => 'Sensodyne Rapid relief', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://drogist.test/p/1', 'gtin' => '5054563110503']);
+    fakeBolApi(['api.bol.com/*' => Http::response(['title' => 'Unauthorized'], 401)]);
+
+    expect(fn () => runBolLookup($product))->toThrow(BolApiFailed::class, 'answered 401');
+    Http::assertSentCount(4);
+});
+
+it('searches by name when bol knows none of the product\'s barcodes', function (): void {
+    $product = Product::factory()->create(['title' => 'Remia Fritessaus classic', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://saus.test/p/1', 'gtin' => '5054563110503', 'pack_quantity' => '500.00', 'pack_unit' => 'ml']);
+    fakeBolApi([
+        'api.bol.com/marketing/catalog/v1/products/search*' => Http::response(['results' => [bolProductJson('8710448620013', 'Remia Fritessaus Classic 500 ml', '9300000001', 1.99)]]),
+        'api.bol.com/marketing/catalog/v1/products/5054563110503*' => Http::response(['title' => 'Not Found'], 404),
+    ]);
+
+    runBolLookup($product);
+
+    expect(CheckjebonPrice::query()->where('supermarket', 'bol')->pluck('name')->all())->toBe(['Remia Fritessaus Classic 500 ml']);
+});
+
+it('asks bol nothing for a product paused after it was queued', function (): void {
+    $product = Product::factory()->create(['title' => 'Remia Fritessaus classic', 'currency' => 'EUR', 'active' => false]);
+    Http::fake();
+
+    runBolLookup($product);
+
+    Http::assertNothingSent();
+});
+
+it('is not queued for a paused product, nor for one priced in another currency', function (): void {
+    Queue::fake();
+
+    LookUpBolOffers::dispatchFor(Product::factory()->create(['currency' => 'EUR', 'active' => false]));
+    LookUpBolOffers::dispatchFor(Product::factory()->create(['currency' => 'GBP']));
+
+    Queue::assertNothingPushed();
+});
+
+it('is queued when a shop is added to a product', function (): void {
+    Queue::fake();
+    $product = Product::factory()->create(['currency' => 'EUR']);
+
+    app(AttachShop::class)($product, new ShopDraft(url: 'https://shop.test/p/1', adapterKey: 'jsonld', price: '1.99', currency: 'EUR', inStock: true));
+
+    Queue::assertPushed(LookUpBolOffers::class, fn (LookUpBolOffers $job): bool => $job->productId === $product->id);
 });

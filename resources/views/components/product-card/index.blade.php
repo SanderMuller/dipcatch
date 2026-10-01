@@ -32,8 +32,6 @@
             </span>
         @endif
         @if ($product->active && $product->isAtTarget())
-            {{-- The price is at or under the owner's own target now. The ping
-                 marks it as live, like the alert itself. --}}
             <span class="absolute top-5 right-5 flex size-8 items-center justify-center rounded-full bg-white/90 text-emerald-600 shadow-xs ring-1 ring-black/5 backdrop-blur-sm dark:bg-zinc-800/90 dark:text-emerald-400 dark:ring-white/10" data-test="at-target-badge">
                 <flux:icon.bell-alert variant="micro" class="size-4" />
                 <span class="absolute -top-0.5 -right-0.5 flex size-2.5" aria-hidden="true">

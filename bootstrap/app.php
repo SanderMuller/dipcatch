@@ -48,7 +48,6 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->onOneServer();
 
-        // After the checkjebon refresh, which keeps chains with prices only.
         // Needs the IP address it runs from whitelisted at bol.com.
         $schedule->command(ImportBolFeedCommand::class)
             ->dailyAt('08:00')
@@ -58,8 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->onOneServer()
             ->runInBackground();
 
-        // Keeps suggested bol.com prices a day old at most where the feed
-        // import cannot run. No IP whitelist: the API answers anywhere.
+        // No IP whitelist: the API answers anywhere.
         $schedule->command(RefreshBolOffersCommand::class)
             ->dailyAt('08:30')
             ->timezone('Europe/Amsterdam')

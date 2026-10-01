@@ -71,7 +71,7 @@
                 }
             }
         @endphp
-        {{-- No card of its own: the add-shop disclosure is the card. --}}
+        {{-- No card of its own: every caller wraps it in one. --}}
         <div class="space-y-3">
             @php($alreadyTracked = $this->alreadyTrackedNote())
             @if ($alreadyTracked !== null)

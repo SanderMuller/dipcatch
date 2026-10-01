@@ -2,6 +2,7 @@
 
 namespace App\Services\BolApi;
 
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -107,6 +108,23 @@ final readonly class BolCatalogClient
             return $cached;
         }
 
+        // One login at a time: when the token expires, every queued lookup
+        // would otherwise log in at once, which is what bol blocks.
+        try {
+            $token = Cache::lock(self::TOKEN_CACHE_KEY . ':login', self::TIMEOUT_SECONDS)->block(self::TIMEOUT_SECONDS, function (): string {
+                $cached = Cache::get(self::TOKEN_CACHE_KEY);
+
+                return is_string($cached) && $cached !== '' ? $cached : $this->logIn();
+            });
+        } catch (LockTimeoutException $e) {
+            throw new BolApiFailed('Waited too long for the bol.com login.', 0, $e);
+        }
+
+        return is_string($token) ? $token : throw new BolApiFailed('bol.com login gave no token.');
+    }
+
+    private function logIn(): string
+    {
         try {
             $response = Http::withBasicAuth(Config::string('services.bol.api.client_id'), Config::string('services.bol.api.client_secret'))
                 ->acceptJson()

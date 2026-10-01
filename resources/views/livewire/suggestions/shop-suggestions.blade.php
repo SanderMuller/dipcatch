@@ -61,8 +61,8 @@
                                 @if ($suggestionUnitPrice !== null)
                                     <span class="font-medium text-zinc-700 dark:text-zinc-300">{{ \App\Support\MoneyFormatter::unitPrice($suggestionUnitPrice, 'EUR') }} {{ $suggestionSize->label() }}</span> ·
                                 @endif
-                                {{-- bol.com's own current price, offers included; the
-                                     supermarket dataset knows only the regular price. --}}
+                                {{-- bol.com's price includes its offers; the supermarket
+                                     dataset has only the regular price. --}}
                                 @if ($suggestion->chain === \App\Services\BolFeed\BolCatalogRows::CHAIN)
                                     <span title="{{ __('bol.com’s price at the last check') }}">{{ __('bol.com price :price', ['price' => \App\Support\PackLine::format($suggestion->price, 'EUR', $suggestionSize)]) }}</span>
                                 @else

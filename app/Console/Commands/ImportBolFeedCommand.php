@@ -32,6 +32,9 @@ final class ImportBolFeedCommand extends Command
 
     private const int UPSERT_CHUNK = 1000;
 
+    /** Longer than a day, so a row the API refresh read yesterday survives. */
+    private const int KEEP_HOURS = 36;
+
     public function handle(FeedSource $downloader, SuggestShops $suggest): int
     {
         if (! BolFeedDownloader::configured()) {
@@ -53,6 +56,7 @@ final class ImportBolFeedCommand extends Command
         $directory = storage_path('app/private/bol-feed');
         File::ensureDirectoryExists($directory);
         $failed = 0;
+        $emptyGroups = 0;
 
         foreach ($groups as $group) {
             $file = "product-feed_{$group}-v2.csv.gz";
@@ -61,6 +65,7 @@ final class ImportBolFeedCommand extends Command
             try {
                 $downloader->download($file, $path);
                 $kept = $this->store(new BolFeedFile($path), $interest, $runStartedAt);
+                $emptyGroups += $kept === 0 ? 1 : 0;
                 $this->info("{$group}: {$kept} rows kept.");
             } catch (Throwable $e) {
                 $failed++;
@@ -77,9 +82,19 @@ final class ImportBolFeedCommand extends Command
             return $failed > 0 ? self::FAILURE : self::SUCCESS;
         }
 
+        if ($emptyGroups > 0) {
+            // A group with nothing wanted is far likelier a changed feed
+            // format than a real answer; pruning on it would empty the chain.
+            $this->warn("{$emptyGroups} groups kept no rows; nothing removed.");
+
+            return self::SUCCESS;
+        }
+
+        // Rows the daily API refresh keeps current, including ones found by
+        // the live lookup outside these groups, are left alone.
         $pruned = DB::table('checkjebon_prices')
             ->where('supermarket', BolCatalogRows::CHAIN)
-            ->where('refreshed_at', '<', $runStartedAt)
+            ->where('refreshed_at', '<', $runStartedAt->copy()->subHours(self::KEEP_HOURS))
             ->delete();
         $this->info("{$pruned} rows no longer wanted or no longer offered were removed.");
 

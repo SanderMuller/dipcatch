@@ -5,10 +5,9 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * The barcode of a catalogue row, where the source states one: bol.com's
- * product feed does, the checkjebon dataset does not. A suggestion matches
- * a tracked shop's barcode on it before it compares names. Stored with
- * leading zeros stripped, so an EAN-13 and its UPC-12 compare equal.
+ * The barcode of a catalogue row, where the source states one (bol.com
+ * does, checkjebon does not), stored with leading zeros stripped so an
+ * EAN-13 and its UPC-12 compare equal.
  */
 return new class extends Migration {
     public function up(): void

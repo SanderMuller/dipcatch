@@ -1060,3 +1060,27 @@ it('calls the line between the drops and the rest "No discount right now"', func
 
     livewire(ProductList::class)->assertSeeText('No discount right now')->assertDontSeeText('No drop right now');
 });
+
+it('marks a price exactly at the target, but not a price above a per-unit target, nor a paused product', function (): void {
+    $user = User::factory()->create();
+    $exact = Product::factory()->create(['user_id' => $user->id, 'title' => 'Exact', 'target_price' => '1.99']);
+    Shop::factory()->for($exact)->create(['current_price' => '1.99']);
+    $above = Product::factory()->create(['user_id' => $user->id, 'title' => 'Above per kilo', 'unit_price_target' => '7.0000']);
+    Shop::factory()->for($above)->create(['current_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
+    $paused = Product::factory()->create(['user_id' => $user->id, 'title' => 'Paused', 'target_price' => '2.00', 'active' => false]);
+    Shop::factory()->for($paused)->create(['current_price' => '1.50']);
+
+    foreach ([$exact, $above, $paused] as $product) {
+        $product->refresh()->recomputeCheapestShop();
+    }
+
+    $this->actingAs($user);
+
+    $badged = collect(explode('data-test="product-card"', livewire(ProductList::class)->set('sort', 'title')->html()))->skip(1)
+        ->filter(fn (string $card): bool => str_contains($card, 'data-test="at-target-badge"'))
+        ->map(fn (string $card): string => collect(['Above per kilo', 'Exact', 'Paused'])->first(fn (string $title): bool => str_contains($card, $title)) ?? '')
+        ->values()->all();
+
+    // €4.99 for 660 g is €7.56 /kg, above the €7 target.
+    expect($badged)->toBe(['Exact']);
+});

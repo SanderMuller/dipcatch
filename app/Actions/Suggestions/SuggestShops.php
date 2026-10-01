@@ -9,7 +9,9 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\ShopSuggestionDismissal;
 use App\Models\WebShopFinding;
+use App\Services\BolFeed\BolCatalogRows;
 use App\Services\Suggestions\QueryTokens;
+use App\Services\Suggestions\RowScore;
 use App\Services\Suggestions\ShopSuggestion;
 use App\Services\TypeSafe\ShopMatchCheck;
 use App\Support\PackSize;
@@ -20,8 +22,9 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Suggests other shops for a tracked product by matching its title and pack
- * size against the local checkjebon dataset. The dataset price is a
+ * Suggests other shops for a tracked product by matching its title, pack
+ * size and barcodes against the local catalogue: the checkjebon dataset and
+ * bol.com offers ({@see BolCatalogRows}). The price is a
  * comparison hint, and adding a suggested shop still runs the normal probe.
  * With the shop check on, Jev's stored answers filter the matches, and rows
  * without one are sent to Jev after the response.
@@ -34,17 +37,6 @@ final class SuggestShops
     private const float THRESHOLD = 0.55;
 
     /**
-     * Taken off the overlap of a row whose pack size differs from the one
-     * it is compared against, in the same unit. The size is two of about
-     * eight tokens, so a wrong size alone barely moved the overlap: a 300 g
-     * Milka Mmmax bar scored 0.556 against a 100 g Milka bar and was offered.
-     * With this, a row of another size needs about 0.65 on its name alone.
-     * The same name in a bigger pack still reaches that (0.71 for a
-     * four-word name), since per-kilo prices compare across pack sizes.
-     */
-    private const float OTHER_SIZE_PENALTY = 0.1;
-
-    /**
      * A chain whose newest row is older than this is dropped. Matches the
      * fail threshold of `CheckjebonFreshnessCheck`: the importer keeps a
      * chain's rows when upstream serves none, so one refreshed chain must
@@ -55,8 +47,8 @@ final class SuggestShops
     /**
      * Suggestions for a product, memoized for the request. The product page
      * renders two instances of the suggestions component (the panel and the
-     * copy inside the add-shop form), and the catalogue scan costs about
-     * 90 ms — paying it twice per page is pure waste. The action is bound
+     * copy inside the add-shop form), and the catalogue scan is the
+     * expensive part — paying it twice per page is waste. The action is bound
      * per request, so the memo cannot outlive one.
      *
      * @var array<string, list<ShopSuggestion>>
@@ -71,8 +63,8 @@ final class SuggestShops
      * offered, never which chains are fresh.
      *
      * The container flushes this between HTTP requests, Octane operations
-     * and queued jobs, but not inside one `artisan` process — nothing loops
-     * products through this action today, and a command that did would hold
+     * and queued jobs, but not inside one `artisan` process — no command
+     * asks this action for many products today, and one that did would hold
      * one set, and one freshness cutoff, for its whole run.
      *
      * @var array<string, CheckjebonChain>|null
@@ -226,7 +218,8 @@ final class SuggestShops
      * One token set per distinct pack size the product's shops report, or a
      * single title-only set. Sizes live on the shop, not the product, and two
      * shops can disagree — a 150 g and a 250 g pack — so each gets its own
-     * pass and the best score per chain wins.
+     * pass, and each chain keeps its best row per tracked size
+     * ({@see bestPerChain()}).
      *
      * @return list<QueryTokens>
      */
@@ -263,8 +256,9 @@ final class SuggestShops
     }
 
     /**
-     * Rows worth scoring, prefiltered on the words of each title
-     * ({@see QueryTokens::prefilter()}).
+     * Rows worth scoring: those that pass a query's word prefilter
+     * ({@see QueryTokens::prefilter()}) or carry one of the product's
+     * barcodes, without dismissed rows.
      *
      * @param  array<string, CheckjebonChain>  $chains
      * @param  list<QueryTokens>  $queries
@@ -350,13 +344,15 @@ final class SuggestShops
                 continue;
             }
 
-            [$score, $query] = $this->scoreOf($row, $queries, $gtins);
+            [$score, $query, $sameSize] = RowScore::of($row, $queries, $gtins);
 
             if ($score < $verdicts->floor() || ! $verdicts->admits($chain, $row, $score)) {
                 continue;
             }
 
-            $key = "{$row->supermarket}|{$query}";
+            // A row in a tracked size counts per size; a row in another size
+            // only as the chain's fallback when it has none in a tracked size.
+            $key = $sameSize ? "{$row->supermarket}|{$query}" : $row->supermarket;
             $current = $best[$key] ?? null;
 
             // Equal scores break on external id, so the list is stable
@@ -381,6 +377,12 @@ final class SuggestShops
             );
         }
 
+        foreach (array_keys($best) as $key) {
+            if (! str_contains($key, '|') && array_any(array_keys($best), static fn (string $other): bool => str_starts_with($other, "{$key}|"))) {
+                unset($best[$key]);
+            }
+        }
+
         return $best;
     }
 
@@ -400,49 +402,15 @@ final class SuggestShops
 
     /**
      * Whether a catalogue name would score high enough to be offered for one
-     * of the queries, with or without the AI check. The bol.com import keeps
-     * only such rows of its feed.
+     * of the queries, with or without the AI check.
      *
      * @param  list<QueryTokens>  $queries
      */
     public function couldOffer(string $name, array $queries): bool
     {
-        [$score] = $this->scoreOf(new CheckjebonPrice(['name' => $name, 'size' => null]), $queries, []);
+        [$score] = RowScore::of(new CheckjebonPrice(['name' => $name, 'size' => null]), $queries, []);
 
         return $score >= min(self::THRESHOLD, Config::float('dipcatch.shop_checks.loose_match_from'));
-    }
-
-    /**
-     * The row's best overlap with the queries, and which query gave it.
-     *
-     * @param  list<QueryTokens>  $queries
-     * @param  list<string>  $gtins
-     * @return array{0: float, 1: int}
-     */
-    private function scoreOf(CheckjebonPrice $row, array $queries, array $gtins): array
-    {
-        $candidate = QueryTokens::ofCatalogueRow($row->name, $row->size);
-        $best = [0.0, 0];
-
-        foreach ($candidate->isEmpty() ? [] : $queries as $index => $query) {
-            if (! $query->sameVariantAs($candidate)) {
-                continue;
-            }
-
-            $overlap = $query->overlapWith($candidate) - ($query->hasOtherSizeThan($candidate) ? self::OTHER_SIZE_PENALTY : 0.0);
-
-            if ($overlap > $best[0]) {
-                $best = [$overlap, $index];
-            }
-        }
-
-        // The same barcode as a tracked shop is the same article, whatever
-        // the name says; only the pack the name matched best is kept.
-        if (is_string($row->ean) && in_array($row->ean, $gtins, true)) {
-            $best[0] = 1.0;
-        }
-
-        return $best;
     }
 
     /**

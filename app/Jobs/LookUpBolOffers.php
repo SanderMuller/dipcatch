@@ -17,18 +17,16 @@ use Illuminate\Queue\Attributes\Tries;
 /**
  * Asks bol.com's Catalog API what it sells of a product, the moment the
  * product is added or gets a shop, so bol.com is suggested without waiting
- * for the nightly feed import. By barcode first, which is exact; by name
- * when no tracked shop reports a barcode. Only offers that would be
- * suggested are stored, in the same catalogue rows the feed writes.
+ * for the daily feed import. By barcode first, which is exact; by name
+ * when no barcode finds it. Only offers that would be suggested, and that
+ * carry a barcode the daily refresh can ask for again, are stored, in the
+ * same catalogue rows the feed writes.
  */
 #[Tries(3)]
 #[Timeout(30)]
 final class LookUpBolOffers implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Queueable;
-
-    /** Search results read per product: the best matches come first. */
-    private const int SEARCH_RESULTS = 10;
 
     /** Barcodes asked per product; a product rarely has more. */
     private const int BARCODES = 3;
@@ -58,7 +56,7 @@ final class LookUpBolOffers implements ShouldBeUniqueUntilProcessing, ShouldQueu
         try {
             $found = $this->byBarcode($bol, $product) ?: $this->byName($bol, $suggest, $product);
         } catch (BolApiFailed $e) {
-            // Rate limited: bol counts per second, so a short wait suffices.
+            // bol counts per second, so a short wait suffices.
             if ($e->rateLimited()) {
                 $this->release(10);
 
@@ -69,10 +67,13 @@ final class LookUpBolOffers implements ShouldBeUniqueUntilProcessing, ShouldQueu
         }
 
         $now = now();
-        BolCatalogRows::store(array_values(array_filter(array_map(
-            static fn (BolProduct $offer): ?array => $offer->price === null ? null : BolCatalogRows::row(self::productIdOf($offer->url), $offer->ean, $offer->title, $offer->url, $offer->price, $now),
-            $found,
-        ))), $now);
+        BolCatalogRows::store(array_values(array_filter(
+            array_map(
+                static fn (BolProduct $offer): ?array => $offer->price === null ? null : BolCatalogRows::row(self::productIdOf($offer->url), $offer->ean, $offer->title, $offer->url, $offer->price, $now),
+                $found,
+            ),
+            static fn (?array $row): bool => $row !== null && $row['ean'] !== null,
+        )), $now);
     }
 
     /**
@@ -105,12 +106,11 @@ final class LookUpBolOffers implements ShouldBeUniqueUntilProcessing, ShouldQueu
         }
 
         return array_values(array_filter(
-            $bol->search((string) $product->title, self::SEARCH_RESULTS),
+            $bol->search((string) $product->title),
             static fn (BolProduct $offer): bool => $suggest->couldOffer($offer->title, $queries),
         ));
     }
 
-    /** The bol product id: the last path segment of a product page. */
     private static function productIdOf(string $url): string
     {
         $segments = array_values(array_filter(explode('/', (string) parse_url($url, PHP_URL_PATH))));

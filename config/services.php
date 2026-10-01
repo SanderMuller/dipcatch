@@ -67,7 +67,6 @@ return [
     // switches the feed import off. Never commit the real credentials.
     'bol' => [
         'feed' => [
-            'host' => (string) env('BOL_FEED_HOST', 'apm-feed.unftp.bol.com'),
             'username' => (string) env('BOL_USERNAME', ''),
             'password' => (string) env('BOL_PASSWORD', ''),
         ],

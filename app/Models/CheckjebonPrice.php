@@ -8,8 +8,10 @@ use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * One row of the daily checkjebon.nl price dataset — an internal cache
- * table owned by RefreshCheckjebonDatasetCommand, read by CheckjebonSource.
+ * One row of the suggestion catalogue: the daily checkjebon.nl dataset,
+ * written by RefreshCheckjebonDatasetCommand and read by CheckjebonSource,
+ * and bol.com offers (`supermarket` 'bol'), written through BolCatalogRows.
+ * A prune or reset of one source must not touch the other's rows.
  * `supermarket` is the dataset key ('ah', 'jumbo', 'plus', …); `external_id`
  * is the AH `wi` id, the boodschaapje numeric id, or — for the match-only
  * chains — the raw link. `link` is always the raw upstream link, appended to

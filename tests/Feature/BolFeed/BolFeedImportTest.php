@@ -124,20 +124,61 @@ it('offers a bol row with the same barcode as a tracked shop, whatever its name'
         ->and($suggestions[0]->score)->toBe(1.0);
 });
 
-it('keeps the rows of the last import when a group fails, and removes stale rows after a full run', function (): void {
+function staleBolRow(string $id, DateTimeInterface $refreshedAt): void
+{
+    CheckjebonPrice::query()->create(['supermarket' => 'bol', 'external_id' => $id, 'name' => 'Remia Fritessaus classic 1 l', 'price' => '2.99', 'link' => "remia/{$id}/", 'refreshed_at' => $refreshedAt]);
+}
+
+/**
+ * Every group answers with the same file.
+ *
+ * @return array<string, string>
+ */
+function everyBolGroup(string $path): array
+{
+    return array_fill_keys(array_map(fn (string $group): string => "product-feed_{$group}-v2.csv.gz", ['supermarket', 'daily-care', 'health', 'pet', 'perfumery', 'baby']), $path);
+}
+
+it('keeps the rows of the last import when a group fails', function (): void {
     remiaProduct();
-    CheckjebonPrice::query()->create(['supermarket' => 'bol', 'external_id' => 'old', 'name' => 'Remia Fritessaus classic 1 l', 'price' => '2.99', 'link' => 'old/1/', 'refreshed_at' => now()->subDay()]);
-
-    // Every group missing: nothing is removed.
+    staleBolRow('old', now()->subDays(3));
     fakeBolDownloader([]);
-    $this->artisan('dipcatch:import-bol-feed')->assertFailed();
-    expect(CheckjebonPrice::query()->where('supermarket', 'bol')->count())->toBe(1);
 
-    // Every group read: the row no longer in the feed goes.
-    $empty = bolFeedGz([]);
-    fakeBolDownloader(array_fill_keys(array_map(fn (string $group): string => "product-feed_{$group}-v2.csv.gz", ['supermarket', 'daily-care', 'health', 'pet', 'perfumery', 'baby']), $empty));
+    $this->artisan('dipcatch:import-bol-feed')->assertFailed();
+
+    expect(CheckjebonPrice::query()->where('supermarket', 'bol')->pluck('external_id')->all())->toBe(['old']);
+});
+
+it('removes nothing on a run of some groups only', function (): void {
+    remiaProduct();
+    staleBolRow('old', now()->subDays(3));
+    fakeBolDownloader(['product-feed_supermarket-v2.csv.gz' => bolFeedGz([['9300000001', '8710448620013', 'Remia Fritessaus Classic 500 ml', '1.99']])]);
+
+    $this->artisan('dipcatch:import-bol-feed', ['--group' => ['supermarket']])->assertSuccessful();
+
+    expect(CheckjebonPrice::query()->where('supermarket', 'bol')->pluck('external_id')->sort()->values()->all())->toBe(['9300000001', 'old']);
+});
+
+it('after a full run, removes a row nothing refreshed, and keeps this run\'s rows and the ones the API refreshed yesterday', function (): void {
+    $product = remiaProduct();
+    staleBolRow('gone', now()->subDays(3));
+    staleBolRow('refreshed-by-api', now()->subDay());
+    fakeBolDownloader(everyBolGroup(bolFeedGz([['9300000001', '8710448620013', 'Remia Fritessaus Classic 500 ml', '1.99']])));
+
     $this->artisan('dipcatch:import-bol-feed')->assertSuccessful();
-    expect(CheckjebonPrice::query()->where('supermarket', 'bol')->count())->toBe(0);
+
+    expect(CheckjebonPrice::query()->where('supermarket', 'bol')->pluck('external_id')->sort()->values()->all())->toBe(['9300000001', 'refreshed-by-api'])
+        ->and(collect(app(SuggestShops::class)($product, verify: false))->pluck('chain')->all())->toContain('bol');
+});
+
+it('removes nothing when a group keeps no rows, which more likely means the feed changed format', function (): void {
+    remiaProduct();
+    staleBolRow('old', now()->subDays(3));
+    fakeBolDownloader(everyBolGroup(bolFeedGz([])));
+
+    $this->artisan('dipcatch:import-bol-feed')->assertSuccessful()->expectsOutputToContain('nothing removed');
+
+    expect(CheckjebonPrice::query()->where('supermarket', 'bol')->count())->toBe(1);
 });
 
 it('does nothing without feed credentials', function (): void {

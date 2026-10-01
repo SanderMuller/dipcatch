@@ -11,7 +11,8 @@ use Spatie\Health\Checks\Check;
 use Spatie\Health\Checks\Result;
 
 /**
- * Alerts when the local checkjebon.nl dataset goes stale. Rechecks keep
+ * Alerts when the suggestion catalogue goes stale: the checkjebon.nl
+ * dataset, and the bol.com rows. Rechecks keep
  * serving the last-known price as `Ok` when upstream stops updating, so
  * without this check nothing ever fires. Upstream skips single days
  * (observed), so the warn threshold tolerates a one-day gap.
@@ -20,7 +21,9 @@ use Spatie\Health\Checks\Result;
  * and shop suggestions for every product. Age is therefore measured on the
  * OLDEST imported chain — one refreshed chain must not mask nine stale ones.
  * A chain that stops refreshing keeps its rows, so its `max(refreshed_at)`
- * stops moving and it becomes the oldest chain.
+ * stops moving and it becomes the oldest chain. bol.com is the exception:
+ * the live lookup writes fresh rows whenever a product gets a shop, so a
+ * dead daily refresh shows here only on a quiet account.
  */
 final class CheckjebonFreshnessCheck extends Check
 {
@@ -91,7 +94,6 @@ final class CheckjebonFreshnessCheck extends Check
             ])
             ->shortSummary("{$ageHours}h old");
 
-        // bol.com rows come from their own commands, not the checkjebon one.
         $fix = $oldestChain === BolCatalogRows::CHAIN ? 'run dipcatch:refresh-bol-offers' : 'run dipcatch:refresh-checkjebon';
 
         if ($ageHours >= $this->failAfterHours) {

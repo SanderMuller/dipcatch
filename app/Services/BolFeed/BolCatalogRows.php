@@ -8,9 +8,9 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * bol.com offers as rows of the suggestion catalogue (`checkjebon_prices`,
- * chain `bol`), written by the nightly feed import and by the live lookup
- * when a product is added. One shape for both, so a row written by one is
- * updated, not doubled, by the other.
+ * chain `bol`), written by the daily feed import, the daily API refresh,
+ * and the live lookup when a product is added or gets a shop. One shape for
+ * all three, so a row written by one is updated, not doubled, by another.
  */
 final class BolCatalogRows
 {

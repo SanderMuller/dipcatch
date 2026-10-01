@@ -41,7 +41,6 @@
                         <ul role="list" class="mt-3 divide-y divide-ink/5 border-t border-ink/5 dark:divide-white/5 dark:border-white/5">
                             @foreach ($productRows as $row)
                                 @php($badge = $match($row))
-                                {{-- Lands on the product with this shop's comparison already open. --}}
                                 @php($addUrl = route('app.products.show', array_filter([$product, 'add-shop' => 1, 'suggest' => $row['url'], 'finding' => $row['findingId']], fn ($value): bool => $value !== null)))
                                 <li class="pt-2.5 not-last:pb-2.5" wire:key="suggested-{{ $product->id }}-{{ $row['host'] }}" data-test="suggested-shop">
                                     <div class="flex items-center gap-2">
@@ -94,9 +93,8 @@
                                         </flux:dropdown>
                                     </div>
 
-                                    {{-- A row of its own under the shop name, so the price and
-                                         the match fit beside the four buttons. Indented to the
-                                         name, past the favicon. --}}
+                                    {{-- Under the shop name, so the four buttons keep the first
+                                         row to themselves; pl-7 lines it up with the name. --}}
                                     @php($priceSource = match (true) {
                                         $row['checkedOn'] !== null => __('Price when checked on :date', ['date' => $row['checkedOn']->isoFormat('D MMM')]),
                                         $row['host'] === 'bol.com' => __('bol.com’s price at the last check'),

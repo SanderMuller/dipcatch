@@ -46,6 +46,9 @@ function beemsterProduct(): Product
     return $product->refresh();
 }
 
+/**
+ * @return list<ShopSuggestion>
+ */
 function suggest(Product $product): array
 {
     return app(SuggestShops::class)($product);
@@ -491,4 +494,32 @@ test('a product tracked in one pack size still gets one suggestion per chain', f
 
     expect(collect(suggest($product->refresh()))->map(fn (ShopSuggestion $suggestion): string => "{$suggestion->chain} {$suggestion->size}")->all())
         ->toBe(['dirk 500 ml']);
+});
+
+test('a short title with a pack size in it is still matched on its words, not on the size', function (string $title, int $quantity, string $unit): void {
+    seedChains();
+    seedRow('jumbo', 'Fanta Orange', '1,5 liter', '2.19', link: 'fanta-1');
+    seedRow('dirk', 'AH Tomatenketchup', '500 ml', '1.99', link: 'ketchup-1');
+
+    $product = Product::factory()->create(['title' => $title, 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://shop.test/p/1', 'pack_quantity' => (string) $quantity, 'pack_unit' => $unit]);
+
+    expect(suggest($product->refresh()))->not->toBeEmpty();
+})->with([
+    'size only from the shop' => ['Fanta', 1500, 'ml'],
+    'size glued to the title' => ['AH Tomatenketchup 500ml', 500, 'ml'],
+]);
+
+test('a chain offers a row in another size only when it has none in a tracked size', function (): void {
+    seedChains();
+    seedRow('dirk', 'Remia Fritessaus classic', '1 liter', '2.79', link: 'remia-1l');
+    seedRow('dirk', 'Remia Fritessaus classic', '750 ml', '2.29', link: 'remia-750');
+    seedRow('jumbo', 'Remia Fritessaus classic', '750 ml', '2.39', link: 'remia-jumbo-750');
+
+    $product = Product::factory()->create(['title' => 'Remia Fritessaus classic', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://saus.test/p/1', 'pack_quantity' => '1000.00', 'pack_unit' => 'ml']);
+    Shop::factory()->for($product)->create(['url' => 'https://saus.test/p/2', 'pack_quantity' => '500.00', 'pack_unit' => 'ml']);
+
+    expect(collect(suggest($product->refresh()))->map(fn (ShopSuggestion $suggestion): string => "{$suggestion->chain} {$suggestion->size}")->sort()->values()->all())
+        ->toBe(['dirk 1 liter', 'jumbo 750 ml']);
 });

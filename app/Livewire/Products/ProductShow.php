@@ -55,10 +55,8 @@ final class ProductShow extends Component
     public bool $openAddShop = false;
 
     /**
-     * A suggested shop the add-shop form checks on arrival: the dashboard's
-     * "Add this shop" links here with it, so the comparison is already open
-     * when the page paints. The browser then drops it from the address, so a
-     * reload does not check the page again. A Url property for the reason
+     * A shop page the add-shop form checks on arrival: the dashboard's "Add
+     * this shop" links here with it. A Url property for the reason
      * `$openAddShop` is one.
      */
     #[Url(as: 'suggest', except: null)]

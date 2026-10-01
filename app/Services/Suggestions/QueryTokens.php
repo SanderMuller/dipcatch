@@ -62,7 +62,8 @@ final readonly class QueryTokens
      */
     public static function ofCatalogueRow(string $name, ?string $size): self
     {
-        $parsed = PackSize::resolve($size, authoritative: true, title: null);
+        // No stated size (bol.com, some chains): read it from the name.
+        $parsed = PackSize::resolve($size, authoritative: $size !== null, title: $name);
 
         if ($parsed instanceof PackSize) {
             return self::of($name, $parsed);
@@ -167,24 +168,25 @@ final readonly class QueryTokens
     }
 
     /**
-     * The words {@see prefilter()} looks for, longest first.
+     * Words with a digit ("1500", "500ml") are left out: they come from the
+     * pack size, and catalogue names rarely state it the same way.
      *
      * @return list<string>
      */
     public function prefilterNeedles(): array
     {
-        return $this->longestTokens(4, 3) ?: $this->longestTokens(2, 1);
+        return $this->longestTokens(4, 3, withoutDigits: true) ?: $this->longestTokens(2, 1, withoutDigits: false);
     }
 
     /**
      * @return list<string>
      */
-    private function longestTokens(int $minimumLength, int $count): array
+    private function longestTokens(int $minimumLength, int $count, bool $withoutDigits): array
     {
         // PHP casts a numeric array key to int, so "150" comes back as 150.
         $tokens = array_values(array_filter(
             array_map(strval(...), array_keys($this->tokens)),
-            static fn (string $token): bool => mb_strlen($token) >= $minimumLength,
+            static fn (string $token): bool => mb_strlen($token) >= $minimumLength && ! ($withoutDigits && preg_match('/\d/', $token) === 1),
         ));
 
         usort($tokens, static fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));
