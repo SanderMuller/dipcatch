@@ -268,3 +268,20 @@ it('keeps the list for a few minutes, and lists again as soon as a shop is hidde
     HiddenShop::hide($user, 'spar.nl');
     expect(collect(suggestedShopRows($user))->contains(fn (string $row): bool => str_contains($row, 'SPAR')))->toBeFalse();
 });
+
+it('serves a cached list that holds a checked date, under a store that refuses to rebuild objects', function (): void {
+    // Production's cache store unserializes with `serializable_classes`
+    // false, so a CarbonImmutable came back as an incomplete object and the
+    // dashboard broke on its date.
+    config()->set('cache.stores.array.serialize', true);
+    Cache::forgetDriver('array');
+
+    $user = User::factory()->create(['shop_checks' => true]);
+    subscribeUser($user);
+    $product = dashboardProduct($user, 'Douwe Egberts Aroma Rood bonen');
+    dashboardWebFinding($product, 'koffie.test', 0.9);
+
+    expect(suggestedShopRows($user))->toHaveCount(1)
+        // The second read comes from the cache.
+        ->and(suggestedShopRows($user)[0])->toContain('koffie.test');
+});

@@ -63,7 +63,9 @@ final readonly class DashboardSuggestions
         $cached = Cache::remember(
             self::cacheKey($user),
             now()->addMinutes(self::CACHE_MINUTES),
-            fn (): array => array_map(static fn (array $row): array => ['product' => $row['product']->id] + $row, $this->compute($user)),
+            // Scalars only: the production store unserializes no objects, so
+            // a model or a date comes back as an incomplete class.
+            fn (): array => array_map(static fn (array $row): array => ['product' => $row['product']->id, 'checkedOn' => $row['checkedOn']?->toIso8601String()] + $row, $this->compute($user)),
         );
 
         $products = Product::query()
@@ -78,7 +80,7 @@ final readonly class DashboardSuggestions
             $product = $products->get($row['product']);
 
             if ($product instanceof Product) {
-                $rows[] = ['product' => $product] + $row;
+                $rows[] = ['product' => $product, 'checkedOn' => $row['checkedOn'] === null ? null : CarbonImmutable::parse($row['checkedOn'])] + $row;
             }
         }
 
@@ -104,7 +106,8 @@ final readonly class DashboardSuggestions
             $user->wantsShopChecks(),
         ];
 
-        return "dashboard-suggestions:{$user->id}:" . hash('sha256', (string) json_encode($fingerprint));
+        // v2: earlier entries held objects the store cannot rebuild.
+        return "dashboard-suggestions:v2:{$user->id}:" . hash('sha256', (string) json_encode($fingerprint));
     }
 
     /**
