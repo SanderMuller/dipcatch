@@ -16,7 +16,9 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\AhApi\AhApiSource;
+use App\Services\BolApi\BolApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
+use App\Services\PriceSources\ApiPriceSources;
 use App\Services\ShopFetcher\Exceptions\FetchException;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\ShopFetcher;
@@ -134,14 +136,13 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        // ah.nl: mobile API first (live, bonus-aware); dataset as fallback.
-        if ($ahApi->supports($shop->host)) {
-            $result = $ahApi->resolve($shop->url);
-            if ($result->snapshot !== null) {
-                $this->persist($shop, $this->sourceOutcome($result->snapshot, 'ah-api'));
+        // An API first (ah.nl, bol.com); the dataset or the page as fallback.
+        $reading = new ApiPriceSources($ahApi, app(BolApiSource::class))->read($shop->host, $shop->url);
 
-                return;
-            }
+        if ($reading !== null) {
+            $this->persist($shop, $this->sourceOutcome($reading[0], $reading[1]));
+
+            return;
         }
 
         if ($checkjebon->supports($shop->host)) {

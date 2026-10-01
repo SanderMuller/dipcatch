@@ -47,6 +47,19 @@ final readonly class BolCatalogClient
         return is_array($product) ? self::product($product) : null;
     }
 
+    /** The barcode of a bol product id (the number in a product page URL); null when bol has no such product. */
+    public function eanOf(string $bolProductId): ?string
+    {
+        if (preg_match('/^\d+$/', $bolProductId) !== 1) {
+            return null;
+        }
+
+        $body = $this->get("/products/{$bolProductId}/to-ean", []);
+        $ean = is_array($body) ? ($body['ean'] ?? null) : null;
+
+        return is_string($ean) && $ean !== '' ? $ean : null;
+    }
+
     /**
      * Products for a search term, most relevant first, each with its best
      * offer in the Netherlands.

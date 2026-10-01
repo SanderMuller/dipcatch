@@ -10,8 +10,8 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\ShopSnapshot;
-use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
+use App\Services\PriceSources\ApiPriceSources;
 use App\Services\ShopFetcher\Exceptions\Blocked;
 use App\Services\ShopFetcher\Exceptions\HttpError;
 use App\Services\ShopFetcher\Exceptions\NotServable;
@@ -41,7 +41,7 @@ final readonly class ProbeShopUrl
         private ShopFetcher $fetcher,
         private AdapterResolver $resolver,
         private CheckjebonSource $checkjebon,
-        private AhApiSource $ahApi,
+        private ApiPriceSources $apiSources,
         private HostFetchMemory $memory,
         private ProbeBudget $budget,
         private AddressRefusal $refusal,
@@ -296,19 +296,17 @@ final readonly class ProbeShopUrl
     }
 
     /**
-     * ah.nl resolves via the mobile API (live, bonus-aware) with the
-     * checkjebon dataset as a regular-price fallback when the unofficial
-     * API misbehaves; boodschaapje.nl/Lidl is dataset-only. Returns null
-     * for every other host so the network probe runs.
+     * ah.nl and bol.com resolve through an API ({@see ApiPriceSources}); ah.nl
+     * falls back to the checkjebon dataset's regular price when the
+     * unofficial API misbehaves, and boodschaapje.nl/Lidl is dataset-only.
+     * Returns null otherwise, so the network probe runs.
      */
     private function resolveFromLocalSources(?Product $product, string $normalizedUrl, string $host): ?ProbeOutcome
     {
-        if ($this->ahApi->supports($host)) {
-            $result = $this->ahApi->resolve($normalizedUrl);
-            $snapshot = $result->snapshot;
-            if ($snapshot instanceof ShopSnapshot) {
-                return $this->successFromSnapshot($product, $snapshot, $normalizedUrl, $host, adapterKey: 'ah-api');
-            }
+        $reading = $this->apiSources->read($host, $normalizedUrl);
+
+        if ($reading !== null) {
+            return $this->successFromSnapshot($product, $reading[0], $normalizedUrl, $host, adapterKey: $reading[1]);
         }
 
         if ($this->checkjebon->supports($host)) {

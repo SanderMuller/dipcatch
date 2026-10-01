@@ -32,7 +32,7 @@ return [
             'date' => '2026-10-01',
             'category' => 'shop',
             'title' => 'bol.com in your shop suggestions',
-            'body' => "DipCatch now suggests bol.com for the products you track. It checks bol.com as soon as you add a product or a shop: by barcode when one of your shops shows it, otherwise by name.\n\nThe price you see is bol.com's own, offers included. Add the shop and DipCatch keeps an eye on it like any other.",
+            'body' => "DipCatch now suggests bol.com for the products you track. It checks bol.com as soon as you add a product or a shop: by barcode when one of your shops shows it, otherwise by name.\n\nThe price you see is bol.com's own, offers included. Add the shop and DipCatch keeps an eye on it like any other.\n\nYou can also paste a bol.com link yourself. That works now too, even on days the bol.com site turns automated checks away.",
             'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],
         ],
         [

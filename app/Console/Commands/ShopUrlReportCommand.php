@@ -24,7 +24,7 @@ use Illuminate\Console\Command;
 final class ShopUrlReportCommand extends Command
 {
     /** Hosts read from an API or the dataset: no page fetch to share. */
-    private const array NO_FETCH_ADAPTERS = ['ah-api', 'checkjebon'];
+    private const array NO_FETCH_ADAPTERS = ['ah-api', 'bol-api', 'checkjebon'];
 
     public function handle(): int
     {

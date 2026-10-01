@@ -6,6 +6,7 @@ use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Services\AhApi\AhApiSource;
+use App\Services\BolApi\BolApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Support\Numeric;
 
@@ -96,6 +97,7 @@ final readonly class LargeDropConfirmation
     private function isExempt(Shop $shop): bool
     {
         return app(AhApiSource::class)->supports($shop->host)
+            || app(BolApiSource::class)->supports($shop->host)
             || app(CheckjebonSource::class)->supports($shop->host);
     }
 
