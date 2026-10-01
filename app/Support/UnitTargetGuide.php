@@ -102,18 +102,20 @@ final readonly class UnitTargetGuide
     }
 
     /**
-     * A target `$percent` under a price per unit, with what it comes to for a
-     * pack of `$perPack` units. Null when it is below the smallest target.
+     * A per-unit target `$percent` under a pack price, for a pack of `$perPack`
+     * units, with what it comes to for that pack. The saving comes off the
+     * pack price before the division, so €1.00 for 3 at 40% off is €0.20
+     * each rather than €0.1999. Null when the column cannot hold it.
      *
-     * @param  numeric-string  $unitPrice
+     * @param  numeric-string  $packPrice
      * @return array{unit: string, packPrice: string}|null
      */
-    public static function percentUnder(string $unitPrice, float $perPack, int $percent): ?array
+    public static function percentUnder(string $packPrice, float $perPack, int $percent): ?array
     {
-        return self::storable(
-            bcmul($unitPrice, bcsub('1', bcdiv((string) $percent, '100', 10), 10), 10),
-            self::decimal($perPack),
-        );
+        $perPack = self::decimal($perPack);
+        $pack = bcmul($packPrice, bcsub('1', bcdiv((string) $percent, '100', 10), 10), 10);
+
+        return self::storable(bcdiv($pack, $perPack, 10), $perPack);
     }
 
     /**
@@ -128,7 +130,8 @@ final readonly class UnitTargetGuide
     {
         $unit = bcadd($unit, '0', 4);
 
-        if (bccomp($unit, '0.0001', 4) < 0) {
+        // Outside what `unit_price_target` (decimal 12,4) can hold.
+        if (bccomp($unit, '0.0001', 4) < 0 || bccomp($unit, '99999999.9999', 4) > 0) {
             return null;
         }
 

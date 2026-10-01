@@ -384,13 +384,7 @@ final class EditProduct extends Component
         ];
     }
 
-    /**
-     * The sentence under the per-unit target field.
-     *
-     * Built here rather than in the template: it is two branches and a
-     * conditional clause, and gluing two translated sentences together is the
-     * part a second locale breaks first.
-     */
+    /** The sentence under the per-unit target field. */
     private function unitTargetDescription(?string $unitWord): string
     {
         return $unitWord === null

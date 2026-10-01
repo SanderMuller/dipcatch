@@ -2,7 +2,6 @@
 
 namespace App\Enums;
 
-/** Which input set the depth of a suggested alert. */
 enum DepthSource: string
 {
     case Jev = 'jev';

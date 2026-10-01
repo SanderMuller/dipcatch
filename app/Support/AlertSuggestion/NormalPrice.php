@@ -3,6 +3,7 @@
 namespace App\Support\AlertSuggestion;
 
 use App\Actions\Shops\RegularPriceClaim;
+use App\Enums\ProductDepartment;
 use App\Models\Shop;
 use App\Support\Numeric;
 
@@ -14,20 +15,22 @@ use App\Support\Numeric;
 final readonly class NormalPrice
 {
     /**
-     * @param  numeric-string  $price  The pack price.
-     * @param  int  $depthNow  Whole percent under `$price` the shop charges now.
+     * @param  numeric-string  $price  The normal pack price, before any offer.
+     * @param  int  $depthNow  Whole percent under `$price` the offer is worth, rounded for display.
+     * @param  int  $depthStep  The depth of the price the alert checks, floored to a step of 5%, so a target at it is never deeper than today's offer.
      */
     private function __construct(
         public string $price,
-        public int $depthNow,
+        public int $depthNow = 0,
+        public int $depthStep = 0,
     ) {}
 
     /**
      * Null when the shop's normal price cannot be told: no price, a running
-     * promotion with no "was" price, or a "was" price `$trustClaims` says not
-     * to believe.
+     * promotion with no "was" price, or a "was" price in a department where
+     * those say little.
      */
-    public static function of(Shop $shop, bool $trustClaims): ?self
+    public static function of(Shop $shop, ?ProductDepartment $department): ?self
     {
         $current = $shop->current_price;
 
@@ -41,15 +44,17 @@ final readonly class NormalPrice
         if ($bundle !== null) {
             $single = Numeric::str((string) $shop->singleItemPrice());
 
-            return new self($single, self::depth($bundle->effectiveUnitPrice(), $single));
+            // From the bundle's total, not its per-item price: that is rounded
+            // to the cent, which reads a 1+1 at €2.99 as 49% off.
+            // The offer's worth from its total; the step from the cent-rounded
+            // price per item the alert checks, which a 1+1 on €2.99 puts at €1.50.
+            return self::under($single, bcdiv($bundle->totalPrice, (string) $bundle->quantity, 10), $current);
         }
 
         $window = $shop->promotionWindow();
 
-        // An announced bonus that has not started: the price on screen is
-        // still the regular one.
         if ($window?->hasNotStarted() === true) {
-            return new self($current, 0);
+            return new self($current);
         }
 
         // Kept earlier by a reader with claim authority, so checked again:
@@ -63,23 +68,42 @@ final readonly class NormalPrice
         if ($claim !== null) {
             $claim = Numeric::str($claim);
 
-            return $trustClaims ? new self($claim, self::depth($current, $claim)) : null;
+            $distrusted = $department instanceof ProductDepartment && TypicalPromotionDepth::distrustsClaims($department);
+
+            return $distrusted ? null : self::under($claim, $current, $current);
         }
 
         if ($window?->isRunning() === true || ($window === null && $shop->promotion_label !== null)) {
             return null;
         }
 
-        return new self($current, 0);
+        return new self($current);
     }
 
-    /** @param numeric-string $normal */
-    private static function depth(string $now, string $normal): int
+    /**
+     * @param  numeric-string  $normal
+     * @param  numeric-string  $worth  The offer's price per item, unrounded.
+     * @param  numeric-string  $tracked  The price the alert checks.
+     */
+    private static function under(string $normal, string $worth, string $tracked): self
     {
         if (bccomp($normal, '0', 2) <= 0) {
-            return 0;
+            return new self($normal);
         }
 
-        return max(0, (int) bcmul(bcsub('1', bcdiv(Numeric::str($now), $normal, 10), 10), '100', 0));
+        return new self(
+            $normal,
+            max(0, (int) round(self::percentUnder($normal, $worth))),
+            max(0, (int) floor(self::percentUnder($normal, $tracked) / 5) * 5),
+        );
+    }
+
+    /**
+     * @param  numeric-string  $normal
+     * @param  numeric-string  $price
+     */
+    private static function percentUnder(string $normal, string $price): float
+    {
+        return (float) bcmul(bcsub('1', bcdiv($price, $normal, 10), 10), '100', 10);
     }
 }

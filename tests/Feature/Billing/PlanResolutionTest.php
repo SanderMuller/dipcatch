@@ -193,8 +193,8 @@ it('keeps pro when a live subscription sits under a newer incomplete one', funct
 });
 
 it('keeps the entitlements a paying customer is owed under a stray row', function (): void {
-    // The failure a customer would feel: history window, AI features and the
-    // recheck cadence all follow the plan.
+    // The failure a customer would feel: the history window and AI features
+    // follow the plan.
     $user = User::factory()->create(['auto_categories' => true]);
     withStrayIncompleteRow($user);
 

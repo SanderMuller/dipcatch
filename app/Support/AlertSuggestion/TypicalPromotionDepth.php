@@ -10,8 +10,7 @@ use App\Enums\ProductDepartment;
  * depth a deal-seeker waits for. Researched on 2026-10-01 from public
  * sources: Consumentenbond and Circana on supermarket and drugstore
  * promotions, Tweakers and the ACM on Black Friday, the Alcoholwet. Many rows
- * are estimates; tune them from DipCatch's own promotion data once it has
- * enough.
+ * are estimates.
  */
 final class TypicalPromotionDepth
 {
@@ -63,11 +62,14 @@ final class TypicalPromotionDepth
         };
     }
 
-    /** The deepest discount the law allows, in whole percent. */
-    public static function legalCap(?ProductCategory $category): int
+    /**
+     * The deepest discount the law allows, in whole percent, or null where no
+     * law caps it.
+     */
+    public static function legalCap(?ProductCategory $category): ?int
     {
         // The Alcoholwet forbids a retail discount on alcohol above 25%.
-        return $category === ProductCategory::Alcohol ? 25 : self::MAX;
+        return $category === ProductCategory::Alcohol ? 25 : null;
     }
 
     /**

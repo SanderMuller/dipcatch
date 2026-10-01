@@ -37,7 +37,7 @@ final class DropEvaluator
 
         // A product with a target alerts only on what its owner set: an empty
         // drop threshold is off there, not the default. Asked only when one is
-        // empty, because it reads the plan and the shops inside the row lock.
+        // empty, because it reads the shops inside the row lock.
         $useDefaults = ($product->drop_threshold_pct !== null && $product->drop_threshold_abs !== null)
             || ! $product->hasActiveTarget();
 

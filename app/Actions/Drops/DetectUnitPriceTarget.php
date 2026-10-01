@@ -86,22 +86,17 @@ final readonly class DetectUnitPriceTarget
         return bccomp(Numeric::str($unitPrice), Numeric::str((string) $notified), self::BC_SCALE) >= 0;
     }
 
-    /**
-     * A float rendered at a scale bccomp can read without losing the decision.
-     *
-     * @return numeric-string
-     */
-    /**
-     * Whether an unrounded unit price reaches the target. The wizard's
-     * already-met check asks the same question, so the two cannot disagree
-     * at the fourth decimal.
-     */
+    /** Whether an unrounded unit price reaches the target. */
     public static function meets(float $unitValue, string $target): bool
     {
         return bccomp(self::precise($unitValue), Numeric::str($target), self::BC_SCALE) <= 0;
     }
 
-    /** @return numeric-string */
+    /**
+     * A float rendered at a scale bccomp can read without losing the decision.
+     *
+     * @return numeric-string
+     */
     private static function precise(float $value): string
     {
         return Numeric::str(number_format($value, self::BC_SCALE, '.', ''));

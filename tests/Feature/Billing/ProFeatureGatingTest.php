@@ -55,16 +55,6 @@ it('alerts a pro account on the same target', function (): void {
     Notification::assertSentTo($user, UnitPriceTargetNotification::class);
 });
 
-it('keeps the stored target of a free account after it alerts', function (): void {
-    Notification::fake();
-
-    $product = productAtTarget(User::factory()->create());
-
-    app(DetectUnitPriceTarget::class)($product);
-
-    expect($product->fresh()?->unit_price_target)->not->toBeNull();
-});
-
 it('offers a trial only to an account that never had this subscription', function (): void {
     $fresh = User::factory()->create();
 

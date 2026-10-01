@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * A product tracked at two shops: a 200 g bag and a 370 g bag.
+ * A product tracked at two shops: a 200 g bag and a 370 g bag. The owner is
+ * on Pro for the notification ceiling one test relies on.
  */
 function targetProduct(?string $target, string $lidlPrice = '1.99'): Product
 {

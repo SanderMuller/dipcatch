@@ -174,9 +174,12 @@ it('includes the target price per kilo on both plans', function (): void {
 });
 
 it('no longer lists the target price per kilo as something Pro adds', function (): void {
+    configureStripe();
     $this->actingAs(User::factory()->create());
 
-    livewire(BillingPage::class)->assertDontSee('Target price per kilo');
+    livewire(BillingPage::class)
+        ->assertSee('What Pro adds')
+        ->assertDontSee('Target price per kilo');
 });
 
 it('promises Pro no more price history than the nightly prune keeps', function (): void {

@@ -437,7 +437,6 @@ it('keeps the three-way wording while no shop has read a pack size', function ()
 
     $this->actingAs($user);
 
-    // The resolver decides the label.
     livewire(EditProduct::class, ['product' => $product])
         ->assertSee('Target price per kilo, litre or piece');
 
@@ -809,7 +808,8 @@ it('offers a free account the switch to a price alert', function (): void {
         ->assertSeeHtml('data-test="price-alert-switch"')
         ->call('switchToPriceAlert')
         ->assertSet('dropThresholdPct', null)
-        ->assertNotSet('unitPriceTarget', null);
+        // €6.15 for 840 g is €7.3214/kg; 25% under that, cut to four decimals.
+        ->assertSet('unitPriceTarget', '5.491');
 });
 
 it('offers no switch when the same saving leaves less than the smallest target', function (): void {

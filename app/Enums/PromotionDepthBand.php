@@ -3,10 +3,10 @@
 namespace App\Enums;
 
 /**
- * How deep a product's promotions usually go, as Jev answers it for the
- * suggested alert. `Fixed` is a product that may not or does not go on sale;
- * `Unknown` is Jev having no answer, which hands the decision to the
- * category table.
+ * How deep a product's promotions usually go: the options of the Choice Jev
+ * is asked for a suggested alert. `Fixed` is a product that may not or does
+ * not go on sale; `Unknown` is Jev having no answer, which hands the decision
+ * to the category table.
  */
 enum PromotionDepthBand: string
 {
@@ -30,7 +30,7 @@ enum PromotionDepthBand: string
         };
     }
 
-    /** What the option means, in English, for the Choice Jev answers. */
+    /** What the option means, in English, for the Choice Jev is asked. */
     public function rubric(): string
     {
         return match ($this) {
