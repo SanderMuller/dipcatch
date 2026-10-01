@@ -80,7 +80,7 @@ test('duplicate URL surfaces duplicate error without fetch', function (): void {
         ->assertSet('state', 'error')
         ->assertSet('errorCode', 'duplicate')
         // The rendered sentence, not just the code behind it. This copy lives
-        // in a partial shared with create-product-from-url, so a careless edit
+        // in a partial shared with add-product-wizard, so a careless edit
         // there is the way it breaks — and the host is interpolated, so an
         // unresolved `$dupHost` would still pass an errorCode assertion.
         ->assertSee('This URL is already tracked for this product (shop.example.com).');

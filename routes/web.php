@@ -18,8 +18,7 @@ use App\Livewire\Billing\BillingPage;
 use App\Livewire\Changelog\ChangelogPage;
 use App\Livewire\Connections\ConnectionsPage;
 use App\Livewire\Dashboard;
-use App\Livewire\Products\CreateProductFromUrl;
-use App\Livewire\Products\CreateProductManual;
+use App\Livewire\Products\AddProductWizard;
 use App\Livewire\Products\EditProduct;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
@@ -32,6 +31,7 @@ use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Config;
@@ -223,8 +223,12 @@ Route::prefix('app')
     ->group(function (): void {
         Route::livewire('/', Dashboard::class)->name('dashboard');
         Route::livewire('products', ProductList::class)->name('products.index');
-        Route::livewire('products/create', CreateProductFromUrl::class)->name('products.create');
-        Route::livewire('products/create-manual', CreateProductManual::class)->name('products.create-manual');
+        Route::livewire('products/create', AddProductWizard::class)->name('products.create');
+        // Old links to the page for a product filled in by hand: now step 1's manual mode.
+        Route::get('products/create-manual', fn (Request $request): RedirectResponse => redirect()->route('app.products.create', array_filter([
+            'mode' => 'manual',
+            'idea' => is_string($request->query('idea')) ? $request->query('idea') : '',
+        ])))->name('products.create-manual');
         // Product ids are UUIDs. Without the constraint `products/{product}`
         // also matches `<uuid>.md`, and the markdown route below is never reached.
         Route::livewire('products/{product}', ProductShow::class)->whereUuid('product')->name('products.show');

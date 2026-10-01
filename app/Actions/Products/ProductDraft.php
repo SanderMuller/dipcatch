@@ -6,8 +6,7 @@ use App\Enums\ProductCategory;
 
 /**
  * The product half of a create. Both thresholds are separate `decimal(_, 2)`
- * columns and the URL-first web path requires both, so neither collapses into
- * one field. They are decimal strings, matching every other price in this
+ * columns, so neither collapses into one field. They are decimal strings, matching every other price in this
  * codebase — no floats, no cent integers.
  */
 final readonly class ProductDraft

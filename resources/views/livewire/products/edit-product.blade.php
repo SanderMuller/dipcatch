@@ -78,29 +78,7 @@
 
                 <flux:input wire:model="imageUrl" :label="__('Image URL')" type="url" placeholder="https://…" />
 
-                @if ($shopImages !== [])
-                    <div>
-                        <flux:text size="sm" class="text-zinc-500">{{ __('Or take one a shop reported:') }}</flux:text>
-                        <ul role="list" class="mt-2 flex flex-wrap gap-3">
-                            @foreach ($shopImages as $url => $host)
-                                <li>
-                                    <button
-                                        type="button"
-                                        wire:click="useShopImage({{ $loop->index }})"
-                                        class="flex w-24 cursor-pointer flex-col items-center gap-1 rounded-xl bg-white/80 p-2 ring-1 ring-zinc-200 hover:bg-white dark:bg-zinc-900/60 dark:ring-zinc-800 dark:hover:bg-zinc-900"
-                                    >
-                                        <img src="{{ $url }}" alt="" loading="lazy" class="size-16 rounded-lg bg-white object-contain" />
-                                        <span class="w-full truncate text-center text-xs text-zinc-500">{{ $host }}</span>
-                                    </button>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @else
-                    <flux:text size="sm" class="text-zinc-500">
-                        {{ __('Shop images appear here after the next price check of each shop.') }}
-                    </flux:text>
-                @endif
+                <x-shop-image-picker :images="$shopImages" />
             </div>
         </flux:card>
 

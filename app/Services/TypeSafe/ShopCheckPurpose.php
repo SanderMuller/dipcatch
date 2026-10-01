@@ -2,7 +2,7 @@
 
 namespace App\Services\TypeSafe;
 
-/** Why a same-product check runs, which decides the budget it spends. */
+/** Why a Jev check on a product and its shops runs, which decides the budget it spends. */
 enum ShopCheckPurpose: string
 {
     /** The add-shop preview a person is looking at. */
@@ -19,4 +19,7 @@ enum ShopCheckPurpose: string
      * apart, so first checks never use up the checks that finish a product.
      */
     case WebDiscoveryConfirm = 'web-discovery-confirm';
+
+    /** How deep a new product's promotions go, for its suggested alert. */
+    case AlertSuggestion = 'alert-suggestion';
 }

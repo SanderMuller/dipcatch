@@ -38,6 +38,13 @@ return [
         [
             'date' => '2026-10-01',
             'category' => 'feature',
+            'title' => 'Add a product in three steps',
+            'body' => "Adding a product now walks you through it: first the product, from a shop link or filled in by hand, then more shops to compare, then your alert.\n\nOn the last step DipCatch suggests an alert at the discount this kind of product usually gets, worked out from its normal price, so an offer on today doesn't count twice. With AI help on, Pro also checks how products like it go on sale.",
+            'link' => ['route' => 'app.products.create', 'label' => 'Add a product'],
+        ],
+        [
+            'date' => '2026-10-01',
+            'category' => 'feature',
             'title' => 'More shop suggestions through Klarna',
             'body' => "With Pro, DipCatch now also looks up your product on Klarna when it searches for more shops. It checks the shops Klarna lists on their own websites and adds them to your shop suggestions. If a shop sells a different pack size, the suggestion says so and compares the price per kilo or litre.\n\nPasted a Klarna link? You'll see which shops it lists. Klarna no longer counts as your cheapest shop, since you can't buy there.",
             'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],

@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Jobs\ReadKlarnaLeads;
-use App\Livewire\Products\CreateProductFromUrl;
+use App\Livewire\Products\AddProductWizard;
 use App\Livewire\Shops\AddShop;
 use App\Mcp\Servers\DipCatchServer;
 use App\Mcp\Tools\AddShopTool;
@@ -81,7 +81,7 @@ test('the create-product form lists the shops without a lookup', function (): vo
     fakePastedKlarna();
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', pastedKlarnaUrl())
         ->call('probe')
         ->assertSet('errorCode', 'not_a_shop')

@@ -2,7 +2,7 @@
 
 use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ProbeFailure;
-use App\Livewire\Products\CreateProductFromUrl;
+use App\Livewire\Products\AddProductWizard;
 use App\Models\CheckjebonPrice;
 use App\Models\PriceCheck;
 use App\Models\Product;
@@ -125,19 +125,15 @@ test('create-from-URL flow creates product + shop + check from a seeded dataset 
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://www.ah.nl/producten/product/wi257/ah-kruiden-roomkaas')
         ->call('probe')
         ->assertSet('state', 'preview')
         ->assertSet('title', 'AH Kruiden roomkaas')
         ->assertSet('imageUrl', '')
-        // The 125 g pack makes the reference €440 per kilo, in the 100-500
-        // tier: 8%. The money amount bands on the €55 pack: 7.00.
-        ->assertSeeHtml('placeholder="8.00"')
-        ->assertSeeHtml('placeholder="7.00"')
         ->call('confirm')
         ->assertHasNoErrors()
-        ->assertRedirect();
+        ->assertSet('step', 2);
 
     $product = Product::query()->where('user_id', $user->id)->first();
     expect($product)->not->toBeNull()
@@ -169,7 +165,7 @@ test('the AH probe transports salesUnitSize and confirm stores it', function ():
     Http::preventStrayRequests();
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://www.ah.nl/producten/product/wi526381/lay-s-naturel')
         ->call('probe')
         ->assertSet('snapshot.pack_size', '200 g')
@@ -191,7 +187,7 @@ test('the dataset probe transports the dataset size and confirm stores it', func
     seedAhRow();
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://www.ah.nl/producten/product/wi257/ah-kruiden-roomkaas')
         ->call('probe')
         ->assertSet('snapshot.pack_size', '125 g')
@@ -218,7 +214,7 @@ test('a dataset URL with no product id explains that, not the generic miss', fun
     seedAhRow();
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         // An AH category page: the host is dataset-served, but no `wi<digits>`
         // segment means no product id to look up.
         ->set('url', 'https://www.ah.nl/producten/zuivel')
@@ -236,7 +232,7 @@ test('an unloaded dataset says to load it rather than blaming the product', func
     // not a statement about this product.
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://www.ah.nl/producten/product/wi257/ah-kruiden-roomkaas')
         ->call('probe')
         ->assertSet('state', 'error')
@@ -251,7 +247,7 @@ test('a product missing from a loaded dataset gets the generic miss', function (
     seedAhRow();
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://www.ah.nl/producten/product/wi999999/unknown')
         ->call('probe')
         ->assertSet('state', 'error')

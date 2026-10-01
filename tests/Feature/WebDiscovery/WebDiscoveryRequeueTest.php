@@ -5,6 +5,7 @@ use App\Actions\Shops\ShopDraft;
 use App\Enums\WebDiscoveryState;
 use App\Enums\WebFindingStatus;
 use App\Jobs\DiscoverWebShops;
+use App\Livewire\Products\AddProductWizard;
 use App\Livewire\Products\EditProduct;
 use App\Livewire\Products\ProductShow;
 use App\Livewire\Suggestions\ShopSuggestions;
@@ -119,6 +120,19 @@ it('re-checks after the product is renamed', function (): void {
     Livewire::test(EditProduct::class, ['product' => $product])
         ->set('title', 'Cavalor Hoof Aid Special 1 kg')
         ->call('save')
+        ->assertHasNoErrors();
+
+    Queue::assertPushed(DiscoverWebShops::class);
+});
+
+it('re-checks after the product is renamed in the add-product wizard', function (): void {
+    $product = requeueProduct();
+    $this->actingAs($product->user()->sole());
+
+    Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 1])
+        ->test(AddProductWizard::class)
+        ->set('title', 'Cavalor Hoof Aid Special 1 kg')
+        ->call('saveDetails')
         ->assertHasNoErrors();
 
     Queue::assertPushed(DiscoverWebShops::class);

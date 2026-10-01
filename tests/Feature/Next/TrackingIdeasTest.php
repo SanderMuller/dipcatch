@@ -4,7 +4,7 @@ use App\Enums\ProductCategory;
 use App\Enums\TrackingIdea;
 use App\Enums\TrackingIdeaMarkState;
 use App\Livewire\Dashboard\TrackingIdeas;
-use App\Livewire\Products\CreateProductFromUrl;
+use App\Livewire\Products\AddProductWizard;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\TrackingIdeaChecklist;
@@ -198,11 +198,11 @@ test('the add-product page names shops for the idea the person came from', funct
     $this->actingAs(User::factory()->create());
 
     Livewire::withQueryParams(['idea' => 'pet_food'])
-        ->test(CreateProductFromUrl::class)
+        ->test(AddProductWizard::class)
         ->assertSeeHtml('data-test="tracking-idea-hint"')
         ->assertSee('zooplus.nl');
 
     Livewire::withQueryParams(['idea' => 'nonsense'])
-        ->test(CreateProductFromUrl::class)
+        ->test(AddProductWizard::class)
         ->assertDontSeeHtml('data-test="tracking-idea-hint"');
 });

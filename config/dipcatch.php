@@ -177,8 +177,8 @@ return [
         // Candidates checked in one request for one product.
         'max_candidates' => (int) env('DIPCATCH_SHOP_CHECKS_MAX_CANDIDATES', 10),
         // Paid calls per account and app-wide per day, counted apart for each
-        // ShopCheckPurpose (add-shop, suggestions, and web discovery's two
-        // checks), so background checks never use up the warning a person
+        // ShopCheckPurpose (add-shop, suggestions, web discovery's two checks,
+        // and the alert suggestion), so background checks never use up the warning a person
         // is waiting for. Zero lifts a cap.
         'daily_limit_per_user' => (int) env('DIPCATCH_SHOP_CHECKS_DAILY_LIMIT_PER_USER', 50),
         'daily_limit' => (int) env('DIPCATCH_SHOP_CHECKS_DAILY_LIMIT', 2000),

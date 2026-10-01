@@ -57,10 +57,10 @@ function prohibitedMoneyPatterns(): array
 function tripwireAllowlist(): array
 {
     return [
-        'CreateProductFromUrl.php' => [
+        'AddProductWizard.php' => [
             [
                 'fragment' => 'number_format($defaults[',
-                'reason' => 'serialises threshold decimals into form state, not display',
+                'reason' => 'serialises the default threshold decimals into placeholders, not display',
             ],
         ],
     ];

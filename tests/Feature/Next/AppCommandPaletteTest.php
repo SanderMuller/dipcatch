@@ -93,7 +93,7 @@ it('lists the settings pages and the other pages people look for', function (): 
     livewire(AppCommandPalette::class)
         ->assertSeeHtml('href="' . route('security.edit') . '"')
         ->assertSeeHtml('href="' . route('appearance.edit') . '"')
-        ->assertSeeHtml('href="' . route('app.products.create-manual') . '"')
+        ->assertSeeHtml('href="' . e(route('app.products.create', ['mode' => 'manual'])) . '"')
         ->assertSeeHtml('href="' . route('shops') . '"')
         ->assertSeeHtml('keywords="password change password two-factor');
 });

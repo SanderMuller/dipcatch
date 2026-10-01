@@ -80,6 +80,14 @@ final readonly class NormalPrice
         return new self($current);
     }
 
+    /** Whether the shop shows an offer now: a live multi-buy, a running promotion, or a "was" price above today's. */
+    public static function isOnOffer(Shop $shop): bool
+    {
+        return $shop->liveBundleOffer() !== null
+            || $shop->promotionWindow()?->isRunning() === true
+            || ($shop->claimed_regular_price !== null && (float) $shop->claimed_regular_price > (float) $shop->current_price);
+    }
+
     /**
      * @param  numeric-string  $normal
      * @param  numeric-string  $worth  The offer's price per item, unrounded.

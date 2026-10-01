@@ -2,7 +2,7 @@
 
 use App\Actions\Shops\ProbeBudget;
 use App\Actions\Shops\ProbeShopUrl;
-use App\Livewire\Products\CreateProductFromUrl;
+use App\Livewire\Products\AddProductWizard;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Laravel\Passport\Client;
 use Laravel\Passport\Token;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 function fakeCreateFlowOffer(string $url = 'https://shop.example.com/p/1', string $price = '50.00', string $currency = 'EUR', string $title = 'Demo Item'): array
@@ -44,22 +46,16 @@ beforeEach(function (): void {
     RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
 });
 
-test('probe success prefills title and image, and suggests the tier-default thresholds', function (): void {
+test('probe success prefills title and image', function (): void {
     Http::fake(fakeCreateFlowOffer());
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
         ->assertSet('title', 'Demo Item')
         ->assertSet('imageUrl', 'https://shop.example.com/img.jpg')
-        // The thresholds are optional and start empty; 50.00 sits in the
-        // 25–100 tier, so the placeholders suggest 10% / 7.00 absolute.
-        ->assertSet('thresholdPct', '')
-        ->assertSet('thresholdAbs', '')
-        ->assertSeeHtml('placeholder="10.00"')
-        ->assertSeeHtml('placeholder="7.00"')
         ->assertSet('existingTrackedProduct', null);
 });
 
@@ -67,7 +63,7 @@ test('the preview shows the photo large and links to the page it reads', functio
     Http::fake(fakeCreateFlowOffer());
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
@@ -84,7 +80,7 @@ test('the prefilled title has the shop name and buying word taken off', function
     Http::fake(fakeCreateFlowOffer(title: 'Demo Item - 12 x 55 g kopen | Example'));
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('title', 'Demo Item - 12 x 55 g');
@@ -95,19 +91,20 @@ test('confirm creates product + shop + initial price check and recomputes cheape
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->set('title', 'My Tracked Item')
         ->call('confirm')
         ->assertHasNoErrors()
-        ->assertRedirect();
+        ->assertSet('step', 2)
+        ->assertNoRedirect();
 
     $product = Product::query()->where('user_id', $user->id)->first();
     expect($product)->not->toBeNull()
         ->and($product->title)->toBe('My Tracked Item')
         ->and($product->currency)->toBe('EUR')
-        // Left empty, so nothing is stored and the drop check uses the default.
+        // No alert yet: the drop check uses the default.
         ->and($product->drop_threshold_pct)->toBeNull()
         ->and($product->drop_threshold_abs)->toBeNull()
         ->and($product->active)->toBeTrue();
@@ -128,7 +125,7 @@ test('empty title blocks confirm and persists nothing', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->set('title', '')
@@ -143,7 +140,7 @@ test('an edited image url whose scheme is not http(s) blocks confirm', function 
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->set('imageUrl', 'ftp://shop.example.com/img.jpg')
@@ -160,7 +157,7 @@ test('URL already tracked on another product of this user shows a warning but co
     Shop::factory()->for($existingProduct)->create(['url' => 'https://shop.example.com/p/1']);
     $this->actingAs($user);
 
-    $component = Livewire::test(CreateProductFromUrl::class)
+    $component = Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
@@ -177,7 +174,7 @@ test('URL tracked only by another user shows no warning', function (): void {
     Shop::factory()->for($otherProduct)->create(['url' => 'https://shop.example.com/p/1']);
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
@@ -191,7 +188,7 @@ test('fetch-level failure shows the error state', function (): void {
     ]);
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'error')
@@ -206,7 +203,7 @@ test('an unservable shop explains itself instead of printing the raw error code'
     Http::fake(); // any HTTP call would be an unexpected fetch — the check is host-based, before any fetch.
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://www.plus.nl/product/fanta-orange-fles-1500-ml-991700')
         ->call('probe')
         ->assertSet('state', 'error')
@@ -229,7 +226,7 @@ test('extraction failure flips to manual selector and selectors create the produ
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'manual_selector')
@@ -237,9 +234,6 @@ test('extraction failure flips to manual selector and selectors create the produ
         ->set('manualCurrency', 'EUR')
         ->call('probeWithSelectors')
         ->assertSet('state', 'preview')
-        // 19.95 sits in the <25 tier: 15% / 3.00 absolute.
-        ->assertSeeHtml('placeholder="15.00"')
-        ->assertSeeHtml('placeholder="3.00"')
         ->set('title', 'Selector Item')
         ->call('confirm')
         ->assertHasNoErrors();
@@ -258,7 +252,7 @@ test('abandoning after probe persists nothing', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
@@ -269,15 +263,16 @@ test('abandoning after probe persists nothing', function (): void {
         ->and(Shop::query()->count())->toBe(0);
 });
 
-test('create page renders the component and manual page still creates', function (): void {
+test('create page renders the wizard, and the old manual page sends you to its by-hand mode', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);
 
     $this->get('/app/products/create')
         ->assertOk()
-        ->assertSeeLivewire(CreateProductFromUrl::class);
+        ->assertSeeLivewire(AddProductWizard::class);
 
-    $this->get('/app/products/create-manual')->assertOk();
+    $this->get('/app/products/create-manual?idea=coffee')
+        ->assertRedirect(route('app.products.create', ['mode' => 'manual', 'idea' => 'coffee']));
 });
 
 test('extraction failure offers a shop request mailto', function (): void {
@@ -294,7 +289,7 @@ test('extraction failure offers a shop request mailto', function (): void {
     ]);
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'error')
@@ -319,7 +314,7 @@ test('a blocking shop names Cloudflare on the first refusal', function (): void 
     ]);
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('errorCode', 'blocked')
@@ -339,7 +334,7 @@ test('a persistently blocking shop counts the refusals instead', function (): vo
     ]);
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('errorCode', 'blocked')
@@ -358,7 +353,7 @@ test('a shop that has gone quiet for a while counts the silences', function (): 
     ]);
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('errorCode', 'temporary_failure')
@@ -375,7 +370,7 @@ test('a 429 from the shop states the wait it asked for', function (): void {
     ]);
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('errorCode', 'host_rate_limited')
@@ -392,7 +387,7 @@ test('our own per-host throttle says so rather than blaming the shop', function 
     Http::fake();
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('errorCode', 'local_throttle')
@@ -416,70 +411,12 @@ test('too many probes in a minute states the wait', function (): void {
         app(ProbeShopUrl::class)(null, "https://shop.example.com/p/{$i}", $user);
     }
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/over')
         ->call('probe')
         ->assertSet('errorCode', 'probe_rate_limited')
         ->assertSee('You have checked too many links in the last minute.')
         ->assertDontSee('Try again in ~60 seconds');
-});
-
-test('stores the drop thresholds a person does enter', function (): void {
-    Http::fake(fakeCreateFlowOffer());
-    $user = User::factory()->create();
-    $this->actingAs($user);
-
-    Livewire::test(CreateProductFromUrl::class)
-        ->set('url', 'https://shop.example.com/p/1')
-        ->call('probe')
-        ->set('thresholdPct', '12.5')
-        ->set('thresholdAbs', '')
-        ->call('confirm')
-        ->assertHasNoErrors();
-
-    $product = Product::query()->where('user_id', $user->id)->firstOrFail();
-    expect((string) $product->drop_threshold_pct)->toBe('12.50')
-        ->and($product->drop_threshold_abs)->toBeNull();
-});
-
-test('still refuses a drop threshold out of range', function (): void {
-    Http::fake(fakeCreateFlowOffer());
-    $this->actingAs(User::factory()->create());
-
-    Livewire::test(CreateProductFromUrl::class)
-        ->set('url', 'https://shop.example.com/p/1')
-        ->call('probe')
-        ->set('thresholdPct', '0')
-        ->call('confirm')
-        ->assertHasErrors(['thresholdPct']);
-});
-
-test('offers a price per unit when the page states a pack size, and stores it', function (): void {
-    Http::fake(fakeCreateFlowOffer(price: '4.00', title: 'Crisps 500 g'));
-    $user = User::factory()->create();
-    $this->actingAs($user);
-
-    Livewire::test(CreateProductFromUrl::class)
-        ->set('url', 'https://shop.example.com/p/1')
-        ->call('probe')
-        ->assertSeeHtml('data-test="unit-target"')
-        ->assertSee('same price per kilo')
-        // What the component sets from "€3.00 for the 500 g bag".
-        ->set('unitPriceTarget', '6')
-        ->call('confirm')
-        ->assertHasNoErrors();
-
-    expect((string) Product::query()->where('user_id', $user->id)->firstOrFail()->unit_price_target)->toBe('6.0000');
-});
-
-test('offers no price per unit when the page states no pack size', function (): void {
-    Http::fake(fakeCreateFlowOffer());
-    $this->actingAs(User::factory()->create());
-
-    Livewire::test(CreateProductFromUrl::class)
-        ->set('url', 'https://shop.example.com/p/1')
-        ->call('probe')
-        ->assertDontSeeHtml('data-test="unit-target"');
 });
 
 function connectAssistantFor(User $user, bool $revoked = false): void
@@ -506,7 +443,7 @@ function connectAssistantFor(User $user, bool $revoked = false): void
 test('the page offers Claude as another way to add products and shops', function (): void {
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->assertSeeHtml('data-test="assistant-hint"')
         ->assertSee('Add products and shops from Claude')
         ->assertSee('Connect Claude once')
@@ -518,7 +455,7 @@ test('with Claude connected, the hint says to ask it rather than to connect it',
     connectAssistantFor($user);
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->assertSee('Claude is connected.')
         ->assertDontSee('Connect Claude once');
 });
@@ -528,7 +465,7 @@ test('a disconnected Claude counts as not connected', function (): void {
     connectAssistantFor($user, revoked: true);
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->assertSee('Connect Claude once')
         ->assertDontSee('Claude is connected.');
 });
@@ -537,7 +474,7 @@ test('the hint leaves once a product is looked up', function (): void {
     Http::fake(fakeCreateFlowOffer());
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
@@ -550,11 +487,11 @@ test('a grant without the DipCatch tools scope, or an expired one, does not coun
     Token::query()->where('user_id', $user->getKey())->update(['scopes' => json_encode(['profile'])]);
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)->assertSee('Connect Claude once');
+    Livewire::test(AddProductWizard::class)->assertSee('Connect Claude once');
 
     Token::query()->where('user_id', $user->getKey())->update(['scopes' => json_encode(['mcp:use']), 'expires_at' => now()->subMinute()]);
 
-    Livewire::test(CreateProductFromUrl::class)->assertSee('Connect Claude once');
+    Livewire::test(AddProductWizard::class)->assertSee('Connect Claude once');
 });
 
 test('the hint names the assistant that is connected', function (): void {
@@ -563,7 +500,7 @@ test('the hint names the assistant that is connected', function (): void {
     Client::query()->update(['name' => 'ChatGPT']);
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->assertSee('Add products and shops from ChatGPT')
         ->assertSee('ChatGPT is connected.');
 });
@@ -574,14 +511,14 @@ test('a grant from a revoked client does not count as connected', function (): v
     Client::query()->update(['revoked' => true]);
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)->assertSee('Connect Claude once');
+    Livewire::test(AddProductWizard::class)->assertSee('Connect Claude once');
 });
 
 test('the preview leads with the price per unit when the page states a pack size', function (): void {
     Http::fake(fakeCreateFlowOffer(price: '1.99', title: 'Chips naturel 370 g'));
     $this->actingAs(User::factory()->create());
 
-    $text = (string) preg_replace('/\s+/', ' ', strip_tags(Livewire::test(CreateProductFromUrl::class)
+    $text = (string) preg_replace('/\s+/', ' ', strip_tags(Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
@@ -594,10 +531,399 @@ test('the preview leads with the pack price when the page states no size', funct
     Http::fake(fakeCreateFlowOffer(price: '299.00', title: 'Camera'));
     $this->actingAs(User::factory()->create());
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSeeHtml('data-test="preview-price"')
         ->assertSee('€299.00')
         ->assertDontSeeHtml('data-test="preview-pack"');
+});
+
+describe('step 1 by hand', function (): void {
+    it('creates a product the scraper cannot read, and moves on to the shops', function (): void {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(AddProductWizard::class, ['mode' => 'manual'])
+            ->set('manualTitle', 'Local roastery beans')
+            ->set('manualImageUrl', 'https://example.test/beans.jpg')
+            ->set('currency', 'EUR')
+            ->call('saveManual')
+            ->assertHasNoErrors()
+            ->assertSet('step', 2);
+
+        $product = Product::query()->where('user_id', $user->id)->sole();
+
+        expect($product->title)->toBe('Local roastery beans')
+            ->and($product->image_url)->toBe('https://example.test/beans.jpg')
+            // No alert input yet: the default rule applies.
+            ->and($product->drop_threshold_pct)->toBeNull();
+    });
+
+    it('accepts a currency typed in lower case', function (): void {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(AddProductWizard::class, ['mode' => 'manual'])
+            ->set('manualTitle', 'Local roastery beans')
+            ->set('currency', 'eur')
+            ->call('saveManual')
+            ->assertHasNoErrors();
+
+        expect(Product::query()->where('user_id', $user->id)->sole()->currency)->toBe('EUR');
+    });
+
+    it('refuses a currency that is not an ISO 4217 code', function (): void {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(AddProductWizard::class, ['mode' => 'manual'])
+            ->set('manualTitle', 'Local roastery beans')
+            ->set('currency', 'ZZZ')
+            ->call('saveManual')
+            ->assertHasErrors('currency');
+
+        expect(Product::query()->where('user_id', $user->id)->count())->toBe(0);
+    });
+
+    it('refuses an image url whose scheme is not http(s)', function (): void {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(AddProductWizard::class, ['mode' => 'manual'])
+            ->set('manualTitle', 'Local roastery beans')
+            ->set('manualImageUrl', 'ftp://example.test/beans.jpg')
+            ->set('currency', 'EUR')
+            ->call('saveManual')
+            ->assertHasErrors('manualImageUrl');
+
+        expect(Product::query()->where('user_id', $user->id)->count())->toBe(0);
+    });
+
+});
+
+describe('the steps', function (): void {
+    it('resumes on the step and product in the URL', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create(['title' => 'Coffee beans']);
+        $this->actingAs($user);
+
+        Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 3])
+            ->test(AddProductWizard::class)
+            ->assertSet('step', 3)
+            ->assertSet('title', 'Coffee beans')
+            ->assertSeeHtml('data-test="wizard-alerts"');
+    });
+
+    it('starts on step 1 when there is no product yet', function (): void {
+        $this->actingAs(User::factory()->create());
+
+        Livewire::withQueryParams(['step' => 3])
+            ->test(AddProductWizard::class)
+            ->assertSet('step', 1);
+    });
+
+    it('clamps a step out of range', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create();
+        $this->actingAs($user);
+
+        Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 9])
+            ->test(AddProductWizard::class)
+            ->assertSet('step', 3);
+    });
+
+    it('answers 404 for a product that is not this account\'s to finish', function (string $id): void {
+        $other = Product::factory()->create();
+        $this->actingAs(User::factory()->create());
+
+        $this->get(route('app.products.create', ['product' => $id === 'foreign' ? (string) $other->id : $id, 'step' => 2]))
+            ->assertNotFound();
+    })->with([
+        'another account\'s product' => ['foreign'],
+        'a malformed id' => ['not-a-uuid'],
+        'an unknown id' => ['01929a8e-0000-7000-8000-000000000000'],
+    ]);
+
+    it('refuses a product id set from the browser', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create();
+        $this->actingAs($user);
+
+        Livewire::test(AddProductWizard::class)->set('productId', (string) $product->id);
+    })->throws(CannotUpdateLockedPropertyException::class);
+
+    it('does not leave step 1 without a product', function (): void {
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AddProductWizard::class)
+            ->call('goToStep', 2)
+            ->assertSet('step', 1);
+    });
+
+    it('switches between a shop link and filling it in by hand', function (): void {
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AddProductWizard::class)
+            ->call('switchMode', 'manual')
+            ->assertSet('mode', 'manual')
+            ->assertSeeHtml('data-test="manual-product-form"')
+            ->call('switchMode', 'url')
+            ->assertSet('mode', 'url')
+            ->assertSeeHtml('id="create-product-url"');
+    });
+
+    it('keeps the name and photo editable after the save, with the edit page\'s side effects', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create(['title' => 'Old name', 'tracking_idea' => 'coffee_tea']);
+        Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1'])
+            ->forceFill(['image_url' => 'https://ah.nl/img.jpg'])->save();
+        $this->actingAs($user);
+
+        Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 1])
+            ->test(AddProductWizard::class)
+            ->assertSeeHtml('data-test="product-details-form"')
+            ->set('title', 'New name')
+            ->call('useShopImage', 'https://ah.nl/img.jpg')
+            ->assertSet('imageUrl', 'https://ah.nl/img.jpg')
+            ->call('saveDetails')
+            ->assertHasNoErrors()
+            ->assertSet('step', 2);
+
+        $product->refresh();
+
+        expect($product->title)->toBe('New name')
+            ->and($product->image_url)->toBe('https://ah.nl/img.jpg')
+            // Jev read the old name; the idea it picked from it goes.
+            ->and($product->tracking_idea)->toBeNull();
+    });
+
+    it('refuses an empty name on the edit view', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create(['title' => 'Kept']);
+        $this->actingAs($user);
+
+        Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 1])
+            ->test(AddProductWizard::class)
+            ->set('title', '')
+            ->call('saveDetails')
+            ->assertHasErrors('title');
+
+        expect($product->refresh()->title)->toBe('Kept');
+    });
+
+    it('creates no second product once step 1 saved one', function (): void {
+        Http::fake(fakeCreateFlowOffer());
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(AddProductWizard::class)
+            ->set('url', 'https://shop.example.com/p/1')
+            ->call('probe')
+            ->call('confirm')
+            ->assertSet('step', 2)
+            ->call('confirm')
+            ->set('manualTitle', 'Another')
+            ->call('saveManual');
+
+        expect(Product::query()->where('user_id', $user->id)->count())->toBe(1);
+    });
+
+    it('says the product is tracked when the person is done', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create(['title' => 'Coffee beans']);
+        $this->actingAs($user);
+
+        Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 3])
+            ->test(AddProductWizard::class)
+            ->call('finish')
+            ->assertNotified('Product created')
+            ->assertRedirect(route('app.products.show', $product));
+    });
+});
+
+/** Step 3, after step 1 from a link, so the product has a price and a reference. */
+function wizardAtAlerts(string $price = '50.00', string $title = 'Demo Item'): Testable
+{
+    Http::fake(fakeCreateFlowOffer(price: $price, title: $title));
+
+    return Livewire::test(AddProductWizard::class)
+        ->set('url', 'https://shop.example.com/p/1')
+        ->call('probe')
+        ->call('confirm')
+        ->call('goToStep', 3);
+}
+
+describe('step 3, the alert', function (): void {
+    it('explains that tracking goes on whatever the alert says', function (): void {
+        $this->actingAs(User::factory()->create());
+
+        wizardAtAlerts()->assertSee('We check every shop and keep the full price history, whatever you set here.');
+    });
+
+    it('suggests the default thresholds from the reference the drop check uses', function (): void {
+        $this->actingAs(User::factory()->create());
+
+        // 50.00 sits in the 25–100 tier: 10% or 7.00.
+        wizardAtAlerts()
+            ->assertSeeHtml('placeholder="10.00"')
+            ->assertSeeHtml('placeholder="7.00"');
+    });
+
+    it('stores the alert a person sets', function (): void {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        wizardAtAlerts()
+            ->set('dropThresholdPct', '12.5')
+            ->set('targetPrice', '40')
+            ->call('saveAlerts')
+            ->assertHasNoErrors()
+            ->assertRedirect();
+
+        $product = Product::query()->where('user_id', $user->id)->sole();
+
+        expect((string) $product->drop_threshold_pct)->toBe('12.50')
+            ->and($product->drop_threshold_abs)->toBeNull()
+            ->and((string) $product->target_price)->toBe('40.00');
+    });
+
+    it('refuses a threshold of zero, as the edit page does', function (string $field): void {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        wizardAtAlerts()
+            ->set($field, '0')
+            ->call('saveAlerts')
+            ->assertHasErrors($field)
+            ->assertNoRedirect();
+
+        expect(Product::query()->where('user_id', $user->id)->sole()->{$field === 'dropThresholdPct' ? 'drop_threshold_pct' : 'drop_threshold_abs'})->toBeNull();
+    })->with(['dropThresholdPct', 'dropThresholdAbs']);
+
+    it('offers a price per unit when a shop states a pack size, and stores it', function (): void {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        wizardAtAlerts(price: '4.00', title: 'Crisps 500 g')
+            ->assertSeeHtml('data-test="unit-target"')
+            ->assertSee('same price per kilo')
+            ->set('unitPriceTarget', '6')
+            ->call('saveAlerts')
+            ->assertHasNoErrors();
+
+        expect((string) Product::query()->where('user_id', $user->id)->sole()->unit_price_target)->toBe('6.0000');
+    });
+
+    it('asks for a price per unit without the pack picker when no shop states a size', function (): void {
+        $this->actingAs(User::factory()->create());
+
+        wizardAtAlerts()
+            ->assertDontSeeHtml('data-test="unit-target"')
+            ->assertSee('Target price per kilo, litre or piece');
+    });
+
+    it('saves nothing when the person keeps the defaults', function (): void {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        wizardAtAlerts()
+            ->set('dropThresholdPct', '30')
+            ->call('finish')
+            ->assertRedirect();
+
+        expect(Product::query()->where('user_id', $user->id)->sole()->drop_threshold_pct)->toBeNull();
+    });
+
+    it('keeps the alert a reopened product already has', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create([
+            'drop_threshold_pct' => '20.00', 'drop_threshold_abs' => '1.50',
+            'target_price' => '3.00', 'unit_price_target' => '0.5000',
+        ]);
+        $this->actingAs($user);
+
+        Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 3])
+            ->test(AddProductWizard::class)
+            ->assertSet('unitPriceTarget', '0.5')
+            ->call('saveAlerts')
+            ->assertHasNoErrors();
+
+        $product->refresh();
+
+        expect((string) $product->drop_threshold_pct)->toBe('20.00')
+            ->and((string) $product->drop_threshold_abs)->toBe('1.50')
+            ->and((string) $product->target_price)->toBe('3.00')
+            ->and((string) $product->unit_price_target)->toBe('0.5000');
+    });
+
+    it('says the default starts later for a product with no price yet', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create();
+        $this->actingAs($user);
+
+        Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 3])
+            ->test(AddProductWizard::class)
+            ->assertSee('The default alert starts once we have read a price.')
+            ->call('saveAlerts')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('app.products.show', $product));
+    });
+});
+
+describe('guards', function (): void {
+    it('refuses a step set from the browser', function (): void {
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AddProductWizard::class)->set('step', 2);
+    })->throws(CannotUpdateLockedPropertyException::class);
+
+    it('redirects an old by-hand link whose idea is not a string', function (): void {
+        $this->actingAs(User::factory()->create());
+
+        $this->get('/app/products/create-manual?idea[]=coffee')
+            ->assertRedirect(route('app.products.create', ['mode' => 'manual']));
+    });
+
+    it('takes only a photo a shop reported', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create(['image_url' => null]);
+        Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1'])
+            ->forceFill(['image_url' => 'https://ah.nl/pack.jpg'])->save();
+        $this->actingAs($user);
+
+        Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 1])
+            ->test(AddProductWizard::class)
+            ->call('useShopImage', 'https://elsewhere.test/other.jpg')
+            ->assertSet('imageUrl', '')
+            ->call('useShopImage', 'https://ah.nl/pack.jpg')
+            ->assertSet('imageUrl', 'https://ah.nl/pack.jpg');
+    });
+
+    it('saves the name when the person leaves step 1 by the step list', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create(['title' => 'Old name']);
+        $this->actingAs($user);
+
+        Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 1])
+            ->test(AddProductWizard::class)
+            ->set('title', 'New name')
+            ->call('goToStep', 3)
+            ->assertSet('step', 3);
+
+        expect($product->refresh()->title)->toBe('New name');
+    });
+
+    it('stays on step 1 when the name it would save is empty', function (): void {
+        $user = User::factory()->create();
+        $product = Product::factory()->for($user)->create(['title' => 'Kept']);
+        $this->actingAs($user);
+
+        Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 1])
+            ->test(AddProductWizard::class)
+            ->set('title', '')
+            ->call('goToStep', 2)
+            ->assertHasErrors('title')
+            ->assertSet('step', 1);
+    });
 });

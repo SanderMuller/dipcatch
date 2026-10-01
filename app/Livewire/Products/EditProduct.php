@@ -3,9 +3,11 @@
 namespace App\Livewire\Products;
 
 use App\Actions\Products\CategoriseProduct;
+use App\Actions\Products\UpdateProductDetails;
 use App\Enums\CategorySource;
 use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
+use App\Livewire\Concerns\EditsAlertFields;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Services\ShopDiscovery\WebShopDiscovery;
@@ -14,7 +16,6 @@ use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
 use App\Support\Iso4217;
 use App\Support\MoneyFormatter;
-use App\Support\Numeric;
 use App\Support\UnitTargetGuide;
 use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
@@ -33,6 +34,7 @@ use SanderMuller\FluentValidation\HasFluentValidation;
  */
 final class EditProduct extends Component
 {
+    use EditsAlertFields;
     use HasFluentValidation;
 
     public Product $product;
@@ -42,14 +44,6 @@ final class EditProduct extends Component
     public ?string $imageUrl = null;
 
     public string $currency = 'EUR';
-
-    public ?string $dropThresholdPct = null;
-
-    public ?string $dropThresholdAbs = null;
-
-    public ?string $targetPrice = null;
-
-    public ?string $unitPriceTarget = null;
 
     public bool $active = true;
 
@@ -83,11 +77,7 @@ final class EditProduct extends Component
         $this->title = $product->title;
         $this->imageUrl = $product->image_url;
         $this->currency = $product->currency;
-        $this->dropThresholdPct = $product->drop_threshold_pct === null ? null : (string) $product->drop_threshold_pct;
-        $this->dropThresholdAbs = $product->drop_threshold_abs === null ? null : (string) $product->drop_threshold_abs;
-        $this->targetPrice = $product->target_price === null ? null : (string) $product->target_price;
-        // The column keeps four decimals, which the form would show as 7.0000.
-        $this->unitPriceTarget = $product->unit_price_target === null ? null : Numeric::trimmed((string) $product->unit_price_target);
+        $this->loadAlertFields($product);
         $this->active = $product->active;
         $this->priceDisplay = $product->price_display->value ?? '';
         $this->category = $product->category->value ?? '';
@@ -104,16 +94,7 @@ final class EditProduct extends Component
             'title' => FluentRule::string('Title')->required()->max(255),
             'imageUrl' => FluentRule::httpUrl('Image URL')->nullable()->max(2048),
             'currency' => FluentRule::string('Currency')->required()->in(Iso4217::CODES),
-            // A threshold of zero would alert on a price that did not move.
-            'dropThresholdPct' => FluentRule::numeric('Alert me when it drops by (%)')
-                ->nullable()
-                ->between(0.01, 99.98999999999999),
-            'dropThresholdAbs' => FluentRule::numeric('Alert me when it drops by (amount)')->nullable()->min(0.01),
-            'targetPrice' => FluentRule::numeric('Target price')->nullable()->min(0.01),
-            // A cent is a floor for money and a ceiling for a rate: a tablet
-            // costs three hundredths of one, and a target above every real
-            // value cannot be set at all.
-            'unitPriceTarget' => FluentRule::numeric('Target price per kilo, litre or piece')->nullable()->min(0.0001),
+            ...$this->alertFieldRules(),
             'category' => FluentRule::string('Category')->nullable()->in(ProductCategory::values()),
             'priceDisplay' => FluentRule::string('Show the price as')->nullable()->in(PriceDisplay::class),
         ];
@@ -129,7 +110,7 @@ final class EditProduct extends Component
     {
         $suggestion = new UnitTargetGuide($this->product)->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs);
 
-        if ($suggestion === null || $this->blankToNull($this->unitPriceTarget) !== null) {
+        if ($suggestion === null || self::blankToNull($this->unitPriceTarget) !== null) {
             return;
         }
 
@@ -155,19 +136,11 @@ final class EditProduct extends Component
             $this->product->forceFill(['suggested_category' => null]);
         }
 
-        // Jev read the old name; a renamed product may be another purchase.
-        if (trim($this->title) !== $this->product->title) {
-            $this->product->forceFill(['tracking_idea' => null]);
-        }
+        UpdateProductDetails::fill($this->product, $this->title, self::blankToNull($this->imageUrl));
 
         $this->product->forceFill([
-            'title' => trim($this->title),
-            'image_url' => $this->blankToNull($this->imageUrl),
             'currency' => $this->currency,
-            'drop_threshold_pct' => $this->blankToNull($this->dropThresholdPct),
-            'drop_threshold_abs' => $this->blankToNull($this->dropThresholdAbs),
-            'target_price' => $this->blankToNull($this->targetPrice),
-            'unit_price_target' => $this->blankToNull($this->unitPriceTarget),
+            ...$this->alertFieldValues(),
             'active' => $this->active,
             'price_display' => PriceDisplay::tryFrom($this->priceDisplay),
         ])->save();
@@ -262,16 +235,11 @@ final class EditProduct extends Component
 
     /**
      * Use an image one of the shops reported, rather than making someone find
-     * a URL by hand.
-     *
-     * Addressed by position: a URL written into a `wire:click` attribute
-     * breaks the page's JavaScript as soon as it contains a quote.
+     * a URL by hand. Only one of those: the URL comes from the browser.
      */
-    public function useShopImage(int $index): void
+    public function useShopImage(string $url): void
     {
-        $url = array_keys($this->shopImages())[$index] ?? null;
-
-        if ($url === null) {
+        if (! array_key_exists($url, UpdateProductDetails::shopImages($this->product))) {
             return;
         }
 
@@ -290,9 +258,9 @@ final class EditProduct extends Component
             'suggestionAvailable' => TypeSafeClient::configured(),
             'allowsAutoCategories' => $this->allowsAutoCategories(),
             'suggestedLabel' => ProductCategory::tryFrom((string) $this->suggestedCategory)?->label(),
-            'shopImages' => $this->shopImages(),
+            'shopImages' => UpdateProductDetails::shopImages($this->product),
             'packChoices' => $packChoices,
-            'priceAlertSwitch' => $this->blankToNull($this->unitPriceTarget) === null
+            'priceAlertSwitch' => self::blankToNull($this->unitPriceTarget) === null
                 ? $guide->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs, $packChoices)
                 : null,
             'unitHistory' => $guide->history(),
@@ -304,26 +272,6 @@ final class EditProduct extends Component
     private function allowsAutoCategories(): bool
     {
         return $this->product->user?->entitlements()->allowsAutoCategories() === true;
-    }
-
-    /**
-     * Distinct images the shops reported, newest check first.
-     *
-     * @return array<string, string>
-     */
-    private function shopImages(): array
-    {
-        $images = [];
-
-        foreach ($this->product->shops as $shop) {
-            $url = $shop->safeImageUrl();
-
-            if ($url !== null && ! isset($images[$url])) {
-                $images[$url] = $shop->host ?? '';
-            }
-        }
-
-        return $images;
     }
 
     /**
@@ -390,12 +338,5 @@ final class EditProduct extends Component
         return $unitWord === null
             ? __('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.')
             : __('We tell you when the best value reaches this price per :unit.', ['unit' => $unitWord]);
-    }
-
-    private function blankToNull(?string $value): ?string
-    {
-        $trimmed = is_string($value) ? trim($value) : '';
-
-        return $trimmed === '' ? null : $trimmed;
     }
 }

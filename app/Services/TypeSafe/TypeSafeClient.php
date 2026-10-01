@@ -3,6 +3,7 @@
 namespace App\Services\TypeSafe;
 
 use App\Enums\ProductDepartment;
+use App\Enums\PromotionDepthBand;
 use App\Enums\TrackingIdea;
 use App\Models\Product;
 use App\Models\Shop;
@@ -14,9 +15,9 @@ use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
- * TypeSafe's Jev model, for two jobs. `categorise()` places a product in the
+ * TypeSafe's Jev model, for three jobs. `categorise()` places a product in the
  * taxonomy; `sameProduct()` judges whether other offers sell the same product
- * and pack.
+ * and pack; `promotionDepth()` judges how deep its promotions usually go.
  *
  * Categorising is one request
  * with a department Choice plus a leaf Choice per real department, scored by
@@ -35,6 +36,8 @@ final readonly class TypeSafeClient
     public const string LEAF_QUESTION_PREFIX = 'leaf_';
 
     public const string TRACKING_IDEA_QUESTION = 'tracking_idea';
+
+    public const string PROMOTION_DEPTH_QUESTION = 'promotion_depth';
 
     /** The Choice option for a product no getting-started idea covers. */
     public const string NO_TRACKING_IDEA = 'none';
@@ -133,6 +136,63 @@ final readonly class TypeSafeClient
         }
 
         return $chances;
+    }
+
+    /**
+     * What `promotionDepth()` sends about a product: the shared state, with
+     * each shop's price, pack, promotion and live multi-buy in place of the
+     * plain offers, plus the category. Public so a caller can tell whether an
+     * answer still describes the product.
+     *
+     * @return array<string, mixed>
+     */
+    public function promotionDepthState(Product $product): array
+    {
+        $product->loadMissing('shops');
+        $state = $this->state($product);
+
+        $state['offers'] = PromotionDepthQuestion::offers($product);
+
+        $category = $product->category ?? $product->suggested_category;
+
+        if ($category !== null) {
+            $state['category'] = $category->label();
+        }
+
+        return $state;
+    }
+
+    /**
+     * The chance of each `PromotionDepthBand` for the product `$state`
+     * describes, as one Choice. A quick request: a person waits for it.
+     *
+     * @param  array<string, mixed>  $state  From `promotionDepthState()`.
+     * @return array<string, float> Keyed by band value.
+     *
+     * @throws TypeSafeRequestFailed
+     */
+    public function promotionDepth(array $state): array
+    {
+        $criteria = [];
+
+        foreach (PromotionDepthBand::cases() as $band) {
+            $criteria[$band->value] = $band->rubric();
+        }
+
+        $payload = $this->send([
+            'model' => self::MODEL,
+            'state' => $state,
+            'questions' => [
+                self::PROMOTION_DEPTH_QUESTION => [
+                    'type' => 'choice',
+                    'instructions' => 'How deep do the promotions on this product usually go, per item, at Dutch shops like the ones in the state? '
+                        . 'Judge from the product, its category, its shops and any promotion they show now.',
+                    'criteria' => $criteria,
+                ],
+            ],
+        ], quick: true);
+
+        return PromotionDepthQuestion::chances($payload);
     }
 
     /**
@@ -254,7 +314,7 @@ final readonly class TypeSafeClient
         return $sizes;
     }
 
-    private static function packSize(Shop $shop): ?string
+    public static function packSize(Shop $shop): ?string
     {
         if ($shop->pack_quantity === null || ! is_string($shop->pack_unit) || $shop->pack_unit === '') {
             return null;

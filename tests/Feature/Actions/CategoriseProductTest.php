@@ -4,8 +4,7 @@ use App\Actions\Products\CategoriseProduct;
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Enums\TrackingIdea;
-use App\Livewire\Products\CreateProductFromUrl;
-use App\Livewire\Products\CreateProductManual;
+use App\Livewire\Products\AddProductWizard;
 use App\Mcp\Servers\DipCatchServer;
 use App\Mcp\Support\DraftToken;
 use App\Mcp\Tools\CreateProductTool;
@@ -56,7 +55,7 @@ it('categorises a product created from a URL once the request has terminated', f
     $user = proUserWantingCategories();
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->call('confirm')
@@ -79,10 +78,10 @@ it('categorises a product created by hand after the response', function (): void
     $user = proUserWantingCategories();
     $this->actingAs($user);
 
-    livewire(CreateProductManual::class)
-        ->set('title', 'Local roastery beans')
+    livewire(AddProductWizard::class, ['mode' => 'manual'])
+        ->set('manualTitle', 'Local roastery beans')
         ->set('currency', 'EUR')
-        ->call('save')
+        ->call('saveManual')
         ->assertHasNoErrors();
 
     app()->terminate();
@@ -115,10 +114,10 @@ it('sends nothing for a free account, an opted-out account, or without a key', f
     };
     $this->actingAs($user);
 
-    livewire(CreateProductManual::class)
-        ->set('title', 'Local roastery beans')
+    livewire(AddProductWizard::class, ['mode' => 'manual'])
+        ->set('manualTitle', 'Local roastery beans')
         ->set('currency', 'EUR')
-        ->call('save')
+        ->call('saveManual')
         ->assertHasNoErrors();
 
     app()->terminate();
@@ -247,10 +246,10 @@ it('sends nothing once the account has spent its daily budget', function (): voi
     $this->actingAs($user);
 
     foreach (['First', 'Second'] as $title) {
-        livewire(CreateProductManual::class)
-            ->set('title', $title)
+        livewire(AddProductWizard::class, ['mode' => 'manual'])
+            ->set('manualTitle', $title)
             ->set('currency', 'EUR')
-            ->call('save')
+            ->call('saveManual')
             ->assertHasNoErrors();
         app()->terminate();
     }

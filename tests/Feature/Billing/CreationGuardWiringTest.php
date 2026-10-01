@@ -1,7 +1,6 @@
 <?php declare(strict_types=1);
 
-use App\Livewire\Products\CreateProductFromUrl;
-use App\Livewire\Products\CreateProductManual;
+use App\Livewire\Products\AddProductWizard;
 use App\Livewire\Shops\AddShop;
 use App\Models\Product;
 use App\Models\Shop;
@@ -52,12 +51,14 @@ it('refuses the product over the limit on the URL-first flow', function (): void
     Product::factory()->count(20)->create(['user_id' => $user->id]);
     $this->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)
+    Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview')
         ->call('confirm')
-        ->assertNotified('You have used all your free products');
+        ->assertSee('You have used all your free products')
+        ->assertSet('productId', '')
+        ->assertSet('step', 1);
 
     expect(Product::query()->where('user_id', $user->id)->count())->toBe(20)
         ->and(Shop::query()->count())->toBe(0);
@@ -68,12 +69,12 @@ it('refuses the product over the limit on the manual flow', function (): void {
     Product::factory()->count(20)->create(['user_id' => $user->id]);
     $this->actingAs($user);
 
-    Livewire::test(CreateProductManual::class)
-        ->set('title', 'One too many')
+    Livewire::test(AddProductWizard::class, ['mode' => 'manual'])
+        ->set('manualTitle', 'One too many')
         ->set('currency', 'EUR')
-        ->set('drop_threshold_pct', '10')
-        ->set('drop_threshold_abs', '0.50')
-        ->call('save');
+        ->call('saveManual')
+        ->assertSee('You have used all your free products')
+        ->assertSet('step', 1);
 
     expect(Product::query()->where('user_id', $user->id)->count())->toBe(20);
 });

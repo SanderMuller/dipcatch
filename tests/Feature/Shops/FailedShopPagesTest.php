@@ -3,7 +3,7 @@
 use App\Actions\Shops\ProbeOutcome;
 use App\Enums\ProbeFailure;
 use App\Filament\Admin\Resources\FailedShopPages\Pages\ListFailedShopPages;
-use App\Livewire\Products\CreateProductFromUrl;
+use App\Livewire\Products\AddProductWizard;
 use App\Mcp\Servers\DipCatchServer;
 use App\Mcp\Tools\AddShopTool;
 use App\Mcp\Tools\CreateProductTool;
@@ -36,7 +36,7 @@ function probeFromUrl(User $user, string $url = 'https://shop.example.com/p/1'):
 {
     test()->actingAs($user);
 
-    Livewire::test(CreateProductFromUrl::class)->set('url', $url)->call('probe');
+    Livewire::test(AddProductWizard::class)->set('url', $url)->call('probe');
 }
 
 it('keeps a page it could not read, with why, and counts each try', function (): void {

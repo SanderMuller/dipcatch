@@ -5,7 +5,7 @@
 
     <x-settings.layout :heading="__('Product features')" :subheading="__('Features that use AI. Both are off until you switch them on.')">
         @if ($available)
-            <flux:text>{{ __('DipCatch then sends the product name, its shops and their web addresses, the pack size, barcode and price to TypeSafe, our AI provider. Nothing about you.') }}</flux:text>
+            <flux:text>{{ __('DipCatch then sends the product name, its shops and their web addresses, the pack size, barcode and price, any offer a shop shows, and the category of the product to TypeSafe, our AI provider. Nothing about you.') }}</flux:text>
 
             <form wire:submit="save" class="my-6 w-full space-y-6">
                 {{-- Composed by hand: `flux:switch` takes its label as a
@@ -32,12 +32,12 @@
 
                 <flux:field variant="inline">
                     <flux:label>
-                        {{ __('Check that a new shop sells the same product and pack') }}
+                        {{ __('Check new shops, and suggest alerts') }}
                         <flux:badge size="sm" color="zinc" class="ms-2">{{ __('Pro') }}</flux:badge>
                     </flux:label>
                     <flux:description>
                         {{ $allowsShopChecks
-                            ? __('When you add a shop, AI compares it with the shops you already track and warns you about a different product or pack size. It also finds more shops that sell your products.')
+                            ? __('When you add a shop, AI compares it with the shops you already track and warns you about a different product or pack size. It also finds more shops that sell your products, and suggests an alert for a new product from how products like it go on sale.')
                             : __('Pro checks new shops for you. Your choice is kept, and it starts working when you upgrade.') }}
                     </flux:description>
                     <flux:switch

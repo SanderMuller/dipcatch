@@ -199,7 +199,10 @@ it('offers the images the shops reported', function (): void {
 
     livewire(EditProduct::class, ['product' => $product->fresh()])
         ->assertSee('https://static.ah.test/pack.jpg', escape: false)
-        ->call('useShopImage', 0)
+        // A URL no shop reported is refused: it comes from the browser.
+        ->call('useShopImage', 'https://elsewhere.test/other.jpg')
+        ->assertNotSet('imageUrl', 'https://elsewhere.test/other.jpg')
+        ->call('useShopImage', 'https://static.ah.test/pack.jpg')
         ->assertSet('imageUrl', 'https://static.ah.test/pack.jpg');
 });
 

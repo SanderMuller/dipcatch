@@ -60,7 +60,7 @@
                 <flux:command.item icon="plus" :href="route('app.products.create')" wire:navigate keywords="add new product link url watch follow">
                     {{ __('Track a product') }}
                 </flux:command.item>
-                <flux:command.item icon="pencil-square" :href="route('app.products.create-manual')" wire:navigate keywords="manual by hand without link no url custom">
+                <flux:command.item icon="pencil-square" :href="route('app.products.create', ['mode' => 'manual'])" wire:navigate keywords="manual by hand without link no url custom">
                     {{ __('Add a product by hand') }}
                 </flux:command.item>
                 <flux:command.item icon="credit-card" :href="route('app.billing')" wire:navigate keywords="pro upgrade subscription payment invoice stripe plan price">

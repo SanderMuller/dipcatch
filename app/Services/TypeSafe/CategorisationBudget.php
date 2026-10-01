@@ -38,9 +38,10 @@ final class CategorisationBudget
     }
 
     /**
-     * The same guard for the same-product checks, on counters of their own
-     * per purpose, so checking shops never spends the categorisation budget
-     * and background suggestion checks never spend the add-shop one.
+     * The same guard for the other Jev checks on a product's shops, on
+     * counters of their own per purpose, so checking shops never spends the
+     * categorisation budget and background suggestion checks never spend the
+     * add-shop one.
      */
     public function allowsShopCheck(User $user, ShopCheckPurpose $purpose): bool
     {

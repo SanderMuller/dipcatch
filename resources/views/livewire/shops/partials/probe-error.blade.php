@@ -1,6 +1,6 @@
 {{--
     The probe error copy for every `ProbeFailure` code. Shared by add-shop and
-    create-product-from-url — `$url` and `$errorContext` are public component
+    add-product-wizard — `$url` and `$errorContext` are public component
     properties, so an `@include` inherits them the same way manual-selector
     and variant-chooser already do.
 --}}
