@@ -343,8 +343,13 @@ final readonly class KlarnaDiscovery
         });
     }
 
+    /** Null too when the Klarna steps were switched off after this one was queued. */
     private static function current(Product $product, int $generation): ?WebDiscovery
     {
+        if (! KlarnaSource::enabled()) {
+            return null;
+        }
+
         $discovery = WebDiscovery::query()->with('search')->find($product->id);
 
         return $discovery instanceof WebDiscovery && $discovery->klarna_generation === $generation ? $discovery : null;

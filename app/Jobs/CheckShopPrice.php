@@ -130,7 +130,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     {
         $shop = Shop::query()->with('product')->find($this->shop->id);
         // A comparison site becomes a link: it has nothing to read.
-        if ($shop === null || ! $shop->active || $shop->health === ShopHealth::Dead || $shop->keepAsComparisonLink()) {
+        if ($shop === null || ! $shop->active || $shop->health === ShopHealth::Dead || $shop->isComparisonLink() || $shop->keepAsComparisonLink()) {
             return;
         }
 

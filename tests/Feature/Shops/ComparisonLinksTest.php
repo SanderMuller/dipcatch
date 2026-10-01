@@ -69,6 +69,17 @@ test('a scheduled check of a Klarna shop makes it a link without reading the pag
         ->and($product->best_value_shop_id)->not->toBe($klarna->id);
 });
 
+test('a check queued before its shop became a link reads nothing', function (): void {
+    Http::fake();
+    [, $klarna] = productWithKlarnaCheapest();
+    $klarna->keepAsComparisonLink();
+
+    runComparisonCheck($klarna);
+
+    Http::assertNothingSent();
+    expect($klarna->refresh()->priceChecks()->count())->toBe(1);
+});
+
 test('the recheck command makes Klarna shops links on paused products too', function (): void {
     Queue::fake();
     [$product, $klarna] = productWithKlarnaCheapest(['active' => false]);

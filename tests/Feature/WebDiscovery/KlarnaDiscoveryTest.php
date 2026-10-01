@@ -243,6 +243,26 @@ test('a Klarna page the product already tracks is the source without a search', 
     Http::assertNotSent(static fn (Request $request): bool => str_contains(serperQuery($request), 'site:klarna.com'));
 });
 
+test('queued Klarna steps do nothing once the Klarna steps are switched off', function (): void {
+    fakeKlarnaWorld(['Hill’s Young Adult' => []]);
+    $product = klarnaProduct();
+    WebDiscovery::markQueued($product);
+    WebDiscovery::query()->whereKey($product->id)->update([
+        'klarna_url' => klarnaSourceUrl(),
+        'klarna_leads' => json_encode([['host' => 'medpets.nl', 'title' => 'Hill’s Sterilised Cat Eend 10 kg', 'pack_quantity' => 10000, 'pack_unit' => 'g', 'state' => 'pending', 'attempts' => 0]]),
+    ]);
+    config()->set('dipcatch.web_discovery.klarna_leads', false);
+
+    app(KlarnaDiscovery::class)->lookUp($product, 0, 'medpets.nl');
+    WebDiscovery::query()->whereKey($product->id)->update(['klarna_leads' => null]);
+    app(KlarnaDiscovery::class)->readLeads($product, 0);
+    WebDiscovery::query()->whereKey($product->id)->update(['klarna_url' => null]);
+    app(KlarnaDiscovery::class)->findPage($product->load('shops', 'user'), 0);
+
+    Http::assertNothingSent();
+    expect(WebDiscovery::query()->findOrFail($product->id)->klarna_url)->toBeNull();
+});
+
 test('a product that is not on Klarna ends the Klarna work without a source', function (): void {
     fakeKlarnaWorld(['site:klarna.com' => [], 'Hill’s Young Adult' => []]);
     $product = klarnaProduct();
