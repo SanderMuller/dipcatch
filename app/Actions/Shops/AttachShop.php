@@ -6,6 +6,7 @@ use App\Actions\Products\BorrowShopImage;
 use App\Billing\PlanLimitReached;
 use App\Billing\PlanLimits;
 use App\Enums\ScrapeStatus;
+use App\Jobs\LookUpBolOffers;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
@@ -42,6 +43,8 @@ final readonly class AttachShop
         // A shop in a new pack size hides the web suggestions until they are
         // checked against it.
         $this->webShops->requeueIfStale($product);
+        // A new shop can bring the barcode bol.com is found by.
+        LookUpBolOffers::dispatchFor($product);
 
         return $shop;
     }

@@ -4,6 +4,7 @@ use App\Actions\Suggestions\SuggestionVerdicts;
 use App\Enums\WebFindingStatus;
 use App\Livewire\Dashboard;
 use App\Livewire\DashboardSuggestedShops;
+use App\Models\HiddenShop;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\ShopSuggestionVerdict;
@@ -147,14 +148,14 @@ it('lists any dataset suggestion for an account without the AI check, closest na
         ->and(implode(' ', $rows))->not->toContain('koffie.test')->not->toContain('match');
 });
 
-it('links each shop to its page, and Add to the product with the add-shop form open', function (): void {
+it('links each shop to its page, and Add to the product with this shop\'s comparison open', function (): void {
     $user = User::factory()->create();
     $product = dashboardProduct($user, 'Beemster Extra belegen 48+ plakken');
     seedRow('ah', 'Beemster Extra belegen 48+ plakken', '150 g', '3.49', link: 'beemster-ah');
     $this->actingAs($user);
 
     Livewire::withoutLazyLoading()->test(DashboardSuggestedShops::class)
-        ->assertSeeHtml(e(route('app.products.show', [$product, 'add-shop' => 1])))
+        ->assertSeeHtml(e(route('app.products.show', [$product, 'add-shop' => 1, 'suggest' => 'https://www.ah.nl/producten/product/beemster-ah'])))
         ->assertSeeHtml('aria-label="Add AH to Beemster Extra belegen 48+ plakken"')
         ->assertSeeHtml('aria-label="Open AH in a new tab to check the product"')
         ->assertSeeHtml('beemster-ah');
@@ -206,19 +207,23 @@ it('shows one row per shop when the dataset and the web both find it, with the s
         ->and($rows[0])->toContain('ah.nl')->toContain('90% match');
 });
 
-it('shows at most eight shops', function (): void {
+it('shows at most twelve shops, and at most three per product', function (): void {
     $user = User::factory()->create();
 
     foreach (range(1, 5) as $index) {
         dashboardProduct($user, "Beemster Extra belegen 48+ plakken {$index}");
     }
 
-    seedRow('ah', 'Beemster Extra belegen 48+ plakken', '150 g', '3.49', link: 'beemster-ah');
-    seedRow('spar', 'Beemster Extra belegen 48+ plakken', '150 g', '3.69', link: 'beemster-spar');
+    foreach (['ah', 'spar', 'dirk', 'jumbo'] as $chain) {
+        seedRow($chain, 'Beemster Extra belegen 48+ plakken', '150 g', '3.49', link: "beemster-{$chain}");
+    }
 
-    expect(suggestedShopRows($user))->toHaveCount(8);
+    // Five products with four shops each: three each, and twelve in all.
+    $rows = suggestedShopRows($user);
+
+    expect($rows)->toHaveCount(12)
+        ->and(collect($rows)->countBy(fn (string $row): string => (string) preg_replace('/^.*?plakken (\d).*$/', '$1', $row))->max())->toBe(3);
 });
-
 it('compares a suggested shop with the product side by side, marking the words the names do not share', function (): void {
     $user = User::factory()->create(['shop_checks' => true]);
     subscribeUser($user);
@@ -234,4 +239,32 @@ it('compares a suggested shop with the product side by side, marking the words t
     expect($html)->toContain('data-test="suggested-shop-compare"')
         ->and($panel)->toContain('https://koffie.test/p/1')->toContain('tracked.test · 150 g')
         ->and($marked[1])->toBe(['at', 'koffie.test']);
+});
+
+it('names the web suggestion in the Add link, so the form checks the variant its read picked', function (): void {
+    $user = User::factory()->create(['shop_checks' => true]);
+    subscribeUser($user);
+    $product = dashboardProduct($user, 'Beemster Extra belegen 48+ plakken');
+    dashboardWebFinding($product, 'kaas.example', 0.9);
+    $findingId = WebShopFinding::query()->where('product_id', $product->id)->value('id');
+    $this->actingAs($user);
+
+    Livewire::withoutLazyLoading()->test(DashboardSuggestedShops::class)
+        ->assertSeeHtml(e(route('app.products.show', [$product, 'add-shop' => 1, 'suggest' => 'https://kaas.example/p/1', 'finding' => $findingId])));
+});
+
+it('keeps the list for a few minutes, and lists again as soon as a shop is hidden', function (): void {
+    $user = User::factory()->create();
+    dashboardProduct($user, 'Beemster Extra belegen 48+ plakken');
+    seedRow('ah', 'Beemster Extra belegen 48+ plakken', '150 g', '3.49', link: 'beemster-ah');
+    seedRow('spar', 'Beemster Extra belegen 48+ plakken', '150 g', '3.69', link: 'beemster-spar');
+
+    expect(suggestedShopRows($user))->toHaveCount(2);
+
+    // A new catalogue row alone does not show until the list expires.
+    seedRow('dirk', 'Beemster Extra belegen 48+ plakken', '150 g', '3.59', link: 'beemster-dirk');
+    expect(suggestedShopRows($user))->toHaveCount(2);
+
+    HiddenShop::hide($user, 'spar.nl');
+    expect(collect(suggestedShopRows($user))->contains(fn (string $row): bool => str_contains($row, 'SPAR')))->toBeFalse();
 });

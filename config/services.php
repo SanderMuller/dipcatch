@@ -62,6 +62,23 @@ return [
         'key' => (string) env('SERPER_API_KEY', ''),
     ],
 
+    // bol.com's affiliate product feed, over FTPS. The server only answers
+    // an IP address whitelisted in the affiliate portal. An empty username
+    // switches the feed import off. Never commit the real credentials.
+    'bol' => [
+        'feed' => [
+            'host' => (string) env('BOL_FEED_HOST', 'apm-feed.unftp.bol.com'),
+            'username' => (string) env('BOL_USERNAME', ''),
+            'password' => (string) env('BOL_PASSWORD', ''),
+        ],
+        // The Marketing Catalog API: products, offers and search by barcode
+        // or name. No IP whitelist. An empty client id switches it off.
+        'api' => [
+            'client_id' => (string) env('BOL_CLIENT_ID', ''),
+            'client_secret' => (string) env('BOL_CLIENT_SECRET', ''),
+        ],
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -454,3 +454,41 @@ test('another pack size needs a closer name: a different 300 g bar is not a 100 
 
     expect(collect(suggest($product->refresh()))->pluck('chain')->all())->toBe(['dirk']);
 });
+
+test('a chain whose name leaves out the longest word of the title is still offered', function (): void {
+    seedChains();
+    // "dagelijkse" is the longest word of the title, and no row says it.
+    seedRow('jumbo', 'Sensodyne Rapid Relief Mint Tandpasta 75 ML', null, '7.29');
+    seedRow('hoogvliet', 'Sensodyne Tandpasta rapid relief', '75 milliliter', '6.75');
+
+    $product = Product::factory()->create(['title' => 'Sensodyne Rapid relief dagelijkse tandpasta', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://drogist.test/p/1', 'pack_quantity' => '75.00', 'pack_unit' => 'ml']);
+
+    expect(collect(suggest($product->refresh()))->pluck('chain')->sort()->values()->all())
+        ->toBe(['hoogvliet', 'jumbo']);
+});
+
+test('a product tracked in two pack sizes gets a suggestion per size from one chain', function (): void {
+    seedChains();
+    seedRow('dirk', 'Remia Fritessaus classic', '1 liter', '2.79', link: 'remia-1l');
+    seedRow('dirk', 'Remia Fritessaus classic', '500 ml', '1.92', link: 'remia-500');
+
+    $product = Product::factory()->create(['title' => 'Remia Fritessaus classic', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://saus.test/p/1', 'pack_quantity' => '1000.00', 'pack_unit' => 'ml']);
+    Shop::factory()->for($product)->create(['url' => 'https://saus.test/p/2', 'pack_quantity' => '500.00', 'pack_unit' => 'ml']);
+
+    expect(collect(suggest($product->refresh()))->map(fn (ShopSuggestion $suggestion): string => "{$suggestion->chain} {$suggestion->size}")->sort()->values()->all())
+        ->toBe(['dirk 1 liter', 'dirk 500 ml']);
+});
+
+test('a product tracked in one pack size still gets one suggestion per chain', function (): void {
+    seedChains();
+    seedRow('dirk', 'Remia Fritessaus classic', '1 liter', '2.79', link: 'remia-1l');
+    seedRow('dirk', 'Remia Fritessaus classic', '500 ml', '1.92', link: 'remia-500');
+
+    $product = Product::factory()->create(['title' => 'Remia Fritessaus classic', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://saus.test/p/1', 'pack_quantity' => '500.00', 'pack_unit' => 'ml']);
+
+    expect(collect(suggest($product->refresh()))->map(fn (ShopSuggestion $suggestion): string => "{$suggestion->chain} {$suggestion->size}")->all())
+        ->toBe(['dirk 500 ml']);
+});

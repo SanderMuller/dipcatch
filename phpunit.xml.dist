@@ -42,6 +42,14 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="SENTRY_LARAVEL_DSN" value="" force="true"/>
         <env name="SENTRY_TRACES_SAMPLE_RATE" value="" force="true"/>
+        <!-- bol.com is off for the suite whatever the developer configured:
+             a real client id would send every test that adds a shop to
+             bol's API, and a feed username to its FTP server. Tests that
+             need it set the config themselves. -->
+        <env name="BOL_CLIENT_ID" value="" force="true"/>
+        <env name="BOL_CLIENT_SECRET" value="" force="true"/>
+        <env name="BOL_USERNAME" value="" force="true"/>
+        <env name="BOL_PASSWORD" value="" force="true"/>
         <!-- The plan cadence is asserted on, so it is pinned here rather than
              left to whichever .env the run happens to load. CI copies
              .env.example and a developer has their own: the suite read 2 hours

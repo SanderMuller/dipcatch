@@ -128,3 +128,15 @@ test('a chain row with no prices of its own does not change the verdict', functi
         ->and($result->meta['oldest_chain'])->toBe('ah')
         ->and($result->meta)->not->toHaveKey('chains_without_rows');
 });
+
+test('names the command that refreshes the stale chain', function (): void {
+    freshnessShop();
+    freshnessRow(now()->subHours(97));
+    CheckjebonPrice::query()->create(['supermarket' => 'bol', 'external_id' => '9200000077118993', 'name' => 'Sensodyne', 'price' => '8.81', 'refreshed_at' => now()->subHours(120)]);
+
+    expect(new CheckjebonFreshnessCheck()->run()->notificationMessage)->toContain('dipcatch:refresh-bol-offers');
+
+    CheckjebonPrice::query()->where('supermarket', 'bol')->delete();
+
+    expect(new CheckjebonFreshnessCheck()->run()->notificationMessage)->toContain('dipcatch:refresh-checkjebon');
+});

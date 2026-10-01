@@ -7,6 +7,7 @@ use App\Actions\Shops\ShopDraft;
 use App\Billing\PlanLimitReached;
 use App\Billing\PlanLimits;
 use App\Enums\CategorySource;
+use App\Jobs\LookUpBolOffers;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\ShopDiscovery\WebShopDiscovery;
@@ -52,6 +53,7 @@ final readonly class CreateProductWithShop
 
         CategoriseProduct::afterResponseFor($created);
         $this->webShops->queue($created->load(['user', 'shops']));
+        LookUpBolOffers::dispatchFor($created);
 
         return $created;
     }

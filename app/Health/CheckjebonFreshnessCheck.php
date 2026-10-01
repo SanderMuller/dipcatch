@@ -5,6 +5,7 @@ namespace App\Health;
 use App\Models\CheckjebonPrice;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Services\BolFeed\BolCatalogRows;
 use Carbon\CarbonImmutable;
 use Spatie\Health\Checks\Check;
 use Spatie\Health\Checks\Result;
@@ -90,12 +91,15 @@ final class CheckjebonFreshnessCheck extends Check
             ])
             ->shortSummary("{$ageHours}h old");
 
+        // bol.com rows come from their own commands, not the checkjebon one.
+        $fix = $oldestChain === BolCatalogRows::CHAIN ? 'run dipcatch:refresh-bol-offers' : 'run dipcatch:refresh-checkjebon';
+
         if ($ageHours >= $this->failAfterHours) {
-            return $result->failed("Checkjebon chain '{$oldestChain}' is {$ageHours}h old (fail threshold {$this->failAfterHours}h).");
+            return $result->failed("Checkjebon chain '{$oldestChain}' is {$ageHours}h old (fail threshold {$this->failAfterHours}h) — {$fix}.");
         }
 
         if ($ageHours >= $this->warnAfterHours) {
-            return $result->warning("Checkjebon chain '{$oldestChain}' is {$ageHours}h old (warn threshold {$this->warnAfterHours}h).");
+            return $result->warning("Checkjebon chain '{$oldestChain}' is {$ageHours}h old (warn threshold {$this->warnAfterHours}h) — {$fix}.");
         }
 
         return $result->ok('Checkjebon dataset is fresh.');

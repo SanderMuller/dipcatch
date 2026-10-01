@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property numeric-string $price
  * @property string|null $size
  * @property string|null $link
+ * @property string|null $ean  Barcode with leading zeros stripped; only bol.com rows carry one.
  * @property CarbonImmutable $refreshed_at
  */
 #[WithoutTimestamps]

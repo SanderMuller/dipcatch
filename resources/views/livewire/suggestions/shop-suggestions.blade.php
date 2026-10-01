@@ -61,7 +61,13 @@
                                 @if ($suggestionUnitPrice !== null)
                                     <span class="font-medium text-zinc-700 dark:text-zinc-300">{{ \App\Support\MoneyFormatter::unitPrice($suggestionUnitPrice, 'EUR') }} {{ $suggestionSize->label() }}</span> ·
                                 @endif
-                                <span title="Regular price from the daily dataset">{{ __('dataset price :price', ['price' => \App\Support\PackLine::format($suggestion->price, 'EUR', $suggestionSize)]) }}</span>
+                                {{-- bol.com's own current price, offers included; the
+                                     supermarket dataset knows only the regular price. --}}
+                                @if ($suggestion->chain === \App\Services\BolFeed\BolCatalogRows::CHAIN)
+                                    <span title="{{ __('bol.com’s price at the last check') }}">{{ __('bol.com price :price', ['price' => \App\Support\PackLine::format($suggestion->price, 'EUR', $suggestionSize)]) }}</span>
+                                @else
+                                    <span title="Regular price from the daily dataset">{{ __('dataset price :price', ['price' => \App\Support\PackLine::format($suggestion->price, 'EUR', $suggestionSize)]) }}</span>
+                                @endif
                                 @unless ($suggestion->trackable)
                                     · <span class="text-amber-600 dark:text-amber-400">not trackable yet</span>
                                 @endunless
@@ -214,7 +220,8 @@
 
     {{-- Outside the disclosure, so it shows while the disclosure is closed. --}}
     @if ($discovering)
-        <flux:text size="sm" @class(['text-zinc-500 dark:text-zinc-400', 'mt-2' => $total > 0]) aria-hidden="true" data-test="web-discovery-running">
+        <flux:text size="sm" @class(['flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400', 'mt-2' => $total > 0]) aria-hidden="true" data-test="web-discovery-running">
+            <flux:icon.loading variant="micro" class="size-4 shrink-0" />
             {{ __('Looking for more shops…') }}
         </flux:text>
     @endif

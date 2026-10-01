@@ -3,8 +3,10 @@
 use App\Console\Commands\CategoriseProductsCommand;
 use App\Console\Commands\DiscoverWebShopsCommand;
 use App\Console\Commands\DispatchDailyDigestsCommand;
+use App\Console\Commands\ImportBolFeedCommand;
 use App\Console\Commands\PruneOldChecksCommand;
 use App\Console\Commands\RecheckActiveShopsCommand;
+use App\Console\Commands\RefreshBolOffersCommand;
 use App\Console\Commands\RefreshCheckjebonDatasetCommand;
 use App\Console\Commands\RetryReferenceShopsCommand;
 use App\Console\Commands\RunAdapterCanaryCommand;
@@ -12,6 +14,8 @@ use App\Http\Middleware\RequireVerifiedEmailToAddCredentials;
 use App\Http\Middleware\SecurityHeaders;
 use App\Models\EmptySearch;
 use App\Models\FailedShopPage;
+use App\Services\BolApi\BolCatalogClient;
+use App\Services\BolFeed\BolFeedDownloader;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Console\PruneCommand;
 use Illuminate\Database\QueryException;
@@ -43,6 +47,26 @@ return Application::configure(basePath: dirname(__DIR__))
             ->timezone('Europe/Amsterdam')
             ->withoutOverlapping()
             ->onOneServer();
+
+        // After the checkjebon refresh, which keeps chains with prices only.
+        // Needs the IP address it runs from whitelisted at bol.com.
+        $schedule->command(ImportBolFeedCommand::class)
+            ->dailyAt('08:00')
+            ->timezone('Europe/Amsterdam')
+            ->when(BolFeedDownloader::configured(...))
+            ->withoutOverlapping()
+            ->onOneServer()
+            ->runInBackground();
+
+        // Keeps suggested bol.com prices a day old at most where the feed
+        // import cannot run. No IP whitelist: the API answers anywhere.
+        $schedule->command(RefreshBolOffersCommand::class)
+            ->dailyAt('08:30')
+            ->timezone('Europe/Amsterdam')
+            ->when(BolCatalogClient::configured(...))
+            ->withoutOverlapping()
+            ->onOneServer()
+            ->runInBackground();
 
         // Searches without results and pages we could not read are kept six
         // months after the last one.

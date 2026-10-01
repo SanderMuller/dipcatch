@@ -132,23 +132,64 @@ final readonly class QueryTokens
     }
 
     /**
-     * The longest token, used as the SQL prefilter needle. Short tokens make
-     * a useless `LIKE` — they match half the catalogue.
+     * The SQL prefilter a catalogue row must pass to be scored: two of the
+     * three longest words of four letters or more. Two, so a row that leaves
+     * out one word of the title ("dagelijkse") still matches on the others,
+     * while a row that shares one common word ("classic") is not scored at
+     * all. Shorter words make a useless `LIKE`: they match half the
+     * catalogue. A short title ("7up 1 l") falls back to its longest word,
+     * rather than to no suggestions.
+     *
+     * `lower(name) like ?` rather than a bare `like`: production runs
+     * PostgreSQL, where `like` is case-sensitive. A sum of `CASE`s, because
+     * PostgreSQL does not add booleans.
+     *
+     * @return array{0: literal-string, 1: list<string>}|null  The condition and its bindings.
      */
-    public function longestToken(int $minimumLength): ?string
+    public function prefilter(): ?array
     {
-        $longest = '';
+        $needles = $this->prefilterNeedles();
 
-        foreach (array_keys($this->tokens) as $token) {
-            // PHP casts a numeric array key to int, so "150" comes back as 150.
-            $token = (string) $token;
-
-            if (mb_strlen($token) >= $minimumLength && mb_strlen($token) > mb_strlen($longest)) {
-                $longest = $token;
-            }
+        if ($needles === []) {
+            return null;
         }
 
-        return $longest === '' ? null : $longest;
+        $like = 'CASE WHEN lower(name) like ? THEN 1 ELSE 0 END';
+
+        return [
+            match (count($needles)) {
+                1 => "({$like}) >= 1",
+                2 => "({$like} + {$like}) >= 2",
+                default => "({$like} + {$like} + {$like}) >= 2",
+            },
+            array_map(static fn (string $needle): string => "%{$needle}%", $needles),
+        ];
+    }
+
+    /**
+     * The words {@see prefilter()} looks for, longest first.
+     *
+     * @return list<string>
+     */
+    public function prefilterNeedles(): array
+    {
+        return $this->longestTokens(4, 3) ?: $this->longestTokens(2, 1);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function longestTokens(int $minimumLength, int $count): array
+    {
+        // PHP casts a numeric array key to int, so "150" comes back as 150.
+        $tokens = array_values(array_filter(
+            array_map(strval(...), array_keys($this->tokens)),
+            static fn (string $token): bool => mb_strlen($token) >= $minimumLength,
+        ));
+
+        usort($tokens, static fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));
+
+        return array_slice($tokens, 0, $count);
     }
 
     /**

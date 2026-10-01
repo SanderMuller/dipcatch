@@ -8,6 +8,7 @@ use App\Models\HiddenShop;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\ShopSuggestionDismissal;
+use App\Models\WebShopFinding;
 use App\Services\Suggestions\QueryTokens;
 use App\Services\Suggestions\ShopSuggestion;
 use App\Services\TypeSafe\ShopMatchCheck;
@@ -15,6 +16,7 @@ use App\Support\PackSize;
 use App\Support\SupermarketChains;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -77,12 +79,6 @@ final class SuggestShops
      */
     private ?array $freshChains = null;
 
-    /** Preferred prefilter token length — shorter needles match half the catalogue. */
-    private const int PREFERRED_PREFILTER_TOKEN = 4;
-
-    /** Shortest token still worth a `LIKE`, used when no longer one exists. */
-    private const int MIN_PREFILTER_TOKEN = 2;
-
     public function __construct(private readonly ShopMatchCheck $shopMatch) {}
 
     /**
@@ -107,7 +103,7 @@ final class SuggestShops
         }
 
         $chains = $this->eligibleChains($product);
-        $queries = $this->queryTokenSets($product);
+        $queries = $this->queriesFor($product);
 
         if ($chains === [] || $queries === []) {
             return [];
@@ -117,7 +113,8 @@ final class SuggestShops
             ? SuggestionVerdicts::for($product, self::THRESHOLD)
             : SuggestionVerdicts::off(self::THRESHOLD);
 
-        $suggestions = $this->rank($this->bestPerChain($this->candidateRows($product, $chains, $queries), $chains, $queries, $verdicts));
+        $gtins = self::gtinsOf($product);
+        $suggestions = $this->rank($this->bestPerChain($this->candidateRows($product, $chains, $queries, $gtins), $chains, $queries, $gtins, $verdicts));
 
         if ($verify && $verdicts->unchecked() !== []) {
             VerifyShopSuggestions::afterResponseFor($product, $verdicts->unchecked());
@@ -233,7 +230,7 @@ final class SuggestShops
      *
      * @return list<QueryTokens>
      */
-    private function queryTokenSets(Product $product): array
+    public function queriesFor(Product $product): array
     {
         $title = (string) $product->title;
 
@@ -266,32 +263,19 @@ final class SuggestShops
     }
 
     /**
-     * Rows worth scoring, prefiltered on the longest query token.
-     * `lower(name) like ?` rather than a bare `like` — production runs
-     * PostgreSQL, where `like` is case-sensitive and a lowercased token
-     * would never match a capitalised catalogue name.
+     * Rows worth scoring, prefiltered on the words of each title
+     * ({@see QueryTokens::prefilter()}).
      *
      * @param  array<string, CheckjebonChain>  $chains
      * @param  list<QueryTokens>  $queries
+     * @param  list<string>  $gtins
      * @return Collection<int, CheckjebonPrice>
      */
-    private function candidateRows(Product $product, array $chains, array $queries): Collection
+    private function candidateRows(Product $product, array $chains, array $queries, array $gtins): Collection
     {
-        $needles = [];
+        $conditions = array_values(array_filter(array_map(static fn (QueryTokens $query): ?array => $query->prefilter(), $queries)));
 
-        foreach ($queries as $query) {
-            // A short title ("7up 1 l") has no four-letter token; falling
-            // back to its longest one keeps the product from silently
-            // getting no suggestions at all.
-            $needle = $query->longestToken(self::PREFERRED_PREFILTER_TOKEN)
-                ?? $query->longestToken(self::MIN_PREFILTER_TOKEN);
-
-            if ($needle !== null) {
-                $needles[$needle] = true;
-            }
-        }
-
-        if ($needles === []) {
+        if ($conditions === []) {
             /** @var Collection<int, CheckjebonPrice> $empty */
             $empty = collect();
 
@@ -301,9 +285,13 @@ final class SuggestShops
         /** @var Collection<int, CheckjebonPrice> $rows */
         $rows = CheckjebonPrice::query()
             ->whereIn('supermarket', array_keys($chains))
-            ->where(function (EloquentQueryBuilder $query) use ($needles): void {
-                foreach (array_keys($needles) as $needle) {
-                    $query->orWhereRaw('lower(name) like ?', ['%' . $needle . '%']);
+            ->where(function (EloquentQueryBuilder $query) use ($conditions, $gtins): void {
+                foreach ($conditions as [$condition, $bindings]) {
+                    $query->orWhereRaw($condition, $bindings);
+                }
+
+                if ($gtins !== []) {
+                    $query->orWhereIn('ean', $gtins);
                 }
             })
             ->when(
@@ -340,12 +328,17 @@ final class SuggestShops
     }
 
     /**
+     * The best row per chain and per pack size the product is tracked in:
+     * a product tracked in 500 ml and 1 l gets a suggestion for each size a
+     * chain sells, not only the one that happens to sort first.
+     *
      * @param  Collection<int, CheckjebonPrice>  $rows
      * @param  array<string, CheckjebonChain>  $chains
      * @param  list<QueryTokens>  $queries
+     * @param  list<string>  $gtins
      * @return array<string, ShopSuggestion>
      */
-    private function bestPerChain(Collection $rows, array $chains, array $queries, SuggestionVerdicts $verdicts): array
+    private function bestPerChain(Collection $rows, array $chains, array $queries, array $gtins, SuggestionVerdicts $verdicts): array
     {
         $best = [];
 
@@ -357,13 +350,14 @@ final class SuggestShops
                 continue;
             }
 
-            $score = $this->scoreOf($row, $queries);
+            [$score, $query] = $this->scoreOf($row, $queries, $gtins);
 
             if ($score < $verdicts->floor() || ! $verdicts->admits($chain, $row, $score)) {
                 continue;
             }
 
-            $current = $best[$row->supermarket] ?? null;
+            $key = "{$row->supermarket}|{$query}";
+            $current = $best[$key] ?? null;
 
             // Equal scores break on external id, so the list is stable
             // between renders.
@@ -373,7 +367,7 @@ final class SuggestShops
                 continue;
             }
 
-            $best[$row->supermarket] = new ShopSuggestion(
+            $best[$key] = new ShopSuggestion(
                 chain: $chain->chain,
                 chainLabel: $chain->label,
                 externalId: $row->external_id,
@@ -391,28 +385,61 @@ final class SuggestShops
     }
 
     /**
+     * The barcodes the product's shops report, in the form the catalogue
+     * stores them: leading zeros stripped, so an EAN-13 and its UPC-12 match.
+     *
+     * @return list<string>
+     */
+    public static function gtinsOf(Product $product): array
+    {
+        return array_values(array_unique(array_map(
+            static fn (string $gtin): string => ltrim($gtin, '0'),
+            WebShopFinding::trackedGtins($product),
+        )));
+    }
+
+    /**
+     * Whether a catalogue name would score high enough to be offered for one
+     * of the queries, with or without the AI check. The bol.com import keeps
+     * only such rows of its feed.
+     *
      * @param  list<QueryTokens>  $queries
      */
-    private function scoreOf(CheckjebonPrice $row, array $queries): float
+    public function couldOffer(string $name, array $queries): bool
+    {
+        [$score] = $this->scoreOf(new CheckjebonPrice(['name' => $name, 'size' => null]), $queries, []);
+
+        return $score >= min(self::THRESHOLD, Config::float('dipcatch.shop_checks.loose_match_from'));
+    }
+
+    /**
+     * The row's best overlap with the queries, and which query gave it.
+     *
+     * @param  list<QueryTokens>  $queries
+     * @param  list<string>  $gtins
+     * @return array{0: float, 1: int}
+     */
+    private function scoreOf(CheckjebonPrice $row, array $queries, array $gtins): array
     {
         $candidate = QueryTokens::ofCatalogueRow($row->name, $row->size);
+        $best = [0.0, 0];
 
-        if ($candidate->isEmpty()) {
-            return 0.0;
+        foreach ($candidate->isEmpty() ? [] : $queries as $index => $query) {
+            if (! $query->sameVariantAs($candidate)) {
+                continue;
+            }
+
+            $overlap = $query->overlapWith($candidate) - ($query->hasOtherSizeThan($candidate) ? self::OTHER_SIZE_PENALTY : 0.0);
+
+            if ($overlap > $best[0]) {
+                $best = [$overlap, $index];
+            }
         }
 
-        $best = 0.0;
-
-        foreach ($queries as $query) {
-            if ($query->sameVariantAs($candidate)) {
-                $overlap = $query->overlapWith($candidate);
-
-                if ($query->hasOtherSizeThan($candidate)) {
-                    $overlap -= self::OTHER_SIZE_PENALTY;
-                }
-
-                $best = max($best, $overlap);
-            }
+        // The same barcode as a tracked shop is the same article, whatever
+        // the name says; only the pack the name matched best is kept.
+        if (is_string($row->ean) && in_array($row->ean, $gtins, true)) {
+            $best[0] = 1.0;
         }
 
         return $best;

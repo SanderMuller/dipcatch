@@ -6,13 +6,16 @@ use App\Actions\Suggestions\SuggestShops;
 use App\Enums\WebFindingStatus;
 use App\Models\HiddenShop;
 use App\Models\Product;
+use App\Models\ShopSuggestionDismissal;
 use App\Models\ShopSuggestionVerdict;
 use App\Models\User;
 use App\Models\WebShopFinding;
 use App\Services\Suggestions\ShopSuggestion;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Suggested shops across an account's products, for the dashboard. With
@@ -22,58 +25,171 @@ use Illuminate\Support\Facades\Config;
  * Matching the daily dataset costs tens of milliseconds a product, so only
  * a few products are matched per render: with the AI check, the ones with
  * the most likely stored matches, then those tracked at the fewest shops.
- * Listing sends nothing to Jev; a product's own page asks for its answers.
+ * A product with nothing left to add gives up its place to the next one, up
+ * to a fixed number of products matched. Listing sends nothing to Jev; a
+ * product's own page asks for its answers.
  */
 final readonly class DashboardSuggestions
 {
-    private const int PRODUCTS = 10;
+    private const int PRODUCTS = 12;
 
-    private const int ROWS = 8;
+    /** Rows per product, so one product with many shops cannot fill the list. */
+    private const int ROWS_PER_PRODUCT = 3;
+
+    /**
+     * Products matched at most per render. A stored answer can name a shop
+     * that is tracked by now or cannot be added, so some products give no
+     * row; the ones after them take their place, up to this many.
+     */
+    private const int MATCHED = 30;
+
+    private const int ROWS = 12;
+
+    private const int CACHE_MINUTES = 10;
 
     public function __construct(private SuggestShops $suggest) {}
 
     /**
-     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool}>
+     * The rows for the dashboard, kept for a few minutes: matching costs a
+     * catalogue scan per product, and the dataset changes once a day. The
+     * key changes as soon as anything the rows depend on does (a shop
+     * added, a shop hidden or shown again, a suggestion dismissed), so the
+     * cache never shows what the account just changed.
+     *
+     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}>
      */
     public function forUser(User $user): array
     {
-        $aiChecked = $user->wantsShopChecks();
+        $cached = Cache::remember(
+            self::cacheKey($user),
+            now()->addMinutes(self::CACHE_MINUTES),
+            fn (): array => array_map(static fn (array $row): array => ['product' => $row['product']->id] + $row, $this->compute($user)),
+        );
+
         $products = Product::query()
             ->with(['user', 'shops', 'cheapestShop'])
-            ->whereKey($this->productIds($user, $aiChecked))
-            ->get();
+            ->whereKey(array_column($cached, 'product'))
+            ->get()
+            ->keyBy('id');
 
-        $chances = $aiChecked ? self::storedChances(array_values(array_map(strval(...), $products->modelKeys()))) : [];
         $rows = [];
 
-        foreach ($products as $product) {
-            $productRows = [];
+        foreach ($cached as $row) {
+            $product = $products->get($row['product']);
 
-            foreach (($this->suggest)($product, verify: false) as $suggestion) {
-                if ($suggestion->trackable) {
-                    $row = self::datasetRow($product, $suggestion, $chances);
-                    $productRows[$row['host']] = $row;
-                }
+            if ($product instanceof Product) {
+                $rows[] = ['product' => $product] + $row;
             }
-
-            foreach ($aiChecked ? WebShopFinding::shownFor($product) : [] as $finding) {
-                $row = self::webRow($product, $finding);
-
-                // One row per shop: the dataset and the web can both find it.
-                if (($productRows[$row['host']]['chance'] ?? -1.0) < $row['chance']) {
-                    $productRows[$row['host']] = $row;
-                }
-            }
-
-            array_push($rows, ...array_values($productRows));
         }
 
-        usort($rows, static fn (array $a, array $b): int => ($b['chance'] ?? -1.0) <=> ($a['chance'] ?? -1.0) ?: $b['score'] <=> $a['score']);
+        return $rows;
+    }
+
+    /**
+     * What the rows depend on, in one cheap read: the account's products and
+     * shops, its hidden shops, its dismissed suggestions and its AI setting.
+     */
+    private static function cacheKey(User $user): string
+    {
+        $shops = DB::table('shops')
+            ->join('products', 'products.id', '=', 'shops.product_id')
+            ->where('products.user_id', $user->id)
+            ->selectRaw('count(*) as shop_count, max(shops.created_at) as last_shop, count(distinct products.id) as product_count')
+            ->first();
+
+        $fingerprint = [
+            (array) $shops,
+            HiddenShop::query()->where('user_id', $user->id)->orderBy('id')->pluck('id')->all(),
+            ShopSuggestionDismissal::query()->whereIn('product_id', Product::query()->where('user_id', $user->id)->select('id'))->max('id'),
+            $user->wantsShopChecks(),
+        ];
+
+        return "dashboard-suggestions:{$user->id}:" . hash('sha256', (string) json_encode($fingerprint));
+    }
+
+    /**
+     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}>
+     */
+    private function compute(User $user): array
+    {
+        $aiChecked = $user->wantsShopChecks();
+        $ids = $this->productIds($user, $aiChecked);
+        $products = Product::query()
+            ->with(['user', 'shops', 'cheapestShop'])
+            ->whereKey($ids)
+            ->get()
+            ->sortBy(static fn (Product $product): int|false => array_search($product->id, $ids, true));
+
+        $chances = $aiChecked ? self::storedChances($ids) : [];
+        $rows = [];
+        $filled = 0;
+
+        foreach ($products as $product) {
+            $productRows = $this->rowsFor($product, $aiChecked, $chances);
+
+            if ($productRows === []) {
+                continue;
+            }
+
+            array_push($rows, ...$productRows);
+
+            if (++$filled === self::PRODUCTS) {
+                break;
+            }
+        }
+
+        usort($rows, self::byLikelihood(...));
 
         return array_slice($rows, 0, self::ROWS);
     }
 
     /**
+     * One row per shop for a product: the dataset and the web can both find
+     * it, and the surer one is kept.
+     *
+     * @param  array<string, float>  $chances
+     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}>
+     */
+    private function rowsFor(Product $product, bool $aiChecked, array $chances): array
+    {
+        $productRows = [];
+
+        foreach (($this->suggest)($product, verify: false) as $suggestion) {
+            // One row per shop here, the best-ranked of its pack sizes.
+            if ($suggestion->trackable) {
+                $row = self::datasetRow($product, $suggestion, $chances);
+                $productRows[$row['host']] ??= $row;
+            }
+        }
+
+        foreach ($aiChecked ? WebShopFinding::shownFor($product) : [] as $finding) {
+            $row = self::webRow($product, $finding);
+
+            if (($productRows[$row['host']]['chance'] ?? -1.0) < $row['chance']) {
+                $productRows[$row['host']] = $row;
+            }
+        }
+
+        $productRows = array_values($productRows);
+        usort($productRows, self::byLikelihood(...));
+
+        return array_slice($productRows, 0, self::ROWS_PER_PRODUCT);
+    }
+
+    /**
+     * Most likely first: an AI answer before none, then the closer name.
+     *
+     * @param  array{chance: ?float, score: float, ...}  $a
+     * @param  array{chance: ?float, score: float, ...}  $b
+     */
+    private static function byLikelihood(array $a, array $b): int
+    {
+        return ($b['chance'] ?? -1.0) <=> ($a['chance'] ?? -1.0) ?: $b['score'] <=> $a['score'];
+    }
+
+    /**
+     * The products to match, in order, at most {@see MATCHED} of them.
+     *
      * @return list<string>
      */
     private function productIds(User $user, bool $aiChecked): array
@@ -85,7 +201,7 @@ final readonly class DashboardSuggestions
             ->withCount('shops')
             ->orderBy('shops_count')
             ->latest('created_at')
-            ->limit(self::PRODUCTS - count($ids))
+            ->limit(self::MATCHED - count($ids))
             ->pluck('id')
             ->all();
 
@@ -130,7 +246,7 @@ final readonly class DashboardSuggestions
 
         arsort($best);
 
-        return array_slice(array_map(strval(...), array_keys($best)), 0, self::PRODUCTS);
+        return array_slice(array_map(strval(...), array_keys($best)), 0, self::MATCHED);
     }
 
     /**
@@ -162,7 +278,7 @@ final readonly class DashboardSuggestions
 
     /**
      * @param  array<string, float>  $chances
-     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool}
+     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}
      */
     private static function datasetRow(Product $product, ShopSuggestion $suggestion, array $chances): array
     {
@@ -181,13 +297,14 @@ final readonly class DashboardSuggestions
             'barcode' => false,
             'otherSize' => null,
             'viaKlarna' => false,
+            'findingId' => null,
             'chance' => $suggestion->checked ? ($chances["{$product->id}|{$suggestion->chain}|{$suggestion->externalId}"] ?? null) : null,
             'score' => $suggestion->score,
         ];
     }
 
     /**
-     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: float, score: float, otherSize: ?string, viaKlarna: bool}
+     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}
      */
     private static function webRow(Product $product, WebShopFinding $finding): array
     {
@@ -211,6 +328,7 @@ final readonly class DashboardSuggestions
             'barcode' => $finding->matched_gtin !== null,
             'otherSize' => $finding->otherSizeNote($product),
             'viaKlarna' => $finding->isLead(),
+            'findingId' => $finding->id,
             'chance' => $chance,
             'score' => $chance,
         ];

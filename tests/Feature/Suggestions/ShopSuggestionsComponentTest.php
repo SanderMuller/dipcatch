@@ -3,6 +3,7 @@
 use App\Actions\Shops\ProbeBudget;
 use App\Livewire\Shops\AddShop;
 use App\Livewire\Suggestions\ShopSuggestions;
+use App\Models\CheckjebonChain;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\ShopSuggestionDismissal;
@@ -336,4 +337,17 @@ test('the link field and the suggestions hide while a shop\'s page is read', fun
     // where Livewire would scope it to the form's own submit.
     expect(substr_count($html, '<div wire:loading.remove.block>'))->toBe(2)
         ->and($html)->not->toContain('<form wire:submit.prevent="probe" wire:loading');
+});
+
+test('labels a bol.com suggestion with bol.com\'s own price, not the dataset\'s', function (): void {
+    CheckjebonChain::query()->create(['chain' => 'bol', 'label' => 'bol.com', 'base_url' => 'https://www.bol.com/nl/nl/p/', 'refreshed_at' => now()]);
+    seedRow('bol', 'Beemster Extra belegen 48+ plakken', '150 g', '3.59', link: 'beemster/9300000001/');
+
+    $product = suggestionProduct();
+    $this->actingAs($product->user()->sole());
+
+    $text = (string) preg_replace('/\s+/', ' ', strip_tags(Livewire::test(ShopSuggestions::class, ['product' => $product])->html()));
+
+    expect($text)->toContain('bol.com price €3.59 for 150 g')
+        ->not->toContain('dataset price €3.59');
 });
