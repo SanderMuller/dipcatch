@@ -289,14 +289,15 @@ it('will not let one account spend a draft issued to another', function (): void
         ->and($issuer->products()->count())->toBe(0);
 });
 
-it('sets the unit price target, and says when the account is not alerted on it', function (): void {
+it('sets the unit price target on a free account, with no Pro caveat', function (): void {
     $me = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
 
     DipCatchServer::actingAs($me)
         ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 6.5])
         ->assertOk()
-        ->assertSee('Pro feature');
+        ->assertDontSee('Pro feature')
+        ->assertDontSee('upgrade');
 
     expect((float) $product->fresh()?->unit_price_target)->toBe(6.5);
 });

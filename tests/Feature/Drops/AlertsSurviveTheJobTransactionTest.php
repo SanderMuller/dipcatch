@@ -63,10 +63,6 @@ function jobTransactionShop(): Shop
 
     $user = User::factory()->create(['notify_via_filament' => true]);
 
-    // The unit-price target is a Pro feature, so without this the middle
-    // detector returns before it stages a callback.
-    subscribeUser($user);
-
     $product = Product::factory()->for($user)->create([
         'currency' => 'EUR',
         'target_price' => '18.00',

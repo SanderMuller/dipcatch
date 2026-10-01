@@ -173,15 +173,11 @@ it('refuses an image url whose scheme is not http(s)', function (): void {
     expect($product->fresh()?->image_url)->toBeNull();
 });
 
-it('keeps a unit price target a free account cannot be alerted on', function (): void {
-    // The number is stored on any plan and starts working on upgrade, which
-    // is what DetectUnitPriceTarget already assumes.
+it('saves a unit price target on a free account', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id]);
 
     $this->actingAs($user);
-
-    expect($user->entitlements()->allowsUnitPriceAlerts())->toBeFalse();
 
     livewire(EditProduct::class, ['product' => $product])
         ->set('unitPriceTarget', '3.2000')
@@ -441,8 +437,7 @@ it('keeps the three-way wording while no shop has read a pack size', function ()
 
     $this->actingAs($user);
 
-    // The explanation under the field is the Pro one for a free account, so
-    // this pins the label; the resolver is what decides both.
+    // The resolver decides the label.
     livewire(EditProduct::class, ['product' => $product])
         ->assertSee('Target price per kilo, litre or piece');
 
@@ -717,9 +712,7 @@ it('anchors to the shop that is cheapest now, not the one a recompute last named
         ->assertSee('Now €4.00 at dirk.nl');
 });
 
-it('shows a free account the current figure beside the upgrade line', function (): void {
-    // The number is worth setting before an upgrade, and it is the one thing
-    // that makes it possible to pick.
+it('shows a free account the current figure, with no upgrade line', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
 
@@ -734,10 +727,8 @@ it('shows a free account the current figure beside the upgrade line', function (
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertSee('Pro alerts on this.')
         ->assertSee('Now €4.00 /kg at ah.nl')
-        // The note says where to upgrade, not only that one is needed.
-        ->assertSeeInOrder(['Pro alerts on this.', 'Get Pro']);
+        ->assertDontSee('Pro alerts on this');
 });
 
 it('shows the unit target without the zeros its column pads it with', function (): void {
@@ -805,9 +796,7 @@ it('offers no switch once the product has a price alert', function (): void {
     livewire(EditProduct::class, ['product' => $product->refresh()])->assertDontSeeHtml('data-test="price-alert-switch"');
 });
 
-it('keeps a free account on its drop alert', function (): void {
-    // A free account's price alert is stored but not checked, so switching
-    // would leave it with no alert of its own.
+it('offers a free account the switch to a price alert', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '25.00', 'unit_price_target' => null]);
     Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
@@ -817,10 +806,10 @@ it('keeps a free account on its drop alert', function (): void {
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertDontSeeHtml('data-test="price-alert-switch"')
+        ->assertSeeHtml('data-test="price-alert-switch"')
         ->call('switchToPriceAlert')
-        ->assertSet('dropThresholdPct', '25.00')
-        ->assertSet('unitPriceTarget', null);
+        ->assertSet('dropThresholdPct', null)
+        ->assertNotSet('unitPriceTarget', null);
 });
 
 it('offers no switch when the same saving leaves less than the smallest target', function (): void {

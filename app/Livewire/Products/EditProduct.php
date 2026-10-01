@@ -121,17 +121,15 @@ final class EditProduct extends Component
 
     /**
      * Replaces the product's own drop alert with a price alert at the same
-     * saving. The drop fields empty, which puts the drop check back on the
-     * default for the price; nothing is written until the form is saved.
+     * saving. The drop fields empty, and with a target set an empty drop field
+     * is off, so the price alert is the only alert left. Nothing is written
+     * until the form is saved.
      */
     public function switchToPriceAlert(): void
     {
         $suggestion = new UnitTargetGuide($this->product)->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs);
 
-        // A free account keeps its drop settings: its price alert would be
-        // stored but not checked, so the switch would leave it with no alert
-        // of its own.
-        if ($suggestion === null || $this->blankToNull($this->unitPriceTarget) !== null || ! $this->allowsUnitPriceAlerts()) {
+        if ($suggestion === null || $this->blankToNull($this->unitPriceTarget) !== null) {
             return;
         }
 
@@ -169,9 +167,6 @@ final class EditProduct extends Component
             'drop_threshold_pct' => $this->blankToNull($this->dropThresholdPct),
             'drop_threshold_abs' => $this->blankToNull($this->dropThresholdAbs),
             'target_price' => $this->blankToNull($this->targetPrice),
-            // Stored on any plan and kept on downgrade. DetectUnitPriceTarget
-            // decides whether it may alert, so a Pro trial that lapses does
-            // not silently throw the number away.
             'unit_price_target' => $this->blankToNull($this->unitPriceTarget),
             'active' => $this->active,
             'price_display' => PriceDisplay::tryFrom($this->priceDisplay),
@@ -296,9 +291,8 @@ final class EditProduct extends Component
             'allowsAutoCategories' => $this->allowsAutoCategories(),
             'suggestedLabel' => ProductCategory::tryFrom((string) $this->suggestedCategory)?->label(),
             'shopImages' => $this->shopImages(),
-            'allowsUnitPriceAlerts' => $this->allowsUnitPriceAlerts(),
             'packChoices' => $packChoices,
-            'priceAlertSwitch' => $this->blankToNull($this->unitPriceTarget) === null && $this->allowsUnitPriceAlerts()
+            'priceAlertSwitch' => $this->blankToNull($this->unitPriceTarget) === null
                 ? $guide->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs, $packChoices)
                 : null,
             'unitHistory' => $guide->history(),
@@ -393,27 +387,15 @@ final class EditProduct extends Component
     /**
      * The sentence under the per-unit target field.
      *
-     * Built here rather than in the template: it is three branches and a
+     * Built here rather than in the template: it is two branches and a
      * conditional clause, and gluing two translated sentences together is the
      * part a second locale breaks first.
      */
     private function unitTargetDescription(?string $unitWord): string
     {
-        if (! $this->allowsUnitPriceAlerts()) {
-            // The figure still shows on a free account: the number is worth
-            // setting before an upgrade, and it is the one thing that makes it
-            // possible to pick.
-            return __('Pro alerts on this. We keep the number, and it starts working when you upgrade.');
-        }
-
         return $unitWord === null
             ? __('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.')
             : __('We tell you when the best value reaches this price per :unit.', ['unit' => $unitWord]);
-    }
-
-    private function allowsUnitPriceAlerts(): bool
-    {
-        return $this->product->user?->entitlements()->allowsUnitPriceAlerts() === true;
     }
 
     private function blankToNull(?string $value): ?string

@@ -36,10 +36,7 @@ final readonly class DetectUnitPriceTarget
     {
         $target = $product->unit_price_target;
 
-        // A unit-price target is a Pro feature. A free account keeps its
-        // stored target — it starts working again on upgrade — but is not
-        // alerted on it.
-        if ($target === null || $product->user?->entitlements()->allowsUnitPriceAlerts() !== true) {
+        if ($target === null) {
             return;
         }
 
@@ -57,7 +54,7 @@ final readonly class DetectUnitPriceTarget
             return;
         }
 
-        if (bccomp(self::precise($unitValue), Numeric::str((string) $target), self::BC_SCALE) > 0) {
+        if (! self::meets($unitValue, (string) $target)) {
             // Above the target: nothing to say, and the next time it drops
             // below is worth saying again.
             $this->clearLatch($product);
@@ -94,6 +91,17 @@ final readonly class DetectUnitPriceTarget
      *
      * @return numeric-string
      */
+    /**
+     * Whether an unrounded unit price reaches the target. The wizard's
+     * already-met check asks the same question, so the two cannot disagree
+     * at the fourth decimal.
+     */
+    public static function meets(float $unitValue, string $target): bool
+    {
+        return bccomp(self::precise($unitValue), Numeric::str($target), self::BC_SCALE) <= 0;
+    }
+
+    /** @return numeric-string */
     private static function precise(float $value): string
     {
         return Numeric::str(number_format($value, self::BC_SCALE, '.', ''));

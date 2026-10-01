@@ -62,7 +62,7 @@
                         __('Alerts') => [
                             [__('Price drop alerts'), __('Email, in-app and browser push.'), true, true],
                             [__('Alerts per hour'), __('For the days everything is on offer.'), (string) $free->notificationsHourlyLimit(), (string) $pro->notificationsHourlyLimit()],
-                            [__('Target price per kilo'), __('Any shop, any pack, at the price you set.'), false, true],
+                            [__('Target price per kilo'), __('Any shop, any pack, at the price you set.'), true, true],
                         ],
                         __('History') => [
                             [__('Price history'), __('Tells a real low from the usual offer.'), __(':days days', ['days' => $free->historyKeptDays()]), $proHistory],
@@ -96,7 +96,6 @@
                         __('Price checks') => __(':times× as often', ['times' => (int) round($free->recheckIntervalHours() / max(1, $pro->recheckIntervalHours()))]),
                         __('Alerts per hour') => __(':times× more', ['times' => (int) floor($pro->notificationsHourlyLimit() / max(1, $free->notificationsHourlyLimit()))]),
                         __('Price history') => __(':times× longer', ['times' => (int) floor($pro->historyKeptDays() / max(1, $free->historyKeptDays()))]),
-                        __('Target price per kilo') => __('Pro only'),
                         __('Automatic categories') => __('Pro only'),
                         __('Same-product check') => __('Pro only'),
                         __('More shops found') => __('Pro only'),

@@ -29,6 +29,13 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-01',
+            'category' => 'pro',
+            'title' => 'Price per kilo alerts are now free',
+            'body' => "You can now set a target price per kilo, litre or piece on the free plan. DipCatch tells you when any shop reaches it, whatever size the pack is.\n\nSaved one earlier, when it said Pro only? It works now. With that price set, DipCatch stops the automatic drop alerts for that product, so your price decides.",
+            'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],
+        ],
+        [
             'date' => '2026-09-30',
             'category' => 'feature',
             'title' => 'Check a shop page before you add it',

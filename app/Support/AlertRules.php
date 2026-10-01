@@ -16,7 +16,7 @@ final readonly class AlertRules
      * A price target carries `below` for the line under it; a drop names
      * itself.
      *
-     * @return list<array{value: string, below: bool, pro?: bool}>
+     * @return list<array{value: string, below: bool}>
      */
     public static function of(Product $product): array
     {
@@ -28,13 +28,11 @@ final readonly class AlertRules
 
         $unitLabel = UnitWord::labelFor($product->comparablePacks()->unit());
 
-        // Without a unit the figure would read as a pack price, and a free
-        // account's target is kept but not checked.
+        // Without a unit the figure would read as a pack price.
         if ($product->unit_price_target !== null && $unitLabel !== '') {
             $rules[] = [
                 'value' => MoneyFormatter::unitPrice((string) $product->unit_price_target, $product->currency) . ' ' . $unitLabel,
                 'below' => true,
-                'pro' => $product->user?->entitlements()->allowsUnitPriceAlerts() !== true,
             ];
         }
 

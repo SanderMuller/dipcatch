@@ -86,7 +86,47 @@ final readonly class UnitTargetGuide
 
         $drops = array_column($candidates, 'drop');
         usort($candidates, fn (array $a, array $b): int => bccomp($b['unit'], $a['unit'], 10));
-        $unit = bcadd($candidates[0]['unit'], '0', 4);
+        $target = self::storable($candidates[0]['unit'], $perPack);
+
+        if ($target === null) {
+            return null;
+        }
+
+        return [
+            'unit' => $target['unit'],
+            'drops' => $drops,
+            'percentUnder' => (int) round((1 - (float) $target['unit'] / (float) $bestUnit) * 100),
+            'packPrice' => $target['packPrice'],
+            'pack' => $best['pack'],
+        ];
+    }
+
+    /**
+     * A target `$percent` under a price per unit, with what it comes to for a
+     * pack of `$perPack` units. Null when it is below the smallest target.
+     *
+     * @param  numeric-string  $unitPrice
+     * @return array{unit: string, packPrice: string}|null
+     */
+    public static function percentUnder(string $unitPrice, float $perPack, int $percent): ?array
+    {
+        return self::storable(
+            bcmul($unitPrice, bcsub('1', bcdiv((string) $percent, '100', 10), 10), 10),
+            self::decimal($perPack),
+        );
+    }
+
+    /**
+     * A per-unit figure cut to the four decimals the column keeps, never
+     * rounded up past the saving it was worked out from.
+     *
+     * @param  numeric-string  $unit
+     * @param  numeric-string  $perPack
+     * @return array{unit: string, packPrice: string}|null
+     */
+    private static function storable(string $unit, string $perPack): ?array
+    {
+        $unit = bcadd($unit, '0', 4);
 
         if (bccomp($unit, '0.0001', 4) < 0) {
             return null;
@@ -94,10 +134,7 @@ final readonly class UnitTargetGuide
 
         return [
             'unit' => Numeric::trimmed($unit),
-            'drops' => $drops,
-            'percentUnder' => (int) round((1 - (float) $unit / (float) $bestUnit) * 100),
             'packPrice' => bcadd(bcmul($unit, $perPack, 10), '0', 2),
-            'pack' => $best['pack'],
         ];
     }
 

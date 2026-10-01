@@ -98,7 +98,6 @@
                 [__('Price history'), $historyLabel($free), $historyLabel($pro)],
             ];
             $extras = [
-                __('Target price per kilo, at any shop and any pack'),
                 __('Automatic categories, and a check that a new shop sells the same product. AI help stays off until you switch it on.'),
             ];
         @endphp

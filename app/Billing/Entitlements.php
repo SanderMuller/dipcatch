@@ -75,11 +75,6 @@ final readonly class Entitlements
         return min($this->historyDays() ?? PruneOldChecksCommand::RETAIN_DAYS, PruneOldChecksCommand::RETAIN_DAYS);
     }
 
-    public function allowsUnitPriceAlerts(): bool
-    {
-        return $this->value('unit_price_alerts') === true;
-    }
-
     /** The plan half of `User::wantsAutoCategories()`. */
     public function allowsAutoCategories(): bool
     {

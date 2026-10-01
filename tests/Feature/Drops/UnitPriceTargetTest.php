@@ -13,9 +13,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * A product tracked at two shops: a 200 g bag and a 370 g bag. The owner is
- * on Pro, because the unit-price target is a Pro feature — the free-plan
- * behaviour has its own test in tests/Feature/Billing.
+ * A product tracked at two shops: a 200 g bag and a 370 g bag.
  */
 function targetProduct(?string $target, string $lidlPrice = '1.99'): Product
 {

@@ -442,9 +442,6 @@
                 <flux:text size="sm" class="mt-0.5 text-zinc-500">{{ __('DipCatch tells you when a price meets one of these.') }}</flux:text>
                 <p class="mt-3 text-2xl font-semibold tracking-tight tabular-nums" data-test="alert-rules">
                     {{ $alertRules[0]['value'] ?? __('Any drop') }}
-                    @if ($alertRules[0]['pro'] ?? false)
-                        <flux:badge size="sm" color="zinc" class="align-middle">{{ __('Pro') }}</flux:badge>
-                    @endif
                 </p>
                 @if ($alertRules[0]['below'] ?? false)
                     <p class="text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('when a price reaches it') }}</p>
@@ -453,9 +450,6 @@
                 @foreach (array_slice($alertRules, 1) as $rule)
                     <p class="mt-1 text-base font-medium tabular-nums text-zinc-600 sm:text-sm dark:text-zinc-300">
                         {{ $rule['below'] ? __('or :value or less', ['value' => $rule['value']]) : __('or :value', ['value' => $rule['value']]) }}
-                        @if ($rule['pro'] ?? false)
-                            <flux:badge size="sm" color="zinc">{{ __('Pro') }}</flux:badge>
-                        @endif
                     </p>
                 @endforeach
                 @if ($awaitsConfirmation)

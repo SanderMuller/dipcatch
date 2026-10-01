@@ -127,10 +127,9 @@
                 <x-unit-target
                     class="mt-6 max-w-2xl"
                     model="unitPriceTarget"
-                    :description="trim(($allowsUnitPriceAlerts ? '' : $unitTargetDescription) . ' ' . ($currentUnitPrice
+                    :description="$currentUnitPrice
                         ? __('Now :amount at :host.', ['amount' => $currentUnitPrice['amount'], 'host' => $currentUnitPrice['host']])
-                        : ''))"
-                    :upgrade="! $allowsUnitPriceAlerts"
+                        : ''"
                     :packs="$packChoices"
                     :history="$unitHistory"
                     :currency="$product->currency ?? 'EUR'"

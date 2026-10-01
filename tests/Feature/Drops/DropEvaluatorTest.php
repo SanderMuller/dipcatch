@@ -131,17 +131,17 @@ test('a product with a price target still alerts on a drop its owner set', funct
         ->and($outcome->thresholdAbs)->toBeNull();
 });
 
-test('a unit-price target a free account is not alerted on keeps the default drops', function (): void {
+test('a unit-price target on a free account switches the default drops off too', function (): void {
     $product = Product::factory()->create([
         'unit_price_target' => '5.00',
         'drop_threshold_pct' => null,
         'drop_threshold_abs' => null,
     ]);
+    Shop::factory()->for($product)->create(['current_price' => '6.00', 'pack_quantity' => 500, 'pack_unit' => 'g']);
 
     $outcome = new DropEvaluator()->evaluate($product, '60.00', ref('100.00'));
 
-    expect($outcome->belowThreshold)->toBeTrue()
-        ->and($outcome->thresholdPct)->not->toBeNull();
+    expect($outcome->belowThreshold)->toBeFalse();
 });
 
 test('a unit-price target a Pro account is alerted on switches the default drops off', function (): void {

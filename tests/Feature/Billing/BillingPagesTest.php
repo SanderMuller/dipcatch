@@ -167,6 +167,18 @@ it('serves the public pricing page to a guest', function (): void {
         ->assertDontSee('no limit on how much you track');
 });
 
+it('includes the target price per kilo on both plans', function (): void {
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSeeInOrder(['Target price per kilo', 'Any shop, any pack, at the price you set.', 'Included', 'Included', 'Price history']);
+});
+
+it('no longer lists the target price per kilo as something Pro adds', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    livewire(BillingPage::class)->assertDontSee('Target price per kilo');
+});
+
 it('promises Pro no more price history than the nightly prune keeps', function (): void {
     config()->set('plans.free.history_days', 90);
     config()->set('plans.pro.history_days');

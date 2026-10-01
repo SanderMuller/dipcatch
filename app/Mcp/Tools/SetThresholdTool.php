@@ -82,13 +82,6 @@ final class SetThresholdTool extends Tool
 
         $notes = [];
 
-        // A stored target on a free account is kept and starts working on
-        // upgrade, so say that rather than let the caller promise an alert
-        // that will not arrive.
-        if ($unitPriceTarget !== null && ! $this->user($request)->entitlements()->allowsUnitPriceAlerts()) {
-            $notes[] = 'The unit price target is stored, but unit-price alerts are a Pro feature. This account is not alerted on it until it upgrades.';
-        }
-
         if ($unitPriceTarget !== null) {
             $excluded = self::shopsOutsideTheUnitGroup($product);
 
@@ -191,8 +184,8 @@ final class SetThresholdTool extends Tool
             'product_id' => $schema->string()->format('uuid')->description('From list_products.')->required(),
             'percent' => $schema->number()->description('Alert when the price falls this many percent, e.g. 10.'),
             'amount' => $schema->number()->description('Alert when the price falls by at least this much money.'),
-            'target_price' => $schema->number()->description('Alert when the lowest price per item reaches this amount. If that price requires a multi-buy, the result says how many items to buy. Available on Free and Pro.'),
-            'unit_price_target' => $schema->number()->description('Alert when the best value reaches this price per kg, litre or piece, up to four decimals (e.g. 0.0125 per piece). Pro accounts only — for a pack price on any plan, use target_price.'),
+            'target_price' => $schema->number()->description('Alert when the lowest price per item reaches this amount. If that price requires a multi-buy, the result says how many items to buy. Use it for a price per pack; for a price per kg, litre or piece, use unit_price_target.'),
+            'unit_price_target' => $schema->number()->description('Alert when the best value reaches this price per kg, litre or piece, up to four decimals (e.g. 0.0125 per piece). It holds every shop and pack size to one rate.'),
         ];
     }
 }

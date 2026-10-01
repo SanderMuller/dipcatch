@@ -100,7 +100,7 @@ final class UseCases
                 'example' => __('A 200 g bag of Lay’s Naturel is €2.19 at ah.nl and €1.69 on bonus. That is €8.45 per kilo against €10.95, and it is the cheapest of the four shops tracking it. You get one mail instead of nine open tabs.'),
                 'tips' => [
                     __('Add the shops you actually pass. A weekly bonus is only worth knowing about at a shop you would walk into anyway.'),
-                    __('On Pro, pick your price per kilo instead of the price on the shelf when the packs differ per shop.'),
+                    __('Pick your price per kilo instead of the price on the shelf when the packs differ per shop.'),
                     __('Track the pack you buy, not the range. "Lay’s Naturel 200 g" is a price; "crisps" is not.'),
                 ],
                 'faq' => [
@@ -139,7 +139,7 @@ final class UseCases
                 'intro' => __('Coffee is the clearest case for a price alert. You buy it on a schedule, you buy the same thing every time, and it is on offer constantly. The catch is that a box of 40 capsules and a box of 100 are priced to look alike. DipCatch turns both into a price per cup and watches them.'),
                 'example' => __('A box of 40 capsules is €14.99 and a box of 100 of the same capsule is €31.99. That is €0.37 a cup against €0.32, so the larger box wins until the small one goes on offer at €11.99 and takes the lead at €0.30. DipCatch tells you which week that happens.'),
                 'tips' => [
-                    __('On Pro, pick your price per cup. A box of 100 at a good price still beats a box of 40 on offer more often than not.'),
+                    __('Pick your price per cup. A box of 100 at a good price still beats a box of 40 on offer more often than not.'),
                     __('Add the supermarket and the webshop for the same coffee. They rarely run offers in the same week.'),
                     __('Watch the end date on an offer price. A bonus week that closes tomorrow is not the price you will pay on Friday.'),
                 ],
@@ -149,7 +149,7 @@ final class UseCases
                     ['q' => __('Can I track the same coffee at more than one shop?'), 'a' => __('Yes, and that is where it earns its keep. Add the same product from several shops and the page shows you the cheapest one right now.')],
                     ['q' => __('Do supermarket bonus prices count?'), 'a' => __('They do. AH Bonus and Dirk promo prices are read as the current price, which is usually the price you actually want to know about.')],
                     ['q' => __('Does it work with a shop that only sells beans by subscription?'), 'a' => __('If the page states a price, yes. A price that only appears after you pick a delivery interval usually cannot be read, and you see that before anything is saved.')],
-                    ['q' => __('Can I set a target per cup rather than per box?'), 'a' => __('On Pro, yes. You can pick a price per cup, per kilo or per litre, whichever the pack states.')],
+                    ['q' => __('Can I set a target per cup rather than per box?'), 'a' => __('Yes. You can pick a price per cup, per kilo or per litre, whichever the pack states.')],
                     ['q' => __('Which coffee is worth tracking?'), 'a' => __('The one you reorder without thinking. A coffee you buy once is a choice. A coffee you buy every month is a fixed cost, and that is where watching the price pays for itself.')],
                 ],
             ],
@@ -190,7 +190,7 @@ final class UseCases
                     ['q' => __('What can I ask it to do?'), 'a' => __('It can list your products, look one up and show how a price moved. It can follow a new product, add or remove a shop, and ask for a fresh check. It can set your price, rename a product, file it under a category, pick its picture or stop following it. If DipCatch cannot read a shop page, the assistant can keep it as a plain link, and DipCatch tries that page again every week. The assistant only sees your own account.')],
                     ['q' => __('Can it change things without asking me?'), 'a' => __('Yes. It can change your alert, rename a product and remove a shop without checking with you first. DipCatch tells it to ask you before it deletes a product, but the assistant has to follow that itself. So connect one you trust, and disconnect it on the Connections page when you are done. Adding a shop takes two steps. The first saves nothing and shows you what DipCatch read from the page.')],
                     ['q' => __('When does DipCatch send an alert?'), 'a' => __('When the price falls well below what the product usually costs. That is the typical price over the last 30 days, or the first price DipCatch read if the product is new. For a cheap item that means 15 percent, or €3 off a pack of the same size. The percentage is lower on costly items. DipCatch compares per kilo, litre or piece where the pack says how much is in it, so a bigger pack that works out cheaper counts as a drop too. Set your own percentage or amount and it replaces that part of the default.')],
-                    ['q' => __('What happens when I set my own price?'), 'a' => __('Then your price decides. DipCatch tells you when a shop reaches it, and says how many to buy if it takes a multi-buy. You hear about it once while the price stays there, and again if it drops lower. The automatic drop alerts switch off for that product, unless you also set a percentage or an amount. On Pro you can set a price per kilo, litre or piece instead.')],
+                    ['q' => __('What happens when I set my own price?'), 'a' => __('Then your price decides. DipCatch tells you when a shop reaches it, and says how many to buy if it takes a multi-buy. You hear about it once while the price stays there, and again if it drops lower. The automatic drop alerts switch off for that product, unless you also set a percentage or an amount. Or set a price per kilo, litre or piece instead.')],
                     ['q' => __('How many shops can one product have?'), 'a' => __('Four on the free plan and as many as you like on Pro. Two shops you already check plus two the assistant finds is a normal starting point.')],
                 ],
             ],
@@ -202,7 +202,7 @@ final class UseCases
                 'example' => __('A 454 g tub of CeraVe moisturising cream is €23.00 at bol.com. Per kilo that is €50.66. The 340 g tub at €18.85 is €55.44 per kilo, so the larger tub wins until the small one goes on offer. Pick your price and you hear about it when either one gets there.'),
                 'tips' => [
                     __('Track the tub or bottle you actually finish, not the range. "CeraVe moisturising cream 454 g" is a price; "moisturiser" is not.'),
-                    __('On Pro, pick your price per kilo or litre when the packs differ per shop.'),
+                    __('Pick your price per kilo or litre when the packs differ per shop.'),
                     __('Add the drogist and the brand site for the same product. They rarely run offers in the same week.'),
                 ],
                 'faq' => [

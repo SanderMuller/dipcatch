@@ -1,7 +1,6 @@
 @props([
     'model',
     'description' => null,
-    'upgrade' => false,
     'packs',
     'history' => null,
     'currency' => 'EUR',
@@ -139,9 +138,6 @@
         <p class="mt-1 max-w-[65ch] text-base/7 text-pretty text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
             {{ __('Any shop, any pack size, at the same price per :unit.', ['unit' => $unitWord]) }}
             {{ $description }}
-            @if ($upgrade)
-                <flux:link :href="route('upgrade')">{{ __('Get Pro') }}</flux:link>
-            @endif
         </p>
     </div>
 

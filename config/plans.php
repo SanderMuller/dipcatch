@@ -51,7 +51,6 @@ return [
         'max_shops_per_product' => (int) env('PLAN_FREE_MAX_SHOPS_PER_PRODUCT', 4),
         'recheck_interval_hours' => env('PLAN_FREE_RECHECK_INTERVAL_HOURS'),
         'notifications_hourly_limit' => env('PLAN_FREE_NOTIFICATIONS_HOURLY_LIMIT'),
-        'unit_price_alerts' => false,
         'auto_categories' => false,
         'shop_checks' => false,
         // Days of price history the chart will plot. Null is unlimited.
@@ -67,7 +66,6 @@ return [
         'max_shops_per_product' => null,
         'recheck_interval_hours' => (int) env('PLAN_PRO_RECHECK_INTERVAL_HOURS', 6),
         'notifications_hourly_limit' => (int) env('PLAN_PRO_NOTIFICATIONS_HOURLY_LIMIT', 200),
-        'unit_price_alerts' => true,
         'auto_categories' => true,
         'shop_checks' => true,
         'history_days' => null,

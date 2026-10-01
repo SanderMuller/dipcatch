@@ -1070,9 +1070,16 @@ it('shows every alert rule the product has', function (): void {
 
     $this->actingAs($user);
 
-    livewire(ProductShow::class, ['product' => $product->refresh()])
+    $html = livewire(ProductShow::class, ['product' => $product->refresh()])
         ->assertSeeInOrder(['€0.2000 /piece', 'when a price reaches it', 'or 10% drop'])
-        ->assertDontSee('Any drop');
+        ->assertDontSee('Any drop')
+        ->html();
+
+    // A free account's unit target alerts like any other, so it carries no Pro badge.
+    preg_match('/data-test="alert-rules".*?<\/p>/s', $html, $rules);
+
+    expect($rules[0] ?? '')->toContain('€0.2000')
+        ->not->toContain('data-flux-badge');
 });
 
 it('says any drop when the product has no alert rule and no price yet', function (): void {

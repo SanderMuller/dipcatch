@@ -178,10 +178,7 @@
                     <x-unit-target
                         class="pt-2"
                         model="unitPriceTarget"
-                        :description="auth()->user()?->entitlements()->allowsUnitPriceAlerts()
-                            ? __('Optional.')
-                            : __('Pro alerts on this. We keep the number, and it starts working when you upgrade.')"
-                        :upgrade="! auth()->user()?->entitlements()->allowsUnitPriceAlerts()"
+                        :description="__('Optional.')"
                         :packs="$targetPacks"
                         :currency="$snapshot['currency'] ?? 'EUR'"
                         :unit-word="$targetUnitWord"

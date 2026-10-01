@@ -94,8 +94,7 @@ it('reads the free limits from config', function (): void {
 
     expect($entitlements->maxProducts())->toBe(20)
         ->and($entitlements->maxShopsPerProduct())->toBe(4)
-        ->and($entitlements->recheckIntervalHours())->toBe(24)
-        ->and($entitlements->allowsUnitPriceAlerts())->toBeFalse();
+        ->and($entitlements->recheckIntervalHours())->toBe(24);
 });
 
 it('gives pro 250 products and unlimited shops', function (): void {
@@ -103,8 +102,7 @@ it('gives pro 250 products and unlimited shops', function (): void {
 
     expect($entitlements->maxProducts())->toBe(250)
         ->and($entitlements->maxShopsPerProduct())->toBeNull()
-        ->and($entitlements->recheckIntervalHours())->toBe(6)
-        ->and($entitlements->allowsUnitPriceAlerts())->toBeTrue();
+        ->and($entitlements->recheckIntervalHours())->toBe(6);
 });
 
 /** The scheduler's reader, asked the same way `proAnswers()` asks it. */
@@ -195,12 +193,12 @@ it('keeps pro when a live subscription sits under a newer incomplete one', funct
 });
 
 it('keeps the entitlements a paying customer is owed under a stray row', function (): void {
-    // The failure a customer would feel: history window, unit-price alerts and
-    // the recheck cadence all follow the plan.
+    // The failure a customer would feel: history window, AI features and the
+    // recheck cadence all follow the plan.
     $user = User::factory()->create(['auto_categories' => true]);
     withStrayIncompleteRow($user);
 
-    expect($user->entitlements()->allowsUnitPriceAlerts())->toBeTrue()
+    expect($user->entitlements()->historyDays())->toBeNull()
         ->and($user->wantsAutoCategories())->toBeTrue();
 });
 

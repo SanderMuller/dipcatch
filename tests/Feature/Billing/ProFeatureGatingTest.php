@@ -31,14 +31,15 @@ function productAtTarget(User $user): Product
     return $product->fresh() ?? $product;
 }
 
-it('does not alert a free account on a unit price target', function (): void {
+it('alerts a free account on a unit price target', function (): void {
     Notification::fake();
 
-    $product = productAtTarget(User::factory()->create());
+    $user = User::factory()->create();
+    $product = productAtTarget($user);
 
     app(DetectUnitPriceTarget::class)($product);
 
-    Notification::assertNothingSent();
+    Notification::assertSentTo($user, UnitPriceTargetNotification::class);
 });
 
 it('alerts a pro account on the same target', function (): void {
@@ -54,7 +55,7 @@ it('alerts a pro account on the same target', function (): void {
     Notification::assertSentTo($user, UnitPriceTargetNotification::class);
 });
 
-it('keeps the stored target of a free account so an upgrade turns it back on', function (): void {
+it('keeps the stored target of a free account after it alerts', function (): void {
     Notification::fake();
 
     $product = productAtTarget(User::factory()->create());
