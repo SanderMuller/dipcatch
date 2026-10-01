@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\WebFindingStatus;
 use App\Services\TypeSafe\TypeSafeClient;
+use App\Support\PackSize;
+use App\Support\UnitWord;
 use App\Support\UrlNormalizer;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -48,11 +50,37 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $generation
  * @property ?CarbonImmutable $checked_at
  * @property ?CarbonImmutable $dismissed_at
+ * @property ?string $lead_url The Klarna page a lead finding came from; null for an open-search finding.
+ * @property ?numeric-string $lead_pack_quantity
+ * @property ?string $lead_pack_unit
+ * @property ?string $variant_key The variant the page read picked.
  */
 #[WithoutTimestamps]
 #[Unguarded]
 final class WebShopFinding extends Model
 {
+    /** What a finding that starts over forgets: every read and check. */
+    public const array CLEARED_CHECKS = [
+        'first_chance' => null,
+        'add_url' => null,
+        'served_host' => null,
+        'page_title' => null,
+        'page_pack_quantity' => null,
+        'page_pack_unit' => null,
+        'page_price' => null,
+        'page_currency' => null,
+        'page_gtin' => null,
+        'matched_gtin' => null,
+        'checked_gtins' => null,
+        'variant_key' => null,
+        'read_at' => null,
+        'second_chance' => null,
+        'failure' => null,
+        'attempts' => 0,
+        'next_attempt_at' => null,
+        'checked_at' => null,
+    ];
+
     /**
      * What a finding was checked against: the product title and its distinct
      * tracked pack sizes. Not the tracked shops' URLs or barcodes, so adding
@@ -154,6 +182,50 @@ final class WebShopFinding extends Model
             ->update(array_map(static fn (mixed $value): mixed => is_array($value) ? json_encode($value) : $value, $columns));
     }
 
+    public function isLead(): bool
+    {
+        return $this->lead_url !== null;
+    }
+
+    public function leadPackSize(): ?PackSize
+    {
+        return $this->lead_pack_quantity === null || $this->lead_pack_unit === null
+            ? null
+            : PackSize::of((float) $this->lead_pack_quantity, $this->lead_pack_unit);
+    }
+
+    /**
+     * The page's size when no shop on the product tracks it: a suggestion in
+     * another size, which the product compares per unit.
+     */
+    public function otherPackSize(Product $product): ?PackSize
+    {
+        $size = $this->page_pack_quantity === null || $this->page_pack_unit === null
+            ? null
+            : PackSize::of((float) $this->page_pack_quantity, $this->page_pack_unit);
+
+        if (! $size instanceof PackSize) {
+            return null;
+        }
+
+        $product->loadMissing('shops');
+        $tracked = $product->shops->map(static fn (Shop $shop): ?PackSize => $shop->packSize())->filter();
+
+        return $tracked->isEmpty() || $tracked->contains(static fn (PackSize $other): bool => $other->isSameSizeAs($size)) ? null : $size;
+    }
+
+    /** "Other size: 7 kg — compared per kilo", or null when the page states no size, the product tracks none, or it tracks this one. */
+    public function otherSizeNote(Product $product): ?string
+    {
+        $size = $this->otherPackSize($product);
+
+        $note = $size instanceof PackSize
+            ? __('Other size: :pack — compared per :unit', ['pack' => UnitWord::pack($size), 'unit' => UnitWord::noun($size->unit)])
+            : null;
+
+        return is_string($note) ? $note : null;
+    }
+
     /** The host Add would track: the read page's address, else the search result's. */
     public function addHost(): string
     {
@@ -197,6 +269,7 @@ final class WebShopFinding extends Model
             'status' => WebFindingStatus::class,
             'page_pack_quantity' => 'decimal:3',
             'page_price' => 'decimal:2',
+            'lead_pack_quantity' => 'decimal:2',
             'first_chance' => 'float',
             'second_chance' => 'float',
             'checked_gtins' => 'array',

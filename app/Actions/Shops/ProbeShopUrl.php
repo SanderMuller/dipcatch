@@ -23,8 +23,7 @@ use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\Iso4217;
 use App\Support\MovedShopUrl;
-use App\Support\NotAShop;
-use App\Support\UnservableShops;
+use App\Support\PackSize;
 use App\Support\UrlNormalizer;
 use InvalidArgumentException;
 
@@ -45,6 +44,7 @@ final readonly class ProbeShopUrl
         private AhApiSource $ahApi,
         private HostFetchMemory $memory,
         private ProbeBudget $budget,
+        private AddressRefusal $refusal,
     ) {}
 
     /**
@@ -67,6 +67,8 @@ final readonly class ProbeShopUrl
          * `ShopFetcher` holds every host to its own ceiling regardless.
          */
         bool $spendBudget = true,
+        /** The size to pick on a page of variants, instead of the product's own. */
+        ?PackSize $preferredPack = null,
     ): ProbeOutcome {
         try {
             $normalizedUrl = UrlNormalizer::normalize($rawUrl);
@@ -86,7 +88,7 @@ final readonly class ProbeShopUrl
         // per-user probe budget consumed (bulk-adding must not throttle).
         $host = UrlNormalizer::normalizeHost((string) parse_url($normalizedUrl, PHP_URL_HOST));
 
-        $refused = self::refusedHost($host);
+        $refused = $this->refusal->for($normalizedUrl, $host, fn (): ?ProbeOutcome => $this->overBudget($actor, $spendBudget));
         if ($refused instanceof ProbeOutcome) {
             return $refused;
         }
@@ -146,6 +148,7 @@ final readonly class ProbeShopUrl
             $extraction,
             $variantKey,
             fn (string $key): ExtractionResult => $this->resolver->resolve(url: $fetch->finalUrl, html: $fetch->html, context: $context->withVariantKey($key)),
+            $preferredPack,
         ) ?? [null, $extraction];
         $variantKey ??= $picked;
 
@@ -363,20 +366,5 @@ final readonly class ProbeShopUrl
             'failures' => $this->memory->count($host, $kind),
             'persistent' => $this->memory->isPersistent($host, $kind),
         ];
-    }
-
-    /**
-     * A host refused before anything is fetched: a shop whose pages hold no
-     * price the server can read, or a site that is not a shop at all.
-     */
-    private static function refusedHost(string $host): ?ProbeOutcome
-    {
-        $unservable = UnservableShops::reasonFor($host);
-
-        if ($unservable !== null) {
-            return ProbeOutcome::failed(ProbeFailure::ShopNotServable, ['reason' => $unservable]);
-        }
-
-        return NotAShop::covers($host) ? ProbeOutcome::failed(ProbeFailure::NotAShop) : null;
     }
 }

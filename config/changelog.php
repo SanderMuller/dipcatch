@@ -30,6 +30,13 @@ return [
     'entries' => [
         [
             'date' => '2026-10-01',
+            'category' => 'feature',
+            'title' => 'More shop suggestions through Klarna',
+            'body' => "With Pro, DipCatch now also looks up your product on Klarna when it searches for more shops. It checks the shops Klarna lists on their own websites and adds them to your shop suggestions. If a shop sells a different pack size, the suggestion says so and compares the price per kilo or litre.\n\nPasted a Klarna link? You'll see which shops it lists. Klarna no longer counts as your cheapest shop, since you can't buy there.",
+            'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],
+        ],
+        [
+            'date' => '2026-10-01',
             'category' => 'pro',
             'title' => 'Price per kilo alerts are now free',
             'body' => "You can now set a target price per kilo, litre or piece on the free plan. DipCatch tells you when any shop reaches it, whatever size the pack is.\n\nSaved one earlier, when it said Pro only? It works now. With that price set, DipCatch stops the automatic drop alerts for that product, so your price decides.",

@@ -91,13 +91,13 @@ it('drops a suggestion once its shop is tracked, and keeps the others', function
 
 it('hands the read address to the add-shop form', function (): void {
     $product = webSuggestionProduct();
-    proposedFinding($product, 'koffiehenk.nl', ['add_url' => 'https://koffiehenk.nl/moved']);
+    $finding = proposedFinding($product, 'koffiehenk.nl', ['add_url' => 'https://koffiehenk.nl/moved']);
     $this->actingAs($product->user()->sole());
 
     Livewire::test(ShopSuggestions::class, ['product' => $product])
-        ->call('accept', 'https://koffiehenk.nl/moved')
-        ->assertDispatched('suggest-shop', url: 'https://koffiehenk.nl/moved')
-        ->assertSeeHtml("wire:click=\"accept('https:\\/\\/koffiehenk.nl\\/moved')\"");
+        ->call('accept', 'https://koffiehenk.nl/moved', $finding->id)
+        ->assertDispatched('suggest-shop', url: 'https://koffiehenk.nl/moved', findingId: $finding->id)
+        ->assertSeeHtml("wire:click=\"accept('https:\\/\\/koffiehenk.nl\\/moved', {$finding->id})\"");
 });
 
 it('hides a web suggestion on this product and tells the other panel', function (): void {

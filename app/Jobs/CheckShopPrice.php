@@ -129,7 +129,8 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     public function handle(ShopFetcher $fetcher, AdapterResolver $resolver, CheckjebonSource $checkjebon, AhApiSource $ahApi): void
     {
         $shop = Shop::query()->with('product')->find($this->shop->id);
-        if ($shop === null || ! $shop->active || $shop->health === ShopHealth::Dead) {
+        // A comparison site becomes a link: it has nothing to read.
+        if ($shop === null || ! $shop->active || $shop->health === ShopHealth::Dead || $shop->keepAsComparisonLink()) {
             return;
         }
 
@@ -271,7 +272,9 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         // fails everything rolls back together — no stale `cheapest_*` window.
         DB::transaction(function () use ($shop, $outcome, $now): void {
             $locked = Shop::query()->lockForUpdate()->find($shop->id);
-            if ($locked === null) {
+            // Gone, or repointed or kept as a link while the page was fetched:
+            // drop this reading.
+            if ($locked === null || ! $locked->stillTracks($shop)) {
                 return;
             }
 

@@ -63,14 +63,17 @@ test('web discovery skips the same hosts from the shared list', function (): voi
         ->and(WebResultFilter::isNotAShop('expert.nl'))->toBeFalse();
 });
 
-test('a shop already tracked on a listed host keeps rechecking', function (): void {
-    Http::fake(fakeJsonLdOffer('https://www.bcc.nl/product/1', '1699.00'));
+test('a shop already tracked on a listed host becomes a link at its next check', function (): void {
+    Http::fake();
     $product = Product::factory()->create(['currency' => 'EUR']);
-    $shop = Shop::factory()->for($product)->create(['url' => 'https://www.bcc.nl/product/1']);
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://www.bcc.nl/product/1', 'current_price' => '1699.00']);
 
     new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
 
-    expect($shop->refresh()->current_price)->toBe('1699.00');
+    Http::assertNothingSent();
+    expect($shop->refresh()->kind)->toBe(ShopKind::Reference)
+        ->and($shop->unreadable_reason)->toBe(ProbeFailure::NotAShop->value)
+        ->and($shop->current_price)->toBeNull();
 });
 
 test('a link kept on a listed host stays a link on its weekly retry', function (): void {

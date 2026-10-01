@@ -26,6 +26,8 @@ beforeEach(function (): void {
     config()->set('services.serper.key', 'test-key');
     config()->set('services.typesafe.key', 'test-key');
     config()->set('dipcatch.web_discovery.enabled', true);
+    // The Klarna steps have their own tests (KlarnaDiscoveryTest).
+    config()->set('dipcatch.web_discovery.klarna_leads', false);
     config()->set('dipcatch.shop_checks.accept_from', 0.6);
     Cache::flush();
     Http::preventStrayRequests();

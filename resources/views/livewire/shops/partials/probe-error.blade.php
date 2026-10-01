@@ -60,6 +60,9 @@
         @break
     @case('not_a_shop')
         This is a comparison site, not a shop. Paste the link of the shop that sells it.
+        @if (! empty($errorContext['leads']))
+            <x-shops.klarna-leads :leads="$errorContext['leads']" :looking-up="($errorContext['looking_up'] ?? false) === true" />
+        @endif
         @break
     @case('not_in_dataset')
         @php $njReason = $errorContext['reason'] ?? null; @endphp

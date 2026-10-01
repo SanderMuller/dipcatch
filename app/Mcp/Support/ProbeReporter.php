@@ -7,6 +7,7 @@ use App\Actions\Shops\ProbeOutcome;
 use App\Enums\ConsumerPriceIssue;
 use App\Enums\ProbeFailure;
 use App\PriceAdapters\VariantCandidate;
+use App\Support\MoneyFormatter;
 use App\Support\PackSize;
 use Laravel\Mcp\Response;
 
@@ -128,7 +129,7 @@ final readonly class ProbeReporter
             // Without this the default fired, which tells a caller to try a
             // direct product URL — the one retry that can never work here.
             ProbeFailure::ShopNotServable => 'That shop builds its prices in the browser, so its pages carry no price to read. It cannot be tracked, and another URL from the same shop will not help.',
-            ProbeFailure::NotAShop => 'This is a comparison site, not a shop. Paste the link of the shop that sells it.',
+            ProbeFailure::NotAShop => 'This is a comparison site, not a shop. Paste the link of the shop that sells it.' . self::leadLines($context),
             ProbeFailure::TemporaryFailure, ProbeFailure::HttpError => self::persistent($context)
                 ? 'That shop has not answered DipCatch on its last ' . self::failures($context) . ' requests. This is not a passing fault, so another attempt now will fail too.'
                 : 'The shop did not answer. Try again shortly.' . self::streak($context),
@@ -147,6 +148,26 @@ final readonly class ProbeReporter
         $failures = self::failures($context);
 
         return $failures > 1 ? ' That is ' . $failures . ' in a row.' : '';
+    }
+
+    /**
+     * The shops a Klarna page lists, one per line, so the caller can look one
+     * up and paste its own page.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private static function leadLines(array $context): string
+    {
+        $leads = is_array($context['leads'] ?? null) ? $context['leads'] : [];
+        $lines = [];
+
+        foreach ($leads as $lead) {
+            if (is_array($lead) && is_string($lead['shop'] ?? null) && is_string($lead['host'] ?? null) && is_string($lead['price'] ?? null) && is_string($lead['currency'] ?? null) && is_string($lead['title'] ?? null)) {
+                $lines[] = "- {$lead['shop']} ({$lead['host']}): " . MoneyFormatter::format($lead['price'], $lead['currency']) . " — {$lead['title']}";
+            }
+        }
+
+        return $lines === [] ? '' : "\nKlarna lists these shops:\n" . implode("\n", $lines);
     }
 
     /**

@@ -33,7 +33,7 @@ final readonly class DashboardSuggestions
     public function __construct(private SuggestShops $suggest) {}
 
     /**
-     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float}>
+     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool}>
      */
     public function forUser(User $user): array
     {
@@ -162,7 +162,7 @@ final readonly class DashboardSuggestions
 
     /**
      * @param  array<string, float>  $chances
-     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float}
+     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool}
      */
     private static function datasetRow(Product $product, ShopSuggestion $suggestion, array $chances): array
     {
@@ -179,13 +179,15 @@ final readonly class DashboardSuggestions
             'packPrice' => PackLine::format($suggestion->price, 'EUR', $size),
             'checkedOn' => null,
             'barcode' => false,
+            'otherSize' => null,
+            'viaKlarna' => false,
             'chance' => $suggestion->checked ? ($chances["{$product->id}|{$suggestion->chain}|{$suggestion->externalId}"] ?? null) : null,
             'score' => $suggestion->score,
         ];
     }
 
     /**
-     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: float, score: float}
+     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: float, score: float, otherSize: ?string, viaKlarna: bool}
      */
     private static function webRow(Product $product, WebShopFinding $finding): array
     {
@@ -207,6 +209,8 @@ final readonly class DashboardSuggestions
             'packPrice' => $finding->page_price === null ? null : PackLine::format($finding->page_price, $currency, $size),
             'checkedOn' => $finding->read_at ?? $finding->checked_at,
             'barcode' => $finding->matched_gtin !== null,
+            'otherSize' => $finding->otherSizeNote($product),
+            'viaKlarna' => $finding->isLead(),
             'chance' => $chance,
             'score' => $chance,
         ];

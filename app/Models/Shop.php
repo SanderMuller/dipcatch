@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ConsumerPriceIssue;
 use App\Enums\PackExclusion;
+use App\Enums\ProbeFailure;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Enums\ShopKind;
@@ -12,6 +13,7 @@ use App\PriceAdapters\ConditionalOffer;
 use App\PriceAdapters\PromotionWindow;
 use App\Support\Favicon;
 use App\Support\ImageUrl;
+use App\Support\NotAShop;
 use App\Support\PackSize;
 use App\Support\UrlNormalizer;
 use Carbon\CarbonImmutable;
@@ -25,6 +27,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @property bool|null $current_in_stock True in stock, false out of stock, null when the shop's page did not say.
@@ -49,7 +52,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $last_success_at Stamped only when a price was actually read.
  * @property int $consecutive_failures Reset to zero by any successful read.
  * @property ShopKind $kind Read on a schedule, or kept as a link — see {@see ShopKind}.
- * @property string|null $unreadable_reason Which wall the page hit when the link was kept.
+ * @property string|null $unreadable_reason Why the link was kept: the wall the page hit, or `not_a_shop` for a comparison site.
  * @property CarbonInterface|null $retried_at When a reference shop was last asked again.
  * @property ConsumerPriceIssue|null $consumer_price_issue Why this is not a price a shopper can pay.
  * @property string|null $consumer_price_note The words the page used to say so.
@@ -111,6 +114,7 @@ final class Shop extends Model
      * and reset the failure counters / health so a user-initiated URL fix
      * unblocks an offer that had previously gone dead. Returns true when
      * the URL actually changed.
+     * A comparison link pointed at a real shop becomes a tracked shop again.
      */
     public function updateUrl(string $normalized): bool
     {
@@ -176,9 +180,94 @@ final class Shop extends Model
             // everything before it priced whatever the old URL sold, so
             // `Reference` stops reading it. See {@see ProductCheapestHistory}.
             'repointed_at' => now(),
-        ])->save();
+        ]);
+
+        // A comparison site kept as a link and pointed at a real shop is a
+        // shop again: the check that follows reads it like any other.
+        if ($this->isComparisonLink() && ! NotAShop::covers((string) $this->host)) {
+            $this->forceFill(['kind' => ShopKind::Tracked, 'unreadable_reason' => null]);
+        }
+
+        $this->save();
 
         return true;
+    }
+
+    /**
+     * Turns a shop on a comparison-site host into a reference link with no
+     * current price, and recomputes the product's cheapest shop: the page
+     * states another shop's price. Price checks stay. Re-checks the host
+     * under the row lock. Returns whether it converted the row; false for a
+     * row that is already a reference.
+     */
+    public function keepAsComparisonLink(): bool
+    {
+        // Most rows are shops: no lock for them.
+        if (! NotAShop::covers((string) $this->host)) {
+            return false;
+        }
+
+        $converted = DB::transaction(function (): bool {
+            $locked = self::query()->lockForUpdate()->find($this->id);
+
+            if ($locked === null || $locked->isReference() || ! NotAShop::covers((string) $locked->host)) {
+                return false;
+            }
+
+            $locked->forceFill([
+                'kind' => ShopKind::Reference,
+                'unreadable_reason' => ProbeFailure::NotAShop->value,
+                'current_price' => null,
+                'current_in_stock' => null,
+                'single_item_price' => null,
+                'bundle_quantity' => null,
+                'bundle_total_price' => null,
+                'conditional_price' => null,
+                'conditional_label' => null,
+                'conditional_starts_at' => null,
+                'conditional_ends_at' => null,
+                'promotion_starts_at' => null,
+                'promotion_ends_at' => null,
+                'promotion_label' => null,
+                'claimed_regular_price' => null,
+                'consumer_price_issue' => null,
+                'consumer_price_note' => null,
+            ])->save();
+
+            $locked->product?->recomputeCheapestShop();
+
+            return true;
+        });
+
+        if ($converted) {
+            $this->refresh();
+        }
+
+        return $converted;
+    }
+
+    /**
+     * Whether this row still tracks the page `$read` was loaded for: the same
+     * URL, the same kind, and not a comparison site since.
+     */
+    public function stillTracks(self $read): bool
+    {
+        return $this->url_hash === $read->url_hash
+            && $this->kind === $read->kind
+            && ! NotAShop::covers((string) $this->host);
+    }
+
+    public function isComparisonLink(): bool
+    {
+        return $this->isReference() && $this->unreadable_reason === ProbeFailure::NotAShop->value;
+    }
+
+    /** The note a link carries, or null for a shop DipCatch reads. */
+    public function linkNote(): ?string
+    {
+        return $this->isComparisonLink()
+            ? 'Comparison site — DipCatch tracks the shops it lists, not this page.'
+            : $this->kind->note();
     }
 
     /**

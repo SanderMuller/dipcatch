@@ -62,18 +62,21 @@ final readonly class TypeSafeClient
 
     /**
      * The chance that each candidate offer sells the same product as the
-     * tracked one, in the same pack, as one Noul question per candidate in a
-     * single request. A candidate the answer leaves out is left out here.
+     * tracked one, in the same pack (in any pack for a candidate in
+     * `$anyPackKeys`), as one Noul question per candidate in a single
+     * request. A candidate the answer leaves out is left out here. Klarna
+     * leads point at other sizes too, and a product compares sizes per unit.
      *
      * Pass `$quick` false for the longer timeout and the retry; see
      * `request()`.
      *
      * @param  array<string, array<string, string>>  $candidates  Keyed by a caller-chosen id.
+     * @param  list<string>  $anyPackKeys
      * @return array<string, float>
      *
      * @throws TypeSafeRequestFailed
      */
-    public function sameProduct(Product $product, array $candidates, bool $quick = true): array
+    public function sameProduct(Product $product, array $candidates, bool $quick = true, array $anyPackKeys = []): array
     {
         if ($candidates === []) {
             return [];
@@ -84,7 +87,17 @@ final readonly class TypeSafeClient
         $questions = [];
 
         foreach ($candidates as $key => $candidate) {
-            $questions[$key] = [
+            $questions[$key] = in_array((string) $key, $anyPackKeys, strict: true) ? [
+                'type' => 'noul',
+                'instructions' => [
+                    'candidate' => $candidate,
+                    'question' => 'Does `candidate` sell the same product as the tracked product in the state, in any pack size?',
+                ],
+                'criteria' => [
+                    'true' => 'The same product, the same variant or flavour; the pack size may differ',
+                    'false' => 'A different product, variant or flavour',
+                ],
+            ] : [
                 'type' => 'noul',
                 'instructions' => [
                     'candidate' => $candidate,

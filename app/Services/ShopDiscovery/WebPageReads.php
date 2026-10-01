@@ -46,7 +46,7 @@ final readonly class WebPageReads
             return null;
         }
 
-        $outcome = ($this->probe)($product, $finding->url, $owner, spendBudget: false);
+        $outcome = ($this->probe)($product, $finding->url, $owner, spendBudget: false, preferredPack: $finding->leadPackSize());
 
         if (in_array($outcome->errorCode, self::RETRYABLE, strict: true) && $finding->attempts + 1 < Config::integer('dipcatch.web_discovery.read_attempts')) {
             $delay = self::retryDelay($outcome);
@@ -100,6 +100,7 @@ final readonly class WebPageReads
             'page_price' => $draft->trackedPrice(),
             'page_currency' => $draft->currency,
             'page_gtin' => $draft->gtin,
+            'variant_key' => $outcome->pickedVariantKey,
             'read_at' => now(),
         ];
 

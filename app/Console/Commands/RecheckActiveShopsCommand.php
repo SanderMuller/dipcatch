@@ -27,6 +27,8 @@ final class RecheckActiveShopsCommand extends Command
         $jitterSeconds = RecheckJitter::maxSeconds();
         $dispatched = 0;
 
+        $this->keepComparisonSitesAsLinks();
+
         $this->dueQuery()
             ->limit(Config::integer('dipcatch.scheduler.batch_size'))
             ->each(function (Shop $shop) use ($jitterSeconds, &$dispatched): void {
@@ -39,6 +41,29 @@ final class RecheckActiveShopsCommand extends Command
         $this->info("Dispatched {$dispatched} CheckShopPrice jobs.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Shops tracked on a comparison site become links, on every product. A
+     * paused product's shops are never dispatched below, but they still
+     * decide what its page shows.
+     */
+    private function keepComparisonSitesAsLinks(): void
+    {
+        /** @var list<string> $listed */
+        $listed = Config::array('dipcatch.not_a_shop');
+
+        Shop::query()
+            ->tracked()
+            ->where(function (EloquentQueryBuilder $query) use ($listed): void {
+                foreach ($listed as $host) {
+                    $query->orWhere('host', $host)->orWhere('host', 'like', '%.' . $host);
+                }
+            })
+            // By id: each conversion leaves the result set, which would make
+            // offset pages skip rows.
+            ->lazyById()
+            ->each(static fn (Shop $shop): bool => $shop->keepAsComparisonLink());
     }
 
     /**

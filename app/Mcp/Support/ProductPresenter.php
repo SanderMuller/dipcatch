@@ -168,7 +168,7 @@ final readonly class ProductPresenter
                 // A link rather than a tracked price. Never in either answer,
                 // and retried weekly — see ShopKind.
                 'kind' => $shop->kind->value,
-                'link_note' => $shop->kind->note(),
+                'link_note' => $shop->linkNote(),
                 'is_cheapest' => $shop->getKey() === $product->cheapest_shop_id,
                 'is_best_value' => $bestValueId !== null && $shop->getKey() === $bestValueId,
                 'last_checked_at' => $checked instanceof CarbonInterface ? $checked->toIso8601String() : null,

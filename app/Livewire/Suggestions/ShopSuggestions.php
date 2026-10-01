@@ -57,11 +57,16 @@ final class ShopSuggestions extends Component
         $this->mountedAt = now()->getTimestamp();
     }
 
-    public function accept(string $url): void
+    /**
+     * `$findingId` names the web suggestion behind the URL, so the add-shop
+     * form tracks the variant its read picked and, for a Klarna lead, asks
+     * the any-size question.
+     */
+    public function accept(string $url, ?int $findingId = null): void
     {
         $this->product();
 
-        $this->dispatch('suggest-shop', url: $url)->to('shops.add-shop');
+        $this->dispatch('suggest-shop', url: $url, findingId: $findingId)->to('shops.add-shop');
 
         // The add-shop form lives in a collapsed disclosure on the product
         // page. Without this the probe preview would render inside a closed
@@ -115,6 +120,7 @@ final class ShopSuggestions extends Component
         $discovering = $webShown && self::discovering($product);
 
         return view('livewire.suggestions.shop-suggestions', [
+            'product' => $product,
             'suggestions' => $suggest($product),
             'webSuggestions' => $webShown ? WebShopFinding::shownFor($product) : new EloquentCollection(),
             'discovering' => $discovering,

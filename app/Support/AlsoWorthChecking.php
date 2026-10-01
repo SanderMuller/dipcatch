@@ -2,9 +2,11 @@
 
 namespace App\Support;
 
+use App\Enums\ProbeFailure;
 use App\Enums\ShopKind;
 use App\Models\Product;
 use App\Models\Shop;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * The shops on a product that DipCatch cannot read, named at the moment
@@ -34,6 +36,10 @@ final readonly class AlsoWorthChecking
         return $product->shops()
             ->where('kind', ShopKind::Reference->value)
             ->where('active', true)
+            // A comparison site is not a shop to check by hand.
+            ->where(fn (Builder $query): Builder => $query
+                ->whereNull('unreadable_reason')
+                ->orWhere('unreadable_reason', '!=', ProbeFailure::NotAShop->value))
             ->orderBy('host')
             ->limit(self::MAX)
             ->get()

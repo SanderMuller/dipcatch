@@ -232,7 +232,7 @@ final readonly class ProductMarkdown
         $unitPrice = $packs->unitPriceOf($shop);
 
         return match (true) {
-            $shop->isReference() => (string) $shop->kind->note(),
+            $shop->isReference() => (string) $shop->linkNote(),
             $shop->notAConsumerPriceReason() !== null => $shop->notAConsumerPriceReason(),
             ! $packs->hasComparisonUnit() => '—',
             $pack !== null && $pack->isExcluded() => (string) $pack->reason(),

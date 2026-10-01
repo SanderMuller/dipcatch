@@ -55,6 +55,11 @@
                                                     <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {{ $badge[1] }}">{{ $badge[0] }}</span>
                                                 @endif
                                             </div>
+                                            @if ($row['otherSize'] !== null || $row['viaKlarna'])
+                                                <p class="truncate text-xs text-zinc-500 dark:text-zinc-400" data-test="suggested-shop-lead">
+                                                    {{ implode(' · ', array_filter([$row['otherSize'], $row['viaKlarna'] ? __('Found through Klarna') : null])) }}
+                                                </p>
+                                            @endif
                                         </div>
                                         @php($compareModal = 'compare-' . $product->id . '-' . \Illuminate\Support\Str::slug($row['host']))
                                         <flux:modal.trigger :name="$compareModal">

@@ -9,7 +9,8 @@ use App\Support\PackSize;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Asks Jev whether a shop sells the same product, in the same pack, as the
+ * Asks Jev whether a shop sells the same product, in the same pack unless
+ * the caller asks about any pack, as the
  * shops a product already tracks. Only for an account that switched the
  * check on and whose plan allows it, and never a reason to refuse a shop:
  * the answer is a warning the person can overrule.
@@ -25,8 +26,10 @@ final readonly class ShopMatchCheck
      * The chance the drafted shop sells the same product and pack, or null
      * when nothing was checked: the account has not opted in, the product has
      * no shop to compare with, the budget is spent, or the call failed.
+     * `$anyPack` asks about the product in any pack size, for a suggestion
+     * that came from a Klarna lead.
      */
-    public function draft(Product $product, ShopDraft $draft): ?float
+    public function draft(Product $product, ShopDraft $draft, bool $anyPack = false): ?float
     {
         if (! $this->applies($product)) {
             return null;
@@ -43,7 +46,7 @@ final readonly class ShopMatchCheck
             packSize: $draft->packSize === null ? null : self::packLabel($draft->packSize),
             price: "{$draft->trackedPrice()} {$draft->currency}",
             gtin: $draft->gtin,
-        )])['draft'] ?? null;
+        )], anyPackKeys: $anyPack ? ['draft'] : [])['draft'] ?? null;
     }
 
     public function applies(Product $product): bool
@@ -59,20 +62,32 @@ final readonly class ShopMatchCheck
 
     /**
      * @param  array<string, array<string, string>>  $candidates
+     * @param  list<string>  $anyPackKeys  Candidates that may sell another pack size of the product.
      * @return array<string, float>
      */
-    public function ask(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true): array
+    public function ask(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = []): array
+    {
+        return $this->askOutcome($product, $purpose, $candidates, $quick, $anyPackKeys)->answers;
+    }
+
+    /**
+     * As {@see ask()}, with the reason when nothing was answered.
+     *
+     * @param  array<string, array<string, string>>  $candidates
+     * @param  list<string>  $anyPackKeys
+     */
+    public function askOutcome(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = []): ShopCheckOutcome
     {
         $user = $product->user;
 
         if ($user === null || ! $this->budget->allowsShopCheck($user, $purpose)) {
             Log::info('Same-product check skipped: the daily budget is spent.', ['product_id' => $product->id, 'purpose' => $purpose->value]);
 
-            return [];
+            return new ShopCheckOutcome(ShopCheckOutcome::BUDGET_SPENT);
         }
 
         try {
-            return $this->client->sameProduct($product, $candidates, $quick);
+            return new ShopCheckOutcome(ShopCheckOutcome::ANSWERED, $this->client->sameProduct($product, $candidates, $quick, $anyPackKeys));
         } catch (TypeSafeRequestFailed $e) {
             Log::warning('Same-product check failed; the candidates go unchecked.', [
                 'product_id' => $product->id,
@@ -82,7 +97,7 @@ final readonly class ShopMatchCheck
                 'exception' => $e,
             ]);
 
-            return [];
+            return new ShopCheckOutcome(ShopCheckOutcome::FAILED);
         }
     }
 

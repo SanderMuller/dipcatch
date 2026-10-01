@@ -22,13 +22,15 @@ final readonly class MatchingPackVariant
      * and the page read again for it. Null when nobody asked the question, the
      * caller already chose, or no single variant fits.
      *
+     * `$preferred` asks for that size instead of the product's own.
+     *
      * @param  Closure(string): ExtractionResult  $readFor
      * @return array{0: string, 1: ExtractionResult}|null
      */
-    public static function answer(?Product $product, ExtractionResult $extraction, ?string $chosen, Closure $readFor): ?array
+    public static function answer(?Product $product, ExtractionResult $extraction, ?string $chosen, Closure $readFor, ?PackSize $preferred = null): ?array
     {
         $key = $chosen === null && $product instanceof Product && $extraction->isAmbiguous()
-            ? self::keyFor($product, $extraction->variants)
+            ? self::keyFor($product, $extraction->variants, $preferred)
             : null;
 
         if ($key === null) {
@@ -42,14 +44,15 @@ final readonly class MatchingPackVariant
     }
 
     /**
-     * The key of the one variant whose name states the product's pack size,
-     * or null when the product has no single size or no single variant has it.
+     * The key of the one variant whose name states `$preferred`, else the
+     * product's pack size. Null when there is no single size to match or no
+     * single variant has it.
      *
      * @param  list<VariantCandidate>  $variants
      */
-    public static function keyFor(Product $product, array $variants): ?string
+    public static function keyFor(Product $product, array $variants, ?PackSize $preferred = null): ?string
     {
-        $size = self::productSize($product);
+        $size = $preferred ?? self::productSize($product);
 
         if (! $size instanceof PackSize) {
             return null;
@@ -57,7 +60,7 @@ final readonly class MatchingPackVariant
 
         $matches = array_values(array_filter(
             $variants,
-            static fn (VariantCandidate $variant): bool => $size->isSameSizeAs(PackSize::resolve(null, false, $variant->title)),
+            static fn (VariantCandidate $variant): bool => $size->isSameSizeAs(PackSize::resolve(packSize: null, authoritative: false, title: $variant->title)),
         ));
 
         return count($matches) === 1 ? $matches[0]->key : null;
@@ -77,7 +80,7 @@ final readonly class MatchingPackVariant
 
         // Read like the variants' names, so "12st Bar 55g" is 660 g on both sides.
         if ($sizes->isEmpty()) {
-            return PackSize::resolve(null, false, $product->title);
+            return PackSize::resolve(packSize: null, authoritative: false, title: $product->title);
         }
 
         $first = $sizes->first();

@@ -64,6 +64,19 @@ final readonly class ExtractionResult
         );
     }
 
+    /**
+     * @param  list<VariantCandidate>  $variants
+     */
+    public function withVariantList(array $variants): self
+    {
+        return new self($this->state, $this->snapshot, $this->failureReason, $this->adapterKey, $variants, $this->unmatchedVariantKey);
+    }
+
+    public function withSnapshot(ShopSnapshot $snapshot): self
+    {
+        return new self($this->state, $snapshot, $this->failureReason, $this->adapterKey, $this->variants, $this->unmatchedVariantKey);
+    }
+
     public function withAdapterKey(string $key): self
     {
         return new self($this->state, $this->snapshot, $this->failureReason, $key, $this->variants, $this->unmatchedVariantKey);

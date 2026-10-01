@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Actions\Shops\AttachShop;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\ShopDraft;
+use App\Enums\ProbeFailure;
 use App\Enums\ShopKind;
 use App\Models\Shop;
 use Illuminate\Console\Attributes\Description;
@@ -126,6 +127,11 @@ final class RetryReferenceShopsCommand extends Command
         return Shop::query()
             ->where('kind', ShopKind::Reference->value)
             ->where('active', true)
+            // The probe always refuses a comparison site: a retry can never
+            // make it a shop.
+            ->where(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query
+                ->whereNull('unreadable_reason')
+                ->orWhere('unreadable_reason', '!=', ProbeFailure::NotAShop->value))
             ->whereHas('product', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('active', true))
             ->where(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query
                 ->whereNull('retried_at')

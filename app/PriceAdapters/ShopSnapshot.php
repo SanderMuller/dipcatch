@@ -116,9 +116,14 @@ final readonly class ShopSnapshot
             : $this->price;
     }
 
-    public function withPackSize(string $packSize): self
+    /**
+     * `$authoritative` false for a size read outside the structured markup,
+     * such as the name a page gives a variant: the page's own words, but not
+     * a size field, so an empty one cannot clear stored pack data.
+     */
+    public function withPackSize(string $packSize, bool $authoritative = true): self
     {
-        return clone($this, ['packSize' => $packSize, 'packSizeAuthoritative' => true]);
+        return clone($this, ['packSize' => $packSize, 'packSizeAuthoritative' => $authoritative]);
     }
 
     public function withPromotionWindow(?PromotionWindow $promotionWindow): self

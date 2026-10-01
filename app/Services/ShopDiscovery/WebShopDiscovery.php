@@ -29,6 +29,7 @@ final readonly class WebShopDiscovery
     public function __construct(
         private WebSearches $searches,
         private ShopMatchCheck $shopMatch,
+        private KlarnaDiscovery $klarna,
     ) {}
 
     private function runsFor(Product $product): bool
@@ -53,6 +54,22 @@ final readonly class WebShopDiscovery
         dispatch(new DiscoverWebShops((string) $product->id));
 
         return true;
+    }
+
+    /**
+     * A Klarna page someone pasted becomes the product's lead source, and its
+     * shops are looked up now. False when the URL is not a Klarna product
+     * page, web discovery does not run for the product, or the Klarna steps
+     * are off. The same page pasted again while it is still being looked up
+     * changes nothing.
+     */
+    public function useKlarnaPage(Product $product, string $url): bool
+    {
+        if (! KlarnaSource::enabled() || ! KlarnaLeads::isKlarnaPage($url) || ! $this->runsFor($product)) {
+            return false;
+        }
+
+        return KlarnaSource::usePasted($product, $url);
     }
 
     /**
@@ -100,6 +117,7 @@ final readonly class WebShopDiscovery
 
         $this->firstCheck($product);
         $this->queueDueReadsOrCheck($product);
+        $this->klarna->continue($product);
         WebDiscovery::finishIfDone($product);
     }
 
@@ -108,6 +126,11 @@ final readonly class WebShopDiscovery
      * this or another product with the same title), when the product's title
      * or pack sizes changed, or when a barcode they were checked against is
      * gone. One no longer kept from the search is deleted; hidden ones stay hidden.
+     *
+     * Lead findings come from their own lookup: a refreshed search leaves
+     * them, and a stale fingerprint or barcode resets them with their lead
+     * kept. A rebuilt search also looks for the Klarna page again, unless the
+     * Klarna work of a known page, a pasted one say, is still under way.
      *
      * @param  list<array{url: string, url_hash: string, host: string, title: string, snippet: string}>  $kept
      */
@@ -124,7 +147,15 @@ final readonly class WebShopDiscovery
         $results = array_column($kept, null, 'url_hash');
 
         foreach (WebShopFinding::query()->where('product_id', $product->id)->whereNull('dismissed_at')->get() as $finding) {
-            if (! $searchChanged && $finding->fingerprint === $fingerprint && ! $finding->hasStaleGtins($gtins)) {
+            $stale = $finding->fingerprint !== $fingerprint || $finding->hasStaleGtins($gtins);
+
+            if ($finding->isLead()) {
+                LeadFindings::startOverIf($stale, $finding, $fingerprint);
+
+                continue;
+            }
+
+            if (! $searchChanged && ! $stale) {
                 continue;
             }
 
@@ -138,30 +169,18 @@ final readonly class WebShopDiscovery
             }
 
             WebShopFinding::query()->whereKey($finding->id)->update([
+                ...WebShopFinding::CLEARED_CHECKS,
                 'web_search_id' => $search->id,
                 'search_title' => mb_substr($result['title'], 0, 255),
                 'snippet' => $result['snippet'],
                 'status' => WebFindingStatus::New,
                 'fingerprint' => $fingerprint,
                 'generation' => $finding->generation + 1,
-                'first_chance' => null,
-                'add_url' => null,
-                'served_host' => null,
-                'page_title' => null,
-                'page_pack_quantity' => null,
-                'page_pack_unit' => null,
-                'page_price' => null,
-                'page_currency' => null,
-                'page_gtin' => null,
-                'matched_gtin' => null,
-                'checked_gtins' => null,
-                'read_at' => null,
-                'second_chance' => null,
-                'failure' => null,
-                'attempts' => 0,
-                'next_attempt_at' => null,
-                'checked_at' => null,
             ]);
+        }
+
+        if ($searchChanged) {
+            KlarnaSource::searchRebuilt($product, $discovery);
         }
 
         WebDiscovery::query()->whereKey($product->id)->update(['web_search_id' => $search->id, 'search_searched_at' => $search->searched_at]);
@@ -209,12 +228,20 @@ final readonly class WebShopDiscovery
             price: null,
             snippet: $finding->snippet,
         ))->all();
+        // A Klarna lead may point at the product in another size.
+        $anyPack = array_values($pending->filter(static fn (WebShopFinding $finding): bool => $finding->isLead())->keys()->all());
 
-        $answers = $this->shopMatch->ask($product, ShopCheckPurpose::WebDiscovery, $candidates, quick: false);
+        $answers = $this->shopMatch->ask($product, ShopCheckPurpose::WebDiscovery, $candidates, quick: false, anyPackKeys: $anyPack);
         arsort($answers);
 
         $readFrom = Config::float('dipcatch.web_discovery.read_from');
-        $slots = Config::integer('dipcatch.web_discovery.max_reads_per_product') - self::readsGranted($product, $fingerprint, $readFrom);
+        // Open-search and lead findings each have their own read cap.
+        $leadReads = self::grantedReads($product, $fingerprint, $readFrom)->whereNotNull('lead_url')->pluck('host');
+        $slots = [
+            'open' => Config::integer('dipcatch.web_discovery.max_reads_per_product') - self::grantedReads($product, $fingerprint, $readFrom)->whereNull('lead_url')->count(),
+            'lead' => Config::integer('dipcatch.web_discovery.klarna_leads_per_product') - $leadReads->count(),
+        ];
+        $leadHostsRead = $leadReads->unique()->values()->all();
         $gtins = WebShopFinding::trackedGtins($product);
 
         foreach ($answers as $key => $chance) {
@@ -224,13 +251,25 @@ final readonly class WebShopDiscovery
                 continue;
             }
 
+            $lead = $finding->isLead();
+            $kind = $lead ? 'lead' : 'open';
             $passes = $chance >= $readFrom;
-            $read = $passes && $slots > 0;
-            $slots -= $read ? 1 : 0;
+            // A lookup sends a few results per shop; only the best is read.
+            $otherPage = $lead && $passes && in_array($finding->host, $leadHostsRead, strict: true);
+            $read = $passes && ! $otherPage && $slots[$kind] > 0;
+            $slots[$kind] -= $read ? 1 : 0;
+
+            if ($read && $lead) {
+                $leadHostsRead[] = $finding->host;
+            }
 
             $finding->writeIfUnchanged(WebFindingStatus::New, [
                 'status' => $read ? WebFindingStatus::PendingRead : WebFindingStatus::Rejected,
-                'failure' => $passes && ! $read ? 'read_cap' : null,
+                'failure' => match (true) {
+                    $otherPage => 'other_page_on_host',
+                    $passes && ! $read => 'read_cap',
+                    default => null,
+                },
                 'first_chance' => $chance,
                 'checked_gtins' => $gtins,
             ]);
@@ -240,16 +279,17 @@ final readonly class WebShopDiscovery
     /**
      * Findings of this product and fingerprint that got a read: every one
      * that passed the first check, whatever became of the read, except the
-     * ones turned away by the cap itself.
+     * ones turned away by the cap or as another page of a shop already read.
+     *
+     * @return EloquentQueryBuilder<WebShopFinding>
      */
-    private static function readsGranted(Product $product, string $fingerprint, float $readFrom): int
+    private static function grantedReads(Product $product, string $fingerprint, float $readFrom): EloquentQueryBuilder
     {
         return WebShopFinding::query()
             ->where('product_id', $product->id)
             ->where('fingerprint', $fingerprint)
             ->where('first_chance', '>=', $readFrom)
-            ->where(static fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('failure')->orWhere('failure', '!=', 'read_cap'))
-            ->count();
+            ->where(static fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('failure')->orWhereNotIn('failure', ['read_cap', 'other_page_on_host']));
     }
 
     /** Queues the reads that may run now, and the second check once no read is left. */

@@ -12,6 +12,8 @@ use App\Enums\ProbeFailure;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\WebShopFinding;
+use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Services\TypeSafe\ShopMatchCheck;
 use App\Support\Gtin;
 use App\Support\PackSize;
@@ -38,9 +40,16 @@ final class AddShop extends Component
     /** Keep suggestions visible whenever the add-shop form is open. */
     public bool $expandSuggestions = true;
 
-    /** Jev's chance that the previewed shop sells the same product and pack; null when unchecked. */
+    /** Jev's chance that the previewed shop sells the same product (and pack, unless the preview is a Klarna lead suggestion); null when unchecked. */
     #[Locked]
     public ?float $sameProductChance = null;
+
+    /**
+     * The URL of a Klarna lead suggestion being added: its preview asks
+     * whether the page sells the product in any pack size.
+     */
+    #[Locked]
+    public ?string $anyPackUrl = null;
 
     public function mount(Product $product): void
     {
@@ -50,16 +59,25 @@ final class AddShop extends Component
         $this->manualCurrency = $product->currency !== '' ? $product->currency : 'EUR';
     }
 
-    /** A suggestion hands over a URL; the flow from here is the normal one. */
+    /**
+     * A suggestion hands over a URL; the flow from here is the normal one. A
+     * web suggestion also names its finding: the probe asks for the variant
+     * its read picked, and a Klarna lead's preview asks the any-size question.
+     */
     #[On('suggest-shop')]
-    public function useSuggestion(string $url, ProbeShopUrl $probe): void
+    public function useSuggestion(string $url, ProbeShopUrl $probe, ?int $findingId = null): void
     {
         Gate::authorize('view', $this->product);
 
+        $finding = $findingId === null ? null : WebShopFinding::query()->where('product_id', $this->product->id)->find($findingId);
+
+        $url = $finding instanceof WebShopFinding ? ($finding->add_url ?? $finding->url) : $url;
+
         $this->resetProbeState();
         $this->url = $url;
+        $this->anyPackUrl = $finding?->isLead() === true ? $url : null;
 
-        $this->runProbe($probe);
+        $this->runProbe($probe, variantKey: $finding?->variant_key);
 
         // Whatever the probe answered, the suggestion's button stops saying
         // "Adding…"; the form now shows the preview or the error.
@@ -73,7 +91,25 @@ final class AddShop extends Component
 
     protected function onPreviewShown(ProbeOutcome $outcome): void
     {
-        $this->sameProductChance = app(ShopMatchCheck::class)->draft($this->product, $this->shopDraft());
+        $this->sameProductChance = app(ShopMatchCheck::class)->draft($this->product, $this->shopDraft(), anyPack: $this->anyPackUrl === $this->url);
+    }
+
+    /**
+     * A pasted Klarna page on a product web discovery runs for: its shops are
+     * looked up, and the refusal says so.
+     *
+     * @param  array<string, mixed>|null  $context
+     * @return array<string, mixed>|null
+     */
+    protected function failureContext(ProbeOutcome $outcome, ?array $context): ?array
+    {
+        $klarnaUrl = $context['klarna_url'] ?? null;
+
+        if ($context === null || $outcome->errorCode !== ProbeFailure::NotAShop || ! is_string($klarnaUrl) || ! app(WebShopDiscovery::class)->useKlarnaPage($this->product, $klarnaUrl)) {
+            return $context;
+        }
+
+        return $context + ['looking_up' => true];
     }
 
     protected function onProbeReset(): void
@@ -81,7 +117,7 @@ final class AddShop extends Component
         $this->sameProductChance = null;
     }
 
-    /** Whether Jev doubts the previewed shop sells this product in this pack. */
+    /** Whether Jev doubts the previewed shop sells this product. */
     public function doubtsSameProduct(): bool
     {
         return $this->sameProductChance !== null

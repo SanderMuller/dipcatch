@@ -207,6 +207,18 @@ return [
         'search_max_age_days' => (int) env('DIPCATCH_WEB_DISCOVERY_SEARCH_MAX_AGE_DAYS', 90),
         // Paid searches app-wide per day. Zero or less lifts the cap.
         'daily_search_limit' => (int) env('DIPCATCH_WEB_DISCOVERY_DAILY_SEARCH_LIMIT', 300),
+        // Klarna pages as a source of shop leads (specs/klarna-shop-leads.md).
+        // Switch off when Klarna changes its page or refuses DipCatch.
+        'klarna_leads' => (bool) env('DIPCATCH_WEB_DISCOVERY_KLARNA_LEADS', true),
+        // Shops looked up per product (also the read cap for lead findings),
+        // results per shop sent to the first check, and attempts per Klarna
+        // step or lead before it gives up.
+        'klarna_leads_per_product' => (int) env('DIPCATCH_WEB_DISCOVERY_KLARNA_LEADS_PER_PRODUCT', 3),
+        'lead_results_per_host' => (int) env('DIPCATCH_WEB_DISCOVERY_LEAD_RESULTS_PER_HOST', 3),
+        'klarna_attempts' => (int) env('DIPCATCH_WEB_DISCOVERY_KLARNA_ATTEMPTS', 3),
+        // Pasted Klarna pages looked up per account per day: each one spends
+        // searches from the daily limit every account shares.
+        'klarna_pastes_per_day' => (int) env('DIPCATCH_WEB_DISCOVERY_KLARNA_PASTES_PER_DAY', 10),
     ],
 
     // Hosts that are not a shop a consumer orders from: comparison and review
@@ -221,6 +233,9 @@ return [
         'supermarktscanner.nl', 'fatsecret.nl', 'beeradvocate.com', 'techradar.com',
         'kisteman-events.nl', 'partyverhuren.nl', 'bidfood.nl', 'makro.nl',
         'bcc.nl', 'maxict.nl',
+        // Klarna and PriceRunner (Klarna's comparison site abroad) list other
+        // shops' prices. Web discovery reads Klarna pages for those shops.
+        'klarna.com', 'pricerunner.com', 'pricerunner.nl',
     ],
 
     // Price extraction chain. Order is priority — user selectors first, then

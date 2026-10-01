@@ -4,6 +4,7 @@ namespace App\PriceAdapters;
 
 use App\Enums\ConsumerPriceIssue;
 use App\PriceAdapters\Hosts\HostUrl;
+use App\Support\PackSize;
 
 /**
  * Chain-of-responsibility over registered adapters. Per spec §2:
@@ -19,8 +20,8 @@ use App\PriceAdapters\Hosts\HostUrl;
  * back ambiguous ends resolution, because a weaker adapter would otherwise
  * read some other number off the page and call it this product's price.
  *
- * An optional {@see AdapterContext} carries user-supplied selectors and a
- * fallback currency; today only {@see UserSelectorAdapter} consumes it.
+ * An optional {@see AdapterContext} carries user-supplied selectors, a
+ * fallback currency and a chosen variant key.
  */
 final readonly class AdapterResolver
 {
@@ -42,7 +43,7 @@ final readonly class AdapterResolver
         // Generic keys (jsonld etc.) never short-circuit — a host that
         // later gained a dedicated adapter must get it on the next check.
         if (! $persisted instanceof HostSpecificAdapter) {
-            return $this->readPage($this->runChain($url, $html, skipKey: null, context: $context), $html);
+            return $this->readPage($this->runChain($url, $html, skipKey: null, context: $context), $url, $html, $context);
         }
 
         $result = $this->extractWith($persisted, $url, $html, $context);
@@ -56,11 +57,11 @@ final readonly class AdapterResolver
         // present it as this product's price, which is how a wrong price
         // reaches a drop alert. Fail loudly instead.
         if (! $result->isSkip()) {
-            return $this->readPage($result->withAdapterKey($persisted->key()), $html);
+            return $this->readPage($result->withAdapterKey($persisted->key()), $url, $html, $context);
         }
 
         // The hint already ran and skipped — exclude it from the chain.
-        return $this->readPage($this->runChain($url, $html, $persistedKey, $context), $html);
+        return $this->readPage($this->runChain($url, $html, $persistedKey, $context), $url, $html, $context);
     }
 
     private function runChain(string $url, string $html, ?string $skipKey, ?AdapterContext $context): ExtractionResult
@@ -99,9 +100,38 @@ final readonly class AdapterResolver
     /**
      * What the page says in its own words, whichever adapter read the price.
      */
-    private function readPage(ExtractionResult $result, string $html): ExtractionResult
+    private function readPage(ExtractionResult $result, string $url, string $html, ?AdapterContext $context): ExtractionResult
     {
-        return $this->readConsumerPrice($this->readStock($result, $html), $html);
+        return $this->readConsumerPrice($this->readStock($this->readVariantSizes($result, $url, $html, $context), $html), $html);
+    }
+
+    /**
+     * The size a variant's own name states, where the markup it was read from
+     * left it out. See {@see VariantSizeNames}: on an ambiguous page every
+     * variant is named, so the pack a product tracks can be matched; on a read
+     * of one variant, by its key or by its URL, the snapshot takes that
+     * variant's size.
+     */
+    private function readVariantSizes(ExtractionResult $result, string $url, string $html, ?AdapterContext $context): ExtractionResult
+    {
+        if ($result->isAmbiguous()) {
+            return $result->withVariantList(VariantSizeNames::fill($result->variants, $html));
+        }
+
+        $snapshot = $result->snapshot;
+
+        if (! $result->isSuccess() || ! $snapshot instanceof ShopSnapshot || $snapshot->packSize !== null || VariantSizeNames::statesSize($snapshot->title)) {
+            return $result;
+        }
+
+        $name = VariantSizeNames::nameFor($context->variantKey ?? $url, $html);
+        $size = $name === null ? null : PackSize::resolve(packSize: null, authoritative: false, title: $name);
+
+        if (! $size instanceof PackSize) {
+            return $result;
+        }
+
+        return $result->withSnapshot($snapshot->withPackSize($size->quantity . ' ' . $size->unit, authoritative: false));
     }
 
     /**

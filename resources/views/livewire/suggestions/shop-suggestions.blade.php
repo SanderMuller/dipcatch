@@ -153,6 +153,17 @@
                                     {{-- A barcode match skips the second AI check, so it says so. --}}
                                     <span class="text-savings-strong">{{ $finding->matched_gtin !== null ? __('same barcode as your product') : __('same product, checked by AI') }}</span>
                                 </flux:text>
+                                @php($webOtherSize = $finding->otherSizeNote($product))
+                                @if ($webOtherSize !== null || $finding->isLead())
+                                    <div class="mt-1 flex flex-wrap gap-1.5" data-test="web-suggestion-lead">
+                                        @if ($webOtherSize !== null)
+                                            <flux:badge size="sm" color="amber">{{ $webOtherSize }}</flux:badge>
+                                        @endif
+                                        @if ($finding->isLead())
+                                            <flux:badge size="sm">{{ __('Found through Klarna') }}</flux:badge>
+                                        @endif
+                                    </div>
+                                @endif
                             </div>
 
                             <div class="flex w-full shrink-0 items-center gap-2 pl-8 sm:w-auto sm:pl-0">
@@ -163,7 +174,7 @@
                                 <flux:button
                                     size="xs"
                                     variant="primary"
-                                    wire:click="accept({{ \Illuminate\Support\Js::from($finding->add_url ?? $finding->url) }})"
+                                    wire:click="accept({{ \Illuminate\Support\Js::from($finding->add_url ?? $finding->url) }}, {{ $finding->id }})"
                                     wire:loading.attr="disabled"
                                     x-on:click="$el.dataset.adding = 'true'"
                                     x-on:shop-probe-finished.window="delete $el.dataset.adding"

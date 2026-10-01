@@ -36,6 +36,13 @@ final class DiscoverWebShopsCommand extends Command
 
     private const int SEARCH_AGAIN = 3;
 
+    /**
+     * Only the Klarna steps are left: a Klarna search and a lookup per lead.
+     * Last, and counted against the day's searches, so the night after a
+     * deploy cannot spend them all on Klarna before new products search.
+     */
+    private const int KLARNA = 4;
+
     public function handle(WebShopDiscovery $discovery, WebSearches $searches): int
     {
         if (! $searches->enabled() || ! TypeSafeClient::configured()) {
@@ -60,12 +67,14 @@ final class DiscoverWebShopsCommand extends Command
             }
 
             // Zero or less lifts the limit, as it does in WebSearches.
+            $cost = $rank === self::KLARNA ? 1 + Config::integer('dipcatch.web_discovery.klarna_leads_per_product') : 1;
+
             if ($rank >= self::SEARCH_NEW && $limitSearches > 0) {
-                if ($searchesLeft === 0) {
+                if ($searchesLeft < $cost) {
                     continue;
                 }
 
-                $searchesLeft--;
+                $searchesLeft -= $cost;
             }
 
             $queued += $discovery->queue($product) ? 1 : 0;
@@ -134,7 +143,15 @@ final class DiscoverWebShopsCommand extends Command
             return self::SEARCH_AGAIN;
         }
 
-        if ($discovery->state !== WebDiscoveryState::Done || $findings->contains(fn (WebShopFinding $finding): bool => in_array($finding->status, WebFindingStatus::unfinished(), strict: true))) {
+        if ($findings->contains(fn (WebShopFinding $finding): bool => in_array($finding->status, WebFindingStatus::unfinished(), strict: true))) {
+            return self::FINISH;
+        }
+
+        if ($discovery->klarnaUnfinished()) {
+            return self::KLARNA;
+        }
+
+        if ($discovery->state !== WebDiscoveryState::Done) {
             return self::FINISH;
         }
 

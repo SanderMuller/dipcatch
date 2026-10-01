@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\WithoutIncrementing;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Config;
 
 /**
  * Web shop discovery for one product as a whole.
@@ -19,6 +20,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property WebDiscoveryState $state
  * @property ?CarbonImmutable $queued_at
  * @property ?CarbonImmutable $finished_at
+ * @property ?string $klarna_url The Klarna page the product's shop leads come from.
+ * @property ?int $klarna_search_id
+ * @property int $klarna_generation Raised each time the lead source is resolved again.
+ * @property int $klarna_attempts Attempts of the source or page step of this generation.
+ * @property ?list<array{host: string, title: string, pack_quantity: ?float, pack_unit: ?string, state: string, attempts: int}> $klarna_leads
+ * @property ?CarbonImmutable $klarna_checked_at When the Klarna work of this generation finished.
  */
 #[WithoutTimestamps]
 #[Unguarded]
@@ -60,9 +67,14 @@ final class WebDiscovery extends Model
             ->unfinished()
             ->exists();
 
-        if (! $unfinished) {
+        if (! $unfinished && ! self::query()->find($product->id)?->klarnaUnfinished()) {
             self::mark($product, WebDiscoveryState::Done);
         }
+    }
+
+    public function klarnaUnfinished(): bool
+    {
+        return Config::boolean('dipcatch.web_discovery.klarna_leads') && $this->klarna_checked_at === null;
     }
 
     /**
@@ -83,6 +95,10 @@ final class WebDiscovery extends Model
             'search_searched_at' => 'datetime',
             'queued_at' => 'datetime',
             'finished_at' => 'datetime',
+            'klarna_generation' => 'integer',
+            'klarna_attempts' => 'integer',
+            'klarna_leads' => 'array',
+            'klarna_checked_at' => 'datetime',
         ];
     }
 }

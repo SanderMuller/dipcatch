@@ -362,7 +362,18 @@ trait DrivesShopProbe
             ? $outcome->context
             : [...$outcome->context ?? [], 'reason' => $outcome->extractionReason];
 
-        $this->failWith($outcome->errorCode->value, $context);
+        $this->failWith($outcome->errorCode->value, $this->failureContext($outcome, $context));
+    }
+
+    /**
+     * Hook for consumers that act on a refusal and say so in its message.
+     *
+     * @param  array<string, mixed>|null  $context
+     * @return array<string, mixed>|null
+     */
+    protected function failureContext(ProbeOutcome $outcome, ?array $context): ?array
+    {
+        return $context;
     }
 
     /**
