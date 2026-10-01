@@ -28,9 +28,7 @@
         $usedPercent = $maxProducts ? min(100, (int) round($productCount / $maxProducts * 100)) : null;
         $productsFull = $remainingProducts === 0;
         $statClass = 'border-ink/10 px-6 py-5 even:border-l dark:border-white/10 [&:nth-child(n+3)]:border-t @2xl:[&:not(:first-child)]:border-l @2xl:[&:nth-child(n+3)]:border-t-0';
-        $historyLabel = fn (\App\Billing\Entitlements $plan): string => $plan->historyDays() === null
-            ? __('Everything, kept')
-            : __(':days days', ['days' => $plan->historyDays()]);
+        $historyLabel = fn (\App\Billing\Entitlements $plan): string => __(':days days', ['days' => $plan->historyKeptDays()]);
     @endphp
 
     <flux:card class="mt-8 overflow-hidden p-0!">

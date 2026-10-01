@@ -23,6 +23,7 @@ test('the Dutch marketing pages render no untranslated string', function (): voi
         $this->get(route('pricing', ['lang' => 'nl']))->assertOk();
         $this->get(route('shops', ['lang' => 'nl']))->assertOk();
         $this->get(route('support', ['lang' => 'nl']))->assertOk();
+        $this->get(route('terms', ['lang' => 'nl']))->assertOk();
 
         // Slugs from config, not UseCases::all(): building the objects here
         // evaluates their __() copy while the locale is still English, and the
@@ -38,6 +39,7 @@ test('the Dutch marketing pages render no untranslated string', function (): voi
         $this->get(route('pricing', ['lang' => 'nl']))->assertOk();
         $this->get(route('shops', ['lang' => 'nl']))->assertOk();
         $this->get(route('support', ['lang' => 'nl']))->assertOk();
+        $this->get(route('terms', ['lang' => 'nl']))->assertOk();
 
         // Slugs from config, not UseCases::all(): building the objects here
         // evaluates their __() copy while the locale is still English, and the

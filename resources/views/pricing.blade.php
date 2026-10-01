@@ -50,7 +50,7 @@
                     // Numbers come from the plans, never typed, so the page
                     // cannot drift from what each plan gives.
                     $symbol = \App\Support\MoneyFormatter::symbol(\App\Billing\ProPrice::currency());
-                    $proHistory = $pro->historyDays() === null ? __('Everything, kept') : __(':days days', ['days' => $pro->historyDays()]);
+                    $proHistory = __(':days days', ['days' => $pro->historyKeptDays()]);
                     // [label, what it means, Free, Pro]: true is a tick, false a dash.
                     $sections = [
                         __('Tracking') => [
@@ -65,7 +65,7 @@
                             [__('Target price per kilo'), __('Any shop, any pack, at the price you set.'), false, true],
                         ],
                         __('History') => [
-                            [__('Price history'), __('Tells a real low from the usual offer.'), __(':days days', ['days' => $free->historyDays()]), $proHistory],
+                            [__('Price history'), __('Tells a real low from the usual offer.'), __(':days days', ['days' => $free->historyKeptDays()]), $proHistory],
                         ],
                         __('AI help, off until you switch it on') => [
                             [__('Automatic categories'), __('New products filed for you.'), false, true],
@@ -95,7 +95,7 @@
                         __('Shops per product') => __('No limit'),
                         __('Price checks') => __(':times× as often', ['times' => (int) round($free->recheckIntervalHours() / max(1, $pro->recheckIntervalHours()))]),
                         __('Alerts per hour') => __(':times× more', ['times' => (int) floor($pro->notificationsHourlyLimit() / max(1, $free->notificationsHourlyLimit()))]),
-                        __('Price history') => __('No limit'),
+                        __('Price history') => __(':times× longer', ['times' => (int) floor($pro->historyKeptDays() / max(1, $free->historyKeptDays()))]),
                         __('Target price per kilo') => __('Pro only'),
                         __('Automatic categories') => __('Pro only'),
                         __('Same-product check') => __('Pro only'),
@@ -109,7 +109,7 @@
 
                 <div class="w-fit mx-auto">
                     <h1 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Free to start. Pro for everything you buy.') }}</h1>
-                    <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-300">{{ __('Both plans alert you when a price drops. Pro compares every shop, checks more often, keeps every price, and can let AI help.') }}</p>
+                    <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-300">{{ __('Both plans alert you when a price drops. Pro compares every shop, checks more often, keeps prices for longer, and can let AI help.') }}</p>
                 </div>
 
                 <div class="mt-12 max-w-3xl mx-auto">

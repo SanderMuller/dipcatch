@@ -22,10 +22,23 @@ return [
      * page shows it and the sitemap emits it as <lastmod>, so both read one
      * value. Set to null to hide the line and drop the sitemap timestamp.
      */
-    'privacy_updated_at' => '2026-09-12',
+    'privacy_updated_at' => '2026-10-01',
 
     /** Shown on the terms page, and the date a change is measured from. */
-    'terms_updated_at' => '2026-09-26',
+    'terms_updated_at' => '2026-10-01',
+
+    /**
+     * The business that runs DipCatch, as the terms and privacy pages name
+     * it. Dutch law requires the name, address and KvK number on a web shop
+     * or online service. Public registry data, not a secret.
+     */
+    'operator' => [
+        'name' => 'Scode',
+        'street' => 'Slinge 26',
+        'city' => '9406 EC Assen',
+        'kvk' => '61360511',
+        'vat' => 'NL002241339B45',
+    ],
 
     /**
      * Shops with a dedicated landing page. One host per brand, plus the

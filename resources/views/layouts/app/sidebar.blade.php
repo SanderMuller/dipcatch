@@ -16,7 +16,7 @@
     </head>
     {{-- The same warm canvas as the marketing site, so the app a person
          lands in after signing up looks like the page that sold it. --}}
-    <body class="min-h-dvh bg-amber-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50 print:bg-white print:text-black">
+    <body class="flex min-h-dvh flex-col bg-amber-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50 print:bg-white print:text-black">
         {{-- The same two blurred washes the marketing hero uses. They are what
              gives that page its depth, and a flat tint could not reproduce it.
              Fixed and behind everything, so scrolling and hit-testing are
@@ -174,6 +174,20 @@
         </header>
 
         {{ $slot }}
+
+        {{-- The bottom row of the marketing footer, so the legal pages are a
+             click away from inside the app as well. --}}
+        <footer class="mx-auto mt-auto w-full max-w-app px-4 pt-6 pb-8 sm:px-6 lg:px-8 print:hidden">
+            <div class="flex flex-col items-center justify-between gap-3 border-t border-zinc-900/10 pt-6 text-sm text-zinc-500 sm:flex-row dark:border-white/10 dark:text-zinc-400">
+                <p>&copy; {{ date('Y') }} {{ config('app.name') }}</p>
+                <nav class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2" aria-label="{{ __('Footer') }}">
+                    <a href="{{ route('pricing') }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Pricing') }}</a>
+                    <a href="{{ route('privacy') }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Privacy') }}</a>
+                    <a href="{{ route('terms') }}" class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Terms') }}</a>
+                    <a href="{{ route('app.support') }}" wire:navigate class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Support') }}</a>
+                </nav>
+            </div>
+        </footer>
 
         @persist('toast')
             <flux:toast.group>

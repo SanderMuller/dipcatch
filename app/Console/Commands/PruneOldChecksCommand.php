@@ -22,7 +22,8 @@ use Illuminate\Support\Facades\DB;
 #[Description('Prune price_checks / price_drop_events / cheapest_history older than 365 days, keeping at least 50 most-recent rows per offer/product, and target_price_events older than 365 days.')]
 final class PruneOldChecksCommand extends Command
 {
-    private const int RETAIN_DAYS = 365;
+    /** No plan keeps price history longer; the plan pages show this. */
+    public const int RETAIN_DAYS = 365;
 
     private const int RETAIN_MIN_PER_OFFER = 50;
 

@@ -178,3 +178,18 @@ it('does not mark the logo as the current page while the stats page is open', fu
     expect($logo(route('app.dashboard')))->toContain('aria-current="page"')
         ->and($logo(route('app.stats')))->not->toContain('aria-current="page"');
 });
+
+it('links pricing, privacy, terms and support from the footer', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $body = $this->get(route('app.dashboard'))->assertOk()->getContent();
+
+    expect($body)->toMatch('#<nav [^>]*aria-label="Footer"#');
+    preg_match('#<nav [^>]*aria-label="Footer"[^>]*>(.*?)</nav>#s', (string) $body, $matches);
+
+    expect($matches[1] ?? '')
+        ->toContain('href="' . route('pricing') . '"')
+        ->toContain('href="' . route('privacy') . '"')
+        ->toContain('href="' . route('terms') . '"')
+        ->toContain('href="' . route('app.support') . '"');
+});

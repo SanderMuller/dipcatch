@@ -167,6 +167,18 @@ it('serves the public pricing page to a guest', function (): void {
         ->assertDontSee('no limit on how much you track');
 });
 
+it('promises Pro no more price history than the nightly prune keeps', function (): void {
+    config()->set('plans.free.history_days', 90);
+    config()->set('plans.pro.history_days');
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSeeInOrder(['Price history', '90 days', '365 days'])
+        ->assertSee('4× longer')
+        ->assertDontSee('Everything, kept')
+        ->assertDontSee('keeps every price');
+});
+
 it('links to the pricing page from the marketing site', function (): void {
     $this->get('/')->assertOk()->assertSee(route('pricing'));
 });

@@ -34,7 +34,8 @@
                     <section>
                         <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-50">What it fetches</h2>
                         <p class="mt-2">
-                            Only product pages that one of our users has added by pasting the link. It reads the title,
+                            Only product pages that one of our users has added by pasting the link, and, for Pro users,
+                            product pages a web search found for a product they track, so we can suggest other shops. It reads the title,
                             image, price and pack size, the regular price the page states beside a discount, and the name
                             of the marketplace seller when the page gives one. It stores nothing else from the page. It
                             does not crawl your site looking for pages, and it does not follow links.

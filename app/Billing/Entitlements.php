@@ -2,6 +2,7 @@
 
 namespace App\Billing;
 
+use App\Console\Commands\PruneOldChecksCommand;
 use App\Models\User;
 use Illuminate\Support\Facades\Config;
 
@@ -63,6 +64,15 @@ final readonly class Entitlements
     public function historyDays(): ?int
     {
         return $this->limit('history_days');
+    }
+
+    /**
+     * Days of price history the plan pages promise. The nightly prune caps
+     * every plan, so an unlimited read still shows a year at most.
+     */
+    public function historyKeptDays(): int
+    {
+        return min($this->historyDays() ?? PruneOldChecksCommand::RETAIN_DAYS, PruneOldChecksCommand::RETAIN_DAYS);
     }
 
     public function allowsUnitPriceAlerts(): bool

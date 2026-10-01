@@ -72,3 +72,20 @@ it('links the pages from every marketing footer', function (): void {
         $this->get($path)->assertOk()->assertSeeHtml(route('support'))->assertSeeHtml(route('terms'));
     }
 });
+
+it('names the business behind DipCatch on the terms and privacy pages', function (string $route): void {
+    config()->set('site.operator', ['name' => 'Example BV', 'street' => 'Teststraat 1', 'city' => '1234 AB Testdorp', 'kvk' => '12345678', 'vat' => 'NL000000000B01']);
+
+    $this->get(route($route))
+        ->assertOk()
+        ->assertSee('Example BV, Teststraat 1, 1234 AB Testdorp')
+        ->assertSee('12345678');
+})->with(['terms', 'privacy']);
+
+it('tells a consumer how to withdraw from Pro', function (): void {
+    $this->get('/terms-of-service')->assertOk()->assertSee('withdraw from a Pro subscription within 14 days');
+});
+
+it('names the Dutch data protection authority for complaints', function (): void {
+    $this->get(route('privacy'))->assertOk()->assertSeeHtml('https://autoriteitpersoonsgegevens.nl');
+});
