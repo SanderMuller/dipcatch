@@ -317,6 +317,28 @@ it('opens the add-shop disclosure when the page is asked to', function (): void 
         ->toContain('x-data="{ addOpen: true }"');
 });
 
+it('checks a suggested shop on arrival, so its comparison is open when the page paints', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+
+    $this->actingAs($user)
+        ->get(route('app.products.show', [$product, 'add-shop' => 1, 'suggest' => 'https://www.jumbo.com/producten/x-1', 'finding' => '7']))
+        ->assertOk()
+        ->assertSee("Livewire.dispatchTo('shops.add-shop', 'suggest-shop'", false)
+        ->assertSee('https:\\/\\/www.jumbo.com\\/producten\\/x-1', false)
+        ->assertSee('findingId: 7', false);
+});
+
+it('ignores a suggested address that is not a web page', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+
+    $this->actingAs($user)
+        ->get(route('app.products.show', [$product, 'add-shop' => 1, 'suggest' => 'javascript:alert(1)']))
+        ->assertOk()
+        ->assertDontSee("'suggest-shop'", false);
+});
+
 it('leaves the add-shop disclosure closed without that request', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user);

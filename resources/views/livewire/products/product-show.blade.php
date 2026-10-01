@@ -226,6 +226,8 @@
                     'shopLimit' => $shopLimit,
                     'canAddShop' => $canAddShop,
                     'openAddShop' => $openAddShop,
+                    'suggestUrl' => $suggestUrl,
+                    'suggestFindingId' => $suggestFinding === null ? null : (int) $suggestFinding,
                     'heading' => __('Shop comparison'),
                     'subheading' => $packs->hasComparisonUnit()
                         ? __('Same product, different pack sizes. Sorted by price :unit.', ['unit' => \App\Support\UnitWord::forCode($packs->unit())])

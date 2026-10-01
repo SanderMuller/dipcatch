@@ -4,6 +4,10 @@
     /** @var bool $canAddShop */
     /** @var bool $openAddShop Opens the disclosure on arrival, for a link that promised the form. */
     $openAddShop = $openAddShop ?? false;
+    /** @var string|null $suggestUrl A suggested shop page the form checks on arrival. */
+    $suggestUrl = $suggestUrl ?? null;
+    /** @var int|null $suggestFindingId The web suggestion behind it. */
+    $suggestFindingId = $suggestFindingId ?? null;
     /** @var string|null $heading Rendered beside the add button, on one row. */
     $heading = $heading ?? null;
     /** @var string|null $subheading One line under the heading, as the brand kit's card titles carry. */
@@ -76,6 +80,19 @@
             <flux:card class="mt-4">
                 @livewire('shops.add-shop', ['product' => $product], key('add-shop-inline-' . $product->id))
             </flux:card>
+
+            {{-- After the form, so it exists when the suggestion reaches it.
+                 Alpine runs this once; a later morph keeps the element, so
+                 the page is not checked a second time. --}}
+            @if ($suggestUrl !== null)
+                <div hidden x-init="$nextTick(() => {
+                    Livewire.dispatchTo('shops.add-shop', 'suggest-shop', { url: {{ \Illuminate\Support\Js::from($suggestUrl) }}, findingId: {{ \Illuminate\Support\Js::from($suggestFindingId) }} });
+                    const address = new URL(window.location.href);
+                    address.searchParams.delete('suggest');
+                    address.searchParams.delete('finding');
+                    history.replaceState(history.state, '', address);
+                })"></div>
+            @endif
         </details>
         </div>
     @else

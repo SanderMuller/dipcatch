@@ -190,7 +190,7 @@
                     @if ($inDropCount > 0 && $products->firstItem() + $loop->index === $inDropCount + 1)
                         <li wire:key="drop-divider" class="col-span-full flex items-center gap-3 py-1" data-test="drop-divider">
                             <span class="h-px flex-1 bg-zinc-300 dark:bg-white/15"></span>
-                            <span class="text-sm font-medium text-zinc-600 dark:text-zinc-300">{{ __('No drop right now') }}</span>
+                            <span class="text-sm font-medium text-zinc-600 dark:text-zinc-300">{{ __('No discount right now') }}</span>
                             <span class="h-px flex-1 bg-zinc-300 dark:bg-white/15"></span>
                         </li>
                     @endif

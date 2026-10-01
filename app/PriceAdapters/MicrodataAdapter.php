@@ -40,8 +40,13 @@ final readonly class MicrodataAdapter implements ShopAdapter
             return ExtractionResult::failed('microdata_no_currency');
         }
 
-        $title = $scope->read('name', $crawler) ?? 'Unknown';
-        $image = $scope->read('image', $crawler);
+        // A shop can mark up only the offer, with no Product scope around it
+        // (Magento: bootsapotheek.nl). Its name and image then sit outside
+        // every scope, so the page's own share tags stand in for them.
+        $title = $scope->read('name', $crawler)
+            ?? PageMarkup::meta($crawler, 'meta[property="og:title"]')
+            ?? 'Unknown';
+        $image = $scope->read('image', $crawler) ?? PageMarkup::ogImage($crawler);
         $availability = $scope->read('availability', $crawler);
         [$inStock, $stockSignal] = StockAvailability::read($availability);
 

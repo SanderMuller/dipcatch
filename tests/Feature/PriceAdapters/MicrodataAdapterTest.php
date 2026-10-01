@@ -145,3 +145,28 @@ test('an explicit out-of-stock value is read as such', function (): void {
 
     expect($this->adapter->extract('https://x.test', $html)->snapshot?->inStock)->toBeFalse();
 });
+
+test('takes the title and image from the share tags when only the offer is marked up', function (): void {
+    // bootsapotheek.nl (Magento): an Offer scope with no Product scope around
+    // it, and the product name outside every scope.
+    $html = <<<'HTML'
+<html><head>
+<meta property="og:title"
+      content="Sensodyne&#x20;Tandpasta&#x20;Rapid&#x20;Relief" />
+<meta property="og:image"
+      content="https://www.bootsapotheek.nl/media/catalog/product/sensodyne.jpg" />
+</head><body>
+<h1><span itemprop="name">Sensodyne Tandpasta Rapid Relief</span></h1>
+<span itemprop="offers" itemscope itemtype="http://schema.org/Offer">
+  <meta itemprop="price" content="7.29" />
+  <meta itemprop="priceCurrency" content="EUR" />
+</span>
+</body></html>
+HTML;
+
+    $result = $this->adapter->extract('https://www.bootsapotheek.nl/sensodyne-tandpasta-rapid-relief-75ml', $html);
+
+    expect($result->snapshot?->price)->toBe('7.29')
+        ->and($result->snapshot?->title)->toBe('Sensodyne Tandpasta Rapid Relief')
+        ->and($result->snapshot?->imageUrl)->toBe('https://www.bootsapotheek.nl/media/catalog/product/sensodyne.jpg');
+});

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Drops\DetectDrop;
+use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Enums\CategorySource;
 use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
@@ -347,6 +348,27 @@ final class Product extends Model
     {
         return $this->target_price !== null
             || ($this->unit_price_target !== null && $this->bestValueShop()?->unitPrice() !== null);
+    }
+
+    /**
+     * Whether the price is at or under a target the owner set, right now:
+     * the cheapest price against the price target, or the best value against
+     * the per-unit target. The same comparisons the target alerts make.
+     */
+    public function isAtTarget(): bool
+    {
+        if ($this->target_price !== null && $this->cheapest_price !== null
+            && bccomp(Numeric::str((string) $this->cheapest_price), Numeric::str((string) $this->target_price), self::BC_SCALE) <= 0) {
+            return true;
+        }
+
+        if ($this->unit_price_target === null) {
+            return false;
+        }
+
+        $unitValue = $this->bestValueShop()?->unitPriceValue();
+
+        return $unitValue !== null && DetectUnitPriceTarget::meets($unitValue, (string) $this->unit_price_target);
     }
 
     public function isPubliclyShared(): bool

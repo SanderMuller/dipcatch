@@ -71,7 +71,8 @@
                 }
             }
         @endphp
-        <flux:card class="space-y-3">
+        {{-- No card of its own: the add-shop disclosure is the card. --}}
+        <div class="space-y-3">
             @php($alreadyTracked = $this->alreadyTrackedNote())
             @if ($alreadyTracked !== null)
                 <flux:callout icon="exclamation-triangle" color="amber">
@@ -199,7 +200,7 @@
                     Different product
                 </flux:button>
             </div>
-        </flux:card>
+        </div>
     @endif
 
     @if ($state === 'error')

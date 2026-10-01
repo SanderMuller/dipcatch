@@ -1023,3 +1023,40 @@ it('offers the on-list filter only to an account with something on its list', fu
 
     livewire(ProductList::class)->assertSeeHtml('data-test="product-on-list-filter"');
 });
+
+it('marks a product whose price is at or under its target, and only that one', function (): void {
+    $user = User::factory()->create();
+    $reached = Product::factory()->create(['user_id' => $user->id, 'title' => 'Reached', 'target_price' => '2.00']);
+    Shop::factory()->for($reached)->create(['current_price' => '1.99']);
+    $above = Product::factory()->create(['user_id' => $user->id, 'title' => 'Above', 'target_price' => '0.95']);
+    Shop::factory()->for($above)->create(['current_price' => '1.92']);
+    $perKilo = Product::factory()->create(['user_id' => $user->id, 'title' => 'Per kilo', 'unit_price_target' => '8.0000']);
+    Shop::factory()->for($perKilo)->create(['current_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
+
+    foreach ([$reached, $above, $perKilo] as $product) {
+        $product->refresh()->recomputeCheapestShop();
+    }
+
+    $this->actingAs($user);
+
+    $html = livewire(ProductList::class)->set('sort', 'title')->html();
+
+    // One chunk per card. €4.99 for 660 g is €7.56 /kg, under the €8 target.
+    $badged = collect(explode('data-test="product-card"', $html))->skip(1)
+        ->filter(fn (string $card): bool => str_contains($card, 'data-test="at-target-badge"'))
+        ->map(fn (string $card): string => collect(['Above', 'Per kilo', 'Reached'])->first(fn (string $title): bool => str_contains($card, $title)) ?? '')
+        ->values()->all();
+
+    expect($badged)->toBe(['Per kilo', 'Reached']);
+});
+
+it('calls the line between the drops and the rest "No discount right now"', function (): void {
+    $user = User::factory()->create();
+    $dropped = Product::factory()->create(['user_id' => $user->id, 'last_notified_price' => '6.00', 'last_notified_at' => now()]);
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $dropped->id, 'drop_pct' => 40]);
+    Product::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)->assertSeeText('No discount right now')->assertDontSeeText('No drop right now');
+});

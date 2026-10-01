@@ -31,6 +31,18 @@
                 {{ __('Paused') }}
             </span>
         @endif
+        @if ($product->active && $product->isAtTarget())
+            {{-- The price is at or under the owner's own target now. The ping
+                 marks it as live, like the alert itself. --}}
+            <span class="absolute top-5 right-5 flex size-8 items-center justify-center rounded-full bg-white/90 text-emerald-600 shadow-xs ring-1 ring-black/5 backdrop-blur-sm dark:bg-zinc-800/90 dark:text-emerald-400 dark:ring-white/10" data-test="at-target-badge">
+                <flux:icon.bell-alert variant="micro" class="size-4" />
+                <span class="absolute -top-0.5 -right-0.5 flex size-2.5" aria-hidden="true">
+                    <span class="absolute inline-flex size-full rounded-full bg-emerald-400 opacity-75 motion-safe:animate-ping"></span>
+                    <span class="relative inline-flex size-2.5 rounded-full bg-emerald-500"></span>
+                </span>
+                <span class="sr-only">{{ __('At or under your target price') }}</span>
+            </span>
+        @endif
         @if ($listToggle)
             {{-- Above the link stretched over the card (z-10), so a click adds
                  rather than opens the product. The flight is decoration; the

@@ -54,6 +54,20 @@ final class ProductShow extends Component
     #[Url(as: 'add-shop', except: false)]
     public bool $openAddShop = false;
 
+    /**
+     * A suggested shop the add-shop form checks on arrival: the dashboard's
+     * "Add this shop" links here with it, so the comparison is already open
+     * when the page paints. The browser then drops it from the address, so a
+     * reload does not check the page again. A Url property for the reason
+     * `$openAddShop` is one.
+     */
+    #[Url(as: 'suggest', except: null)]
+    public ?string $suggestUrl = null;
+
+    /** The web suggestion behind `$suggestUrl`, as the query string gives it. */
+    #[Url(as: 'finding', except: null)]
+    public ?string $suggestFinding = null;
+
     public ?string $shopMessage = null;
 
     /** The shop whose panel is open, and the fields it is editing. */
@@ -72,6 +86,15 @@ final class ProductShow extends Component
         $this->authorize('view', $product);
 
         $this->product = $product;
+
+        // Only a web page is handed to the form; anything else is dropped.
+        if ($this->suggestUrl !== null && preg_match('#^https?://#i', $this->suggestUrl) !== 1) {
+            $this->suggestUrl = null;
+        }
+
+        if ($this->suggestUrl === null || $this->suggestFinding === null || ! ctype_digit($this->suggestFinding)) {
+            $this->suggestFinding = null;
+        }
     }
 
     /**
