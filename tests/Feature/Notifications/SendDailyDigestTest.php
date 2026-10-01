@@ -612,3 +612,23 @@ test('drops and reached targets share one mail, grouped per product, counted tog
             && $dropOnlyGroup['reached']->isEmpty();
     });
 });
+
+test('the shop name in the digest links to the product page, not the shop homepage', function (): void {
+    Mail::swap(app('mail.manager'));
+
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create();
+    $dropShop = Shop::factory()->for($product)->create(['url' => 'https://www.amazon.nl/dp/B0DROP0001']);
+    $targetShop = Shop::factory()->for($product)->create(['url' => 'https://www.amazon.nl/dp/B0TARGET01']);
+    $drops = PriceDropEvent::factory()->count(1)->for($user)->create(['product_id' => $product->id, 'triggered_by_shop_id' => $dropShop->id]);
+    $reached = TargetPriceEvent::factory()->count(1)->for($user)->for($product)->create(['shop_id' => $targetShop->id]);
+
+    $html = new DailyDigestMail(
+        $user,
+        PriceDropEvent::query()->whereKey($drops->modelKeys())->get(),
+        TargetPriceEvent::query()->whereKey($reached->modelKeys())->get(),
+    )->render();
+
+    expect($html)->toContain('href="https://www.amazon.nl/dp/B0DROP0001"')
+        ->toContain('href="https://www.amazon.nl/dp/B0TARGET01"');
+});

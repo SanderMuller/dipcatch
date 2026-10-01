@@ -40,7 +40,7 @@ $image = $product->safeImageUrl();
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; margin: 0 0 {{ $loop->last && $events->isEmpty() ? '0' : '16px' }}; border-collapse: collapse;">
 <tr>
 <td style="padding: 0 0 8px; color: #71717a; font-size: 13px; line-height: 1.4;">
-{{ $hit->shop?->host ?? 'Shop unknown' }} · {{ $hit->fired_at->setTimezone($user->timezone)->format('H:i') }}
+<x-digest-shop-link :shop="$hit->shop" /> · {{ $hit->fired_at->setTimezone($user->timezone)->format('H:i') }}
 </td>
 </tr>
 <tr>
@@ -72,7 +72,7 @@ $image = $product->safeImageUrl();
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; margin: 0 0 {{ $loop->last ? '0' : '16px' }}; border-collapse: collapse;">
 <tr>
 <td style="padding: 0 0 8px; color: #71717a; font-size: 13px; line-height: 1.4;">
-{{ $event->triggeredByShop?->host ?? 'Shop unknown' }} · {{ $event->fired_at->setTimezone($user->timezone)->format('H:i') }}
+<x-digest-shop-link :shop="$event->triggeredByShop" /> · {{ $event->fired_at->setTimezone($user->timezone)->format('H:i') }}
 </td>
 </tr>
 <tr>
