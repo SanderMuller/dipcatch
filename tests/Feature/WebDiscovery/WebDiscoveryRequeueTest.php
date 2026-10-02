@@ -110,7 +110,13 @@ it('re-checks when a removed shop takes a barcode a finding was checked against'
 });
 
 it('stays unique only while queued, so a change during a run queues the next one', function (): void {
-    expect(new DiscoverWebShops('x'))->toBeInstanceOf(ShouldBeUniqueUntilProcessing::class);
+    Queue::fake();
+
+    dispatch(new DiscoverWebShops('x'));
+    dispatch(new DiscoverWebShops('x'));
+
+    Queue::assertPushed(DiscoverWebShops::class, 1);
+    expect(class_implements(DiscoverWebShops::class))->toHaveKey(ShouldBeUniqueUntilProcessing::class);
 });
 
 it('re-checks after the product is renamed', function (): void {

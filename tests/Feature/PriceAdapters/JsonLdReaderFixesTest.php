@@ -58,6 +58,7 @@ test('a Product stated only inside a BuyAction is read', function (string $shape
         'top level' => $action,
         'list' => [$action],
         'graph' => ['@context' => 'https://schema.org', '@graph' => [$action]],
+        default => throw new InvalidArgumentException($shape),
     };
 
     $html = '<html><head><script type="application/ld+json">' . json_encode($decoded, JSON_THROW_ON_ERROR) . '</script></head></html>';

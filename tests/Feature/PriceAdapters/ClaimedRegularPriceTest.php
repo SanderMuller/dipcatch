@@ -84,10 +84,10 @@ test('a strikethrough price is stored as the claim on the shop and the reading, 
         ->and($check->shelf_inherited)->toBeFalse();
 });
 
-test('a list price, a claim in another currency, or a claim at or below the price is no claim', function (array $specs): void {
+test('a list price, a claim in another currency, or a claim at or below the price is no claim', function (string $price, string $type, string $currency): void {
     $shop = claimShop();
 
-    checkClaimShop($shop, claimPage('80.00', $specs));
+    checkClaimShop($shop, claimPage('80.00', [struck($price, $type, $currency)]));
 
     $check = PriceCheck::query()->where('shop_id', $shop->id)->sole();
 
@@ -96,10 +96,10 @@ test('a list price, a claim in another currency, or a claim at or below the pric
         // The reader could have stated one, so "none" is a fact here.
         ->and($check->claim_read)->toBeTrue();
 })->with([
-    'list price (MSRP)' => [[struck('100.00', 'https://schema.org/ListPrice')]],
-    'other currency' => [[struck('100.00', currency: 'USD')]],
-    'equal' => [[struck('80.00')]],
-    'below' => [[struck('70.00')]],
+    'list price (MSRP)' => ['100.00', 'https://schema.org/ListPrice', 'EUR'],
+    'other currency' => ['100.00', 'https://schema.org/StrikethroughPrice', 'USD'],
+    'equal' => ['80.00', 'https://schema.org/StrikethroughPrice', 'EUR'],
+    'below' => ['70.00', 'https://schema.org/StrikethroughPrice', 'EUR'],
 ]);
 
 test('a later reading without a claim clears it, and a failed reading leaves it alone', function (): void {
@@ -177,6 +177,7 @@ test('a claim is dropped while a bundle applies, but kept when the bundle is onl
         'running' => PromotionWindow::make(endsAt: CarbonImmutable::now()->addDays(3), startsAt: CarbonImmutable::now()->subDay()),
         'announced' => PromotionWindow::make(endsAt: CarbonImmutable::now()->addDays(10), startsAt: CarbonImmutable::now()->addDays(3)),
         'over' => PromotionWindow::make(endsAt: CarbonImmutable::now()->subDay(), startsAt: CarbonImmutable::now()->subDays(8)),
+        default => throw new InvalidArgumentException($window),
     };
 
     $draft = new ShopDraft(

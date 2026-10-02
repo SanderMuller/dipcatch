@@ -18,18 +18,27 @@ use App\Services\Suggestions\ShopSuggestion;
  */
 function bolFeedGz(array $rows): string
 {
-    $quote = static fn (array $fields): string => implode('|', array_map(static fn (string $field): string => '"' . str_replace('"', '""', $field) . '"', $fields));
-    $lines = [$quote(['productId', 'ean', 'title', 'productPageUrlNL', 'imageUrl', 'OfferNL.sellingPrice', 'OfferNL.condition', 'OfferNL.isDeliverable', 'description'])];
+    $lines = [bolFeedLine(['productId', 'ean', 'title', 'productPageUrlNL', 'imageUrl', 'OfferNL.sellingPrice', 'OfferNL.condition', 'OfferNL.isDeliverable', 'description'])];
 
     foreach ($rows as $row) {
         $slug = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $row[2]));
-        $lines[] = $quote([$row[0], $row[1], $row[2], "https://www.bol.com/nl/nl/p/{$slug}/{$row[0]}/", '', $row[3], $row[5] ?? 'new', $row[4] ?? 'Y', "Line one\nline two"]);
+        $lines[] = bolFeedLine([$row[0], $row[1], $row[2], "https://www.bol.com/nl/nl/p/{$slug}/{$row[0]}/", '', $row[3], $row[5] ?? 'new', $row[4] ?? 'Y', "Line one\nline two"]);
     }
 
     $path = tempnam(sys_get_temp_dir(), 'bol') . '.csv.gz';
     file_put_contents($path, gzencode(implode("\n", $lines) . "\n"));
 
     return $path;
+}
+
+/**
+ * One feed line: every field quoted, a quote inside doubled.
+ *
+ * @param  list<string>  $fields
+ */
+function bolFeedLine(array $fields): string
+{
+    return implode('|', array_map(static fn (string $field): string => '"' . str_replace('"', '""', $field) . '"', $fields));
 }
 
 function remiaProduct(?string $gtin = null): Product
@@ -40,12 +49,17 @@ function remiaProduct(?string $gtin = null): Product
     return $product->refresh();
 }
 
-/** A downloader that hands out the given local files instead of reaching bol.com. */
+/**
+ * A downloader that hands out the given local files instead of reaching bol.com.
+ *
+ * @param  array<string, string>  $files  file name => local path
+ */
 function fakeBolDownloader(array $files): void
 {
     config()->set('services.bol.feed.username', 'feed-user');
 
     app()->instance(FeedSource::class, new readonly class ($files) implements FeedSource {
+        /** @param  array<string, string>  $files */
         public function __construct(private array $files) {}
 
         public function download(string $file, string $target): void

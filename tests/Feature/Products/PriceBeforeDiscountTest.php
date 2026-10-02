@@ -30,7 +30,7 @@ function discountShop(?ProductCategory $category = null, string $claim = '100.00
  * One reading per day, from `$from` days ago to `$to` days ago (inclusive),
  * at the current clock time.
  *
- * @param  array<string, mixed>  $extra
+ * @param  array<model-property<PriceCheck>, mixed>  $extra
  */
 function readDaily(Shop $shop, int $from, int $to, string $price, ?string $claim = null, array $extra = []): void
 {
@@ -40,7 +40,7 @@ function readDaily(Shop $shop, int $from, int $to, string $price, ?string $claim
 }
 
 /**
- * @param  array<string, mixed>  $extra
+ * @param  array<model-property<PriceCheck>, mixed>  $extra
  */
 function readAt(Shop $shop, CarbonImmutable $at, string $price, ?string $claim = null, array $extra = []): void
 {
@@ -55,6 +55,22 @@ function readAt(Shop $shop, CarbonImmutable $at, string $price, ?string $claim =
         'shelf_inherited' => false,
         ...$extra,
     ]);
+}
+
+/**
+ * The fields that make a reading no evidence of a price.
+ *
+ * @return array<model-property<PriceCheck>, mixed>
+ */
+function noEvidence(string $reading): array
+{
+    return match ($reading) {
+        'ex-VAT' => ['consumer_price_issue' => ConsumerPriceIssue::cases()[0]],
+        'carried-over bundle' => ['shelf_inherited' => true],
+        'no claim reader' => ['claim_read' => false],
+        'from before this shipped' => ['claim_read' => null, 'shelf_inherited' => null],
+        default => throw new InvalidArgumentException($reading),
+    };
 }
 
 function discountFor(Shop $shop): ?DiscountCheck
@@ -211,16 +227,16 @@ test('a gap older than three months cannot move a long run, so the line still sh
     expect(discountFor($shop)?->lowestBefore)->toBe('80.00');
 });
 
-test('today\'s reading must be evidence too', function (array $noEvidence): void {
+test('today\'s reading must be evidence too', function (string $reading): void {
     $shop = discountShop();
     readDaily($shop, 60, 8, '80.00');
     readDaily($shop, 7, 1, '70.00', claim: '100.00');
-    readAt($shop, CarbonImmutable::now()->subHour(), '70.00', '100.00', $noEvidence);
+    readAt($shop, CarbonImmutable::now()->subHour(), '70.00', '100.00', noEvidence($reading));
 
     expect(discountFor($shop))->toBeNull();
 })->with([
-    'ex-VAT' => [['consumer_price_issue' => ConsumerPriceIssue::cases()[0]]],
-    'carried-over bundle' => [['shelf_inherited' => true]],
+    'ex-VAT' => ['ex-VAT'],
+    'carried-over bundle' => ['carried-over bundle'],
 ]);
 
 test('a shop first read less than 30 days before the discount shows no line', function (): void {
@@ -252,18 +268,18 @@ test('a reading under a multi-buy bundle counts at its single-item price', funct
     expect(discountFor($shop)?->lowestBefore)->toBe('2.00');
 });
 
-test('readings that are no evidence count as gaps', function (array $noEvidence): void {
+test('readings that are no evidence count as gaps', function (string $reading): void {
     $shop = discountShop();
     readDaily($shop, 60, 21, '80.00');
-    readDaily($shop, 20, 15, '80.00', extra: $noEvidence);
+    readDaily($shop, 20, 15, '80.00', extra: noEvidence($reading));
     readDaily($shop, 14, 8, '80.00');
     readDaily($shop, 7, 0, '70.00', claim: '100.00');
 
     expect(discountFor($shop))->toBeNull();
 })->with([
-    'a reader that cannot state a claim (the AH dataset fallback)' => [['claim_read' => false]],
-    'carried-over bundle prices' => [['shelf_inherited' => true]],
-    'rows from before this shipped' => [['claim_read' => null, 'shelf_inherited' => null]],
+    'a reader that cannot state a claim (the AH dataset fallback)' => ['no claim reader'],
+    'carried-over bundle prices' => ['carried-over bundle'],
+    'rows from before this shipped' => ['from before this shipped'],
 ]);
 
 test('an ex-VAT reading never becomes the low', function (): void {

@@ -67,6 +67,7 @@ test('an ambiguous or failed JSON-LD answer is final, even beside readable OpenG
             ['@type' => 'Product', 'name' => 'Kettle blue', 'sku' => 'B', 'offers' => ['@type' => 'Offer', 'price' => '22.00', 'priceCurrency' => 'EUR']],
         ]],
         'failed' => ['@type' => 'Product', 'name' => 'Kettle'],
+        default => throw new InvalidArgumentException($case),
     };
     $html = '<html><head>' . $og . '<script type="application/ld+json">' . json_encode($entity, JSON_THROW_ON_ERROR) . '</script></head></html>';
 

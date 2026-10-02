@@ -12,19 +12,20 @@
 // is fictional, because the media are published. It sets a known password,
 // so it refuses anything but a local environment.
 
-$root = dirname(__DIR__, 2);
-require $root . '/vendor/autoload.php';
-$app = require $root . '/bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-
 use App\Enums\WebFindingStatus;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Models\WebShopFinding;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+
+$root = dirname(__DIR__, 2);
+require $root . '/vendor/autoload.php';
+$app = require $root . '/bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
 
 if (! $app->environment('local')) {
     fwrite(STDERR, 'Refusing to seed: APP_ENV is ' . $app->environment() . ', not local.' . PHP_EOL);
