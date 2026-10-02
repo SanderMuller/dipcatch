@@ -53,4 +53,17 @@ final class WebResultFilter
     {
         return NotAShop::covers($host);
     }
+
+    /**
+     * As {@see keep()}, only the results on one shop.
+     *
+     * @return list<array{url: string, url_hash: string, host: string, title: string, snippet: string}>
+     */
+    public static function keepOn(Product $product, WebSearch $search, string $host): array
+    {
+        return array_values(array_filter(
+            self::keep($product, $search),
+            static fn (array $result): bool => $result['host'] === $host || str_ends_with($result['host'], ".{$host}"),
+        ));
+    }
 }

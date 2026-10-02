@@ -64,6 +64,9 @@
             <x-shops.klarna-leads :leads="$errorContext['leads']" :looking-up="($errorContext['looking_up'] ?? false) === true" />
         @endif
         @break
+    @case('not_listed_online')
+        {{ $errorContext['shop'] ?? 'This shop' }} does not list this product on its website, so there is no price to read. Search the shop's own site for it, or add another shop.
+        @break
     @case('not_in_dataset')
         @php $njReason = $errorContext['reason'] ?? null; @endphp
         @if ($njReason === 'unrecognized_url')

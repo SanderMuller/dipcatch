@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Services\Checkjebon\CatalogueLinks;
+
 /**
  * Caller-facing failure code emitted by {@see ProbeShopUrl}.
  *
@@ -59,6 +61,13 @@ enum ProbeFailure: string
     case NotAShop = 'not_a_shop';
 
     /**
+     * The shop answered that the product is not on its site: a 404 for a
+     * supermarket list page, or Dirk's "helaas" page. Nothing to keep a link
+     * to, and the list row is no longer suggested ({@see CatalogueLinks}).
+     */
+    case NotListedOnline = 'not_listed_online';
+
+    /**
      * Whether this wall is one worth keeping the URL behind.
      *
      * A page that cannot be read today is still a page that sells the thing,
@@ -79,7 +88,8 @@ enum ProbeFailure: string
             self::Blocked, self::RobotsDisallowed, self::TemporaryFailure,
             self::HttpError, self::ExtractionFailed, self::ShopNotServable => true,
             self::InvalidUrl, self::ProbeRateLimited, self::LocalThrottle,
-            self::HostRateLimited, self::CurrencyMismatch, self::NotInDataset, self::NotAShop => false,
+            self::HostRateLimited, self::CurrencyMismatch, self::NotInDataset, self::NotAShop,
+            self::NotListedOnline => false,
         };
     }
 }

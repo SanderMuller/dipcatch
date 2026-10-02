@@ -30,6 +30,12 @@ return [
     'entries' => [
         [
             'date' => '2026-10-02',
+            'category' => 'fix',
+            'title' => 'No more suggestions for pages that are gone',
+            'body' => "Shop suggestions no longer link to supermarket pages a shop has taken down. DipCatch checks Dirk's range every day, and SPAR and Poiesz pages when it suggests them. If you paste a link to a product a shop no longer lists, it now tells you that, instead of saying it couldn't read a price.\n\nDeals on BENU Shop, like 1+1 gratis, now count toward the price.",
+        ],
+        [
+            'date' => '2026-10-02',
             'category' => 'feature',
             'title' => 'Your products in three groups',
             'body' => "Sorted by biggest drop, your products now come in three groups: the ones at your alert price, the ones on discount at a shop, and the rest. A product with a shop deal no longer ends up under \"No discount right now\".",

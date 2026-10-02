@@ -2,6 +2,7 @@
 
 namespace App\Actions\Suggestions;
 
+use App\Models\CatalogueLink;
 use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
 use App\Models\HiddenShop;
@@ -10,6 +11,7 @@ use App\Models\Shop;
 use App\Models\ShopSuggestionDismissal;
 use App\Models\WebShopFinding;
 use App\Services\BolFeed\BolCatalogRows;
+use App\Services\Checkjebon\CatalogueLinks;
 use App\Services\Suggestions\QueryTokens;
 use App\Services\Suggestions\RowScore;
 use App\Services\Suggestions\ShopSuggestion;
@@ -106,10 +108,15 @@ final class SuggestShops
             : SuggestionVerdicts::off(self::THRESHOLD);
 
         $gtins = self::gtinsOf($product);
-        $suggestions = $this->rank($this->bestPerChain($this->candidateRows($product, $chains, $queries, $gtins), $chains, $queries, $gtins, $verdicts));
+        $rows = $this->candidateRows($product, $chains, $queries, $gtins);
+        $suggestions = $this->rank($this->bestPerChain($rows, $chains, $queries, $gtins, $verdicts));
 
         if ($verify && $verdicts->unchecked() !== []) {
             VerifyShopSuggestions::afterResponseFor($product, $verdicts->unchecked());
+        }
+
+        if ($verify) {
+            CheckSuggestedLinks::afterResponseFor($product, $suggestions, CheckSuggestedLinks::lost($rows, $queries, $gtins, $suggestions, self::THRESHOLD));
         }
 
         return $suggestions;
@@ -258,7 +265,9 @@ final class SuggestShops
     /**
      * Rows worth scoring: those that pass a query's word prefilter
      * ({@see QueryTokens::prefilter()}) or carry one of the product's
-     * barcodes, without dismissed rows.
+     * barcodes, without dismissed rows. A row whose page a check found gone
+     * ({@see CatalogueLinks}) is kept, marked `link_gone`, so the chain's
+     * next-best row can stand in and a lost match can be looked up again.
      *
      * @param  array<string, CheckjebonChain>  $chains
      * @param  list<QueryTokens>  $queries
@@ -278,6 +287,11 @@ final class SuggestShops
 
         /** @var Collection<int, CheckjebonPrice> $rows */
         $rows = CheckjebonPrice::query()
+            ->select('checkjebon_prices.*')
+            ->addSelect([
+                'live_url' => CatalogueLink::query()->select('url')->whereColumn('chain', 'checkjebon_prices.supermarket')->whereColumn('external_id', 'checkjebon_prices.external_id')->where('alive', true)->limit(1),
+                'link_gone' => CatalogueLink::query()->selectRaw('1')->whereColumn('chain', 'checkjebon_prices.supermarket')->whereColumn('external_id', 'checkjebon_prices.external_id')->where('alive', false)->where('checked_at', '>=', CatalogueLink::validFrom())->limit(1),
+            ])
             ->whereIn('supermarket', array_keys($chains))
             ->where(function (EloquentQueryBuilder $query) use ($conditions, $gtins): void {
                 foreach ($conditions as [$condition, $bindings]) {
@@ -340,7 +354,7 @@ final class SuggestShops
             $chain = $chains[$row->supermarket] ?? null;
             $link = $row->link;
 
-            if (! $chain instanceof CheckjebonChain || ! is_string($link) || $link === '') {
+            if (! $chain instanceof CheckjebonChain || ! is_string($link) || $link === '' || $row->getAttribute('link_gone') !== null) {
                 continue;
             }
 
@@ -370,7 +384,7 @@ final class SuggestShops
                 name: $row->name,
                 size: $row->size !== null && $row->size !== '' ? $row->size : null,
                 price: number_format((float) $row->price, 2, '.', ''),
-                url: $chain->productUrl($link),
+                url: is_string($row->getAttribute('live_url')) ? $row->getAttribute('live_url') : $chain->productUrl($link),
                 score: $score,
                 trackable: SupermarketChains::isTrackable($chain->chain),
                 checked: $verdicts->confirmed($row),

@@ -10,10 +10,13 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Models\WebShopFinding;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
     Cache::flush();
+    // Showing a SPAR suggestion checks its page after the response.
+    Http::fake();
     seedChains();
     seedRow('spar', 'Beemster Extra belegen 48+ plakken', '150 g', '3.69', link: 'beemster-spar');
     seedRow('lidl', 'Beemster Extra belegen 48+ plakken', '150 g', '3.29', link: 'beemster-lidl');

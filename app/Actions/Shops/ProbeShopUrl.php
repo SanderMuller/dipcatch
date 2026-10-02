@@ -104,30 +104,10 @@ final readonly class ProbeShopUrl
             return $overBudget;
         }
 
-        try {
-            $fetch = $this->fetcher->fetch($normalizedUrl);
-        } catch (NotServable $e) {
-            // Only reachable through a redirect: the pasted host passed the
-            // pre-fetch check, the host that answered did not.
-            return ProbeOutcome::failed(ProbeFailure::ShopNotServable, ['reason' => $e->reason]);
-        } catch (RobotsDisallowed) {
-            return ProbeOutcome::failed(ProbeFailure::RobotsDisallowed);
-        } catch (Blocked) {
-            return ProbeOutcome::failed(ProbeFailure::Blocked, $this->hostHistory($host, HostFetchMemory::KIND_BLOCKED));
-        } catch (RateLimitedByHost $e) {
-            return ProbeOutcome::failed(
-                $e->source === RateLimitedByHost::SOURCE_LOCAL
-                    ? ProbeFailure::LocalThrottle
-                    : ProbeFailure::HostRateLimited,
-                ['retry_after_seconds' => $e->retryAfterSeconds],
-            );
-        } catch (TemporaryFailure $e) {
-            return ProbeOutcome::failed(
-                ProbeFailure::TemporaryFailure,
-                ['status' => $e->statusCode] + $this->hostHistory($host, HostFetchMemory::KIND_SILENT),
-            );
-        } catch (HttpError $e) {
-            return ProbeOutcome::failed(ProbeFailure::HttpError, ['status' => $e->statusCode]);
+        $fetch = $this->fetchPage($normalizedUrl, $host);
+
+        if ($fetch instanceof ProbeOutcome) {
+            return $fetch;
         }
 
         $context = new AdapterContext(
@@ -364,5 +344,38 @@ final readonly class ProbeShopUrl
             'failures' => $this->memory->count($host, $kind),
             'persistent' => $this->memory->isPersistent($host, $kind),
         ];
+    }
+
+    /** The page, or the outcome that stops the probe: a refusal, an error, or a product the shop does not list. */
+    private function fetchPage(string $normalizedUrl, string $host): FetchResult|ProbeOutcome
+    {
+        try {
+            $fetch = $this->fetcher->fetch($normalizedUrl);
+        } catch (NotServable $e) {
+            // Only reachable through a redirect: the pasted host passed the
+            // pre-fetch check, the host that answered did not.
+            return ProbeOutcome::failed(ProbeFailure::ShopNotServable, ['reason' => $e->reason]);
+        } catch (RobotsDisallowed) {
+            return ProbeOutcome::failed(ProbeFailure::RobotsDisallowed);
+        } catch (Blocked) {
+            return ProbeOutcome::failed(ProbeFailure::Blocked, $this->hostHistory($host, HostFetchMemory::KIND_BLOCKED));
+        } catch (RateLimitedByHost $e) {
+            return ProbeOutcome::failed(
+                $e->source === RateLimitedByHost::SOURCE_LOCAL
+                    ? ProbeFailure::LocalThrottle
+                    : ProbeFailure::HostRateLimited,
+                ['retry_after_seconds' => $e->retryAfterSeconds],
+            );
+        } catch (TemporaryFailure $e) {
+            return ProbeOutcome::failed(
+                ProbeFailure::TemporaryFailure,
+                ['status' => $e->statusCode] + $this->hostHistory($host, HostFetchMemory::KIND_SILENT),
+            );
+        } catch (HttpError $e) {
+            return NotListedOnline::afterError($normalizedUrl, $host, $e->statusCode)
+                ?? ProbeOutcome::failed(ProbeFailure::HttpError, ['status' => $e->statusCode]);
+        }
+
+        return NotListedOnline::onPage($normalizedUrl, $fetch) ?? $fetch;
     }
 }

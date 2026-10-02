@@ -163,10 +163,15 @@ final readonly class WebShopDiscovery
         $gtins = WebShopFinding::trackedGtins($product);
         $results = array_column($kept, null, 'url_hash');
 
-        foreach (WebShopFinding::query()->where('product_id', $product->id)->whereNull('dismissed_at')->get() as $finding) {
+        $findings = WebShopFinding::query()->where('product_id', $product->id)->whereNull('dismissed_at')->get();
+        // A page looked up on one shop's site ({@see storeFindingsOn()}) is
+        // not in the title search, and must not be dropped for that.
+        $ownSearch = WebSearch::query()->whereIn('id', $findings->pluck('web_search_id')->filter()->all())->where('query', 'like', 'site:%')->pluck('id')->all();
+
+        foreach ($findings as $finding) {
             $stale = $finding->fingerprint !== $fingerprint || $finding->hasStaleGtins($gtins);
 
-            if ($finding->isLead()) {
+            if ($finding->isLead() || in_array($finding->web_search_id, $ownSearch, strict: true)) {
                 LeadFindings::startOverIf($stale, $finding, $fingerprint);
 
                 continue;
@@ -204,13 +209,23 @@ final readonly class WebShopDiscovery
     }
 
     /**
+     * Stores a search's result on one shop as a new finding, for the usual
+     * first check and page read: a supermarket product whose list page is
+     * gone, looked up on the shop's own site. True when one was added.
+     */
+    public function storeFindingsOn(Product $product, WebSearch $search, string $host): bool
+    {
+        return $this->storeNew($product, $search, WebResultFilter::keepOn($product, $search, $host)) > 0;
+    }
+
+    /**
      * @param  list<array{url: string, url_hash: string, host: string, title: string, snippet: string}>  $kept
      */
-    private function storeNew(Product $product, WebSearch $search, array $kept): void
+    private function storeNew(Product $product, WebSearch $search, array $kept): int
     {
         $fingerprint = WebShopFinding::fingerprintFor($product);
 
-        WebShopFinding::query()->insertOrIgnore(array_map(static fn (array $result): array => [
+        return WebShopFinding::query()->insertOrIgnore(array_map(static fn (array $result): array => [
             'product_id' => $product->id,
             'web_search_id' => $search->id,
             'url' => $result['url'],

@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Console\Commands\CategoriseProductsCommand;
+use App\Console\Commands\CheckCatalogueLinksCommand;
 use App\Console\Commands\DiscoverWebShopsCommand;
 use App\Console\Commands\DispatchDailyDigestsCommand;
 use App\Console\Commands\ImportBolFeedCommand;
@@ -55,6 +56,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(RefreshCheckjebonDatasetCommand::class)
             ->dailyAt('05:30')
             ->withoutOverlapping(60)
+            ->onOneServer();
+
+        // After the list refresh, so a new list row is checked the same day.
+        $schedule->command(CheckCatalogueLinksCommand::class)
+            ->dailyAt('05:45')
+            ->withoutOverlapping(30)
             ->onOneServer();
 
         // Needs the IP address it runs from whitelisted at bol.com. Still
