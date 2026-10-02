@@ -1,9 +1,13 @@
-<flux:callout icon="information-circle">
-    <flux:callout.heading>Multiple variants on this page.</flux:callout.heading>
-    <flux:callout.text>Pick the one to track:</flux:callout.text>
+{{-- No box of its own: on the product page the add-shop panel is the box. --}}
+<div data-test="variant-chooser">
+    <p class="flex items-center gap-2 text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">
+        <flux:icon.information-circle variant="mini" class="shrink-0 text-zinc-400" />
+        {{ __('Multiple variants on this page.') }}
+    </p>
+    <p id="variant-chooser-label" class="mt-1 text-base/7 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">{{ __('Pick the one to track:') }}</p>
 
     <form wire:submit.prevent="selectVariant" class="mt-4 space-y-3">
-        <flux:radio.group variant="cards" wire:model="chosenVariantKey" class="space-y-2">
+        <flux:radio.group variant="cards" wire:model="chosenVariantKey" aria-labelledby="variant-chooser-label" class="flex-col! wrap-anywhere">
             @foreach ($variants as $variant)
                 {{-- Per unit first when the variant's name states a size, so a
                      page selling a small and a big pack can be compared here. --}}
@@ -25,4 +29,4 @@
             <flux:button type="button" wire:click="cancel">Cancel</flux:button>
         </div>
     </form>
-</flux:callout>
+</div>
