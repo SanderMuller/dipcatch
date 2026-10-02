@@ -134,6 +134,33 @@ it('keeps the usual depth when an offer is less than a step deeper', function ()
         ->and($suggestion->halfwayToOffer)->toBeFalse();
 });
 
+it('leaves out a shop that is always far cheaper than the rest, so the usual depth gives a deal the shops run', function (): void {
+    // 16 rolls: an online-only seller at €0.75 a roll, two shops at about €1.12.
+    $product = alertSuggestionProduct([
+        ['url' => 'https://www.123schoon.nl/p/1', 'host' => '123schoon.nl', 'current_price' => '11.95', 'pack_quantity' => '16.00', 'pack_unit' => 'piece'],
+        ['url' => 'https://www.ah.nl/p/1', 'host' => 'ah.nl', 'current_price' => '17.99', 'pack_quantity' => '16.00', 'pack_unit' => 'piece'],
+        ['url' => 'https://www.bol.com/p/1', 'host' => 'bol.com', 'current_price' => '53.75', 'pack_quantity' => '48.00', 'pack_unit' => 'piece'],
+    ], ProductCategory::PaperDisposables);
+
+    $suggestion = AlertSuggestion::for($product);
+
+    // Half off bol.com's €1.1198 a roll, not half off €0.7469.
+    expect($suggestion->cheapOutliers)->toBe(['123schoon.nl'])
+        ->and($suggestion->normalUnitPrice)->toBe('1.1197')
+        ->and($suggestion->depth)->toBe(50)
+        ->and($suggestion->unitTarget)->toBe('0.5598');
+});
+
+it('keeps the cheapest shop with only two shops to compare', function (): void {
+    $product = alertSuggestionProduct([
+        ['url' => 'https://www.123schoon.nl/p/1', 'current_price' => '11.95', 'pack_quantity' => '16.00', 'pack_unit' => 'piece'],
+        ['url' => 'https://www.ah.nl/p/1', 'current_price' => '17.99', 'pack_quantity' => '16.00', 'pack_unit' => 'piece'],
+    ], ProductCategory::PaperDisposables);
+
+    expect(AlertSuggestion::for($product)->cheapOutliers)->toBe([])
+        ->and(AlertSuggestion::for($product)->normalUnitPrice)->toBe('0.7468');
+});
+
 it('takes a promotion running now as it is, capped, with no usual depth to go on', function (): void {
     // 1+2 free is 66% off; a suggestion goes at most 60%.
     $product = alertSuggestionProduct([

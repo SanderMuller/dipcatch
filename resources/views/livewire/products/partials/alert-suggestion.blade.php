@@ -88,6 +88,9 @@
                     'normal' => $perUnit((string) $suggestion->normalUnitPrice),
                 ]) }}
             @endif
+            @if ($suggestion->cheapOutliers !== [])
+                {{ trans_choice(':shops is normally far cheaper than the other shops, so its price does not count as the normal one.|:shops are normally far cheaper than the other shops, so their prices do not count as the normal one.', count($suggestion->cheapOutliers), ['shops' => implode(', ', $suggestion->cheapOutliers)]) }}
+            @endif
             @if ($suggestion->alreadyMet)
                 {{ __('It is at that price now, so we notify you from the next time it gets there.') }}
             @endif

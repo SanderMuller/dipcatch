@@ -20,6 +20,9 @@ use App\Support\UnitTargetGuide;
  */
 final readonly class AlertSuggestion
 {
+    /** How far under the middle of the shops' normal prices, in percent, a shop counts as far cheaper. */
+    private const int OUTLIER_UNDER_MIDDLE = 25;
+
     private function __construct(
         /** The suggested `unit_price_target`, or null when only the default drop alert applies. */
         public ?string $unitTarget,
@@ -39,6 +42,8 @@ final readonly class AlertSuggestion
         public bool $alreadyMet,
         /** Whether the depth lies halfway between the usual one and a deeper offer running now. */
         public bool $halfwayToOffer,
+        /** @var list<string> Shops left out of the normal price for being far cheaper than the rest. */
+        public array $cheapOutliers,
     ) {}
 
     public static function for(Product $product, PromotionDepthBand $band = PromotionDepthBand::Unknown): self
@@ -47,7 +52,7 @@ final readonly class AlertSuggestion
         $packs = $product->comparablePacks();
         $department = $category?->department();
 
-        $normal = null;
+        $normals = [];
         $deepest = null;
 
         foreach ($packs->winnable($product->eligibleShops()) as $shop) {
@@ -61,14 +66,14 @@ final readonly class AlertSuggestion
                 continue;
             }
 
-            if ($normal === null || $choice['unitPrice'] < $normal['unitPrice']) {
-                $normal = [...$choice, 'normalPrice' => $price->price];
-            }
+            $normals[] = [...$choice, 'normalPrice' => $price->price];
 
             if ($price->depthNow > 0 && ($deepest === null || [$price->depthStep, $price->depthNow] > [$deepest['step'], $deepest['depth']])) {
                 $deepest = ['step' => $price->depthStep, 'depth' => $price->depthNow, 'host' => (string) $shop->host];
             }
         }
+
+        [$normal, $outliers] = self::normalShop($normals);
 
         [$prior, $source] = match (true) {
             $band !== PromotionDepthBand::Unknown => [(int) $band->depth(), DepthSource::Jev],
@@ -102,7 +107,41 @@ final readonly class AlertSuggestion
             cappedByLaw: $target !== null && $legalCap !== null && $prior > $legalCap,
             alreadyMet: $target !== null && self::meets($product->bestValueShop(), $target['unit']),
             halfwayToOffer: $target !== null && $halfway && ! ($legalCap !== null && $prior > $legalCap),
+            cheapOutliers: $target === null ? [] : $outliers,
         );
+    }
+
+    /**
+     * The shop whose normal price a promotion goes off: the lowest normal
+     * price per unit, leaving out a shop whose normal price is far under the
+     * middle of the shops', an online-only seller say. The usual depth off
+     * its price is a deal none of the shops runs. Two shops have no middle
+     * to tell an outlier by.
+     *
+     * @param  list<array{shopId: string, host: string, pack: string, perPack: float, price: float|null, unitPrice: float, normalPrice: numeric-string}>  $normals
+     * @return array{0: array{shopId: string, host: string, pack: string, perPack: float, price: float|null, unitPrice: float, normalPrice: numeric-string}|null, 1: list<string>} the shop, and the hosts left out
+     */
+    private static function normalShop(array $normals): array
+    {
+        usort($normals, static fn (array $a, array $b): int => $a['unitPrice'] <=> $b['unitPrice']);
+        $count = count($normals);
+
+        if ($count < 3) {
+            return [$normals[0] ?? null, []];
+        }
+
+        $middle = $count % 2 === 1
+            ? $normals[intdiv($count, 2)]['unitPrice']
+            : ($normals[$count / 2 - 1]['unitPrice'] + $normals[$count / 2]['unitPrice']) / 2;
+        $floor = $middle * (1 - self::OUTLIER_UNDER_MIDDLE / 100);
+        $kept = array_values(array_filter($normals, static fn (array $row): bool => $row['unitPrice'] >= $floor));
+        $outliers = array_values(array_map(
+            static fn (array $row): string => $row['host'],
+            array_filter($normals, static fn (array $row): bool => $row['unitPrice'] < $floor),
+        ));
+
+        // The middle shop itself is always kept.
+        return [$kept[0], $outliers];
     }
 
     /**

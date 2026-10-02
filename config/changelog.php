@@ -39,7 +39,7 @@ return [
             'date' => '2026-10-02',
             'category' => 'fix',
             'title' => 'Better suggested alerts during a deal',
-            'body' => "When a shop already has a big deal, the suggested alert now sits between that deal and the usual discount, instead of far above what the shop just charged. DipCatch also reads Dirk's \"was\" prices now.",
+            'body' => "When a shop already has a big deal, the suggested alert now sits between that deal and the usual discount, instead of far above what the shop just charged. A shop that is usually much cheaper than the rest no longer sets the bar. DipCatch also reads Dirk's \"was\" prices now.",
         ],
         [
             'date' => '2026-10-02',

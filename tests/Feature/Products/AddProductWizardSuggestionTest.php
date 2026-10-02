@@ -378,6 +378,24 @@ it('explains each kind of suggestion', function (string $category, string $now, 
     'on offer with no normal price' => ['home.small_appliances', '70.00', '100.00', null, 'It is on offer now, so for its first weeks the default counts from the offer price.', false],
 ]);
 
+it('names a shop it leaves out of the normal price for being far cheaper', function (): void {
+    fakeJevAnswer();
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'category' => ProductCategory::PaperDisposables]);
+
+    foreach (['123schoon.nl' => '11.95', 'ah.nl' => '17.99', 'jumbo.com' => '17.49'] as $host => $price) {
+        Shop::factory()->for($product)->create([
+            'url' => "https://www.{$host}/p/1", 'host' => $host, 'currency' => 'EUR', 'current_in_stock' => true,
+            'pack_quantity' => '16.00', 'pack_unit' => 'piece',
+        ])->forceFill(['current_price' => $price])->save();
+    }
+
+    $product->refresh()->recomputeCheapestShop();
+    $this->actingAs($user);
+
+    alertStep($product->refresh())->assertSee('123schoon.nl is normally far cheaper than the other shops, so its price does not count as the normal one.');
+});
+
 it('says a fixed-price product gets the default alert', function (): void {
     Http::fake([TypeSafeClient::ENDPOINT => Http::response(['answers' => [TypeSafeClient::PROMOTION_DEPTH_QUESTION => ['probabilities' => [PromotionDepthBand::Fixed->value => 0.9]]]])]);
     $user = wizardProUser();
