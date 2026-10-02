@@ -20,7 +20,7 @@ use Illuminate\Support\HtmlString;
  */
 final class ShopsNeedingAttentionWidget extends BaseWidget
 {
-    protected static ?int $sort = 3;
+    protected static ?int $sort = 5;
 
     protected int|string|array $columnSpan = 'full';
 

@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Widgets\ApiUsagePurposesWidget;
+use App\Filament\Admin\Widgets\ApiUsageWidget;
 use App\Filament\Admin\Widgets\OperationsOverviewWidget;
 use App\Filament\Admin\Widgets\RevenueOverviewWidget;
 use App\Filament\Admin\Widgets\ShopsNeedingAttentionWidget;
@@ -58,6 +60,8 @@ final class AdminPanelProvider extends PanelProvider
                 OperationsOverviewWidget::class,
                 SubscriptionOverviewWidget::class,
                 RevenueOverviewWidget::class,
+                ApiUsageWidget::class,
+                ApiUsagePurposesWidget::class,
                 ShopsNeedingAttentionWidget::class,
             ])
             ->middleware([

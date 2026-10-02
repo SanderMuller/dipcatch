@@ -87,7 +87,7 @@ final readonly class ShopMatchCheck
         }
 
         try {
-            return new ShopCheckOutcome(ShopCheckOutcome::ANSWERED, $this->client->sameProduct($product, $candidates, $quick, $anyPackKeys));
+            return new ShopCheckOutcome(ShopCheckOutcome::ANSWERED, $this->client->sameProduct($product, $purpose, $candidates, $quick, $anyPackKeys));
         } catch (TypeSafeRequestFailed $e) {
             Log::warning('Same-product check failed; the candidates go unchecked.', [
                 'product_id' => $product->id,

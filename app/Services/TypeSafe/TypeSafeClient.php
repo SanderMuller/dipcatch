@@ -5,6 +5,7 @@ namespace App\Services\TypeSafe;
 use App\Enums\ProductDepartment;
 use App\Enums\PromotionDepthBand;
 use App\Enums\TrackingIdea;
+use App\Models\ApiUsageDay;
 use App\Models\Product;
 use App\Models\Shop;
 use Illuminate\Http\Client\ConnectionException;
@@ -54,7 +55,7 @@ final readonly class TypeSafeClient
     {
         $product->loadMissing('shops');
 
-        $payload = $this->send([
+        $payload = $this->send(CategorisationBudget::CATEGORISE, [
             'model' => self::MODEL,
             'state' => $this->state($product),
             'questions' => $this->questions(),
@@ -79,7 +80,7 @@ final readonly class TypeSafeClient
      *
      * @throws TypeSafeRequestFailed
      */
-    public function sameProduct(Product $product, array $candidates, bool $quick = true, array $anyPackKeys = []): array
+    public function sameProduct(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = []): array
     {
         if ($candidates === []) {
             return [];
@@ -113,7 +114,7 @@ final readonly class TypeSafeClient
             ];
         }
 
-        $payload = $this->send([
+        $payload = $this->send($purpose->value, [
             'model' => self::MODEL,
             'state' => [...$this->state($product), 'tracked_pack_sizes' => self::trackedPackSizes($product)],
             'questions' => $questions,
@@ -179,7 +180,7 @@ final readonly class TypeSafeClient
             $criteria[$band->value] = $band->rubric();
         }
 
-        $payload = $this->send([
+        $payload = $this->send(ShopCheckPurpose::AlertSuggestion->value, [
             'model' => self::MODEL,
             'state' => $state,
             'questions' => [
@@ -196,24 +197,28 @@ final readonly class TypeSafeClient
     }
 
     /**
+     * @param  string  $purpose  The usage row it counts under: a ShopCheckPurpose value or CategorisationBudget::CATEGORISE.
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      *
      * @throws TypeSafeRequestFailed
      */
-    private function send(array $body, bool $quick = false): array
+    private function send(string $purpose, array $body, bool $quick = false): array
     {
         try {
             $response = $this->request($quick)->post(self::ENDPOINT, $body);
         } catch (ConnectionException $e) {
+            ApiUsageDay::typeSafeCall($purpose, failed: true, payload: null);
+
             throw new TypeSafeRequestFailed('TypeSafe unreachable: ' . $e->getMessage(), previous: $e);
         }
+
+        $payload = $response->json();
+        ApiUsageDay::typeSafeCall($purpose, failed: ! $response->successful() || ! is_array($payload), payload: $payload);
 
         if (! $response->successful()) {
             throw new TypeSafeRequestFailed("TypeSafe answered {$response->status()}.", status: $response->status());
         }
-
-        $payload = $response->json();
 
         if (! is_array($payload)) {
             throw new TypeSafeRequestFailed('TypeSafe answered with a body that is not JSON.');

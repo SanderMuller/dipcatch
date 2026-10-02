@@ -2,6 +2,8 @@
 
 namespace App\Services\ShopDiscovery;
 
+use App\Enums\ApiService;
+use App\Models\ApiUsageDay;
 use App\Models\WebSearch;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
@@ -81,6 +83,7 @@ final readonly class WebSearches
     {
         if (! self::reserveSearch()) {
             Log::info('Web shop discovery skipped a search: the daily limit is spent.');
+            ApiUsageDay::refused(ApiService::Serper, SerperProvider::PURPOSE);
 
             return WebSearchOutcome::quotaSpent();
         }

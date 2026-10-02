@@ -2,6 +2,8 @@
 
 namespace App\Services\TypeSafe;
 
+use App\Enums\ApiService;
+use App\Models\ApiUsageDay;
 use App\Models\User;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\RateLimiter;
@@ -16,6 +18,9 @@ final class CategorisationBudget
 {
     private const int DAY = 86400;
 
+    /** The usage purpose of a categorisation call, beside the ShopCheckPurpose values. */
+    public const string CATEGORISE = 'categorise';
+
     public function allows(User $user): bool
     {
         $userLimit = Config::integer('dipcatch.categories.daily_limit_per_user');
@@ -23,6 +28,8 @@ final class CategorisationBudget
 
         if (($userLimit > 0 && RateLimiter::tooManyAttempts(self::userKey($user), $userLimit))
             || ($appLimit > 0 && RateLimiter::tooManyAttempts(self::appKey(), $appLimit))) {
+            ApiUsageDay::refused(ApiService::TypeSafe, self::CATEGORISE);
+
             return false;
         }
 
@@ -47,8 +54,14 @@ final class CategorisationBudget
     {
         // Counted first and compared after, so two requests at once cannot
         // both pass a check that neither has counted yet.
-        return self::spend("shop-check:{$purpose->value}:user:{$user->id}", Config::integer('dipcatch.shop_checks.daily_limit_per_user'))
+        $allowed = self::spend("shop-check:{$purpose->value}:user:{$user->id}", Config::integer('dipcatch.shop_checks.daily_limit_per_user'))
             && self::spend("shop-check:{$purpose->value}:app", Config::integer('dipcatch.shop_checks.daily_limit'));
+
+        if (! $allowed) {
+            ApiUsageDay::refused(ApiService::TypeSafe, $purpose->value);
+        }
+
+        return $allowed;
     }
 
     private static function spend(string $key, int $limit): bool

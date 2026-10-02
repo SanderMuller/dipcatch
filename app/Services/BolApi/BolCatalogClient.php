@@ -2,6 +2,8 @@
 
 namespace App\Services\BolApi;
 
+use App\Enums\ApiService;
+use App\Models\ApiUsageDay;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
@@ -96,8 +98,12 @@ final readonly class BolCatalogClient
                 ->timeout(self::TIMEOUT_SECONDS)
                 ->get(self::BASE_URL . $path, ['country-code' => 'NL'] + $query);
         } catch (ConnectionException $e) {
+            ApiUsageDay::call(ApiService::Bol, self::purposeOf($path), failed: true);
+
             throw new BolApiFailed('bol.com API unreachable: ' . $e->getMessage(), 0, $e);
         }
+
+        ApiUsageDay::call(ApiService::Bol, self::purposeOf($path), failed: ! $response->successful() && ! $response->notFound());
 
         if ($response->status() === 401 && ! $retried) {
             // A token bol revoked before its own expiry: log in once more.
@@ -111,6 +117,15 @@ final readonly class BolCatalogClient
         }
 
         return self::body($response);
+    }
+
+    private static function purposeOf(string $path): string
+    {
+        return match (true) {
+            $path === '/products/search' => 'search',
+            str_ends_with($path, '/to-ean') => 'to-ean',
+            default => 'by-ean',
+        };
     }
 
     private function token(): string
@@ -144,8 +159,13 @@ final readonly class BolCatalogClient
                 ->timeout(self::TIMEOUT_SECONDS)
                 ->post(self::TOKEN_URL);
         } catch (ConnectionException $e) {
+            ApiUsageDay::call(ApiService::Bol, 'login', failed: true);
+
             throw new BolApiFailed('bol.com login unreachable: ' . $e->getMessage(), 0, $e);
         }
+
+        // Counted apart: bol.com blocks bursts of logins.
+        ApiUsageDay::call(ApiService::Bol, 'login', failed: ! $response->successful());
 
         $body = self::body($response);
         $token = $body['access_token'] ?? null;

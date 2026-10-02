@@ -2,6 +2,8 @@
 
 namespace App\Services\ShopDiscovery;
 
+use App\Enums\ApiService;
+use App\Models\ApiUsageDay;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
@@ -11,6 +13,8 @@ final readonly class SerperProvider implements WebSearchProvider
     public const string ENDPOINT = 'https://google.serper.dev/search';
 
     private const int TIMEOUT_SECONDS = 20;
+
+    public const string PURPOSE = 'search';
 
     public function configured(): bool
     {
@@ -30,8 +34,12 @@ final readonly class SerperProvider implements WebSearchProvider
                     'num' => Config::integer('dipcatch.web_discovery.results_per_search'),
                 ]);
         } catch (ConnectionException $e) {
+            ApiUsageDay::call(ApiService::Serper, self::PURPOSE, failed: true);
+
             throw new WebSearchFailed('Serper unreachable: ' . $e->getMessage(), $e->getCode(), previous: $e);
         }
+
+        ApiUsageDay::call(ApiService::Serper, self::PURPOSE, failed: ! $response->successful() || ! is_array($response->json('organic')));
 
         if (! $response->successful()) {
             throw new WebSearchFailed("Serper answered {$response->status()}.", $response->status());
