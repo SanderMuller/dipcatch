@@ -9,6 +9,7 @@ use App\Billing\ProUsers;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -40,7 +41,7 @@ final class UsersTable
                 TextColumn::make('email')
                     ->searchable()
                     ->sortable()
-                    ->description(fn (User $record): string => $record->name),
+                    ->description(fn (User $record): string => str($record->name)->limit(30)->toString()),
 
                 TextColumn::make('plan')
                     ->badge()
@@ -104,54 +105,56 @@ final class UsersTable
                     ->query(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('is_admin', true)),
             ])
             ->recordActions([
-                Action::make('comp')
-                    ->label('Comp')
-                    ->icon('heroicon-o-gift')
-                    ->color('success')
-                    // The panel gate already requires an admin. Checked again
-                    // here so the action stays safe if it is ever reused
-                    // outside this panel.
-                    ->visible(fn (): bool => self::actorIsAdmin())
-                    ->schema(self::compForm(...))
-                    ->action(self::grantComp(...)),
+                ActionGroup::make([
+                    Action::make('comp')
+                        ->label('Comp')
+                        ->icon('heroicon-o-gift')
+                        ->color('success')
+                        // The panel gate already requires an admin. Checked again
+                        // here so the action stays safe if it is ever reused
+                        // outside this panel.
+                        ->visible(fn (): bool => self::actorIsAdmin())
+                        ->schema(self::compForm(...))
+                        ->action(self::grantComp(...)),
 
-                Action::make('endComp')
-                    ->label('End comp')
-                    ->icon('heroicon-o-x-circle')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->modalDescription('The account drops to Free immediately. History already kept stays kept.')
-                    ->visible(fn (User $record): bool => self::actorIsAdmin() && $record->isComped())
-                    ->action(self::endComp(...)),
+                    Action::make('endComp')
+                        ->label('End comp')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalDescription('The account drops to Free immediately. History already kept stays kept.')
+                        ->visible(fn (User $record): bool => self::actorIsAdmin() && $record->isComped())
+                        ->action(self::endComp(...)),
 
-                // An affiliate program pays nothing on its partner's own
-                // purchases, so the owner's accounts get plain shop links.
-                Action::make('affiliateLinks')
-                    ->label(fn (User $record): string => $record->affiliate_links_excluded ? 'Use affiliate links' : 'Exclude from affiliate links')
-                    ->icon('heroicon-o-link')
-                    ->color('gray')
-                    ->visible(fn (): bool => self::actorIsAdmin())
-                    ->action(self::toggleAffiliateLinks(...)),
+                    // An affiliate program pays nothing on its partner's own
+                    // purchases, so the owner's accounts get plain shop links.
+                    Action::make('affiliateLinks')
+                        ->label(fn (User $record): string => $record->affiliate_links_excluded ? 'Use affiliate links' : 'Exclude from affiliate links')
+                        ->icon('heroicon-o-link')
+                        ->color('gray')
+                        ->visible(fn (): bool => self::actorIsAdmin())
+                        ->action(self::toggleAffiliateLinks(...)),
 
-                DeleteAction::make()
-                    ->failureNotificationTitle('Stripe refused the cancellation, so the account was kept. Try again in a moment.')
-                    ->modalDescription('The account, its products, its price history and its notifications go. A live subscription is cancelled in Stripe first. Payment and dispute records stay, without the account.')
-                    // Deleting yourself ends your own session halfway through
-                    // the request, so the action is not offered on your row.
-                    ->visible(fn (User $record): bool => self::actorIsAdmin() && ! $record->is(auth()->user()))
-                    // False picks Filament's failure notification. Without the
-                    // catch a Stripe error escapes into Livewire instead.
-                    ->using(function (User $record): bool {
-                        try {
-                            self::delete($record);
-                        } catch (Throwable $exception) {
-                            report($exception);
+                    DeleteAction::make()
+                        ->failureNotificationTitle('Stripe refused the cancellation, so the account was kept. Try again in a moment.')
+                        ->modalDescription('The account, its products, its price history and its notifications go. A live subscription is cancelled in Stripe first. Payment and dispute records stay, without the account.')
+                        // Deleting yourself ends your own session halfway through
+                        // the request, so the action is not offered on your row.
+                        ->visible(fn (User $record): bool => self::actorIsAdmin() && ! $record->is(auth()->user()))
+                        // False picks Filament's failure notification. Without the
+                        // catch a Stripe error escapes into Livewire instead.
+                        ->using(function (User $record): bool {
+                            try {
+                                self::delete($record);
+                            } catch (Throwable $exception) {
+                                report($exception);
 
-                            return false;
-                        }
+                                return false;
+                            }
 
-                        return true;
-                    }),
+                            return true;
+                        }),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
