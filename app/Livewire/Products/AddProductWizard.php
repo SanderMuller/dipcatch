@@ -11,6 +11,7 @@ use App\Actions\Shops\ProbeOutcome;
 use App\Billing\PlanLimitReached;
 use App\Billing\PlanLimits;
 use App\Enums\TrackingIdea;
+use App\Jobs\PrewarmShopSearches;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Livewire\Concerns\EditsAlertFields;
 use App\Livewire\Concerns\SuggestsAlert;
@@ -159,6 +160,11 @@ final class AddProductWizard extends Component
                     'title' => $existing->product->title,
                 ];
             }
+        }
+
+        $currency = $snapshot['currency'] ?? '';
+        if ($this->existingTrackedProduct === null && is_string($currency)) {
+            PrewarmShopSearches::dispatchFor($this->currentUser(), $this->title, $currency);
         }
     }
 

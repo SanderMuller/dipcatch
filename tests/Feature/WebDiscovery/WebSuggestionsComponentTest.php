@@ -126,14 +126,43 @@ it('answers 404 for a finding of another product', function (): void {
     expect($theirs->refresh()->dismissed_at)->toBeNull();
 });
 
-it('says it is looking while discovery is queued, and polls', function (): void {
+it('says it is looking while discovery is queued, and polls often in the first minute, then less', function (): void {
     $product = webSuggestionProduct();
     WebDiscovery::markQueued($product);
     $this->actingAs($product->user()->sole());
 
+    $panel = Livewire::test(ShopSuggestions::class, ['product' => $product])
+        ->assertSee('Looking for more shops…')
+        ->assertSeeHtml('wire:poll.visible.3s');
+
+    $this->travel(61)->seconds();
+
+    $panel->call('$refresh')->assertSeeHtml('wire:poll.visible.15s');
+});
+
+it('shows a progress bar while it searches, timed from the queued search, with the count found so far', function (): void {
+    $product = webSuggestionProduct();
+    WebDiscovery::markQueued($product);
+    $this->travel(40)->seconds();
+    proposedFinding($product, 'koffiehenk.nl');
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(ShopSuggestions::class, ['product' => $product])
+        ->assertSeeHtml('data-test="web-discovery-running"')
+        ->assertSeeHtml('data-flux-progress')
+        ->assertSeeHtml('Date.now() - 40 * 1000')
+        ->assertSee('1 shop found so far');
+});
+
+it('keeps the plain line, not a bar near its end, for a search that runs past the polling window', function (): void {
+    $product = webSuggestionProduct();
+    WebDiscovery::markQueued($product);
+    $this->travel(301)->seconds();
+    $this->actingAs($product->user()->sole());
+
     Livewire::test(ShopSuggestions::class, ['product' => $product])
         ->assertSee('Looking for more shops…')
-        ->assertSeeHtml('wire:poll.visible.15s');
+        ->assertDontSeeHtml('data-flux-progress');
 });
 
 it('shows a suggestion that turns proposed while the panel is open', function (): void {

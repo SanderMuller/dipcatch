@@ -51,7 +51,7 @@ const panel = () => page.locator('[wire\\:name="suggestions.shop-suggestions"]')
     const running = panel().locator('[data-test="web-discovery-running"]');
     checker.check('the panel says it is looking while discovery is queued', await running.isVisible(), await panel().innerText());
     checker.check('the panel does not say it has no suggestions', ! (await panel().innerText()).includes('No shop suggestions for this product'));
-    checker.check('the panel polls while discovery runs', (await panel().getAttribute('wire:poll.visible.15s')) !== null);
+    checker.check('the panel polls often while discovery starts', (await panel().locator('[wire\\:poll\\.visible\\.3s]').count()) > 0);
     await page.screenshot({ path: path.join(ART, 'web-suggestions-looking.png') });
 }
 
@@ -63,7 +63,7 @@ const panel = () => page.locator('[wire\\:name="suggestions.shop-suggestions"]')
     checker.check('the proposed suggestion appears without a reload', appeared);
     // The seed stores the finding, then marks discovery done; a poll between
     // the two shows the row while still polling, so give it one more poll.
-    const stopped = await page.waitForFunction(() => ! document.querySelector('[wire\\:name="suggestions.shop-suggestions"]')?.hasAttribute('wire:poll.visible.15s'), null, { timeout: 25000 }).then(() => true).catch(() => false);
+    const stopped = await page.waitForFunction(() => ! document.querySelector('[wire\\:name="suggestions.shop-suggestions"] [data-test="web-discovery-poll"]'), null, { timeout: 25000 }).then(() => true).catch(() => false);
     checker.check('the poll stops once discovery is done', stopped);
 
     await heading.click();

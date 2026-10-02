@@ -200,6 +200,9 @@ return [
         'read_attempts' => (int) env('DIPCATCH_WEB_DISCOVERY_READ_ATTEMPTS', 3),
         'retry_fallback_seconds' => (int) env('DIPCATCH_WEB_DISCOVERY_RETRY_FALLBACK', 60),
         'retry_max_seconds' => (int) env('DIPCATCH_WEB_DISCOVERY_RETRY_MAX', 900),
+        // It polls more often at first, while the shops come in.
+        'poll_fast_seconds' => (int) env('DIPCATCH_WEB_DISCOVERY_POLL_FAST_SECONDS', 3),
+        'poll_fast_for_seconds' => (int) env('DIPCATCH_WEB_DISCOVERY_POLL_FAST_FOR', 60),
         // How often, and how long, an open suggestions panel polls while
         // discovery is unfinished.
         'poll_seconds' => (int) env('DIPCATCH_WEB_DISCOVERY_POLL_SECONDS', 15),

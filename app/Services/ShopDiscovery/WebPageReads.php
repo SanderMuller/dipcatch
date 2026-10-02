@@ -73,7 +73,7 @@ final readonly class WebPageReads
 
     private static function afterRead(Product $product): void
     {
-        WebShopDiscovery::checkWhenReadsDone($product);
+        WebShopDiscovery::checkReadPages($product);
         WebDiscovery::finishIfDone($product);
     }
 

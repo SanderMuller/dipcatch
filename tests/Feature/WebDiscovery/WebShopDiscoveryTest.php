@@ -16,6 +16,7 @@ use App\Services\ShopDiscovery\WebPageReads;
 use App\Services\ShopDiscovery\WebSecondCheck;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Services\TypeSafe\TypeSafeClient;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
@@ -266,6 +267,63 @@ it('retries a rate-limited read later, and gives up after the last try', functio
     expect(app(WebPageReads::class)->read($finding->load('product.user', 'product.shops')))->toBeNull()
         ->and($finding->refresh()->status)->toBe(WebFindingStatus::Unreadable)
         ->and($finding->failure)->toBe('host_rate_limited');
+});
+
+it('proposes a page as soon as it is read, while another shop still waits to retry its read', function (): void {
+    $product = discoveryProduct();
+    fakeDiscovery(
+        [['title' => 'Coffee beans', 'link' => 'https://slow.test/p'], ['title' => 'Coffee beans', 'link' => 'https://quick.test/p']],
+        ['https://slow.test/p' => Http::response('slow down', 429, ['Retry-After' => '120']), 'https://quick.test/p' => htmlPage(discoveryPage('Coffee beans'))],
+    );
+
+    discover($product);
+
+    expect(findingAt($product, 'quick.test')->status)->toBe(WebFindingStatus::Proposed)
+        ->and(WebShopFinding::shownFor($product->refresh())->pluck('host')->all())->toBe(['quick.test'])
+        ->and(findingAt($product, 'slow.test')->status)->toBe(WebFindingStatus::PendingRead)
+        ->and(WebDiscovery::query()->find($product->id)?->state)->toBe(WebDiscoveryState::Running);
+});
+
+it('checks the pages of an older product once every read is done, as in the daily run, to keep its Jev calls to one', function (): void {
+    $product = discoveryProduct();
+    $this->travel(1)->day();
+    fakeDiscovery(
+        [['title' => 'Coffee beans', 'link' => 'https://slow.test/p'], ['title' => 'Coffee beans', 'link' => 'https://quick.test/p']],
+        ['https://slow.test/p' => Http::response('slow down', 429, ['Retry-After' => '120']), 'https://quick.test/p' => htmlPage(discoveryPage('Coffee beans'))],
+    );
+
+    discover($product);
+
+    expect(findingAt($product, 'quick.test')->status)->toBe(WebFindingStatus::Read)
+        ->and(jevCandidates())->toHaveCount(1);
+});
+
+it('waits for every read again once a new product has had its early checks', function (): void {
+    $product = discoveryProduct();
+    Cache::put("web-discovery:early-check:{$product->id}", 4, 600);
+    fakeDiscovery(
+        [['title' => 'Coffee beans', 'link' => 'https://slow.test/p'], ['title' => 'Coffee beans', 'link' => 'https://quick.test/p']],
+        ['https://slow.test/p' => Http::response('slow down', 429, ['Retry-After' => '120']), 'https://quick.test/p' => htmlPage(discoveryPage('Coffee beans'))],
+    );
+
+    discover($product);
+
+    expect(findingAt($product, 'quick.test')->status)->toBe(WebFindingStatus::Read);
+});
+
+it('proposes pages one by one again once a shop is added to an older product', function (): void {
+    $product = discoveryProduct();
+    $this->travel(1)->day();
+    Shop::factory()->for($product)->create(['url' => 'https://second.test/p/1', 'host' => 'second.test', 'pack_quantity' => '1000.00', 'pack_unit' => 'g']);
+    fakeDiscovery(
+        [['title' => 'Coffee beans', 'link' => 'https://slow.test/p'], ['title' => 'Coffee beans', 'link' => 'https://quick.test/p']],
+        ['https://slow.test/p' => Http::response('slow down', 429, ['Retry-After' => '120']), 'https://quick.test/p' => htmlPage(discoveryPage('Coffee beans'))],
+    );
+
+    discover($product);
+
+    expect(findingAt($product, 'quick.test')->status)->toBe(WebFindingStatus::Proposed)
+        ->and(findingAt($product, 'slow.test')->status)->toBe(WebFindingStatus::PendingRead);
 });
 
 it('waits the fallback delay when a temporary failure names none', function (): void {
@@ -545,6 +603,56 @@ it('queues the reads, then the second check, as jobs', function (): void {
 
     new ReadWebFinding(findingAt($product, 'a.test')->id)->handle(app(WebPageReads::class));
     Queue::assertPushed(CheckWebFindings::class, 1);
+    // A moment's wait, so reads that end close together share one Jev call.
+    Queue::assertPushed(CheckWebFindings::class, fn (CheckWebFindings $job): bool => $job->delay === CheckWebFindings::GATHER_SECONDS);
+});
+
+it('counts an early check when it starts, so reads it gathered while queued use one of the early checks', function (): void {
+    $product = discoveryProduct();
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p'], ['title' => 'Coffee beans', 'link' => 'https://b.test/p']], [
+        'https://a.test/p' => htmlPage(discoveryPage('Coffee beans')),
+        'https://b.test/p' => htmlPage(discoveryPage('Coffee beans')),
+    ]);
+    Queue::fake();
+    new DiscoverWebShops((string) $product->id)->handle(app(WebShopDiscovery::class));
+
+    new ReadWebFinding(findingAt($product, 'a.test')->id)->handle(app(WebPageReads::class));
+    new ReadWebFinding(findingAt($product, 'b.test')->id)->handle(app(WebPageReads::class));
+
+    expect(Cache::integer("web-discovery:early-check:{$product->id}", 0))->toBe(0);
+
+    Queue::pushed(CheckWebFindings::class)->first()->handle(app(WebSecondCheck::class));
+
+    expect(Cache::integer("web-discovery:early-check:{$product->id}", 0))->toBe(1)
+        ->and(findingAt($product, 'a.test')->status)->toBe(WebFindingStatus::Proposed)
+        ->and(findingAt($product, 'b.test')->status)->toBe(WebFindingStatus::Proposed);
+});
+
+it('lets an early check past the cap wait for the reads still to come', function (): void {
+    $product = discoveryProduct();
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p'], ['title' => 'Coffee beans', 'link' => 'https://b.test/p']], [
+        'https://a.test/p' => htmlPage(discoveryPage('Coffee beans')),
+    ]);
+    Queue::fake();
+    new DiscoverWebShops((string) $product->id)->handle(app(WebShopDiscovery::class));
+    new ReadWebFinding(findingAt($product, 'a.test')->id)->handle(app(WebPageReads::class));
+    Cache::put("web-discovery:early-check:{$product->id}", 4, 600);
+
+    new CheckWebFindings((string) $product->id, early: true)->handle(app(WebSecondCheck::class));
+
+    expect(findingAt($product, 'a.test')->status)->toBe(WebFindingStatus::Read)
+        ->and(findingAt($product, 'b.test')->status)->toBe(WebFindingStatus::PendingRead);
+});
+
+it('queues one second check per product, and only until it starts, so a later read queues the next', function (): void {
+    Queue::fake();
+
+    dispatch(new CheckWebFindings('a'));
+    dispatch(new CheckWebFindings('a'));
+    dispatch(new CheckWebFindings('b'));
+
+    Queue::assertPushed(CheckWebFindings::class, 2);
+    expect(class_implements(CheckWebFindings::class))->toHaveKey(ShouldBeUniqueUntilProcessing::class);
 });
 
 it('puts back only claims older than any live check', function (): void {

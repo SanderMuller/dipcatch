@@ -50,3 +50,13 @@ php .github/eye-verify/product-markdown-seed.php
 node .github/eye-verify/product-markdown.mjs
 php .github/eye-verify/product-markdown-seed.php --teardown
 ```
+
+`discovery-progress.mjs` drives the progress bar of the shop search in step 2
+of the add-product wizard. It needs a throwaway account whose search stays
+queued:
+
+```bash
+php .github/eye-verify/discovery-progress-seed.php
+node .github/eye-verify/discovery-progress.mjs
+php .github/eye-verify/discovery-progress-seed.php --teardown
+```

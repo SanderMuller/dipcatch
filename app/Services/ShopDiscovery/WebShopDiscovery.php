@@ -8,6 +8,7 @@ use App\Jobs\CheckWebFindings;
 use App\Jobs\DiscoverWebShops;
 use App\Jobs\ReadWebFinding;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use App\Models\WebDiscovery;
 use App\Models\WebSearch;
@@ -16,6 +17,7 @@ use App\Services\TypeSafe\ShopCheckPurpose;
 use App\Services\TypeSafe\ShopMatchCheck;
 use App\Services\TypeSafe\TypeSafeClient;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 
 /**
@@ -26,6 +28,14 @@ use Illuminate\Support\Facades\Config;
  */
 final readonly class WebShopDiscovery
 {
+    private const int RECENTLY_ADDED_MINUTES = 10;
+
+    /** Early second checks per product in that window, each a Jev call from the account's daily budget. */
+    private const int EARLY_CHECKS = 4;
+
+    /** Longer than one Jev call with its retry. */
+    private const int FIRST_CHECK_LOCK_SECONDS = 60;
+
     public function __construct(
         private WebSearches $searches,
         private ShopMatchCheck $shopMatch,
@@ -36,12 +46,18 @@ final readonly class WebShopDiscovery
     {
         $product->loadMissing(['user', 'shops']);
 
+        return $product->user instanceof User
+            && $this->runsForOwner($product->user, $product->currency)
+            && $product->shops->isNotEmpty();
+    }
+
+    /** The part of the gate that needs no product yet: the account and the currency. */
+    public function runsForOwner(User $user, string $currency): bool
+    {
         return $this->searches->enabled()
             && TypeSafeClient::configured()
-            && $product->user instanceof User
-            && $product->user->wantsShopChecks()
-            && strcasecmp($product->currency, 'EUR') === 0
-            && $product->shops->isNotEmpty();
+            && $user->wantsShopChecks()
+            && strcasecmp($currency, 'EUR') === 0;
     }
 
     public function queue(Product $product): bool
@@ -115,9 +131,10 @@ final readonly class WebShopDiscovery
             $this->storeNew($product, $search, $kept);
         }
 
-        $this->firstCheck($product);
-        $this->queueDueReadsOrCheck($product);
+        // First: the Klarna jobs need only the search, so they run while the first check does.
         $this->klarna->continue($product);
+        $this->firstCheckAlone($product);
+        $this->queueDueReadsAndCheck($product);
         WebDiscovery::finishIfDone($product);
     }
 
@@ -206,6 +223,26 @@ final readonly class WebShopDiscovery
         ], $kept));
     }
 
+    /**
+     * One first check per product at a time. A Klarna lookup can queue the
+     * next run while this one still waits on Jev, and both would send the
+     * same `new` findings. The second does not wait, which could outrun its
+     * job's timeout: it runs again once the first is done, for what is left.
+     */
+    private function firstCheckAlone(Product $product): void
+    {
+        $ran = Cache::lock("web-discovery:first-check:{$product->id}", self::FIRST_CHECK_LOCK_SECONDS)
+            ->get(function () use ($product): bool {
+                $this->firstCheck($product);
+
+                return true;
+            });
+
+        if ($ran === false) {
+            dispatch(new DiscoverWebShops((string) $product->id))->delay(self::FIRST_CHECK_LOCK_SECONDS);
+        }
+    }
+
     private function firstCheck(Product $product): void
     {
         $fingerprint = WebShopFinding::fingerprintFor($product);
@@ -292,8 +329,7 @@ final readonly class WebShopDiscovery
             ->where(static fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('failure')->orWhereNotIn('failure', ['read_cap', 'other_page_on_host']));
     }
 
-    /** Queues the reads that may run now, and the second check once no read is left. */
-    private function queueDueReadsOrCheck(Product $product): void
+    private function queueDueReadsAndCheck(Product $product): void
     {
         $due = WebShopFinding::query()
             ->where('product_id', $product->id)
@@ -307,18 +343,62 @@ final readonly class WebShopDiscovery
             dispatch(new ReadWebFinding($finding->id));
         }
 
-        if ($due->isEmpty()) {
-            self::checkWhenReadsDone($product);
-        }
+        self::checkReadPages($product);
     }
 
-    public static function checkWhenReadsDone(Product $product): void
+    /**
+     * Queues the second check for the pages read so far. Right after a
+     * product or shop is added someone waits, so the check does not wait for
+     * the other reads: a read that waits to retry does not hold back the
+     * pages already read. Otherwise, and after a few such early checks, one
+     * check waits for every read, as in the daily run, to keep the Jev calls
+     * per product low.
+     */
+    public static function checkReadPages(Product $product): void
     {
         WebSecondCheck::releaseStaleClaims($product);
         $current = WebShopFinding::query()->where('product_id', $product->id)->current($product)->whereNull('dismissed_at');
 
-        if (! (clone $current)->where('status', WebFindingStatus::PendingRead)->exists() && (clone $current)->where('status', WebFindingStatus::Read)->exists()) {
+        if (! (clone $current)->where('status', WebFindingStatus::Read)->exists()) {
+            return;
+        }
+
+        if (self::addedRecently($product) && Cache::integer(self::earlyCheckKey($product), 0) < self::EARLY_CHECKS) {
+            dispatch(new CheckWebFindings((string) $product->id, early: true))->delay(CheckWebFindings::GATHER_SECONDS);
+        } elseif (! (clone $current)->where('status', WebFindingStatus::PendingRead)->exists()) {
             dispatch(new CheckWebFindings((string) $product->id));
         }
+    }
+
+    /**
+     * Whether an early check may run now. Counted as it starts, so reads it
+     * gathered while queued count once, and counted before it compares, so
+     * two checks starting together cannot both take the last place. Past the
+     * cap it waits for every read, like any other check.
+     */
+    public static function startsEarlyCheck(Product $product): bool
+    {
+        $key = self::earlyCheckKey($product);
+        Cache::add($key, 0, now()->addMinutes(self::RECENTLY_ADDED_MINUTES));
+
+        if (self::addedRecently($product) && (int) Cache::increment($key) <= self::EARLY_CHECKS) {
+            return true;
+        }
+
+        return ! WebShopFinding::query()->where('product_id', $product->id)->current($product)->whereNull('dismissed_at')->where('status', WebFindingStatus::PendingRead)->exists();
+    }
+
+    private static function earlyCheckKey(Product $product): string
+    {
+        return "web-discovery:early-check:{$product->id}";
+    }
+
+    private static function addedRecently(Product $product): bool
+    {
+        $since = now()->subMinutes(self::RECENTLY_ADDED_MINUTES);
+        $product->loadMissing('shops');
+
+        return $product->created_at?->greaterThan($since) === true
+            || $product->shops->contains(static fn (Shop $shop): bool => $shop->created_at?->greaterThan($since) === true);
     }
 }

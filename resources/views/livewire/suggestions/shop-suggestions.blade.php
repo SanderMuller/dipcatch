@@ -1,5 +1,10 @@
-{{-- `.visible`: the copy inside the closed add-shop form does not poll. --}}
-<div x-data="{ hideHost: '', hideLabel: '' }" @if ($pollSeconds !== null) wire:poll.visible.{{ $pollSeconds }}s @endif>
+<div x-data="{ hideHost: '', hideLabel: '' }">
+    {{-- `.visible`: the copy inside the closed add-shop form does not poll.
+         Keyed by the interval, so a new interval replaces the element and its
+         timer: Livewire keeps the old timer when only the attribute changes. --}}
+    @if ($pollSeconds !== null)
+        <div wire:key="poll-{{ $pollSeconds }}" wire:poll.visible.{{ $pollSeconds }}s class="h-px" aria-hidden="true" data-test="web-discovery-poll"></div>
+    @endif
     @php($total = count($suggestions) + $webSuggestions->count())
 
     {{-- Present from the first render, so a screen reader hears the search
@@ -218,8 +223,49 @@
 
     <x-hide-shop-confirm :name="'hide-shop-' . $this->getId()" />
 
-    {{-- Outside the disclosure, so it shows while the disclosure is closed. --}}
-    @if ($discovering)
+    {{-- Outside the disclosure, so it shows while the disclosure is closed.
+         The bar and its steps are an estimate, not a report: the search has
+         no fixed length, and only the count of shops found is real. The
+         status line above speaks for it, hence aria-hidden. --}}
+    @if ($showsProgress)
+        <div
+            x-data="{
+                startedAt: Date.now() - {{ $searchingFor }} * 1000,
+                now: Date.now(),
+                steps: @js([__('Checking the DipCatch catalogue'), __('Reading product feeds'), __('Searching the web'), __('Reading shop pages'), __('Comparing products and pack sizes'), __('Evaluating the results')]),
+                timer: null,
+                init() {
+                    this.timer = setInterval(() => {
+                        this.now = Date.now();
+                    }, 500);
+                },
+                destroy() {
+                    clearInterval(this.timer);
+                },
+                get progress() {
+                    return Math.round(4 + 91 * (1 - Math.exp(-Math.max(0, this.now - this.startedAt) / 30000)));
+                },
+                get step() {
+                    return Math.min(this.steps.length - 1, Math.floor(this.progress / 95 * this.steps.length));
+                },
+            }"
+            @class(['space-y-2', 'mt-3' => $total > 0])
+            aria-hidden="true"
+            data-test="web-discovery-running"
+        >
+            <div class="flex items-baseline justify-between gap-3 text-sm">
+                <span class="font-medium text-zinc-800 dark:text-white">{{ __('Looking for more shops…') }}</span>
+                <span class="shrink-0 text-xs text-zinc-500 tabular-nums dark:text-zinc-400" x-text="`${step + 1} / ${steps.length}`"></span>
+            </div>
+            <flux:progress value="4" color="blue" x-effect="$el.value = progress" />
+            <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">
+                <span x-text="steps[step] + '…'">{{ __('Checking the DipCatch catalogue') }}…</span>
+                @if ($webSuggestions->isNotEmpty())
+                    <span class="text-zinc-600 dark:text-zinc-300">· {{ trans_choice(':count shop found so far|:count shops found so far', $webSuggestions->count(), ['count' => $webSuggestions->count()]) }}</span>
+                @endif
+            </flux:text>
+        </div>
+    @elseif ($discovering)
         <flux:text size="sm" @class(['flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400', 'mt-2' => $total > 0]) aria-hidden="true" data-test="web-discovery-running">
             <flux:icon.loading variant="micro" class="size-4 shrink-0" />
             {{ __('Looking for more shops…') }}

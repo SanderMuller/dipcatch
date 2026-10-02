@@ -23,9 +23,9 @@ Confirmed with the user on 2026-09-30 unless marked otherwise.
 - **Proposal bar:** the second check reuses `shop_checks.accept_from` (0.6). Carried over from the existing suggestions; not asked separately.
 - **Page read retries:** 3 attempts for a rate-limited or temporary failure, then `unreadable`. AI-chosen from the prototype, where 3 of 62 reads were rate-limited.
 - **Job type:** three short queued jobs (search and first check, one per page read, second check), not one long job and not `app()->terminating()`: page reads wait on per-host rate limits, and one long job would outrun the queue's 90 s `retry_after`. AI-chosen after the spec review.
-- **Concurrency:** writes guarded by generation, fingerprint and expected status; the second check claims its rows instead of holding a uniqueness lock. AI-chosen after the spec review.
+- **Concurrency:** writes guarded by generation, fingerprint and expected status; the second check claims its rows; its uniqueness lock lasts only until it starts, so a later dispatch is never swallowed. AI-chosen after the spec review.
 - **Budget split:** first and second checks spend from separate daily counters, so first checks never starve the checks that finish a read product. AI-chosen after the spec review.
-- **Open panel:** "Looking for more shops…" and a 15 s poll for up to 5 minutes while discovery is unfinished. AI-chosen after the spec review.
+- **Open panel:** "Looking for more shops…" with a progress bar that estimates the steps, and a 3 s poll for the first minute, then 15 s up to 5 minutes, while discovery is unfinished. A search queued more than 5 minutes ago shows the plain line instead of the bar. AI-chosen after the spec review.
 - **Consumer prices:** a page whose price has no VAT or is trade-only is rejected, never shown. AI-chosen after the spec review.
 
 ---
@@ -140,6 +140,7 @@ A new `dipcatch.web_discovery` block in `config/dipcatch.php`, next to `shop_che
 | `max_reads_per_product` | 8 | Page reads per product per run |
 | `read_attempts` | 3 | Attempts for a rate-limited or temporary page read |
 | `retry_fallback_seconds` / `retry_max_seconds` | 60 / 900 | Delay when a failed read names none, and the cap on any delay |
+| `poll_fast_seconds` / `poll_fast_for_seconds` | 3 / 60 | How often an open panel polls in its first minute |
 | `poll_seconds` / `poll_for_seconds` | 15 / 300 | How often and how long an open panel polls while discovery is unfinished |
 | `search_max_age_days` | 90 | When a stored search is repeated |
 | `daily_search_limit` | 300 | Serper searches app-wide per day; zero lifts it. Reserved with an atomic `Cache::increment` on a key that expires at the end of the day, compared after the increment |
@@ -154,6 +155,7 @@ Jev spending goes through `CategorisationBudget::allowsShopCheck()` with two new
 ### 5.1 Trigger
 
 - **New product:** at the end of `CreateProductWithShop` (used by the paste-a-link form and the MCP `create_product` tool), dispatch `DiscoverWebShops` when the owner passes the gate in section 2 and the product's currency is EUR. `CreateProductManual` creates a product without a shop, so there is no pack to compare against; the backfill picks it up once it has one.
+- **Preview of a pasted page:** before the product is saved, the add-product wizard dispatches `PrewarmShopSearches` for the preview title: the open search and the Klarna page search, stored per query as usual, so the discovery that starts on save finds them done. Same gate and currency rule as a new product, none for a page the account already tracks, and at most 10 per account per hour and 30 per day, as a preview without a save still spends paid searches.
 - **Daily command:** `dipcatch:discover-web-shops` (daily, `withoutOverlapping()->onOneServer()`, next to the others in `bootstrap/app.php`) dispatches `DiscoverWebShops` for gated EUR products with at least one shop, in this order, up to the daily search limit for the ones that need a search:
   1. products with unfinished discovery (3.4) and a fresh search (an unfinished product whose search is stale falls under 4), so a run cut short by Jev or the budget goes on the next day without a new search;
   2. products whose `web_discoveries.search_searched_at` is older than their search's `searched_at` (another product refreshed the shared search), and products with findings whose fingerprint or `checked_gtins` is stale, re-checked from the stored search;
@@ -161,7 +163,7 @@ Jev spending goes through `CategorisationBudget::allowsShopCheck()` with two new
 
 ### 5.2 Jobs
 
-Three short queued jobs rather than one long one. One job that reads eight pages at 15 s or more each (`dipcatch.fetcher.timeout_seconds` per redirect hop, plus robots.txt) plus two Jev calls at up to 20 s with a retry would outrun the queue's 90 s `retry_after` (`config/queue.php`), and a second worker would pick the same job up. Each job below sets `$timeout` below `retry_after`. `DiscoverWebShops` makes two network calls (the search and the first check); the other jobs make one step each. A page with many redirects can outrun `ReadWebFinding`'s 60 s; the worker then kills it, which uses one of its tries. `DiscoverWebShops` and `ReadWebFinding` are `ShouldBeUnique` on their key, like `CheckShopPrice`; `CheckWebFindings` claims its rows instead (see below). Every job is safe to run again: it reads the findings' state and does only what is still missing.
+Three short queued jobs rather than one long one. One job that reads eight pages at 15 s or more each (`dipcatch.fetcher.timeout_seconds` per redirect hop, plus robots.txt) plus two Jev calls at up to 20 s with a retry would outrun the queue's 90 s `retry_after` (`config/queue.php`), and a second worker would pick the same job up. Each job below sets `$timeout` below `retry_after`. `DiscoverWebShops` makes two network calls (the search and the first check); the other jobs make one step each. A page with many redirects can outrun `ReadWebFinding`'s 60 s; the worker then kills it, which uses one of its tries. `DiscoverWebShops` and `ReadWebFinding` are `ShouldBeUnique` on their key, like `CheckShopPrice`; `CheckWebFindings` claims its rows, and is unique only until it starts (see below). Every job is safe to run again: it reads the findings' state and does only what is still missing.
 
 **`DiscoverWebShops` (unique per product)**
 
@@ -169,7 +171,7 @@ Three short queued jobs rather than one long one. One job that reads eight pages
 2. **Start over where needed.** A finding starts over when the product's `search_searched_at` is older than the search's `searched_at` (this or another product refreshed it), or when its fingerprint is not the current one. A stale `checked_gtins` starts it over too. Starting over deletes an undismissed finding whose URL is not in the filtered results (step 3), so a result that now points at a tracked or non-shop host goes too, and puts the others back to `new` with the current fingerprint, the new search's title and snippet, read and check columns cleared, `attempts` reset and `generation` raised. Dismissed findings stay dismissed. Then record the search on `web_discoveries`.
 3. **Filter.** Drop results whose host the product already tracks (same rule as the prototype's `FoundShop::bestPerNewHost`), hosts on `not_a_shop`, and URLs with a dismissed finding. Keep the best result per host. Insert the rest as `new` findings (insert-or-ignore on the unique key).
 4. **First check.** One `sameProduct()` request for the product's `new` findings with the current fingerprint, with `title` = search title and `snippet` as its own field, and `checked_gtins` stored. Below `read_from`: `rejected`. From `read_from`: `pending_read`, while the product's current-generation findings that are `pending_read`, `read`, `checking`, `proposed`, `declined` or `unreadable` number fewer than `max_reads_per_product`; the rest `rejected`. A finding the answer leaves out stays `new` (`sameProduct()` returns a partial map when at least one candidate is answered). Jev down or budget spent: the findings stay `new` for the daily command.
-5. Dispatch `ReadWebFinding` for each `pending_read` finding whose `next_attempt_at` has passed, and `CheckWebFindings` when there are `read` findings and no `pending_read` ones. With nothing left unfinished, state `done`.
+5. Dispatch `ReadWebFinding` for each `pending_read` finding whose `next_attempt_at` has passed, and `CheckWebFindings` for the `read` findings as below. With nothing left unfinished, state `done`.
 
 **`ReadWebFinding` (unique per finding)**
 
@@ -181,11 +183,11 @@ Run `ProbeShopUrl($product, $url, $product->user, spendBudget: false)`.
   - `proposed` at chance 1.0, with `matched_gtin` and `checked_gtins`, when the page barcode matches a tracked shop's barcode, without a Jev call, as `ShopMatchCheck::draft()` does.
 - `LocalThrottle`, `HostRateLimited`, `TemporaryFailure`: count the attempt and set `next_attempt_at` from `retry_after_seconds`, or `retry_fallback_seconds` when the outcome carries none (`TemporaryFailure` does not), capped at `retry_max_seconds`; release the job to that time. After `read_attempts`, `unreadable`. The job declares `tries()` of `read_attempts` and a `uniqueFor()` longer than the sum of its delays, as `CheckShopPrice` does (`#[Tries(10)]`, `uniqueFor()`), because the dev worker runs with `--tries=1`. Its `failed()` sets the finding `unreadable`, so a worker crash does not leave it `pending_read` for good.
 - Any other failure, a duplicate included: `unreadable`, with the `failure` value.
-- When no finding of the product is left `pending_read`, dispatch `CheckWebFindings`. Then run the completion rule below.
+- Within 10 minutes of a product or shop being added, someone waits: when the product has a `read` finding, dispatch `CheckWebFindings` with a 2 s delay, without waiting for the other reads, up to 4 such early checks per product. A read that waits to retry then does not hold back the pages already read, so web suggestions appear one by one. Otherwise, as in the daily run, dispatch it once no finding is left `pending_read`, which keeps the second check to one Jev call per product. Then run the completion rule below.
 
-**`CheckWebFindings` (not unique)**
+**`CheckWebFindings` (unique until it starts)**
 
-Claim the product's `read` findings with the current fingerprint by a conditional update to `checking` (only rows still `read` move), then send one `sameProduct()` request for the claimed ones: `title` = page title, `listing_title` = search title, `pack_size`, `price`, `gtin`. Store `second_chance` and `checked_at`; `proposed` at or above `accept_from`, else `declined`. A finding the answer leaves out goes back to `read`. Jev down or budget spent: the claimed findings go back to `read` for the daily command; the page is not read again. `failed()` puts back claims older than 120 s; a job killed at its timeout leaves younger claims, which the next run puts back. Two jobs for one product never send the same finding twice, because the claim moves each row once, so the job needs no uniqueness lock that could swallow a later dispatch. Then run the completion rule.
+Claim the product's `read` findings with the current fingerprint by a conditional update to `checking` (only rows still `read` move), then send one `sameProduct()` request for the claimed ones: `title` = page title, `listing_title` = search title, `pack_size`, `price`, `gtin`. Store `second_chance` and `checked_at`; `proposed` at or above `accept_from`, else `declined`. A finding the answer leaves out goes back to `read`. Jev down or budget spent: the claimed findings go back to `read` for the daily command; the page is not read again. `failed()` puts back claims older than 120 s; a job killed at its timeout leaves younger claims, which the next run puts back. Two jobs for one product never send the same finding twice, because the claim moves each row once. The job is unique only until it starts: reads that end while it waits are checked in the same request, and a read after it starts queues the next one. Then run the completion rule.
 
 **Completion rule**
 
@@ -257,7 +259,7 @@ The view (`resources/views/livewire/suggestions/shop-suggestions.blade.php`) dec
 | All reads and checks finish | The completion rule sets `done`, and the panel stops "Looking for more shops…". `judge` and `ui` tests. |
 | A refresh returns the same URL with a new title or snippet | The finding takes the new title and snippet before its first check. `judge` tests. |
 | User hides a web suggestion while a job runs | Jobs never write `dismissed_at` and update by column, so the Hide stays. `judge` tests. |
-| Panel open while discovery is unfinished, also before the first job ran | `web_discoveries.state` is `queued` from dispatch; "Looking for more shops…" and a 15 s poll for up to 5 min; new web rows appear without a reload. `ui` tests and eye-verify. |
+| Panel open while discovery is unfinished, also before the first job ran | `web_discoveries.state` is `queued` from dispatch; "Looking for more shops…" and a 3 s poll for the first minute, then 15 s up to 5 min; new web rows appear without a reload. `ui` tests and eye-verify. |
 | More results pass the first check than the read cap | The top `max_reads_per_product` are read; the rest are `rejected` for this search. `judge` tests. |
 | Product deleted | Findings cascade. Stored searches stay; they hold no user data. Migration test. |
 | A search result on an unsafe or internal URL | `ProbeShopUrl` runs `UrlSafetyGuard` and robots.txt as for any pasted URL. `judge` tests. |

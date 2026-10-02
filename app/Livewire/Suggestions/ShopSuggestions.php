@@ -117,18 +117,21 @@ final class ShopSuggestions extends Component
     {
         $product = $this->product();
         $webShown = $product->user instanceof User && $product->user->wantsShopChecks();
-        $discovering = $webShown && self::discovering($product);
+        $discovery = $webShown ? WebDiscovery::query()->find($product->id) : null;
+        $discovering = $webShown && self::discovering($product, $discovery);
+        $searchingFor = $discovering ? self::searchingFor($discovery) : 0;
 
         return view('livewire.suggestions.shop-suggestions', [
             'product' => $product,
             'suggestions' => $suggest($product),
             'webSuggestions' => $webShown ? WebShopFinding::shownFor($product) : new EloquentCollection(),
             'discovering' => $discovering,
-            // A queued job cannot send the browser an event, so an open panel
-            // polls while discovery runs, for a bounded time.
-            'pollSeconds' => $discovering && now()->getTimestamp() - $this->mountedAt < Config::integer('dipcatch.web_discovery.poll_for_seconds')
-                ? Config::integer('dipcatch.web_discovery.poll_seconds')
-                : null,
+            'searchingFor' => $searchingFor,
+            // A search that runs past the polling window, a read retried for
+            // minutes say, keeps the plain line: a bar at its end would claim
+            // more than anyone knows.
+            'showsProgress' => $discovering && $searchingFor < Config::integer('dipcatch.web_discovery.poll_for_seconds'),
+            'pollSeconds' => $discovering ? $this->pollSeconds() : null,
             // Distinguish "nothing matched" from "nothing to match against":
             // an empty or stale catalogue is an operational problem, not an
             // answer, so the panel stays silent rather than claiming no shop
@@ -137,9 +140,35 @@ final class ShopSuggestions extends Component
         ]);
     }
 
-    private static function discovering(Product $product): bool
+    /**
+     * A queued job cannot send the browser an event, so an open panel polls
+     * while discovery runs, for a bounded time.
+     */
+    private function pollSeconds(): ?int
     {
-        $state = WebDiscovery::query()->whereKey($product->id)->first()?->state;
+        $elapsed = now()->getTimestamp() - $this->mountedAt;
+
+        return match (true) {
+            $elapsed < Config::integer('dipcatch.web_discovery.poll_fast_for_seconds') => Config::integer('dipcatch.web_discovery.poll_fast_seconds'),
+            $elapsed < Config::integer('dipcatch.web_discovery.poll_for_seconds') => Config::integer('dipcatch.web_discovery.poll_seconds'),
+            default => null,
+        };
+    }
+
+    /**
+     * Seconds since the search was queued, so the progress bar picks up
+     * where it was after a reload rather than starting over.
+     */
+    private static function searchingFor(?WebDiscovery $discovery): int
+    {
+        $queuedAt = $discovery?->queued_at;
+
+        return $queuedAt === null ? 0 : max(0, (int) $queuedAt->diffInSeconds(now()));
+    }
+
+    private static function discovering(Product $product, ?WebDiscovery $discovery): bool
+    {
+        $state = $discovery?->state;
 
         if ($state === WebDiscoveryState::Queued || $state === WebDiscoveryState::Running) {
             return true;

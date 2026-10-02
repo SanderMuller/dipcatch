@@ -29,6 +29,13 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-02',
+            'category' => 'feature',
+            'title' => 'Shop suggestions arrive one by one',
+            'body' => "With Pro, DipCatch starts looking for more shops as soon as you paste a product link, while you still check the preview. Each shop appears once it's checked, so a slow shop no longer holds up the others. You can open or add one while the search goes on.\n\nA progress bar replaces the spinner while it searches.",
+            'link' => ['route' => 'app.products.create', 'label' => 'Add a product'],
+        ],
+        [
             'date' => '2026-10-01',
             'category' => 'shop',
             'title' => 'bol.com in your shop suggestions',
