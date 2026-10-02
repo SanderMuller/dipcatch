@@ -39,7 +39,7 @@ return [
             'date' => '2026-10-01',
             'category' => 'feature',
             'title' => 'Add a product in three steps',
-            'body' => "Adding a product now walks you through it: first the product, from a shop link or filled in by hand, then more shops to compare, then your alert.\n\nOn the last step DipCatch suggests an alert at the discount this kind of product usually gets, worked out from its normal price, so an offer on today doesn't count twice. With AI help on, Pro also checks how products like it go on sale.",
+            'body' => "Adding a product now walks you through it: first the product, from a shop link or filled in by hand, then more shops to compare, then your alert.\n\nDipCatch suggests an alert at the discount this kind of product usually gets, worked out from its normal price, so today's offer doesn't count twice. You'll find it on the last step and on a product's edit page. With AI help on, Pro also checks how products like it go on sale.",
             'link' => ['route' => 'app.products.create', 'label' => 'Add a product'],
         ],
         [

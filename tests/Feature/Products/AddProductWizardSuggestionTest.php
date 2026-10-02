@@ -69,7 +69,7 @@ it('suggests an alert from the category on a free account, with the Pro teaser a
     alertStep(suggestionWizardProduct($user))
         ->assertSeeHtml('data-test="alert-suggestion"')
         ->assertSee('Pet food often goes about 20% off.')
-        ->assertSee('We suggest €3.20 /kg, 20% under the normal €4.00 /kg.')
+        ->assertSeeInOrder(['€3.20', 'for the 1 kg pack', 'Pet food often goes about 20% off.', 'Our suggestion is €3.20 /kg, 20% under the normal €4.00 /kg.'])
         ->assertSeeHtml('data-test="pro-teaser"')
         ->assertDontSeeHtml('wire:init="askJev"')
         // Called from the browser anyway: the server refuses it too.
@@ -83,11 +83,23 @@ it('asks Jev on Pro with AI help on, and suggests its band', function (): void {
     $user = wizardProUser();
     $this->actingAs($user);
 
-    alertStep(suggestionWizardProduct($user))
+    $product = suggestionWizardProduct($user);
+
+    alertStep($product)
         ->assertSeeHtml('wire:init="askJev"')
+        // Until Jev answers, the card shows no numbers that could still change.
+        ->assertSeeHtml('data-test="alert-suggestion-checking"')
+        ->assertDontSee('Use this alert')
         ->call('askJev')
+        ->assertDontSeeHtml('data-test="alert-suggestion-checking"')
         ->assertSee('Products like this often go 50% off.')
-        ->assertSee('We suggest €2.00 /kg');
+        ->assertSee('Our suggestion is €2.00 /kg')
+        ->assertDontSeeHtml('data-test="pro-teaser"');
+
+    // A reload reads the answer back instead of asking again.
+    alertStep($product)
+        ->assertDontSeeHtml('wire:init="askJev"')
+        ->assertSee('Our suggestion is €2.00 /kg');
 
     Http::assertSentCount(1);
 });
@@ -265,7 +277,7 @@ it('keeps the pre-latch for the suggestion taken, when Jev answers after it', fu
         ->assertSet('unitPriceTarget', '3')
         // Jev's half-price band moves the card to €2.00; the fields keep €3.00.
         ->call('askJev')
-        ->assertSee('We suggest €2.00 /kg')
+        ->assertSee('Our suggestion is €2.00 /kg')
         ->call('saveAlerts');
 
     $product->refresh();
@@ -274,7 +286,7 @@ it('keeps the pre-latch for the suggestion taken, when Jev answers after it', fu
         ->and((string) $product->unit_price_notified)->toBe('3.0000');
 });
 
-it('asks Jev again once the product changed, and ignores the old answer meanwhile', function (): void {
+it('asks Jev again once the product changed, and shows no old answer meanwhile', function (): void {
     fakeJevAnswer();
     $user = wizardProUser();
     $product = suggestionWizardProduct($user);
@@ -288,8 +300,10 @@ it('asks Jev again once the product changed, and ignores the old answer meanwhil
 
     $wizard->call('goToStep', 2)
         ->call('goToStep', 3)
-        ->assertSee('Pet food often goes about 20% off.')
-        ->call('askJev');
+        ->assertSeeHtml('data-test="alert-suggestion-checking"')
+        ->assertDontSee('Products like this often go 50% off.')
+        ->call('askJev')
+        ->assertSee('Products like this often go 50% off.');
 
     Http::assertSentCount(2);
 });
@@ -389,4 +403,22 @@ it('stops using Jev\'s answer once the owner has no AI help any more', function 
         ->call('goToStep', 3)
         ->assertSee('Pet food often goes about 20% off.')
         ->assertDontSee('Products like this often go 50% off.');
+});
+
+it('folds the other alerts away until one of them is set', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // As a product the wizard just created: no drop of its own yet.
+    $product = suggestionWizardProduct($user);
+    $product->forceFill(['drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+
+    $wizard = alertStep($product);
+
+    expect($wizard->html())->toMatch('/<details(?![^>]*\bopen\b)[^>]*data-test="other-alerts"/');
+
+    $wizard->set('dropThresholdPct', '12.5');
+
+    expect($wizard->html())->toMatch('/<details[^>]*\bopen\b[^>]*data-test="other-alerts"/')
+        ->and($wizard->html())->toContain('12.5% drop');
 });

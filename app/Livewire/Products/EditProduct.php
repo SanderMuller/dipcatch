@@ -3,11 +3,13 @@
 namespace App\Livewire\Products;
 
 use App\Actions\Products\CategoriseProduct;
+use App\Actions\Products\SaveAlert;
 use App\Actions\Products\UpdateProductDetails;
 use App\Enums\CategorySource;
 use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
 use App\Livewire\Concerns\EditsAlertFields;
+use App\Livewire\Concerns\SuggestsAlert;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Services\ShopDiscovery\WebShopDiscovery;
@@ -16,9 +18,11 @@ use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
 use App\Support\Iso4217;
 use App\Support\MoneyFormatter;
+use App\Support\Numeric;
 use App\Support\UnitTargetGuide;
 use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
@@ -36,6 +40,7 @@ final class EditProduct extends Component
 {
     use EditsAlertFields;
     use HasFluentValidation;
+    use SuggestsAlert;
 
     public Product $product;
 
@@ -61,6 +66,9 @@ final class EditProduct extends Component
     public string $loadedCategory = '';
 
     public ?string $message = null;
+
+    /** What the last action did, for the page's status region: a screen reader hears it. */
+    public string $status = '';
 
     /** A category Jev proposed, as a `ProductCategory` value, until accepted or declined. */
     public ?string $suggestedCategory = null;
@@ -119,7 +127,7 @@ final class EditProduct extends Component
         $this->dropThresholdAbs = null;
     }
 
-    public function save(): void
+    public function save(SaveAlert $saveAlert): void
     {
         $this->authorize('update', $this->product);
 
@@ -138,12 +146,16 @@ final class EditProduct extends Component
 
         UpdateProductDetails::fill($this->product, $this->title, self::blankToNull($this->imageUrl));
 
-        $this->product->forceFill([
-            'currency' => $this->currency,
-            ...$this->alertFieldValues(),
-            'active' => $this->active,
-            'price_display' => PriceDisplay::tryFrom($this->priceDisplay),
-        ])->save();
+        // One transaction, so the details never save without the alerts.
+        DB::transaction(function () use ($saveAlert): void {
+            $this->product->forceFill([
+                'currency' => $this->currency,
+                'active' => $this->active,
+                'price_display' => PriceDisplay::tryFrom($this->priceDisplay),
+            ])->save();
+
+            $saveAlert($this->product, $this->alertFieldValues(), $this->chosenTarget);
+        });
 
         // A new title changes what the web suggestions were checked against.
         app(WebShopDiscovery::class)->requeueIfStale($this->product);
@@ -224,6 +236,20 @@ final class EditProduct extends Component
         $this->product->forceFill(['suggested_category' => null, 'category_set_by' => CategorySource::User])->save();
     }
 
+    /** Fills in the suggested per-unit target. Nothing is written until the form is saved. */
+    public function useSuggestion(): void
+    {
+        $target = $this->alertSuggestion($this->product)->unitTarget;
+
+        if ($target === null) {
+            return;
+        }
+
+        $this->unitPriceTarget = $target;
+        $this->chosenTarget = $target;
+        $this->announce(__('Alert set to :target. Save changes to keep it.', ['target' => $target]));
+    }
+
     public function delete(): void
     {
         $this->authorize('delete', $this->product);
@@ -251,6 +277,7 @@ final class EditProduct extends Component
     {
         $guide = new UnitTargetGuide($this->product);
         $packChoices = $guide->packs();
+        $alertCard = $this->product->unit_price_target === null && $packChoices !== [] ? $this->suggestionCard($this->product) : null;
 
         return view('livewire.products.edit-product', [
             'currencies' => Iso4217::options(),
@@ -266,7 +293,23 @@ final class EditProduct extends Component
             'unitHistory' => $guide->history(),
             'comparisonUnit' => $this->product->comparablePacks()->unit(),
             ...$this->alertAnchors(),
+            'alertCard' => $alertCard,
+            // "In use" on the card, compared as numbers: the pack picker
+            // writes 3.20 where the suggestion says 3.2.
+            'suggestionInUse' => $alertCard !== null && $alertCard['suggestion']->unitTarget !== null && ($typed = self::blankToNull($this->unitPriceTarget)) !== null
+                && is_numeric($typed) && bccomp(Numeric::str($typed), Numeric::str($alertCard['suggestion']->unitTarget), 4) === 0,
+            'otherAlerts' => $this->otherAlertSummaries($this->currency),
         ]);
+    }
+
+    protected function suggestedProduct(): Product
+    {
+        return $this->product;
+    }
+
+    protected function announce(string $message): void
+    {
+        $this->status = $message;
     }
 
     private function allowsAutoCategories(): bool

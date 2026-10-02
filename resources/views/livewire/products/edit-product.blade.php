@@ -23,9 +23,12 @@
         <flux:callout class="mt-6" icon="information-circle">{{ $message }}</flux:callout>
     @endif
 
+    {{-- Always in the page, so a screen reader announces what lands in it. --}}
+    <div role="status" class="sr-only" data-test="edit-status">{{ $status }}</div>
+
     <form wire:submit="save">
         <flux:card class="mt-6">
-            <flux:heading size="lg">{{ __('Product') }}</flux:heading>
+            <flux:heading size="lg" level="2">{{ __('Product') }}</flux:heading>
 
             <div class="mt-4 space-y-4">
                 <flux:input wire:model="title" :label="__('Title')" required />
@@ -83,7 +86,13 @@
         </flux:card>
 
         <flux:card class="mt-6">
-            <flux:heading size="lg">{{ __('Alerts') }}</flux:heading>
+            <flux:heading size="lg" level="2">{{ __('Alerts') }}</flux:heading>
+
+            @if ($alertCard !== null && ($alertCard['asksJev'] || $alertCard['suggestion']->unitTarget !== null))
+                <div class="mt-4 max-w-2xl">
+                    @include('livewire.products.partials.alert-suggestion', [...$alertCard, 'inWizard' => false])
+                </div>
+            @endif
 
             @if ($packChoices === [])
                 {{-- No shop has said how much is in its pack yet, so there is
@@ -117,11 +126,6 @@
 
             {{-- Folded away while empty, so the price alert leads; open when
                  one of them is set or has an error, so nothing active hides. --}}
-            @php($otherAlerts = array_values(array_filter([
-                $targetPrice !== null && $targetPrice !== '' ? __(':amount for any pack', ['amount' => \App\Support\MoneyFormatter::format((string) $targetPrice, (string) $currency)]) : null,
-                $dropThresholdPct !== null && $dropThresholdPct !== '' ? __(':percent% drop', ['percent' => \App\Support\Numeric::trimmed((string) $dropThresholdPct)]) : null,
-                $dropThresholdAbs !== null && $dropThresholdAbs !== '' ? __(':amount drop', ['amount' => \App\Support\MoneyFormatter::format((string) $dropThresholdAbs, (string) $currency)]) : null,
-            ])))
             @php($otherAlertErrors = $errors->hasAny(['dropThresholdPct', 'dropThresholdAbs', 'targetPrice']))
             {{-- wire:ignore.self keeps the section open or shut across round
                  trips; the summary line, which does morph, names an error. --}}
@@ -133,7 +137,7 @@
             >
                 <summary class="flex cursor-pointer list-none items-center gap-2 select-none [&::-webkit-details-marker]:hidden">
                     <flux:icon.chevron-right variant="micro" class="shrink-0 text-zinc-400 group-open:rotate-90" />
-                    <span class="text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Other alerts') }}</span>
+                    <span class="shrink-0 text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Other alerts') }}</span>
                     <span class="truncate text-base/7 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
                         · {{ $otherAlerts === [] ? __('a drop in percent or money, or a price for any pack') : implode(', ', $otherAlerts) }}
                     </span>

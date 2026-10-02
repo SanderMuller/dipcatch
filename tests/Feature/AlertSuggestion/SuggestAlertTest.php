@@ -107,9 +107,46 @@ it('stops asking once the daily budget is spent', function (): void {
     fakeDepthAnswer([PromotionDepthBand::Deep->value => 0.9]);
     $product = productForJev();
 
-    expect(app(SuggestAlert::class)->band($product))->toBe(PromotionDepthBand::Deep)
-        ->and(app(SuggestAlert::class)->band($product))->toBe(PromotionDepthBand::Unknown);
+    expect(app(SuggestAlert::class)->band($product))->toBe(PromotionDepthBand::Deep);
+
+    // Another state of the product, so the remembered answer does not apply.
+    $product->shops()->update(['promotion_label' => null]);
+
+    expect(app(SuggestAlert::class)->band($product->refresh()))->toBe(PromotionDepthBand::Unknown);
     Http::assertSentCount(1);
+});
+
+it('remembers the answer while the product stays the same', function (): void {
+    fakeDepthAnswer([PromotionDepthBand::Deep->value => 0.9]);
+    $product = productForJev();
+
+    expect(app(SuggestAlert::class)->remembered($product))->toBeNull()
+        ->and(app(SuggestAlert::class)->band($product))->toBe(PromotionDepthBand::Deep)
+        ->and(app(SuggestAlert::class)->band($product))->toBe(PromotionDepthBand::Deep)
+        ->and(app(SuggestAlert::class)->remembered($product))->toBe(PromotionDepthBand::Deep);
+    Http::assertSentCount(1);
+});
+
+it('does not hand back a remembered answer once AI help is off', function (): void {
+    fakeDepthAnswer([PromotionDepthBand::Deep->value => 0.9]);
+    $product = productForJev();
+
+    expect(app(SuggestAlert::class)->band($product))->toBe(PromotionDepthBand::Deep);
+
+    $product->user->forceFill(['shop_checks' => false])->save();
+
+    expect(app(SuggestAlert::class)->band($product->refresh()))->toBe(PromotionDepthBand::Unknown);
+});
+
+it('does not remember a failed request', function (): void {
+    Http::fake([TypeSafeClient::ENDPOINT => Http::sequence()
+        ->push([], 500)
+        ->push(['answers' => [TypeSafeClient::PROMOTION_DEPTH_QUESTION => ['probabilities' => [PromotionDepthBand::Deep->value => 0.9]]]])]);
+    $product = productForJev();
+
+    expect(app(SuggestAlert::class)->band($product))->toBe(PromotionDepthBand::Unknown)
+        ->and(app(SuggestAlert::class)->remembered($product))->toBeNull()
+        ->and(app(SuggestAlert::class)->band($product))->toBe(PromotionDepthBand::Deep);
 });
 
 it('drops an answer for a product that changed while Jev read it', function (): void {

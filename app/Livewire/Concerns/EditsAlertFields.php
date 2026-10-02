@@ -3,6 +3,7 @@
 namespace App\Livewire\Concerns;
 
 use App\Models\Product;
+use App\Support\MoneyFormatter;
 use App\Support\Numeric;
 use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
 use SanderMuller\FluentValidation\FluentRule;
@@ -59,6 +60,21 @@ trait EditsAlertFields
             'target_price' => self::blankToNull($this->targetPrice),
             'unit_price_target' => self::blankToNull($this->unitPriceTarget),
         ];
+    }
+
+    /**
+     * The "Other alerts" fold's summary line: one phrase per alert set there.
+     * The fold opens when this is not empty, so no active alert hides.
+     *
+     * @return list<string>
+     */
+    protected function otherAlertSummaries(string $currency): array
+    {
+        return array_values(array_filter([
+            ($amount = self::blankToNull($this->targetPrice)) === null ? null : __(':amount for any pack', ['amount' => MoneyFormatter::format($amount, $currency)]),
+            ($percent = self::blankToNull($this->dropThresholdPct)) === null ? null : __(':percent% drop', ['percent' => Numeric::trimmed($percent)]),
+            ($drop = self::blankToNull($this->dropThresholdAbs)) === null ? null : __(':amount drop', ['amount' => MoneyFormatter::format($drop, $currency)]),
+        ], is_string(...)));
     }
 
     private static function blankToNull(?string $value): ?string

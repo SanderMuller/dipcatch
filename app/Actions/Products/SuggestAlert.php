@@ -10,6 +10,7 @@ use App\Services\TypeSafe\ShopCheckPurpose;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
 use App\Support\AlertSuggestion\AlertSuggestion;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * The suggested alert for a product, with Jev's view of how deep its
@@ -21,6 +22,8 @@ final readonly class SuggestAlert
     /** Below this, Jev's top band is a guess, and the category decides. */
     private const float MIN_PROBABILITY = 0.5;
 
+    private const int REMEMBER_DAYS = 30;
+
     public function __construct(
         private TypeSafeClient $client,
         private CategorisationBudget $budget,
@@ -31,13 +34,26 @@ final readonly class SuggestAlert
         return AlertSuggestion::for($product, $this->band($product));
     }
 
-    /** `Unknown` whenever there is no confident answer to give. */
+    /**
+     * `Unknown` whenever there is no confident answer to give. Jev's answer is
+     * cached per state of the product.
+     */
     public function band(Product $product): PromotionDepthBand
     {
         $user = $product->user;
 
-        if (! $user instanceof User || ! $user->wantsShopChecks() || ! TypeSafeClient::configured()
-            || ! $this->budget->allowsShopCheck($user, ShopCheckPurpose::AlertSuggestion)) {
+        if (! $user instanceof User || ! $user->wantsShopChecks() || ! TypeSafeClient::configured()) {
+            return PromotionDepthBand::Unknown;
+        }
+
+        // Before the budget, which counts a check when it is asked.
+        $remembered = $this->remembered($product);
+
+        if ($remembered instanceof PromotionDepthBand) {
+            return $remembered;
+        }
+
+        if (! $this->budget->allowsShopCheck($user, ShopCheckPurpose::AlertSuggestion)) {
             return PromotionDepthBand::Unknown;
         }
 
@@ -54,27 +70,36 @@ final readonly class SuggestAlert
             return PromotionDepthBand::Unknown;
         }
 
+        if ($chances === []) {
+            return PromotionDepthBand::Unknown;
+        }
+
         arsort($chances);
         $top = array_key_first($chances);
-
-        return $top !== null && $chances[$top] >= self::MIN_PROBABILITY
+        $band = $chances[$top] >= self::MIN_PROBABILITY
             ? PromotionDepthBand::tryFrom($top) ?? PromotionDepthBand::Unknown
             : PromotionDepthBand::Unknown;
+
+        Cache::put($this->cacheKey($product), $band->value, now()->addDays(self::REMEMBER_DAYS));
+
+        return $band;
     }
 
-    /**
-     * A band asked for earlier, while it still applies: the product is the
-     * same, and its owner still has AI help on.
-     */
-    public function stillApplies(Product $product, ?PromotionDepthBand $band, ?string $fingerprint): PromotionDepthBand
+    /** Jev's earlier answer for the product as it is now, without asking. */
+    public function remembered(Product $product): ?PromotionDepthBand
     {
-        return $band !== null && $product->user?->wantsShopChecks() === true && $fingerprint === $this->fingerprint($product)
-            ? $band
-            : PromotionDepthBand::Unknown;
+        $value = Cache::get($this->cacheKey($product));
+
+        return is_string($value) ? PromotionDepthBand::tryFrom($value) : null;
     }
 
     public function fingerprint(Product $product): string
     {
         return hash('xxh128', (string) json_encode($this->client->promotionDepthState($product)));
+    }
+
+    private function cacheKey(Product $product): string
+    {
+        return "alert-suggestion:band:{$product->id}:{$this->fingerprint($product)}";
     }
 }

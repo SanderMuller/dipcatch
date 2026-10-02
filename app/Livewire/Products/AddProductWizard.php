@@ -6,15 +6,14 @@ use App\Actions\Products\CategoriseProduct;
 use App\Actions\Products\CreateProductWithShop;
 use App\Actions\Products\ProductDraft;
 use App\Actions\Products\SaveAlert;
-use App\Actions\Products\SuggestAlert;
 use App\Actions\Products\UpdateProductDetails;
 use App\Actions\Shops\ProbeOutcome;
 use App\Billing\PlanLimitReached;
 use App\Billing\PlanLimits;
-use App\Enums\PromotionDepthBand;
 use App\Enums\TrackingIdea;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Livewire\Concerns\EditsAlertFields;
+use App\Livewire\Concerns\SuggestsAlert;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -23,7 +22,6 @@ use App\Services\Drops\Reference;
 use App\Services\Drops\TierDefaults;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Support\AlertSuggestion\AlertSuggestion;
-use App\Support\AlertSuggestion\NormalPrice;
 use App\Support\ConnectedAssistant;
 use App\Support\Iso4217;
 use App\Support\UnitTargetGuide;
@@ -33,6 +31,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -56,6 +55,7 @@ final class AddProductWizard extends Component
     use DrivesShopProbe;
     use EditsAlertFields;
     use HasFluentValidation;
+    use SuggestsAlert;
 
     /**
      * Steps 2 and 3 need a product, and step 1 shows it once there is one.
@@ -91,17 +91,6 @@ final class AddProductWizard extends Component
 
     public ?string $limitMessage = null;
 
-    /** Jev's band for the suggested alert, while `$bandFingerprint` still describes the product. */
-    #[Locked]
-    public ?PromotionDepthBand $band = null;
-
-    #[Locked]
-    public ?string $bandFingerprint = null;
-
-    /** The per-unit target "Use this alert" filled in, so Done can tell it was kept. */
-    #[Locked]
-    public ?string $chosenTarget = null;
-
     /** "Set my own": the card steps aside for the fields. */
     public bool $settingOwn = false;
 
@@ -124,7 +113,7 @@ final class AddProductWizard extends Component
         $product = $this->product();
         $this->title = $product->title;
         $this->imageUrl = (string) $product->image_url;
-        // From the product, so Done on a product reopened later keeps what it
+        // From the product, so saving a product reopened later keeps what it
         // had rather than writing empty fields over it.
         $this->loadAlertFields($product);
         $this->step = max(1, min(3, $this->step));
@@ -303,28 +292,9 @@ final class AddProductWizard extends Component
         return $mode === 'manual' ? 'manual' : 'url';
     }
 
-    /**
-     * Step 3, for an account with the AI shop check: Jev's view of how deep
-     * this product's promotions go. Asked once per state of the product, so
-     * going back and forth between the steps costs no second request.
-     */
-    public function askJev(SuggestAlert $suggest): void
+    public function useSuggestion(): void
     {
-        $product = $this->product();
-        $fingerprint = $suggest->fingerprint($product);
-
-        if ($product->user?->wantsShopChecks() !== true || $fingerprint === $this->bandFingerprint) {
-            return;
-        }
-
-        $this->band = $suggest->band($product);
-        $this->bandFingerprint = $fingerprint;
-        $this->status = __('Suggested alert updated.');
-    }
-
-    public function useSuggestion(SuggestAlert $suggest): void
-    {
-        $target = $this->suggestion($this->product(), $suggest)->unitTarget;
+        $target = $this->alertSuggestion($this->product())->unitTarget;
 
         if ($target === null) {
             return;
@@ -357,26 +327,41 @@ final class AddProductWizard extends Component
     public function showSuggestion(): void
     {
         $this->settingOwn = false;
+        $this->focus('alert-suggestion-heading');
     }
 
     public function saveAlerts(SaveAlert $save): void
     {
         $product = $this->product();
 
-        $this->validate($this->alertFieldRules());
+        try {
+            $this->validate($this->alertFieldRules());
+        } catch (ValidationException $e) {
+            // The fold keeps its own open state across round trips, so an
+            // error in it would stay hidden in a closed one.
+            if (array_intersect(array_keys($e->errors()), ['dropThresholdPct', 'dropThresholdAbs', 'targetPrice']) !== []) {
+                $this->js("document.querySelector('[data-test=\"other-alerts\"]')?.setAttribute('open', '')");
+            }
+
+            throw $e;
+        }
 
         $save($product, $this->alertFieldValues(), $this->chosenTarget);
 
         $this->finish();
     }
 
-    private function suggestion(Product $product, SuggestAlert $suggest): AlertSuggestion
+    protected function suggestedProduct(): Product
     {
-        return AlertSuggestion::for($product, $suggest->stillApplies($product, $this->band, $this->bandFingerprint));
+        return $this->product();
     }
 
-    /** "Keep the defaults" calls it straight: it saves nothing. */
-    public function finish(): void
+    protected function announce(string $message): void
+    {
+        $this->status = $message;
+    }
+
+    private function finish(): void
     {
         $product = $this->product();
 
@@ -470,26 +455,22 @@ final class AddProductWizard extends Component
      * The drop defaults come from the same reference the drop check measures
      * from: for a product added during an offer, that is the offer price.
      *
-     * @return array{suggestion: AlertSuggestion, onOfferNow: bool, asksJev: bool, canSwitchOnAi: bool, packChoices: list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>, unitWord: ?string, defaults: array{pct: string, abs: string}|null}
+     * @return array{suggestion: AlertSuggestion, onOfferNow: bool, asksJev: bool, usesJev: bool, canSwitchOnAi: bool, packChoices: list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>, unitWord: ?string, defaults: array{pct: string, abs: string}|null, otherAlerts: list<string>}
      */
     private function alertStep(Product $product): array
     {
         $reference = app(Reference::class)->compute($product);
         $defaults = $reference === null ? null : TierDefaults::forReference($reference);
 
-        $user = $product->user;
-
         return [
-            'suggestion' => $this->suggestion($product, app(SuggestAlert::class)),
-            'onOfferNow' => $product->shops->contains(NormalPrice::isOnOffer(...)),
-            'asksJev' => $user?->wantsShopChecks() === true,
-            'canSwitchOnAi' => $user?->entitlements()->allowsShopChecks() === true && $user->wantsShopChecks() !== true,
+            ...$this->suggestionCard($product),
             'packChoices' => new UnitTargetGuide($product)->packs(),
             'unitWord' => UnitWord::noun($product->comparablePacks()->unit()),
             'defaults' => $defaults === null ? null : [
                 'pct' => number_format($defaults['pct'], 2, '.', ''),
                 'abs' => $defaults['abs'] === null ? '' : number_format($defaults['abs'], 2, '.', ''),
             ],
+            'otherAlerts' => $this->otherAlertSummaries($product->currency),
         ];
     }
 }

@@ -5,6 +5,7 @@
     'history' => null,
     'currency' => 'EUR',
     'unitWord' => 'unit',
+    'heading' => true,
 ])
 
 {{--
@@ -133,13 +134,15 @@
 >
     {{-- Rendered on the server, so the rule and today's figure read without
          the script. --}}
-    <div>
-        <flux:heading>{{ __('Price alert') }}</flux:heading>
-        <p class="mt-1 max-w-[65ch] text-base/7 text-pretty text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-            {{ __('Any shop, any pack size, at the same price per :unit.', ['unit' => $unitWord]) }}
-            {{ $description }}
-        </p>
-    </div>
+    @if ($heading)
+        <div>
+            <flux:heading>{{ __('Price alert') }}</flux:heading>
+            <p class="mt-1 max-w-[65ch] text-base/7 text-pretty text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
+                {{ __('Any shop, any pack size, at the same price per :unit.', ['unit' => $unitWord]) }}
+                {{ $description }}
+            </p>
+        </div>
+    @endif
 
     <div x-show="packs.length > 1">
         <p class="text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Which pack do you buy?') }}</p>
@@ -171,13 +174,11 @@
         <p x-show="levels().length > 0" class="text-base/7 text-zinc-500 sm:text-sm/6 dark:text-zinc-400" data-test="unit-target-context">
             {{ __('Today’s best:') }}
             <span class="rounded-md bg-zinc-950/5 px-1.5 py-0.5 font-medium text-zinc-900 tabular-nums dark:bg-white/10 dark:text-white" x-text="money(bestUnit(), true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
-            <span x-text="@js(__('at')) + ' ' + best().host + (packs.length > 1 || chosen !== 0 ? ', ' + @js(__('which is')) : '.')"></span>
-            <template x-if="packs.length > 1 || chosen !== 0">
-                <span>
-                    <span class="rounded-md bg-zinc-950/5 px-1.5 py-0.5 font-medium text-zinc-900 tabular-nums dark:bg-white/10 dark:text-white" x-text="money(bestUnit() * pack().perPack)"></span>
-                    <span x-text="@js(__('for your')) + ' ' + pack().pack + '.'"></span>
-                </span>
-            </template>
+            {{-- The pack price too, always: the suggested alert and the
+                 levels below are pack prices. --}}
+            <span x-text="@js(__('at')) + ' ' + best().host + ', ' + @js(__('which is'))"></span>
+            <span class="rounded-md bg-zinc-950/5 px-1.5 py-0.5 font-medium text-zinc-900 tabular-nums dark:bg-white/10 dark:text-white" x-text="money(bestUnit() * pack().perPack)"></span>
+            <span x-text="@js(__('for your')) + ' ' + pack().pack + '.'"></span>
             <span x-show="lowest() !== null" x-text="@js(__('Lowest on the chart:')) + ' ' + money(lowest(), true) + ' ' + @js(__('per')) + ' ' + unitWord + '.'"></span>
         </p>
 

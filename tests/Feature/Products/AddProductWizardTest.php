@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Laravel\Passport\Client;
 use Laravel\Passport\Token;
+use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -736,7 +737,7 @@ describe('the steps', function (): void {
 
         Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 3])
             ->test(AddProductWizard::class)
-            ->call('finish')
+            ->call('saveAlerts')
             ->assertNotified('Product created')
             ->assertRedirect(route('app.products.show', $product));
     });
@@ -758,7 +759,10 @@ describe('step 3, the alert', function (): void {
     it('explains that tracking goes on whatever the alert says', function (): void {
         $this->actingAs(User::factory()->create());
 
-        wizardAtAlerts()->assertSee('We check every shop and keep the full price history, whatever you set here.');
+        wizardAtAlerts()
+            ->assertSee('We track every price either way. Your alert only decides when we notify you.')
+            // The step list and this line say what the price alert is for.
+            ->assertDontSee('Any shop, any pack size');
     });
 
     it('suggests the default thresholds from the reference the drop check uses', function (): void {
@@ -807,7 +811,7 @@ describe('step 3, the alert', function (): void {
 
         wizardAtAlerts(price: '4.00', title: 'Crisps 500 g')
             ->assertSeeHtml('data-test="unit-target"')
-            ->assertSee('same price per kilo')
+            ->assertSee('Alert me when it costs')
             ->set('unitPriceTarget', '6')
             ->call('saveAlerts')
             ->assertHasNoErrors();
@@ -823,16 +827,22 @@ describe('step 3, the alert', function (): void {
             ->assertSee('Target price per kilo, litre or piece');
     });
 
-    it('saves nothing when the person keeps the defaults', function (): void {
+    it('finishes through Start tracking only, which saves what was set', function (): void {
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        wizardAtAlerts()
-            ->set('dropThresholdPct', '30')
-            ->call('finish')
+        $wizard = wizardAtAlerts()
+            ->assertSee('Start tracking')
+            ->assertDontSee('Keep the defaults');
+
+        // The old way out, which skipped saving, is no longer reachable.
+        expect(fn () => $wizard->call('finish'))->toThrow(MethodNotFoundException::class);
+
+        $wizard->set('dropThresholdPct', '30')
+            ->call('saveAlerts')
             ->assertRedirect();
 
-        expect(Product::query()->where('user_id', $user->id)->sole()->drop_threshold_pct)->toBeNull();
+        expect(Product::query()->where('user_id', $user->id)->sole()->drop_threshold_pct)->toEqual('30.00');
     });
 
     it('keeps the alert a reopened product already has', function (): void {

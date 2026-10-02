@@ -8,10 +8,9 @@ use App\Support\Numeric;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Saves the alert step 3 of adding a product set. When the person kept the
- * suggested per-unit target and the price already meets it, the target is
- * marked as notified: they saw this offer while adding the product, and the
- * next one is worth an alert.
+ * Saves a product's alert fields. When the person kept the suggested per-unit
+ * target and the price already meets it, the target is marked as notified:
+ * they saw this offer when they set it, and the next one is worth an alert.
  */
 final class SaveAlert
 {
