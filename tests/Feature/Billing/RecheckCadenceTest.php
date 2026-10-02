@@ -4,6 +4,7 @@ use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Support\RecheckJitter;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Queue;
 
@@ -91,4 +92,18 @@ it('drops a blocked account back to the free cadence', function (): void {
     $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
 
     Queue::assertNotPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($shop));
+});
+
+it('rechecks a shop checked late in the last hourly run, rather than an hour after its interval', function (): void {
+    // The run is hourly, and a check lands up to one jitter window after the
+    // run that queued it. That shop is due at the run six hours on.
+    Queue::fake();
+    $pro = proUser();
+    $checkedLate = shopFor($pro, CarbonImmutable::now()->subHours(6)->addSeconds(RecheckJitter::maxSeconds()));
+    $checkedFiveHoursAgo = shopFor($pro, CarbonImmutable::now()->subHours(5));
+
+    $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
+
+    Queue::assertPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($checkedLate));
+    Queue::assertNotPushed(CheckShopPrice::class, fn (CheckShopPrice $job): bool => $job->shop->is($checkedFiveHoursAgo));
 });

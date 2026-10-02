@@ -119,10 +119,9 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
     public function uniqueFor(): int
     {
         // RecheckActiveShopsCommand dispatches with up to one jitter window of
-        // delay; the scheduler ticks more frequently than that, so a short
-        // 60s window would let the same offer be re-queued before the original
-        // delayed job has started. Hold the uniqueness lock for the full
-        // jitter window plus a buffer covering job timeout + queue scheduling.
+        // delay. Hold the uniqueness lock for that window plus a buffer
+        // covering job timeout + queue scheduling, so the offer is not
+        // re-queued before the delayed job has run.
         // Read the window through RecheckJitter so the lock cannot outlive or
         // undercut the delay the command actually draws.
         return RecheckJitter::maxSeconds() + 600;

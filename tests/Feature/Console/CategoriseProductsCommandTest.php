@@ -6,8 +6,10 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
+use App\Services\TypeSafe\TypeSafeRequestFailed;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -43,7 +45,7 @@ it('categorises only the null, never-touched products of opted-in Pro accounts',
     $free = Product::factory()->create(['user_id' => User::factory()->create(['auto_categories' => true])->id, 'title' => 'Free']);
 
     $this->artisan('dipcatch:categorise-products')
-        ->expectsOutputToContain('1 categorised, 0 skipped, 0 failed.')
+        ->expectsOutputToContain('Queued 1 product(s).')
         ->assertSuccessful();
 
     Http::assertSentCount(1);
@@ -64,7 +66,7 @@ it('categorises an account on a granted trial beside a lapsed subscription', fun
     $product = Product::factory()->create(['user_id' => $user->id]);
 
     $this->artisan('dipcatch:categorise-products')
-        ->expectsOutputToContain('1 categorised, 0 skipped, 0 failed.')
+        ->expectsOutputToContain('Queued 1 product(s).')
         ->assertSuccessful();
 
     expect($product->fresh()?->category)->toBe(ProductCategory::CoffeeTea);
@@ -92,7 +94,7 @@ it('caps a run at --limit and --user', function (): void {
     $other = Product::factory()->create(['user_id' => $otherPro->id]);
 
     $this->artisan("dipcatch:categorise-products --limit=2 --user={$pro->id}")
-        ->expectsOutputToContain('2 categorised, 0 skipped, 0 failed.')
+        ->expectsOutputToContain('Queued 2 product(s).')
         ->assertSuccessful();
 
     Http::assertSentCount(2);
@@ -100,9 +102,8 @@ it('caps a run at --limit and --user', function (): void {
         ->and($other->fresh()?->category)->toBeNull();
 });
 
-it('keeps going after one product fails, and counts it', function (): void {
-    // Two server errors exhaust the retry for the first product; a rejected
-    // key would stop the run instead.
+it('keeps going after one product fails', function (): void {
+    // Two server errors exhaust the retry for the first product.
     Http::fake([TypeSafeClient::ENDPOINT => Http::sequence()
         ->push([], 500)
         ->push([], 500)
@@ -111,38 +112,50 @@ it('keeps going after one product fails, and counts it', function (): void {
     [$first, $second] = Product::factory()->count(2)->sequence(['created_at' => now()->subMinute()], ['created_at' => now()])->create(['user_id' => $pro->id]);
 
     $this->artisan('dipcatch:categorise-products')
-        ->expectsOutputToContain('1 categorised, 0 skipped, 1 failed.')
-        ->assertFailed();
+        ->expectsOutputToContain('Queued 2 product(s).')
+        ->assertSuccessful();
 
     expect($first->fresh()?->category)->toBeNull()
         ->and($second->fresh()?->category)->toBe(ProductCategory::CoffeeTea);
 });
 
-it('keeps an answer below the guards as a suggestion, counts it as skipped, and does not ask again', function (): void {
+it('keeps an answer below the guards as a suggestion, and does not ask again', function (): void {
     Http::fake([TypeSafeClient::ENDPOINT => Http::response(typesafeAnswer(['other' => 0.9, 'food' => 0.1], ['food' => ['coffee_tea' => 0.9, 'pantry' => 0.1]]))]);
     $pro = optedInProUser();
     $product = Product::factory()->create(['user_id' => $pro->id]);
 
     $this->artisan('dipcatch:categorise-products')
-        ->expectsOutputToContain('0 categorised, 1 skipped, 0 failed.')
+        ->expectsOutputToContain('Queued 1 product(s).')
         ->assertSuccessful();
 
     expect($product->fresh()?->category)->toBeNull()
         ->and($product->fresh()?->suggested_category)->toBe(ProductCategory::CoffeeTea);
 
     $this->artisan('dipcatch:categorise-products')
-        ->expectsOutputToContain('0 categorised, 0 skipped, 0 failed.')
+        ->expectsOutputToContain('Queued 0 product(s).')
         ->assertSuccessful();
 
     Http::assertSentCount(1);
 });
 
-it('stops at the first rejected key instead of failing every product', function (): void {
+it('reports a rejected key, which fails every product until someone fixes it', function (): void {
+    Exceptions::fake();
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response(['error' => 'unauthorized'], 401)]);
+    $pro = optedInProUser();
+    $product = Product::factory()->create(['user_id' => $pro->id]);
+
+    $this->artisan('dipcatch:categorise-products')->assertSuccessful();
+
+    Exceptions::assertReported(fn (TypeSafeRequestFailed $e): bool => $e->isRejectedKey());
+    expect($product->fresh()?->category)->toBeNull();
+});
+
+it('stops a dry run at the first rejected key instead of failing every product', function (): void {
     Http::fake([TypeSafeClient::ENDPOINT => Http::response(['error' => 'unauthorized'], 401)]);
     $pro = optedInProUser();
     Product::factory()->count(3)->create(['user_id' => $pro->id]);
 
-    $this->artisan('dipcatch:categorise-products')
+    $this->artisan('dipcatch:categorise-products --dry-run')
         ->expectsOutputToContain('TypeSafe rejects TYPESAFE_API_KEY')
         ->assertFailed();
 
@@ -179,7 +192,7 @@ it('writes each row as it is answered, so a rerun after an interruption continue
         ->and($second->fresh()?->category)->toBeNull();
 
     $this->artisan('dipcatch:categorise-products')
-        ->expectsOutputToContain('1 categorised, 0 skipped, 0 failed.')
+        ->expectsOutputToContain('Queued 1 product(s).')
         ->assertSuccessful();
 
     // The call that threw is not recorded as sent, so two of three are.
@@ -201,7 +214,7 @@ it('skips products past the account budget without a request', function (): void
     Product::factory()->count(2)->create(['user_id' => $pro->id]);
 
     $this->artisan('dipcatch:categorise-products')
-        ->expectsOutputToContain('1 categorised, 1 skipped, 0 failed.')
+        ->expectsOutputToContain('Queued 2 product(s).')
         ->assertSuccessful();
 
     Http::assertSentCount(1);

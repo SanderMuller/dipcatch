@@ -165,5 +165,5 @@ it('is scheduled daily', function (): void {
         ->filter(fn ($event): bool => str_contains((string) $event->command, 'dipcatch:discover-web-shops'));
 
     expect($events)->toHaveCount(1)
-        ->and($events->first()->expression)->toBe('40 4 * * *');
+        ->and($events->first()->expression)->toBe('40 2 * * *');
 });

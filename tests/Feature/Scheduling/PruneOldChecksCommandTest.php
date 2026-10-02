@@ -1,11 +1,15 @@
 <?php declare(strict_types=1);
 
+use App\Jobs\PruneOldHistory;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\TargetPriceEvent;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Queue;
 
 test('prunes price_checks per offer older than retention when more than 50 rows exist', function (): void {
     $product = Product::factory()->create();
@@ -136,4 +140,34 @@ test('prunes reached-target rows older than retention and keeps recent ones', fu
 
     expect(TargetPriceEvent::query()->whereKey($old->id)->exists())->toBeFalse()
         ->and(TargetPriceEvent::query()->whereKey($recent->id)->exists())->toBeTrue();
+});
+
+test('hands the rest of a pass to a next job once its time is up', function (): void {
+    Queue::fake();
+    $shops = Shop::factory()->count(2)->create()->sortBy('id')->values();
+
+    // Every clock read moves a minute on, so the stretch is spent after one row.
+    $clock = CarbonImmutable::now();
+    $tick = function () use (&$clock): CarbonImmutable {
+        $clock = $clock->addMinute();
+
+        return $clock;
+    };
+    CarbonImmutable::setTestNow($tick);
+    Carbon::setTestNow($tick);
+
+    new PruneOldHistory(PruneOldHistory::SHOPS)->handle();
+
+    Queue::assertPushed(PruneOldHistory::class, fn (PruneOldHistory $next): bool => $next->pass === PruneOldHistory::SHOPS
+        && $next->afterId === $shops->first()->id);
+});
+
+test('starts the shops pass when the products pass is done', function (): void {
+    Queue::fake();
+    Product::factory()->create();
+
+    new PruneOldHistory()->handle();
+
+    Queue::assertPushed(PruneOldHistory::class, fn (PruneOldHistory $next): bool => $next->pass === PruneOldHistory::SHOPS
+        && $next->afterId === null);
 });

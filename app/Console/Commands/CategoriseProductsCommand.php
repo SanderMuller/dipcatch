@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Actions\Products\CategoriseProduct;
 use App\Billing\ProUsers;
+use App\Jobs\CategoriseExistingProduct;
 use App\Models\Product;
 use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
@@ -12,6 +12,7 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 #[Signature('dipcatch:categorise-products {--user= : Only this user id} {--limit=200 : Products per run} {--dry-run : Print the verdicts, write nothing}')]
 #[Description('Sort the uncategorised products of accounts that opted in to automatic categories.')]
@@ -35,8 +36,8 @@ final class CategoriseProductsCommand extends Command
             ->whereNull('category_set_by')
             // Judged once already; its best guess waits on the edit form.
             ->whereNull('suggested_category')
-            // A pre-filter in SQL. Each row is re-checked below with the one
-            // guard the app uses everywhere.
+            // A pre-filter in SQL. Each job, and the dry run, re-checks the
+            // row with the one guard the app uses everywhere.
             ->whereIn('user_id', ProUsers::ids())
             ->whereHas('user', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('auto_categories', true))
             ->when(is_string($userId) && $userId !== '', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('user_id', $userId))
@@ -44,6 +45,29 @@ final class CategoriseProductsCommand extends Command
             ->limit($limit)
             ->get();
 
+        if (! $dryRun) {
+            // A job per product: each asks the AI once, and together they
+            // can outlast the App's few awake minutes after a scheduled run.
+            foreach ($products as $product) {
+                dispatch(new CategoriseExistingProduct($product->id));
+            }
+
+            $this->info("Queued {$products->count()} product(s).");
+
+            return self::SUCCESS;
+        }
+
+        return $this->dryRun($products, $client, $budget);
+    }
+
+    /**
+     * Prints each verdict and stores no category, but spends the AI budget.
+     * Runs here rather than on the queue, because the output is the point.
+     *
+     * @param  EloquentCollection<int, Product>  $products
+     */
+    private function dryRun(EloquentCollection $products, TypeSafeClient $client, CategorisationBudget $budget): int
+    {
         $categorised = 0;
         $skipped = 0;
         $failed = 0;
@@ -86,33 +110,14 @@ final class CategoriseProductsCommand extends Command
             ));
 
             if ($verdict->category === null) {
-                if (! $dryRun) {
-                    CategoriseProduct::store($product, $verdict);
-                }
-
                 $skipped++;
-
-                continue;
-            }
-
-            if ($dryRun) {
+            } else {
                 $categorised++;
-
-                continue;
             }
-
-            if (! CategoriseProduct::store($product, $verdict)) {
-                $skipped++;
-
-                continue;
-            }
-
-            $categorised++;
         }
 
         $this->info(sprintf(
-            '%s%d categorised, %d skipped, %d failed. Tokens: %d in, %d out.',
-            $dryRun ? '[dry run] ' : '',
+            '[dry run] %d categorised, %d skipped, %d failed. Tokens: %d in, %d out.',
             $categorised,
             $skipped,
             $failed,

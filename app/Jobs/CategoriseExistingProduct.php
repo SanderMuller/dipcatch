@@ -16,7 +16,7 @@ use Illuminate\Queue\Attributes\Tries;
 
 /**
  * Sorts one product someone already tracked when they switched automatic
- * categories on. A queued job rather than the after-response hook a new
+ * categories on, or one the nightly run picked up. A queued job rather than the after-response hook a new
  * product uses: there can be dozens, and each asks the AI on its own.
  */
 #[Tries(1)]
@@ -30,6 +30,12 @@ final class CategoriseExistingProduct implements ShouldBeUnique, ShouldQueue
     public function uniqueId(): string
     {
         return "categorise-existing-product:{$this->productId}";
+    }
+
+    /** Frees the lock should the queued job be lost; the nightly run queues the product again. */
+    public function uniqueFor(): int
+    {
+        return 3600;
     }
 
     /**

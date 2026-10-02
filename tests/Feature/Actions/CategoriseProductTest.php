@@ -168,7 +168,8 @@ it('does not write over a choice made between the request and the write', functi
 });
 
 it('logs a warning and leaves the product untouched when the request fails for good', function (): void {
-    Http::fake([TypeSafeClient::ENDPOINT => Http::response([], 401)]);
+    // A server error on every try. A rejected key is reported instead.
+    Http::fake([TypeSafeClient::ENDPOINT => Http::response([], 500)]);
     Log::spy();
     $user = proUserWantingCategories();
     $product = Product::factory()->create(['user_id' => $user->id]);
@@ -179,7 +180,7 @@ it('logs a warning and leaves the product untouched when the request fails for g
         ->once()
         ->withArgs(fn (string $message, array $context): bool => $context['product_id'] === $product->id
             && is_string($context['error'])
-            && str_contains($context['error'], '401'));
+            && str_contains($context['error'], '500'));
     expect($product->fresh()?->category)->toBeNull()
         ->and($product->fresh()?->category_set_by)->toBeNull();
 });

@@ -2,19 +2,15 @@
 
 namespace App\Console\Commands;
 
-use App\Actions\Shops\AttachShop;
-use App\Actions\Shops\ProbeShopUrl;
-use App\Actions\Shops\ShopDraft;
 use App\Enums\ProbeFailure;
 use App\Enums\ShopKind;
+use App\Jobs\RetryReferenceShop;
 use App\Models\Shop;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Log;
-use Throwable;
 
 /**
  * Asks the shops kept as links whether they will talk yet.
@@ -35,18 +31,16 @@ use Throwable;
 #[Description('Retry the shops kept as links, and start tracking any whose page has become readable.')]
 final class RetryReferenceShopsCommand extends Command
 {
-    public function handle(ProbeShopUrl $probe, AttachShop $attach): int
+    public function handle(): int
     {
         $dryRun = (bool) $this->option('dry-run');
-        $due = $this->dueQuery()->limit(max(1, (int) $this->option('limit')))->get();
+        $due = $this->dueQuery()->limit(max(1, (int) $this->option('limit')))->get(['id', 'url']);
 
         if ($due->isEmpty()) {
             $this->info('No links are due a retry.');
 
             return self::SUCCESS;
         }
-
-        $promoted = 0;
 
         foreach ($due as $shop) {
             if ($dryRun) {
@@ -55,66 +49,14 @@ final class RetryReferenceShopsCommand extends Command
                 continue;
             }
 
-            $promoted += $this->retry($shop, $probe, $attach) ? 1 : 0;
+            // A job per link: each one probes a page, and together they
+            // can outlast the App's few awake minutes after a scheduled run.
+            dispatch(new RetryReferenceShop($shop->id));
         }
 
-        $this->info(sprintf('Retried %d link(s); %d now read and are tracked.', $dryRun ? 0 : $due->count(), $promoted));
+        $this->info(sprintf($dryRun ? 'Would retry %d link(s).' : 'Queued %d link(s) for a retry.', $due->count()));
 
         return self::SUCCESS;
-    }
-
-    /**
-     * One link, asked again.
-     *
-     * A refusal costs the row nothing but a stamp: its failure counters stay
-     * at zero, because a link that cannot be read is not a shop going wrong —
-     * it is a shop behaving exactly as recorded. Counting these would reach
-     * `dead_after` and switch the feature off from the inside.
-     */
-    private function retry(Shop $shop, ProbeShopUrl $probe, AttachShop $attach): bool
-    {
-        $product = $shop->product;
-        $owner = $product?->user;
-
-        if ($product === null || $owner === null) {
-            return false;
-        }
-
-        // Never on the caller's budget: nobody asked for this.
-        $outcome = $probe(null, $shop->url, $owner, spendBudget: false);
-
-        $shop->forceFill(['retried_at' => now()])->save();
-
-        if (! $outcome->isSuccess()) {
-            return false;
-        }
-
-        try {
-            // The row is replaced rather than filled in: `AttachShop` writes
-            // the first price check and the recompute that reads it, which is
-            // how every other shop starts life. A link carries no history to
-            // lose — no checks, no cheapest segments, no drop events — so
-            // there is nothing to preserve and one fewer path to maintain.
-            $shop->delete();
-
-            $attach->firstShopOf($product, ShopDraft::fromOutcome(
-                $outcome,
-                $outcome->normalizedUrl ?? $shop->url,
-                (string) $outcome->adapterKey,
-            ));
-        } catch (Throwable $e) {
-            Log::warning('A shop kept as a link became readable but could not be tracked.', [
-                'shop_url' => $shop->url,
-                'product_id' => $product->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
-
-        $this->line("now readable: {$shop->url}");
-
-        return true;
     }
 
     /**

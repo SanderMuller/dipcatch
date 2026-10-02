@@ -39,14 +39,14 @@ test('the canary and the health run are both scheduled daily', function (): void
         ->and($listing)->toContain('health:check');
 });
 
-test('the schedule heartbeat runs every minute', function (): void {
+test('the schedule heartbeat runs hourly', function (): void {
     // Spatie's registered ScheduleCheck fails with "The schedule did not run
     // yet" until this writes its cache key, so without it the first health
     // mail is a false alarm about the scheduler itself.
     $heartbeat = scheduledEvents('health:schedule-check-heartbeat');
 
     expect($heartbeat)->toHaveCount(1)
-        ->and($heartbeat->first()->expression)->toBe('* * * * *');
+        ->and($heartbeat->first()->expression)->toBe('0 * * * *');
 });
 
 test('the scheduled canary runs on one server without overlapping', function (): void {

@@ -37,89 +37,92 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
+        // Production scales to zero. Laravel Cloud wakes the App per due task,
+        // from the `schedule:list` it stored at deploy, and stops it after the
+        // sleep timeout even mid-command. So: nothing runs more often than
+        // hourly; work that can outlast the timeout goes on the queue (the
+        // bol.com feed import is the exception); times are UTC, because the
+        // stored wake time does not follow a DST switch until the next deploy.
+        // A run cut off by the sleep keeps its overlap lock until it expires,
+        // so every lock expires well before the next run.
+
         $schedule->command(RecheckActiveShopsCommand::class)
-            ->everyFiveMinutes()
-            ->withoutOverlapping()
+            ->hourly()
+            ->withoutOverlapping(15)
             ->onOneServer();
 
         $schedule->command(RefreshCheckjebonDatasetCommand::class)
-            ->dailyAt('07:30')
-            ->timezone('Europe/Amsterdam')
-            ->withoutOverlapping()
+            ->dailyAt('05:30')
+            ->withoutOverlapping(60)
             ->onOneServer();
 
-        // Needs the IP address it runs from whitelisted at bol.com.
+        // Needs the IP address it runs from whitelisted at bol.com. Still
+        // runs on the App: the feed is too large for a queue job, so a run
+        // that outlasts the sleep timeout is cut off.
         $schedule->command(ImportBolFeedCommand::class)
-            ->dailyAt('08:00')
-            ->timezone('Europe/Amsterdam')
+            ->dailyAt('06:00')
             ->when(BolFeedDownloader::configured(...))
-            ->withoutOverlapping()
+            ->withoutOverlapping(60)
             ->onOneServer()
             ->runInBackground();
 
         // No IP whitelist: the API answers anywhere.
         $schedule->command(RefreshBolOffersCommand::class)
-            ->dailyAt('08:30')
-            ->timezone('Europe/Amsterdam')
+            ->dailyAt('06:30')
             ->when(BolCatalogClient::configured(...))
-            ->withoutOverlapping()
-            ->onOneServer()
-            ->runInBackground();
+            ->withoutOverlapping(60)
+            ->onOneServer();
 
         // Searches without results and pages we could not read are kept six
         // months after the last one.
         $schedule->command(PruneCommand::class, ['--model' => [EmptySearch::class, FailedShopPage::class]])
-            ->dailyAt('03:50')
-            ->timezone('Europe/Amsterdam')
+            ->dailyAt('01:50')
             ->onOneServer();
 
         $schedule->command(RunAdapterCanaryCommand::class)
-            ->dailyAt('05:15')
-            ->timezone('Europe/Amsterdam')
-            ->withoutOverlapping()
+            ->dailyAt('03:15')
+            ->withoutOverlapping(60)
             ->onOneServer();
 
         // Spatie's registered ScheduleCheck fails until this heartbeat runs,
-        // so without it the first health mail is a false alarm.
+        // so without it the first health mail is a false alarm. Hourly, and
+        // the check allows for that; see AppServiceProvider.
         $schedule->command('health:schedule-check-heartbeat')
-            ->everyMinute()
+            ->hourly()
             ->onOneServer();
 
+        // Half an hour after the canary, whose jobs it reads.
         $schedule->command('health:check')
-            ->dailyAt('05:45')
-            ->timezone('Europe/Amsterdam')
-            ->withoutOverlapping()
+            ->dailyAt('03:45')
+            ->withoutOverlapping(60)
             ->onOneServer();
 
         $schedule->command(PruneOldChecksCommand::class)
             ->dailyAt('03:00')
-            ->withoutOverlapping()
+            ->withoutOverlapping(60)
             ->onOneServer();
 
         $schedule->command(CategoriseProductsCommand::class)
-            ->dailyAt('04:30')
-            ->timezone('Europe/Amsterdam')
-            ->withoutOverlapping()
+            ->dailyAt('02:30')
+            ->withoutOverlapping(60)
             ->onOneServer();
 
         $schedule->command(DiscoverWebShopsCommand::class)
-            ->dailyAt('04:40')
-            ->timezone('Europe/Amsterdam')
-            ->withoutOverlapping()
+            ->dailyAt('02:40')
+            ->withoutOverlapping(60)
             ->onOneServer();
 
         // Weekly, and deliberately slow: a shop that refuses us is not going
         // to change its mind on a Tuesday afternoon, and every attempt is a
         // request to a host that already said no.
         $schedule->command(RetryReferenceShopsCommand::class)
-            ->weeklyOn(1, '04:45')
-            ->timezone('Europe/Amsterdam')
-            ->withoutOverlapping()
+            ->weeklyOn(1, '02:45')
+            ->withoutOverlapping(60)
             ->onOneServer();
 
         $schedule->command(DispatchDailyDigestsCommand::class)
-            ->everyFiveMinutes()
-            ->withoutOverlapping()
+            ->hourly()
+            ->withoutOverlapping(15)
             ->onOneServer();
     })
     ->withMiddleware(function (Middleware $middleware): void {

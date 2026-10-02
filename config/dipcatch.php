@@ -60,7 +60,9 @@ return [
     ],
 
     'scheduler' => [
-        'batch_size' => (int) env('DIPCATCH_SCHEDULER_BATCH_SIZE', 200),
+        // Offers queued per hourly recheck run: the 200 every five minutes
+        // this replaced, so the daily capacity stays the same.
+        'batch_size' => (int) env('DIPCATCH_SCHEDULER_BATCH_SIZE', 2400),
         'jitter_seconds' => (int) env('DIPCATCH_SCHEDULER_JITTER_SECONDS', 300),
     ],
 

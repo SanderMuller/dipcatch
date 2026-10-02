@@ -15,9 +15,9 @@ use Illuminate\Support\Facades\Config;
  * Dispatches SendDailyDigest jobs for users whose local clock has reached the
  * configured send-hour and whose digest has not run yet today.
  *
- * Runs every five minutes (see bootstrap/app.php schedule). The dispatch test
- * is hour-granular, so the cadence only bounds the skew: at most five minutes
- * between "09:00 local" and the actual dispatch.
+ * Runs hourly, on the hour (see bootstrap/app.php schedule). The test is
+ * hour-granular, so the digest goes out on the first run at or after the send
+ * hour: on time in a whole-hour timezone, up to 45 minutes late in the others.
  */
 #[Signature('dipcatch:dispatch-daily-digests')]
 #[Description('Dispatch SendDailyDigest jobs for users due for their daily price-drop email.')]

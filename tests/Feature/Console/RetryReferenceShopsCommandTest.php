@@ -4,6 +4,7 @@ use App\Actions\Shops\KeepShopAsLink;
 use App\Actions\Shops\ProbeBudget;
 use App\Console\Commands\RetryReferenceShopsCommand;
 use App\Enums\ShopKind;
+use App\Jobs\RetryReferenceShop;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -106,8 +107,8 @@ test('a link is not asked again until its week is up', function (): void {
 });
 
 test('the retry spends nothing from the page budget', function (): void {
-    // Nobody asked for it. Charging it to whoever happens to be working at
-    // 04:45 would throttle them for a request they did not make.
+    // Nobody asked for it. Charging it to whoever is working when it runs
+    // would throttle them for a request they did not make.
     Http::fake(readablePage());
 
     $user = User::factory()->create();
@@ -141,6 +142,23 @@ test('a dry run reports without fetching', function (): void {
         ->assertSuccessful();
 
     expect($product->refresh()->shops->sole()->kind)->toBe(ShopKind::Reference);
+
+    Http::assertNothingSent();
+});
+
+test('a retry delivered after the link was promoted asks nothing', function (): void {
+    // The queue delivers at least once: a second delivery finds the row
+    // already tracked, or already replaced by the tracked one.
+    Http::preventStrayRequests();
+    Http::fake();
+
+    $product = Product::factory()->for(User::factory())->create(['currency' => 'EUR', 'active' => true]);
+    $link = linkOn($product);
+    $link->forceFill(['kind' => ShopKind::Tracked])->save();
+
+    dispatch(new RetryReferenceShop($link->id));
+    $link->delete();
+    dispatch(new RetryReferenceShop($link->id));
 
     Http::assertNothingSent();
 });

@@ -9,6 +9,7 @@ use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\CategoryVerdict;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -60,6 +61,17 @@ final class CategoriseProduct
         try {
             $verdict = $client->categorise($product);
         } catch (TypeSafeRequestFailed $e) {
+            // A rejected key fails every product until someone fixes the
+            // configuration, so it is reported, not only logged. Once an
+            // hour: the nightly run asks for up to 200 products.
+            if ($e->isRejectedKey()) {
+                if (Cache::add('typesafe:rejected-key-reported', true, 3600)) {
+                    report($e);
+                }
+
+                return;
+            }
+
             Log::warning('Automatic categorisation failed; the product stays uncategorised.', [
                 'product_id' => $product->id,
                 'error' => $e->getMessage(),

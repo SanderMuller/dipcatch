@@ -1,7 +1,12 @@
 <?php declare(strict_types=1);
 
+use App\Jobs\RefreshBolOffers;
 use App\Models\CheckjebonPrice;
+use App\Services\BolApi\BolApiFailed;
+use App\Services\BolApi\BolCatalogClient;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Sleep;
 
 beforeEach(function (): void {
@@ -51,9 +56,9 @@ it('stops without touching the rest when bol is down, so no row is lost to an ou
         'api.bol.com/*' => Http::response('', 503),
     ]);
 
-    $this->artisan('dipcatch:refresh-bol-offers')->assertFailed();
-
-    expect(CheckjebonPrice::query()->where('supermarket', 'bol')->value('price'))->toBe('9.99');
+    // The job fails, which ends the run; the sync queue throws it here.
+    expect(fn () => Artisan::call('dipcatch:refresh-bol-offers'))->toThrow(BolApiFailed::class)
+        ->and(CheckjebonPrice::query()->where('supermarket', 'bol')->value('price'))->toBe('9.99');
 });
 
 it('does nothing without API credentials', function (): void {
@@ -89,4 +94,25 @@ it('never asks for, nor removes, a row whose barcode is longer than EAN-13', fun
 
     Http::assertNothingSent();
     expect(CheckjebonPrice::query()->where('supermarket', 'bol')->count())->toBe(1);
+});
+
+it('hands the rest of the rows to a next job once its time is up', function (): void {
+    Sleep::fake();
+    Queue::fake();
+    $first = storedBolRow('5054563110503', '9.99');
+    storedBolRow('8712100325328', '3.49');
+    Http::fake([
+        'login.bol.com/*' => Http::response(['access_token' => 'token', 'expires_in' => 299]),
+        'api.bol.com/*' => function () {
+            $this->travel(RefreshBolOffers::WORK_SECONDS)->seconds();
+
+            return Http::response(['ean' => '5054563110503', 'title' => 'Sensodyne', 'url' => 'https://www.bol.com/nl/nl/p/sensodyne/id-5054563110503/', 'offer' => ['price' => 8.81]]);
+        },
+    ]);
+
+    new RefreshBolOffers()->handle(app(BolCatalogClient::class));
+
+    Http::assertSentCount(2);
+    Queue::assertPushed(RefreshBolOffers::class, fn (RefreshBolOffers $next): bool => $next->afterId === $first->id);
+    expect(CheckjebonPrice::query()->where('ean', '8712100325328')->value('price'))->toBe('3.49');
 });

@@ -162,8 +162,16 @@ final class RecheckActiveShopsCommand extends Command
             });
     }
 
+    /**
+     * The run is hourly, and a check lands up to one jitter window after the
+     * run that queued it. Without the slack, a shop checked at 00:07 is not
+     * due at 06:00 and waits for 07:00, so every interval would run an hour
+     * long. Five minutes more covers the wait on the queue.
+     */
     private function cutoff(Plan $plan): CarbonInterface
     {
-        return now()->subHours(Entitlements::of($plan)->recheckIntervalHours());
+        return now()
+            ->subHours(Entitlements::of($plan)->recheckIntervalHours())
+            ->addSeconds(RecheckJitter::maxSeconds() + 300);
     }
 }

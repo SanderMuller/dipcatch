@@ -185,7 +185,9 @@ final class AppServiceProvider extends ServiceProvider
             DebugModeCheck::new(),
             CacheCheck::new(),
             DatabaseCheck::new(),
-            ScheduleCheck::new(),
+            // The heartbeat runs hourly (bootstrap/app.php), so one missed
+            // run fails the check, and an hour's wait does not.
+            ScheduleCheck::new()->heartbeatMaxAgeInMinutes(90),
             UsedDiskSpaceCheck::new(),
             CpuLoadCheck::new(),
             SecurityAdvisoriesCheck::new(),
