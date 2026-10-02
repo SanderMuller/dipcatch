@@ -3,6 +3,7 @@
 use App\PriceAdapters\GenericAdapter;
 use App\PriceAdapters\Hosts\AldiAdapter;
 use App\PriceAdapters\Hosts\AmazonAdapter;
+use App\PriceAdapters\Hosts\BenuAdapter;
 use App\PriceAdapters\Hosts\BolAdapter;
 use App\PriceAdapters\Hosts\DekaMarktAdapter;
 use App\PriceAdapters\Hosts\DierapothekerAdapter;
@@ -249,6 +250,7 @@ return [
         UserSelectorAdapter::class,
         AldiAdapter::class,
         AmazonAdapter::class,
+        BenuAdapter::class,
         BolAdapter::class,
         DekaMarktAdapter::class,
         DierapothekerAdapter::class,
