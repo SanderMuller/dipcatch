@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
 
 function klarnaSourceUrl(): string
 {
@@ -225,9 +226,9 @@ test('a Klarna page found by search brings in its shops as checked web suggestio
 
     // Klarna's results and every lead finding are asked about the product in any size.
     $leadQuestions = array_filter($questions, static fn (array $question): bool => str_contains($question['title'], 'Sterilised') || str_contains($question['title'], 'Kitten'));
-    expect($leadQuestions)->not->toBeEmpty()
-        ->and(array_unique(array_column($leadQuestions, 'question')))->toBe([array_values($leadQuestions)[0]['question']])
-        ->and(array_values($leadQuestions)[0]['question'])->toContain('in any pack size');
+    $asked = array_values(array_unique(array_column($leadQuestions, 'question')));
+    expect($asked)->toHaveCount(1)
+        ->and($asked[0] ?? '')->toContain('in any pack size');
 });
 
 test('a Klarna page the product already tracks is the source without a search', function (): void {
@@ -482,7 +483,7 @@ test('a lead in another size reads that size and is shown as another size', func
         ->and(WebShopFinding::query()->where('url', brekzLeadUrl())->sole()->otherSizeNote($product))->toBeNull();
 
     $this->actingAs($product->user()->sole());
-    Livewire\Livewire::test(ShopSuggestions::class, ['product' => $product])
+    Livewire::test(ShopSuggestions::class, ['product' => $product])
         ->assertSee('Other size: 7 kg — compared per kilo')
         ->assertSee('Found through Klarna');
 });
@@ -576,7 +577,7 @@ test('adding a Klarna lead suggestion tracks its variant and asks the any-size q
     ]);
     $this->actingAs($product->user()->sole());
 
-    Livewire\Livewire::test(AddShop::class, ['product' => $product->refresh()])
+    Livewire::test(AddShop::class, ['product' => $product->refresh()])
         ->call('useSuggestion', $agradi, app(ProbeShopUrl::class), $finding->id)
         ->assertSet('chosenVariantKey', '44768357')
         ->assertSet('snapshot.price', '186.47');
@@ -591,7 +592,7 @@ test('a pasted link that is not the suggestion asks the same-size question', fun
     $product = klarnaProduct();
     $this->actingAs($product->user()->sole());
 
-    Livewire\Livewire::test(AddShop::class, ['product' => $product])
+    Livewire::test(AddShop::class, ['product' => $product])
         ->set('url', brekzLeadUrl())
         ->call('probe');
 
@@ -854,7 +855,7 @@ test('a suggestion of another product is ignored: Add probes the link it was giv
     $foreign = storedLeadFinding($other, $agradi, 'agradi.nl', WebFindingStatus::Proposed, ['variant_key' => '44768357', 'add_url' => $agradi . '?variant=44768357']);
     $this->actingAs($product->user()->sole());
 
-    Livewire\Livewire::test(AddShop::class, ['product' => $product])
+    Livewire::test(AddShop::class, ['product' => $product])
         ->call('useSuggestion', brekzLeadUrl(), app(ProbeShopUrl::class), $foreign->id)
         ->assertSet('url', brekzLeadUrl())
         ->assertSet('chosenVariantKey', null)

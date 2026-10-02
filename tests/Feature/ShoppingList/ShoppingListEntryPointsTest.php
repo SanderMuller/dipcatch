@@ -313,7 +313,7 @@ it('keeps only the latest items crossed off in the header', function (): void {
     $this->actingAs($user);
     $menu = livewire(HeaderMenu::class);
 
-    foreach (Product::query()->orderBy('listed_at')->get() as $product) {
+    foreach (Product::query()->oldest('listed_at')->get() as $product) {
         $menu->call('toggleCrossedOff', (string) $product->id);
     }
 

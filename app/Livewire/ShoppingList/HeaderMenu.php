@@ -129,7 +129,7 @@ final class HeaderMenu extends Component
             ->onShoppingList()
             ->with(['cheapestShop', 'shops']);
 
-        $open = $listed()->whereNull('list_checked_at')->orderBy('listed_at')->orderBy('id')->limit(self::LIMIT)->get();
+        $open = $listed()->whereNull('list_checked_at')->oldest('listed_at')->orderBy('id')->limit(self::LIMIT)->get();
 
         // Read apart from the open items, so they never take an open item's place.
         $crossedHere = array_values(array_filter($this->crossedHere, Str::isUuid(...)));

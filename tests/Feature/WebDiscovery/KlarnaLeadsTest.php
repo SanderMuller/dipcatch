@@ -44,7 +44,7 @@ test('an offer whose shop names no website is left out', function (): void {
 test('a page without the offer list gives no leads and says so in the log', function (): void {
     Log::spy();
 
-    expect(KlarnaLeads::fromHtml('<html><body>changed</body></html>', klarnaHillsUrl()))->toBe([]);
+    expect(KlarnaLeads::fromHtml('<html><body>changed</body></html>', klarnaHillsUrl()))->toBeEmpty();
 
     Log::shouldHaveReceived('warning')->with('klarna_payload_missing', ['url' => klarnaHillsUrl()])->once();
 });

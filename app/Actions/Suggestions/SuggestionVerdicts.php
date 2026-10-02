@@ -34,7 +34,7 @@ final class SuggestionVerdicts
 
     public static function off(float $nameMatchFloor): self
     {
-        return new self(false, $nameMatchFloor, '', []);
+        return new self(checks: false, nameMatchFloor: $nameMatchFloor, evidence: '', verdicts: []);
     }
 
     public static function for(Product $product, float $nameMatchFloor): self
@@ -45,7 +45,7 @@ final class SuggestionVerdicts
             $verdicts["{$verdict->chain}|{$verdict->external_id}"] = ['fingerprint' => $verdict->fingerprint, 'chance' => $verdict->same_chance];
         }
 
-        return new self(true, $nameMatchFloor, self::evidence($product), $verdicts);
+        return new self(checks: true, nameMatchFloor: $nameMatchFloor, evidence: self::evidence($product), verdicts: $verdicts);
     }
 
     /**

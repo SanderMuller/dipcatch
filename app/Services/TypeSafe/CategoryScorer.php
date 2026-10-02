@@ -114,7 +114,7 @@ final class CategoryScorer
         }
 
         $best = self::highest($probabilities);
-        $key = array_search($best, array_map(static fn (mixed $value): float => is_numeric($value) ? (float) $value : 0.0, $probabilities), true);
+        $key = array_search($best, array_map(static fn (mixed $value): float => is_numeric($value) ? (float) $value : 0.0, $probabilities), strict: true);
 
         if (! is_string($key) || $best < Config::float('dipcatch.categories.min_idea_probability')) {
             return null;

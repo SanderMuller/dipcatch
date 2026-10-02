@@ -143,9 +143,8 @@ test('the rows Jev has no answer for are checked after the response, once, and s
     Http::assertSentCount(1);
     expect(ShopSuggestionVerdict::query()->where('product_id', $product->id)->pluck('same_chance', 'chain')->all())
         ->toMatchArray(['ah' => 0.95, 'poiesz' => 0.85])
-        ->and(suggestedChains($product))->toBe(['ah', 'poiesz']);
-
-    expect(ShopSuggestionVerdict::query()->where('chain', 'poiesz')->sole()->external_id)->toBe($loose->external_id);
+        ->and(suggestedChains($product))->toBe(['ah', 'poiesz'])
+        ->and(ShopSuggestionVerdict::query()->where('chain', 'poiesz')->sole()->external_id)->toBe($loose->external_id);
 });
 
 test('without the opt-in the suggestions stay name matches and nothing is sent', function (): void {
@@ -248,7 +247,7 @@ test('a borderline name match waits for Jev before it shows, and shows once Jev 
     $product = checkedBeemsterProduct();
     Cache::put("shop-suggestions:verify:{$product->id}", true, 600);
 
-    expect(suggestedChains($product))->toBe([]);
+    expect(suggestedChains($product))->toBeEmpty();
 
     verdict($product, $borderline, 0.9);
 

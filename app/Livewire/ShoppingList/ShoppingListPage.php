@@ -43,7 +43,7 @@ final class ShoppingListPage extends Component
 
         $skipped = $this->skippedHosts();
 
-        $this->skip = in_array($host, $skipped, true)
+        $this->skip = in_array($host, $skipped, strict: true)
             ? array_values(array_diff($skipped, [$host]))
             : [...$skipped, $host];
     }

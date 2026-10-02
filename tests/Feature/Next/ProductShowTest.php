@@ -322,11 +322,7 @@ it('checks a suggested shop on arrival, so its comparison is open when the page 
     $product = ownedProduct($user);
 
     $this->actingAs($user)
-        ->get(route('app.products.show', [$product, 'add-shop' => 1, 'suggest' => 'https://www.jumbo.com/producten/x-1', 'finding' => '7']))
-        ->assertOk()
-        ->assertSee("Livewire.dispatchTo('shops.add-shop', 'suggest-shop'", false)
-        ->assertSee('https:\\/\\/www.jumbo.com\\/producten\\/x-1', false)
-        ->assertSee('findingId: 7', false);
+        ->get(route('app.products.show', [$product, 'add-shop' => 1, 'suggest' => 'https://www.jumbo.com/producten/x-1', 'finding' => '7']))->assertOk()->assertSeeHtml("Livewire.dispatchTo('shops.add-shop', 'suggest-shop'")->assertSeeHtml('https:\\/\\/www.jumbo.com\\/producten\\/x-1')->assertSeeHtml('findingId: 7');
 });
 
 it('ignores a suggested address that is not a web page', function (): void {
@@ -334,9 +330,7 @@ it('ignores a suggested address that is not a web page', function (): void {
     $product = ownedProduct($user);
 
     $this->actingAs($user)
-        ->get(route('app.products.show', [$product, 'add-shop' => 1, 'suggest' => 'javascript:alert(1)']))
-        ->assertOk()
-        ->assertDontSee("'suggest-shop'", false);
+        ->get(route('app.products.show', [$product, 'add-shop' => 1, 'suggest' => 'javascript:alert(1)']))->assertOk()->assertDontSeeHtml("'suggest-shop'");
 });
 
 it('leaves the add-shop disclosure closed without that request', function (): void {

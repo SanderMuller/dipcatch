@@ -17,7 +17,7 @@
     </flux:modal.trigger>
 
     <flux:modal name="app-command" variant="bare" class="my-[12vh] max-h-screen w-full max-w-[30rem] overflow-y-hidden">
-        <flux:command class="inline-flex max-h-[76vh] flex-col border-none shadow-lg" x-data="{ noMatches: false }">
+        <flux:command class="inline-flex max-h-[76vh] flex-col border-none shadow-lg">
             {{-- Pages filter in the browser. Products are searched on the server
                  as you type, so an old product is found too. --}}
             <flux:command.input :placeholder="__('Search pages and products…')" wire:model.live.debounce.250ms="search" closable autofocus autocomplete="off" data-1p-ignore />
@@ -29,21 +29,35 @@
             <ui-options
                 class="overflow-y-auto overscroll-y-none bg-white p-[.3125rem] dark:bg-zinc-700"
                 data-flux-command-items
-                x-data="{ logged: new Set(), timer: null }"
-                x-init="
-                    new MutationObserver(() => {
-                        noMatches = ! [...$el.querySelectorAll('ui-option')].some((option) => ! option.hasAttribute('data-hidden'));
-                        clearTimeout(timer);
-                        timer = setTimeout(() => {
-                            const term = ($wire.search ?? '').trim().toLowerCase();
+                x-data="{
+                    logged: new Set(),
+                    timer: null,
+                    observer: null,
+                    noMatches: false,
+                    init() {
+                        this.observer = new MutationObserver(() => {
+                            this.noMatches = ! [...this.$el.querySelectorAll('ui-option')].some((option) => ! option.hasAttribute('data-hidden'));
+                            this.$el.parentElement.querySelector('[data-test=command-empty]').hidden = ! this.noMatches;
+                            clearTimeout(this.timer);
+                            this.timer = setTimeout(() => {
+                                const term = (this.$wire.search ?? '').trim().toLowerCase();
 
-                            if (noMatches && term.length >= 3 && ! logged.has(term)) {
-                                logged.add(term);
-                                $wire.logEmptySearch(term);
-                            }
-                        }, 1500);
-                    }).observe($el, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-hidden'] });
-                "
+                                if (this.noMatches && term.length >= 3 && ! this.logged.has(term)) {
+                                    this.logged.add(term);
+                                    this.$wire.logEmptySearch(term);
+                                }
+                            }, 1500);
+                        });
+                        this.observer.observe(this.$el, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-hidden'] });
+                    },
+                    {{-- A page change through the palette removes this element,
+                         but an observer and a timer outlive it, and then run
+                         without its scope. --}}
+                    destroy() {
+                        this.observer?.disconnect();
+                        clearTimeout(this.timer);
+                    },
+                }"
             >
                 <flux:command.item icon="home" :href="route('app.dashboard')" wire:navigate keywords="home overview start trips week">
                     {{ __('Dashboard') }}
@@ -80,7 +94,7 @@
                 <flux:command.item icon="lifebuoy" :href="route('app.support')" wire:navigate keywords="help contact question bug problem feedback">
                     {{ __('Support') }}
                 </flux:command.item>
-                <flux:command.item icon="cog-6-tooth" :href="route('profile.edit')" wire:navigate keywords="profile account name email delete account remove account close account">
+                <flux:command.item icon="cog-6-tooth" :href="route('profile.edit')" wire:navigate keywords="profile account name email delete account remove account close account timezone time zone currency region regional">
                     {{ __('Settings') }}
                 </flux:command.item>
                 <flux:command.item icon="shield-check" :href="route('security.edit')" wire:navigate keywords="password change password two-factor 2fa authenticator passkey face id fingerprint login sign in sign out everywhere log out sessions devices hacked stolen wachtwoord">
@@ -88,6 +102,9 @@
                 </flux:command.item>
                 <flux:command.item icon="swatch" :href="route('appearance.edit')" wire:navigate keywords="theme dark mode light mode colours colors display">
                     {{ __('Appearance') }}
+                </flux:command.item>
+                <flux:command.item icon="sparkles" :href="route('product-features.edit')" wire:navigate keywords="ai jev automatic auto categories categorise categorize sort pack same product check shop pro">
+                    {{ __('Product features') }}
                 </flux:command.item>
                 <flux:command.item icon="building-storefront" :href="route('shops')" keywords="stores supermarket which shops supported unsupported winkels">
                     {{ __('Supported shops') }}
@@ -123,7 +140,7 @@
             {{-- A suggestion, not a result: outside the list, which may only hold
                  options, and announced when it appears. --}}
             <div aria-live="polite" class="bg-white dark:bg-zinc-700">
-                <p x-show="noMatches" x-cloak class="px-3 pb-3 pt-1 text-center text-sm text-zinc-500 dark:text-zinc-400" data-test="command-empty">
+                <p hidden class="px-3 pb-3 pt-1 text-center text-sm text-zinc-500 dark:text-zinc-400" data-test="command-empty">
                     {{ __('Not finding what you’re looking for?') }}
                     <a href="{{ route('app.support') }}" wire:navigate class="font-medium text-brand underline-offset-4 hover:underline" data-test="command-empty-support">{{ __('Let us know') }}</a>
                 </p>

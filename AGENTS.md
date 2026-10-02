@@ -169,8 +169,7 @@ Every project on this Laravel Cloud account shares one Redis instance. The key p
 # Laravel Boost
 
 ## Project Rules
-- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists (settled decisions, non-obvious traps, standing constraints). Framework and package guidelines that only apply to specific paths (testing, frontend, components) also live there, under `.ai/rules/boost` — this is not just recorded decisions, it is load-bearing guidance you have not seen inline. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
-
+- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists, including path-scoped framework guidelines under `.ai/rules/boost`. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
 
 ## Artisan
 - Run Artisan commands directly via the command line (e.g., `php artisan route:list`). Use `php artisan list` to discover available commands and `php artisan [command] --help` to check parameters.
@@ -187,7 +186,6 @@ Every project on this Laravel Cloud account shares one Redis instance. The key p
 # Deployment
 
 - Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
-- Activate the `deploying-to-cloud` skill whenever deploying to Laravel Cloud, configuring Cloud environments or resources, using the Cloud CLI, or troubleshooting Cloud deployments.
 
 ---
 
@@ -203,10 +201,8 @@ Every project on this Laravel Cloud account shares one Redis instance. The key p
 
 # Laravel Boost Guidelines
 
-The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to ensure the best experience when building Laravel applications.
-
 ## Foundational Context
-This application is a Laravel application running on PHP 8.5. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
+This application is a Laravel application running on PHP 8.5. Always use the APIs that match the installed major version of each package — do not assume a version.
 
 Before relying on a package's API, confirm its installed version:
 - PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
@@ -227,13 +223,10 @@ Before relying on a package's API, confirm its installed version:
 - Do not change the application's dependencies without approval.
 
 ## Frontend Bundling
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `yarn run build`, `yarn run dev`, or `composer run dev`. Ask them.
+- If a frontend change doesn't show in the UI or you get a "Unable to locate file in Vite manifest" error, run `yarn run build` or ask the user to run `yarn run dev` or `composer run dev`.
 
 ## Documentation Files
 - You must only create documentation files if explicitly requested by the user.
-
-## Replies
-- Be concise in your explanations - focus on what's important rather than explaining obvious details.
 
 ---
 
@@ -273,9 +266,6 @@ Before relying on a package's API, confirm its installed version:
 - When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
 @endscoped
 
-## Vite Error
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `yarn run build` or ask the user to run `yarn run dev` or `composer run dev`.
-
 ---
 
 @scoped(['app/Livewire/**', 'resources/views/**'])
@@ -308,35 +298,13 @@ Before relying on a package's API, confirm its installed version:
 
 ## PHP 8.4
 
-Use these array functions instead of manual loops when not using Laravel collections:
-- `array_find(array $array, callable $callback): mixed` - first matching element
-- `array_find_key(array $array, callable $callback): int|string|null` - first matching key
-- `array_any(array $array, callable $callback): bool` - true if any element matches
-- `array_all(array $array, callable $callback): bool` - true if all elements match
-
-Chain directly on new instances without wrapping in parentheses:
-```php
-// Before: $response = (new JsonResponse(['data' => $data]))->setStatusCode(201);
-$response = new JsonResponse(['data' => $data])->setStatusCode(201);
-```
+- Prefer `array_find`, `array_find_key`, `array_any`, and `array_all` over manual loops when not using collections, and call methods on `new Foo()` without wrapping parentheses.
 
 ---
 
 ## PHP 8.5
 
-Use these array functions instead of manual loops when not using Laravel collections:
-
-- `array_first(array $array): mixed` - first value or `null` if empty
-- `array_last(array $array): mixed` - last value or `null` if empty
-
-Use the pipe operator (`|>`) to chain function calls left-to-right instead of nesting:
-
-```php
-// Before: $slug = strtolower(str_replace(' ', '-', trim($title)));
-$slug = $title |> trim(...) |> (fn($s) => str_replace(' ', '-', $s)) |> strtolower(...);
-```
-
-Use `clone($object, ['property' => $value])` to modify properties during cloning. Ideal for readonly classes.
+- Prefer `array_first`/`array_last` over manual loops when not using collections, the pipe operator (`|>`) over nested calls, and `clone($object, [...])` to modify properties while cloning.
 
 ---
 

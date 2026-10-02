@@ -130,7 +130,7 @@ final readonly class UnitPriceSize
         foreach (self::specifications($offer) as $specification) {
             $type = $specification['priceType'] ?? null;
 
-            if (! is_string($type) || ! (str_ends_with($type, 'StrikethroughPrice') || str_ends_with($type, 'ListPrice'))) {
+            if (! is_string($type) || ! str_ends_with($type, 'StrikethroughPrice') && ! str_ends_with($type, 'ListPrice')) {
                 continue;
             }
 

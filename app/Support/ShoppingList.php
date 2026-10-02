@@ -129,11 +129,11 @@ final readonly class ShoppingList
     {
         $skippedBest = null;
 
-        if ($skip !== [] && $product->shops->contains(fn (Shop $shop): bool => in_array($shop->host, $skip, true))) {
+        if ($skip !== [] && $product->shops->contains(fn (Shop $shop): bool => in_array($shop->host, $skip, strict: true))) {
             $everywhere = HeadlinePrice::of($product)->buyableShop();
 
             $product = clone $product;
-            $product->setRelation('shops', $product->shops->reject(fn (Shop $shop): bool => in_array($shop->host, $skip, true))->values());
+            $product->setRelation('shops', $product->shops->reject(fn (Shop $shop): bool => in_array($shop->host, $skip, strict: true))->values());
 
             $headline = HeadlinePrice::of($product);
             $skippedBest = $headline->buyableShop() === null ? $everywhere : null;

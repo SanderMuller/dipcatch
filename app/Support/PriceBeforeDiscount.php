@@ -59,7 +59,7 @@ final class PriceBeforeDiscount
             ->whereIn('shop_id', $claiming->pluck('id'))
             ->where('status', ScrapeStatus::Ok)
             ->where('checked_at', '>=', $earliest)
-            ->orderBy('checked_at')
+            ->oldest('checked_at')
             ->orderBy('id')
             ->get(['id', 'shop_id', 'price', 'single_item_price', 'checked_at', 'claimed_regular_price', 'seller', 'claim_read', 'shelf_inherited', 'consumer_price_issue']);
 

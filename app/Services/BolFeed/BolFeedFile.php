@@ -39,7 +39,7 @@ final readonly class BolFeedFile
             }
 
             while (($row = fgetcsv($handle, 0, '|', '"', '')) !== false) {
-                $field = static fn (string $name): string => (string) ($row[$columns[$name]] ?? '');
+                $field = static fn (string $name): string => $row[$columns[$name]] ?? '';
                 $price = $field('OfferNL.sellingPrice');
 
                 if ($field('OfferNL.isDeliverable') !== 'Y' || $field('OfferNL.condition') !== 'new' || ! is_numeric($price) || (float) $price <= 0.0) {

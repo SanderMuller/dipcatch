@@ -34,7 +34,7 @@ test('a word that merely contains a keyword ticks nothing', function (): void {
     $user = User::factory()->create();
     Product::factory()->for($user)->create(['title' => 'Ring Video Doorbell', 'category' => null]);
 
-    expect(TrackingIdeaChecklist::for($user)->tracked)->toBe([]);
+    expect(TrackingIdeaChecklist::for($user)->tracked)->toBeEmpty();
 });
 
 test('a shower gel does not tick sunscreen or skincare, though they share its category', function (): void {
@@ -95,7 +95,7 @@ test('a tracked product outranks an idea marked not for me', function (): void {
     $checklist = TrackingIdeaChecklist::for($user);
 
     expect($checklist->tracked)->toContain(TrackingIdea::Nappies)
-        ->and($checklist->skipped)->toBe([]);
+        ->and($checklist->skipped)->toBeEmpty();
 });
 
 test('an idea ticked by hand moves out of the open list, and undo puts it back', function (): void {
@@ -146,7 +146,7 @@ test('another account\'s products and marks tick nothing here', function (): voi
 
     $checklist = TrackingIdeaChecklist::for(User::factory()->create());
 
-    expect($checklist->open)->toHaveCount(count(TrackingIdea::cases()));
+    expect($checklist->open)->toHaveSameSize(TrackingIdea::cases());
 });
 
 test('the card can be hidden, and shows on the dashboard until then', function (): void {

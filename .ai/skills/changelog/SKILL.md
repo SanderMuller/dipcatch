@@ -67,13 +67,25 @@ Write down what changed for the user: what they can do now, where they find it, 
 
 Rewrite the draft so anyone can read it:
 
+- Say what the user gets, not how DipCatch does it. One or two sentences on the benefit usually carry the whole entry. Leave out the mechanism: when a step starts, what runs first, what a check compares, how a limit or a fallback works.
+- Describe what the user sees in their own words ("results come in while you wait"), not the interface parts that changed ("a progress bar replaces the spinner").
 - A title of at most 8 words that names the thing, in sentence case. No full stop.
-- A body of 1 to 3 short paragraphs, at most about 70 words in total.
+- A body of 1 to 3 short paragraphs, at most about 50 words in total.
 - Say "you". Everyday words. Short sentences.
 - No internal names: no class names, no "Jev", "TypeSafe", "Serper", "MCP" or "Livewire". Say "AI check", "AI assistant", "search".
 - No numbers from the code (thresholds, limits, cron times) unless the user sees them.
 - Name the place in the app where the feature lives: the dashboard, the product page, Settings.
 - Public repository: no customer names, no e-mail addresses, no internal hosts. Shop names are fine.
+
+Too deep:
+
+> With Pro, DipCatch starts looking for more shops as soon as you paste a product link, while you still check the preview. Each shop appears once it's checked, so a slow shop no longer holds up the others.
+>
+> A progress bar replaces the spinner while it searches.
+
+At the user's level:
+
+> Finding more shops for a product is faster now. They come in one by one, so you can look at the first ones while DipCatch keeps searching.
 
 ### Pass 3: humanizer
 

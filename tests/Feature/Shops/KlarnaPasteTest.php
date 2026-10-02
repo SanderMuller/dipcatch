@@ -70,9 +70,8 @@ test('a pasted Klarna page is refused, lists its shops, and has them looked up',
     // In stock first, then cheapest.
     $positions = array_map(static fn (string $text): int|false => strpos($html, $text), ['€76.05', '€81.99', '€162.99', '€85.69', '€167.95']);
     expect($positions)->not->toContain(false)
-        ->and($positions)->toBe(array_values(Arr::sort($positions)));
-
-    expect(WebDiscovery::query()->findOrFail($product->id)->klarna_url)->toBe(pastedKlarnaUrl());
+        ->and($positions)->toBe(array_values(Arr::sort($positions)))
+        ->and(WebDiscovery::query()->findOrFail($product->id)->klarna_url)->toBe(pastedKlarnaUrl());
     Queue::assertPushed(ReadKlarnaLeads::class, 1);
     Http::assertNotSent(static fn (Request $request): bool => str_contains($request->url(), 'clk.klarna.com'));
 });
