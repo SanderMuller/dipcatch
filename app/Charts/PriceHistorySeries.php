@@ -49,7 +49,7 @@ final readonly class PriceHistorySeries
      * Rows a Flux line chart can plot. Null prices stay as gaps; notified
      * points are omitted when no alert fired on that stamp.
      *
-     * @return array{rows: list<array<string, mixed>>, currency: string, unit: ?string, unitDecimals: int, hasNotified: bool, hasBundles: bool, unitCoverage: float}
+     * @return array{rows: list<array<string, mixed>>, currency: string, unit: ?string, unitDecimals: int, hasNotified: bool, hasBundles: bool, unitCoverage: float, latest: array{price: ?array{value: float, dropToday: ?int}, unit: ?array{value: float, dropToday: ?int}}}
      */
     public function fluxChart(): array
     {

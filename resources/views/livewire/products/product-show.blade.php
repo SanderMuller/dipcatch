@@ -518,11 +518,14 @@
                     @foreach ($perUnit === null ? ['price'] : ['unit', 'price'] as $field)
                         @php($isUnit = $field === 'unit')
                         @php($notifiedField = $isUnit ? 'notifiedUnit' : 'notified')
+                        @php($nowField = $isUnit ? 'nowUnit' : 'now')
                         <div wire:key="price-history-{{ $field }}" x-show="basis === '{{ $field }}'" @if ($field !== $basis) x-cloak @endif>
                             <flux:chart :value="$chart['rows']" class="mt-4 h-72 sm:h-80 min-[112.5rem]:h-120" data-test="price-history-chart-{{ $field }}">
                                 <flux:chart.svg :gutter="$chart['hasNotified'] ? '52 8 8 8' : '20 8 8 8'">
                                     <flux:chart.area :field="$field" class="text-chart/15 dark:text-chart/20" curve="none" />
                                     <flux:chart.line :field="$field" class="text-chart-line" stroke-width="2" curve="none" />
+                                    {{-- Before the alert point, so an alert moments before now stays on top. --}}
+                                    <flux:chart.point :field="$nowField" class="text-chart-line" r="5" stroke-width="3" />
                                     @if ($chart['hasNotified'])
                                         <flux:chart.point :field="$notifiedField" class="text-alert" r="5" stroke-width="3" />
                                     @endif
@@ -556,56 +559,34 @@
                                     @endif
                                 </flux:chart.tooltip>
                                 {{-- The last alert, labelled on the chart without a hover, as
-                                     the brand kit shows it. Flux plots the point, so the label
-                                     finds that point once it is drawn, and again whenever
-                                     the chart redraws or changes size. --}}
+                                     the brand kit shows it. --}}
                                 @php($lastNotified = array_last(array_filter($chart['rows'], fn (array $row): bool => isset($row[$notifiedField]))))
                                 @if ($lastNotified !== null)
-                                    <div
-                                        x-data="{
-                                            left: null,
-                                            top: 0,
-                                            place() {
-                                                const chart = $el.parentElement;
-
-                                                if (! chart) {
-                                                    return;
-                                                }
-
-                                                const point = [...chart.querySelectorAll('circle[data-point][data-series={{ $notifiedField }}]')]
-                                                    .sort((a, b) => a.getAttribute('cx') - b.getAttribute('cx'))
-                                                    .pop();
-                                                const box = chart.getBoundingClientRect();
-                                                const dot = point?.getBoundingClientRect();
-
-                                                if (! dot || dot.width === 0) {
-                                                    this.left = null;
-
-                                                    return;
-                                                }
-
-                                                const centre = dot.left + dot.width / 2 - box.left;
-                                                this.left = Math.min(Math.max(centre - $el.offsetWidth / 2, 4), box.width - $el.offsetWidth - 4);
-                                                this.top = Math.max(0, dot.top - box.top - $el.offsetHeight - 8);
-                                            },
-                                        }"
-                                        x-init="
-                                            $nextTick(() => requestAnimationFrame(() => place()));
-                                            new ResizeObserver(() => place()).observe($el.parentElement);
-                                            new MutationObserver(() => place()).observe($el.parentElement, { childList: true, subtree: true, attributeFilter: ['cx', 'cy'] });
-                                        "
-                                        x-bind:class="left === null && 'invisible'"
-                                        x-bind:style="{ left: `${left ?? 0}px`, top: `${top}px` }"
-                                        class="pointer-events-none absolute z-10 rounded-lg bg-paper px-2.5 py-1.5 shadow-lg shadow-ink/10 ring-1 ring-line dark:shadow-none"
-                                        data-test="notified-callout-{{ $field }}"
-                                    >
+                                    <x-chart-point-label :series="$notifiedField" data-test="notified-callout-{{ $field }}">
                                         <p class="text-xs font-medium text-alert">{{ __('Notified') }}</p>
                                         <p class="text-sm font-semibold whitespace-nowrap tabular-nums">
                                             {{-- The price the alert stated, on either line: the per-unit
                                                  point only marks when it fired. --}}
                                             {{ \App\Support\MoneyFormatter::format((string) $lastNotified['notified'], $chart['currency']) }}
                                         </p>
-                                    </div>
+                                    </x-chart-point-label>
+                                @endif
+                                {{-- Where the line ends: today's value, so a jump at the right
+                                     edge reads as news, not as a line cut off. Below the
+                                     point, so it never meets the alert label above one. --}}
+                                @php($latest = $chart['latest'][$field])
+                                @if ($latest !== null)
+                                    <x-chart-point-label :series="$nowField" placement="below-left" data-test="now-callout-{{ $field }}">
+                                        <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                                            {{ __('Now') }}
+                                            @if ($latest['dropToday'] !== null)
+                                                <span class="text-savings-strong dark:text-savings"><span aria-hidden="true">· ↓</span> {{ __(':percent% lower today', ['percent' => $latest['dropToday']]) }}</span>
+                                            @endif
+                                        </p>
+                                        <p class="text-sm font-semibold whitespace-nowrap tabular-nums">
+                                            {{ $isUnit ? \App\Support\MoneyFormatter::unitPrice((string) $latest['value'], $chart['currency']) . ' ' . $perUnit : \App\Support\MoneyFormatter::format((string) $latest['value'], $chart['currency']) }}
+                                        </p>
+                                    </x-chart-point-label>
                                 @endif
                                 @if ($chart['hasNotified'])
                                     <div class="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-wrap justify-center gap-x-5 gap-y-2">

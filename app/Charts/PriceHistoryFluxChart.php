@@ -15,20 +15,23 @@ final class PriceHistoryFluxChart
 {
     /**
      * @param  array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>}  $data
-     * @return array{rows: list<array<string, mixed>>, currency: string, unit: ?string, unitDecimals: int, hasNotified: bool, hasBundles: bool, unitCoverage: float}
+     * @return array{rows: list<array<string, mixed>>, currency: string, unit: ?string, unitDecimals: int, hasNotified: bool, hasBundles: bool, unitCoverage: float, latest: array{price: ?array{value: float, dropToday: ?int}, unit: ?array{value: float, dropToday: ?int}}}
      */
     public static function fromData(array $data, string $currency): array
     {
-        $rows = self::holdingUntilNextChange(self::rows(
+        $readings = self::rows(
             $data['labels'],
             $data['price'],
             $data['unit']['points'] ?? null,
             $data['notified'],
             $data['bundleConditions'],
-        ));
+        );
+        $latest = ['price' => LatestReading::of($readings, 'price'), 'unit' => LatestReading::of($readings, 'unit')];
+        $rows = self::holdingUntilNextChange(LatestReading::marked($readings, $latest));
 
         return [
             'rows' => $rows,
+            'latest' => $latest,
             'currency' => $currency,
             'unit' => $data['unit']['unit'] ?? null,
             'unitDecimals' => self::unitDecimals($rows),
