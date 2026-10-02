@@ -108,11 +108,18 @@ final class PriceCheck extends Model
             ->exists();
     }
 
+    /**
+     * Readings from before Jev confirmed the shop's pack size do not count:
+     * the shop only joined the comparison then, as a new shop does.
+     */
     private function hasEarlierReadingAtItsOwnShop(): bool
     {
+        $joinedAt = $this->shop?->confirmed_pack_quantity === null ? null : $this->shop->pack_checked_at;
+
         return self::query()
             ->where('shop_id', $this->shop_id)
             ->where('id', '<', $this->id)
+            ->when($joinedAt !== null, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('checked_at', '>', $joinedAt))
             ->eligible()
             ->exists();
     }

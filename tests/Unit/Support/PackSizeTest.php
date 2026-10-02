@@ -414,6 +414,8 @@ test('a chewable, effervescent or lozenge tablet count is read', function (strin
     ['Davitamon Junior 60 kauwtabletten', 60.0],
     ['Redoxon Vitamine C 20 bruistabletten', 20.0],
     ['Strepsils Honing citroen 24 zuigtabletten', 24.0],
+    // A singular is a dose, not a count.
+    ['Multivitamine 1 kauwtablet per dag 60 stuks', 60.0],
 ]);
 
 test('a terabyte is not a tablet', function (string $title): void {

@@ -636,14 +636,17 @@ final class Product extends Model
             ->first();
     }
 
-    public function recomputeCheapestShop(?int $triggeringPriceCheckId = null): void
+    /**
+     * @param  bool  $sizesChanged  Only a pack size changed, such as one Jev confirmed: no price moved, so nothing is detected.
+     */
+    public function recomputeCheapestShop(?int $triggeringPriceCheckId = null, bool $sizesChanged = false): void
     {
         // Computed before the lock and handed to both branches below: the
         // 30-day window read is a segment query plus a price_checks count,
         // and it has no business inside the critical section.
         $reference = app(Reference::class)->compute($this);
 
-        DB::transaction(function () use ($triggeringPriceCheckId, $reference): void {
+        DB::transaction(function () use ($triggeringPriceCheckId, $reference, $sizesChanged): void {
             $locked = self::query()->lockForUpdate()->find($this->id);
 
             if ($locked === null) {
@@ -722,7 +725,7 @@ final class Product extends Model
             // by whatever the correction was, which reads as a spectacular drop
             // or rise and is neither. The segment is still written — history
             // has to stay faithful — but nothing is detected on it.
-            $sizeCorrection = $previousBestValueId !== null
+            $sizeCorrection = $sizesChanged || $previousBestValueId !== null
                 && $previousBestValueId === $bestValue?->id
                 && $previousBestValuePack === $newBasisPack
                 && $previousBestValueSize?->isSameSizeAs($bestValueSize) === false;

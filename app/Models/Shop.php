@@ -156,6 +156,11 @@ final class Shop extends Model
             // price the new offer wrongly until the next successful check.
             'pack_quantity' => null,
             'pack_unit' => null,
+            // A size Jev confirmed belongs to the page it read.
+            'confirmed_pack_quantity' => null,
+            'confirmed_pack_unit' => null,
+            'pack_check_key' => null,
+            'pack_checked_at' => null,
             'gtin' => null,
             // Until the next successful check this offer has no known price,
             // and a leftover one keeps it eligible for
@@ -297,7 +302,7 @@ final class Shop extends Model
             return null;
         }
 
-        return $this->packSize()?->unitPriceFor((string) $price);
+        return $this->comparableSize()?->unitPriceFor((string) $price);
     }
 
     /**
@@ -313,7 +318,7 @@ final class Shop extends Model
             return null;
         }
 
-        return $this->packSize()?->unitPriceValueFor((string) $price);
+        return $this->comparableSize()?->unitPriceValueFor((string) $price);
     }
 
     /**
@@ -322,13 +327,22 @@ final class Shop extends Model
      */
     public function unitPriceLabel(): ?string
     {
-        return $this->unitPrice() === null ? null : $this->packSize()?->label();
+        return $this->unitPrice() === null ? null : $this->comparableSize()?->label();
     }
 
     /** `/kg`, `/l` or `/piece` for this shop's pack, whatever its price. */
     public function packUnitLabel(): ?string
     {
-        return $this->packSize()?->label();
+        return $this->comparableSize()?->label();
+    }
+
+    /**
+     * The size this shop's prices are compared by: the page's own, or one
+     * Jev confirmed for a page that states none. Not a borrowed size.
+     */
+    public function comparableSize(): ?PackSize
+    {
+        return $this->packSize() ?? $this->confirmedPackSize();
     }
 
     /**

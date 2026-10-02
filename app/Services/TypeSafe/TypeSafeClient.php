@@ -80,7 +80,7 @@ final readonly class TypeSafeClient
      *
      * @throws TypeSafeRequestFailed
      */
-    public function sameProduct(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = []): array
+    public function sameProduct(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = [], ?string $exactPackSize = null): array
     {
         if ($candidates === []) {
             return [];
@@ -91,32 +91,12 @@ final readonly class TypeSafeClient
         $questions = [];
 
         foreach ($candidates as $key => $candidate) {
-            $questions[$key] = in_array((string) $key, $anyPackKeys, strict: true) ? [
-                'type' => 'noul',
-                'instructions' => [
-                    'candidate' => $candidate,
-                    'question' => 'Does `candidate` sell the same product as the tracked product in the state, in any pack size?',
-                ],
-                'criteria' => [
-                    'true' => 'The same product, the same variant or flavour; the pack size may differ',
-                    'false' => 'A different product, variant or flavour',
-                ],
-            ] : [
-                'type' => 'noul',
-                'instructions' => [
-                    'candidate' => $candidate,
-                    'question' => 'Does `candidate` sell the same product as the tracked product in the state, in the same pack size or in one of its `tracked_pack_sizes`, so that the prices compare like for like?',
-                ],
-                'criteria' => [
-                    'true' => 'The same product, the same variant or flavour, and the same amount per pack',
-                    'false' => 'A different product, variant, flavour, or pack size',
-                ],
-            ];
+            $questions[$key] = SameProductQuestion::for($candidate, anyPack: in_array((string) $key, $anyPackKeys, strict: true), exactPackSize: $exactPackSize);
         }
 
         $payload = $this->send($purpose->value, [
             'model' => self::MODEL,
-            'state' => [...$this->state($product), 'tracked_pack_sizes' => self::trackedPackSizes($product)],
+            'state' => [...$this->state($product), 'tracked_pack_sizes' => $exactPackSize === null ? self::trackedPackSizes($product) : [$exactPackSize]],
             'questions' => $questions,
         ], quick: $quick);
 

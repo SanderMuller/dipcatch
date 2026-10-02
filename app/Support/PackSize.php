@@ -58,7 +58,9 @@ final readonly class PackSize
      * @var list<string>
      */
     private const array PIECE_WORDS = [
-        'kauwtabletten', 'bruistabletten', 'zuigtabletten', 'kauwtablet', 'bruistablet', 'zuigtablet',
+        // Plurals only: a singular is a dose ("1 kauwtablet per dag"), and a
+        // second count makes the title ambiguous.
+        'kauwtabletten', 'bruistabletten', 'zuigtabletten',
         'tabletten', 'capsules', 'capsule', 'rollen', 'zakjes', 'tablet', 'vellen',
         'stuks', 'zakje', 'tabl', 'sach', 'caps', 'stuk', 'pack', 'cups', 'pads',
         'cps', 'stk', 'rol', 'vel', 'cup', 'pad', 'st', 'tb',

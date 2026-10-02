@@ -41,7 +41,9 @@ final class UsersTable
                 TextColumn::make('email')
                     ->searchable()
                     ->sortable()
-                    ->description(fn (User $record): string => str($record->name)->limit(30)->toString()),
+                    ->description(fn (User $record): string => str($record->name)->limit(30)->toString())
+                    // The whole name, where the description cuts it short.
+                    ->tooltip(fn (User $record): ?string => mb_strlen($record->name) > 30 ? $record->name : null),
 
                 TextColumn::make('plan')
                     ->badge()

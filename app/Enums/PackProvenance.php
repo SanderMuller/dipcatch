@@ -8,8 +8,8 @@ namespace App\Enums;
  * Only {@see self::Stated} and {@see self::Confirmed} may win the per-unit
  * ranking. An inferred size is shown with a marker and kept out of ranking and
  * alerting: agreement among the shops that state a size says what *those*
- * shops sell, and says nothing about the silent one. A confirmed size is one
- * Jev read from the silent page itself.
+ * shops sell, and says nothing about the silent one. A confirmed size is the
+ * agreed size Jev judged the silent page to sell, from its title and price.
  */
 enum PackProvenance: string
 {

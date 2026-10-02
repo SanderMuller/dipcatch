@@ -61,7 +61,7 @@ final class Reference
 
         $contributing = $unit === null
             ? $segments->values()->all()
-            : ReferenceEpoch::currentEpoch($segments->values()->all(), $unit);
+            : ReferenceEpoch::currentEpoch($segments->values()->all(), $unit, self::joinedAt($product));
 
         // Only the segments that actually answer in this basis. A sizeless
         // segment stays in the epoch — products go briefly sizeless whenever a
@@ -192,6 +192,24 @@ final class Reference
     }
 
     /**
+     * When each shop whose pack size Jev confirmed joined the comparison.
+     *
+     * @return array<string, CarbonImmutable>
+     */
+    private static function joinedAt(Product $product): array
+    {
+        $joined = [];
+
+        foreach ($product->shops()->whereNotNull('confirmed_pack_quantity')->whereNotNull('pack_checked_at')->get(['id', 'pack_checked_at']) as $shop) {
+            if ($shop->pack_checked_at !== null) {
+                $joined[(string) $shop->id] = CarbonImmutable::parse($shop->pack_checked_at->toDateTimeString());
+            }
+        }
+
+        return $joined;
+    }
+
+    /**
      * The segment the fallback reference reads.
      *
      * On the pack basis that is the product's earliest segment, as it always
@@ -213,7 +231,7 @@ final class Reference
             return $all->first();
         }
 
-        foreach (ReferenceEpoch::currentEpoch($all->values()->all(), $unit) as $segment) {
+        foreach (ReferenceEpoch::currentEpoch($all->values()->all(), $unit, self::joinedAt($product)) as $segment) {
             // The unit check is belt and braces beside the epoch slice: this
             // reference is unbounded by the window, and a price per litre
             // measured against a price per kilo is not a drop, it is a category

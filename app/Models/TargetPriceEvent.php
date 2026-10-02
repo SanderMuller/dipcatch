@@ -50,7 +50,7 @@ final class TargetPriceEvent extends Model
         ?string $price,
         ?string $unitPrice = null,
     ): self {
-        $packSize = $shop->packSize();
+        $packSize = $shop->comparableSize();
         $bundle = $shop->liveBundleOffer();
 
         return self::query()->create([

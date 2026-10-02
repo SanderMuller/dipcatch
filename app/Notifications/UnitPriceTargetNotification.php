@@ -55,7 +55,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
         $this->snapshotHost = $shop->host;
         $this->snapshotPrice = $shop->current_price === null ? null : (string) $shop->current_price;
         $this->snapshotUnitLabel = $shop->unitPriceLabel();
-        $packSize = $shop->packSize();
+        $packSize = $shop->comparableSize();
         $this->snapshotUnit = $packSize?->unit;
         $this->snapshotPackQuantity = $packSize === null ? null : (string) $packSize->quantity;
         $this->snapshotPackUnit = $packSize?->unit;

@@ -131,8 +131,8 @@ final readonly class ComparablePacks
     }
 
     /**
-     * The shops that may win the per-unit ranking — a stated size, in the
-     * comparison unit.
+     * The shops that may win the per-unit ranking — a stated or a confirmed
+     * size, in the comparison unit.
      *
      * @param  Collection<int, Shop>  $shops
      * @return Collection<int, Shop>
@@ -265,7 +265,9 @@ final readonly class ComparablePacks
 
         $confirmed = $shop->confirmedPackSize();
 
-        if ($confirmed instanceof PackSize && $confirmed->unit === $unit) {
+        // Only while the other shops still agree on that size: once they move
+        // on, or disagree, the borrowed size is in doubt again.
+        if ($confirmed instanceof PackSize && $agreed instanceof PackSize && $confirmed->isSameSizeAs($agreed)) {
             return ComparablePack::confirmed($confirmed);
         }
 

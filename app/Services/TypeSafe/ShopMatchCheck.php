@@ -63,11 +63,12 @@ final readonly class ShopMatchCheck
     /**
      * @param  array<string, array<string, string>>  $candidates
      * @param  list<string>  $anyPackKeys  Candidates that may sell another pack size of the product.
+     * @param  string|null  $exactPackSize  Asks about this one pack, not about any size the product's shops state.
      * @return array<string, float>
      */
-    public function ask(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = []): array
+    public function ask(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = [], ?string $exactPackSize = null): array
     {
-        return $this->askOutcome($product, $purpose, $candidates, $quick, $anyPackKeys)->answers;
+        return $this->askOutcome($product, $purpose, $candidates, $quick, $anyPackKeys, $exactPackSize)->answers;
     }
 
     /**
@@ -76,7 +77,7 @@ final readonly class ShopMatchCheck
      * @param  array<string, array<string, string>>  $candidates
      * @param  list<string>  $anyPackKeys
      */
-    public function askOutcome(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = []): ShopCheckOutcome
+    public function askOutcome(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = [], ?string $exactPackSize = null): ShopCheckOutcome
     {
         $user = $product->user;
 
@@ -87,7 +88,7 @@ final readonly class ShopMatchCheck
         }
 
         try {
-            return new ShopCheckOutcome(ShopCheckOutcome::ANSWERED, $this->client->sameProduct($product, $purpose, $candidates, $quick, $anyPackKeys));
+            return new ShopCheckOutcome(ShopCheckOutcome::ANSWERED, $this->client->sameProduct($product, $purpose, $candidates, $quick, $anyPackKeys, $exactPackSize));
         } catch (TypeSafeRequestFailed $e) {
             Log::warning('Same-product check failed; the candidates go unchecked.', [
                 'product_id' => $product->id,

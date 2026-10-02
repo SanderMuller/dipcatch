@@ -31,13 +31,19 @@ final class ReferenceEpoch
      * briefly sizeless whenever a shop falls out of stock, and ending the epoch
      * there would collapse the reference to its fallback every time.
      *
+     * A shop that wins once Jev confirmed its pack size starts one too: its
+     * price was there all along, unseen, and the shops before it are no
+     * history it fell from.
+     *
      * @param  list<ProductCheapestHistory>  $segments  oldest first
+     * @param  array<string, CarbonInterface>  $joinedAt  when each shop with a confirmed size joined the comparison
      * @return list<ProductCheapestHistory>
      */
-    public static function currentEpoch(array $segments, string $unit): array
+    public static function currentEpoch(array $segments, string $unit, array $joinedAt = []): array
     {
         $start = 0;
         $previous = null;
+        $joined = [];
 
         foreach ($segments as $index => $segment) {
             $size = $segment->packSize();
@@ -52,7 +58,7 @@ final class ReferenceEpoch
             // the first reading of the new epoch, so it starts on it.
             if ($size->unit !== $unit) {
                 $start = $index + 1;
-            } elseif (self::isSizeCorrection($previous, $segment)) {
+            } elseif (self::isSizeCorrection($previous, $segment) || self::joinsByConfirmedSize($previous, $segment, $joinedAt, $joined)) {
                 $start = $index;
             }
 
@@ -60,6 +66,28 @@ final class ReferenceEpoch
         }
 
         return array_slice($segments, $start);
+    }
+
+    /**
+     * The first segment a shop wins after its pack size was confirmed. Only
+     * the first: winning again later is an ordinary change of winner.
+     *
+     * @param  array<string, CarbonInterface>  $joinedAt
+     * @param  array<string, true>  $joined  shops whose first win is already counted
+     */
+    private static function joinsByConfirmedSize(?ProductCheapestHistory $previous, ProductCheapestHistory $segment, array $joinedAt, array &$joined): bool
+    {
+        $shopId = $segment->best_value_shop_id === null ? null : (string) $segment->best_value_shop_id;
+        $joinedOn = $shopId === null ? null : ($joinedAt[$shopId] ?? null);
+
+        if ($shopId === null || $joinedOn === null || isset($joined[$shopId])
+            || ! $segment->started_at instanceof CarbonInterface || $segment->started_at->isBefore($joinedOn)) {
+            return false;
+        }
+
+        $joined[$shopId] = true;
+
+        return $previous?->best_value_shop_id !== $segment->best_value_shop_id;
     }
 
     /**
