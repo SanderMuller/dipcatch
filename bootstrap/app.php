@@ -4,6 +4,7 @@ use App\Console\Commands\CategoriseProductsCommand;
 use App\Console\Commands\DiscoverWebShopsCommand;
 use App\Console\Commands\DispatchDailyDigestsCommand;
 use App\Console\Commands\ImportBolFeedCommand;
+use App\Console\Commands\LookUpBolOffersCommand;
 use App\Console\Commands\PruneOldChecksCommand;
 use App\Console\Commands\RecheckActiveShopsCommand;
 use App\Console\Commands\RefreshBolOffersCommand;
@@ -65,6 +66,13 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping(60)
             ->onOneServer()
             ->runInBackground();
+
+        // A product untouched since bol.com became a suggestion gets one too.
+        $schedule->command(LookUpBolOffersCommand::class)
+            ->dailyAt('07:00')
+            ->when(BolCatalogClient::configured(...))
+            ->withoutOverlapping(60)
+            ->onOneServer();
 
         // No IP whitelist: the API answers anywhere.
         $schedule->command(RefreshBolOffersCommand::class)

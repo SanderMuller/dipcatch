@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Asks bol.com's Catalog API what it sells of a product, the moment the
@@ -30,6 +31,9 @@ final class LookUpBolOffers implements ShouldBeUniqueUntilProcessing, ShouldQueu
 
     /** Barcodes asked per product; a product rarely has more. */
     private const int BARCODES = 3;
+
+    /** How long a product counts as looked up, before the daily run asks again. */
+    public const int FRESH_DAYS = 7;
 
     public function __construct(public string $productId) {}
 
@@ -74,6 +78,19 @@ final class LookUpBolOffers implements ShouldBeUniqueUntilProcessing, ShouldQueu
             ),
             static fn (?array $row): bool => $row !== null && $row['ean'] !== null,
         )), $now);
+
+        Cache::put(self::lookedUpKey($this->productId), true, now()->addDays(self::FRESH_DAYS));
+    }
+
+    /** Whether bol.com was asked about the product in the last {@see FRESH_DAYS} days. */
+    public static function lookedUpRecently(string $productId): bool
+    {
+        return Cache::has(self::lookedUpKey($productId));
+    }
+
+    private static function lookedUpKey(string $productId): string
+    {
+        return "bol-offers:looked-up:{$productId}";
     }
 
     /**
