@@ -183,14 +183,22 @@
 
             {{-- Four across leaves room for the category list. --}}
             <x-product-card.grid :columns="4">
-                {{-- Sorted by drop, the products in a drop come first. A line
-                     marks where they end, so the first product after them does
-                     not read as the next-biggest drop. --}}
+                {{-- Sorted by drop, the products at their alert price come
+                     first, then the ones on discount, then the rest. A line
+                     names a group whenever the list holds another one. --}}
                 @forelse ($products as $product)
-                    @if ($inDropCount > 0 && $products->firstItem() + $loop->index === $inDropCount + 1)
-                        <li wire:key="drop-divider" class="col-span-full flex items-center gap-3 py-1" data-test="drop-divider">
+                    @php($position = $products->firstItem() + $loop->index)
+                    @php($divider = match (true) {
+                        $groupSizes === null => null,
+                        $groupSizes[0] > 0 && $groupSizes[1] + $groupSizes[2] > 0 && $position === 1 => ['at-alert', __('At your alert price')],
+                        $groupSizes[0] > 0 && $groupSizes[1] > 0 && $position === $groupSizes[0] + 1 => ['discount', __('On discount now')],
+                        $groupSizes[0] + $groupSizes[1] > 0 && $groupSizes[2] > 0 && $position === $groupSizes[0] + $groupSizes[1] + 1 => ['drop', __('No discount right now')],
+                        default => null,
+                    })
+                    @if ($divider !== null)
+                        <li wire:key="{{ $divider[0] }}-divider" class="col-span-full flex items-center gap-3 py-1" data-test="{{ $divider[0] }}-divider">
                             <span class="h-px flex-1 bg-zinc-300 dark:bg-white/15"></span>
-                            <span class="text-sm font-medium text-zinc-600 dark:text-zinc-300">{{ __('No discount right now') }}</span>
+                            <span class="text-sm font-medium text-zinc-600 dark:text-zinc-300">{{ $divider[1] }}</span>
                             <span class="h-px flex-1 bg-zinc-300 dark:bg-white/15"></span>
                         </li>
                     @endif

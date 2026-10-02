@@ -121,3 +121,43 @@ test('a packaging record for another product is not this product\'s pack size', 
         ->and($result->snapshot?->packSize)->toBeNull()
         ->and($result->snapshot?->packSizeAuthoritative)->toBeFalse();
 });
+
+test('reads the price struck through beside the offer as the "was" price', function (?string $normal, ?string $claim): void {
+    $result = new DirkAdapter()->extract('https://www.dirk.nl/boodschappen/x/x/x/115212', dirkPage(price: '2.57', offerPrice: '2.57', normalPrice: $normal));
+
+    expect($result->snapshot?->claimedRegularPrice)->toBe($claim)
+        ->and($result->snapshot?->claimAuthoritative)->toBeTrue();
+})->with([
+    'normally €5.15, now €2.57' => ['5.15', '5.15'],
+    'no lower offer' => ['2.57', null],
+    'no normal price' => [null, null],
+]);
+
+test('a price record for another offer lends no "was" price to this price', function (): void {
+    $result = new DirkAdapter()->extract('https://www.dirk.nl/boodschappen/x/x/x/115212', dirkPage(price: '1.69', offerPrice: '2.49', normalPrice: '3.99'));
+
+    expect($result->snapshot?->claimedRegularPrice)->toBeNull();
+});
+
+test('prefers the price record that states a period, for the period and the "was" price', function (): void {
+    $jsonLd = json_encode(['@context' => 'http://schema.org/', '@type' => 'Product', 'name' => 'Beemster Kaas', 'offers' => ['@type' => 'Offer', 'priceCurrency' => 'EUR', 'Price' => 1.69]], JSON_THROW_ON_ERROR);
+    $payload = json_encode([
+        ['productId' => 1, 'headerText' => 2, 'packaging' => 3],
+        '115212',
+        'Beemster Kaas',
+        '150 g',
+        // A record at the same price without dates, before the one with them.
+        ['productId' => 1, 'offerPrice' => 5],
+        1.69,
+        ['productId' => 1, 'offerPrice' => 5, 'startDate' => 7, 'endDate' => 8, 'normalPrice' => 9],
+        '2026-08-26',
+        '2026-09-08',
+        2.49,
+    ], JSON_THROW_ON_ERROR);
+    $html = '<html><head><script type="application/ld+json">' . $jsonLd . '</script></head><body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';
+
+    $result = new DirkAdapter()->extract('https://www.dirk.nl/boodschappen/x/x/x/115212', $html);
+
+    expect($result->snapshot?->promotionWindow?->endsAt?->toDateString())->toBe('2026-09-08')
+        ->and($result->snapshot?->claimedRegularPrice)->toBe('2.49');
+});

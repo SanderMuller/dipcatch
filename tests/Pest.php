@@ -294,6 +294,7 @@ function dirkPage(
     ?string $offerPrice = '1.69',
     string $offerStart = '2026-08-26',
     string $offerEnd = '2026-09-08',
+    ?string $normalPrice = null,
 ): string {
     $jsonLd = json_encode([
         '@context' => 'http://schema.org/',
@@ -311,10 +312,11 @@ function dirkPage(
     ];
 
     if ($offerPrice !== null) {
-        $records[] = ['productId' => 1, 'offerPrice' => 5, 'startDate' => 6, 'endDate' => 7];
+        $records[] = ['productId' => 1, 'offerPrice' => 5, 'startDate' => 6, 'endDate' => 7, 'normalPrice' => 8];
         $records[] = (float) $offerPrice;
         $records[] = $offerStart;
         $records[] = $offerEnd;
+        $records[] = $normalPrice === null ? null : (float) $normalPrice;
     }
 
     $payload = json_encode($records, JSON_THROW_ON_ERROR);

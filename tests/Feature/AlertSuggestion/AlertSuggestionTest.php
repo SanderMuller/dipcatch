@@ -88,7 +88,8 @@ it('bases a product sold in several sizes on its best-value pack', function (): 
         ->and($suggestion->packTarget)->toBe('51.20');
 });
 
-it('takes the depth of a promotion deeper than the prior, capped', function (string $now, int $quantity, string $total, int $depth): void {
+it('goes halfway from the usual depth to a deeper promotion running now, in steps of 5%', function (string $now, int $quantity, string $total, int $depth): void {
+    // Pet food usually goes 20% off.
     $product = alertSuggestionProduct([
         ['current_price' => $now, 'single_item_price' => '4.00', 'bundle_quantity' => $quantity, 'bundle_total_price' => $total],
     ], ProductCategory::PetFood);
@@ -97,13 +98,56 @@ it('takes the depth of a promotion deeper than the prior, capped', function (str
 
     expect($suggestion->depth)->toBe($depth)
         ->and($suggestion->depthSource)->toBe(DepthSource::PromotionNow)
+        ->and($suggestion->halfwayToOffer)->toBeTrue()
+        ->and($suggestion->alreadyMet)->toBeTrue();
+})->with([
+    '1+1 free, 50%: 35%' => ['2.00', 2, '4.00', 35],
+    '2+3 free, 60%: 40%' => ['1.60', 5, '8.00', 40],
+]);
+
+it('suggests between the usual offer and a deep one running now, not far above what a shop just charged', function (): void {
+    // A frozen A-brand meal: usually about a third off, half off at one shop now.
+    $product = alertSuggestionProduct([
+        ['current_price' => '2.57', 'claimed_regular_price' => '5.15', 'pack_quantity' => '750.00'],
+        ['current_price' => '5.39', 'pack_quantity' => '750.00'],
+    ], ProductCategory::Frozen);
+
+    $suggestion = AlertSuggestion::for($product, PromotionDepthBand::Deep);
+
+    expect($suggestion->promotionNowDepth)->toBe(50)
+        ->and($suggestion->depth)->toBe(40)
+        ->and($suggestion->halfwayToOffer)->toBeTrue()
+        ->and($suggestion->packTarget)->toBe('3.09')
+        ->and($suggestion->alreadyMet)->toBeTrue();
+});
+
+it('keeps the usual depth when an offer is less than a step deeper', function (): void {
+    // 25% off now over pet food's usual 20%: halfway is 22.5%, the 20% step.
+    $product = alertSuggestionProduct([
+        ['current_price' => '3.00', 'claimed_regular_price' => '4.00'],
+    ], ProductCategory::PetFood);
+
+    $suggestion = AlertSuggestion::for($product);
+
+    expect($suggestion->depth)->toBe(20)
+        ->and($suggestion->depthSource)->toBe(DepthSource::Category)
+        ->and($suggestion->halfwayToOffer)->toBeFalse();
+});
+
+it('takes a promotion running now as it is, capped, with no usual depth to go on', function (): void {
+    // 1+2 free is 66% off; a suggestion goes at most 60%.
+    $product = alertSuggestionProduct([
+        ['current_price' => '1.33', 'single_item_price' => '4.00', 'bundle_quantity' => 3, 'bundle_total_price' => '4.00'],
+    ]);
+
+    $suggestion = AlertSuggestion::for($product);
+
+    expect($suggestion->depth)->toBe(60)
+        ->and($suggestion->depthSource)->toBe(DepthSource::PromotionNow)
+        ->and($suggestion->halfwayToOffer)->toBeFalse()
         // 60% is the suggestion's ceiling, not a law.
         ->and($suggestion->cappedByLaw)->toBeFalse();
-})->with([
-    '1+1 free, 50%' => ['2.00', 2, '4.00', 50],
-    '2+3 free at 60%, the cap' => ['1.60', 5, '8.00', 60],
-    '1+2 free at 66% stops at the cap' => ['1.33', 3, '4.00', 60],
-]);
+});
 
 it('caps alcohol at the 25% the law allows', function (): void {
     $product = alertSuggestionProduct([
@@ -254,7 +298,8 @@ it('suggests a target a promotion priced in cents reaches again', function (stri
         ->and($suggestion->depth)->toBe($depth)
         ->and($suggestion->alreadyMet)->toBeTrue();
 })->with([
-    '1+1 free on €2.99' => ['2.99', 50, 45],
+    // 45% off now; halfway from pet food's usual 20% is the 30% step.
+    '1+1 free on €2.99' => ['2.99', 50, 30],
     '2nd half price on €2.99' => ['4.49', 25, 20],
 ]);
 
@@ -273,7 +318,8 @@ it('floors a claimed discount without slack', function (string $now, string $cla
 ]);
 
 it('rounds a current promotion down to a step of 5%', function (): void {
-    // 43% off now: 2.28 against a claimed 4.00, over a pet-food prior of 20%.
+    // 43% off now, the 40% step: 2.28 against a claimed 4.00, halfway from a
+    // pet-food prior of 20%.
     $product = alertSuggestionProduct([
         ['current_price' => '2.28', 'claimed_regular_price' => '4.00'],
     ], ProductCategory::PetFood);
@@ -281,7 +327,7 @@ it('rounds a current promotion down to a step of 5%', function (): void {
     $suggestion = AlertSuggestion::for($product);
 
     expect($suggestion->promotionNowDepth)->toBe(43)
-        ->and($suggestion->depth)->toBe(40)
+        ->and($suggestion->depth)->toBe(30)
         ->and($suggestion->depthSource)->toBe(DepthSource::PromotionNow);
 });
 
@@ -372,9 +418,10 @@ it('prefers the category set on the product over a suggested one', function (): 
 });
 
 it('takes the saving off the pack price, so an exact target stays exact', function (): void {
-    // 40% off €1.00 for 3 is €0.60 a pack, €0.20 each, which €0.60 now meets.
+    // Halfway from pantry's 35% to 50% off now is 40%: €0.60 a pack, €0.20
+    // each, which €0.50 now meets.
     $product = alertSuggestionProduct([
-        ['current_price' => '0.60', 'claimed_regular_price' => '1.00', 'pack_unit' => 'piece', 'pack_quantity' => '3.00'],
+        ['current_price' => '0.50', 'claimed_regular_price' => '1.00', 'pack_unit' => 'piece', 'pack_quantity' => '3.00'],
     ], ProductCategory::Pantry);
 
     $suggestion = AlertSuggestion::for($product);

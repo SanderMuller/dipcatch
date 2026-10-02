@@ -149,6 +149,99 @@ it('draws the line at the top of the next page when the drops fill the page befo
         ->assertSeeHtmlInOrder(['data-test="drop-divider"', 'Never dropped']);
 });
 
+it('puts the products at their alert price first, then the ones on discount, then the rest, each under its line', function (): void {
+    $user = User::factory()->create();
+    productWithCheapestShop($user, 'Plain product', []);
+    // A deal at a shop, with no drop alert of its own.
+    productWithCheapestShop($user, 'Deal only', ['promotion_ends_at' => now()->addDays(3)]);
+    productWithCheapestShop($user, 'Under the alert', [], ['target_price' => '2.50']);
+    // A target it has not reached: no different from a plain product.
+    productWithCheapestShop($user, 'Above the alert', [], ['target_price' => '1.50']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertSeeHtmlInOrder([
+            'data-test="at-alert-divider"', 'Under the alert',
+            'data-test="discount-divider"', 'Deal only',
+            'data-test="drop-divider"', 'Plain product',
+        ])
+        ->assertSeeHtmlInOrder(['data-test="drop-divider"', 'Above the alert']);
+});
+
+it('draws no discount line when nothing is on discount', function (): void {
+    $user = User::factory()->create();
+    productWithCheapestShop($user, 'Plain product', []);
+    productWithCheapestShop($user, 'Under the alert', [], ['target_price' => '2.50']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertDontSeeHtml('data-test="discount-divider"')
+        ->assertSeeHtmlInOrder(['data-test="at-alert-divider"', 'Under the alert', 'data-test="drop-divider"', 'Plain product']);
+});
+
+it('counts a deal at the best-value shop as a discount', function (): void {
+    $user = User::factory()->create();
+    $product = productWithCheapestShop($user, 'Deal at the best value', []);
+    $bestValue = Shop::factory()->for($product)->create(['url' => 'https://bulk.example/p/1', 'current_price' => '3.00', 'promotion_ends_at' => now()->addDays(3)]);
+    $product->forceFill(['best_value_shop_id' => (string) $bestValue->id])->save();
+    productWithCheapestShop($user, 'Plain product', []);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)->assertSeeHtmlInOrder(['Deal at the best value', 'data-test="drop-divider"', 'Plain product']);
+});
+
+it('groups only when sorted by drop', function (): void {
+    $user = User::factory()->create();
+    productWithCheapestShop($user, 'Zest', [], ['target_price' => '2.50']);
+    productWithCheapestShop($user, 'Apple', []);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('sort', 'title')
+        ->assertSeeInOrder(['Apple', 'Zest'])
+        ->assertDontSeeHtml('-divider"');
+});
+
+it('counts a per-kilo alert, and leaves a paused product out of the alert group', function (): void {
+    $user = User::factory()->create();
+    productWithCheapestShop($user, 'Plain product', []);
+    // €2.00 for 500 g is €4.00 a kilo, under a €4.50 target.
+    productWithCheapestShop($user, 'Under the kilo alert', [], ['unit_price_target' => '4.50', 'best_value_price' => '2.00', 'best_value_pack_quantity' => '500.00', 'best_value_pack_unit' => 'g']);
+    productWithCheapestShop($user, 'Paused under the alert', [], ['target_price' => '2.50', 'active' => false]);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertSeeHtmlInOrder(['data-test="at-alert-divider"', 'Under the kilo alert', 'data-test="drop-divider"'])
+        ->assertSeeInOrder(['No discount right now', 'Paused under the alert']);
+});
+
+it('counts a deal at the chosen shop as a discount, also when another shop is cheaper', function (): void {
+    $user = User::factory()->create();
+    $product = productWithCheapestShop($user, 'Deal at AH', ['host' => 'dirk.nl', 'url' => 'https://www.dirk.nl/p/1']);
+    Shop::factory()->for($product)->create(['host' => 'ah.nl', 'url' => 'https://www.ah.nl/p/1', 'current_price' => '2.50', 'promotion_ends_at' => now()->addDays(3)]);
+    productWithCheapestShop($user, 'Plain at AH', ['host' => 'ah.nl', 'url' => 'https://www.ah.nl/p/2']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('shop', 'ah.nl')
+        ->assertSeeHtmlInOrder(['Deal at AH', 'data-test="drop-divider"', 'Plain at AH']);
+});
+
+it('draws no line above a single group of products at their alert price', function (): void {
+    $user = User::factory()->create();
+    productWithCheapestShop($user, 'Under the alert', [], ['target_price' => '2.50']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)->assertDontSeeHtml('-divider"');
+});
+
 it('draws no line when no product is in a drop', function (): void {
     $user = User::factory()->create();
     Product::factory()->count(2)->create(['user_id' => $user->id]);

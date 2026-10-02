@@ -57,6 +57,7 @@
         @php
             $insight = match (true) {
                 $suggestion->cappedByLaw => __('Alcohol can go at most :depth% off in the Netherlands.', ['depth' => $suggestion->depth]),
+                $suggestion->halfwayToOffer => __('We suggest a price halfway between that and its usual offers.'),
                 $suggestion->depthSource === \App\Enums\DepthSource::Jev => __('Products like this often go :depth% off.', ['depth' => $suggestion->depth]),
                 $suggestion->depthSource === \App\Enums\DepthSource::Category && $suggestion->category !== null => __(':category often goes about :depth% off.', ['category' => $suggestion->category->label(), 'depth' => $suggestion->depth]),
                 default => null,

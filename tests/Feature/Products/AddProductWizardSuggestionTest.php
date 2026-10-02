@@ -182,8 +182,8 @@ it('marks a suggested target the offer on screen already meets as notified, unti
     fakeJevAnswer();
     Notification::fake();
     $user = User::factory()->create();
-    // 25% off now: the 25% step, €3.00, which today's €3.00 meets.
-    $product = suggestionWizardProduct($user, now: '3.00');
+    // 20% off now, the usual pet-food depth: €3.20, which today's €3.20 meets.
+    $product = suggestionWizardProduct($user, now: '3.20');
     $this->actingAs($user);
 
     alertStep($product)
@@ -192,8 +192,8 @@ it('marks a suggested target the offer on screen already meets as notified, unti
         ->call('saveAlerts');
 
     $product->refresh();
-    expect((string) $product->unit_price_target)->toBe('3.0000')
-        ->and((string) $product->unit_price_notified)->toBe('3.0000')
+    expect((string) $product->unit_price_target)->toBe('3.2000')
+        ->and((string) $product->unit_price_notified)->toBe('3.2000')
         ->and($product->unit_price_notified_at)->not->toBeNull();
 
     // The next check at the same price: no alert.
@@ -230,8 +230,8 @@ it('latches nothing for a target the person typed', function (): void {
 it('keeps a lower latch a reopened product already has', function (): void {
     fakeJevAnswer();
     $user = User::factory()->create();
-    $product = suggestionWizardProduct($user, now: '3.00');
-    $product->forceFill(['unit_price_target' => '3.0000'])->save();
+    $product = suggestionWizardProduct($user, now: '3.20');
+    $product->forceFill(['unit_price_target' => '3.2000'])->save();
     $product->forceFill(['unit_price_notified' => '2.5000', 'unit_price_notified_at' => now()->subWeek()])->save();
     $this->actingAs($user);
 
@@ -268,22 +268,22 @@ it('explains a product with no pack size, and offers no target', function (): vo
 it('keeps the pre-latch for the suggestion taken, when Jev answers after it', function (): void {
     fakeJevAnswer();
     $user = wizardProUser();
-    // 25% off now: the evidence suggests €3.00, which today's €3.00 meets.
-    $product = suggestionWizardProduct($user, now: '3.00');
+    // 20% off now: the evidence suggests €3.20, which today's €3.20 meets.
+    $product = suggestionWizardProduct($user, now: '3.20');
     $this->actingAs($user);
 
     alertStep($product)
         ->call('useSuggestion')
-        ->assertSet('unitPriceTarget', '3')
-        // Jev's half-price band moves the card to €2.00; the fields keep €3.00.
+        ->assertSet('unitPriceTarget', '3.2')
+        // Jev's half-price band moves the card to €2.00; the fields keep €3.20.
         ->call('askJev')
         ->assertSee('Our suggestion is €2.00 /kg')
         ->call('saveAlerts');
 
     $product->refresh();
 
-    expect((string) $product->unit_price_target)->toBe('3.0000')
-        ->and((string) $product->unit_price_notified)->toBe('3.0000');
+    expect((string) $product->unit_price_target)->toBe('3.2000')
+        ->and((string) $product->unit_price_notified)->toBe('3.2000');
 });
 
 it('asks Jev again once the product changed, and shows no old answer meanwhile', function (): void {
@@ -370,6 +370,8 @@ it('explains each kind of suggestion', function (string $category, string $now, 
         : $wizard->assertDontSeeHtml('data-test="use-suggestion"');
 })->with([
     'a promotion on now' => ['food.pantry', '3.00', '4.00', null, 'ah.nl has this 25% off now.', true],
+    // Pantry usually goes 35% off: halfway to 50% now is the 40% step.
+    'halfway to a deeper offer' => ['food.pantry', '2.00', '4.00', null, 'We suggest a price halfway between that and its usual offers.', true],
     'the alcohol limit' => ['food.alcohol', '0.60', '1.20', null, 'Alcohol can go at most 25% off in the Netherlands.', true],
     'no normal price' => ['home.small_appliances', '70.00', '100.00', null, 'We could not tell its normal price', false],
     'no sign of sales' => ['', '4.00', null, null, 'We have no sign that this product goes on sale', false],

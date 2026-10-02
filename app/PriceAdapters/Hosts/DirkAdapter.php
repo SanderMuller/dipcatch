@@ -12,6 +12,7 @@ use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\DutchDate;
+use App\Support\Numeric;
 use App\Support\NuxtData;
 
 /**
@@ -66,41 +67,61 @@ final readonly class DirkAdapter implements HostSpecificAdapter, OwnsHosts, Shop
             $snapshot = $snapshot->withPackSize($packaging);
         }
 
+        $offer = self::offerRecord($data, $productId, $snapshot->price);
+
         // The payload is the only promotion source this adapter reads, so one
         // that states no period for this product ends the promotion.
         return ExtractionResult::success(
-            $snapshot->withPromotionWindow(self::promotionWindow($data, $productId, $snapshot->price)),
+            $snapshot
+                ->withPromotionWindow($offer === null ? null : self::promotionWindow($data, $offer))
+                ->withClaimedRegularPrice($offer === null ? $snapshot->claimedRegularPrice : self::normalPrice($data, $offer, $snapshot->price)),
         );
     }
 
     /**
-     * The offer period behind the price, when the payload holds a price
-     * record for this product whose offer price is the price the JSON-LD
-     * reported. A record that prices something else describes a different
-     * offer, and its dates would be attached to a price they do not cover.
+     * The payload's price record for this product whose offer price is the
+     * price the JSON-LD reported. A record that prices something else
+     * describes a different offer, and its period and "was" price would be
+     * attached to a price they do not cover. One that states a period goes
+     * before one that does not.
      *
      * @param  list<mixed>  $data
+     * @return array<string, mixed>|null
      */
-    private static function promotionWindow(array $data, string $productId, string $price): ?PromotionWindow
+    private static function offerRecord(array $data, string $productId, string $price): ?array
     {
-        foreach (NuxtData::recordsFor($data, ['productId', 'offerPrice'], 'productId', $productId) as $record) {
-            $offer = PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'offerPrice'));
+        $matching = array_values(array_filter(
+            NuxtData::recordsFor($data, ['productId', 'offerPrice'], 'productId', $productId),
+            static fn (array $record): bool => PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'offerPrice')) === $price,
+        ));
 
-            if ($offer === null || $offer !== $price) {
-                continue;
-            }
+        return array_find($matching, static fn (array $record): bool => self::promotionWindow($data, $record) instanceof PromotionWindow)
+            ?? $matching[0] ?? null;
+    }
 
-            $window = PromotionWindow::make(
-                endsAt: DutchDate::endOfDay(NuxtData::value($data, $record, 'endDate')),
-                startsAt: DutchDate::startOfDay(NuxtData::value($data, $record, 'startDate')),
-            );
+    /**
+     * @param  list<mixed>  $data
+     * @param  array<string, mixed>  $record
+     */
+    private static function promotionWindow(array $data, array $record): ?PromotionWindow
+    {
+        return PromotionWindow::make(
+            endsAt: DutchDate::endOfDay(NuxtData::value($data, $record, 'endDate')),
+            startsAt: DutchDate::startOfDay(NuxtData::value($data, $record, 'startDate')),
+        );
+    }
 
-            if ($window !== null) {
-                return $window;
-            }
-        }
+    /**
+     * The price struck through beside the offer, only when it is above it.
+     *
+     * @param  list<mixed>  $data
+     * @param  array<string, mixed>  $record
+     */
+    private static function normalPrice(array $data, array $record, string $price): ?string
+    {
+        $normal = PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'normalPrice'));
 
-        return null;
+        return $normal !== null && bccomp(Numeric::str($normal), Numeric::str($price), 2) > 0 ? $normal : null;
     }
 
     /**

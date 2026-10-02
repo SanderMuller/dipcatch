@@ -144,6 +144,12 @@ final readonly class ShopSnapshot
         return clone($this, ['promotionWindowAuthoritative' => false]);
     }
 
+    /** The "was" price as the reader states it: a null clears a stored one. */
+    public function withClaimedRegularPrice(?string $claimedRegularPrice): self
+    {
+        return clone($this, ['claimedRegularPrice' => $claimedRegularPrice, 'claimAuthoritative' => true]);
+    }
+
     public function withBundleOffer(?BundleOffer $bundleOffer): self
     {
         return clone($this, ['bundleOffer' => $bundleOffer, 'bundleOfferAuthoritative' => true]);

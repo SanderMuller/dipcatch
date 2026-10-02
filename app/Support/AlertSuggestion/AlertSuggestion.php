@@ -37,6 +37,8 @@ final readonly class AlertSuggestion
         public int $promotionNowDepth,
         public bool $cappedByLaw,
         public bool $alreadyMet,
+        /** Whether the depth lies halfway between the usual one and a deeper offer running now. */
+        public bool $halfwayToOffer,
     ) {}
 
     public static function for(Product $product, PromotionDepthBand $band = PromotionDepthBand::Unknown): self
@@ -74,11 +76,7 @@ final readonly class AlertSuggestion
             default => [0, DepthSource::None],
         };
 
-        $now = $deepest['step'] ?? 0;
-
-        if ($now > $prior) {
-            [$prior, $source] = [$now, DepthSource::PromotionNow];
-        }
+        [$prior, $source, $halfway] = self::withOfferNow($prior, $source, $deepest['step'] ?? 0);
 
         $legalCap = TypicalPromotionDepth::legalCap($category);
         $cap = $legalCap ?? TypicalPromotionDepth::MAX;
@@ -103,7 +101,27 @@ final readonly class AlertSuggestion
             promotionNowDepth: $deepest['depth'] ?? 0,
             cappedByLaw: $target !== null && $legalCap !== null && $prior > $legalCap,
             alreadyMet: $target !== null && self::meets($product->bestValueShop(), $target['unit']),
+            halfwayToOffer: $target !== null && $halfway && ! ($legalCap !== null && $prior > $legalCap),
         );
+    }
+
+    /**
+     * An offer deeper than usual moves the suggestion halfway towards it, on
+     * the same 5% steps: the usual depth would ask far more than the shop
+     * just charged, and the offer itself may seldom come back. With no usual
+     * depth to go on, the offer is the only sign there is.
+     *
+     * @return array{0: int, 1: DepthSource, 2: bool} the depth, its source, and whether it is halfway
+     */
+    private static function withOfferNow(int $prior, DepthSource $source, int $now): array
+    {
+        $halfway = intdiv(intdiv($prior + $now, 2), 5) * 5;
+
+        return match (true) {
+            $prior > 0 && $halfway > $prior => [$halfway, DepthSource::PromotionNow, true],
+            $prior === 0 && $now > 0 => [$now, DepthSource::PromotionNow, false],
+            default => [$prior, $source, false],
+        };
     }
 
     /** The detector's own comparison, so `alreadyMet` and the alert agree. */

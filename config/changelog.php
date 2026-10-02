@@ -31,8 +31,21 @@ return [
         [
             'date' => '2026-10-02',
             'category' => 'feature',
+            'title' => 'Your products in three groups',
+            'body' => "Sorted by biggest drop, your products now come in three groups: the ones at your alert price, the ones on discount at a shop, and the rest. A product with a shop deal no longer ends up under \"No discount right now\".",
+            'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],
+        ],
+        [
+            'date' => '2026-10-02',
+            'category' => 'fix',
+            'title' => 'Better suggested alerts during a deal',
+            'body' => "When a shop already has a big deal, the suggested alert now sits between that deal and the usual discount, instead of far above what the shop just charged. DipCatch also reads Dirk's \"was\" prices now.",
+        ],
+        [
+            'date' => '2026-10-02',
+            'category' => 'feature',
             'title' => 'Faster shop suggestions',
-            'body' => "Finding more shops for a product is faster now. They come in one by one, so you can look at the first ones while DipCatch keeps searching.",
+            'body' => "With Pro, finding more shops for a product is faster now. They come in one by one, so you can look at the first ones while DipCatch keeps searching.",
             'link' => ['route' => 'app.products.create', 'label' => 'Add a product'],
         ],
         [

@@ -73,6 +73,25 @@ final class ProductList extends Component
 
     private const string DEFAULT_SORT = 'biggest_drop';
 
+    /**
+     * The group of a product sorted by drop. 0: an active product at or
+     * under its alert price, compared as {@see Product::isAtTarget()} does,
+     * on the stored best value; 1: in a drop, or with a deal as the "Only
+     * discounts" switch reads one; 2: the rest.
+     */
+    private const string LIST_GROUP = <<<'SQL'
+        CASE
+            WHEN active = TRUE AND (
+                (target_price IS NOT NULL AND cheapest_price IS NOT NULL AND cheapest_price <= target_price)
+                OR (unit_price_target IS NOT NULL AND best_value_price > 0 AND best_value_pack_quantity > 0
+                    AND ROUND(best_value_price * 1.0 / best_value_pack_quantity
+                        * (CASE best_value_pack_unit WHEN 'piece' THEN 1 ELSE 1000 END), 6) <= unit_price_target)
+            ) THEN 0
+            WHEN biggest_drop >= 0.5 OR deals_now > 0 THEN 1
+            ELSE 2
+        END
+        SQL;
+
     /** @var list<string>|null Memo for {@see bestBuyIds()}; not public, so it lives for one request. */
     private ?array $bestBuyIds = null;
 
@@ -206,7 +225,7 @@ final class ProductList extends Component
 
         return view('livewire.products.product-list', [
             'products' => $this->products(),
-            'inDropCount' => $this->inDropCount(),
+            'groupSizes' => $this->groupSizes(),
             'canAddProduct' => $this->canAddProduct(),
             'categoryGroups' => $this->categoryGroups(),
             'shopHosts' => $this->shopHosts(),
@@ -227,8 +246,13 @@ final class ProductList extends Component
     {
         $sort = array_key_exists($this->sort, self::SORTS) ? $this->sort : self::DEFAULT_SORT;
 
-        return $this->filtered()
-            ->addSelect(['biggest_drop' => Product::liveDropPercentQuery()])
+        // By drop, the groups come first: at the alert price, then on
+        // discount, then the rest.
+        $query = $sort === 'biggest_drop'
+            ? $this->grouped()->orderBy('list_group')
+            : $this->filtered()->addSelect(['biggest_drop' => Product::liveDropPercentQuery()]);
+
+        return $query
             ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
             // A product not in a drop, or with no price yet, sorts last
             // whichever way the list runs, rather than heading a list of
@@ -298,16 +322,54 @@ final class ProductList extends Component
     }
 
     /**
-     * How many products in the list are in a drop, when it is sorted by
-     * drop: they come first, so the line after them goes after this many.
-     * Counted, not read off the page, so the line still shows when the
-     * drops end on the last card of a page.
+     * The filtered products with what the sort and the groups read: the live
+     * drop, the deals running at the shops a card names, and the group.
+     * Wrapped, so the group can be computed from the two subqueries.
+     *
+     * @return EloquentQueryBuilder<Product>
      */
-    private function inDropCount(): ?int
+    private function grouped(): EloquentQueryBuilder
+    {
+        // With a shop chosen, a deal there counts, as the "Only discounts"
+        // switch has it; otherwise a deal at a shop the card names.
+        $shops = $this->shop === ''
+            ? Shop::query()->where(fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $shop
+                ->whereColumn('shops.id', 'products.cheapest_shop_id')
+                // A string column beside a uuid key: cast for PostgreSQL.
+                ->orWhereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id'))
+            : Shop::query()->whereColumn('shops.product_id', 'products.id')->where('host', $this->shop)->where('active', true);
+
+        $inner = $this->filtered()->addSelect([
+            'biggest_drop' => Product::liveDropPercentQuery(),
+            'deals_now' => self::dealRunningNow($shops->selectRaw('COUNT(*)')),
+        ]);
+
+        return Product::query()->fromSub($inner, 'products')->select('*')->selectRaw(self::LIST_GROUP . ' AS list_group');
+    }
+
+    /**
+     * How many products sit in each group, when the list is sorted by drop:
+     * a line goes where a group starts. Counted, not read off the page, so
+     * the line still shows when a group ends on the last card of a page.
+     *
+     * @return array{0: int, 1: int, 2: int}|null at the alert price, on discount, the rest
+     */
+    private function groupSizes(): ?array
     {
         $sort = array_key_exists($this->sort, self::SORTS) ? $this->sort : self::DEFAULT_SORT;
 
-        return $sort === 'biggest_drop' ? $this->filtered()->inVisibleDrop()->count() : null;
+        if ($sort !== 'biggest_drop') {
+            return null;
+        }
+
+        $sizes = Product::query()->fromSub($this->grouped(), 'grouped')
+            ->selectRaw('list_group, COUNT(*) AS size')
+            ->groupBy('list_group')
+            ->pluck('size', 'list_group');
+
+        $size = static fn (int $group): int => is_numeric($sizes[$group] ?? null) ? (int) $sizes[$group] : 0;
+
+        return [$size(0), $size(1), $size(2)];
     }
 
     /**
