@@ -8,6 +8,7 @@ use App\Enums\ProbeFailure;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
 use App\Enums\ShopKind;
+use App\Jobs\ConfirmPackSize;
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\ConditionalOffer;
 use App\PriceAdapters\PromotionWindow;
@@ -57,6 +58,10 @@ use Illuminate\Support\Facades\DB;
  * @property ConsumerPriceIssue|null $consumer_price_issue Why this is not a price a shopper can pay.
  * @property string|null $consumer_price_note The words the page used to say so.
  * @property string|null $claimed_regular_price The price the shop says it charged before the discount.
+ * @property string|null $confirmed_pack_quantity A pack size Jev confirmed for a page that states none.
+ * @property string|null $confirmed_pack_unit
+ * @property string|null $pack_check_key The page and size Jev was last asked about.
+ * @property CarbonInterface|null $pack_checked_at
  */
 #[Unguarded]
 final class Shop extends Model
@@ -77,6 +82,8 @@ final class Shop extends Model
             'bundle_total_price' => 'decimal:2',
             'claimed_regular_price' => 'decimal:2',
             'pack_quantity' => 'decimal:2',
+            'confirmed_pack_quantity' => 'decimal:2',
+            'pack_checked_at' => 'datetime',
             'conditional_price' => 'decimal:2',
             'conditional_starts_at' => 'datetime',
             'conditional_ends_at' => 'datetime',
@@ -506,6 +513,16 @@ final class Shop extends Model
         }
 
         return PackSize::of((float) $this->pack_quantity, $this->pack_unit);
+    }
+
+    /** A size Jev confirmed for this page, which states none itself; see {@see ConfirmPackSize}. */
+    public function confirmedPackSize(): ?PackSize
+    {
+        if ($this->confirmed_pack_quantity === null || $this->confirmed_pack_unit === null) {
+            return null;
+        }
+
+        return PackSize::of((float) $this->confirmed_pack_quantity, $this->confirmed_pack_unit);
     }
 
     public function safeImageUrl(): ?string

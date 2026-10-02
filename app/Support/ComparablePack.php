@@ -28,6 +28,11 @@ final readonly class ComparablePack
         return new self($size, PackProvenance::Stated, exclusion: null);
     }
 
+    public static function confirmed(PackSize $size): self
+    {
+        return new self($size, PackProvenance::Confirmed, exclusion: null);
+    }
+
     public static function inferred(PackSize $size): self
     {
         return new self($size, PackProvenance::Inferred, exclusion: null);
@@ -45,11 +50,11 @@ final readonly class ComparablePack
 
     /**
      * Whether this size may win the per-unit ranking and be the basis of an
-     * alert. Only a stated size may.
+     * alert: a stated size, or one Jev confirmed from the page.
      */
     public function canWin(): bool
     {
-        return $this->provenance === PackProvenance::Stated;
+        return $this->provenance === PackProvenance::Stated || $this->provenance === PackProvenance::Confirmed;
     }
 
     public function reason(): ?string

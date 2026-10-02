@@ -30,6 +30,13 @@ return [
     'entries' => [
         [
             'date' => '2026-10-02',
+            'category' => 'pro',
+            'title' => 'AI reads a missing pack size',
+            'body' => "With Pro and the AI check on, DipCatch now asks the AI when a shop's page doesn't say how much is in the pack. When it's sure, that shop's price per piece or kilo counts like any other, marked \"size checked by AI\".",
+            'link' => ['route' => 'product-features.edit', 'label' => 'Open product features'],
+        ],
+        [
+            'date' => '2026-10-02',
             'category' => 'fix',
             'title' => 'No more suggestions for pages that are gone',
             'body' => "Shop suggestions no longer link to supermarket pages a shop has taken down. DipCatch checks Dirk's range every day, and SPAR and Poiesz pages when it suggests them. If you paste a link to a product a shop no longer lists, it now tells you that, instead of saying it couldn't read a price.\n\nDeals on BENU Shop, like 1+1 gratis, now count toward the price.",

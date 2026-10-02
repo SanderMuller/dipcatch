@@ -411,6 +411,8 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 app(DetectTargetPrice::class)($product);
             }
         });
+
+        ConfirmPackSize::afterRead((string) $shop->id, $outcome);
     }
 
     /**

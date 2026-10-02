@@ -22,6 +22,8 @@ final readonly class PackLine
         public bool $estimated,
         /** `2 for €6.00 · or €3.50 each` while a bundle sets the price. */
         public ?string $bundle,
+        /** A size the page does not state, which Jev confirmed from it. */
+        public bool $checkedByAi = false,
     ) {}
 
     public static function of(Shop $shop, ?ComparablePacks $packs = null): self
@@ -34,6 +36,7 @@ final readonly class PackLine
             size: $pack->size ?? $shop->packSize(),
             estimated: $pack?->provenance === PackProvenance::Inferred,
             bundle: BundlePriceLabel::forShop($shop),
+            checkedByAi: $pack?->provenance === PackProvenance::Confirmed,
         );
     }
 
@@ -44,6 +47,10 @@ final readonly class PackLine
 
         if ($this->estimated) {
             $text .= ' (' . __('estimated') . ')';
+        }
+
+        if ($this->checkedByAi) {
+            $text .= ' (' . __('size checked by AI') . ')';
         }
 
         return $this->bundle === null ? $text : $text . ' · ' . $this->bundle;

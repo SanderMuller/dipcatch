@@ -51,6 +51,7 @@ final readonly class ComparablePacks
     private function __construct(
         private ?string $unit,
         private array $packs,
+        private ?PackSize $agreed = null,
     ) {}
 
     /**
@@ -99,7 +100,13 @@ final readonly class ComparablePacks
             $packs[(string) $shop->id] = self::resolveOne($shop, $currency, $unit, $agreed, $median);
         }
 
-        return new self($unit, $packs);
+        return new self($unit, $packs, $agreed);
+    }
+
+    /** The size the shops that state one agree on, which a silent page borrows. */
+    public function sharedSize(): ?PackSize
+    {
+        return $this->agreed;
     }
 
     /** The unit this product compares in, or null when it has none. */
@@ -254,6 +261,12 @@ final readonly class ComparablePacks
             return ComparablePack::excluded($size->unit === 'piece'
                 ? PackExclusion::SoldByThePiece
                 : PackExclusion::UnitDoesNotConvert);
+        }
+
+        $confirmed = $shop->confirmedPackSize();
+
+        if ($confirmed instanceof PackSize && $confirmed->unit === $unit) {
+            return ComparablePack::confirmed($confirmed);
         }
 
         if (! $agreed instanceof PackSize) {

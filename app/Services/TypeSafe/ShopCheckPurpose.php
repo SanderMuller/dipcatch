@@ -22,4 +22,7 @@ enum ShopCheckPurpose: string
 
     /** How deep a new product's promotions go, for its suggested alert. */
     case AlertSuggestion = 'alert-suggestion';
+
+    /** Whether a page that states no pack size sells the size the other shops state. */
+    case PackSize = 'pack-size';
 }

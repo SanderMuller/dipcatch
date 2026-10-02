@@ -35,6 +35,10 @@
             <flux:tooltip content="{{ __('No pack size on this page. Taken from the other shops on this product, which all agree.') }}">
                 <flux:badge size="sm" color="zinc">{{ __('estimated') }}</flux:badge>
             </flux:tooltip>
+        @elseif ($pack?->provenance === \App\Enums\PackProvenance::Confirmed)
+            <flux:tooltip content="{{ __('No pack size on this page. The AI check read the page as the size the other shops state.') }}">
+                <flux:badge size="sm" color="zinc" data-test="pack-checked-by-ai">{{ __('size checked by AI') }}</flux:badge>
+            </flux:tooltip>
         @endif
     </span>
 @endif
