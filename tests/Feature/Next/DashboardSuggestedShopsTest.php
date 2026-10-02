@@ -304,5 +304,5 @@ it('lists again as soon as a shop is added, a web suggestion dismissed, or a pro
     expect(collect(suggestedShopRows($user))->contains(fn (string $row): bool => str_contains($row, 'koffie.test')))->toBeFalse();
 
     $cheese->update(['active' => false]);
-    expect(suggestedShopRows($user))->toBe([]);
+    expect(suggestedShopRows($user))->toBeEmpty();
 });

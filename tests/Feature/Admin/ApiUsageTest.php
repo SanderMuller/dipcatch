@@ -52,11 +52,8 @@ it('counts a Jev call with its tokens, per purpose and day', function (): void {
 it('counts a failed Jev call as a call and a failure', function (): void {
     Http::fake([TypeSafeClient::ENDPOINT => Http::response([], 500)]);
 
-    expect(fn () => app(TypeSafeClient::class)->promotionDepth(['title' => 'Kattenvoer']))->toThrow(TypeSafeRequestFailed::class);
-
-    expect(usageToday(ApiService::TypeSafe, ShopCheckPurpose::AlertSuggestion->value))
-        ->calls->toBe(1)
-        ->failures->toBe(1);
+    expect(fn () => app(TypeSafeClient::class)->promotionDepth(['title' => 'Kattenvoer']))->toThrow(TypeSafeRequestFailed::class)
+        ->and(usageToday(ApiService::TypeSafe, ShopCheckPurpose::AlertSuggestion->value))->calls->toBe(1)->failures->toBe(1);
 });
 
 it('counts a Jev check a daily cap refused, without a call', function (): void {
@@ -64,11 +61,8 @@ it('counts a Jev check a daily cap refused, without a call', function (): void {
     $user = User::factory()->create();
 
     expect(app(CategorisationBudget::class)->allowsShopCheck($user, ShopCheckPurpose::AddShop))->toBeTrue()
-        ->and(app(CategorisationBudget::class)->allowsShopCheck($user, ShopCheckPurpose::AddShop))->toBeFalse();
-
-    expect(usageToday(ApiService::TypeSafe, ShopCheckPurpose::AddShop->value))
-        ->calls->toBe(0)
-        ->refusals->toBe(1);
+        ->and(app(CategorisationBudget::class)->allowsShopCheck($user, ShopCheckPurpose::AddShop))->toBeFalse()
+        ->and(usageToday(ApiService::TypeSafe, ShopCheckPurpose::AddShop->value))->calls->toBe(0)->refusals->toBe(1);
 });
 
 it('counts a Serper search, and a search the daily cap refused', function (): void {
@@ -142,11 +136,8 @@ it('counts a categorisation a daily cap refused under categorise', function (): 
 it('counts an unreachable Serper as a failed call', function (): void {
     Http::fake([SerperProvider::ENDPOINT => fn () => throw new ConnectionException('timed out')]);
 
-    expect(app(WebSearches::class)->forQuery('kattenvoer 2 kg'))->toBeNull();
-
-    expect(usageToday(ApiService::Serper, SerperProvider::PURPOSE))
-        ->calls->toBe(1)
-        ->failures->toBe(1);
+    expect(app(WebSearches::class)->forQuery('kattenvoer 2 kg'))->toBeNull()
+        ->and(usageToday(ApiService::Serper, SerperProvider::PURPOSE))->calls->toBe(1)->failures->toBe(1);
 });
 
 it('counts a bol.com re-login after a revoked token, and a missing product as no failure', function (): void {

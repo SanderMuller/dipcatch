@@ -186,7 +186,7 @@ final readonly class QueryTokens
         // PHP casts a numeric array key to int, so "150" comes back as 150.
         $tokens = array_values(array_filter(
             array_map(strval(...), array_keys($this->tokens)),
-            static fn (string $token): bool => mb_strlen($token) >= $minimumLength && ! ($withoutDigits && preg_match('/\d/', $token) === 1),
+            static fn (string $token): bool => mb_strlen($token) >= $minimumLength && (! $withoutDigits || preg_match('/\d/', $token) !== 1),
         ));
 
         usort($tokens, static fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));

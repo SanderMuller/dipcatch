@@ -64,7 +64,7 @@ final readonly class KlarnaPageSearch
 
         $answers = $check->answers;
         arsort($answers);
-        $bestKey = (string) array_key_first($answers);
+        $bestKey = array_key_first($answers);
 
         if ($answers[$bestKey] >= Config::float('dipcatch.web_discovery.read_from')) {
             return ['url' => $results[(int) substr($bestKey, 1)]['link'], 'searchId' => $outcome->search->id];

@@ -131,7 +131,7 @@ it('gives up when bol refuses a fresh token too, instead of logging in forever',
     Shop::factory()->for($product)->create(['url' => 'https://drogist.test/p/1', 'gtin' => '5054563110503']);
     fakeBolApi(['api.bol.com/*' => Http::response(['title' => 'Unauthorized'], 401)]);
 
-    expect(fn () => runBolLookup($product))->toThrow(BolApiFailed::class, 'answered 401');
+    expect(fn (): LookUpBolOffers => runBolLookup($product))->toThrow(BolApiFailed::class, 'answered 401');
     Http::assertSentCount(4);
 });
 

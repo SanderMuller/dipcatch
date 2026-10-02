@@ -52,8 +52,8 @@ final readonly class BolFeedDownloader implements FeedSource
         try {
             curl_exec($curl);
             $error = curl_errno($curl) === 0 ? null : curl_error($curl);
-            $expected = (int) curl_getinfo($curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T);
-            $written = (int) curl_getinfo($curl, CURLINFO_SIZE_DOWNLOAD_T);
+            $expected = curl_getinfo($curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T);
+            $written = curl_getinfo($curl, CURLINFO_SIZE_DOWNLOAD_T);
         } finally {
             fclose($out);
         }
