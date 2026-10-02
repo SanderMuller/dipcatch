@@ -44,6 +44,7 @@
                         <p class="mt-2">{{ __('You give DipCatch links to product pages. DipCatch fetches those pages on a schedule, reads the price and the pack size, keeps a history, and tells you when a price falls past a threshold you set.') }}</p>
                         <p class="mt-2">{{ __('The prices come from the shops, not from us. A shop can change a page, block automated requests or state a price we read wrongly, and a shop is always the authority on what it charges. Check the price at the shop before you buy.') }}</p>
                         <p class="mt-2">{{ __('Some features use AI: automatic categories, and the check that another shop sells the same product. AI can get it wrong, so check what it suggests before you rely on it.') }}</p>
+                        <p class="mt-2">{{ __('Some links to bol.com and Amazon are affiliate links: when you buy after clicking one, that shop may pay DipCatch a commission. You pay the same. It never changes which shop DipCatch shows first, which depends on price alone. DipCatch is not a bol.com site, and bol.com has no control over it. As an Amazon Associate, DipCatch earns from qualifying purchases.') }}</p>
                     </section>
 
                     <section>

@@ -214,8 +214,8 @@
                             @foreach ($shops as $shop)
                                 <li>
                                     <a
-                                        href="{{ $shop->url }}"
-                                        rel="noopener nofollow ugc"
+                                        href="{{ \App\Support\AffiliateLink::for($shop->url) }}"
+                                        rel="{{ \App\Support\AffiliateLink::for($shop->url) === $shop->url ? 'noopener nofollow ugc' : 'sponsored noopener' }}"
                                         target="_blank"
                                         class="flex flex-col items-start gap-2 px-4 py-3 hover:bg-canvas sm:flex-row sm:items-center sm:justify-between sm:gap-4"
                                     >
@@ -273,6 +273,9 @@
                                 </li>
                             @endforeach
                         </ul>
+                        @if ($shops->contains(fn ($shop) => \App\Support\AffiliateLink::for($shop->url) !== $shop->url))
+                            @include('partials.affiliate-disclosure', ['shops' => \App\Support\AffiliateLink::shops(), 'class' => 'mt-2'])
+                        @endif
                     </section>
                 @endif
             </div>

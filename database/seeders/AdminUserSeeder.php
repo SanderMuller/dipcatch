@@ -28,6 +28,10 @@ final class AdminUserSeeder extends Seeder
                 'password' => Hash::make($password),
                 'is_admin' => true,
                 'email_verified_at' => now(),
+                // The owner's own account: an affiliate program does not pay
+                // for its partner's purchases. Production sets it in the
+                // admin, so a seed there leaves it as it is.
+                ...(app()->environment('production') ? [] : ['affiliate_links_excluded' => true]),
             ],
         );
     }

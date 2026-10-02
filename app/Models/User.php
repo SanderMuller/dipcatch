@@ -44,6 +44,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property string $timezone
  * @property bool $auto_categories
  * @property bool $shop_checks
+ * @property bool $affiliate_links_excluded
  * @property CarbonImmutable|null $ai_prompts_dismissed_at
  * @property CarbonImmutable|null $digest_processed_until
  * @property CarbonImmutable|null $tracking_ideas_hidden_at
@@ -93,6 +94,7 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
             'notify_via_push' => 'boolean',
             'auto_categories' => 'boolean',
             'shop_checks' => 'boolean',
+            'affiliate_links_excluded' => 'boolean',
             'ai_prompts_dismissed_at' => 'datetime',
             'digest_processed_until' => 'datetime',
             'tracking_ideas_hidden_at' => 'datetime',

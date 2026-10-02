@@ -86,7 +86,7 @@
                             {{-- Every row opens: a shopper may want to see the
                                  product before tracking it, not only when
                                  tracking is impossible. --}}
-                            <flux:button size="xs" :href="$suggestion->url" target="_blank" rel="noopener noreferrer">
+                            <flux:button size="xs" :href="\App\Support\AffiliateLink::for($suggestion->url)" target="_blank" :rel="\App\Support\AffiliateLink::rel($suggestion->url)">
                                 Open
                             </flux:button>
 
@@ -178,7 +178,7 @@
                             </div>
 
                             <div class="flex w-full shrink-0 items-center gap-2 pl-8 sm:w-auto sm:pl-0">
-                                <flux:button size="xs" :href="$finding->add_url ?? $finding->url" target="_blank" rel="noopener noreferrer">
+                                <flux:button size="xs" :href="\App\Support\AffiliateLink::for($finding->add_url ?? $finding->url)" target="_blank" :rel="\App\Support\AffiliateLink::rel($finding->add_url ?? $finding->url)">
                                     Open<span class="sr-only"> {{ $webHost }} {{ __('(opens in a new tab)') }}</span>
                                 </flux:button>
 

@@ -22,10 +22,10 @@ return [
      * page shows it and the sitemap emits it as <lastmod>, so both read one
      * value. Set to null to hide the line and drop the sitemap timestamp.
      */
-    'privacy_updated_at' => '2026-10-01',
+    'privacy_updated_at' => '2026-10-02',
 
     /** Shown on the terms page, and the date a change is measured from. */
-    'terms_updated_at' => '2026-10-01',
+    'terms_updated_at' => '2026-10-02',
 
     /**
      * The business that runs DipCatch, as the terms and privacy pages name

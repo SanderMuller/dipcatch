@@ -64,9 +64,9 @@
                                             variant="ghost"
                                             square
                                             icon="arrow-top-right-on-square"
-                                            :href="$row['url']"
+                                            :href="\App\Support\AffiliateLink::for($row['url'])"
                                             target="_blank"
-                                            rel="noopener noreferrer"
+                                            :rel="\App\Support\AffiliateLink::rel($row['url'])"
                                             :aria-label="__('Open :shop in a new tab to check the product', ['shop' => $row['shop']])"
                                             :tooltip="__('Open the shop page')"
                                             data-test="suggested-shop-open"
@@ -130,7 +130,7 @@
                                                     <span class="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium {{ $badge[1] }}">{{ $badge[0] }}</span>
                                                 @endif
                                                 <div class="mt-3 flex flex-wrap items-center gap-2">
-                                                    <flux:button size="sm" icon:trailing="arrow-top-right-on-square" :href="$row['url']" target="_blank" rel="noopener noreferrer">{{ __('Open the page') }}</flux:button>
+                                                    <flux:button size="sm" icon:trailing="arrow-top-right-on-square" :href="\App\Support\AffiliateLink::for($row['url'])" target="_blank" :rel="\App\Support\AffiliateLink::rel($row['url'])">{{ __('Open the page') }}</flux:button>
                                                     <flux:button size="sm" variant="primary" icon="plus" :href="$addUrl" wire:navigate>{{ __('Add this shop') }}</flux:button>
                                                 </div>
                                             </div>

@@ -76,6 +76,17 @@ return [
             'client_id' => (string) env('BOL_CLIENT_ID', ''),
             'client_secret' => (string) env('BOL_CLIENT_SECRET', ''),
         ],
+        // The partner site id that affiliate links to bol.com carry. Not a
+        // secret: every link shows it. Empty leaves bol.com links plain.
+        'affiliate' => [
+            'site_id' => (string) env('BOL_AFFILIATE_SITE_ID', ''),
+        ],
+    ],
+
+    // The amazon.nl partner tag the app's links to amazon.nl carry. Not a
+    // secret: every link shows it. Empty leaves amazon.nl links plain.
+    'amazon' => [
+        'associate_tag' => (string) env('AMAZON_ASSOCIATE_TAG', ''),
     ],
 
     'slack' => [

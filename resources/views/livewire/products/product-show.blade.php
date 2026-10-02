@@ -111,7 +111,7 @@
                                 {{ __('Lowest price: :line at', ['line' => $headline->packLine($headline->lowestShop)?->text()]) }}
                                 {{-- Written inline rather than as x-shop-link, whose trailing
                                      newline would put a space before the period. --}}
-                                <a href="{{ $headline->lowestShop->url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center align-bottom hover:underline underline-offset-4">{!! \App\Support\Favicon::html($headline->lowestShop->host) !!}</a>.
+                                <a href="{{ \App\Support\AffiliateLink::for($headline->lowestShop->url) }}" target="_blank" rel="{{ \App\Support\AffiliateLink::rel($headline->lowestShop->url) }}" class="inline-flex items-center align-bottom hover:underline underline-offset-4">{!! \App\Support\Favicon::html($headline->lowestShop->host) !!}</a>.
                                 @if ($unitGap !== null)
                                     {{ __('That is :percent% more :unit than the best value.', [
                                         'percent' => $unitGap,
@@ -355,7 +355,7 @@
                                     <flux:dropdown>
                                         <flux:button size="xs" variant="ghost" icon="ellipsis-horizontal" :aria-label="__('Actions')" />
                                         <flux:menu>
-                                            <flux:menu.item icon="arrow-top-right-on-square" :href="$shop->url" target="_blank">
+                                            <flux:menu.item icon="arrow-top-right-on-square" :href="\App\Support\AffiliateLink::for($shop->url)" target="_blank" :rel="\App\Support\AffiliateLink::rel($shop->url)">
                                                 {{ __('Open') }}
                                             </flux:menu.item>
                                             <flux:menu.item icon="pencil-square" wire:click="editShop('{{ $shop->id }}')">

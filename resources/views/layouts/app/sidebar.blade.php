@@ -187,6 +187,10 @@
                     <a href="{{ route('app.support') }}" wire:navigate class="hover:text-zinc-900 dark:hover:text-zinc-100">{{ __('Support') }}</a>
                 </nav>
             </div>
+            @php($affiliateShops = \App\Support\AffiliateLink::shops())
+            @if ($affiliateShops !== [])
+                @include('partials.affiliate-disclosure', ['shops' => $affiliateShops, 'class' => 'mt-3 text-center sm:text-start'])
+            @endif
         </footer>
 
         @persist('toast')

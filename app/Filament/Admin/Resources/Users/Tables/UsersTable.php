@@ -68,6 +68,11 @@ final class UsersTable
                     ->label('Admin')
                     ->boolean(),
 
+                IconColumn::make('affiliate_links_excluded')
+                    ->label('No affiliate links')
+                    ->boolean()
+                    ->toggleable(),
+
                 TextColumn::make('created_at')
                     ->label('Joined')
                     ->date()
@@ -118,6 +123,15 @@ final class UsersTable
                     ->modalDescription('The account drops to Free immediately. History already kept stays kept.')
                     ->visible(fn (User $record): bool => self::actorIsAdmin() && $record->isComped())
                     ->action(self::endComp(...)),
+
+                // An affiliate program pays nothing on its partner's own
+                // purchases, so the owner's accounts get plain shop links.
+                Action::make('affiliateLinks')
+                    ->label(fn (User $record): string => $record->affiliate_links_excluded ? 'Use affiliate links' : 'Exclude from affiliate links')
+                    ->icon('heroicon-o-link')
+                    ->color('gray')
+                    ->visible(fn (): bool => self::actorIsAdmin())
+                    ->action(self::toggleAffiliateLinks(...)),
 
                 DeleteAction::make()
                     ->failureNotificationTitle('Stripe refused the cancellation, so the account was kept. Try again in a moment.')
@@ -216,6 +230,17 @@ final class UsersTable
                 report($exception);
             }
         }
+    }
+
+    public static function toggleAffiliateLinks(User $record): void
+    {
+        $record->forceFill(['affiliate_links_excluded' => ! $record->affiliate_links_excluded])->save();
+
+        Log::info('Admin set affiliate links for an account.', [
+            'admin_id' => auth()->id(),
+            'user_id' => $record->id,
+            'excluded' => $record->affiliate_links_excluded,
+        ]);
     }
 
     public static function endComp(User $record): void
