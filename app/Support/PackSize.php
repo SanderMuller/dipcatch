@@ -58,6 +58,7 @@ final readonly class PackSize
      * @var list<string>
      */
     private const array PIECE_WORDS = [
+        'kauwtabletten', 'bruistabletten', 'zuigtabletten', 'kauwtablet', 'bruistablet', 'zuigtablet',
         'tabletten', 'capsules', 'capsule', 'rollen', 'zakjes', 'tablet', 'vellen',
         'stuks', 'zakje', 'tabl', 'sach', 'caps', 'stuk', 'pack', 'cups', 'pads',
         'cps', 'stk', 'rol', 'vel', 'cup', 'pad', 'st', 'tb',

@@ -404,6 +404,18 @@ test('a count written as a drugstore abbreviation is read', function (string $ti
     ['Bouillon 6 STK', 6.0],
 ]);
 
+test('a chewable, effervescent or lozenge tablet count is read', function (string $title, float $expected): void {
+    // Unread, a koopjesdrogisterij.nl row inherited 800 from its siblings,
+    // and its real €8.80 for 800 then read as a size that looks wrong.
+    expect(PackSize::parse($title)?->quantity)->toBe($expected)
+        ->and(PackSize::parse($title)?->unit)->toBe('piece');
+})->with([
+    ['Roter Vitamine C 70 mg kauwtablet (800 kauwtabletten)', 800.0],
+    ['Davitamon Junior 60 kauwtabletten', 60.0],
+    ['Redoxon Vitamine C 20 bruistabletten', 20.0],
+    ['Strepsils Honing citroen 24 zuigtabletten', 24.0],
+]);
+
 test('a terabyte is not a tablet', function (string $title): void {
     // `TB` is seventy-five tablets at a drugstore and two thousand gigabytes
     // at an electronics shop. Reading a disk as two tablets would price it per
