@@ -2,13 +2,17 @@
 
 namespace App\Livewire\Suggestions;
 
+use App\Actions\Shops\KeepShopAsLink;
 use App\Actions\Suggestions\SuggestShops;
+use App\Billing\PlanLimitReached;
 use App\Enums\WebDiscoveryState;
 use App\Livewire\Concerns\HidesShops;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\WebDiscovery;
 use App\Models\WebShopFinding;
+use App\Services\Suggestions\ShopSuggestion;
+use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
@@ -72,6 +76,42 @@ final class ShopSuggestions extends Component
         // page. Without this the probe preview would render inside a closed
         // <details> and the click would look like it did nothing.
         $this->dispatch('open-add-shop');
+    }
+
+    /**
+     * Keeps a suggestion DipCatch cannot price as a link on the product. The
+     * row is looked up again here, so only a listed, untrackable suggestion
+     * can be kept, and a second click finds nothing once the shop is added.
+     */
+    public function keepAsLink(string $chain, string $externalId, SuggestShops $suggest, KeepShopAsLink $keep): void
+    {
+        $product = $this->product();
+        $suggestion = array_find(
+            $suggest($product, verify: false),
+            static fn (ShopSuggestion $suggestion): bool => $suggestion->chain === $chain && $suggestion->externalId === $externalId && ! $suggestion->trackable,
+        );
+
+        if (! $suggestion instanceof ShopSuggestion) {
+            return;
+        }
+
+        try {
+            $shop = $keep($product, $suggestion->url);
+        } catch (PlanLimitReached $e) {
+            Flux::toast(text: $e->getMessage(), heading: __('You have used all your shops on this product'), variant: 'warning');
+
+            return;
+        }
+
+        $suggest->forgetSuggestions();
+
+        Flux::toast(
+            text: __('DipCatch cannot read :shop yet, so it holds no price and never decides the cheapest or the best value. It is checked again once a week, and starts being tracked by itself if the page becomes readable.', ['shop' => $suggestion->chainLabel]),
+            heading: __('Kept as a link'),
+            variant: 'success',
+        );
+
+        $this->dispatch('shop-added', offerId: (string) $shop->id);
     }
 
     public function dismiss(string $chain, string $externalId, SuggestShops $suggest): void

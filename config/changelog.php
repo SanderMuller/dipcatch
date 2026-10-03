@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-03',
+            'category' => 'feature',
+            'title' => 'Keep a suggested shop as a link',
+            'body' => "Some suggested shops, like PLUS and Hoogvliet, can't be price-checked yet. Under \"Also sold at\" they now have an \"Add as link\" button, so the page stays one click away on your product.\n\nA link has no price and never counts as the cheapest. If DipCatch can read the page later, it starts tracking it by itself.",
+        ],
+        [
             'date' => '2026-10-02',
             'category' => 'pro',
             'title' => 'AI reads a missing pack size',

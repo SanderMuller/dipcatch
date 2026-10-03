@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Shops\ProbeBudget;
+use App\Enums\ShopKind;
 use App\Livewire\Shops\AddShop;
 use App\Livewire\Suggestions\ShopSuggestions;
 use App\Models\CheckjebonChain;
@@ -135,6 +136,54 @@ test('dismissing a suggestion persists and removes it from the list', function (
     expect(ShopSuggestionDismissal::query()->count())->toBe(1);
 });
 
+test('an untrackable suggestion is kept as a link and leaves the list', function (): void {
+    $row = seedRow('plus', 'Beemster Extra belegen 48+ plakken', '150 g', '3.39', link: 'beemster-plus-1');
+
+    $product = suggestionProduct();
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(ShopSuggestions::class, ['product' => $product])
+        ->assertSeeHtml('data-test="suggestion-keep-link"')
+        ->call('keepAsLink', 'plus', $row->external_id)
+        ->assertDispatched('shop-added')
+        ->assertDontSee('not trackable yet');
+
+    $shop = $product->shops()->where('kind', ShopKind::Reference->value)->sole();
+
+    expect($shop->url)->toBe('https://www.plus.nl/product/beemster-plus-1')
+        ->and($shop->current_price)->toBeNull();
+});
+
+test('keeping as a link refuses a trackable suggestion and an unlisted one', function (string $chain, string $externalId): void {
+    seedRow('spar', 'Beemster Extra belegen 48+ plakken', '150 g', '3.69', link: 'beemster-spar-1/');
+
+    $product = suggestionProduct();
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(ShopSuggestions::class, ['product' => $product])
+        ->call('keepAsLink', $chain, $externalId)
+        ->assertNotDispatched('shop-added');
+
+    expect($product->shops()->count())->toBe(1);
+})->with([
+    'trackable' => ['spar', 'beemster-spar-1/'],
+    'not listed' => ['plus', 'made-up-id'],
+]);
+
+test('keeping as a link counts against the shop limit', function (): void {
+    config()->set('plans.free.max_shops_per_product', 1);
+    $row = seedRow('plus', 'Beemster Extra belegen 48+ plakken', '150 g', '3.39', link: 'beemster-plus-1');
+
+    $product = suggestionProduct();
+    $this->actingAs($product->user()->sole());
+
+    Livewire::test(ShopSuggestions::class, ['product' => $product])
+        ->call('keepAsLink', 'plus', $row->external_id)
+        ->assertNotDispatched('shop-added');
+
+    expect($product->shops()->count())->toBe(1);
+});
+
 test('it says so when the catalogue holds no match for this product', function (): void {
     seedRow('spar', 'Something else entirely', '1 l', '2.00', link: 'other-1');
 
@@ -220,6 +269,7 @@ test('another user cannot dismiss or accept by tampering with the product id', f
 })->with([
     ['dismiss', ['spar', 'beemster-spar-1/']],
     ['accept', ['https://www.spar.nl/beemster-spar-1/']],
+    ['keepAsLink', ['plus', 'beemster-plus-1']],
     ['dismissWeb', [1]],
 ]);
 

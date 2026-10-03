@@ -111,8 +111,14 @@
                                     <span class="hidden items-center gap-1 in-data-adding:inline-flex"><flux:icon.loading class="size-3" /> Adding…</span>
                                 </flux:button>
                             @else
-                                <flux:button size="xs" disabled title="This shop cannot be price-checked yet.">
-                                    Add
+                                <flux:button
+                                    size="xs"
+                                    wire:click="keepAsLink({{ \Illuminate\Support\Js::from($suggestion->chain) }}, {{ \Illuminate\Support\Js::from($suggestion->externalId) }})"
+                                    wire:loading.attr="disabled"
+                                    title="{{ __('DipCatch cannot read this shop’s price yet. Keep the page on this product as a link.') }}"
+                                    data-test="suggestion-keep-link"
+                                >
+                                    {{ __('Add as link') }}<span class="sr-only"> {{ $suggestion->chainLabel }}</span>
                                 </flux:button>
                             @endif
 
