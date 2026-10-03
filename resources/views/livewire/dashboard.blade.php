@@ -154,7 +154,7 @@
 
     <section class="mt-8">
         <flux:heading size="lg" level="2" class="font-semibold! tracking-tight">{{ __('Biggest drops') }}</flux:heading>
-        <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('Cheaper than the price you set, biggest drop first.') }}</flux:text>
+        <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('Cheaper than their normal price, biggest drop first.') }}</flux:text>
 
         @if ($activeDrops->isEmpty())
             <div class="mt-4 rounded-2xl border border-dashed border-line px-6 py-10 text-center">
