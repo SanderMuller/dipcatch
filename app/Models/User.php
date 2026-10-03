@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -110,6 +111,16 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
+    }
+
+    /**
+     * The shops of every product this account tracks.
+     *
+     * @return HasManyThrough<Shop, Product, $this>
+     */
+    public function shops(): HasManyThrough
+    {
+        return $this->hasManyThrough(Shop::class, Product::class);
     }
 
     /**

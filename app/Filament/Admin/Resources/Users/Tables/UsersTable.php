@@ -36,7 +36,7 @@ final class UsersTable
             // this table lists every account rather than only subscribers.
             ->modifyQueryUsing(fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query
                 ->with('subscriptions')
-                ->withCount('products'))
+                ->withCount(['products', 'shops']))
             ->columns([
                 TextColumn::make('email')
                     ->searchable()
@@ -64,6 +64,11 @@ final class UsersTable
 
                 TextColumn::make('products_count')
                     ->label('Products')
+                    ->sortable()
+                    ->alignEnd(),
+
+                TextColumn::make('shops_count')
+                    ->label('Shops')
                     ->sortable()
                     ->alignEnd(),
 

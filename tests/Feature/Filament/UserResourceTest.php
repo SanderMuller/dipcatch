@@ -7,6 +7,7 @@ use App\Billing\StripeCustomers;
 use App\Filament\Admin\Resources\Users\Pages\ListUsers;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use Carbon\CarbonImmutable;
@@ -157,6 +158,17 @@ test('the products count does not add a query per row', function (): void {
     // Six accounts on the page. Without ->with('subscriptions')->withCount()
     // this climbs with the row count; with them it does not.
     expect($queries)->toBeLessThan(15);
+});
+
+test('the shops column counts the shops of every product the account tracks', function (): void {
+    $this->actingAs(User::factory()->admin()->create());
+
+    $user = User::factory()->create();
+    Shop::factory()->count(2)->for(Product::factory()->create(['user_id' => $user->id]))->create();
+    Shop::factory()->for(Product::factory()->create(['user_id' => $user->id]))->create();
+    Shop::factory()->for(Product::factory()->create())->create();
+
+    livewire(ListUsers::class)->assertTableColumnStateSet('shops_count', 3, $user);
 });
 
 test('a non-admin cannot invoke the comp action even if they reach the page', function (): void {
