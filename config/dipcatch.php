@@ -8,6 +8,7 @@ use App\PriceAdapters\Hosts\BolAdapter;
 use App\PriceAdapters\Hosts\DekaMarktAdapter;
 use App\PriceAdapters\Hosts\DierapothekerAdapter;
 use App\PriceAdapters\Hosts\DirkAdapter;
+use App\PriceAdapters\Hosts\EfarmaAdapter;
 use App\PriceAdapters\Hosts\EtosAdapter;
 use App\PriceAdapters\Hosts\ExpertAdapter;
 use App\PriceAdapters\Hosts\HuboAdapter;
@@ -255,6 +256,7 @@ return [
         DekaMarktAdapter::class,
         DierapothekerAdapter::class,
         DirkAdapter::class,
+        EfarmaAdapter::class,
         EtosAdapter::class,
         JumboAdapter::class,
         LidlAdapter::class,

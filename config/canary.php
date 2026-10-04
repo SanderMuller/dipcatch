@@ -31,6 +31,7 @@ return [
         'dekamarkt' => env('CANARY_URL_DEKAMARKT') ?: 'https://www.dekamarkt.nl/producten/dranken-sap-koffie-thee/bier/heineken%20pilsener%20krat/6',
         'dierapotheker' => env('CANARY_URL_DIERAPOTHEKER') ?: 'https://www.dierapotheker.nl/flexadin-advanced-hond/6953/',
         'dirk' => env('CANARY_URL_DIRK') ?: 'https://www.dirk.nl/boodschappen/x/x/x/84109',
+        'efarma' => env('CANARY_URL_EFARMA') ?: 'https://www.efarma.nl/roter-vitamine-c-tablet-70mg-citroen/15592871',
         'etos' => env('CANARY_URL_ETOS'),
         'expert' => env('CANARY_URL_EXPERT') ?: 'https://www.expert.nl/wd-elements-portable-5tb-372606637',
         'hubo' => env('CANARY_URL_HUBO') ?: 'https://www.hubo.nl/products/hubo-muur-en-plafondverf-extra-mat-wit-10l',
