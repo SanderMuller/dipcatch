@@ -3,13 +3,17 @@
 namespace App\PriceAdapters\Hosts;
 
 use App\PriceAdapters\AdapterContext;
+use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\PriceNormalizer;
+use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
+use App\Services\Poiesz\PoieszOffers;
 use App\Support\Gtin;
+use App\Support\Numeric;
 use App\Support\NuxtData;
 
 /**
@@ -17,13 +21,19 @@ use App\Support\NuxtData;
  * microdata or price meta tags — everything lives in the Nuxt
  * `__NUXT_DATA__` payload, a flat array where object values are indices into
  * that same array. The product record holds `price`, `name`, `image`,
- * `packageDescription` and `ean` (observed 2026-09-01).
+ * `packageDescription` and `ean` (observed 2026-09-01). A product on offer
+ * has `promotion` true, its offer in `promotionLabel` ("aanbieding",
+ * "1+1 gratis") and, for a price cut, the price it replaces as
+ * `strikeThroughPrice` (observed 2026-10-04). The page states no offer
+ * period; {@see PoieszOffers} reads it from the offers feed.
  *
  * The payload also carries recommended products, so the record is matched on
  * the id in the URL.
  */
 final readonly class PoieszAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
+    public function __construct(private PoieszOffers $offers) {}
+
     public function key(): string
     {
         return 'poiesz';
@@ -67,6 +77,15 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, OwnsHosts, Sh
             return ExtractionResult::failed('poiesz_no_price');
         }
 
+        // A payload without the offer fields says nothing about an offer, so
+        // it must not clear a stored one.
+        $statesOffer = array_key_exists('promotion', $record);
+        $onOffer = NuxtData::value($data, $record, 'promotion') === true;
+        $label = NuxtData::value($data, $record, 'promotionLabel');
+        $label = $onOffer && is_string($label) && $label !== '' ? $label : null;
+        $window = $onOffer ? $this->runningWindow($productId, $label) : null;
+        $bundle = $label === null ? null : BundleOffer::fromLabel($label, $price);
+
         $title = NuxtData::value($data, $record, 'name');
         $image = NuxtData::value($data, $record, 'image');
         $packageDescription = NuxtData::value($data, $record, 'packageDescription');
@@ -84,6 +103,33 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, OwnsHosts, Sh
             packSizeAuthoritative: true,
             gtin: Gtin::normalize(NuxtData::value($data, $record, 'ean')),
             gtinAuthoritative: true,
+            promotionWindow: $window,
+            // An unknown period keeps the stored one, except under a bundle:
+            // an ended period from an earlier offer would cancel the bundle
+            // the page shows now.
+            promotionWindowAuthoritative: $statesOffer && (! $onOffer || $window !== null || $bundle !== null),
+            bundleOffer: $bundle,
+            bundleOfferAuthoritative: $statesOffer && (! $onOffer || $label !== null),
+            claimedRegularPrice: self::claimedRegularPrice($data, $record, $price),
+            claimAuthoritative: array_key_exists('strikeThroughPrice', $record),
         ));
+    }
+
+    private function runningWindow(string $productId, ?string $label): ?PromotionWindow
+    {
+        $window = $this->offers->windowFor($productId, $label);
+
+        return $window?->isRunning() === true ? $window : null;
+    }
+
+    /**
+     * @param  list<mixed>  $data
+     * @param  array<string, mixed>  $record
+     */
+    private static function claimedRegularPrice(array $data, array $record, string $price): ?string
+    {
+        $strikeThrough = PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'strikeThroughPrice'));
+
+        return $strikeThrough !== null && bccomp(Numeric::str($strikeThrough), Numeric::str($price), 2) > 0 ? $strikeThrough : null;
     }
 }

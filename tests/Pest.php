@@ -446,14 +446,22 @@ function seedRow(string $chain, string $name, ?string $size, string $price = '1.
 /**
  * Trimmed replica of a Poiesz webshop product page: no JSON-LD at all, only
  * the Nuxt `__NUXT_DATA__` flat-array payload whose product record carries
- * price, name, image, pack description and EAN (observed 2026-09-01). Index
- * 0 is the product; a recommended product rides along at index 1 to prove
- * the id in the URL decides.
+ * price, name, image, pack description and EAN (observed 2026-09-01), and
+ * the offer fields `promotion`, `promotionLabel` and `strikeThroughPrice`
+ * (observed 2026-10-04). Index 0 is the product; a recommended product rides
+ * along at index 1 to prove the id in the URL decides.
  */
-function poieszPage(string $price = '1.99', string $packageDescription = '120.00 Gram', string $productId = '278550', string $ean = '5060503500747'): string
-{
+function poieszPage(
+    string $price = '1.99',
+    string $packageDescription = '120.00 Gram',
+    string $productId = '278550',
+    string $ean = '5060503500747',
+    ?string $strikeThroughPrice = null,
+    ?string $promotionLabel = null,
+    ?bool $promotion = null,
+): string {
     $payload = json_encode([
-        ['id' => 2, 'name' => 3, 'image' => 4, 'price' => 5, 'packageDescription' => 6, 'ean' => 7],
+        ['id' => 2, 'name' => 3, 'image' => 4, 'price' => 5, 'packageDescription' => 6, 'ean' => 7, 'strikeThroughPrice' => 12, 'promotion' => 13, 'promotionLabel' => 14],
         ['id' => 8, 'name' => 9, 'image' => 4, 'price' => 10, 'packageDescription' => 6, 'ean' => 11],
         $productId,
         "Ella's Kitchen Aardbeien met Appel 4+ Mnd.",
@@ -465,9 +473,38 @@ function poieszPage(string $price = '1.99', string $packageDescription = '120.00
         'Zwitsal Shampoo',
         4.29,
         '8710447318539',
+        $strikeThroughPrice === null ? null : (float) $strikeThroughPrice,
+        $promotion ?? $promotionLabel !== null,
+        $promotionLabel,
     ], JSON_THROW_ON_ERROR);
 
     return '<html><body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';
+}
+
+/**
+ * Trimmed replica of the Poiesz offers feed behind /aanbiedingen: offers
+ * grouped in categories, each with its period and the ids of the products
+ * it covers. `validUntil` is the midnight after the last day (observed
+ * 2026-10-04).
+ *
+ * @param  list<array{productIDs: list<int>, validFrom?: ?string, validUntil?: ?string}>  $offers
+ * @return array<string, mixed>
+ */
+function poieszOffers(array $offers): array
+{
+    return [
+        'validFrom' => '2026-10-04T00:00:00',
+        'validUntil' => '2026-10-11T00:00:00',
+        'categories' => [[
+            'id' => 11782,
+            'name' => 'Zuivel',
+            'offers' => array_map(static fn (array $offer): array => [
+                'validFrom' => '2026-10-04T00:00:00',
+                'validUntil' => '2026-10-11T00:00:00',
+                ...$offer,
+            ], $offers),
+        ]],
+    ];
 }
 
 /**

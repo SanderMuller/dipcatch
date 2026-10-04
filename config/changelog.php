@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-04',
+            'category' => 'fix',
+            'title' => 'Poiesz deals now show up',
+            'body' => "DipCatch now sees deals at Poiesz. You get the price before the discount and the day the deal ends.\n\n1+1 gratis deals at Poiesz now count toward the price. Before, those products were tracked at the full price.",
+        ],
+        [
             'date' => '2026-10-03',
             'category' => 'feature',
             'title' => 'Keep a suggested shop as a link',

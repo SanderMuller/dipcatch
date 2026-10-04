@@ -15,6 +15,7 @@ use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
+use App\Services\Poiesz\PoieszOffers;
 use App\Services\ShopFetcher\ShopFetcher;
 use App\Support\RecheckJitter;
 use Illuminate\Support\Facades\Artisan;
@@ -416,6 +417,75 @@ test('a host adapter that loses its payload fails the check instead of taking a 
     expect($shop->last_status)->toBe(ScrapeStatus::ParseError)
         ->and((string) $shop->current_price)->toBe('1.99')
         ->and($shop->last_error)->toBe('poiesz_no_payload');
+});
+
+test('a Poiesz offer is stored with its was-price, period and bundle', function (string $label, string $price, ?string $strikeThroughPrice, ?string $claim, ?int $bundleQuantity, string $tracked): void {
+    $this->travelTo('2026-10-06 12:00:00');
+    RateLimiter::clear(ShopFetcher::throttleKey('webwinkel.poiesz-supermarkten.nl'));
+
+    Http::fake([
+        'https://webwinkel.poiesz-supermarkten.nl/robots.txt' => Http::response('', 404),
+        'https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/278550' => Http::response(
+            poieszPage(price: $price, strikeThroughPrice: $strikeThroughPrice, promotionLabel: $label),
+            200,
+            ['Content-Type' => 'text/html'],
+        ),
+        PoieszOffers::URL => Http::response(poieszOffers([['productIDs' => [278550]]])),
+    ]);
+
+    $shop = Shop::factory()->for(Product::factory()->create(['currency' => 'EUR']))->create([
+        'url' => 'https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/278550',
+        'adapter_key' => 'poiesz',
+    ]);
+
+    dispatch_sync(new CheckShopPrice($shop));
+
+    $shop->refresh();
+
+    expect($shop->last_status)->toBe(ScrapeStatus::Ok)
+        ->and((string) $shop->current_price)->toBe($tracked)
+        ->and($shop->claimed_regular_price)->toBe($claim)
+        ->and($shop->bundle_quantity)->toBe($bundleQuantity)
+        ->and($shop->promotion_label)->toBe($label)
+        ->and($shop->promotionWindow()?->endsAt->setTimezone('Europe/Amsterdam')->toDateTimeString())->toBe('2026-10-10 23:59:59');
+})->with([
+    'price cut' => ['aanbieding', '2.49', '2.99', '2.99', null, '2.49'],
+    '1+1 gratis' => ['1+1 gratis', '4.99', null, null, 2, '2.50'],
+]);
+
+test('a Poiesz 1+1 the page confirms is not cancelled by last week\'s ended period when the feed is down', function (): void {
+    $this->travelTo('2026-10-06 12:00:00');
+    RateLimiter::clear(ShopFetcher::throttleKey('webwinkel.poiesz-supermarkten.nl'));
+
+    Http::fake([
+        'https://webwinkel.poiesz-supermarkten.nl/robots.txt' => Http::response('', 404),
+        'https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/278550' => Http::response(
+            poieszPage(price: '4.99', promotionLabel: '1+1 gratis'),
+            200,
+            ['Content-Type' => 'text/html'],
+        ),
+        PoieszOffers::URL => Http::response('', 500),
+    ]);
+
+    $shop = Shop::factory()->for(Product::factory()->create(['currency' => 'EUR']))->create([
+        'url' => 'https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/278550',
+        'adapter_key' => 'poiesz',
+        'current_price' => '2.50',
+        'single_item_price' => '4.99',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.99',
+        'promotion_starts_at' => '2026-09-27 00:00:00',
+        'promotion_ends_at' => '2026-10-03 21:59:59',
+        'promotion_label' => '1+1 gratis',
+    ]);
+
+    dispatch_sync(new CheckShopPrice($shop));
+
+    $shop->refresh();
+
+    expect((string) $shop->current_price)->toBe('2.50')
+        ->and($shop->bundle_quantity)->toBe(2)
+        ->and($shop->promotion_ends_at)->toBeNull();
 });
 
 test('a tracked shop whose host never serves its prices is recorded as needs_js', function (): void {
