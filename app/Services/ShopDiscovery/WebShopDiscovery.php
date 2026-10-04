@@ -40,6 +40,7 @@ final readonly class WebShopDiscovery
         private WebSearches $searches,
         private ShopMatchCheck $shopMatch,
         private KlarnaDiscovery $klarna,
+        private BarcodeSearch $barcodeSearch,
     ) {}
 
     private function runsFor(Product $product): bool
@@ -93,7 +94,8 @@ final readonly class WebShopDiscovery
      * stale, instead of on the next nightly run. A shop in a new pack size
      * changes the fingerprint, which hides every finding until it is checked
      * against that size; waiting for the night left the list empty all day.
-     * The stored search is reused, so no paid search is made.
+     * The stored title search is reused. A barcode without a fresh stored
+     * search is searched, which is one paid search.
      */
     public function requeueIfStale(Product $product): bool
     {
@@ -128,8 +130,11 @@ final readonly class WebShopDiscovery
         if ($search instanceof WebSearch) {
             $kept = WebResultFilter::keep($product, $search);
             $this->startOver($product, $search, $kept);
-            $this->storeNew($product, $search, $kept);
+            $this->storeNew($product, $search, WebResultFilter::withoutKnownHosts($product, $kept));
         }
+
+        // After the title search, so a limit spent by this product still leaves that one.
+        $this->barcodeSearch->run($product, fn (WebSearch $search, array $kept): int => $this->storeNew($product, $search, $kept));
 
         // First: the Klarna jobs need only the search, so they run while the first check does.
         $this->klarna->continue($product);
@@ -164,9 +169,17 @@ final readonly class WebShopDiscovery
         $results = array_column($kept, null, 'url_hash');
 
         $findings = WebShopFinding::query()->where('product_id', $product->id)->whereNull('dismissed_at')->get();
-        // A page looked up on one shop's site ({@see storeFindingsOn()}) is
-        // not in the title search, and must not be dropped for that.
-        $ownSearch = WebSearch::query()->whereIn('id', $findings->pluck('web_search_id')->filter()->all())->where('query', 'like', 'site:%')->pluck('id')->all();
+        // A page looked up on one shop's site ({@see storeFindingsOn()}) or
+        // found by the barcode ({@see BarcodeSearch}) is not in the title
+        // search, and must not be dropped for that.
+        $ownSearch = WebSearch::query()
+            ->whereIn('id', $findings->pluck('web_search_id')->filter()->all())
+            // A title of digits only reads as a barcode.
+            ->whereKeyNot($search->id)
+            ->get(['id', 'query'])
+            ->filter(static fn (WebSearch $own): bool => WebSearch::isLookup($own->query))
+            ->pluck('id')
+            ->all();
 
         foreach ($findings as $finding) {
             $stale = $finding->fingerprint !== $fingerprint || $finding->hasStaleGtins($gtins);

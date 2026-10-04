@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\WebDiscoveryState;
+use App\Jobs\SearchProductBarcode;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutIncrementing;
@@ -67,7 +68,7 @@ final class WebDiscovery extends Model
             ->unfinished()
             ->exists();
 
-        if (! $unfinished && ! self::query()->find($product->id)?->klarnaUnfinished()) {
+        if (! $unfinished && ! self::query()->find($product->id)?->klarnaUnfinished() && ! SearchProductBarcode::isPending($product)) {
             self::mark($product, WebDiscoveryState::Done);
         }
     }

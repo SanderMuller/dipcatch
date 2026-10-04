@@ -32,6 +32,17 @@ final class WebSearch extends Model
     }
 
     /**
+     * Whether the query looks one product up rather than searching its
+     * title: on one shop's site, or by its barcode. Findings from such a
+     * search are not in the title search, so a refreshed title search must
+     * not delete them.
+     */
+    public static function isLookup(string $query): bool
+    {
+        return str_starts_with($query, 'site:') || ctype_digit($query);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

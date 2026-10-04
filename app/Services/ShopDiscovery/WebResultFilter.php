@@ -49,6 +49,26 @@ final class WebResultFilter
         return array_values($kept);
     }
 
+    /**
+     * Results without a host the product already has a finding on under
+     * another URL, hidden ones included. The title search and the barcode
+     * search ({@see BarcodeSearch}) each keep one result per host, but
+     * together they can name one shop twice, and a hidden shop must not come
+     * back under another URL.
+     *
+     * @param  list<array{url: string, url_hash: string, host: string, title: string, snippet: string}>  $kept
+     * @return list<array{url: string, url_hash: string, host: string, title: string, snippet: string}>
+     */
+    public static function withoutKnownHosts(Product $product, array $kept): array
+    {
+        $findings = WebShopFinding::query()->where('product_id', $product->id)->get(['host', 'url_hash']);
+
+        return array_values(array_filter(
+            $kept,
+            static fn (array $result): bool => $findings->every(static fn (WebShopFinding $finding): bool => $finding->host !== $result['host'] || $finding->url_hash === $result['url_hash']),
+        ));
+    }
+
     public static function isNotAShop(string $host): bool
     {
         return NotAShop::covers($host);

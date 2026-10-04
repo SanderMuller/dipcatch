@@ -72,7 +72,8 @@ final readonly class WebSearches
         return $search->searched_at->greaterThan(now()->subDays(Config::integer('dipcatch.web_discovery.search_max_age_days')));
     }
 
-    private function fresh(string $hash): ?WebSearch
+    /** The stored search for a query hash, when it is fresh. */
+    public function fresh(string $hash): ?WebSearch
     {
         $search = WebSearch::query()->where('query_hash', $hash)->first();
 

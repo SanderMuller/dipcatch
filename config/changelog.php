@@ -30,6 +30,12 @@ return [
     'entries' => [
         [
             'date' => '2026-10-04',
+            'category' => 'feature',
+            'title' => 'More shops under "Also sold at"',
+            'body' => "When DipCatch looks for other shops that sell your product, it now searches by barcode too. That finds shops that give the product a different name, which many online drugstores do.\n\nYou can also track prices at eFarma now.",
+        ],
+        [
+            'date' => '2026-10-04',
             'category' => 'fix',
             'title' => 'Poiesz deals now show up',
             'body' => "DipCatch now sees deals at Poiesz. You get the price before the discount and the day the deal ends.\n\n1+1 gratis deals at Poiesz now count toward the price. Before, those products were tracked at the full price.",

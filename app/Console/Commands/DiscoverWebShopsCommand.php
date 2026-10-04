@@ -8,6 +8,7 @@ use App\Enums\WebFindingStatus;
 use App\Models\Product;
 use App\Models\WebDiscovery;
 use App\Models\WebShopFinding;
+use App\Services\ShopDiscovery\BarcodeSearch;
 use App\Services\ShopDiscovery\WebSearches;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Services\TypeSafe\TypeSafeClient;
@@ -43,7 +44,10 @@ final class DiscoverWebShopsCommand extends Command
      */
     private const int KLARNA = 4;
 
-    public function handle(WebShopDiscovery $discovery, WebSearches $searches): int
+    /** Nothing else to do but a barcode without a fresh search: last, as it adds to findings the product has. */
+    private const int BARCODE = 5;
+
+    public function handle(WebShopDiscovery $discovery, WebSearches $searches, BarcodeSearch $barcodes): int
     {
         if (! $searches->enabled() || ! TypeSafeClient::configured()) {
             // Switched on but missing a key reads like a quiet night otherwise.
@@ -61,12 +65,13 @@ final class DiscoverWebShopsCommand extends Command
         $searchesLeft = $limitSearches;
         $limit = max(1, (int) $this->option('limit'));
 
-        foreach ($this->ranked() as [$rank, $product]) {
+        foreach ($this->ranked($barcodes) as [$rank, $product]) {
             if ($queued >= $limit) {
                 break;
             }
 
-            // Zero or less lifts the limit, as it does in WebSearches.
+            // Zero or less lifts the limit, as it does in WebSearches. A
+            // product left only its barcode search pays for that one.
             $cost = $rank === self::KLARNA ? 1 + Config::integer('dipcatch.web_discovery.klarna_leads_per_product') : 1;
 
             if ($rank >= self::SEARCH_NEW && $limitSearches > 0) {
@@ -75,6 +80,13 @@ final class DiscoverWebShopsCommand extends Command
                 }
 
                 $searchesLeft -= $cost;
+            }
+
+            // On top of another rank's work the barcode search is counted
+            // when it fits. When it does not, the limit refuses it and it
+            // waits a night; the rest of the run still goes.
+            if ($rank !== self::BARCODE && $limitSearches > 0 && $searchesLeft > 0 && $barcodes->isDue($product)) {
+                $searchesLeft--;
             }
 
             $queued += $discovery->queue($product) ? 1 : 0;
@@ -90,7 +102,7 @@ final class DiscoverWebShopsCommand extends Command
      *
      * @return list<array{0: int, 1: Product}>
      */
-    private function ranked(): array
+    private function ranked(BarcodeSearch $barcodes): array
     {
         $products = Product::query()
             ->with(['user', 'shops'])
@@ -115,7 +127,7 @@ final class DiscoverWebShopsCommand extends Command
         $ranked = [];
 
         foreach ($products as $product) {
-            $rank = $this->rankOf($product, $discoveries->get($product->id), $findings->get($product->id) ?? new EloquentCollection());
+            $rank = $this->rankOf($product, $discoveries->get($product->id), $findings->get($product->id) ?? new EloquentCollection()) ?? ($barcodes->isDue($product) ? self::BARCODE : null);
 
             if ($rank !== null) {
                 $ranked[] = [$rank, $product];

@@ -5,12 +5,14 @@ use App\Enums\WebFindingStatus;
 use App\Jobs\CheckWebFindings;
 use App\Jobs\DiscoverWebShops;
 use App\Jobs\ReadWebFinding;
+use App\Jobs\SearchProductBarcode;
 use App\Models\HiddenShop;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Models\WebDiscovery;
 use App\Models\WebShopFinding;
+use App\Services\ShopDiscovery\BarcodeSearch;
 use App\Services\ShopDiscovery\SerperProvider;
 use App\Services\ShopDiscovery\WebPageReads;
 use App\Services\ShopDiscovery\WebSecondCheck;
@@ -67,8 +69,9 @@ function discoveryPage(string $title, string $price = '17.49', ?string $gtin = n
  * @param  list<array{title: string, link: string, snippet?: string}>  $organic
  * @param  array<string, mixed>  $pages
  * @param  (Closure(array<string, string>): ?float)|null  $chanceFor
+ * @param  list<array{title: string, link: string, snippet?: string}>|null  $barcodeOrganic  results for a barcode search; null answers it with `$organic`
  */
-function fakeDiscovery(array $organic, array $pages, ?Closure $chanceFor = null, bool $jevDown = false): void
+function fakeDiscovery(array $organic, array $pages, ?Closure $chanceFor = null, bool $jevDown = false, ?array $barcodeOrganic = null): void
 {
     $chanceFor ??= static fn (array $candidate): float => str_contains(mb_strtolower(is_string($candidate['title'] ?? null) ? $candidate['title'] : ''), 'wrong') ? 0.1 : 0.9;
     $robots = [];
@@ -79,7 +82,7 @@ function fakeDiscovery(array $organic, array $pages, ?Closure $chanceFor = null,
 
     Http::preventStrayRequests();
     Http::fake([
-        SerperProvider::ENDPOINT => Http::response(['organic' => $organic]),
+        SerperProvider::ENDPOINT => static fn (Request $request) => Http::response(['organic' => $barcodeOrganic !== null && ctype_digit(discoveryQuery($request)) ? $barcodeOrganic : $organic]),
         TypeSafeClient::ENDPOINT => function (Request $request) use ($chanceFor, $jevDown) {
             if ($jevDown) {
                 return Http::response([], 500);
@@ -151,9 +154,30 @@ function jevCandidates(): array
         ->all();
 }
 
+/** Title searches sent; the barcode search is counted by {@see barcodeSearches()}. */
 function serperCalls(): int
 {
-    return Http::recorded(fn (Request $request): bool => $request->url() === SerperProvider::ENDPOINT)->count();
+    return Http::recorded(fn (Request $request): bool => $request->url() === SerperProvider::ENDPOINT && ! ctype_digit(discoveryQuery($request)))->count();
+}
+
+function discoveryQuery(Request $request): string
+{
+    $query = $request->data()['q'] ?? null;
+
+    return is_string($query) ? $query : '';
+}
+
+/**
+ * The barcode searches sent, as their queries.
+ *
+ * @return list<string>
+ */
+function barcodeSearches(): array
+{
+    return Http::recorded(fn (Request $request): bool => $request->url() === SerperProvider::ENDPOINT && ctype_digit(discoveryQuery($request)))
+        ->map(fn (array $pair): string => discoveryQuery($pair[0]))
+        ->values()
+        ->all();
 }
 
 function findingAt(Product $product, string $host): WebShopFinding
@@ -720,6 +744,176 @@ it('goes on with stored findings when no search can be made', function (): void 
     discover($product);
 
     expect(serperCalls())->toBe(0)
+        ->and(findingAt($product, 'a.test')->status)->toBe(WebFindingStatus::Proposed);
+});
+
+it('searches the barcode for shops the title search did not find', function (): void {
+    $product = discoveryProduct();
+    fakeDiscovery(
+        [['title' => 'Coffee beans', 'link' => 'https://a.test/p']],
+        ['https://a.test/p' => htmlPage(discoveryPage('Coffee beans')), 'https://b.test/p' => htmlPage(discoveryPage('Coffee beans'))],
+        barcodeOrganic: [['title' => 'Coffee beans', 'link' => 'https://a.test/other-url'], ['title' => 'Koffiebonen', 'link' => 'https://b.test/p']],
+    );
+
+    discover($product);
+
+    expect(barcodeSearches())->toBe(['8711000000007'])
+        ->and(WebShopFinding::query()->where('product_id', $product->id)->orderBy('host')->pluck('url')->all())->toBe(['https://a.test/p', 'https://b.test/p'])
+        ->and(findingAt($product, 'b.test')->status)->toBe(WebFindingStatus::Proposed);
+});
+
+it('leaves the barcode search to its own job, so one discovery job makes one search', function (): void {
+    $product = discoveryProduct();
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p']], ['https://a.test/p' => htmlPage(discoveryPage('Coffee beans'))]);
+    Queue::fake();
+
+    discover($product);
+
+    expect(serperCalls())->toBe(1)
+        ->and(barcodeSearches())->toBe([]);
+    Queue::assertPushed(SearchProductBarcode::class, fn (SearchProductBarcode $job): bool => $job->productId === (string) $product->id);
+});
+
+it('keeps discovery unfinished while the barcode search is queued, and finishes it when that search is refused', function (): void {
+    $product = discoveryProduct();
+    fakeDiscovery([], []);
+    Queue::fake();
+
+    discover($product);
+    expect(WebDiscovery::query()->find($product->id)?->state)->not->toBe(WebDiscoveryState::Done);
+
+    config()->set('dipcatch.web_discovery.daily_search_limit', 1);
+    Cache::put('web-discovery:searches:' . now()->toDateString(), 1, now()->endOfDay());
+    new SearchProductBarcode((string) $product->id)->handle(app(BarcodeSearch::class), app(WebShopDiscovery::class));
+
+    expect(WebDiscovery::query()->find($product->id)?->state)->toBe(WebDiscoveryState::Done);
+});
+
+it('makes no barcode search once the owner no longer has shop checks', function (): void {
+    $product = discoveryProduct();
+    fakeDiscovery([], []);
+    Queue::fake();
+    $product->user?->forceFill(['shop_checks' => false])->save();
+
+    new SearchProductBarcode((string) $product->id)->handle(app(BarcodeSearch::class), app(WebShopDiscovery::class));
+
+    expect(barcodeSearches())->toBe([]);
+});
+
+it('queues no discovery after a barcode search the daily limit refused', function (): void {
+    $product = discoveryProduct();
+    config()->set('dipcatch.web_discovery.daily_search_limit', 1);
+    Cache::put('web-discovery:searches:' . now()->toDateString(), 1, now()->endOfDay());
+    fakeDiscovery([], []);
+    Queue::fake();
+
+    new SearchProductBarcode((string) $product->id)->handle(app(BarcodeSearch::class), app(WebShopDiscovery::class));
+
+    expect(barcodeSearches())->toBe([]);
+    Queue::assertNotPushed(DiscoverWebShops::class);
+});
+
+it('makes no barcode search for a product without a barcode', function (): void {
+    $product = discoveryProduct(gtin: '');
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p']], ['https://a.test/p' => htmlPage(discoveryPage('Coffee beans'))]);
+
+    discover($product);
+
+    expect(serperCalls())->toBe(1)
+        ->and(barcodeSearches())->toBe([]);
+});
+
+it('searches the barcode most shops report, in its 13-digit form', function (): void {
+    $product = discoveryProduct(gtin: '08711000000014');
+    Shop::factory()->for($product)->create(['host' => 'second.test', 'gtin' => '8711000000014']);
+    Shop::factory()->for($product)->create(['host' => 'third.test', 'gtin' => '8711000000007']);
+    fakeDiscovery([], []);
+
+    discover($product);
+
+    expect(barcodeSearches())->toBe(['8711000000014']);
+});
+
+it('drops a result a refreshed title search of digits only no longer lists', function (): void {
+    $product = discoveryProduct(title: '4711', gtin: '');
+    $pages = ['https://a.test/p' => htmlPage(discoveryPage('4711'))];
+    fakeDiscovery([['title' => '4711', 'link' => 'https://a.test/p']], $pages);
+    discover($product);
+
+    $this->travel(91)->days();
+    Http::swap(new Factory());
+    fakeDiscovery([], $pages);
+    discover($product);
+
+    expect(WebShopFinding::query()->where('product_id', $product->id)->count())->toBe(0);
+});
+
+it('searches an EAN-8 as the shops store it', function (): void {
+    $product = discoveryProduct(gtin: '96385074');
+    fakeDiscovery([], []);
+
+    discover($product);
+
+    expect(barcodeSearches())->toBe(['96385074']);
+});
+
+it('does not add a second finding on a shop the barcode search found when the title search is refreshed', function (): void {
+    $product = discoveryProduct();
+    $pages = ['https://b.test/p' => htmlPage(discoveryPage('Coffee beans')), 'https://b.test/other' => htmlPage(discoveryPage('Coffee beans'))];
+    fakeDiscovery([], $pages, barcodeOrganic: [['title' => 'Koffiebonen', 'link' => 'https://b.test/p']]);
+    discover($product);
+
+    $this->travel(91)->days();
+    Http::swap(new Factory());
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://b.test/other']], $pages, barcodeOrganic: [['title' => 'Koffiebonen', 'link' => 'https://b.test/p']]);
+    discover($product);
+
+    expect(WebShopFinding::query()->where('product_id', $product->id)->pluck('url')->all())->toBe(['https://b.test/p']);
+});
+
+it('keeps a barcode finding through a title search refresh and a new pack size', function (): void {
+    $product = discoveryProduct();
+    $pages = ['https://a.test/p' => htmlPage(discoveryPage('Coffee beans')), 'https://b.test/p' => htmlPage(discoveryPage('Coffee beans'))];
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p']], $pages, barcodeOrganic: [['title' => 'Koffiebonen', 'link' => 'https://b.test/p']]);
+    discover($product);
+
+    $this->travel(91)->days();
+    Shop::factory()->for($product)->create(['host' => 'other.test', 'pack_quantity' => '500.00', 'pack_unit' => 'g']);
+    Http::swap(new Factory());
+    // The refreshed title search no longer lists the barcode's shop.
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p']], $pages, barcodeOrganic: []);
+
+    discover($product);
+
+    expect(findingAt($product, 'b.test')->generation)->toBe(1);
+});
+
+it('does not bring a hidden shop back under another URL from the barcode search', function (): void {
+    $product = discoveryProduct();
+    $pages = ['https://a.test/p' => htmlPage(discoveryPage('Coffee beans'))];
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p']], $pages, barcodeOrganic: []);
+    discover($product);
+    WebShopFinding::query()->where('product_id', $product->id)->update(['dismissed_at' => now()]);
+
+    Shop::factory()->for($product)->create(['host' => 'second.test', 'gtin' => '8711000000014']);
+    Shop::factory()->for($product)->create(['host' => 'third.test', 'gtin' => '8711000000014']);
+    Http::swap(new Factory());
+    fakeDiscovery([], $pages, barcodeOrganic: [['title' => 'Coffee beans', 'link' => 'https://a.test/other-url']]);
+    discover($product);
+
+    expect(barcodeSearches())->toBe(['8711000000014'])
+        ->and(WebShopFinding::query()->where('product_id', $product->id)->pluck('url')->all())->toBe(['https://a.test/p']);
+});
+
+it('still makes the title search when the day has room for one search only', function (): void {
+    $product = discoveryProduct();
+    config()->set('dipcatch.web_discovery.daily_search_limit', 1);
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p']], ['https://a.test/p' => htmlPage(discoveryPage('Coffee beans'))]);
+
+    discover($product);
+
+    expect(serperCalls())->toBe(1)
+        ->and(barcodeSearches())->toBe([])
         ->and(findingAt($product, 'a.test')->status)->toBe(WebFindingStatus::Proposed);
 });
 

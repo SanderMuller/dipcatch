@@ -122,6 +122,44 @@ it('queues unfinished runs, then stale findings, then never-searched products, a
         ->and($queued)->not->toContain((string) $upToDate->id);
 });
 
+it('counts a barcode without a fresh search against the search limit', function (): void {
+    config()->set('dipcatch.web_discovery.daily_search_limit', 2);
+    $owner = triggerOwner();
+    $withBarcode = gatedProduct($owner, ['created_at' => now()->subDays(3)]);
+    $withBarcode->shops()->update(['gtin' => '8711000000007']);
+    gatedProduct($owner, ['created_at' => now()->subDays(2)]);
+
+    $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
+
+    expect(Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $withBarcode->id]);
+});
+
+it('still queues the title search when the barcode search does not fit', function (): void {
+    config()->set('dipcatch.web_discovery.daily_search_limit', 1);
+    $product = gatedProduct(triggerOwner());
+    $product->shops()->update(['gtin' => '8711000000007']);
+
+    $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
+
+    Queue::assertPushed(DiscoverWebShops::class, fn (DiscoverWebShops $job): bool => $job->productId === (string) $product->id);
+});
+
+it('queues a finished product whose barcode has no fresh search', function (): void {
+    $owner = triggerOwner();
+    $search = WebSearch::query()->create(['query_hash' => 'h', 'query' => 'q', 'results' => [], 'searched_at' => now()]);
+    $product = gatedProduct($owner);
+    $product->shops()->update(['gtin' => '8711000000007']);
+    WebDiscovery::query()->create(['product_id' => $product->id, 'web_search_id' => $search->id, 'search_searched_at' => $search->searched_at, 'state' => WebDiscoveryState::Done]);
+    $searched = gatedProduct($owner);
+    $searched->shops()->update(['gtin' => '8711000000014']);
+    WebDiscovery::query()->create(['product_id' => $searched->id, 'web_search_id' => $search->id, 'search_searched_at' => $search->searched_at, 'state' => WebDiscoveryState::Done]);
+    WebSearch::query()->create(['query_hash' => WebSearch::hashOf('8711000000014'), 'query' => '8711000000014', 'results' => [], 'searched_at' => now()]);
+
+    $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
+
+    expect(Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $product->id]);
+});
+
 it('queues every product that needs a search when the limit is zero', function (): void {
     config()->set('dipcatch.web_discovery.daily_search_limit', 0);
     $owner = triggerOwner();
