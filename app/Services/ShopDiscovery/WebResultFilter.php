@@ -51,7 +51,7 @@ final class WebResultFilter
 
     /**
      * Results without a host the product already has a finding on under
-     * another URL, hidden ones included. The title search and the barcode
+     * another URL, dismissed ones included. The title search and the barcode
      * search ({@see BarcodeSearch}) each keep one result per host, but
      * together they can name one shop twice, and a hidden shop must not come
      * back under another URL.

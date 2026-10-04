@@ -10,8 +10,7 @@ use Closure;
 /**
  * Web discovery's second search: the product's barcode. Shops that list a
  * product under another name than its title are often found by the barcode
- * they print on the page. For Roter Vitamine C 800 the title search found 5
- * pages and the barcode search 8 shops, 5 of them new (2026-10-04).
+ * they print on the page.
  */
 final readonly class BarcodeSearch
 {

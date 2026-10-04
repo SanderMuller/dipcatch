@@ -133,7 +133,7 @@ final readonly class WebShopDiscovery
             $this->storeNew($product, $search, WebResultFilter::withoutKnownHosts($product, $kept));
         }
 
-        // After the title search, so a limit spent by this product still leaves that one.
+        // After the title search, so the title search gets the day's last search.
         $this->barcodeSearch->run($product, fn (WebSearch $search, array $kept): int => $this->storeNew($product, $search, $kept));
 
         // First: the Klarna jobs need only the search, so they run while the first check does.
@@ -147,7 +147,8 @@ final readonly class WebShopDiscovery
      * Findings start over when the search they came from was refreshed (by
      * this or another product with the same title), when the product's title
      * or pack sizes changed, or when a barcode they were checked against is
-     * gone. One no longer kept from the search is deleted; hidden ones stay hidden.
+     * gone. One no longer kept from the search is deleted, unless a site: or
+     * barcode lookup found it; hidden ones stay hidden.
      *
      * Lead findings come from their own lookup: a refreshed search leaves
      * them, and a stale fingerprint or barcode resets them with their lead
