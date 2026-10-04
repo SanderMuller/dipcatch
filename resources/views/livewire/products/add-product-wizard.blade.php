@@ -302,7 +302,7 @@
                     @if ($settingOwn)
                         <flux:button type="button" size="sm" variant="ghost" wire:click="showSuggestion">{{ __('Show the suggested alert') }}</flux:button>
                     @else
-                        @include('livewire.products.partials.alert-suggestion', ['inWizard' => true])
+                        @include('livewire.products.partials.alert-suggestion')
                     @endif
                 </div>
 

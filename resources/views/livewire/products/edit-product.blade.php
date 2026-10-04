@@ -89,46 +89,62 @@
             <flux:heading size="lg" level="2">{{ __('Alerts') }}</flux:heading>
 
             @php($showsSuggestion = $alertCard !== null && ($alertCard['asksJev'] || $alertCard['suggestion']->unitTarget !== null))
-            {{-- On a wide screen the suggestion sits beside the price alert it
-                 fills in; on a phone it comes first, above it. --}}
-            <div @class(['mt-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8' => $showsSuggestion]) data-test="alert-columns">
-                @if ($showsSuggestion)
-                    <div class="max-w-2xl lg:sticky lg:top-6 lg:order-last lg:max-w-none" data-test="alert-suggestion-column">
-                        @include('livewire.products.partials.alert-suggestion', [...$alertCard, 'inWizard' => false])
-                    </div>
-                @endif
+            <div class="mt-4 min-w-0">
+                @if ($packChoices === [])
+                    {{-- No shop has said how much is in its pack yet, so there is
+                         nothing to translate a pack price with. --}}
+                    <flux:input
+                        class="mt-4"
+                        wire:model="unitPriceTarget"
+                        :label="$unitWord ? __('Target price per :unit', ['unit' => $unitWord]) : __('Target price per kilo, litre or piece')"
+                        :description="$unitTargetDescription"
+                        {{-- The column keeps four decimals; a step of 0.01 made the
+                             browser refuse to submit a saved 0.0125. --}}
+                        type="number"
+                        step="any"
+                        min="0.0001"
+                    />
+                @else
+                    {{-- The per-unit target leads: it is the alert that holds every
+                         shop and pack size to one rate. The suggested alert is one
+                         of its choices. --}}
+                    <x-unit-target
+                        class="mt-6 max-w-2xl"
+                        model="unitPriceTarget"
+                        :description="$currentUnitPrice
+                            ? __('Now :amount at :host.', ['amount' => $currentUnitPrice['amount'], 'host' => $currentUnitPrice['host']])
+                            : ''"
+                        :packs="$packChoices"
+                        :history="$unitHistory"
+                        :currency="$product->currency ?? 'EUR'"
+                        :unit-word="$unitWord ?? __('unit')"
+                        :suggested-unit="$showsSuggestion && ! $alertCard['asksJev'] ? $alertCard['suggestion']->unitTarget : null"
+                    >
+                        @if ($showsSuggestion)
+                            @if ($alertCard['asksJev'])
+                                <x-slot:suggestion wire:init="askJev" wire:loading.attr="aria-busy" wire:target="askJev">
+                                    @include('livewire.products.partials.alert-suggestion-row', $alertCard)
+                                </x-slot:suggestion>
+                            @else
+                                <x-slot:suggestion wire:click="useSuggestion">
+                                    @include('livewire.products.partials.alert-suggestion-row', $alertCard)
+                                </x-slot:suggestion>
+                            @endif
+                        @endif
+                    </x-unit-target>
 
-                <div class="min-w-0">
-                    @if ($packChoices === [])
-                        {{-- No shop has said how much is in its pack yet, so there is
-                             nothing to translate a pack price with. --}}
-                        <flux:input
-                            class="mt-4 {{ $showsSuggestion ? 'lg:mt-0' : '' }}"
-                            wire:model="unitPriceTarget"
-                            :label="$unitWord ? __('Target price per :unit', ['unit' => $unitWord]) : __('Target price per kilo, litre or piece')"
-                            :description="$unitTargetDescription"
-                            {{-- The column keeps four decimals; a step of 0.01 made the
-                                 browser refuse to submit a saved 0.0125. --}}
-                            type="number"
-                            step="any"
-                            min="0.0001"
-                        />
-                    @else
-                        {{-- The per-unit target leads: it is the alert that holds every
-                             shop and pack size to one rate. --}}
-                        <x-unit-target
-                            class="mt-6 max-w-2xl {{ $showsSuggestion ? 'lg:mt-0' : '' }}"
-                            model="unitPriceTarget"
-                            :description="$currentUnitPrice
-                                ? __('Now :amount at :host.', ['amount' => $currentUnitPrice['amount'], 'host' => $currentUnitPrice['host']])
-                                : ''"
-                            :packs="$packChoices"
-                            :history="$unitHistory"
-                            :currency="$product->currency ?? 'EUR'"
-                            :unit-word="$unitWord ?? __('unit')"
-                        />
+                    @if ($showsSuggestion && ! $alertCard['usesJev'])
+                        <flux:text size="sm" class="mt-3 max-w-2xl text-zinc-500 dark:text-zinc-400" :data-test="$alertCard['canSwitchOnAi'] ? 'switch-on-ai' : 'pro-teaser'">
+                            @if ($alertCard['canSwitchOnAi'])
+                                {{ __('With AI help on, Pro also checks how products like this go on sale.') }}
+                                <flux:link :href="route('product-features.edit')" wire:navigate>{{ __('Switch on AI help') }}</flux:link>
+                            @else
+                                {{ __('Pro also checks how products like this go on sale.') }}
+                                <flux:link :href="route('app.billing')" wire:navigate>{{ __('Compare plans') }}</flux:link>
+                            @endif
+                        </flux:text>
                     @endif
-                </div>
+                @endif
             </div>
 
             {{-- Folded away while empty, so the price alert leads; open when

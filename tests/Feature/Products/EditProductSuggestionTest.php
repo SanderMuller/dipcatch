@@ -36,25 +36,28 @@ function editSuggestionProduct(User $user, string $now = '4.00', ?string $unitTa
     return $product->refresh();
 }
 
-it('suggests an alert on the edit form while the product has no price per kilo target', function (): void {
+it('suggests an alert as a choice in the price list while the product has no price per kilo target', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => editSuggestionProduct($user)])
-        ->assertSeeHtml('data-test="alert-suggestion"')
-        ->assertSeeInOrder(['€3.20', 'for the 1 kg pack', 'Pet food often goes about 20% off.', 'Our suggestion is €3.20 /kg'])
+        ->assertSeeHtml('data-test="unit-target-suggestion"')
+        ->assertSeeHtml('suggestedUnit: 3.2,')
+        ->assertSeeHtml('wire:click="useSuggestion"')
+        ->assertSeeInOrder(['Suggested alert', '20% under normal', 'Pet food often goes about 20% off.', 'The normal price is €4.00 /kg.'])
+        ->assertDontSeeHtml('data-test="alert-suggestion"')
         ->assertDontSee('Set my own')
         ->assertDontSeeHtml('wire:init="askJev"');
 
     Http::assertNothingSent();
 });
 
-it('leaves the card out once the product has a price per kilo target', function (): void {
+it('leaves the suggestion out once the product has a price per kilo target', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => editSuggestionProduct($user, unitTarget: '3.5000')])
-        ->assertDontSeeHtml('data-test="alert-suggestion"');
+        ->assertDontSeeHtml('data-test="unit-target-suggestion"');
 });
 
 it('fills in the suggestion without saving it, and saves it on Save', function (): void {
@@ -65,8 +68,7 @@ it('fills in the suggestion without saving it, and saves it on Save', function (
     $form = livewire(EditProduct::class, ['product' => $product])
         ->call('useSuggestion')
         ->assertSet('unitPriceTarget', '3.2')
-        ->assertSet('status', 'Alert set to 3.2. Save changes to keep it.')
-        ->assertSee('In use');
+        ->assertSet('status', 'Alert set to 3.2. Save changes to keep it.');
 
     expect($product->refresh()->unit_price_target)->toBeNull();
 
@@ -96,27 +98,15 @@ it('asks Jev on Pro with AI help on, and suggests its band', function (): void {
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => editSuggestionProduct($user)])
+        ->assertSeeHtml('data-test="unit-target-suggestion-checking"')
         ->assertSeeHtml('wire:init="askJev"')
+        ->assertSeeHtml('suggestedUnit: null,')
         ->call('askJev')
-        ->assertSee('Products like this often go 50% off.')
-        ->assertSee('Our suggestion is €2.00 /kg');
+        ->assertDontSeeHtml('data-test="unit-target-suggestion-checking"')
+        ->assertSeeHtml('suggestedUnit: 2,')
+        ->assertSee('Products like this often go 50% off.');
 
     Http::assertSentCount(1);
-});
-
-it('reads a target typed with a trailing zero as the suggestion in use', function (): void {
-    $user = User::factory()->create();
-    $this->actingAs($user);
-
-    $form = livewire(EditProduct::class, ['product' => editSuggestionProduct($user)]);
-
-    // The server picks the label shown first; Alpine follows the field after.
-    expect($form->html())->toMatch('/<span x-show="inUse\(\)"[^>]*display: none/');
-
-    $form->set('unitPriceTarget', '3.20');
-
-    expect($form->html())->toMatch('/<span x-show="! inUse\(\)"[^>]*display: none/')
-        ->and($form->html())->not->toMatch('/<span x-show="inUse\(\)"[^>]*display: none/');
 });
 
 it('shows the suggestion rather than a checking card when a shop changed while Jev answered', function (): void {

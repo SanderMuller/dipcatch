@@ -1,9 +1,9 @@
 {{--
     The suggested alert, built from the facts AlertSuggestion carries, on
-    step 3 of adding a product and on the edit form.
+    step 3 of adding a product. The edit form shows it as a row in the price
+    list instead: alert-suggestion-row.
     Needs `$suggestion`, `$product`, `$onOfferNow`, `$asksJev`, `$usesJev`,
-    `$canSwitchOnAi`, and `$inWizard`: the wizard also offers "Set my own".
-    The edit page passes `$suggestionInUse` once the field holds the target.
+    and `$canSwitchOnAi`.
     While `$asksJev`, the card shows a checking state: the numbers can still
     change with Jev's answer.
 --}}
@@ -54,26 +54,7 @@
             @endif
         </p>
 
-        @php
-            $insight = match (true) {
-                $suggestion->cappedByLaw => __('Alcohol can go at most :depth% off in the Netherlands.', ['depth' => $suggestion->depth]),
-                $suggestion->halfwayToOffer => __('We suggest a price halfway between that and its usual offers.'),
-                $suggestion->depthSource === \App\Enums\DepthSource::Jev => __('Products like this often go :depth% off.', ['depth' => $suggestion->depth]),
-                $suggestion->depthSource === \App\Enums\DepthSource::Category && $suggestion->category !== null => __(':category often goes about :depth% off.', ['category' => $suggestion->category->label(), 'depth' => $suggestion->depth]),
-                default => null,
-            };
-        @endphp
-        @if ($insight !== null || $suggestion->promotionNowHost !== null)
-            <p class="mt-3 flex max-w-[65ch] gap-2 text-base/7 text-pretty text-zinc-900 sm:text-sm/6 dark:text-white" data-test="alert-suggestion-reason">
-                <flux:icon.light-bulb variant="mini" class="mt-1 shrink-0 text-chart-line sm:mt-0.5 dark:text-chart" />
-                <span>
-                    @if ($suggestion->promotionNowHost !== null)
-                        {{ __(':shop has this :depth% off now.', ['shop' => $suggestion->promotionNowHost, 'depth' => $suggestion->promotionNowDepth]) }}
-                    @endif
-                    {{ $insight }}
-                </span>
-            </p>
-        @endif
+        @include('livewire.products.partials.alert-suggestion-insight')
 
         <p class="mt-1 max-w-[65ch] text-base/7 text-pretty text-zinc-500 sm:text-sm/6 dark:text-zinc-400" data-test="alert-suggestion-detail">
             @if ($leadsWithPack)
@@ -97,25 +78,8 @@
         </p>
 
         <div class="mt-4 flex flex-wrap gap-2">
-            @if ($inWizard)
-                <flux:button type="button" size="sm" variant="filled" wire:click="useSuggestion" data-test="use-suggestion">{{ __('Use this alert') }}</flux:button>
-            @else
-                {{-- The price picker changes the target in the browser only, so
-                     the label follows the field there. One button whose label
-                     changes, so the focus a click left on it stays. --}}
-                <div class="contents" x-data="{ inUse() { const value = parseFloat($wire.unitPriceTarget); return ! isNaN(value) && Math.abs(value - {{ (float) $suggestion->unitTarget }}) < 0.00005; } }">
-                    <flux:button type="button" size="sm" variant="filled" wire:click="useSuggestion" x-bind:aria-disabled="inUse() ? 'true' : 'false'" data-test="use-suggestion">
-                        <span x-show="! inUse()" @if ($suggestionInUse ?? false) style="display: none" @endif>{{ __('Use this alert') }}</span>
-                        <span x-show="inUse()" class="flex items-center gap-1.5" @unless ($suggestionInUse ?? false) style="display: none" @endunless>
-                            <flux:icon.check variant="micro" />
-                            {{ __('In use') }}
-                        </span>
-                    </flux:button>
-                </div>
-            @endif
-            @if ($inWizard)
-                <flux:button type="button" size="sm" variant="ghost" wire:click="setOwn">{{ __('Set my own') }}</flux:button>
-            @endif
+            <flux:button type="button" size="sm" variant="filled" wire:click="useSuggestion" data-test="use-suggestion">{{ __('Use this alert') }}</flux:button>
+            <flux:button type="button" size="sm" variant="ghost" wire:click="setOwn">{{ __('Set my own') }}</flux:button>
         </div>
     @endif
 

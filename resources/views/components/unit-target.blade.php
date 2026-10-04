@@ -6,6 +6,7 @@
     'currency' => 'EUR',
     'unitWord' => 'unit',
     'heading' => true,
+    'suggestedUnit' => null,
 ])
 
 {{--
@@ -13,15 +14,22 @@
     size is held to. `packs` comes from UnitTargetGuide::packs(), in the
     best-value ranking's order so the first is the best value, and must not
     be empty.
+    A `suggestion` slot adds the suggested alert as one more choice, placed
+    among the levels by price. Its attributes go on that row: `wire:click`
+    to pick it, or `wire:init` while `suggestedUnit` is still null and the
+    slot shows a checking state.
 --}}
 <div
     {{ $attributes->class('space-y-6') }}
+    {{-- A new key once the suggestion arrives, so Alpine starts again with it. --}}
+    @isset($suggestion) wire:key="unit-target-{{ $suggestedUnit ?? 'checking' }}" @endisset
     x-data="{
         target: $wire.entangle(@js($model)),
         packs: @js($packs),
         history: @js($history),
         currency: @js($currency),
         unitWord: @js($unitWord),
+        suggestedUnit: @js(isset($suggestion) && $suggestedUnit !== null ? (float) $suggestedUnit : null),
         chosen: 0,
         packInput: '',
         init() {
@@ -108,6 +116,22 @@
 
             return levels;
         },
+        isSuggested() {
+            return this.suggestedUnit !== null && this.unit() !== null && Math.abs(this.unit() - this.floor(this.suggestedUnit)) < 0.00005;
+        },
+        // The levels with the suggestion in its place by price, easiest to
+        // reach first, as the levels are.
+        rows() {
+            const rows = this.levels().map((level) => ({ ...level, suggested: false }));
+
+            if (this.suggestedUnit === null) {
+                return rows;
+            }
+
+            return rows
+                .concat([{ name: 'suggested', unit: this.suggestedUnit, suggested: true }])
+                .sort((a, b) => b.unit - a.unit);
+        },
         packPrice(pack) {
             return this.unit() === null ? null : this.unit() * pack.perPack;
         },
@@ -185,28 +209,62 @@
         {{-- One list of choices rather than a grid of cards: the levels and
              the person's own price are the same decision. --}}
         <div role="radiogroup" :aria-label="@js(__('Alert price'))" class="mt-3 divide-y divide-zinc-950/5 rounded-xl ring-1 ring-zinc-950/10 dark:divide-white/5 dark:ring-white/10">
-            <template x-for="level in levels()" :key="level.name">
-                <button
-                    type="button"
-                    role="radio"
-                    :aria-checked="isLevel(level)"
-                    @click="setUnit(level.unit); syncPack()"
-                    class="flex w-full items-center gap-3 px-4 py-3 text-start first:rounded-t-xl hover:bg-zinc-950/2.5 dark:hover:bg-white/5"
-                >
-                    <span class="grid size-5 shrink-0 place-items-center rounded-full ring-1 sm:size-4" :class="isLevel(level) ? 'bg-zinc-900 ring-zinc-900 dark:bg-white dark:ring-white' : 'ring-zinc-950/20 dark:ring-white/20'">
-                        <span class="size-1.5 rounded-full bg-white dark:bg-zinc-900" x-show="isLevel(level)"></span>
-                    </span>
-                    <span class="min-w-0 flex-1 text-base/6 text-zinc-700 sm:text-sm/6 dark:text-zinc-200" x-text="level.name"></span>
-                    <span class="text-end tabular-nums">
-                        <span class="block text-base/6 font-semibold text-zinc-900 sm:text-sm/6 dark:text-white" x-text="money(level.unit * pack().perPack)"></span>
-                        <span class="block text-sm/5 text-zinc-500 sm:text-[0.8125rem]/5 dark:text-zinc-400" x-text="money(level.unit, true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
-                    </span>
-                </button>
+            @isset($suggestion)
+                @if ($suggestedUnit === null)
+                    <div {{ $suggestion->attributes->class('rounded-t-xl px-4 py-3') }} data-test="unit-target-suggestion-checking">{{ $suggestion }}</div>
+                @endif
+            @endisset
+
+            <template x-for="(row, index) in rows()" :key="row.name">
+                <div>
+                    <template x-if="! row.suggested">
+                        <button
+                            type="button"
+                            role="radio"
+                            :aria-checked="isLevel(row)"
+                            @click="setUnit(row.unit); syncPack()"
+                            class="flex w-full items-center gap-3 px-4 py-3 text-start hover:bg-zinc-950/2.5 dark:hover:bg-white/5"
+                            :class="index === 0 && 'rounded-t-xl'"
+                        >
+                            <span class="grid size-5 shrink-0 place-items-center rounded-full ring-1 sm:size-4" :class="isLevel(row) ? 'bg-zinc-900 ring-zinc-900 dark:bg-white dark:ring-white' : 'ring-zinc-950/20 dark:ring-white/20'">
+                                <span class="size-1.5 rounded-full bg-white dark:bg-zinc-900" x-show="isLevel(row)"></span>
+                            </span>
+                            <span class="min-w-0 flex-1 text-base/6 text-zinc-700 sm:text-sm/6 dark:text-zinc-200" x-text="row.name"></span>
+                            <span class="text-end tabular-nums">
+                                <span class="block text-base/6 font-semibold text-zinc-900 sm:text-sm/6 dark:text-white" x-text="money(row.unit * pack().perPack)"></span>
+                                <span class="block text-sm/5 text-zinc-500 sm:text-[0.8125rem]/5 dark:text-zinc-400" x-text="money(row.unit, true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
+                            </span>
+                        </button>
+                    </template>
+                    @isset($suggestion)
+                        {{-- Rendered on the server inside the template, so the
+                             reason reads in the response as the heading does. --}}
+                        <template x-if="row.suggested">
+                            <button
+                                type="button"
+                                role="radio"
+                                :aria-checked="isSuggested()"
+                                {{ $suggestion->attributes->class('flex w-full items-start gap-3 bg-amber-50/70 px-4 py-3 text-start hover:bg-amber-100/60 dark:bg-amber-400/5 dark:hover:bg-amber-400/10') }}
+                                :class="index === 0 && 'rounded-t-xl'"
+                                data-test="unit-target-suggestion"
+                            >
+                                <span class="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full ring-1 sm:size-4" :class="isSuggested() ? 'bg-zinc-900 ring-zinc-900 dark:bg-white dark:ring-white' : 'ring-zinc-950/20 dark:ring-white/20'">
+                                    <span class="size-1.5 rounded-full bg-white dark:bg-zinc-900" x-show="isSuggested()"></span>
+                                </span>
+                                <span class="min-w-0 flex-1">{{ $suggestion }}</span>
+                                <span class="text-end tabular-nums">
+                                    <span class="block text-base/6 font-semibold text-zinc-900 sm:text-sm/6 dark:text-white" x-text="money(row.unit * pack().perPack)"></span>
+                                    <span class="block text-sm/5 text-zinc-500 sm:text-[0.8125rem]/5 dark:text-zinc-400" x-text="money(row.unit, true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
+                                </span>
+                            </button>
+                        </template>
+                    @endisset
+                </div>
             </template>
 
-            <label class="flex items-center gap-3 px-4 py-3" :class="levels().length === 0 ? 'rounded-xl' : 'rounded-b-xl'">
-                <span class="grid size-5 shrink-0 place-items-center rounded-full ring-1 sm:size-4" :class="unit() !== null && ! levels().some((level) => isLevel(level)) ? 'bg-zinc-900 ring-zinc-900 dark:bg-white dark:ring-white' : 'ring-zinc-950/20 dark:ring-white/20'">
-                    <span class="size-1.5 rounded-full bg-white dark:bg-zinc-900" x-show="unit() !== null && ! levels().some((level) => isLevel(level))"></span>
+            <label class="flex items-center gap-3 px-4 py-3" :class="rows().length === 0 ? 'rounded-xl' : 'rounded-b-xl'">
+                <span class="grid size-5 shrink-0 place-items-center rounded-full ring-1 sm:size-4" :class="unit() !== null && ! levels().some((level) => isLevel(level)) && ! isSuggested() ? 'bg-zinc-900 ring-zinc-900 dark:bg-white dark:ring-white' : 'ring-zinc-950/20 dark:ring-white/20'">
+                    <span class="size-1.5 rounded-full bg-white dark:bg-zinc-900" x-show="unit() !== null && ! levels().some((level) => isLevel(level)) && ! isSuggested()"></span>
                 </span>
                 <span class="min-w-0 flex-1 text-base/6 text-zinc-700 sm:text-sm/6 dark:text-zinc-200" x-text="@js(__('My own price for')) + ' ' + pack().pack"></span>
                 <span class="relative w-28">

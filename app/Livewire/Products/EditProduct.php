@@ -18,7 +18,6 @@ use App\Services\TypeSafe\TypeSafeClient;
 use App\Services\TypeSafe\TypeSafeRequestFailed;
 use App\Support\Iso4217;
 use App\Support\MoneyFormatter;
-use App\Support\Numeric;
 use App\Support\UnitTargetGuide;
 use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
@@ -294,10 +293,6 @@ final class EditProduct extends Component
             'comparisonUnit' => $this->product->comparablePacks()->unit(),
             ...$this->alertAnchors(),
             'alertCard' => $alertCard,
-            // "In use" on the card, compared as numbers: the pack picker
-            // writes 3.20 where the suggestion says 3.2.
-            'suggestionInUse' => $alertCard !== null && $alertCard['suggestion']->unitTarget !== null && ($typed = self::blankToNull($this->unitPriceTarget)) !== null
-                && is_numeric($typed) && bccomp(Numeric::str($typed), Numeric::str($alertCard['suggestion']->unitTarget), 4) === 0,
             'otherAlerts' => $this->otherAlertSummaries($this->currency),
         ]);
     }
