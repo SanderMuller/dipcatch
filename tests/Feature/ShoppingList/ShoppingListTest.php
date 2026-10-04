@@ -222,7 +222,7 @@ it('reads the list in the same number of queries however long it is', function (
     DB::flushQueryLog();
     ShoppingList::forUser($user);
 
-    expect(DB::getQueryLog())->toBe($few)->toHaveCount(3);
+    expect(DB::getQueryLog())->toHaveCount($few)->toHaveCount(3);
 });
 
 it('moves a product to its next best shop when its best shop is skipped', function (): void {
