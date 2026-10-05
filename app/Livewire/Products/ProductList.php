@@ -373,8 +373,8 @@ final class ProductList extends Component
     }
 
     /**
-     * In a drop, or with a deal at either shop a card names: the lowest price,
-     * or the best value it leads with.
+     * At the alert price, in a drop, or with a deal at either shop a card
+     * names: the lowest price, or the best value it leads with.
      *
      * @param  EloquentQueryBuilder<Product>  $query
      * @return EloquentQueryBuilder<Product>
@@ -382,7 +382,8 @@ final class ProductList extends Component
     private static function discountedAnywhere(EloquentQueryBuilder $query): EloquentQueryBuilder
     {
         return $query
-            ->inVisibleDrop()
+            ->where(fn (EloquentQueryBuilder $alert): EloquentQueryBuilder => $alert->atTarget())
+            ->orWhere(fn (EloquentQueryBuilder $drop): EloquentQueryBuilder => $drop->inVisibleDrop())
             ->orWhereHas('cheapestShop', self::dealRunningNow(...))
             // A string column beside a uuid key: cast for PostgreSQL.
             ->orWhereExists(self::dealRunningNow(

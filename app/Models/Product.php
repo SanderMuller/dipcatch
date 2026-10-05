@@ -265,6 +265,29 @@ final class Product extends Model
     }
 
     /**
+     * An active product at or under the alert price its owner set, compared
+     * as {@see isAtTarget()} does, on the stored best value. Unqualified
+     * columns, so it also reads a subquery aliased `products`.
+     */
+    public const string AT_TARGET_SQL = <<<'SQL'
+        active = TRUE AND (
+            (target_price IS NOT NULL AND cheapest_price IS NOT NULL AND cheapest_price <= target_price)
+            OR (unit_price_target IS NOT NULL AND best_value_price > 0 AND best_value_pack_quantity > 0
+                AND ROUND(best_value_price * 1.0 / best_value_pack_quantity
+                    * (CASE best_value_pack_unit WHEN 'piece' THEN 1 ELSE 1000 END), 6) <= unit_price_target)
+        )
+        SQL;
+
+    /**
+     * @param EloquentQueryBuilder<$this> $query
+     */
+    #[Scope]
+    protected function atTarget(EloquentQueryBuilder $query): void
+    {
+        $query->whereRaw(self::AT_TARGET_SQL);
+    }
+
+    /**
      * Products whose card shows a drop badge: a drop measured live, from half
      * a percent, as the badge rounds it. The latch alone also holds a price
      * that has climbed back to where it was.
