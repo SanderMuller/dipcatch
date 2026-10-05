@@ -392,24 +392,26 @@ final class ProductList extends Component
     }
 
     /**
-     * On discount at this shop itself: a deal running there, or a drop to the
-     * price there, which is the lowest price or the best value.
+     * On discount at this shop itself: a deal running there, or a drop to or
+     * the alert price at the price there, which is the lowest price or the
+     * best value.
      *
      * @param  EloquentQueryBuilder<Product>  $query
      * @return EloquentQueryBuilder<Product>
      */
     private static function discountedAt(EloquentQueryBuilder $query, string $host): EloquentQueryBuilder
     {
+        $priceThere = fn (EloquentQueryBuilder $there): EloquentQueryBuilder => $there
+            ->whereHas('cheapestShop', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $shop->where('host', $host))
+            ->orWhereExists(Shop::query()
+                ->select(DB::raw(1))
+                ->whereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id')
+                ->where('host', $host));
+
         return $query
             ->whereHas('shops', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => self::dealRunningNow($shop->where('host', $host)->where('active', true)))
-            ->orWhere(fn (EloquentQueryBuilder $drop): EloquentQueryBuilder => $drop
-                ->inVisibleDrop()
-                ->where(fn (EloquentQueryBuilder $there): EloquentQueryBuilder => $there
-                    ->whereHas('cheapestShop', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $shop->where('host', $host))
-                    ->orWhereExists(Shop::query()
-                        ->select(DB::raw(1))
-                        ->whereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id')
-                        ->where('host', $host))));
+            ->orWhere(fn (EloquentQueryBuilder $drop): EloquentQueryBuilder => $drop->inVisibleDrop()->where($priceThere))
+            ->orWhere(fn (EloquentQueryBuilder $alert): EloquentQueryBuilder => $alert->atTarget()->where($priceThere));
     }
 
     /**
