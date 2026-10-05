@@ -183,12 +183,15 @@ final readonly class AdapterResolver
         }
 
         $phrase = StockText::unavailablePhrase($html);
+        $markup = $phrase === null ? StockText::unavailableMarkup($html) : null;
 
-        if ($phrase === null) {
+        if ($phrase === null && $markup === null) {
             return $result;
         }
 
-        return ExtractionResult::success($snapshot->withStock(inStock: false, stockSignal: 'text: ' . $phrase))
+        $signal = $phrase !== null ? 'text: ' . $phrase : 'markup: ' . $markup;
+
+        return ExtractionResult::success($snapshot->withStock(inStock: false, stockSignal: $signal))
             ->withAdapterKey((string) $result->adapterKey);
     }
 

@@ -69,6 +69,21 @@ final readonly class StockText
     }
 
     /**
+     * The stock line WooCommerce prints for the product the page sells,
+     * `<p class="stock out-of-stock">`, whatever its words. A related-product
+     * tile carries `outofstock` on its `<li>` instead, and a variation's line
+     * sits escaped inside a data attribute, so neither matches.
+     */
+    public static function unavailableMarkup(string $html): ?string
+    {
+        $stripped = preg_replace('#<(script|style|template)\b[^>]*>.*?</\1>#is', ' ', $html) ?? $html;
+
+        return preg_match('#<p\s[^>]*\bclass="(?:[^"]*\s)?stock\s(?:[^"]*\s)?out-of-stock(?:\s[^"]*)?"#i', $stripped) === 1
+            ? 'woocommerce out-of-stock'
+            : null;
+    }
+
+    /**
      * Whole words only: "uitverkocht" must not match inside "uitverkochte",
      * and a phrase with a disqualifying word before it does not count. The
      * boundary is letters rather than `\b`, because stripping the markup

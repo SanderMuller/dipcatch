@@ -414,3 +414,29 @@ test('a host adapter that skips another host still hands the page on', function 
 
     expect($resolver->resolve('https://elsewhere.test/p/1', '<html></html>', 'owner')->snapshot?->price)->toBe('1.00');
 });
+
+test('a WooCommerce product page marked out of stock reads as sold out', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    // As plusjevoordeel.nl serves it (2026-10-05): the shop's own "Uitverkocht",
+    // a word too common to read on its own, in WooCommerce's stock line.
+    $result = $resolver->resolve('https://x.test', '<div class="elementor-add-to-cart elementor-product-simple"><p class="stock out-of-stock">Uitverkocht</p></div>');
+
+    expect($result->snapshot?->inStock)->toBeFalse()
+        ->and($result->snapshot?->stockSignal)->toBe('markup: woocommerce out-of-stock');
+});
+
+test('a sold-out WooCommerce tile or variation does not make the product sold out', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $pages = [
+        '<section class="related products"><ul><li class="product type-product outofstock">Andere shampoo</li></ul></section>',
+        '<form data-product_variations="[{&quot;availability_html&quot;:&quot;&lt;p class=\&quot;stock out-of-stock\&quot;&gt;Uitverkocht&lt;\/p&gt;&quot;}]"></form>',
+        '<script type="text/template"><p class="stock out-of-stock">Uitverkocht</p></script>',
+        '<p class="stock in-stock">5 op voorraad</p>',
+    ];
+
+    foreach ($pages as $page) {
+        expect($resolver->resolve('https://x.test', $page)->snapshot?->inStock)->toBeNull();
+    }
+});

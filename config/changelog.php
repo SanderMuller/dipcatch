@@ -30,6 +30,12 @@ return [
     'entries' => [
         [
             'date' => '2026-10-05',
+            'category' => 'fix',
+            'title' => 'Sold-out products at more web shops',
+            'body' => 'DipCatch now sees when a product is sold out at more web shops, such as plusjevoordeel.nl. A shop that has run out no longer counts as the cheapest place to buy.',
+        ],
+        [
+            'date' => '2026-10-05',
             'category' => 'feature',
             'title' => 'A clearer dashboard',
             'body' => "Your dashboard now opens with what's worth buying: the shops where several of your products are cheapest and something is on offer, then products at your alert price and the biggest drops.\n\nSuggested shops and things to check are in a column on the right.",
