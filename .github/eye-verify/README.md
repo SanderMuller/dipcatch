@@ -60,3 +60,14 @@ php .github/eye-verify/discovery-progress-seed.php
 node .github/eye-verify/discovery-progress.mjs
 php .github/eye-verify/discovery-progress-seed.php --teardown
 ```
+
+`tracking-ideas-focus.mjs` drives the "what else do you buy" strip on the
+dashboard: the name of its dialog, and where keyboard focus lands after the
+strip is hidden, shown again, or emptied. It re-seeds the account itself
+partway through:
+
+```bash
+php .github/eye-verify/tracking-ideas-focus-seed.php
+node .github/eye-verify/tracking-ideas-focus.mjs
+php .github/eye-verify/tracking-ideas-focus-seed.php --teardown
+```

@@ -15,17 +15,27 @@
             </div>
             <div class="flex shrink-0 items-center gap-1">
                 <flux:modal.trigger name="tracking-ideas">
-                    <flux:button size="sm" variant="primary">{{ __('Browse ideas') }}</flux:button>
+                    <flux:button size="sm" variant="primary" data-test="tracking-ideas-browse">{{ __('Browse ideas') }}</flux:button>
                 </flux:modal.trigger>
                 <flux:button size="sm" variant="ghost" square icon="x-mark" wire:click="hide" :aria-label="__('Hide these ideas')" :tooltip="__('Hide these ideas')" />
             </div>
         </div>
+    @elseif ($checklist->open !== [])
+        <p class="mt-6 text-base/7 sm:text-sm/6">
+            <button type="button" wire:click="show" class="text-zinc-500 underline-offset-4 hover:text-zinc-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:text-zinc-400 dark:hover:text-zinc-200" data-test="tracking-ideas-show">
+                {{ __('Show ideas for what else to track') }}
+            </button>
+        </p>
+    @endif
 
-        <flux:modal name="tracking-ideas" class="w-full md:max-w-5xl">
-        <div class="space-y-6">
+    {{-- Outside the branches above, so hiding the list or ticking its last
+         item does not pull the open dialog out of the page. The dialog takes
+         its name from the heading: Flux puts aria attributes on its wrapper. --}}
+    <flux:modal name="tracking-ideas" class="w-full md:max-w-5xl">
+        <div class="space-y-6" x-init="$el.closest('dialog')?.setAttribute('aria-labelledby', 'tracking-ideas-heading')">
             <div class="space-y-4">
                 <div>
-                    <flux:heading size="lg" level="2" class="font-semibold! tracking-tight text-balance">{{ __('What else do you buy again and again?') }}</flux:heading>
+                    <flux:heading size="lg" level="2" id="tracking-ideas-heading" class="font-semibold! tracking-tight text-balance">{{ __('What else do you buy again and again?') }}</flux:heading>
                     <flux:text class="mt-1 max-w-[65ch] text-pretty text-zinc-500 dark:text-zinc-400">
                         {{ __('Pick an item to track a product for it. Tick what you already track, and a tracked product ticks its item by itself.') }}
                     </flux:text>
@@ -124,12 +134,5 @@
                 <flux:button size="sm" variant="ghost" class="ml-auto" wire:click="hide">{{ __('Hide this list') }}</flux:button>
             </div>
         </div>
-        </flux:modal>
-    @elseif ($checklist->open !== [])
-        <p class="mt-6 text-base/7 sm:text-sm/6">
-            <button type="button" wire:click="show" class="text-zinc-500 underline-offset-4 hover:text-zinc-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:text-zinc-400 dark:hover:text-zinc-200" data-test="tracking-ideas-show">
-                {{ __('Show ideas for what else to track') }}
-            </button>
-        </p>
-    @endif
+    </flux:modal>
 </div>
