@@ -6,12 +6,17 @@ use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
 use App\PriceAdapters\HostSpecificAdapter;
 use App\PriceAdapters\JsonLdAdapter;
+use App\PriceAdapters\JsonLdEntities;
 use App\PriceAdapters\OwnsHosts;
+use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
+use App\PriceAdapters\StockAvailability;
+use App\Services\Checkjebon\LidlShelfPrice;
 use App\Support\NuxtData;
 use Carbon\CarbonImmutable;
+use Symfony\Component\DomCrawler\Crawler;
 
 /**
  * Host-specific adapter for lidl.nl. Price, title, and image come from the
@@ -25,9 +30,15 @@ use Carbon\CarbonImmutable;
  * with `validFrom` / `validUntil` beside it (verified 2026-09-03). Lidl's
  * JSON-LD carries no `priceValidUntil`, so without reading that badge a
  * weekly action reads as a permanent price.
+ *
+ * A grocery page states no price at all, so its price comes from the
+ * checkjebon dataset instead ({@see LidlShelfPrice}), and its title from the
+ * Nuxt product record.
  */
 final readonly class LidlAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
+    public function __construct(private LidlShelfPrice $shelfPrices) {}
+
     public function key(): string
     {
         return 'lidl';
@@ -45,6 +56,11 @@ final readonly class LidlAdapter implements HostSpecificAdapter, OwnsHosts, Shop
         }
 
         $result = new JsonLdAdapter()->extract($url, $html, $context);
+
+        if ($result->failureReason === 'jsonld_no_price') {
+            return $this->fromShelfPrice($url, $html);
+        }
+
         if (! $result->isSuccess()) {
             return $result->isSkip() ? ExtractionResult::failed('lidl_extraction_failed') : $result;
         }
@@ -72,6 +88,102 @@ final readonly class LidlAdapter implements HostSpecificAdapter, OwnsHosts, Shop
         // The payload always carries the availability record; an offer
         // that ended simply stops stating a period.
         return ExtractionResult::success($snapshot->withPromotionWindow(self::promotionWindow($data)));
+    }
+
+    /**
+     * The dataset's shelf price for a page that states none. Title and image
+     * come from the page, the pack size from the dataset row or else the
+     * page. The dataset holds the regular price, so the page's offer period
+     * is not attached: it would mark a regular price as a running deal.
+     */
+    private function fromShelfPrice(string $url, string $html): ExtractionResult
+    {
+        $data = NuxtData::decode($html);
+        $productId = HostUrl::lastSegmentDigits($url, 'p');
+        $record = $data === null || $productId === null
+            ? null
+            : NuxtData::recordsFor($data, ['productId', 'ians', 'keyfacts'], 'productId', $productId)[0] ?? null;
+
+        if ($data === null || $productId === null || $record === null) {
+            return ExtractionResult::failed('lidl_no_price');
+        }
+
+        $keyfacts = NuxtData::value($data, $record, 'keyfacts');
+        $title = null;
+
+        if (is_array($keyfacts)) {
+            /** @var array<string, mixed> $keyfacts */
+            $title = NuxtData::value($data, $keyfacts, 'title');
+        }
+
+        $ians = NuxtData::value($data, $record, 'ians');
+        $ians = is_array($ians)
+            ? array_values(array_filter(array_map(fn (mixed $index): mixed => is_int($index) ? ($data[$index] ?? null) : $index, $ians), is_string(...)))
+            : [];
+
+        if (! is_string($title) || $title === '') {
+            return ExtractionResult::failed('lidl_no_price');
+        }
+
+        $row = $this->shelfPrices->rowFor($ians, $title);
+
+        if ($row === null) {
+            return ExtractionResult::failed('lidl_no_price');
+        }
+
+        $pagePack = self::packagingFromNuxtPayload($data, $productId);
+
+        // A row for another pack of the same product is another price.
+        if ($row->size !== null && $pagePack !== null && self::packKey($row->size) !== self::packKey($pagePack)) {
+            return ExtractionResult::failed('lidl_no_price');
+        }
+
+        $packSize = $row->size ?? $pagePack;
+        $crawler = new Crawler($html);
+        // The page's offer still says whether the product is sold; null lets
+        // the resolver read the page text instead.
+        [$inStock, $stockSignal] = StockAvailability::read(self::offerAvailability($crawler));
+
+        return ExtractionResult::success(new ShopSnapshot(
+            title: $title,
+            imageUrl: PageMarkup::ogImage($crawler),
+            price: (string) $row->price,
+            currency: 'EUR',
+            inStock: $inStock,
+            raw: [
+                'source' => 'checkjebon',
+                'ian' => $row->external_id,
+                'refreshed_at' => $row->refreshed_at->toIso8601String(),
+            ],
+            packSize: $packSize,
+            packSizeAuthoritative: $packSize !== null,
+            // Authoritative and empty, so a period stored from an earlier
+            // priced page is cleared rather than kept on the regular price.
+            promotionWindowAuthoritative: true,
+            stockSignal: $stockSignal,
+        ));
+    }
+
+    private static function packKey(string $pack): string
+    {
+        return (string) preg_replace('/\s+/', '', str_replace(',', '.', mb_strtolower($pack)));
+    }
+
+    /**
+     * The `availability` of the page's Product offer, which states it even
+     * where it states no price.
+     */
+    private static function offerAvailability(Crawler $crawler): mixed
+    {
+        foreach ($crawler->filter('script[type="application/ld+json"]') as $node) {
+            $decoded = json_decode($node->textContent, true);
+
+            if (is_array($decoded) && ($decoded['@type'] ?? null) === 'Product') {
+                return JsonLdEntities::pickOfferFromProduct($decoded['offers'] ?? null)['availability'] ?? null;
+            }
+        }
+
+        return null;
     }
 
     /**

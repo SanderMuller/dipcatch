@@ -31,6 +31,12 @@ return [
         [
             'date' => '2026-10-05',
             'category' => 'fix',
+            'title' => 'Prices for Lidl groceries',
+            'body' => "Lidl's website doesn't list prices for groceries, so adding a Lidl grocery link used to fail. DipCatch now uses Lidl's regular shelf price from a daily price list. If DipCatch can't tell for sure that a price belongs to your product, it leaves it out.\n\nIn-store deals don't show yet.",
+        ],
+        [
+            'date' => '2026-10-05',
+            'category' => 'fix',
             'title' => 'No more suggested shops from abroad',
             'body' => "The barcode search sometimes suggested French, German or Slovenian shops. Suggested shops are now only ones that sell to shoppers in the Netherlands.",
         ],
