@@ -30,6 +30,13 @@ return [
     'entries' => [
         [
             'date' => '2026-10-05',
+            'category' => 'feature',
+            'title' => 'A clearer dashboard',
+            'body' => "Your dashboard now opens with what's worth buying: the shops where several of your products are cheapest and something is on offer, then products at your alert price and the biggest drops.\n\nSuggested shops and things to check are in a column on the right.",
+            'link' => ['route' => 'app.dashboard', 'label' => 'Go to your dashboard'],
+        ],
+        [
+            'date' => '2026-10-05',
             'category' => 'fix',
             'title' => 'Prices for Lidl groceries',
             'body' => "Lidl's website doesn't list prices for groceries, so adding a Lidl grocery link used to fail. DipCatch now uses Lidl's regular shelf price from a daily price list. If DipCatch can't tell for sure that a price belongs to your product, it leaves it out.\n\nIn-store deals don't show yet.",

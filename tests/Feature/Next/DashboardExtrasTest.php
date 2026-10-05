@@ -147,7 +147,7 @@ it('keeps the alert history off the dashboard', function (): void {
     $this->actingAs($user);
 
     // Not the product title: it is legitimately on the dashboard already,
-    // under "Recently tracked".
+    // under "Recently added".
     livewire(Dashboard::class)
         ->assertDontSee('Recent alerts')
         ->assertDontSee('12.3%')

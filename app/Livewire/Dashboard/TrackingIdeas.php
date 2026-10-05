@@ -11,9 +11,9 @@ use Illuminate\View\View;
 use Livewire\Component;
 
 /**
- * A getting-started checklist of things people buy again and again, on the
- * dashboard until every idea is covered. A hidden card leaves a link to
- * show it again.
+ * A getting-started checklist of things people buy again and again: a strip
+ * on the dashboard, with the list in a dialog, until every idea is covered.
+ * Hiding the strip leaves a link to show it again.
  */
 final class TrackingIdeas extends Component
 {

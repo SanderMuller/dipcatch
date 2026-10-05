@@ -10,12 +10,13 @@ use Illuminate\Support\Str;
 use function Pest\Livewire\livewire;
 
 /**
- * A product at two shops, with the lower price at `$cheapHost`.
+ * A product at two shops, with the lower price at `$cheapHost`, and a deal
+ * running there when `$onOffer`.
  */
-function digestProduct(User $user, string $title, string $cheapHost, string $dearHost): Product
+function digestProduct(User $user, string $title, string $cheapHost, string $dearHost, bool $onOffer = false): Product
 {
     $product = Product::factory()->for($user)->create(['title' => $title, 'currency' => 'EUR']);
-    Shop::factory()->for($product)->create(['url' => "https://{$cheapHost}/p/" . Str::slug($title), 'current_price' => '1.00', 'currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => "https://{$cheapHost}/p/" . Str::slug($title), 'current_price' => '1.00', 'currency' => 'EUR', 'promotion_ends_at' => $onOffer ? now()->addDays(2) : null]);
     Shop::factory()->for($product)->create(['url' => "https://{$dearHost}/p/" . Str::slug($title), 'current_price' => '2.00', 'currency' => 'EUR']);
     $product->refresh()->recomputeCheapestShop();
 
@@ -24,15 +25,26 @@ function digestProduct(User $user, string $title, string $cheapHost, string $dea
 
 it('groups each product under the shop where it is the best buy, biggest trip first', function (): void {
     $user = User::factory()->create();
-    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com');
+    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
     digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com');
-    digestProduct($user, 'Milk', 'jumbo.com', 'ah.nl');
+    digestProduct($user, 'Rice', 'ah.nl', 'jumbo.com');
+    digestProduct($user, 'Milk', 'jumbo.com', 'ah.nl', onOffer: true);
+    digestProduct($user, 'Juice', 'jumbo.com', 'ah.nl');
 
     $trips = DashboardDigest::forUser($user)->trips;
 
     expect(array_column($trips, 'host'))->toBe(['ah.nl', 'jumbo.com'])
-        ->and(array_column($trips, 'count'))->toBe([2, 1])
-        ->and(array_map(fn (Product $product): string => $product->title, $trips[0]['products']))->toEqualCanonicalizing(['Coffee', 'Tea']);
+        ->and(array_column($trips, 'count'))->toBe([3, 2])
+        ->and(array_map(fn (Product $product): string => $product->title, $trips[0]['products']))->toEqualCanonicalizing(['Coffee', 'Tea', 'Rice']);
+});
+
+it('leaves out a shop with one best buy, or with nothing on offer', function (): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Coffee', 'lidl.nl', 'jumbo.com', onOffer: true);
+    digestProduct($user, 'Milk', 'dirk.nl', 'jumbo.com');
+    digestProduct($user, 'Juice', 'dirk.nl', 'jumbo.com');
+
+    expect(DashboardDigest::forUser($user)->trips)->toBeEmpty();
 });
 
 it('leaves out a product whose cheapest shop no longer sells it', function (): void {
@@ -90,8 +102,9 @@ it('names this account\'s shops that fail to read and products at one shop only'
 
 it('shows where to shop this week on the dashboard, and only this account\'s products', function (): void {
     $user = User::factory()->create();
-    digestProduct($user, 'My coffee', 'ah.nl', 'jumbo.com');
-    digestProduct(User::factory()->create(), 'Someone elses tea', 'ah.nl', 'jumbo.com');
+    digestProduct($user, 'My coffee', 'ah.nl', 'jumbo.com', onOffer: true);
+    digestProduct($user, 'My tea', 'ah.nl', 'jumbo.com');
+    digestProduct(User::factory()->create(), 'Someone elses tea', 'ah.nl', 'jumbo.com', onOffer: true);
 
     $this->actingAs($user);
 
@@ -101,19 +114,38 @@ it('shows where to shop this week on the dashboard, and only this account\'s pro
         ->assertDontSee('Someone elses tea');
 });
 
+it('puts shops with a store before online-only ones, whatever their size', function (): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Coffee', 'bol.com', 'jumbo.com', onOffer: true);
+    digestProduct($user, 'Tea', 'bol.com', 'jumbo.com');
+    digestProduct($user, 'Rice', 'bol.com', 'jumbo.com');
+    digestProduct($user, 'Milk', 'ah.nl', 'jumbo.com', onOffer: true);
+    digestProduct($user, 'Juice', 'ah.nl', 'jumbo.com');
+
+    $trips = DashboardDigest::forUser($user)->trips;
+
+    expect(array_column($trips, 'hasStore', 'host'))->toBe(['bol.com' => false, 'ah.nl' => true]);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertSeeInOrder(['Shops with a store', 'ah.nl', 'Online only', 'bol.com']);
+});
+
 it('links a trip\'s best buys and its offers to the product list rows they count', function (): void {
     $user = User::factory()->create();
-    $onOffer = digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com');
-    $onOffer->shops->firstWhere('host', 'ah.nl')?->forceFill(['promotion_ends_at' => now()->addDays(2)])->save();
-    digestProduct($user, 'Tea', 'jumbo.com', 'ah.nl');
+    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
+    digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com');
+    digestProduct($user, 'Milk', 'jumbo.com', 'ah.nl');
+    digestProduct($user, 'Juice', 'jumbo.com', 'ah.nl');
 
     $this->actingAs($user);
 
     livewire(Dashboard::class)
         ->assertSeeHtml('href="' . e(route('app.products.index', ['shop' => 'ah.nl', 'bestBuy' => 'true'])) . '"')
         ->assertSeeHtml('href="' . e(route('app.products.index', ['shop' => 'ah.nl', 'bestBuy' => 'true', 'discounted' => 'true'])) . '"')
-        ->assertSeeHtml('href="' . e(route('app.products.index', ['shop' => 'jumbo.com', 'bestBuy' => 'true'])) . '"')
-        ->assertDontSeeHtml('href="' . e(route('app.products.index', ['shop' => 'jumbo.com', 'bestBuy' => 'true', 'discounted' => 'true'])) . '"');
+        // Best buys alone, nothing on offer: no trip to recommend.
+        ->assertDontSeeHtml('href="' . e(route('app.products.index', ['shop' => 'jumbo.com', 'bestBuy' => 'true'])) . '"');
 });
 
 it('finds the same best buys for a shop as the trip counts', function (): void {
@@ -123,13 +155,44 @@ it('finds the same best buys for a shop as the trip counts', function (): void {
     digestProduct($user, 'Milk', 'jumbo.com', 'ah.nl');
     digestProduct(User::factory()->create(), 'Not mine', 'ah.nl', 'jumbo.com');
 
-    $trip = collect(DashboardDigest::forUser($user)->trips)->firstWhere('host', 'ah.nl');
-
     $coffee->shops->firstWhere('host', 'ah.nl')?->forceFill(['promotion_ends_at' => now()->addDays(2)])->save();
     // A deal at the shop that is not the best buy does not put a product on offer in this trip.
     $tea->shops->firstWhere('host', 'jumbo.com')?->forceFill(['promotion_ends_at' => now()->addDays(2)])->save();
 
+    $trip = collect(DashboardDigest::forUser($user)->trips)->firstWhere('host', 'ah.nl');
+
     expect(DashboardDigest::bestBuyIds($user, 'ah.nl'))->toEqualCanonicalizing([$coffee->id, $tea->id])
         ->and($trip['count'] ?? null)->toBe(2)
         ->and(DashboardDigest::bestBuyIds($user, 'ah.nl', onOfferOnly: true))->toBe([$coffee->id]);
+});
+
+it('keeps the five biggest trips', function (): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Extra at ah.nl', 'ah.nl', 'bol.com');
+
+    foreach (['ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'spar.nl', 'plus.nl'] as $host) {
+        digestProduct($user, "Deal at {$host}", $host, 'bol.com', onOffer: true);
+        digestProduct($user, "Plain at {$host}", $host, 'bol.com');
+    }
+
+    expect(array_column(DashboardDigest::forUser($user)->trips, 'host'))->toBe(['ah.nl', 'dirk.nl', 'jumbo.com', 'lidl.nl', 'plus.nl']);
+});
+
+it('lists what is worth a look, with a way to add a shop to a product at one shop', function (): void {
+    $user = User::factory()->create();
+    $ending = digestProduct($user, 'Ending deal', 'ah.nl', 'jumbo.com');
+    $ending->shops->firstWhere('host', 'ah.nl')?->forceFill(['promotion_ends_at' => now()->addDays(2)])->save();
+    $broken = digestProduct($user, 'Broken page', 'ah.nl', 'jumbo.com');
+    $broken->shops->firstWhere('host', 'jumbo.com')?->forceFill(['consecutive_failures' => 3])->save();
+    $single = Product::factory()->for($user)->create(['title' => 'Lonely', 'currency' => 'EUR']);
+    Shop::factory()->for($single)->create(['url' => 'https://ah.nl/p/lonely', 'current_price' => '1.00', 'currency' => 'EUR']);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertSeeHtml('data-test="worth-a-look"')
+        ->assertSeeText('Deal at ah.nl ends')
+        ->assertSeeText('DipCatch cannot read jumbo.com right now.')
+        ->assertSeeText('Tracked at one shop only.')
+        ->assertSeeHtml(e(route('app.products.show', [$single, 'add-shop' => 1])));
 });

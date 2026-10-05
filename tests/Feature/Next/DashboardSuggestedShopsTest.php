@@ -169,17 +169,15 @@ it('says so when there is nothing to suggest', function (): void {
     Livewire::withoutLazyLoading()->test(DashboardSuggestedShops::class)->assertSee('No suggested shops right now.');
 });
 
-it('loads the suggestions lazily beside Worth a look', function (): void {
+it('loads the suggestions lazily in the sidebar, above Worth a look', function (): void {
     $user = User::factory()->create();
     // One shop only, so Worth a look lists it.
     dashboardProduct($user, 'Beemster Extra belegen 48+ plakken');
     $this->actingAs($user);
 
     Livewire::test(Dashboard::class)
-        ->assertSee('Worth a look')
-        ->assertSee('Add suggested shops to your products')
-        ->assertSee('Looking for other shops that sell your products…')
-        ->assertSeeHtml('lg:grid-cols-2');
+        ->assertSeeInOrder(['Add suggested shops to your products', 'Worth a look'])
+        ->assertSee('Looking for other shops that sell your products…');
 });
 
 it('asks Jev nothing while listing', function (): void {

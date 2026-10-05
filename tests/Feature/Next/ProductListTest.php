@@ -856,7 +856,9 @@ it('leaves a drop the price has climbed back out of off "Only discounts"', funct
 
 it('states a promotion the card is listed under "Only discounts" for', function (): void {
     $user = User::factory()->create();
-    productWithCheapestShop($user, 'Remia Friteslijn', ['host' => 'ah.nl', 'current_price' => '1.69', 'promotion_label' => '25% korting', 'promotion_ends_at' => now()->addDays(4)]);
+    $product = productWithCheapestShop($user, 'Remia Friteslijn', ['host' => 'ah.nl', 'current_price' => '1.69', 'promotion_label' => '25% korting', 'promotion_ends_at' => now()->addDays(4)], ['last_notified_price' => '1.69', 'last_notified_at' => now()]);
+    // In a drop, so it shows as a card: "Recently added" lists no prices.
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'reference_price' => '2.25', 'new_price' => '1.69', 'drop_pct' => 24.9, 'currency' => 'EUR']);
 
     $this->actingAs($user);
 
@@ -978,7 +980,9 @@ it('states a bundle as today\'s deal without a promotion window that has ended',
 
 it('states a running promotion on a dashboard card too', function (): void {
     $user = User::factory()->create();
-    productWithCheapestShop($user, 'Remia Friteslijn', ['host' => 'ah.nl', 'current_price' => '1.69', 'promotion_label' => '25% korting', 'promotion_ends_at' => now()->addDays(4)]);
+    $product = productWithCheapestShop($user, 'Remia Friteslijn', ['host' => 'ah.nl', 'current_price' => '1.69', 'promotion_label' => '25% korting', 'promotion_ends_at' => now()->addDays(4)], ['last_notified_price' => '1.69', 'last_notified_at' => now()]);
+    // In a drop, so it shows as a card: "Recently added" lists no prices.
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'reference_price' => '2.25', 'new_price' => '1.69', 'drop_pct' => 24.9, 'currency' => 'EUR']);
 
     $this->actingAs($user);
 
@@ -998,7 +1002,9 @@ it('states a running promotion on a dashboard card too', function (): void {
 
 it('keeps an announced deal on a dashboard card', function (): void {
     $user = User::factory()->create();
-    productWithCheapestShop($user, 'Remia Friteslijn', ['host' => 'ah.nl', 'current_price' => '1.69', 'promotion_label' => '25% korting', 'promotion_starts_at' => now()->addDays(2), 'promotion_ends_at' => now()->addDays(8)]);
+    $product = productWithCheapestShop($user, 'Remia Friteslijn', ['host' => 'ah.nl', 'current_price' => '1.69', 'promotion_label' => '25% korting', 'promotion_starts_at' => now()->addDays(2), 'promotion_ends_at' => now()->addDays(8)], ['last_notified_price' => '1.69', 'last_notified_at' => now()]);
+    // In a drop, so it shows as a card: "Recently added" lists no prices.
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'reference_price' => '2.25', 'new_price' => '1.69', 'drop_pct' => 24.9, 'currency' => 'EUR']);
 
     $this->actingAs($user);
 

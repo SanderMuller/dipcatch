@@ -23,18 +23,25 @@ final class Dashboard extends Component
     public function render(): View
     {
         $activeDrops = $this->activeDrops();
+        $atAlert = $this->atAlert();
         $watching = $this->watching();
+        $digest = DashboardDigest::forUser($this->user());
 
         return view('livewire.dashboard', [
             'trackedProducts' => $this->trackedProducts(),
             'activeDropCount' => $activeDrops->count(),
             'activeDrops' => $activeDrops,
+            'atAlert' => $atAlert,
+            // Excluded in the query, not after it, so six cards still fill.
+            'dropCards' => $this->activeDrops(limit: 6, except: $atAlert->modelKeys()),
             'watching' => $watching,
             'lifetimeSavings' => $this->lifetimeSavings(),
             'needsSecondShop' => $this->needsSecondShop($watching),
             'canAddProduct' => app(PlanLimits::class)->canAddProduct($this->user()),
             'hasAnyProduct' => $watching->isNotEmpty(),
-            'digest' => DashboardDigest::forUser($this->user()),
+            'digest' => $digest,
+            'storeTrips' => array_values(array_filter($digest->trips, fn (array $trip): bool => $trip['hasStore'])),
+            'onlineTrips' => array_values(array_filter($digest->trips, fn (array $trip): bool => ! $trip['hasStore'])),
         ]);
     }
 
@@ -57,12 +64,14 @@ final class Dashboard extends Component
     /**
      * Products currently below the threshold that alerted on them.
      *
+     * @param  array<int, int|string>  $except
      * @return EloquentCollection<int, Product>
      */
-    private function activeDrops(): EloquentCollection
+    private function activeDrops(int $limit = 10, array $except = []): EloquentCollection
     {
         return Product::query()
             ->where('user_id', $this->user()->id)
+            ->whereKeyNot($except)
             // As "Only discounts" on the product list: a drop the card shows a
             // badge for, not a price that has climbed back to its reference.
             ->inVisibleDrop()
@@ -71,7 +80,26 @@ final class Dashboard extends Component
             // Biggest first: the drop worth acting on leads, not the newest.
             ->orderByDesc(Product::liveDropPercentQuery())
             ->latest('last_notified_at')
-            ->limit(10)
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Active products at or under the alert price their owner set.
+     *
+     * @return EloquentCollection<int, Product>
+     */
+    private function atAlert(): EloquentCollection
+    {
+        return Product::query()
+            ->where('user_id', $this->user()->id)
+            ->atTarget()
+            ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
+            // PostgreSQL sorts NULL first when descending: a product that never alerted goes last.
+            ->orderByRaw('last_notified_at is null')
+            ->latest('last_notified_at')
+            ->latest('updated_at')
+            ->limit(6)
             ->get();
     }
 
@@ -86,11 +114,8 @@ final class Dashboard extends Component
     {
         return Product::query()
             ->where('user_id', $this->user()->id)
-            // The card's figure is resolved across the shops, so they load
-            // with the list rather than once per card.
-            ->with(['cheapestShop', 'shops', 'latestPriceDropEvent'])
+            ->withCount('shops')
             ->latest('created_at')
-            // One row of cards at five across.
             ->limit(5)
             ->get();
     }

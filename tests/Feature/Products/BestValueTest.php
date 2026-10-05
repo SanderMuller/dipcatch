@@ -6,6 +6,7 @@ use App\Enums\ShopHealth;
 use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
+use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -199,6 +200,9 @@ test('the dashboard says how long the drop price lasts', function (): void {
     ]);
     $ah->forceFill(['promotion_ends_at' => CarbonImmutable::parse('2036-09-06 21:59:59')])->save();
     $product->forceFill(['cheapest_shop_id' => $ah->id, 'cheapest_price' => '1.69'])->save();
+    $product->refresh()->recomputeCheapestShop();
+    // In a drop per kilo, so it shows as a card: "Recently added" lists no prices.
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'reference_price' => '1.79', 'new_price' => '1.69', 'comparison_unit' => 'g', 'reference_unit_price' => '8.9500', 'drop_pct' => 5.6, 'currency' => 'EUR']);
 
     $this->actingAs($user);
 
@@ -226,6 +230,9 @@ test('the dashboard card leads with the best value and links its shop', function
         'pack_quantity' => '370.00', 'pack_unit' => 'g',
     ]);
     $product->forceFill(['cheapest_shop_id' => $ah->id, 'cheapest_price' => '1.69'])->save();
+    $product->refresh()->recomputeCheapestShop();
+    // In a drop per kilo, so it shows as a card: "Recently added" lists no prices.
+    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'reference_price' => '1.79', 'new_price' => '1.69', 'comparison_unit' => 'g', 'reference_unit_price' => '6.0000', 'drop_pct' => 10.4, 'currency' => 'EUR']);
 
     $this->actingAs($user);
 

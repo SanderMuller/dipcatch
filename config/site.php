@@ -153,6 +153,26 @@ return [
     ],
 
     /**
+     * Hosts of shops with physical stores. The dashboard groups a
+     * week's shops into these and online-only ones. Most of them also sell
+     * online, so the group says where a shopper can go, not how they shop.
+     * A host missing here counts as online only.
+     */
+    'store_hosts' => [
+        // Supermarkets.
+        'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl', 'plus.nl', 'coop.nl',
+        'dekamarkt.nl', 'poiesz-supermarkten.nl', 'vomar.nl', 'hoogvliet.com', 'janlinders.nl', 'ekoplaza.nl',
+        // Drugstores and variety stores.
+        'kruidvat.nl', 'etos.nl', 'hema.nl', 'action.com', 'blokker.nl', 'boots.com', 'superdrug.com',
+        // DIY, garden and pets.
+        'praxis.nl', 'gamma.nl', 'karwei.nl', 'hubo.nl', 'toolstation.nl', 'welkoop.nl', 'petsplace.nl', 'petsathome.com',
+        // Electronics, toys, baby and department stores.
+        'mediamarkt.nl', 'coolblue.nl', 'expert.nl', 'intertoys.nl', 'prenatal.nl', 'babypark.nl', 'dreamland.nl', 'debijenkorf.nl', 'lego.com',
+        // United States.
+        'walmart.com', 'target.com', 'ulta.com',
+    ],
+
+    /**
      * The public origin the `seo:check-markdown` command reads by default.
      * Cloudflare converts HTML to Markdown at the edge, so the check only
      * means anything against the real site; `--url` overrides it.

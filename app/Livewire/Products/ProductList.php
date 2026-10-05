@@ -74,23 +74,13 @@ final class ProductList extends Component
     private const string DEFAULT_SORT = 'biggest_drop';
 
     /**
-     * The group of a product sorted by drop. 0: an active product at or
-     * under its alert price, compared as {@see Product::isAtTarget()} does,
-     * on the stored best value; 1: in a drop, or with a deal as the "Only
+     * The group of a product sorted by drop. 0: at its alert price, as
+     * {@see Product::AT_TARGET_SQL} reads it; 1: in a drop, or with a deal as the "Only
      * discounts" switch reads one; 2: the rest.
      */
-    private const string LIST_GROUP = <<<'SQL'
-        CASE
-            WHEN active = TRUE AND (
-                (target_price IS NOT NULL AND cheapest_price IS NOT NULL AND cheapest_price <= target_price)
-                OR (unit_price_target IS NOT NULL AND best_value_price > 0 AND best_value_pack_quantity > 0
-                    AND ROUND(best_value_price * 1.0 / best_value_pack_quantity
-                        * (CASE best_value_pack_unit WHEN 'piece' THEN 1 ELSE 1000 END), 6) <= unit_price_target)
-            ) THEN 0
-            WHEN biggest_drop >= 0.5 OR deals_now > 0 THEN 1
-            ELSE 2
-        END
-        SQL;
+    private const string LIST_GROUP = 'CASE WHEN ' . Product::AT_TARGET_SQL . ' THEN 0'
+        . ' WHEN biggest_drop >= 0.5 OR deals_now > 0 THEN 1'
+        . ' ELSE 2 END';
 
     /** @var list<string>|null Memo for {@see bestBuyIds()}; not public, so it lives for one request. */
     private ?array $bestBuyIds = null;

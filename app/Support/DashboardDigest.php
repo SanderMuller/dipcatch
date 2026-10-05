@@ -19,7 +19,10 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
  */
 final readonly class DashboardDigest
 {
-    private const int TRIPS = 3;
+    private const int TRIPS = 5;
+
+    /** A shop with one best buy is not worth a trip of its own. */
+    private const int TRIP_MIN_PRODUCTS = 2;
 
     private const int TRIP_PRODUCTS = 250;
 
@@ -30,7 +33,7 @@ final readonly class DashboardDigest
     private const int ATTENTION = 4;
 
     /**
-     * @param  list<array{host: string, shop: Shop, products: list<Product>, count: int, onOffer: int}>  $trips
+     * @param  list<array{host: string, shop: Shop, products: list<Product>, count: int, onOffer: int, hasStore: bool}>  $trips
      * @param  list<array{product: Product, shop: Shop, endsAt: CarbonImmutable}>  $endingSoon
      * @param  list<array{product: Product, shop: Shop}>  $failing
      * @param  list<Product>  $singleShop
@@ -134,17 +137,26 @@ final readonly class DashboardDigest
 
     /**
      * Each product under the shop the product card leads with, so a trip to
-     * that shop buys every product in it at its best price.
+     * that shop buys every product in it at its best price. Only a shop with
+     * at least two best buys, one of them on offer, makes a trip.
      *
      * @param  EloquentCollection<int, Product>  $products
      * @param  array<int, string>  $inDrop
-     * @return list<array{host: string, shop: Shop, products: list<Product>, count: int, onOffer: int}>
+     * @return list<array{host: string, shop: Shop, products: list<Product>, count: int, onOffer: int, hasStore: bool}>
      */
     private static function trips(EloquentCollection $products, array $inDrop): array
     {
         $trips = [];
 
         foreach (self::itemsByHost($products, $inDrop) as $host => $items) {
+            if (count($items) < self::TRIP_MIN_PRODUCTS) {
+                continue;
+            }
+
+            if (! array_any($items, fn (array $item): bool => $item['onOffer'])) {
+                continue;
+            }
+
             // Offers first, so the products a trip shows are the ones worth the
             // trip; then by id, so equal items keep their place between visits
             // instead of following whichever product was rechecked last.
@@ -156,6 +168,7 @@ final readonly class DashboardDigest
                 'products' => array_column(array_slice($items, 0, self::TRIP_ITEMS), 'product'),
                 'count' => count($items),
                 'onOffer' => count(array_filter($items, fn (array $item): bool => $item['onOffer'])),
+                'hasStore' => in_array((string) $host, (array) config('site.store_hosts'), strict: true),
             ];
         }
 

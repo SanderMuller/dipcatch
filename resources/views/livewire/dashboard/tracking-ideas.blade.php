@@ -1,6 +1,28 @@
 <div>
     @if ($checklist->open !== [] && ! $hidden)
-        <flux:card class="mt-6 space-y-6" data-test="tracking-ideas">
+        <div class="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl bg-soft-yellow/60 px-4 py-3 ring-1 ring-chart/30 dark:bg-white/5 dark:ring-white/10" data-test="tracking-ideas">
+            <div class="flex min-w-0 items-center gap-3">
+                <flux:icon.sparkles variant="mini" class="size-5 shrink-0 text-chart-line" />
+                <p class="text-sm font-medium">{{ __('What else do you buy again and again?') }}</p>
+            </div>
+            <div class="flex min-w-48 flex-1 items-center gap-3 text-sm">
+                <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-ink/10 sm:max-w-48 dark:bg-white/10" aria-hidden="true">
+                    <div class="h-full w-(--progress) rounded-full bg-savings" style="--progress: {{ round($checklist->handled() / $checklist->total() * 100) }}%"></div>
+                </div>
+                <p class="shrink-0 tabular-nums text-zinc-600 dark:text-zinc-400" data-test="tracking-ideas-progress">
+                    {{ __(':done of :total done', ['done' => $checklist->handled(), 'total' => $checklist->total()]) }}
+                </p>
+            </div>
+            <div class="flex shrink-0 items-center gap-1">
+                <flux:modal.trigger name="tracking-ideas">
+                    <flux:button size="sm" variant="primary">{{ __('Browse ideas') }}</flux:button>
+                </flux:modal.trigger>
+                <flux:button size="sm" variant="ghost" square icon="x-mark" wire:click="hide" :aria-label="__('Hide these ideas')" :tooltip="__('Hide these ideas')" />
+            </div>
+        </div>
+
+        <flux:modal name="tracking-ideas" class="w-full md:max-w-5xl">
+        <div class="space-y-6">
             <div class="space-y-4">
                 <div>
                     <flux:heading size="lg" level="2" class="font-semibold! tracking-tight text-balance">{{ __('What else do you buy again and again?') }}</flux:heading>
@@ -13,7 +35,7 @@
                     <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-ink/5 dark:bg-white/10" aria-hidden="true">
                         <div class="h-full w-(--progress) rounded-full bg-savings" style="--progress: {{ round($checklist->handled() / $checklist->total() * 100) }}%"></div>
                     </div>
-                    <p class="shrink-0 tabular-nums text-zinc-500 dark:text-zinc-400" data-test="tracking-ideas-progress">
+                    <p class="shrink-0 tabular-nums text-zinc-500 dark:text-zinc-400">
                         {{ __(':done of :total done', ['done' => $checklist->handled(), 'total' => $checklist->total()]) }}
                     </p>
                 </div>
@@ -101,7 +123,8 @@
                 @endif
                 <flux:button size="sm" variant="ghost" class="ml-auto" wire:click="hide">{{ __('Hide this list') }}</flux:button>
             </div>
-        </flux:card>
+        </div>
+        </flux:modal>
     @elseif ($checklist->open !== [])
         <p class="mt-6 text-base/7 sm:text-sm/6">
             <button type="button" wire:click="show" class="text-zinc-500 underline-offset-4 hover:text-zinc-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:text-zinc-400 dark:hover:text-zinc-200" data-test="tracking-ideas-show">
