@@ -80,7 +80,7 @@ final readonly class TypeSafeClient
      *
      * @throws TypeSafeRequestFailed
      */
-    public function sameProduct(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = [], ?string $exactPackSize = null): array
+    public function sameProduct(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = [], ?string $exactPackSize = null, ?string $shoppersCountry = null): array
     {
         if ($candidates === []) {
             return [];
@@ -89,14 +89,17 @@ final readonly class TypeSafeClient
         $product->loadMissing('shops');
 
         $questions = [];
-
         foreach ($candidates as $key => $candidate) {
-            $questions[$key] = SameProductQuestion::for($candidate, anyPack: in_array((string) $key, $anyPackKeys, strict: true), exactPackSize: $exactPackSize);
+            $questions[$key] = SameProductQuestion::for($candidate, anyPack: in_array((string) $key, $anyPackKeys, strict: true), exactPackSize: $exactPackSize, shoppersCountry: $shoppersCountry);
         }
 
         $payload = $this->send($purpose->value, [
             'model' => self::MODEL,
-            'state' => [...$this->state($product), 'tracked_pack_sizes' => $exactPackSize === null ? self::trackedPackSizes($product) : [$exactPackSize]],
+            'state' => [
+                ...$this->state($product),
+                'tracked_pack_sizes' => $exactPackSize === null ? self::trackedPackSizes($product) : [$exactPackSize],
+                ...($shoppersCountry === null ? [] : ['shoppers_country' => $shoppersCountry]),
+            ],
             'questions' => $questions,
         ], quick: $quick);
 

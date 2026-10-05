@@ -70,7 +70,10 @@ test('the add-shop preview warns when Jev doubts the page sells the same product
 
         $question = $request->data()['questions']['draft'];
 
+        // A pasted page is the shop the person chose; its country is no question.
         expect($request->data()['state']['tracked_pack_sizes'])->toBe(['1020 g'])
+            ->and($request->data()['state'])->not->toHaveKey('shoppers_country')
+            ->and($question['instructions']['question'])->not->toContain('shoppers in')
             ->and($question['type'])->toBe('noul')
             ->and($question['instructions']['candidate'])->toMatchArray(['shop' => 'shop.example.com', 'title' => 'Whiskas Adult Zalm 4 x 85 g']);
 

@@ -93,18 +93,21 @@ final readonly class WebSecondCheck
         ), $claimed);
 
         $anyPack = array_keys(array_filter($claimed, static fn (WebShopFinding $finding): bool => $finding->isLead()));
-        $answers = $this->shopMatch->ask($product, ShopCheckPurpose::WebDiscoveryConfirm, $candidates, quick: false, anyPackKeys: $anyPack);
+        $answers = $this->shopMatch->ask($product, ShopCheckPurpose::WebDiscoveryConfirm, $candidates, quick: false, anyPackKeys: $anyPack, shoppersCountry: ShoppersCountry::name());
         $gtins = WebShopFinding::trackedGtins($product);
 
         foreach ($claimed as $key => $finding) {
             $chance = $answers[$key] ?? null;
 
+            $proposed = $chance !== null && $chance >= Config::float('dipcatch.shop_checks.accept_from');
+
             $finding->writeIfUnchanged(WebFindingStatus::Checking, $chance === null
                 ? ['status' => WebFindingStatus::Read, 'claimed_at' => null]
                 : [
                     'claimed_at' => null,
-                    'status' => $chance >= Config::float('dipcatch.shop_checks.accept_from') ? WebFindingStatus::Proposed : WebFindingStatus::Declined,
+                    'status' => $proposed ? WebFindingStatus::Proposed : WebFindingStatus::Declined,
                     'second_chance' => $chance,
+                    'matched_gtin' => $proposed && in_array($finding->page_gtin, $gtins, strict: true) ? $finding->page_gtin : null,
                     'checked_gtins' => $gtins,
                     'checked_at' => now(),
                 ]);

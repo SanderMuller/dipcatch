@@ -89,8 +89,6 @@ final readonly class WebPageReads
         $draft = ShopDraft::fromOutcome($outcome, $outcome->normalizedUrl, $outcome->adapterKey);
         $addHost = UrlNormalizer::normalizeHost((string) parse_url($outcome->normalizedUrl, PHP_URL_HOST));
         $servedHost = $outcome->host === null ? $addHost : UrlNormalizer::normalizeHost($outcome->host);
-        $gtins = WebShopFinding::trackedGtins($product);
-
         $page = [
             'add_url' => $outcome->normalizedUrl,
             'served_host' => $servedHost,
@@ -104,16 +102,10 @@ final readonly class WebPageReads
             'read_at' => now(),
         ];
 
-        return $page + (self::rejection($product, $addHost, $servedHost, $draft) ?? match (true) {
-            $draft->gtin !== null && in_array($draft->gtin, $gtins, strict: true) => [
-                'status' => WebFindingStatus::Proposed,
-                'second_chance' => 1.0,
-                'matched_gtin' => $draft->gtin,
-                'checked_gtins' => $gtins,
-                'checked_at' => now(),
-            ],
-            default => ['status' => WebFindingStatus::Read],
-        });
+        // A page with the product's barcode still goes to the second check:
+        // the barcode proves the product, not that the shop sells in the
+        // shoppers' country.
+        return $page + (self::rejection($product, $addHost, $servedHost, $draft) ?? ['status' => WebFindingStatus::Read]);
     }
 
     /**

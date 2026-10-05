@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\WebFindingStatus;
+use App\Services\ShopDiscovery\ShoppersCountry;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Support\PackSize;
 use App\Support\UnitWord;
@@ -82,8 +83,8 @@ final class WebShopFinding extends Model
     ];
 
     /**
-     * What a finding was checked against: the product title and its distinct
-     * tracked pack sizes. Not the tracked shops' URLs or barcodes, so adding
+     * What a finding was checked against: the product title, its distinct
+     * tracked pack sizes and the shoppers' country. Not the tracked shops' URLs or barcodes, so adding
      * one suggested shop of the same pack leaves every other finding
      * current. Barcodes are guarded apart, through `checked_gtins`.
      */
@@ -91,7 +92,7 @@ final class WebShopFinding extends Model
     {
         $product->loadMissing('shops');
 
-        return hash('sha256', mb_strtolower($product->title . '|' . implode(',', TypeSafeClient::trackedPackSizes($product))));
+        return hash('sha256', mb_strtolower($product->title . '|' . implode(',', TypeSafeClient::trackedPackSizes($product)) . '|' . ShoppersCountry::code()));
     }
 
     /**

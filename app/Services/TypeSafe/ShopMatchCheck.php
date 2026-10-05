@@ -64,11 +64,12 @@ final readonly class ShopMatchCheck
      * @param  array<string, array<string, string>>  $candidates
      * @param  list<string>  $anyPackKeys  Candidates that may sell another pack size of the product.
      * @param  string|null  $exactPackSize  Asks about this one pack, not about any size the product's shops state.
+     * @param  string|null  $shoppersCountry  The candidate must also be a shop for shoppers in this country.
      * @return array<string, float>
      */
-    public function ask(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = [], ?string $exactPackSize = null): array
+    public function ask(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = [], ?string $exactPackSize = null, ?string $shoppersCountry = null): array
     {
-        return $this->askOutcome($product, $purpose, $candidates, $quick, $anyPackKeys, $exactPackSize)->answers;
+        return $this->askOutcome($product, $purpose, $candidates, $quick, $anyPackKeys, $exactPackSize, $shoppersCountry)->answers;
     }
 
     /**
@@ -77,7 +78,7 @@ final readonly class ShopMatchCheck
      * @param  array<string, array<string, string>>  $candidates
      * @param  list<string>  $anyPackKeys
      */
-    public function askOutcome(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = [], ?string $exactPackSize = null): ShopCheckOutcome
+    public function askOutcome(Product $product, ShopCheckPurpose $purpose, array $candidates, bool $quick = true, array $anyPackKeys = [], ?string $exactPackSize = null, ?string $shoppersCountry = null): ShopCheckOutcome
     {
         $user = $product->user;
 
@@ -88,7 +89,7 @@ final readonly class ShopMatchCheck
         }
 
         try {
-            return new ShopCheckOutcome(ShopCheckOutcome::ANSWERED, $this->client->sameProduct($product, $purpose, $candidates, $quick, $anyPackKeys, $exactPackSize));
+            return new ShopCheckOutcome(ShopCheckOutcome::ANSWERED, $this->client->sameProduct($product, $purpose, $candidates, $quick, $anyPackKeys, $exactPackSize, $shoppersCountry));
         } catch (TypeSafeRequestFailed $e) {
             Log::warning('Same-product check failed; the candidates go unchecked.', [
                 'product_id' => $product->id,

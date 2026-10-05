@@ -198,6 +198,21 @@ function discoverKlarna(Product $product): void
     app(WebShopDiscovery::class)->discover($product);
 }
 
+test('the Klarna page search does not ask about the shoppers\' country: Klarna is no shop', function (): void {
+    fakeKlarnaWorld(happyKlarnaSearches(), [
+        medpetsLeadUrl() => medpetsPage(),
+        brekzLeadUrl() => leadPage('Hill’s Adult Sterilised Cat met eend kattenvoer 10 kg', '85.69'),
+    ]);
+
+    discoverKlarna(klarnaProduct());
+
+    $klarnaChecks = Http::recorded(static fn (Request $request): bool => $request->url() === TypeSafeClient::ENDPOINT && str_contains((string) json_encode($request->data()['questions'] ?? null), 'klarna.com'))
+        ->map(static fn (array $pair): mixed => $pair[0]->data()['state'] ?? null);
+
+    expect($klarnaChecks)->not->toBeEmpty()
+        ->each->not->toHaveKey('shoppers_country');
+});
+
 test('a Klarna page found by search brings in its shops as checked web suggestions', function (): void {
     $questions = [];
     fakeKlarnaWorld(happyKlarnaSearches(), [
@@ -226,9 +241,10 @@ test('a Klarna page found by search brings in its shops as checked web suggestio
 
     // Klarna's results and every lead finding are asked about the product in any size.
     $leadQuestions = array_filter($questions, static fn (array $question): bool => str_contains($question['title'], 'Sterilised') || str_contains($question['title'], 'Kitten'));
+    // The web discovery checks add the shoppers' country; the Klarna page search does not.
     $asked = array_values(array_unique(array_column($leadQuestions, 'question')));
-    expect($asked)->toHaveCount(1)
-        ->and($asked[0] ?? '')->toContain('in any pack size');
+    expect($asked)->not->toBeEmpty()
+        ->each->toContain('in any pack size');
 });
 
 test('a Klarna page the product already tracks is the source without a search', function (): void {

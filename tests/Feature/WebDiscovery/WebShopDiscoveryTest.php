@@ -399,7 +399,7 @@ it('skips a shop its owner hid, in the search results and after a redirect', fun
         ->and(findingAt($product, 'a.test')->failure)->toBe('hidden_shop');
 });
 
-it('proposes a page with the tracked barcode without a second Jev call', function (): void {
+it('sends a page with the tracked barcode to the second check, and marks it as a barcode match', function (): void {
     $product = discoveryProduct();
     fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p']], ['https://a.test/p' => htmlPage(discoveryPage('Coffee', gtin: '8711000000007'))]);
 
@@ -408,7 +408,34 @@ it('proposes a page with the tracked barcode without a second Jev call', functio
     $finding = findingAt($product, 'a.test');
     expect($finding->status)->toBe(WebFindingStatus::Proposed)
         ->and($finding->matched_gtin)->toBe('8711000000007')
-        ->and(jevCandidates())->toHaveCount(1);
+        ->and(jevCandidates())->toHaveCount(2);
+});
+
+it('declines a shop abroad that the check rejects, even with the tracked barcode', function (): void {
+    $product = discoveryProduct();
+    fakeDiscovery(
+        [['title' => 'Café en grains', 'link' => 'https://boutique.test/p']],
+        ['https://boutique.test/p' => htmlPage(discoveryPage('Café en grains 1 kg', gtin: '8711000000007'))],
+        static fn (array $candidate): float => ($candidate['gtin'] ?? null) === '8711000000007' ? 0.1 : 0.9,
+    );
+
+    discover($product);
+
+    expect(findingAt($product, 'boutique.test')->status)->toBe(WebFindingStatus::Declined)
+        ->and(WebShopFinding::shownFor($product->refresh())->all())->toBeEmpty();
+});
+
+it('asks both checks whether the shop sells to shoppers in the searched country', function (): void {
+    config()->set('dipcatch.web_discovery.country', 'be');
+    $product = discoveryProduct();
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p']], ['https://a.test/p' => htmlPage(discoveryPage('Coffee beans'))]);
+
+    discover($product);
+
+    $requests = Http::recorded(fn (Request $request): bool => $request->url() === TypeSafeClient::ENDPOINT)->map(fn (array $pair): array => $pair[0]->data())->values();
+    expect($requests)->toHaveCount(2)
+        ->each(fn ($body) => $body->toHaveKey('state.shoppers_country', 'Belgium'))
+        ->and(substr_count(json_encode($requests->all(), JSON_THROW_ON_ERROR), 'is `candidate` a shop for shoppers in Belgium'))->toBe(2);
 });
 
 it('rejects a page whose price is not a consumer price', function (): void {

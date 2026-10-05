@@ -68,6 +68,15 @@ it('fingerprints the title and the distinct pack sizes, not the shops or their b
     expect(WebShopFinding::fingerprintFor($product->refresh()))->not->toBe($before);
 });
 
+it('fingerprints the shoppers\' country, which both checks ask about', function (): void {
+    $product = Product::factory()->create(['title' => 'Coffee beans']);
+    $before = WebShopFinding::fingerprintFor($product);
+
+    config()->set('dipcatch.web_discovery.country', 'be');
+
+    expect(WebShopFinding::fingerprintFor($product))->not->toBe($before);
+});
+
 it('treats a removed barcode as stale and an added one as not', function (): void {
     $finding = new WebShopFinding(['checked_gtins' => ['1', '2']]);
 

@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-05',
+            'category' => 'fix',
+            'title' => 'No more suggested shops from abroad',
+            'body' => "The barcode search sometimes suggested French, German or Slovenian shops. Suggested shops are now only ones that sell to shoppers in the Netherlands.",
+        ],
+        [
             'date' => '2026-10-04',
             'category' => 'feature',
             'title' => 'More shops under "Also sold at"',
