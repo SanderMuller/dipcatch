@@ -278,7 +278,7 @@ final class Shop extends Model
     public function linkNote(): ?string
     {
         return $this->isComparisonLink()
-            ? 'Comparison site — DipCatch tracks the shops it lists, not this page.'
+            ? 'Comparison site. DipCatch tracks the shops it lists, not this page.'
             : $this->kind->note();
     }
 

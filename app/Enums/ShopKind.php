@@ -34,7 +34,7 @@ enum ShopKind: string
     {
         return match ($this) {
             self::Tracked => null,
-            self::Reference => 'DipCatch cannot read this shop — open it to check the price yourself',
+            self::Reference => 'DipCatch cannot read this shop. Open it to check the price yourself.',
         };
     }
 }

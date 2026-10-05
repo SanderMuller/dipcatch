@@ -159,7 +159,8 @@ final class ShopSuggestions extends Component
         $webShown = $product->user instanceof User && $product->user->wantsShopChecks();
         $discovery = $webShown ? WebDiscovery::query()->find($product->id) : null;
         $discovering = $webShown && self::discovering($product, $discovery);
-        $searchingFor = $discovering ? self::searchingFor($discovery) : 0;
+        $pollSeconds = $discovering ? $this->pollSeconds() : null;
+        $searchingFor = $discovering ? $this->searchingFor($discovery) : 0;
 
         return view('livewire.suggestions.shop-suggestions', [
             'product' => $product,
@@ -167,11 +168,10 @@ final class ShopSuggestions extends Component
             'webSuggestions' => $webShown ? WebShopFinding::shownFor($product) : new EloquentCollection(),
             'discovering' => $discovering,
             'searchingFor' => $searchingFor,
-            // A search that runs past the polling window, a read retried for
-            // minutes say, keeps the plain line: a bar at its end would claim
-            // more than anyone knows.
-            'showsProgress' => $discovering && $searchingFor < Config::integer('dipcatch.web_discovery.poll_for_seconds'),
-            'pollSeconds' => $discovering ? $this->pollSeconds() : null,
+            // The bar shows while the panel polls. Once it stops, the plain
+            // line stays: a bar that no longer moves claims more than anyone knows.
+            'showsProgress' => $pollSeconds !== null,
+            'pollSeconds' => $pollSeconds,
             // Distinguish "nothing matched" from "nothing to match against":
             // an empty or stale catalogue is an operational problem, not an
             // answer, so the panel stays silent rather than claiming no shop
@@ -197,13 +197,19 @@ final class ShopSuggestions extends Component
 
     /**
      * Seconds since the search was queued, so the progress bar picks up
-     * where it was after a reload rather than starting over.
+     * where it was after a reload rather than starting over. A search queued
+     * longer ago than the polling window, a night's re-check say, is timed
+     * from when the panel opened: a bar near its end would claim it is
+     * almost done.
      */
-    private static function searchingFor(?WebDiscovery $discovery): int
+    private function searchingFor(?WebDiscovery $discovery): int
     {
         $queuedAt = $discovery?->queued_at;
+        $sinceQueued = $queuedAt === null ? 0 : max(0, (int) $queuedAt->diffInSeconds(now()));
 
-        return $queuedAt === null ? 0 : max(0, (int) $queuedAt->diffInSeconds(now()));
+        return $sinceQueued < Config::integer('dipcatch.web_discovery.poll_for_seconds')
+            ? $sinceQueued
+            : now()->getTimestamp() - $this->mountedAt;
     }
 
     private static function discovering(Product $product, ?WebDiscovery $discovery): bool

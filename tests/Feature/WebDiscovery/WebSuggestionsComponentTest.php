@@ -154,13 +154,26 @@ it('shows a progress bar while it searches, timed from the queued search, with t
         ->assertSee('1 shop found so far');
 });
 
-it('keeps the plain line, not a bar near its end, for a search that runs past the polling window', function (): void {
+it('times the bar from when the panel opened for a search queued long ago', function (): void {
     $product = webSuggestionProduct();
     WebDiscovery::markQueued($product);
-    $this->travel(301)->seconds();
+    $this->travel(2)->hours();
     $this->actingAs($product->user()->sole());
 
     Livewire::test(ShopSuggestions::class, ['product' => $product])
+        ->assertSeeHtml('data-flux-progress')
+        ->assertSeeHtml('Date.now() - 0 * 1000');
+});
+
+it('keeps the plain line, not a bar that no longer moves, once the panel stops polling', function (): void {
+    $product = webSuggestionProduct();
+    WebDiscovery::markQueued($product);
+    $this->actingAs($product->user()->sole());
+    $panel = Livewire::test(ShopSuggestions::class, ['product' => $product]);
+
+    $this->travel(301)->seconds();
+
+    $panel->call('$refresh')
         ->assertSee('Looking for more shops…')
         ->assertDontSeeHtml('data-flux-progress');
 });

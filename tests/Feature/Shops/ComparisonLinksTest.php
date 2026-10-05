@@ -108,9 +108,9 @@ test('a comparison link says what it is, not that the page cannot be read', func
     $klarna->keepAsComparisonLink();
     $this->actingAs($product->user()->sole());
 
-    expect($klarna->refresh()->linkNote())->toBe('Comparison site — DipCatch tracks the shops it lists, not this page.');
+    expect($klarna->refresh()->linkNote())->toBe('Comparison site. DipCatch tracks the shops it lists, not this page.');
     Livewire::test(ProductShow::class, ['product' => $product])
-        ->assertSee('Comparison site — DipCatch tracks the shops it lists, not this page.')
+        ->assertSee('Comparison site. DipCatch tracks the shops it lists, not this page.')
         ->assertDontSee('DipCatch cannot read this shop');
 });
 
