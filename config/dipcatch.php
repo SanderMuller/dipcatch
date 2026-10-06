@@ -12,6 +12,7 @@ use App\PriceAdapters\Hosts\EfarmaAdapter;
 use App\PriceAdapters\Hosts\EtosAdapter;
 use App\PriceAdapters\Hosts\ExpertAdapter;
 use App\PriceAdapters\Hosts\HuboAdapter;
+use App\PriceAdapters\Hosts\TomAndCoAdapter;
 use App\PriceAdapters\Hosts\IntertoysAdapter;
 use App\PriceAdapters\Hosts\JumboAdapter;
 use App\PriceAdapters\Hosts\LidlAdapter;
@@ -281,6 +282,7 @@ return [
         MegekkoAdapter::class,
         PrenatalAdapter::class,
         ToolstationAdapter::class,
+        TomAndCoAdapter::class,
         JsonLdAdapter::class,
         ShopifyAdapter::class,
         MicrodataAdapter::class,
