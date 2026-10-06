@@ -7,6 +7,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
@@ -214,7 +215,7 @@ it('shows the products at their alert price above the drops, and only there', fu
 
     livewire(Dashboard::class)
         ->assertViewHas('atAlert', fn ($products): bool => $products->pluck('title')->all() === ['Under my alert'])
-        ->assertViewHas('dropCards', fn ($products): bool => $products->isEmpty())
+        ->assertViewHas('dropCards', fn (Collection $products): bool => $products->isEmpty())
         ->assertSeeHtml('data-test="at-alert"')
         ->assertDontSee('Biggest drops');
 });
