@@ -57,8 +57,8 @@ final readonly class ShopDataExport
                 $host,
                 str_contains($host, '.') ? substr($host, (int) strrpos($host, '.') + 1) : '',
                 match (true) {
-                    in_array($host, $supported, true) => 'supported',
-                    in_array($host, $unsupported, true) => 'unsupported',
+                    self::listed($host, $supported) => 'supported',
+                    self::listed($host, $unsupported) => 'unsupported',
                     default => 'generic',
                 },
                 self::count($values, 'offers'),
@@ -174,6 +174,16 @@ final readonly class ShopDataExport
         $hosts = config($key);
 
         return is_array($hosts) ? array_values(array_filter($hosts, is_string(...))) : [];
+    }
+
+    /**
+     * A subdomain counts as its listed shop, the way host adapters match it.
+     *
+     * @param  list<string>  $hosts
+     */
+    private static function listed(string $host, array $hosts): bool
+    {
+        return array_any($hosts, static fn (string $listed): bool => $host === $listed || str_ends_with($host, '.' . $listed));
     }
 
     /**

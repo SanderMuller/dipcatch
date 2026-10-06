@@ -18,6 +18,17 @@ test('the hosts dataset prints one CSV row per host without owner data', functio
         ->assertSuccessful();
 });
 
+test('a subdomain of a supported shop counts as supported', function (): void {
+    config(['site.supported_hosts' => ['winkel.example.de']]);
+    Shop::factory()->create(['url' => 'https://webwinkel.winkel.example.de/p/kaffee']);
+    Shop::factory()->create(['url' => 'https://otherwinkel.example.de/p/kaffee']);
+
+    $this->artisan('dipcatch:export-shop-data', ['dataset' => 'hosts'])
+        ->expectsOutputToContain('webwinkel.winkel.example.de,de,supported,')
+        ->expectsOutputToContain('otherwinkel.example.de,de,generic,')
+        ->assertSuccessful();
+});
+
 test('the urls dataset prints each page without its query string', function (): void {
     Shop::factory()->create(['url' => 'https://winkel.example.de/p/kaffee?ref=jane123']);
 
