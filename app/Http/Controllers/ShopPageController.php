@@ -17,7 +17,7 @@ final class ShopPageController extends Controller
 {
     public function index(): View
     {
-        return view('shops', ['shops' => ShopPages::all()]);
+        return view('shops', ['shops' => ShopPages::highlights()]);
     }
 
     public function show(string $slug): View

@@ -4,7 +4,7 @@
     $useCases = \App\Support\UseCases::all();
     // Identity rows, not pages: this renders on every marketing page and
     // only needs a name and a slug.
-    $shops = \App\Support\SupportedShops::rows();
+    $shops = \App\Support\SupportedShops::highlights();
 @endphp
 
 {{-- Replaces three drifted per-page footers, so a new landing page is linked

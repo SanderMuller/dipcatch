@@ -11,6 +11,7 @@ use App\PriceAdapters\Hosts\DirkAdapter;
 use App\PriceAdapters\Hosts\EfarmaAdapter;
 use App\PriceAdapters\Hosts\EtosAdapter;
 use App\PriceAdapters\Hosts\ExpertAdapter;
+use App\PriceAdapters\Hosts\FressnapfAdapter;
 use App\PriceAdapters\Hosts\HuboAdapter;
 use App\PriceAdapters\Hosts\TomAndCoAdapter;
 use App\PriceAdapters\Hosts\IntertoysAdapter;
@@ -283,6 +284,7 @@ return [
         PrenatalAdapter::class,
         ToolstationAdapter::class,
         TomAndCoAdapter::class,
+        FressnapfAdapter::class,
         JsonLdAdapter::class,
         ShopifyAdapter::class,
         MicrodataAdapter::class,

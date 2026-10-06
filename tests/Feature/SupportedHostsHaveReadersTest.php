@@ -4,7 +4,9 @@ use App\PriceAdapters\Hosts\HostUrl;
 use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\ShopAdapter;
 use App\Services\AhApi\AhApiSource;
+use App\Services\AxfoodApi\AxfoodApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
+use App\Services\DmApi\DmApiSource;
 use App\Support\SupportedShops;
 use Illuminate\Support\Facades\Config;
 
@@ -36,7 +38,8 @@ function siteHosts(string $key): array
  */
 function readsHost(string $host): bool
 {
-    if (app(AhApiSource::class)->supports($host) || app(CheckjebonSource::class)->supports($host)) {
+    if (app(AhApiSource::class)->supports($host) || app(CheckjebonSource::class)->supports($host)
+        || new DmApiSource()->supports($host) || new AxfoodApiSource()->supports($host)) {
         return true;
     }
 
@@ -71,6 +74,10 @@ test('every marketed shop host has a reader written for it', function (string $h
 
 test('every homepage chip is a host the site also supports', function (): void {
     expect(array_diff(siteHosts('site.homepage_hosts'), siteHosts('site.supported_hosts')))->toBeEmpty();
+});
+
+test('every highlighted shop is a host the site also supports', function (): void {
+    expect(array_diff(siteHosts('site.highlight_hosts'), siteHosts('site.supported_hosts')))->toBeEmpty();
 });
 
 test('every use-case host is a host the site also supports', function (): void {

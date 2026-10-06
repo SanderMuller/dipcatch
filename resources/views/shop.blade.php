@@ -8,7 +8,7 @@
     $canonical = $locale === 'nl' ? $shop->url('nl') : $shop->url();
     $contactEmail = config('site.contact_email');
     $related = $shop->relatedUseCases();
-    $others = collect(\App\Support\SupportedShops::rows())->reject(fn (array $row): bool => $row['host'] === $shop->host)->take(6);
+    $others = collect(\App\Support\SupportedShops::highlights())->reject(fn (array $row): bool => $row['host'] === $shop->host)->take(6);
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-canvas">

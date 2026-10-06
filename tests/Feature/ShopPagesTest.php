@@ -85,14 +85,18 @@ it('states that Dierapotheker reads the article number', function (): void {
     $this->get(route('shop', ['slug' => 'dierapotheker-nl']))->assertOk()->assertSeeHtml('article number');
 });
 
-it('lists every shop on the hub, with a link to each', function (): void {
+it('lists the highlighted shops on the hub, with a link to each', function (): void {
     config()->set('site.contact_email', 'hello@example.test');
 
-    $response = $this->get(route('shops'))->assertOk()->assertSeeHtml('Every shop we know well')->assertSeeHtml('Paste a product link from almost any webshop and it works')->assertSeeHtml('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
+    $response = $this->get(route('shops'))->assertOk()->assertSeeHtml('The biggest shops we know well')->assertSeeHtml('Paste a product link from almost any webshop and it works')->assertSeeHtml('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
 
-    foreach (ShopPages::all() as $shop) {
+    foreach (ShopPages::highlights() as $shop) {
         $response->assertSeeHtml(route('shop', ['slug' => $shop->slug]));
     }
+
+    // A supported shop outside the highlights keeps its page, not a card.
+    $response->assertDontSeeHtml(route('shop', ['slug' => 'hubo-nl']));
+    $this->get(route('shop', ['slug' => 'hubo-nl']))->assertOk();
 });
 
 it('carries a canonical, both hreflang alternates and the FAQ graph', function (): void {
@@ -192,7 +196,7 @@ it('carries a slug on the identity row, for a host nobody has named', function (
         ->and(ShopPages::slugs())->toBe(['ah-nl', 'unnamed-example']);
 });
 
-it('links every shop from the footer by its own slug', function (): void {
+it('links every highlighted shop from the footer by its own slug', function (): void {
     // The href moved from a `ShopPage` object to the identity row. A wrong
     // but non-empty key renders a 200 page whose every shop link 404s, so
     // the assertion has to be the href, not the presence of a link.
@@ -201,9 +205,12 @@ it('links every shop from the footer by its own slug', function (): void {
     // Scoped: the shops hub lists the same shops in the page body.
     $hrefs = hrefsWithin($html, 'nav[aria-label="Price alerts by shop"] a');
 
-    foreach (SupportedShops::rows() as $row) {
+    foreach (SupportedShops::highlights() as $row) {
         expect($hrefs)->toContain(route('shop', ['slug' => $row['slug']]));
     }
+
+    expect(array_values(array_filter($hrefs, static fn (string $href): bool => str_contains($href, '/shops/'))))
+        ->toHaveCount(count(SupportedShops::highlights()));
 });
 
 it('offers six other shops to compare with, never the shop itself', function (): void {
@@ -302,7 +309,8 @@ it('gives every supported shop a line of its own on the overview', function (): 
     expect($lines)->toBe(array_values(array_unique($lines)))
         ->and(implode("\n", $lines))->not->toContain('We know');
 
-    $this->get(route('shops'))->assertOk()->assertSeeHtml('Medpets lists a price for every size on one page.');
+    $this->get(route('shops'))->assertOk()->assertSeeHtml('Pets at Home shows an Easy Repeat subscription price');
+    $this->get(route('shop', ['slug' => 'medpets-nl']))->assertOk()->assertSeeHtml('Medpets lists a price for every size on one page.');
 });
 
 it('lists the shops it cannot read below the supported ones, without a page of their own', function (): void {

@@ -5,7 +5,7 @@
     $langQuery = $requestedLang === null ? [] : ['lang' => $requestedLang];
     $canonical = $locale === 'nl' ? route('shops', ['lang' => 'nl']) : route('shops');
     $contactEmail = config('site.contact_email');
-    $description = __('Every shop we know well, with a page of its own. Each one says what DipCatch can see there: the price, how much is in the pack, and how long an offer lasts.');
+    $description = __('The biggest shops we know well, each with a page of its own. Each one says what DipCatch can see there: the price, how much is in the pack, and how long an offer lasts.');
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-canvas">

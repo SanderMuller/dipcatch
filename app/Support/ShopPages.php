@@ -46,6 +46,16 @@ final class ShopPages
         return $pages;
     }
 
+    /**
+     * The pages of the highlighted shops, for the shops hub.
+     *
+     * @return list<ShopPage>
+     */
+    public static function highlights(): array
+    {
+        return array_map(self::page(...), SupportedShops::highlights());
+    }
+
     public static function find(string $slug): ?ShopPage
     {
         foreach (SupportedShops::rows() as $row) {
@@ -169,6 +179,11 @@ final class ShopPages
             'prenatal.nl' => __('Prénatal writes its product data in a longer form than most shops. DipCatch reads it all the same, stock included.'),
             'hubo.nl' => __('Hubo is read from the product data on the page. A tin of paint names its size in the title, so DipCatch compares it per litre.'),
             'toolstation.nl' => __('Toolstation shows prices incl. and excl. VAT. DipCatch reads the price incl. VAT, the one a consumer pays.'),
+            'dm.de' => __('dm’s product pages load their price after they open. DipCatch reads it from dm’s own product data instead, for dm in Germany and Austria.'),
+            'fressnapf.de' => __('Fressnapf shows a recommended price beside the one you pay. DipCatch reads the price you pay, offers included.'),
+            'maxizoo.fr' => __('Maxi Zoo is the French shop of Fressnapf and is read the same way: the price you pay, not the recommended one.'),
+            'willys.se' => __('Willys is read from its own product data, in Swedish kronor. An offer everyone gets counts; a price only for Willys Plus members does not.'),
+            'hemkop.se' => __('Hemköp shares its product data with Willys. DipCatch reads the price in Swedish kronor, offers for everyone included.'),
             default => __('We know :shop well, so the price comes straight off the product page, including its offers.', ['shop' => $name]),
         };
     }

@@ -56,6 +56,19 @@ return [
         'mediamarkt.nl', 'expert.nl', 'megekko.nl',
         'intertoys.nl', 'prenatal.nl',
         'hubo.nl', 'toolstation.nl',
+        'dm.de', 'fressnapf.de', 'maxizoo.fr', 'willys.se', 'hemkop.se',
+    ],
+
+    /**
+     * The supported shops the shops hub, the footer and each shop page's
+     * "compare with" row show: a few market leaders, not every shop. The
+     * other supported shops keep their page, their sitemap entry and their
+     * place on the use-case pages.
+     */
+    'highlight_hosts' => [
+        'ah.nl', 'jumbo.com', 'lidl.nl', 'aldi.nl', 'bol.com', 'amazon.nl',
+        'zooplus.nl', 'petsathome.com', 'mediamarkt.nl',
+        'dm.de', 'fressnapf.de', 'willys.se',
     ],
 
     /**
@@ -141,6 +154,11 @@ return [
         'prenatal.nl' => 'Prénatal',
         'hubo.nl' => 'Hubo',
         'toolstation.nl' => 'Toolstation',
+        'dm.de' => 'dm',
+        'fressnapf.de' => 'Fressnapf',
+        'maxizoo.fr' => 'Maxi Zoo',
+        'willys.se' => 'Willys',
+        'hemkop.se' => 'Hemköp',
         'praxis.nl' => 'Praxis',
         'babypark.nl' => 'Babypark',
         'dreamland.nl' => 'Dreamland',
@@ -162,10 +180,12 @@ return [
         // Supermarkets.
         'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl', 'plus.nl', 'coop.nl',
         'dekamarkt.nl', 'poiesz-supermarkten.nl', 'vomar.nl', 'hoogvliet.com', 'janlinders.nl', 'ekoplaza.nl',
+        'willys.se', 'hemkop.se',
         // Drugstores and variety stores.
-        'kruidvat.nl', 'etos.nl', 'hema.nl', 'action.com', 'blokker.nl', 'boots.com', 'superdrug.com',
+        'kruidvat.nl', 'etos.nl', 'hema.nl', 'action.com', 'blokker.nl', 'boots.com', 'superdrug.com', 'dm.de',
         // DIY, garden and pets.
         'praxis.nl', 'gamma.nl', 'karwei.nl', 'hubo.nl', 'toolstation.nl', 'welkoop.nl', 'petsplace.nl', 'petsathome.com',
+        'fressnapf.de', 'maxizoo.fr',
         // Electronics, toys, baby and department stores.
         'mediamarkt.nl', 'coolblue.nl', 'expert.nl', 'intertoys.nl', 'prenatal.nl', 'babypark.nl', 'dreamland.nl', 'debijenkorf.nl', 'lego.com',
         // United States.
@@ -191,12 +211,13 @@ return [
     'use_cases' => [
         'groceries' => [
             'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl', 'dekamarkt.nl', 'poiesz-supermarkten.nl', 'vomar.nl',
+            'willys.se', 'hemkop.se',
             'amazon.nl', 'amazon.com', 'amazon.co.uk',
         ],
         'pet-food' => [
             'zooplus.nl', 'zooplus.co.uk', 'bitiba.nl',
             'dierapotheker.nl', 'petsplace.nl', 'medpets.nl', 'welkoop.nl',
-            'petsathome.com',
+            'petsathome.com', 'fressnapf.de', 'maxizoo.fr',
             'bol.com', 'amazon.nl',
             'ah.nl', 'jumbo.com',
         ],
@@ -209,7 +230,7 @@ return [
         'beauty' => [
             'theordinary.com',
             'lookfantastic.com', 'cultbeauty.com',
-            'ulta.com',
+            'ulta.com', 'dm.de',
             'bol.com', 'amazon.nl',
             'ah.nl', 'jumbo.com',
         ],

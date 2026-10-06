@@ -34,6 +34,19 @@ final readonly class SupportedShops
     }
 
     /**
+     * The market leaders the shops hub, the footer and the "compare with" row
+     * show, from `site.highlight_hosts`. A host missing from
+     * `supported_hosts` is skipped, so a shop dropped there disappears here
+     * too.
+     *
+     * @return list<array{host: string, favicon: string, name: string, slug: string}>
+     */
+    public static function highlights(): array
+    {
+        return self::pick(config('site.highlight_hosts'));
+    }
+
+    /**
      * The short "Works with" row on the homepage. Hosts missing from
      * `supported_hosts` are skipped, so a shop dropped there disappears here too.
      *
@@ -41,14 +54,23 @@ final readonly class SupportedShops
      */
     public static function homepage(): array
     {
+        return self::pick(config('site.homepage_hosts'));
+    }
+
+    /**
+     * The supported rows for a configured host list, in its order.
+     *
+     * @return list<array{host: string, favicon: string, name: string, slug: string}>
+     */
+    private static function pick(mixed $hosts): array
+    {
         $allowed = [];
         foreach (self::rows() as $row) {
             $allowed[$row['host']] = $row;
         }
 
-        $featured = config('site.homepage_hosts');
         $rows = [];
-        foreach (is_array($featured) ? $featured : [] as $host) {
+        foreach (is_array($hosts) ? $hosts : [] as $host) {
             if (is_string($host) && isset($allowed[$host])) {
                 $rows[] = $allowed[$host];
             }
