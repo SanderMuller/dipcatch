@@ -10,6 +10,9 @@ use App\PriceAdapters\JsonLdEntities;
 use App\PriceAdapters\JsonLdOfferVariants;
 use App\PriceAdapters\OwnsHosts;
 use App\PriceAdapters\ShopAdapter;
+use App\PriceAdapters\ShopSnapshot;
+use App\Support\NextData;
+use App\Support\PackSize;
 use JsonException;
 
 /**
@@ -46,11 +49,51 @@ final readonly class PetsAtHomeAdapter implements HostSpecificAdapter, OwnsHosts
         }
 
         $result = new JsonLdAdapter()->extract($url, $rewritten, $context);
+        if ($result->isSuccess() && $result->snapshot !== null && $result->snapshot->packSize === null) {
+            $size = self::packSizeOf($html, $result->snapshot);
+
+            return $size === null ? $result : $result->withSnapshot($result->snapshot->withPackSize($size));
+        }
+
         if ($result->isSuccess() || $result->isAmbiguous()) {
             return $result;
         }
 
         return ExtractionResult::failed('petsathome_extraction_failed');
+    }
+
+    /**
+     * The size of the bag that was priced. The JSON-LD names the product
+     * without it ("AATU Chicken Adult Dry Dog Food"), and the page state
+     * states it per variant: `baseProduct.products[]` keyed by the offer's
+     * sku, as `netAmount` and `uomValue` (5, "kg") and as `label` ("5kg").
+     * Only a variant selling at the price read is taken.
+     */
+    private static function packSizeOf(string $html, ShopSnapshot $snapshot): ?string
+    {
+        $sku = $snapshot->raw['offer']['sku'] ?? null;
+        $state = NextData::decode($html);
+        $products = $state === null ? null : NextData::value($state, 'props.pageProps.baseProduct.products');
+
+        if (! is_string($sku) || ! is_array($products)) {
+            return null;
+        }
+
+        $variant = array_find($products, static fn (mixed $row): bool => is_array($row) && ($row['id'] ?? null) === $sku);
+        $price = is_array($variant) ? ($variant['price']['base'] ?? null) : null;
+
+        if (! is_array($variant) || ! (is_int($price) || is_float($price)) || abs($price - (float) $snapshot->price) >= 0.005) {
+            return null;
+        }
+
+        $amount = $variant['netAmount'] ?? null;
+        $unit = $variant['uomValue'] ?? null;
+        $candidates = [
+            (is_int($amount) || is_float($amount)) && is_string($unit) ? $amount . ' ' . $unit : null,
+            is_string($variant['label'] ?? null) ? $variant['label'] : null,
+        ];
+
+        return array_find($candidates, static fn (?string $text): bool => $text !== null && PackSize::parse($text) !== null);
     }
 
     private static function withoutSubscriptionOffers(string $html): ?string

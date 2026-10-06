@@ -99,6 +99,13 @@ final readonly class GenericAdapter implements ShopAdapter
 
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
+        // A chosen variant this reader cannot tell apart: whatever number it
+        // finds belongs to whichever variant the page shows, and stored as the
+        // chosen one it is a wrong price (Myprotein, 2026-10-06).
+        if ($context?->variantKey !== null) {
+            return ExtractionResult::failed('variant_not_readable');
+        }
+
         $crawler = self::crawler($html);
 
         // Every rate the page states per unit, so a candidate that merely sits
@@ -139,6 +146,7 @@ final readonly class GenericAdapter implements ShopAdapter
                 if ($price === null
                     || self::isLabelledRate($element, $rawText)
                     || self::isStruckThrough($element)
+                    || RecommendationBlock::contains($element)
                     || in_array($price, $refused, strict: true)) {
                     continue;
                 }

@@ -16,6 +16,13 @@ final readonly class MicrodataAdapter implements ShopAdapter
 
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
+        // A chosen variant this reader cannot tell apart: whatever number it
+        // finds belongs to whichever variant the page shows, and stored as the
+        // chosen one it is a wrong price (Myprotein, 2026-10-06).
+        if ($context?->variantKey !== null) {
+            return ExtractionResult::failed('variant_not_readable');
+        }
+
         $crawler = self::crawler($html);
         $priceNode = $crawler->filter('[itemprop="price"]')->first();
 

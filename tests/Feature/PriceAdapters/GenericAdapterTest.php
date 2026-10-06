@@ -273,3 +273,20 @@ HTML;
 
     expect($this->adapter->extract('https://shop.test/p/16', $html)->snapshot?->price)->toBe('5.99');
 });
+
+test('a price in a block of other products is not this product\'s price', function (): void {
+    // Myprotein prints a "frequently bought together" card, and cards for
+    // recommended products, before the page's own price (2026-10-06).
+    $html = <<<'HTML'
+<html><body>
+  <h1>Impact Whey Protein</h1>
+  <frequently-bought-together><div class="fbt-price-container"><span class="price">€ 36,99</span></div></frequently-bought-together>
+  <div class="pdp-rec-product-container"><span class="price">€ 20,49</span></div>
+  <div id="add-to-basket-price-wrapper"><span class="price">€ 24,99</span></div>
+</body></html>
+HTML;
+
+    $result = $this->adapter->extract('https://x.test', $html);
+
+    expect($result->snapshot?->price)->toBe('24.99');
+});
