@@ -370,3 +370,18 @@ test('a variant the URL names but the page state does not list reads nothing', f
 
     expect($result->isSuccess())->toBeFalse();
 });
+
+test('a rolling price-valid-until date without a struck price is no offer', function (): void {
+    // zooplus dates every price a week out; only a reduction makes it an offer.
+    $jsonLd = json_encode(['@context' => 'https://schema.org', '@type' => 'Product', 'name' => 'Petkit filter 3.0', 'offers' => [
+        '@type' => 'Offer', 'price' => 24.99, 'priceCurrency' => 'EUR',
+        'priceValidUntil' => now()->addDays(7)->toIso8601String(),
+        'priceSpecification' => [['@type' => 'UnitPriceSpecification', 'priceType' => 'https://schema.org/SalePrice', 'price' => 24.99]],
+    ]], JSON_THROW_ON_ERROR);
+
+    $result = $this->adapter->extract('https://www.zooplus.nl/shop/katten/2098338', '<script type="application/ld+json">' . $jsonLd . '</script>');
+
+    expect($result->snapshot?->price)->toBe('24.99')
+        ->and($result->snapshot?->promotionWindow)->toBeNull()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});

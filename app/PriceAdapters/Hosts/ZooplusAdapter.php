@@ -161,8 +161,16 @@ final readonly class ZooplusAdapter extends HostAdapter
     protected function refine(ShopSnapshot $snapshot, string $url, string $html, ?AdapterContext $context): ShopSnapshot
     {
         $size = ZooplusPackSize::read($url, $html, $snapshot->price, $context?->variantKey);
+        $snapshot = $size === null ? $snapshot : $snapshot->withPackSize($size);
 
-        return $size === null ? $snapshot : $snapshot->withPackSize($size);
+        // zooplus states a rolling `priceValidUntil` on every price, a week
+        // out, so the date alone is no offer. Only a struck price above the
+        // one read makes it one (petkit filters, 2026-10-06).
+        $struck = PriceNormalizer::fromMixed($snapshot->claimedRegularPrice);
+        $read = PriceNormalizer::fromMixed($snapshot->price);
+        $reduced = $struck !== null && $read !== null && bccomp($struck, $read, 2) > 0;
+
+        return $reduced ? $snapshot : $snapshot->withPromotionWindow(promotionWindow: null);
     }
 
     private static function title(Crawler $crawler): string
