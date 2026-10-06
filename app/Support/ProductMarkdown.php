@@ -42,7 +42,8 @@ final readonly class ProductMarkdown
         }
 
         foreach ($rules as $rule) {
-            $lines[] = '- ' . ($rule['below'] ? __(':value or less', ['value' => $rule['value']]) : $rule['value']);
+            $line = $rule['below'] ? __(':value or less', ['value' => $rule['value']]) : $rule['value'];
+            $lines[] = '- ' . (isset($rule['pack']) ? $line . ' (' . $rule['pack'] . ')' : $line);
         }
 
         $lines = [...$lines, '', '## ' . __('Tracked shops'), ''];

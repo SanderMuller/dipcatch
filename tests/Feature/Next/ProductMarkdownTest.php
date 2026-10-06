@@ -63,6 +63,17 @@ it('lists the alert rules and marks a shop kept as a link', function (): void {
         ->toContain('| [bol.com](<https://bol.com/p/1>) | Link only | ' . ShopKind::Reference->note() . ' |');
 });
 
+it('gives a unit-price target the pack price it comes to', function (): void {
+    $user = User::factory()->create();
+    $product = markdownProduct($user);
+    $product->update(['target_price' => null, 'unit_price_target' => '2.5400', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null]);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '15.90', 'pack_quantity' => 5, 'pack_unit' => 'piece']);
+
+    $markdown = $this->actingAs($user)->get(route('app.products.markdown', $product))->getContent();
+
+    expect($markdown)->toContain("## Alerts\n\n- €2.54 /piece or less (€12.70 for 5 pieces)\n");
+});
+
 it('lists no default drop once a price target is set', function (): void {
     $user = User::factory()->create();
     $product = markdownProduct($user);

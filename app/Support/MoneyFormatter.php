@@ -97,6 +97,21 @@ final class MoneyFormatter
         return self::normaliseSpaces($symbol);
     }
 
+    /** The decimals {@see format()} shows for a currency: 2 for EUR, 0 for JPY. */
+    public static function decimals(string $currency): int
+    {
+        $code = strtoupper(trim($currency));
+
+        if (! Iso4217::isValid($code)) {
+            return 2;
+        }
+
+        $formatter = self::symbolFormatter();
+        $formatter->setTextAttribute(NumberFormatter::CURRENCY_CODE, $code);
+
+        return $formatter->getAttribute(NumberFormatter::MAX_FRACTION_DIGITS);
+    }
+
     /**
      * A price per kilo, litre or piece, with enough decimals to tell two
      * shops apart.

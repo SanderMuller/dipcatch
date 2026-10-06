@@ -1098,6 +1098,49 @@ it('shows every alert rule the product has', function (): void {
         ->not->toContain('data-flux-badge');
 });
 
+it('says what a unit-price target comes to for the pack every shop sells', function (string $quantity, string $unit, string $target, string $expected): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+
+    foreach (['https://amazon.nl/dp/B0BK923TZY', 'https://zooplus.nl/shop/filters'] as $url) {
+        Shop::factory()->for($product)->create(['url' => $url, 'currency' => 'EUR', 'current_price' => '20.00', 'pack_quantity' => $quantity, 'pack_unit' => $unit]);
+    }
+
+    $product->forceFill(['target_price' => null, 'unit_price_target' => $target, 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])->assertSee($expected);
+})->with([
+    'pieces' => ['5.00', 'piece', '2.5400', 'when a price reaches it (€12.70 for 5 pieces)'],
+    'grams' => ['400.00', 'g', '10.0000', 'when a price reaches it (€4.00 for 400 g)'],
+]);
+
+it('gives the pack price beside a unit-price target listed under a price target', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://amazon.nl/dp/B0BK923TZY', 'currency' => 'EUR', 'current_price' => '15.90', 'pack_quantity' => '5.00', 'pack_unit' => 'piece']);
+    $product->forceFill(['target_price' => '14.00', 'unit_price_target' => '2.5400', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeInOrder(['€14.00', 'when a price reaches it', 'or €2.54 /piece or less', '(€12.70 for 5 pieces)'])
+        ->assertDontSee('when a price reaches it (');
+});
+
+it('gives no pack price for a unit-price target when the shops sell different packs', function (): void {
+    $user = User::factory()->create();
+    $product = smallPackCheapest($user, '6.60');
+    $product->forceFill(['target_price' => null, 'unit_price_target' => '0.2000', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('when a price reaches it')
+        ->assertDontSee('when a price reaches it (');
+});
+
 it('says any drop when the product has no alert rule and no price yet', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user);

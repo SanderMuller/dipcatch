@@ -63,4 +63,19 @@ final readonly class PackLine
 
         return $size === null ? $money : __(':price for :pack', ['price' => $money, 'pack' => UnitWord::pack($size)]);
     }
+
+    /**
+     * `€12.70 for 5 pieces`: the pack a unit price comes to, rounded down to
+     * the shown decimals so a pack at that price is always at or under the
+     * unit price.
+     *
+     * @param  numeric-string  $unitPrice
+     */
+    public static function forUnitPrice(string $unitPrice, string $currency, PackSize $size): string
+    {
+        // A unit price is per kg or per litre, so grams and millilitres count in thousands.
+        $quantity = bcdiv(number_format($size->quantity, 6, '.', ''), $size->unit === 'piece' ? '1' : '1000', 9);
+
+        return self::format(bcmul($unitPrice, $quantity, MoneyFormatter::decimals($currency)), $currency, $size);
+    }
 }

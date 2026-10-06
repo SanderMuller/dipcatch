@@ -446,12 +446,17 @@
                     {{ $alertRules[0]['value'] ?? __('Any drop') }}
                 </p>
                 @if ($alertRules[0]['below'] ?? false)
-                    <p class="text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('when a price reaches it') }}</p>
+                    <p class="text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
+                        {{ isset($alertRules[0]['pack']) ? __('when a price reaches it (:pack)', ['pack' => $alertRules[0]['pack']]) : __('when a price reaches it') }}
+                    </p>
                 @endif
                 {{-- One line per rule, so every rule set on the form shows. --}}
                 @foreach (array_slice($alertRules, 1) as $rule)
                     <p class="mt-1 text-base font-medium tabular-nums text-zinc-600 sm:text-sm dark:text-zinc-300">
                         {{ $rule['below'] ? __('or :value or less', ['value' => $rule['value']]) : __('or :value', ['value' => $rule['value']]) }}
+                        @isset($rule['pack'])
+                            <span class="font-normal text-zinc-500 dark:text-zinc-400">({{ $rule['pack'] }})</span>
+                        @endisset
                     </p>
                 @endforeach
                 @if ($awaitsConfirmation)

@@ -14,9 +14,10 @@ final readonly class AlertRules
 {
     /**
      * A price target carries `below` for the line under it; a drop names
-     * itself.
+     * itself. A unit-price target carries `pack`, what it comes to for the
+     * size the live shops that state one agree on.
      *
-     * @return list<array{value: string, below: bool}>
+     * @return list<array{value: string, below: bool, pack?: string}>
      */
     public static function of(Product $product): array
     {
@@ -26,14 +27,22 @@ final readonly class AlertRules
             $rules[] = ['value' => MoneyFormatter::format((string) $product->target_price, $product->currency), 'below' => true];
         }
 
-        $unitLabel = UnitWord::labelFor($product->comparablePacks()->unit());
+        $packs = $product->comparablePacks();
+        $unitLabel = UnitWord::labelFor($packs->unit());
 
         // Without a unit the figure would read as a pack price.
         if ($product->unit_price_target !== null && $unitLabel !== '') {
-            $rules[] = [
+            $rule = [
                 'value' => MoneyFormatter::unitPrice((string) $product->unit_price_target, $product->currency) . ' ' . $unitLabel,
                 'below' => true,
             ];
+            $size = $packs->sharedSize();
+
+            if ($size !== null) {
+                $rule['pack'] = PackLine::forUnitPrice((string) $product->unit_price_target, (string) $product->currency, $size);
+            }
+
+            $rules[] = $rule;
         }
 
         // An empty drop threshold is not off: the drop check falls back to a
