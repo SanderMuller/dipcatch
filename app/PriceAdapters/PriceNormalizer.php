@@ -9,6 +9,7 @@ namespace App\PriceAdapters;
  */
 final class PriceNormalizer
 {
+    /** @return numeric-string|null */
     public static function fromMixed(mixed $value): ?string
     {
         if (is_string($value)) {

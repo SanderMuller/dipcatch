@@ -135,7 +135,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        // An API first (ah.nl, bol.com); the dataset or the page as fallback.
+        // An API first ({@see ApiPriceSources}); the dataset or the page as fallback.
         $reading = new ApiPriceSources($ahApi, app(BolApiSource::class))->read($shop->host, $shop->url);
 
         if ($reading !== null) {

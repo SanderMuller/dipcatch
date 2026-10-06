@@ -7,7 +7,7 @@ use Illuminate\Contracts\View\View;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * One landing page per supported shop, plus the hub that lists them.
+ * One landing page per supported shop, plus the hub that lists the highlights.
  *
  * The route's slug constraint is built from the same config the pages are, so
  * this guard only fires when a host is dropped between the route cache and

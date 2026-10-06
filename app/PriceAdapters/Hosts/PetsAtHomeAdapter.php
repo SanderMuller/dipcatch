@@ -9,6 +9,7 @@ use App\PriceAdapters\JsonLdAdapter;
 use App\PriceAdapters\JsonLdEntities;
 use App\PriceAdapters\JsonLdOfferVariants;
 use App\PriceAdapters\OwnsHosts;
+use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
 use App\Support\NextData;
@@ -72,6 +73,7 @@ final readonly class PetsAtHomeAdapter implements HostSpecificAdapter, OwnsHosts
     private static function packSizeOf(string $html, ShopSnapshot $snapshot): ?string
     {
         $sku = $snapshot->raw['offer']['sku'] ?? null;
+        $sku = is_int($sku) ? (string) $sku : $sku;
         $state = NextData::decode($html);
         $products = $state === null ? null : NextData::value($state, 'props.pageProps.baseProduct.products');
 
@@ -79,10 +81,13 @@ final readonly class PetsAtHomeAdapter implements HostSpecificAdapter, OwnsHosts
             return null;
         }
 
-        $variant = array_find($products, static fn (mixed $row): bool => is_array($row) && ($row['id'] ?? null) === $sku);
+        $variant = array_find($products, static fn (mixed $row): bool => is_array($row) && is_scalar($row['id'] ?? null) && (string) $row['id'] === $sku);
         $price = is_array($variant) ? ($variant['price']['base'] ?? null) : null;
 
-        if (! is_array($variant) || ! (is_int($price) || is_float($price)) || abs($price - (float) $snapshot->price) >= 0.005) {
+        $statePrice = PriceNormalizer::fromMixed($price);
+        $readPrice = PriceNormalizer::fromMixed($snapshot->price);
+
+        if (! is_array($variant) || $statePrice === null || $readPrice === null || bccomp($statePrice, $readPrice, 2) !== 0) {
             return null;
         }
 

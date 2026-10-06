@@ -70,6 +70,14 @@ it('takes a campaign price anyone gets, never a member or multi-buy price', func
     'a multi-buy' => [axfoodPromotion('GENERAL', qualifyingCount: 2), '59.9'],
 ]);
 
+it('leaves stock unknown when the endpoint does not state it', function (): void {
+    $product = axfoodProduct();
+    unset($product['outOfStock']);
+    Http::fake(['www.willys.se/axfood/rest/p/101544610_ST' => Http::response($product)]);
+
+    expect(new AxfoodApiSource()->resolve('https://www.willys.se/produkt/Originalet-Mellanrost-Bryggkaffe-101544610_ST')->snapshot?->inStock)->toBeNull();
+});
+
 it('reads Hemköp too, and refuses a product priced per kilo', function (): void {
     Http::fake(['www.hemkop.se/axfood/rest/p/101544610_ST' => Http::response(axfoodProduct(outOfStock: true))]);
 

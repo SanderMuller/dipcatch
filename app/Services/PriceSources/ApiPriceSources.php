@@ -9,11 +9,9 @@ use App\Services\BolApi\BolApiSource;
 use App\Services\DmApi\DmApiSource;
 
 /**
- * The shops read through an API instead of their web page: ah.nl through
- * AH's mobile API (live, bonus-aware), bol.com through bol's Catalog API
- * (the site blocks page reads at times), and dm.de, dm.at, willys.se and
- * hemkop.se through the product APIs their pages render from. A miss returns null, so the
- * caller falls back to its next source.
+ * The shops read through an API instead of their web page; each source's
+ * `supports()` names its hosts. A miss returns null, so the caller falls
+ * back to its next source.
  */
 final readonly class ApiPriceSources
 {

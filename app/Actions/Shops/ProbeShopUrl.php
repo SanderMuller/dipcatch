@@ -276,7 +276,7 @@ final readonly class ProbeShopUrl
     }
 
     /**
-     * ah.nl and bol.com resolve through an API ({@see ApiPriceSources}); ah.nl
+     * Some shops resolve through an API ({@see ApiPriceSources}); ah.nl
      * falls back to the checkjebon dataset's regular price when the
      * unofficial API misbehaves, and boodschaapje.nl/Lidl is dataset-only.
      * Returns null otherwise, so the network probe runs.

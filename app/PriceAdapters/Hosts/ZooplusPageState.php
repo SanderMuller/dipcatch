@@ -39,8 +39,7 @@ final readonly class ZooplusPageState
     }
 
     /**
-     * The first hint that names a variant, in the JSON-LD's own order: a
-     * chosen variant outranks the page's own and the URL's.
+     * The variant the first hint names, in the order given.
      *
      * @param  list<?string>  $hints
      * @return array<mixed>|null

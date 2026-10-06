@@ -101,7 +101,7 @@ return [
 
     /**
      * Hosts on the homepage "Works with" row. Keep this short: one chip per
-     * brand a visitor should recognise at a glance. The shops hub lists the rest.
+     * brand a visitor should recognise at a glance.
      */
     'homepage_hosts' => [
         'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl',

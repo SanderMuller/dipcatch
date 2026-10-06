@@ -28,8 +28,7 @@ final readonly class ChallengePage
         '<title>client challenge</title>',
         // PerimeterX's own pages, served on 200 at a `/blocked` or
         // `/are-you-human` address (walmart.com, samsclub.com) or on 307
-        // (gnc.com), 2026-10-06. Its script on an ordinary page carries
-        // neither of these, so a product page that loads it still reads.
+        // (gnc.com), 2026-10-06. These are page titles, not the script name.
         '<title>robot or human?</title>',
         "let us know you're not a robot",
         'access to this page has been denied',
@@ -39,10 +38,6 @@ final readonly class ChallengePage
 
     public static function in(string $body): bool
     {
-        if ($body === '') {
-            return false;
-        }
-
         $head = strtolower(substr($body, 0, 4096));
 
         return array_any(self::MARKERS, static fn (string $marker): bool => str_contains($head, $marker));

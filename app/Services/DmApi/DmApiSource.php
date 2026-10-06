@@ -23,7 +23,6 @@ final readonly class DmApiSource
 {
     private const string DETAIL_URL = 'https://products.dm.de/product/products/detail/%s/dan/%s';
 
-    /** The API's country code for each dm shop. */
     private const array COUNTRIES = ['dm.de' => 'DE', 'dm.at' => 'AT'];
 
     public function supports(string $host): bool

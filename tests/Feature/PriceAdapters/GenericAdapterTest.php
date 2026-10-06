@@ -316,3 +316,12 @@ HTML;
 
     expect($this->adapter->extract('https://x.test', $html)->snapshot?->currency)->toBe('CAD');
 });
+
+test('a currency sign hidden from screen readers still names the currency', function (): void {
+    $html = '<html><body><h1>Kettle</h1><span class="price"><span aria-hidden="true">€</span> 12,99</span></body></html>';
+
+    $result = $this->adapter->extract('https://x.test', $html);
+
+    expect($result->snapshot?->price)->toBe('12.99')
+        ->and($result->snapshot?->currency)->toBe('EUR');
+});

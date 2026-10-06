@@ -30,7 +30,6 @@ final readonly class PageCurrency
             }
         }
 
-        // Three-letter ISO code embedded?
         if (preg_match('/\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|PLN|CZK)\b/i', $priceText, $m)) {
             return strtoupper($m[1]);
         }

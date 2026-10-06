@@ -28,7 +28,7 @@
                 <h1 class="max-w-[24ch] text-4xl font-semibold tracking-tight text-balance sm:text-5xl">{{ __('Supported shops') }}</h1>
                 <p class="mt-5 max-w-[60ch] text-lg text-pretty text-zinc-600 dark:text-zinc-300">{{ $description }}</p>
                 <p class="mt-4 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">
-                    {{ __('Paste a product link from almost any webshop and it works. The shops on this page get extra attention, because their pages are the trickiest to read.') }}
+                    {{ __('Paste a product link from almost any webshop and it works. These are the biggest shops, each with a reader written for it.') }}
                     <x-shop-request-link class="font-medium text-ink hover:text-brand" />
                 </p>
 

@@ -18,9 +18,7 @@ final readonly class OpenGraphAdapter implements ShopAdapter
 
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
-        // A chosen variant this reader cannot tell apart: whatever number it
-        // finds belongs to whichever variant the page shows, and stored as the
-        // chosen one it is a wrong price (Myprotein, 2026-10-06).
+        // A reader that cannot tell variants apart: see GenericAdapter.
         if ($context?->variantKey !== null) {
             return ExtractionResult::failed('variant_not_readable');
         }

@@ -156,11 +156,11 @@ function petsAtHomeTwoPackJson(): string
  * A one-bag page as petsathome.com served it on 2026-10-06: the JSON-LD
  * names the product without its size, the page state names the bag.
  */
-function petsAtHomeBagPage(float $statePrice = 50.19): string
+function petsAtHomeBagPage(float $statePrice = 50.19, int|string $sku = '7108890'): string
 {
     $json = json_encode(['@context' => 'https://schema.org', '@type' => 'Product', 'name' => 'AATU Chicken Adult Dry Dog Food', 'offers' => [
         ['@type' => 'Offer', 'priceCurrency' => 'GBP', 'sku' => '7108890', 'price' => 45.17, 'description' => 'Easy Repeat subscription price'],
-        ['@type' => 'Offer', 'priceCurrency' => 'GBP', 'sku' => '7108890', 'price' => 50.19, 'description' => 'Standard price'],
+        ['@type' => 'Offer', 'priceCurrency' => 'GBP', 'sku' => $sku, 'price' => 50.19, 'description' => 'Standard price'],
     ]], JSON_THROW_ON_ERROR);
     $state = json_encode(['props' => ['pageProps' => ['baseProduct' => ['products' => [
         ['id' => '7108890', 'label' => '5kg', 'netAmount' => 5, 'uomValue' => 'kg', 'price' => ['base' => $statePrice]],
@@ -175,6 +175,12 @@ test('reads the bag size the page state states for the priced offer', function (
 
     expect($result->snapshot?->price)->toBe('50.19')
         ->and($result->snapshot?->packSize)->toBe('5 kg');
+});
+
+test('matches a numeric sku to the page state', function (): void {
+    $result = $this->adapter->extract('https://www.petsathome.com/product/aatu-80-20-dry-adult-dog-food-free-run-chicken/P3794', petsAtHomeBagPage(sku: 7108890));
+
+    expect($result->snapshot?->packSize)->toBe('5 kg');
 });
 
 test('leaves the size unread when the page state prices that bag differently', function (): void {

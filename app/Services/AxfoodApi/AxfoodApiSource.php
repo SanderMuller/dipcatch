@@ -74,14 +74,14 @@ final readonly class AxfoodApiSource
      */
     private static function snapshot(array $product, string $code): ?ShopSnapshot
     {
-        $regular = $product['priceValue'] ?? null;
+        $regular = PriceNormalizer::fromMixed($product['priceValue'] ?? null);
         $name = is_string($product['name'] ?? null) ? trim($product['name']) : '';
 
-        if (! (is_int($regular) || is_float($regular)) || $regular <= 0 || $name === '') {
+        if ($regular === null || bccomp($regular, '0', 2) <= 0 || $name === '') {
             return null;
         }
 
-        $promotion = self::promotionPrice($product, $code, (float) $regular);
+        $promotion = self::promotionPrice($product, $code, $regular);
         $brand = is_string($product['manufacturer'] ?? null) ? trim($product['manufacturer']) : '';
         $volume = is_string($product['displayVolume'] ?? null) ? trim($product['displayVolume']) : '';
         $image = $product['image']['url'] ?? null;
@@ -89,14 +89,14 @@ final readonly class AxfoodApiSource
         return new ShopSnapshot(
             title: trim(($brand === '' || str_contains($name, $brand) ? '' : $brand . ' ') . $name),
             imageUrl: is_string($image) ? $image : null,
-            price: (string) PriceNormalizer::fromMixed($promotion ?? $regular),
+            price: $promotion ?? $regular,
             currency: 'SEK',
-            inStock: ! (($product['outOfStock'] ?? false) === true),
+            inStock: is_bool($product['outOfStock'] ?? null) ? ! $product['outOfStock'] : null,
             raw: ['source' => 'axfood-api'],
             packSize: $volume !== '' && PackSize::parse($volume) !== null ? $volume : null,
             gtin: is_string($product['ean'] ?? null) ? Gtin::normalize($product['ean']) : null,
             gtinAuthoritative: true,
-            claimedRegularPrice: $promotion === null ? null : PriceNormalizer::fromMixed($regular),
+            claimedRegularPrice: $promotion === null ? null : $regular,
             claimAuthoritative: true,
         );
     }
@@ -106,18 +106,20 @@ final readonly class AxfoodApiSource
      * not a `LOYALTY` one for Willys Plus members, and not a multi-buy.
      *
      * @param  array<mixed>  $product
+     * @param  numeric-string  $regular
+     * @return numeric-string|null
      */
-    private static function promotionPrice(array $product, string $code, float $regular): ?float
+    private static function promotionPrice(array $product, string $code, string $regular): ?string
     {
         foreach (is_array($product['potentialPromotions'] ?? null) ? $product['potentialPromotions'] : [] as $promotion) {
-            $value = is_array($promotion) ? ($promotion['price']['value'] ?? null) : null;
+            $value = is_array($promotion) ? PriceNormalizer::fromMixed($promotion['price']['value'] ?? null) : null;
 
             if (is_array($promotion)
                 && ($promotion['campaignType'] ?? null) === 'GENERAL'
                 && ($promotion['qualifyingCount'] ?? null) === 1
                 && in_array($code, is_array($promotion['productCodes'] ?? null) ? $promotion['productCodes'] : [], strict: true)
-                && (is_int($value) || is_float($value)) && $value > 0 && $value < $regular) {
-                return (float) $value;
+                && $value !== null && bccomp($value, '0', 2) > 0 && bccomp($value, $regular, 2) < 0) {
+                return $value;
             }
         }
 

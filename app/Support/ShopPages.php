@@ -30,7 +30,7 @@ final class ShopPages
     private const array BUNDLE_AWARE = ['ah.nl', 'jumbo.com'];
 
     /** Hosts whose adapter reads the article number, which catches a mismatched pack. */
-    private const array ARTICLE_NUMBER = ['dierapotheker.nl', 'poiesz-supermarkten.nl', 'vomar.nl'];
+    private const array ARTICLE_NUMBER = ['dierapotheker.nl', 'poiesz-supermarkten.nl', 'vomar.nl', 'dm.de', 'willys.se', 'hemkop.se'];
 
     /**
      * @return list<ShopPage>
@@ -47,8 +47,6 @@ final class ShopPages
     }
 
     /**
-     * The pages of the highlighted shops, for the shops hub.
-     *
      * @return list<ShopPage>
      */
     public static function highlights(): array

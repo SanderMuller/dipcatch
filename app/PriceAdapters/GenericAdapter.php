@@ -143,7 +143,9 @@ final readonly class GenericAdapter implements ShopAdapter
                     continue;
                 }
 
-                $currency = PageCurrency::of($rawText, $crawler);
+                // The number comes from the readable text, but a currency sign may be
+                // the part hidden from screen readers: `<span aria-hidden>€</span> 12,99`.
+                $currency = PageCurrency::of($rawText, $crawler) ?? PageCurrency::of(trim($node->text('')), $crawler);
 
                 if ($currency === null) {
                     continue;

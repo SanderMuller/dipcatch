@@ -30,12 +30,10 @@ final readonly class ParentPageRedirect
      * Whether `$finalUrl` is on the same host as `$requested` and its path is
      * one of the path's parents that no longer names the product: the home
      * page, or a parent that dropped the product's number, as
-     * `/shop/dogs/402593` landing on `/shop/dogs`. A canonical redirect that
-     * drops only a slug (`/p/123/coffee` to `/p/123`) keeps the number and
-     * still is the product. A page that moves deeper or sideways is not one.
-     * See {@see self::namesProduct()} for what a product number looks like.
+     * `/shop/dogs/402593` landing on `/shop/dogs`. A page that moves deeper or
+     * sideways is not one.
      */
-    public static function dropsProduct(string $finalUrl, string $requested): bool
+    private static function dropsProduct(string $finalUrl, string $requested): bool
     {
         $finalHost = parse_url($finalUrl, PHP_URL_HOST);
         $requestedHost = parse_url($requested, PHP_URL_HOST);
@@ -57,20 +55,25 @@ final readonly class ParentPageRedirect
             return false;
         }
 
-        return $finalPath === [] || (
-            array_any(array_slice($requestedPath, count($finalPath)), self::namesProduct(...))
-            && ! array_any($finalPath, self::namesProduct(...))
-        );
+        if ($finalPath === []) {
+            return true;
+        }
+
+        // A parent that still carries a product number is taken for the
+        // product's own page. That lets a numbered category (`/c/dogs-1234`)
+        // through, but a canonical redirect to `/p/coffee-123` keeps working.
+        return array_any(array_slice($requestedPath, count($finalPath)), self::namesProduct(...))
+            && ! array_any($finalPath, self::namesProduct(...));
     }
 
     /**
-     * Whether a path segment carries a product number: all digits
-     * (`/402593`), or a slug that ends in one (`…-salmon-57815.html` on
-     * petsmart.ca, 2026-10-06). A parent that still carries one still names
-     * the product, as `/p/123` does after dropping `/coffee-2`.
+     * Whether a path segment carries a product number: three or more digits
+     * (`/402593`), or a slug that ends in them (`…-salmon-57815.html` on
+     * petsmart.ca, 2026-10-06). A short number (`/5`) is a size or a
+     * variant, not the product.
      */
     private static function namesProduct(string $segment): bool
     {
-        return preg_match('/^\d+$|-\d{3,}(\.html?)?$/', $segment) === 1;
+        return preg_match('/^\d{3,}$|-\d{3,}(\.html?)?$/', $segment) === 1;
     }
 }

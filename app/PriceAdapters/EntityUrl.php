@@ -28,6 +28,29 @@ final readonly class EntityUrl
     ];
 
     /**
+     * The addresses an entity states for itself: its `url`, and its `@id`
+     * when that is an address. petsmart.com lists one Product per bag size,
+     * each with the `url` of its own size page, and marks the size the page
+     * shows only by giving it the page's address as `@id` (2026-10-06).
+     *
+     * @param  array<string, mixed>  $entity
+     * @return list<string>
+     */
+    public static function of(array $entity): array
+    {
+        $url = JsonLdEntities::nonEmptyString($entity['url'] ?? null);
+        $id = JsonLdEntities::nonEmptyString($entity['@id'] ?? null);
+
+        // A fragment id (`/p/1#product`) names a node on a page. It stands in
+        // for an entity with no `url`, as Yoast and WooCommerce write it, but
+        // never overrides the `url` an entity does state.
+        $usableId = $id !== null && preg_match('~^https?://~i', $id) === 1
+            && ($url === null || ! str_contains($id, '#'));
+
+        return array_values(array_filter([$url, $usableId ? $id : null]));
+    }
+
+    /**
      * The paths must be equal, and every query parameter the entity states
      * must be present with the same value in the requested URL. Extra
      * parameters on the requested URL are ignored: they are the caller's

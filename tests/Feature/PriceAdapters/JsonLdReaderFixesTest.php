@@ -298,3 +298,38 @@ test('a Product whose @id is the page address is the one the page shows', functi
 
     expect($result->snapshot?->price)->toBe('97.99');
 });
+
+test('a fragment @id does not name the page', function (): void {
+    $page = 'https://shop.test/p/large';
+    $html = ldPage([
+        ['@context' => 'https://schema.org', '@type' => 'Product', 'name' => 'Small', '@id' => $page . '#small', 'url' => 'https://shop.test/p/small',
+            'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR']],
+        ['@context' => 'https://schema.org', '@type' => 'Product', 'name' => 'Large', '@id' => $page . '#large', 'url' => $page,
+            'offers' => ['@type' => 'Offer', 'price' => '30.00', 'priceCurrency' => 'EUR']],
+    ]);
+
+    expect(new JsonLdAdapter()->extract($page, $html)->snapshot?->price)->toBe('30.00');
+});
+
+test('a member price is refused for a full-URL Product too, so OpenGraph cannot read it', function (): void {
+    $offer = ['@type' => 'Offer', 'price' => '42.49', 'priceCurrency' => 'EUR', 'priceSpecification' => [
+        ['@type' => 'UnitPriceSpecification', 'priceType' => 'https://schema.org/StrikethroughPrice', 'price' => '49.99'],
+        ['@type' => 'UnitPriceSpecification', 'price' => '42.49', 'validForMemberTier' => ['@type' => 'MemberProgramTier', 'name' => 'autoshipment']],
+    ]];
+    $html = ldPage(
+        [['@context' => 'https://schema.org', '@type' => 'https://schema.org/Product', 'name' => 'Dog food', 'offers' => $offer]],
+        '<meta property="og:price:amount" content="42.49"><meta property="og:price:currency" content="EUR">',
+    );
+
+    expect(app(AdapterResolver::class)->resolve('https://shop.test/p/1', $html)->isSuccess())->toBeFalse();
+});
+
+test('a fragment @id names the page for a Product with no url', function (): void {
+    // Yoast and WooCommerce: `@id: <page>#product`, no `url`.
+    $html = ldPage([['@context' => 'https://schema.org', '@graph' => [
+        ['@type' => 'Product', 'name' => 'Other', '@id' => 'https://shop.test/p/other#product', 'offers' => ['@type' => 'Offer', 'price' => '20.00', 'priceCurrency' => 'EUR']],
+        ['@type' => 'Product', 'name' => 'Main', '@id' => 'https://shop.test/p/main#product', 'offers' => ['@type' => 'Offer', 'price' => '10.00', 'priceCurrency' => 'EUR']],
+    ]]]);
+
+    expect(new JsonLdAdapter()->extract('https://shop.test/p/main', $html)->snapshot?->price)->toBe('10.00');
+});

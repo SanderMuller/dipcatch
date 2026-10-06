@@ -30,3 +30,14 @@ test('a product that can be delivered keeps its in-stock reading', function (): 
 
     expect($result->snapshot?->inStock)->toBeTrue();
 });
+
+test('the delivery block is found whatever the order of its classes', function (): void {
+    $html = str_replace(
+        'class="delivery-info delivery-info--deliverytime is-not-available direct-availability-hidden"',
+        'class="is-not-available delivery-info--deliverytime"',
+        tomAndCoPage('is-not-available'),
+    );
+    $html = str_replace('<body>', '<body><span class="delivery-info--deliverytime-label">Levering</span>', $html);
+
+    expect(new TomAndCoAdapter()->extract('https://www.tomandco.com/nl-be/tribal-kip-adult-12kg.html', $html)->snapshot?->inStock)->toBeFalse();
+});

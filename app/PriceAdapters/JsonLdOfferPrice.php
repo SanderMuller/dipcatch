@@ -16,6 +16,7 @@ final readonly class JsonLdOfferPrice
 {
     /**
      * @param  array<string, mixed>  $offer
+     * @return numeric-string|null
      */
     public static function price(array $offer): ?string
     {
@@ -82,17 +83,10 @@ final readonly class JsonLdOfferPrice
     }
 
     /**
-     * Whether the offer's price is the price a member tier pays, so that the
-     * price anyone else pays is not in the markup.
-     *
-     * A spec with `validForMemberTier` states a member's price beside the
-     * offer's own. zooplus names its repeat-order and zooclub prices that way
-     * and then states the same member price as the offer's price and as a
-     * `SalePrice`, under the regular price struck through: 42.49 on a page
-     * whose one-off price is 49.99 (verified 2026-10-05).
-     *
+     * Whether the offer's price is a member tier's price set under a higher
+     * struck price, as zooplus states its repeat-order and zooclub prices.
      * A member spec at the offer's price with no higher struck price only
-     * states the points a member earns on the regular price. A sale for
+     * states the points a member earns, and is no member price. A sale for
      * everyone that also names a member tier at the sale price reads as a
      * member price too: that page fails rather than risk the wrong price.
      *
@@ -111,7 +105,7 @@ final readonly class JsonLdOfferPrice
         $atMemberPrice = array_any($specs, static function (array $spec) use ($price): bool {
             $member = PriceNormalizer::fromMixed($spec['price'] ?? null);
 
-            return self::isMemberSpec($spec) && $member !== null && abs((float) $member - (float) $price) < 0.005;
+            return self::isMemberSpec($spec) && $member !== null && bccomp($member, $price, 2) === 0;
         });
 
         return $atMemberPrice && array_any($specs, static function (array $spec) use ($price): bool {
@@ -119,7 +113,7 @@ final readonly class JsonLdOfferPrice
             $struck = PriceNormalizer::fromMixed($spec['price'] ?? null);
 
             return is_string($type) && preg_match('~(^|/)StrikethroughPrice$~', $type) === 1
-                && $struck !== null && (float) $struck > (float) $price;
+                && $struck !== null && bccomp($struck, $price, 2) > 0;
         });
     }
 
@@ -150,8 +144,6 @@ final readonly class JsonLdOfferPrice
     }
 
     /**
-     * Whether a spec states the price for a member tier only.
-     *
      * @param  array<string, mixed>  $spec
      */
     private static function isMemberSpec(array $spec): bool

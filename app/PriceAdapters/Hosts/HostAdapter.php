@@ -33,8 +33,8 @@ abstract readonly class HostAdapter implements HostSpecificAdapter, OwnsHosts, S
     abstract protected function extractFromHtml(string $html, string $currency): ?ShopSnapshot;
 
     /**
-     * The fallback read, for a host whose page names the variant asked for in
-     * its URL or the chosen variant key. Reads the markup alone by default.
+     * The read after JSON-LD fails. Override it to read the chosen variant;
+     * by default it reads the markup.
      */
     protected function extractFromPage(string $url, string $html, string $currency, ?AdapterContext $context): ?ShopSnapshot
     {

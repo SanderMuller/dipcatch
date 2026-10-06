@@ -79,7 +79,8 @@ final readonly class JsonLdAdapter implements ShopAdapter
 
         // A full-URL Product whose offer cannot be read was ignored before
         // `typesOf()` read that form: let the next reader have the page.
-        if ($result->isFailed() && $product !== null && JsonLdTypeForms::namesProductOnlyByUrl($product)) {
+        if ($result->isFailed() && $result->failureReason !== 'jsonld_member_price'
+            && $product !== null && JsonLdTypeForms::namesProductOnlyByUrl($product)) {
             return ExtractionResult::skip();
         }
 

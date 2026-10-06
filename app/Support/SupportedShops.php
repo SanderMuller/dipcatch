@@ -10,10 +10,9 @@ namespace App\Support;
 final readonly class SupportedShops
 {
     /**
-     * Every host with a shop landing page.
-     *
-     * Every list that only links shops reads this rather than `ShopPages`,
-     * which builds each page's copy.
+     * Every host with a shop landing page. A list that only links shops reads
+     * this, or {@see self::highlights()}, rather than `ShopPages`, which builds
+     * each page's copy.
      *
      * @return list<array{host: string, favicon: string, name: string, slug: string}>
      */
@@ -34,8 +33,7 @@ final readonly class SupportedShops
     }
 
     /**
-     * The market leaders the shops hub, the footer and the "compare with" row
-     * show, from `site.highlight_hosts`. A host missing from
+     * The shops in `site.highlight_hosts`. A host missing from
      * `supported_hosts` is skipped, so a shop dropped there disappears here
      * too.
      *

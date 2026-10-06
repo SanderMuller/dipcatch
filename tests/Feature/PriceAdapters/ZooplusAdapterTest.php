@@ -293,7 +293,7 @@ function zooplusMemberPricePage(): string
 
     $variant = static fn (int $id, float $price, float $member): array => [
         'variantId' => $id,
-        'offers' => [['price' => ['currency' => 'EUR', 'currentPrice' => ['value' => $price], 'discounts' => [
+        'offers' => [['available' => $id !== 0, 'price' => ['currency' => 'EUR', 'currentPrice' => ['value' => $price], 'discounts' => [
             ['discountedPriceRaw' => $member, 'type' => 'ABD'],
             ['discountedPriceRaw' => $member, 'type' => 'AUTOSHIPMENT'],
         ]]]],
@@ -330,7 +330,19 @@ test('a chosen variant reads its own one-off price, not the one the page shows',
         new AdapterContext(variantKey: '2385221.2'),
     );
 
-    expect($result->snapshot?->price)->toBe('49.99');
+    expect($result->snapshot?->price)->toBe('49.99')
+        ->and($result->snapshot?->inStock)->toBeTrue();
+});
+
+test('a variant the page state marks unavailable reads out of stock', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.zooplus.nl/shop/honden/eukanuba/2385221',
+        zooplusMemberPricePage(),
+        new AdapterContext(variantKey: '2385221.0'),
+    );
+
+    expect($result->snapshot?->price)->toBe('22.99')
+        ->and($result->snapshot?->inStock)->toBeFalse();
 });
 
 test('a chosen variant the page no longer lists reads nothing', function (): void {
@@ -339,6 +351,22 @@ test('a chosen variant the page no longer lists reads nothing', function (): voi
         zooplusMemberPricePage(),
         new AdapterContext(variantKey: '2385221.7'),
     );
+
+    expect($result->isSuccess())->toBeFalse();
+});
+
+test('a chosen variant the page no longer lists reads nothing, even when the URL names another', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.zooplus.nl/shop/honden/eukanuba/2385221?activeVariant=2385221.2',
+        zooplusMemberPricePage(),
+        new AdapterContext(variantKey: '2385221.7'),
+    );
+
+    expect($result->isSuccess())->toBeFalse();
+});
+
+test('a variant the URL names but the page state does not list reads nothing', function (): void {
+    $result = $this->adapter->extract('https://www.zooplus.nl/shop/honden/eukanuba/2385221?activeVariant=2385221.7', zooplusMemberPricePage());
 
     expect($result->isSuccess())->toBeFalse();
 });

@@ -4,6 +4,7 @@ namespace App\PriceAdapters\Hosts;
 
 use App\PriceAdapters\AdapterContext;
 use App\PriceAdapters\ExtractionResult;
+use Symfony\Component\DomCrawler\Crawler;
 
 /**
  * Tom&Co: product pages state their price in structured data, and the
@@ -39,10 +40,6 @@ final readonly class TomAndCoAdapter extends StructuredDataHostAdapter
 
     private static function deliveryUnavailable(string $html): bool
     {
-        if (preg_match('/class="[^"]*\bdelivery-info--deliverytime\b[^"]*"/', $html, $match) !== 1) {
-            return false;
-        }
-
-        return preg_match('/(^|\s)is-not-available(\s|")/', $match[0]) === 1;
+        return new Crawler($html)->filter('.delivery-info--deliverytime.is-not-available')->count() > 0;
     }
 }

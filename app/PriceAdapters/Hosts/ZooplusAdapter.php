@@ -17,8 +17,9 @@ use Symfony\Component\DomCrawler\Crawler;
  * applies it states that member price as the offer's price. The JSON-LD
  * reader refuses it ({@see JsonLdOfferPrice::isMemberPrice()}), and the
  * regular price then comes from the page state, for the variant the URL or
- * the chosen variant key names. Without page state the price is read from
- * the spans tagged `data-zta="reducedPriceAmount"`: multi-variant pages
+ * the chosen variant key names; a variant named but not listed there reads
+ * nothing. When nothing named a variant, or the page has no state, the price
+ * is read from the spans tagged `data-zta="reducedPriceAmount"`: multi-variant pages
  * render one per variant, and the *active* one (selected via
  * `?activeVariant=…`) carries a `Variant_activeVariant__<hash>` class on its
  * wrapping price cell.
@@ -60,31 +61,37 @@ final readonly class ZooplusAdapter extends HostAdapter
     }
 
     /**
-     * The regular price of the variant the URL or the chosen key names. A
-     * chosen key the page does not list reads nothing rather than the
-     * price of whichever variant the page shows.
+     * The regular price of the variant the chosen key names, or else the one
+     * the page or the URL names. A chosen key the page does not list reads
+     * nothing rather than the price of whichever variant the page shows.
      */
     protected function extractFromPage(string $url, string $html, string $currency, ?AdapterContext $context): ?ShopSnapshot
     {
         $variantKey = $context?->variantKey;
         $state = ZooplusPageState::read($html);
-        $variant = $state?->named([$variantKey, $state->pageVariant, ZooplusPageState::queryVariant($url)])
-            ?? ($state !== null && count($state->variants) === 1 ? $state->variants[0] : null);
+        $hints = $variantKey === null ? [$state?->pageVariant, ZooplusPageState::queryVariant($url)] : [$variantKey];
+        $variant = $state?->named($hints)
+            ?? ($variantKey === null && $state !== null && count($state->variants) === 1 ? $state->variants[0] : null);
         $price = $variant === null ? null : ZooplusPageState::regularPrice($variant);
 
         if ($price === null) {
-            return $variantKey === null ? $this->extractFromHtml($html, $currency) : null;
+            // A variant the state should list but does not is not one the
+            // CSS cells may stand in for.
+            $named = array_filter($hints, static fn (?string $hint): bool => $hint !== null) !== [];
+
+            return ($named && $state !== null) || $variantKey !== null ? null : $this->extractFromHtml($html, $currency);
         }
 
         $crawler = new Crawler();
         $crawler->addHtmlContent('<html><body>' . $html . '</body></html>');
+        $available = $variant['offers'][0]['available'] ?? null;
 
         return new ShopSnapshot(
             title: self::title($crawler),
             imageUrl: self::ogImage($crawler),
             price: $price,
             currency: $currency,
-            inStock: true,
+            inStock: is_bool($available) ? $available : null,
             raw: ['source' => 'zooplus-state'],
         );
     }
