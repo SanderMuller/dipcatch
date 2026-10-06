@@ -31,6 +31,12 @@ return [
         [
             'date' => '2026-10-06',
             'category' => 'shop',
+            'title' => 'Willys and Hemköp in Sweden',
+            'body' => 'You can now track products at willys.se and hemkop.se. DipCatch reads the shelf price and any offer everyone gets, but not prices that are only for members.',
+        ],
+        [
+            'date' => '2026-10-06',
+            'category' => 'shop',
             'title' => 'dm in Germany and Austria',
             'body' => 'You can now track products at dm.de and dm.at. Paste a product link and DipCatch reads the price.',
         ],

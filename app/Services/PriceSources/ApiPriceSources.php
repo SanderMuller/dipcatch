@@ -4,14 +4,15 @@ namespace App\Services\PriceSources;
 
 use App\PriceAdapters\ShopSnapshot;
 use App\Services\AhApi\AhApiSource;
+use App\Services\AxfoodApi\AxfoodApiSource;
 use App\Services\BolApi\BolApiSource;
 use App\Services\DmApi\DmApiSource;
 
 /**
  * The shops read through an API instead of their web page: ah.nl through
  * AH's mobile API (live, bonus-aware), bol.com through bol's Catalog API
- * (the site blocks page reads at times), and dm.de and dm.at through the
- * product API their pages render from. A miss returns null, so the
+ * (the site blocks page reads at times), and dm.de, dm.at, willys.se and
+ * hemkop.se through the product APIs their pages render from. A miss returns null, so the
  * caller falls back to its next source.
  */
 final readonly class ApiPriceSources
@@ -20,6 +21,7 @@ final readonly class ApiPriceSources
         private AhApiSource $ahApi,
         private BolApiSource $bolApi,
         private DmApiSource $dmApi = new DmApiSource(),
+        private AxfoodApiSource $axfoodApi = new AxfoodApiSource(),
     ) {}
 
     /**
@@ -31,6 +33,7 @@ final readonly class ApiPriceSources
             $this->bolApi->supports($host) => [$this->bolApi, 'bol-api'],
             $this->ahApi->supports($host) => [$this->ahApi, 'ah-api'],
             $this->dmApi->supports($host) => [$this->dmApi, 'dm-api'],
+            $this->axfoodApi->supports($host) => [$this->axfoodApi, 'axfood-api'],
             default => null,
         };
 
