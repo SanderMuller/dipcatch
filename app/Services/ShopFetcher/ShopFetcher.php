@@ -49,6 +49,10 @@ final readonly class ShopFetcher
         // challenge page and store it as a price (hoogvliet.com, 2026-09-01).
         'incapsula incident id',
         '_incapsula_resource',
+        // A script challenge served as a 200 shell with nothing to read
+        // (rossmann.de, 2026-10-06). Without it the read fails as "no
+        // reader", which says the shop is unsupported, not that it refused.
+        '<title>client challenge</title>',
     ];
 
     public function __construct(

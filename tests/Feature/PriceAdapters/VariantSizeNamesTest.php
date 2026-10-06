@@ -149,3 +149,14 @@ test('two variants named in the tracked size stay a question', function (): void
     expect($outcome->state)->toBe('ambiguous')
         ->and(array_count_values($titles)['Cavalor Muscle Motion - 1kg'] ?? 0)->toBe(2);
 });
+
+test('a THG page names each variant after its flavour and amount choices', function (): void {
+    $html = '<script>{"variants":[{"sku":10530967,"barcode":"5055534302620","inStock":true,"maxPerOrder":null,"choices":['
+        . '{"optionKey":"Flavour","key":"Chocolate Mint","colour":null,"title":"Chocolade Munt"},'
+        . '{"optionKey":"Amount","key":"2.5KG - 83servings","colour":null,"title":"2.5KG - 83servings"}]}]}</script>';
+
+    $variants = VariantSizeNames::fill([new VariantCandidate('10530967', 'Impact Whey Protein Chocolade Munt', '66.49', 'EUR')], $html);
+
+    expect($variants[0]->title)->toBe('Chocolade Munt, 2.5KG - 83servings')
+        ->and(VariantSizeNames::nameFor('10530967', $html))->toBe('Chocolade Munt, 2.5KG - 83servings');
+});

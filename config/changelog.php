@@ -30,6 +30,12 @@ return [
     'entries' => [
         [
             'date' => '2026-10-06',
+            'category' => 'shop',
+            'title' => 'dm in Germany and Austria',
+            'body' => 'You can now track products at dm.de and dm.at. Paste a product link and DipCatch reads the price.',
+        ],
+        [
+            'date' => '2026-10-06',
             'category' => 'fix',
             'title' => 'Correct prices at Zooplus and Bitiba',
             'body' => "Zooplus and Bitiba prices sometimes showed the repeat-order or zooclub price. DipCatch now shows what you pay for a one-off order, so some of these prices will go up a bit.\n\nWhen a shop takes a product off its site, DipCatch no longer shows another product's price in its place.",

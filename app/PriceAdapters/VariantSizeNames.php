@@ -9,7 +9,9 @@ use App\Support\PackSize;
  *
  * Medpets and Shopify shops name each JSON-LD offer after the product alone
  * ("Cavalor Muscle Motion"), and state the size only in their analytics data:
- * Shopify's `ShopifyAnalytics.meta` and Medpets' dataLayer. Without the size
+ * Shopify's `ShopifyAnalytics.meta` and Medpets' dataLayer. THG shops
+ * (Myprotein, Lookfantastic) name a variant after its flavour and state the
+ * amount only in the page state's choices. Without the size
  * in the name, a variant cannot be matched to the pack a product tracks, and a
  * shop added for one variant is stored with no pack size.
  */
@@ -54,7 +56,7 @@ final class VariantSizeNames
     }
 
     /**
-     * @param  array<string, string>  $names
+     * @param  array<int|string, string>  $names
      */
     private static function lookUp(array $names, string $key): ?string
     {
@@ -95,13 +97,14 @@ final class VariantSizeNames
     }
 
     /**
-     * Every variant name the page states, keyed by SKU and by variant id.
+     * Every variant name the page states, keyed by SKU and by variant id. An
+     * all-digit SKU is an integer key, as PHP stores one.
      *
-     * @return array<string, string>
+     * @return array<int|string, string>
      */
     private static function names(string $html): array
     {
-        return self::shopifyNames($html) + self::dataLayerNames($html);
+        return self::shopifyNames($html) + self::dataLayerNames($html) + ThgVariantNames::names($html);
     }
 
     /**

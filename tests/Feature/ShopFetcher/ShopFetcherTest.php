@@ -68,6 +68,16 @@ test('Cloudflare challenge body on 403 → Blocked', function (): void {
         ->toThrow(Blocked::class);
 });
 
+test('a script challenge served with 200 → Blocked', function (): void {
+    Http::fake([
+        'https://blocked.com/robots.txt' => Http::response('', 404),
+        'https://blocked.com/p/1' => Http::response('<html><head><title>Client Challenge</title></head><body><noscript>JavaScript is disabled</noscript></body></html>', 200),
+    ]);
+
+    expect(fn () => app(ShopFetcher::class)->fetch('https://blocked.com/p/1'))
+        ->toThrow(Blocked::class);
+});
+
 test('401 → Blocked', function (): void {
     Http::fake([
         'https://blocked.com/robots.txt' => Http::response('', 404),
