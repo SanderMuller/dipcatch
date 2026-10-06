@@ -280,3 +280,21 @@ test('a member price spec is never the selling price', function (): void {
 
     expect($result->snapshot?->price)->toBe('50.00');
 });
+
+test('a Product whose @id is the page address is the one the page shows', function (): void {
+    // petsmart.com lists one Product per bag size, each with the url of its
+    // own size page, and gives the size on show the page address as @id.
+    $page = 'https://www.petsmart.com/dog/food/dry-food/pro-plan-salmon-formula-57927.html';
+    $html = ldPage([
+        ['@context' => 'https://schema.org', '@type' => 'Product', 'name' => 'Pro Plan 24 lb', 'sku' => '5299150',
+            'url' => 'https://www.petsmart.com/dog/food/dry-food/pro-plan-salmon-formula-5299150.html',
+            'offers' => ['@type' => 'Offer', 'price' => '77.99', 'priceCurrency' => 'USD']],
+        ['@context' => 'https://schema.org', '@type' => 'Product', 'name' => 'Pro Plan 34 lb', 'sku' => '5345204', '@id' => $page,
+            'url' => 'https://www.petsmart.com/dog/food/dry-food/pro-plan-salmon-formula-5345204.html',
+            'offers' => ['@type' => 'Offer', 'price' => '97.99', 'priceCurrency' => 'USD']],
+    ]);
+
+    $result = new JsonLdAdapter()->extract($page . '?redirected=true', $html);
+
+    expect($result->snapshot?->price)->toBe('97.99');
+});

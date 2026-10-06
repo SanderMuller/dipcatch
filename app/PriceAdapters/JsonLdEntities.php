@@ -160,15 +160,32 @@ final class JsonLdEntities
     }
 
     /**
-     * Whether an entity's `url` names the page that was requested — see
-     * {@see EntityUrl} for the rule.
+     * Whether an entity's `url` or `@id` names the page that was requested —
+     * see {@see EntityUrl} for the rule.
      *
      * @param  array<string, mixed>  $entity
      */
     public static function urlMatches(array $entity, string $url): bool
     {
-        $entityUrl = self::nonEmptyString($entity['url'] ?? null);
+        return array_any(self::urls($entity), static fn (string $entityUrl): bool => EntityUrl::matches($entityUrl, $url));
+    }
 
-        return $entityUrl !== null && EntityUrl::matches($entityUrl, $url);
+    /**
+     * The addresses an entity states for itself: its `url`, and its `@id`
+     * when that is an address. petsmart.com lists one Product per bag size,
+     * each with the `url` of its own size page, and marks the size the page
+     * shows only by giving it the page's address as `@id` (2026-10-06).
+     *
+     * @param  array<string, mixed>  $entity
+     * @return list<string>
+     */
+    public static function urls(array $entity): array
+    {
+        $id = self::nonEmptyString($entity['@id'] ?? null);
+
+        return array_values(array_filter([
+            self::nonEmptyString($entity['url'] ?? null),
+            $id !== null && preg_match('~^https?://~i', $id) === 1 ? $id : null,
+        ]));
     }
 }

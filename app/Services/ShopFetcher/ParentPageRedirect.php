@@ -33,6 +33,7 @@ final readonly class ParentPageRedirect
      * `/shop/dogs/402593` landing on `/shop/dogs`. A canonical redirect that
      * drops only a slug (`/p/123/coffee` to `/p/123`) keeps the number and
      * still is the product. A page that moves deeper or sideways is not one.
+     * See {@see self::namesProduct()} for what a product number looks like.
      */
     public static function dropsProduct(string $finalUrl, string $requested): bool
     {
@@ -56,9 +57,20 @@ final readonly class ParentPageRedirect
             return false;
         }
 
-        return $finalPath === [] || array_any(
-            array_slice($requestedPath, count($finalPath)),
-            static fn (string $segment): bool => preg_match('/^\d+$/', $segment) === 1,
+        return $finalPath === [] || (
+            array_any(array_slice($requestedPath, count($finalPath)), self::namesProduct(...))
+            && ! array_any($finalPath, self::namesProduct(...))
         );
+    }
+
+    /**
+     * Whether a path segment carries a product number: all digits
+     * (`/402593`), or a slug that ends in one (`…-salmon-57815.html` on
+     * petsmart.ca, 2026-10-06). A parent that still carries one still names
+     * the product, as `/p/123` does after dropping `/coffee-2`.
+     */
+    private static function namesProduct(string $segment): bool
+    {
+        return preg_match('/^\d+$|-\d{3,}(\.html?)?$/', $segment) === 1;
     }
 }

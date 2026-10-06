@@ -78,14 +78,6 @@ final readonly class GenericAdapter implements ShopAdapter
      */
     private const int RATE_LABEL_ANCESTOR_DEPTH = 2;
 
-    /** @var array<string, string> */
-    private const array CURRENCY_SYMBOLS = [
-        '€' => 'EUR',
-        '$' => 'USD',
-        '£' => 'GBP',
-        '¥' => 'JPY',
-    ];
-
     /**
      * How long a "per litre" label can be before it is a paragraph that merely
      * mentions one. A rate and its words are a handful of characters.
@@ -137,7 +129,7 @@ final readonly class GenericAdapter implements ShopAdapter
             // that rate. Skipping it has to leave the real price reachable.
             foreach ($crawler->filter($selector) as $element) {
                 $node = new Crawler($element);
-                $rawText = trim($node->text(''));
+                $rawText = VisibleText::of($element);
                 $dataPrice = $node->attr('data-price') ?? $node->attr('content');
 
                 $candidate = is_string($dataPrice) && $dataPrice !== '' ? $dataPrice : $rawText;
@@ -151,7 +143,7 @@ final readonly class GenericAdapter implements ShopAdapter
                     continue;
                 }
 
-                $currency = self::detectCurrency($rawText) ?? self::detectCurrencyMeta($crawler);
+                $currency = PageCurrency::of($rawText, $crawler);
 
                 if ($currency === null) {
                     continue;
@@ -327,35 +319,6 @@ final readonly class GenericAdapter implements ShopAdapter
         $crawler->addHtmlContent('<html><body>' . $html . '</body></html>');
 
         return $crawler;
-    }
-
-    private static function detectCurrency(string $text): ?string
-    {
-        foreach (self::CURRENCY_SYMBOLS as $symbol => $iso) {
-            if (str_contains($text, $symbol)) {
-                return $iso;
-            }
-        }
-
-        // Three-letter ISO code embedded?
-        if (preg_match('/\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|PLN|CZK)\b/i', $text, $m)) {
-            return strtoupper($m[1]);
-        }
-
-        return null;
-    }
-
-    private static function detectCurrencyMeta(Crawler $crawler): ?string
-    {
-        $node = $crawler->filter('[itemprop="priceCurrency"]')->first();
-        if ($node->count() > 0) {
-            $content = $node->attr('content') ?? trim($node->text(''));
-            if ($content !== '') {
-                return strtoupper($content);
-            }
-        }
-
-        return null;
     }
 
     private static function detectTitle(Crawler $crawler): string

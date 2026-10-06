@@ -290,3 +290,29 @@ HTML;
 
     expect($result->snapshot?->price)->toBe('24.99');
 });
+
+test('a price split into hidden euros and cents is read from its readable text', function (): void {
+    // billa.at, 2026-10-06: the cents alone read as 99 euros.
+    $html = <<<'HTML'
+<html><body>
+  <h1>BILLA Bio Kiwi</h1>
+  <div class="ws-product-price-value text-regular-price">
+    <span class="d-sr-only">0,99 €</span>
+    <span class="ws-product-price-value__main" aria-hidden="true">0</span>
+    <div class="ws-product-price-value__after"><span class="ws-product-price-value__superscript" aria-hidden="true">99 €</span></div>
+  </div>
+</body></html>
+HTML;
+
+    expect($this->adapter->extract('https://x.test', $html)->snapshot?->price)->toBe('0.99');
+});
+
+test('a dollar sign takes the dollar the page states', function (): void {
+    // petsmart.ca, 2026-10-06: "$38.99" on a page whose JSON-LD says CAD.
+    $html = <<<'HTML'
+<html><head><script type="application/ld+json">{"@type":"WebSite","priceCurrency":"CAD"}</script></head>
+<body><h1>Dry Dog Food</h1><div class="price">$38.99</div></body></html>
+HTML;
+
+    expect($this->adapter->extract('https://x.test', $html)->snapshot?->currency)->toBe('CAD');
+});

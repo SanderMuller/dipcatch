@@ -35,26 +35,6 @@ use Throwable;
  */
 final readonly class ShopFetcher
 {
-    /** @var list<string> Lowercased substrings that indicate WAF challenge pages. */
-    private const array BLOCK_MARKERS = [
-        'cf-mitigated',
-        'just a moment',
-        'access denied',
-        'attention required! | cloudflare',
-        'akamai reference',
-        'perimeterx',
-        'px-captcha',
-        // Imperva/Incapsula serves a 200 with a tiny iframe shell. Without
-        // this marker the generic adapter can read a number out of the
-        // challenge page and store it as a price (hoogvliet.com, 2026-09-01).
-        'incapsula incident id',
-        '_incapsula_resource',
-        // A script challenge served as a 200 shell with nothing to read
-        // (rossmann.de, 2026-10-06). Without it the read fails as "no
-        // reader", which says the shop is unsupported, not that it refused.
-        '<title>client challenge</title>',
-    ];
-
     public function __construct(
         private RobotsTxtPolicy $robots,
         private UrlSafetyGuard $safety,
@@ -291,11 +271,13 @@ final readonly class ShopFetcher
         $status = $response->status();
         $body = $response->body();
 
-        if ($status === 200) {
-            if ($this->bodyIndicatesChallenge($body)) {
-                throw new Blocked('challenge page on 200');
-            }
+        // A redirect status can be the last answer too, with no address to
+        // follow: gnc.com serves its challenge as a 307 with a body.
+        if ($status < 400 && ChallengePage::in($body)) {
+            throw new Blocked("challenge page on {$status}");
+        }
 
+        if ($status === 200) {
             return;
         }
 
@@ -304,7 +286,7 @@ final readonly class ShopFetcher
         }
 
         if ($status === 403) {
-            if ($this->bodyIndicatesChallenge($body)) {
+            if (ChallengePage::in($body)) {
                 throw new Blocked('challenge markers + 403');
             }
             throw new Blocked('403 Forbidden');
@@ -328,17 +310,6 @@ final readonly class ShopFetcher
         if ($status >= 400) {
             throw new HttpError($status);
         }
-    }
-
-    private function bodyIndicatesChallenge(string $body): bool
-    {
-        if ($body === '') {
-            return false;
-        }
-
-        $head = strtolower(substr($body, 0, 4096));
-
-        return array_any(self::BLOCK_MARKERS, fn (string $marker): bool => str_contains($head, $marker));
     }
 
     private function prepareBody(Response $response): string

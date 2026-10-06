@@ -81,9 +81,9 @@ final readonly class JsonLdMatch
             return PHP_INT_MAX;
         }
 
-        $entityUrl = JsonLdEntities::nonEmptyString($entity['url'] ?? null);
+        $urls = JsonLdEntities::urls($entity);
 
-        return $entityUrl === null ? -1 : EntityUrl::precision($entityUrl, $url);
+        return $urls === [] ? -1 : max(array_map(static fn (string $entityUrl): int => EntityUrl::precision($entityUrl, $url), $urls));
     }
 
     /**

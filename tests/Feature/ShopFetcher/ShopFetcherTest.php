@@ -78,6 +78,21 @@ test('a script challenge served with 200 → Blocked', function (): void {
         ->toThrow(Blocked::class);
 });
 
+test('a bot-wall page is reported blocked, whatever status it comes with', function (string $body, int $status): void {
+    Http::fake([
+        'https://blocked.com/robots.txt' => Http::response('', 404),
+        'https://blocked.com/p/1' => Http::response($body, $status),
+    ]);
+
+    expect(fn () => app(ShopFetcher::class)->fetch('https://blocked.com/p/1'))
+        ->toThrow(Blocked::class);
+})->with([
+    'PerimeterX, walmart.com' => ['<html><head><title>Robot or human?</title></head><body></body></html>', 200],
+    'PerimeterX, samsclub.com' => ["<html><head><title>Let us know you're not a robot - Sam's Club</title></head></html>", 200],
+    'PerimeterX on 307, gnc.com' => ['<html><head><title>Access to this page has been denied</title></head></html>', 307],
+    'Baleen, cdiscount.com' => ['<html><head><title>Cdiscount</title><script>var __blnChallengeStore={};</script></head></html>', 200],
+]);
+
 test('401 → Blocked', function (): void {
     Http::fake([
         'https://blocked.com/robots.txt' => Http::response('', 404),
@@ -223,6 +238,20 @@ test('a redirect to a page above the product reports the product gone', function
     'its category' => ['https://shop.test/shop/dogs/josera'],
     'the home page' => ['https://shop.test/'],
 ]);
+
+test('a redirect to the category above a slug that ends in its number reports the product gone', function (): void {
+    // petsmart.ca, 2026-10-06: the product number ends the slug.
+    RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/dog/food/dry-food/canidae-salmon-and-oats-57815.html' => Http::response('', 307, ['Location' => 'https://shop.test/dog/food/dry-food']),
+        'https://shop.test/dog/food/dry-food' => Http::response('<html>a list of other products</html>', 200),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://shop.test/dog/food/dry-food/canidae-salmon-and-oats-57815.html'))
+        ->toThrow(HttpError::class, 'a page above the one asked for');
+});
 
 test('a redirect that drops only a slug still reads the product', function (): void {
     RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
