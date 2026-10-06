@@ -440,3 +440,18 @@ test('a sold-out WooCommerce tile or variation does not make the product sold ou
         expect($resolver->resolve('https://x.test', $page)->snapshot?->inStock)->toBeNull();
     }
 });
+
+test('a page with far more elements than any product page fails before it is parsed', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    $result = $resolver->resolve('https://x.test', str_repeat('<td>1</td>', 50_001));
+
+    expect($result->isFailed())->toBeTrue()
+        ->and($result->failureReason)->toBe('page_too_large');
+});
+
+test('a large product page is still read', function (): void {
+    $resolver = new AdapterResolver([unknownStockAdapter()]);
+
+    expect($resolver->resolve('https://x.test', str_repeat('<td>1</td>', 20_000))->isSuccess())->toBeTrue();
+});

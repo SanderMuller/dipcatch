@@ -26,6 +26,14 @@ use App\Support\PackSize;
 final readonly class AdapterResolver
 {
     /**
+     * More elements than any product page holds: the largest read so far
+     * hold under 20,000. Each adapter parses the page into its own DOM, so
+     * 600,000 tags took a queue worker past its memory limit, and from
+     * about 50,000 the generic adapter alone runs past a check's timeout.
+     */
+    private const int MAX_ELEMENTS = 50_000;
+
+    /**
      * @param  list<ShopAdapter>  $adapters
      */
     public function __construct(
@@ -38,6 +46,10 @@ final readonly class AdapterResolver
         ?string $persistedKey = null,
         ?AdapterContext $context = null,
     ): ExtractionResult {
+        if (preg_match_all('/<[a-z]/i', $html) > self::MAX_ELEMENTS) {
+            return ExtractionResult::failed('page_too_large');
+        }
+
         $persisted = $persistedKey !== null ? $this->findByKey($persistedKey) : null;
 
         // Generic keys (jsonld etc.) never short-circuit — a host that
