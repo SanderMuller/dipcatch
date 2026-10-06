@@ -100,7 +100,8 @@ final class JsonLdEntities
 
     /**
      * Resolve schema.org `image` which may be a string, an array of strings,
-     * or an `ImageObject` with a `url` key.
+     * or an `ImageObject` with a `url` or `contentUrl` key. Some shops write
+     * `URL` (sympharma.nl, 2026-10-06).
      */
     public static function firstImageUrl(mixed $value): ?string
     {
@@ -123,9 +124,9 @@ final class JsonLdEntities
             return null;
         }
 
-        $url = $value['url'] ?? null;
-
-        return is_string($url) && $url !== '' ? $url : null;
+        return self::nonEmptyString($value['url'] ?? null)
+            ?? self::nonEmptyString($value['URL'] ?? null)
+            ?? self::nonEmptyString($value['contentUrl'] ?? null);
     }
 
     /**

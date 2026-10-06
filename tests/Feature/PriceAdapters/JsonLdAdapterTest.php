@@ -216,6 +216,23 @@ test('image as schema.org ImageObject resolves to url', function (): void {
     expect($result->snapshot?->imageUrl)->toBe('https://shop.test/x.jpg');
 });
 
+test('an ImageObject that spells its address URL or contentUrl still resolves', function (array $image): void {
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => 'ImageObject',
+        'image' => ['@type' => 'ImageObject', ...$image],
+        'offers' => ['@type' => 'Offer', 'price' => '1.00', 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR);
+
+    $result = new JsonLdAdapter()->extract('https://x.test', withJsonLd($json));
+
+    expect($result->snapshot?->imageUrl)->toBe('https://shop.test/x.jpg');
+})->with([
+    // As sympharma.nl serves it (2026-10-06).
+    'upper-case URL' => [['URL' => 'https://shop.test/x.jpg']],
+    'contentUrl' => [['contentUrl' => 'https://shop.test/x.jpg']],
+]);
+
 test('matches the requested URL among ProductGroup variants', function (): void {
     $variantUrl = 'https://shop.test/p/three-pack/9200000087037725/';
     $json = json_encode([
