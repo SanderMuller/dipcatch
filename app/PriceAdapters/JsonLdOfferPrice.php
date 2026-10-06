@@ -82,6 +82,48 @@ final readonly class JsonLdOfferPrice
     }
 
     /**
+     * Whether the offer's price is the price a member tier pays, so that the
+     * price anyone else pays is not in the markup.
+     *
+     * A spec with `validForMemberTier` states a member's price beside the
+     * offer's own. zooplus names its repeat-order and zooclub prices that way
+     * and then states the same member price as the offer's price and as a
+     * `SalePrice`, under the regular price struck through: 42.49 on a page
+     * whose one-off price is 49.99 (verified 2026-10-05).
+     *
+     * A member spec at the offer's price with no higher struck price only
+     * states the points a member earns on the regular price. A sale for
+     * everyone that also names a member tier at the sale price reads as a
+     * member price too: that page fails rather than risk the wrong price.
+     *
+     * @param  array<string, mixed>  $offer
+     */
+    public static function isMemberPrice(array $offer): bool
+    {
+        $price = self::price($offer);
+
+        if ($price === null) {
+            return false;
+        }
+
+        $specs = self::specs($offer['priceSpecification'] ?? null);
+
+        $atMemberPrice = array_any($specs, static function (array $spec) use ($price): bool {
+            $member = PriceNormalizer::fromMixed($spec['price'] ?? null);
+
+            return self::isMemberSpec($spec) && $member !== null && abs((float) $member - (float) $price) < 0.005;
+        });
+
+        return $atMemberPrice && array_any($specs, static function (array $spec) use ($price): bool {
+            $type = $spec['priceType'] ?? null;
+            $struck = PriceNormalizer::fromMixed($spec['price'] ?? null);
+
+            return is_string($type) && preg_match('~(^|/)StrikethroughPrice$~', $type) === 1
+                && $struck !== null && (float) $struck > (float) $price;
+        });
+    }
+
+    /**
      * The seller the offer names, when a marketplace offer names one.
      *
      * @param  array<string, mixed>  $offer
@@ -108,14 +150,25 @@ final readonly class JsonLdOfferPrice
     }
 
     /**
-     * The first usable spec that states the price to pay.
+     * Whether a spec states the price for a member tier only.
+     *
+     * @param  array<string, mixed>  $spec
+     */
+    private static function isMemberSpec(array $spec): bool
+    {
+        return isset($spec['validForMemberTier']);
+    }
+
+    /**
+     * The first usable spec that states the price to pay. A member's price is
+     * not the price to pay for everyone else.
      *
      * @return array<string, mixed>|null
      */
     private static function sellingSpec(mixed $value): ?array
     {
         foreach (self::specs($value) as $spec) {
-            if (! self::isReferencePrice($spec)) {
+            if (! self::isReferencePrice($spec) && ! self::isMemberSpec($spec)) {
                 return $spec;
             }
         }

@@ -3,6 +3,7 @@
 namespace App\PriceAdapters\Hosts;
 
 use App\PriceAdapters\AdapterContext;
+use App\PriceAdapters\JsonLdOfferPrice;
 use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\ShopSnapshot;
@@ -11,11 +12,16 @@ use Symfony\Component\DomCrawler\Crawler;
 /**
  * Host-specific adapter for zooplus.nl / .de / .com / .co.uk and bitiba.nl
  * / .de etc. Zooplus Group runs the same Next.js template on both brands.
- * Dutch pages expose no JSON-LD price; the UK shop does, so JSON-LD wins
- * there. Elsewhere the price is server-rendered into spans tagged
- * `data-zta="reducedPriceAmount"`. Multi-variant pages render one such span
- * per variant — the *active* one (selected via `?activeVariant=…`) carries a
- * `Variant_activeVariant__<hash>` class on its wrapping price cell.
+ *
+ * The JSON-LD states a price, but where a repeat-order or zooclub discount
+ * applies it states that member price as the offer's price. The JSON-LD
+ * reader refuses it ({@see JsonLdOfferPrice::isMemberPrice()}), and the
+ * regular price then comes from the page state, for the variant the URL or
+ * the chosen variant key names. Without page state the price is read from
+ * the spans tagged `data-zta="reducedPriceAmount"`: multi-variant pages
+ * render one per variant, and the *active* one (selected via
+ * `?activeVariant=…`) carries a `Variant_activeVariant__<hash>` class on its
+ * wrapping price cell.
  */
 final readonly class ZooplusAdapter extends HostAdapter
 {
@@ -51,6 +57,36 @@ final readonly class ZooplusAdapter extends HostAdapter
             'bitiba.fr' => 'EUR',
             'bitiba.it' => 'EUR',
         ];
+    }
+
+    /**
+     * The regular price of the variant the URL or the chosen key names. A
+     * chosen key the page does not list reads nothing rather than the
+     * price of whichever variant the page shows.
+     */
+    protected function extractFromPage(string $url, string $html, string $currency, ?AdapterContext $context): ?ShopSnapshot
+    {
+        $variantKey = $context?->variantKey;
+        $state = ZooplusPageState::read($html);
+        $variant = $state?->named([$variantKey, $state->pageVariant, ZooplusPageState::queryVariant($url)])
+            ?? ($state !== null && count($state->variants) === 1 ? $state->variants[0] : null);
+        $price = $variant === null ? null : ZooplusPageState::regularPrice($variant);
+
+        if ($price === null) {
+            return $variantKey === null ? $this->extractFromHtml($html, $currency) : null;
+        }
+
+        $crawler = new Crawler();
+        $crawler->addHtmlContent('<html><body>' . $html . '</body></html>');
+
+        return new ShopSnapshot(
+            title: self::title($crawler),
+            imageUrl: self::ogImage($crawler),
+            price: $price,
+            currency: $currency,
+            inStock: true,
+            raw: ['source' => 'zooplus-state'],
+        );
     }
 
     protected function extractFromHtml(string $html, string $currency): ?ShopSnapshot

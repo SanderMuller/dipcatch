@@ -165,6 +165,12 @@ final readonly class JsonLdAdapter implements ShopAdapter
             return ExtractionResult::failed('jsonld_no_price');
         }
 
+        // Failed rather than skipped: a weaker reader would take some other
+        // number off the page. A host adapter reads the page its own way.
+        if (JsonLdOfferPrice::isMemberPrice($shop)) {
+            return ExtractionResult::failed('jsonld_member_price');
+        }
+
         $currency = JsonLdOfferPrice::currency($shop);
         if ($currency === null) {
             return ExtractionResult::failed('jsonld_no_currency');

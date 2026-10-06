@@ -263,3 +263,82 @@ test('with no variant named and two selling at the tracked price, no size is rea
 
     expect($result->snapshot?->packSizeAuthoritative)->toBeFalse();
 });
+
+/**
+ * A zooplus page whose JSON-LD states the repeat-order and zooclub price as
+ * the offer's price, as zooplus.nl did on 2026-10-05: one-off 49.99, members
+ * 42.49.
+ */
+function zooplusMemberPricePage(): string
+{
+    $memberTier = static fn (string $name): array => ['@type' => 'MemberProgramTier', 'name' => $name];
+
+    $jsonLd = json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Eukanuba Adult Large',
+        'sku' => '2385221.2',
+        'offers' => [
+            '@type' => 'Offer',
+            'price' => 42.49,
+            'priceCurrency' => 'EUR',
+            'priceSpecification' => [
+                ['@type' => 'UnitPriceSpecification', 'priceType' => 'https://schema.org/StrikethroughPrice', 'price' => 49.99],
+                ['@type' => 'UnitPriceSpecification', 'priceType' => 'https://schema.org/SalePrice', 'price' => 42.49],
+                ['@type' => 'UnitPriceSpecification', 'price' => 42.49, 'validForMemberTier' => $memberTier('autoshipment')],
+                ['@type' => 'UnitPriceSpecification', 'price' => 42.49, 'validForMemberTier' => $memberTier('Standard'), 'membershipPointsEarned' => 50],
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $variant = static fn (int $id, float $price, float $member): array => [
+        'variantId' => $id,
+        'offers' => [['price' => ['currency' => 'EUR', 'currentPrice' => ['value' => $price], 'discounts' => [
+            ['discountedPriceRaw' => $member, 'type' => 'ABD'],
+            ['discountedPriceRaw' => $member, 'type' => 'AUTOSHIPMENT'],
+        ]]]],
+    ];
+
+    $state = json_encode(['props' => ['pageProps' => ['pageLevelProps' => [
+        'activeVariantFromUrl' => null,
+        'productDetails' => ['product' => ['articleVariants' => [
+            $variant(0, 22.99, 18.39),
+            $variant(2, 49.99, 42.49),
+        ]]],
+    ]]]], JSON_THROW_ON_ERROR);
+
+    return '<html><head><script type="application/ld+json">' . $jsonLd . '</script></head><body>'
+        . '<h1 data-zta="ProductTitle__Title">Eukanuba Adult Large</h1>'
+        . '<div data-zta="Variant__Price"><span data-zta="reducedPriceAmount">€ 22,99</span></div>'
+        . '<script id="__NEXT_DATA__" type="application/json">' . $state . '</script></body></html>';
+}
+
+test('a member price stated as the offer price gives way to the one-off price', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.zooplus.nl/shop/honden/eukanuba/2385221?activeVariant=2385221.2',
+        zooplusMemberPricePage(),
+    );
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('49.99');
+});
+
+test('a chosen variant reads its own one-off price, not the one the page shows', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.zooplus.nl/shop/honden/eukanuba/2385221',
+        zooplusMemberPricePage(),
+        new AdapterContext(variantKey: '2385221.2'),
+    );
+
+    expect($result->snapshot?->price)->toBe('49.99');
+});
+
+test('a chosen variant the page no longer lists reads nothing', function (): void {
+    $result = $this->adapter->extract(
+        'https://www.zooplus.nl/shop/honden/eukanuba/2385221',
+        zooplusMemberPricePage(),
+        new AdapterContext(variantKey: '2385221.7'),
+    );
+
+    expect($result->isSuccess())->toBeFalse();
+});

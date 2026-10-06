@@ -198,6 +198,34 @@ test('a redirect onto a host that never serves its prices is refused', function 
         ->toThrow(NotServable::class);
 });
 
+test('a redirect to a page above the product reports the product gone', function (string $target): void {
+    RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/shop/dogs/josera/2200616' => Http::response('', 308, ['Location' => $target]),
+        $target => Http::response('<html>a list of other products</html>', 200),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch('https://shop.test/shop/dogs/josera/2200616'))
+        ->toThrow(HttpError::class, 'a page above the one asked for');
+})->with([
+    'its category' => ['https://shop.test/shop/dogs/josera'],
+    'the home page' => ['https://shop.test/'],
+]);
+
+test('a redirect that drops only a slug still reads the product', function (): void {
+    RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/123/coffee-beans' => Http::response('', 301, ['Location' => 'https://shop.test/p/123']),
+        'https://shop.test/p/123' => Http::response('<html>ok</html>', 200),
+    ]);
+
+    expect(app(ShopFetcher::class)->fetch('https://shop.test/p/123/coffee-beans')->finalUrl)->toBe('https://shop.test/p/123');
+});
+
 test('a redirect target is checked against its own robots.txt', function (): void {
     RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
 

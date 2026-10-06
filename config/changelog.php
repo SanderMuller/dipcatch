@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-06',
+            'category' => 'fix',
+            'title' => 'Correct prices at Zooplus and Bitiba',
+            'body' => "Zooplus and Bitiba prices sometimes showed the repeat-order or zooclub price. DipCatch now shows what you pay for a one-off order, so some of these prices will go up a bit.\n\nWhen a shop takes a product off its site, DipCatch no longer shows another product's price in its place.",
+        ],
+        [
             'date' => '2026-10-05',
             'category' => 'fix',
             'title' => 'Sold-out products at more web shops',

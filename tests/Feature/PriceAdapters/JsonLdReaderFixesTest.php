@@ -244,3 +244,39 @@ test('an unreadable full-URL Product naming the page does not hide a readable Pr
 
     expect(new JsonLdAdapter()->extract($url, $html)->snapshot?->price)->toBe('89.00');
 });
+
+test('a member price stated as the offer price is not read as the price', function (): void {
+    $offer = ['@type' => 'Offer', 'price' => '42.49', 'priceCurrency' => 'EUR', 'priceSpecification' => [
+        ['@type' => 'UnitPriceSpecification', 'priceType' => 'https://schema.org/StrikethroughPrice', 'price' => '49.99'],
+        ['@type' => 'UnitPriceSpecification', 'priceType' => 'https://schema.org/SalePrice', 'price' => '42.49'],
+        ['@type' => 'UnitPriceSpecification', 'price' => '42.49', 'validForMemberTier' => ['@type' => 'MemberProgramTier', 'name' => 'autoshipment']],
+    ]];
+    $html = ldPage([['@type' => 'Product', 'name' => 'Dog food', 'offers' => $offer]], '<meta property="product:price:amount" content="42.49">');
+
+    $result = app(AdapterResolver::class)->resolve('https://shop.test/p/1', $html);
+
+    // Failed, so no weaker reader prices the page with the member price.
+    expect($result->isSuccess())->toBeFalse()
+        ->and($result->failureReason)->toBe('jsonld_member_price');
+});
+
+test('a member tier that only earns points on the regular price leaves the price readable', function (): void {
+    $offer = ['@type' => 'Offer', 'price' => '49.99', 'priceCurrency' => 'EUR', 'priceSpecification' => [
+        ['@type' => 'UnitPriceSpecification', 'price' => '49.99', 'validForMemberTier' => ['@type' => 'MemberProgramTier', 'name' => 'Standard'], 'membershipPointsEarned' => 50],
+    ]];
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', ldPage([['@type' => 'Product', 'name' => 'Dog food', 'offers' => $offer]]));
+
+    expect($result->snapshot?->price)->toBe('49.99');
+});
+
+test('a member price spec is never the selling price', function (): void {
+    $offer = ['@type' => 'Offer', 'priceCurrency' => 'EUR', 'priceSpecification' => [
+        ['@type' => 'UnitPriceSpecification', 'price' => '40.00', 'validForMemberTier' => ['@type' => 'MemberProgramTier', 'name' => 'Gold']],
+        ['@type' => 'UnitPriceSpecification', 'price' => '50.00'],
+    ]];
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', ldPage([['@type' => 'Product', 'name' => 'Dog food', 'offers' => $offer]]));
+
+    expect($result->snapshot?->price)->toBe('50.00');
+});

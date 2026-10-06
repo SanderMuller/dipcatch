@@ -109,6 +109,8 @@ final readonly class ShopFetcher
             throw new NotServable($finalHost, $unservable);
         }
 
+        ParentPageRedirect::refuse($finalUrl, $url, redirected: $redirects !== []);
+
         return new FetchResult(
             finalUrl: $finalUrl,
             host: $finalHost,
