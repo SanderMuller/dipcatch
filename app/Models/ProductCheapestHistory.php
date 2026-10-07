@@ -33,6 +33,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $bundle_quantity
  * @property string|null $bundle_total_price
  * @property-read Product $product
+ * @property-read Shop|null $cheapestShop
+ * @property-read Shop|null $bestValueShop
  */
 #[WithoutTimestamps]
 #[Unguarded]
@@ -186,6 +188,14 @@ final class ProductCheapestHistory extends Model
     public function cheapestShop(): BelongsTo
     {
         return $this->belongsTo(Shop::class, 'cheapest_shop_id');
+    }
+
+    /**
+     * @return BelongsTo<Shop, $this>
+     */
+    public function bestValueShop(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class, 'best_value_shop_id');
     }
 
     /**

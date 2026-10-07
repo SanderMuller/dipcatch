@@ -14,7 +14,7 @@ use Carbon\CarbonImmutable;
 final class PriceHistoryFluxChart
 {
     /**
-     * @param  array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>}  $data
+     * @param  array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>, shops?: list<?string>, unitShops?: list<?string>}  $data
      * @return array{rows: list<array<string, mixed>>, currency: string, unit: ?string, unitDecimals: int, hasNotified: bool, hasBundles: bool, unitCoverage: float, latest: array{price: ?array{value: float, dropToday: ?int}, unit: ?array{value: float, dropToday: ?int}}}
      */
     public static function fromData(array $data, string $currency): array
@@ -25,6 +25,8 @@ final class PriceHistoryFluxChart
             $data['unit']['points'] ?? null,
             $data['notified'],
             $data['bundleConditions'],
+            $data['shops'] ?? [],
+            $data['unitShops'] ?? [],
         );
         $latest = ['price' => LatestReading::of($readings, 'price'), 'unit' => LatestReading::of($readings, 'unit')];
         $rows = self::holdingUntilNextChange(LatestReading::marked($readings, $latest));
@@ -47,9 +49,11 @@ final class PriceHistoryFluxChart
      * @param  list<float|null>|null  $unit
      * @param  list<float|null>  $notified
      * @param  list<?string>  $bundleConditions
+     * @param  list<?string>  $shops
+     * @param  list<?string>  $unitShops
      * @return list<array<string, mixed>>
      */
-    private static function rows(array $labels, array $price, ?array $unit, array $notified, array $bundleConditions): array
+    private static function rows(array $labels, array $price, ?array $unit, array $notified, array $bundleConditions, array $shops, array $unitShops): array
     {
         $rows = [];
 
@@ -75,6 +79,14 @@ final class PriceHistoryFluxChart
 
             if (is_string($bundleConditions[$index] ?? null)) {
                 $row['bundle'] = $bundleConditions[$index];
+            }
+
+            if (is_string($shops[$index] ?? null)) {
+                $row['shop'] = $shops[$index];
+            }
+
+            if (is_string($unitShops[$index] ?? null)) {
+                $row['unitShop'] = $unitShops[$index];
             }
 
             $rows[] = $row;

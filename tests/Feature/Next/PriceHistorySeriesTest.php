@@ -376,3 +376,25 @@ test('a pack size corrected today does not redraw the past', function (): void {
     // 12.00 for 55 g is 218.18/kg — what was known then, not 18.18 from today.
     expect(unitPoints($product))->toBe([218.1818, 218.1818]);
 });
+
+test('names the shop behind each price point and each best-value point', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $cheapest = Shop::factory()->for($product)->create(['url' => 'https://cheap.example/p/1']);
+    $bestValue = Shop::factory()->for($product)->create(['url' => 'https://value.example/p/1']);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $cheapest->id,
+        'best_value_shop_id' => $bestValue->id,
+        'best_value_price' => '9.00',
+        'pack_quantity' => '250.00',
+        'pack_unit' => 'ml',
+        'cheapest_price' => '3.39',
+        'started_at' => now()->subDays(2),
+        'ended_at' => null,
+    ]);
+
+    $rows = makeChartFor($product)->fluxChart()['rows'];
+
+    expect(array_column($rows, 'shop'))->each->toBe('cheap.example')
+        ->and(array_column($rows, 'unitShop'))->each->toBe('value.example');
+});

@@ -59,15 +59,16 @@ final readonly class PriceHistorySeries
     /**
      * One entry per stamp in every list. `unit` is null when no segment in view
      * states a pack size; `notified` holds the alerted price at the stamp an
-     * alert fired on, null elsewhere.
+     * alert fired on, null elsewhere. `shops` and `unitShops` name the shop
+     * behind each price and unit point, null when that shop was removed since.
      *
-     * @return array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>}
+     * @return array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>, shops: list<?string>, unitShops: list<?string>}
      */
     public function data(): array
     {
         $product = $this->product;
 
-        $segments = $this->segmentsFor($product)->load('cheapestShop');
+        $segments = $this->segmentsFor($product)->load('cheapestShop', 'bestValueShop');
         $now = CarbonImmutable::now();
 
         /** @var list<string> $labels */
@@ -76,6 +77,10 @@ final readonly class PriceHistorySeries
         $points = [];
         /** @var list<?string> $bundleConditions */
         $bundleConditions = [];
+        /** @var list<?string> $shops */
+        $shops = [];
+        /** @var list<?string> $unitShops */
+        $unitShops = [];
         foreach ($segments as $segment) {
             $started = $segment->started_at;
             if (! $started instanceof CarbonInterface) {
@@ -86,6 +91,8 @@ final readonly class PriceHistorySeries
                 ? null
                 : (float) $segment->cheapest_price;
             $bundleConditions[] = BundlePriceLabel::forHistory($segment, $product->currency);
+            $shops[] = $segment->cheapestShop?->host;
+            $unitShops[] = self::unitShopFor($segment);
         }
 
         $current = $segments->last();
@@ -95,6 +102,8 @@ final readonly class PriceHistorySeries
                 ? null
                 : (float) $current->cheapest_price;
             $bundleConditions[] = BundlePriceLabel::forHistory($current, $product->currency);
+            $shops[] = $current->cheapestShop?->host;
+            $unitShops[] = self::unitShopFor($current);
         }
 
         $unit = $this->unitSeries($segments, $current instanceof ProductCheapestHistory);
@@ -107,6 +116,8 @@ final readonly class PriceHistorySeries
             'unit' => $unit,
             'notified' => $markers,
             'bundleConditions' => $bundleConditions,
+            'shops' => $shops,
+            'unitShops' => $unitShops,
         ];
     }
 
@@ -173,6 +184,12 @@ final readonly class PriceHistorySeries
         $unitPrice = $segment->unitPrice();
 
         return $unitPrice === null ? null : (float) $unitPrice;
+    }
+
+    /** The shop behind a unit point, which reads the best-value price when the segment has one. */
+    private static function unitShopFor(ProductCheapestHistory $segment): ?string
+    {
+        return $segment->best_value_price === null ? $segment->cheapestShop?->host : $segment->bestValueShop?->host;
     }
 
     /**

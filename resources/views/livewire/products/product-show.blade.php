@@ -547,6 +547,7 @@
                                 </flux:chart.svg>
                                 <flux:chart.tooltip>
                                     <flux:chart.tooltip.heading field="date" :format="['month' => 'short', 'day' => 'numeric', 'hour' => 'numeric', 'minute' => '2-digit']" />
+                                    <flux:chart.tooltip.value :field="$isUnit ? 'unitShop' : 'shop'" :label="__('Shop')" />
                                     @if ($isUnit)
                                         <flux:chart.tooltip.value field="unit" :label="$unitLabel" :format="$unitCurrency" />
                                         <flux:chart.tooltip.value field="price" :label="$packLabel" :format="$currency" />
