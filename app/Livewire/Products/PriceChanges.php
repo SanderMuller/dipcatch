@@ -60,7 +60,7 @@ final class PriceChanges extends Component
     }
 
     /**
-     * @return list<array{at: CarbonImmutable, shop: ?string, from: ?string, to: ?string, changePct: ?int, action: ?PriceChangeAction}>
+     * @return list<array{at: CarbonImmutable, shop: ?string, from: ?string, to: ?string, unit: ?string, changePct: ?int, action: ?PriceChangeAction, actionShop: ?string}>
      */
     private function rows(User $owner): array
     {

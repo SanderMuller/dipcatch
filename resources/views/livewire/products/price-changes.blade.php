@@ -49,9 +49,10 @@
                                             \App\Charts\PriceChangeAction::WrongPriceCaught => 'shield-check',
                                             \App\Charts\PriceChangeAction::Alert, \App\Charts\PriceChangeAction::ConfirmedAlert, \App\Charts\PriceChangeAction::ReachedAlertPrice => 'bell',
                                             \App\Charts\PriceChangeAction::Confirmed => 'check-circle',
+                                            \App\Charts\PriceChangeAction::WentOutOfStock, \App\Charts\PriceChangeAction::CouldNotRead => 'archive-box-x-mark',
                                             default => 'clock',
                                         }" variant="micro" class="mt-0.5 size-4 shrink-0" />
-                                        <span>{{ $row['action']->label() }}</span>
+                                        <span>{{ $row['action']->label($row['actionShop']) }}</span>
                                     </p>
                                 @endif
                             </li>

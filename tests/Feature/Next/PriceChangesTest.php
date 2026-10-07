@@ -2,6 +2,7 @@
 
 use App\Charts\PriceChangeAction;
 use App\Charts\PriceChangeLog;
+use App\Enums\ScrapeStatus;
 use App\Livewire\Products\PriceChanges;
 use App\Models\LargeDropCheck;
 use App\Models\PriceCheck;
@@ -164,7 +165,7 @@ test('reads the list in a fixed number of queries', function (): void {
     DB::enableQueryLog();
     $log->rows();
 
-    expect(DB::getQueryLog())->toHaveCount(5);
+    expect(DB::getQueryLog())->toHaveCount(6);
 });
 
 test('a Pro owner opens the list and pages it ten at a time', function (): void {
@@ -287,4 +288,47 @@ test('leaves out a segment measured in another unit than the product compares in
 
     expect($rows)->toHaveCount(1)
         ->and($rows[0])->toMatchArray(['from' => null, 'to' => '7.1250', 'unit' => 'g']);
+});
+
+/** A segment opened by `$reader`'s reading, for a change another shop's reading caused. */
+function segmentReadAt(Shop $cheapest, Shop $reader, string $price, float $daysAgo, ?float $endedDaysAgo = null, array $reading = []): void
+{
+    $check = PriceCheck::factory()->for($reader)->create(['price' => $price] + $reading);
+
+    ProductCheapestHistory::factory()->for($cheapest->product()->sole())->create([
+        'cheapest_shop_id' => $cheapest->id,
+        'cheapest_price' => $price,
+        'started_at' => now()->subMinutes((int) ($daysAgo * 1440)),
+        'ended_at' => $endedDaysAgo === null ? null : now()->subMinutes((int) ($endedDaysAgo * 1440)),
+        'triggering_price_check_id' => $check->id,
+    ]);
+}
+
+test('says the shop with the lowest price went out of stock, or could not be read, when that moved the price', function (array $reading, PriceChangeAction $action, string $text): void {
+    $usual = priceLogProduct();
+    $product = $usual->product()->sole();
+    $deal = Shop::factory()->for($product)->create(['url' => 'https://www.plusjevoordeel.test/p/1']);
+
+    segmentReadAt($usual, $usual, '6.49', 10, 5);
+    segmentReadAt($deal, $deal, '3.39', 5, 2);
+    // plusjevoordeel's own reading ends its low price.
+    segmentReadAt($usual, $deal, '6.49', 2, reading: $reading);
+
+    $rows = logRows($usual);
+
+    expect($rows[0])->toMatchArray(['to' => '6.49', 'shop' => 'drogist.test', 'action' => $action, 'actionShop' => 'plusjevoordeel.test'])
+        ->and($rows[0]['action']->label($rows[0]['actionShop']))->toBe($text);
+})->with([
+    'out of stock' => [['in_stock' => false], PriceChangeAction::WentOutOfStock, 'plusjevoordeel.test went out of stock.'],
+    'unreadable' => [['status' => ScrapeStatus::HttpError, 'in_stock' => null], PriceChangeAction::CouldNotRead, 'DipCatch could not read plusjevoordeel.test.'],
+]);
+
+test('gives no reason when another shop simply undercuts the price', function (): void {
+    $usual = priceLogProduct();
+    $deal = Shop::factory()->for($usual->product()->sole())->create(['url' => 'https://deal.test/p/1']);
+
+    segmentReadAt($usual, $usual, '6.49', 10, 5);
+    segmentReadAt($deal, $deal, '3.39', 5);
+
+    expect(logRows($usual)[0])->toMatchArray(['action' => null, 'actionShop' => null]);
 });

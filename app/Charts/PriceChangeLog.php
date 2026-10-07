@@ -3,7 +3,9 @@
 namespace App\Charts;
 
 use App\Enums\LargeDropCheckOutcome;
+use App\Enums\ScrapeStatus;
 use App\Models\LargeDropCheck;
+use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
@@ -33,13 +35,17 @@ final readonly class PriceChangeLog
      * `unit` is the comparison unit the prices are per (`g`, `ml`, `piece`), or
      * null when they are pack prices.
      *
-     * @return list<array{at: CarbonImmutable, shop: ?string, from: ?string, to: ?string, unit: ?string, changePct: ?int, action: ?PriceChangeAction}>
+     * `actionShop` names the shop an action is about when that is not the row's
+     * own shop: the one that went out of stock.
+     *
+     * @return list<array{at: CarbonImmutable, shop: ?string, from: ?string, to: ?string, unit: ?string, changePct: ?int, action: ?PriceChangeAction, actionShop: ?string}>
      */
     public function rows(): array
     {
         $changes = $this->changes();
 
         $triggers = array_values(array_filter(array_map(static fn (array $change): ?int => $change['segment']->triggering_price_check_id, $changes)));
+        $readings = PriceCheck::query()->whereIn('id', $triggers)->get(['id', 'shop_id', 'status', 'in_stock'])->keyBy('id');
         $checks = LargeDropCheck::query()->whereIn('price_check_id', $triggers)->get()->keyBy('price_check_id');
         $answers = $checks->pluck('resolved_by_price_check_id')->filter()->values()->all();
         $alerted = PriceDropEvent::query()->whereIn('price_check_id', [...$triggers, ...$answers])->pluck('price_check_id')->flip();
@@ -62,6 +68,9 @@ final readonly class PriceChangeLog
             $wasAlerted = ($trigger !== null && $alerted->has($trigger))
                 || ($check?->resolved_by_price_check_id !== null && $alerted->has($check->resolved_by_price_check_id));
 
+            $action = self::actionFor($check, $wasAlerted, self::reachedIn($reached, $change['shopId'], $segment->started_at, $change['until']))
+                ?? self::droppedOut($trigger === null ? null : $readings->get($trigger), $change['previousShopId'], $change['shopId']);
+
             $rows[] = [
                 'at' => $segment->started_at,
                 'shop' => $segment->hostOf($change['shop']),
@@ -69,7 +78,8 @@ final readonly class PriceChangeLog
                 'to' => $change['to'],
                 'unit' => $this->unit(),
                 'changePct' => self::changePct($change['from'], $change['to']),
-                'action' => self::actionFor($check, $wasAlerted, self::reachedIn($reached, $change['shopId'], $segment->started_at, $change['until'])),
+                'action' => $action,
+                'actionShop' => in_array($action, [PriceChangeAction::WentOutOfStock, PriceChangeAction::CouldNotRead], strict: true) ? $change['previousHost'] : null,
             ];
         }
 
@@ -80,7 +90,7 @@ final readonly class PriceChangeLog
      * Each change of the price on the basis or of its shop, in order, with the
      * price before it and the moment the next change took over.
      *
-     * @return list<array{segment: ProductCheapestHistory, shop: ?Shop, shopId: ?string, from: ?string, to: ?string, until: ?CarbonImmutable}>
+     * @return list<array{segment: ProductCheapestHistory, shop: ?Shop, shopId: ?string, from: ?string, to: ?string, until: ?CarbonImmutable, previousShopId: ?string, previousHost: ?string}>
      */
     private function changes(): array
     {
@@ -103,10 +113,18 @@ final readonly class PriceChangeLog
             }
 
             if ($previous === null || $point['price'] !== $previous['price'] || $point['shopId'] !== $previous['shopId']) {
-                $starts[] = ['segment' => $segment, 'shop' => $point['shop'], 'shopId' => $point['shopId'], 'from' => $previous['price'] ?? null, 'to' => $point['price']];
+                $starts[] = [
+                    'segment' => $segment,
+                    'shop' => $point['shop'],
+                    'shopId' => $point['shopId'],
+                    'from' => $previous['price'] ?? null,
+                    'to' => $point['price'],
+                    'previousShopId' => $previous['shopId'] ?? null,
+                    'previousHost' => $previous['host'] ?? null,
+                ];
             }
 
-            $previous = $point;
+            $previous = [...$point, 'host' => $segment->hostOf($point['shop'])];
         }
 
         $changes = [];
@@ -134,6 +152,24 @@ final readonly class PriceChangeLog
             $check instanceof LargeDropCheck => $check->asked_at->isAfter(now()->subHours(self::RECHECK_GIVES_UP_AFTER_HOURS))
                 ? PriceChangeAction::Rechecking
                 : PriceChangeAction::RecheckFailed,
+            default => null,
+        };
+    }
+
+    /**
+     * Why the shop that held the price left it, when its own reading moved
+     * the price: out of stock, or a page that could not be read. Another
+     * shop's lower price is a change that explains itself.
+     */
+    private static function droppedOut(?PriceCheck $reading, ?string $previousShopId, ?string $shopId): ?PriceChangeAction
+    {
+        if ($reading === null || $previousShopId === null || $reading->shop_id !== $previousShopId || $shopId === $previousShopId) {
+            return null;
+        }
+
+        return match (true) {
+            $reading->status !== ScrapeStatus::Ok => PriceChangeAction::CouldNotRead,
+            $reading->in_stock === false => PriceChangeAction::WentOutOfStock,
             default => null,
         };
     }
