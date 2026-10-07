@@ -8,6 +8,7 @@ use App\Billing\Plan;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
+use App\Models\Shop;
 use App\Support\BundlePriceLabel;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -91,7 +92,7 @@ final readonly class PriceHistorySeries
                 ? null
                 : (float) $segment->cheapest_price;
             $bundleConditions[] = BundlePriceLabel::forHistory($segment, $product->currency);
-            $shops[] = $segment->cheapestShop?->host;
+            $shops[] = self::hostAt($segment, $segment->cheapestShop);
             $unitShops[] = self::unitShopFor($segment);
         }
 
@@ -102,7 +103,7 @@ final readonly class PriceHistorySeries
                 ? null
                 : (float) $current->cheapest_price;
             $bundleConditions[] = BundlePriceLabel::forHistory($current, $product->currency);
-            $shops[] = $current->cheapestShop?->host;
+            $shops[] = self::hostAt($current, $current->cheapestShop);
             $unitShops[] = self::unitShopFor($current);
         }
 
@@ -189,7 +190,19 @@ final readonly class PriceHistorySeries
     /** The shop behind a unit point, which reads the best-value price when the segment has one. */
     private static function unitShopFor(ProductCheapestHistory $segment): ?string
     {
-        return $segment->best_value_price === null ? $segment->cheapestShop?->host : $segment->bestValueShop?->host;
+        return self::hostAt($segment, $segment->best_value_price === null ? $segment->cheapestShop : $segment->bestValueShop);
+    }
+
+    /**
+     * The shop's host, unless the shop was pointed at another URL after the
+     * segment started: the host is the new page's, and may not be the one
+     * that set this price.
+     */
+    private static function hostAt(ProductCheapestHistory $segment, ?Shop $shop): ?string
+    {
+        $repointed = $shop?->repointed_at;
+
+        return $repointed instanceof CarbonInterface && $segment->started_at->isBefore($repointed) ? null : $shop?->host;
     }
 
     /**

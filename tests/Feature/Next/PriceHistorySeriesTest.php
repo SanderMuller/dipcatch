@@ -398,3 +398,23 @@ test('names the shop behind each price point and each best-value point', functio
     expect(array_column($rows, 'shop'))->each->toBe('cheap.example')
         ->and(array_column($rows, 'unitShop'))->each->toBe('value.example');
 });
+
+test('names no shop for a point set before the shop was pointed at another page', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://new.example/p/1', 'repointed_at' => now()->subDay()]);
+
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '3.39',
+        'started_at' => now()->subDays(2),
+        'ended_at' => now()->subDay(),
+    ]);
+    ProductCheapestHistory::factory()->for($product)->create([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '6.49',
+        'started_at' => now()->subHour(),
+        'ended_at' => null,
+    ]);
+
+    expect(makeChartFor($product)->data()['shops'])->toBe([null, 'new.example', 'new.example']);
+});
