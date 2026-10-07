@@ -608,6 +608,8 @@
                         </div>
                     @endforeach
                 @endif
+
+                <livewire:products.price-changes :product="$product" :range="$range" wire:key="price-changes-{{ $product->id }}" />
             </flux:card>
         </section>
 

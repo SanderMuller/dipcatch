@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\BundlePriceLabel;
 use App\Support\PackSize;
+use Carbon\CarbonImmutable;
 use Database\Factories\TargetPriceEventFactory;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
@@ -15,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A product reaching the price its owner set, as the daily digest reads it.
  * The push and the bell go out when it happens.
+ *
+ * @property string|null $shop_id
+ * @property CarbonImmutable $fired_at
  */
 #[WithoutTimestamps]
 #[Unguarded]

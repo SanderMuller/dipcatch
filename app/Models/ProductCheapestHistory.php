@@ -5,6 +5,7 @@ namespace App\Models;
 use App\PriceAdapters\BundleOffer;
 use App\Support\PackSize;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Database\Factories\ProductCheapestHistoryFactory;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -188,6 +189,18 @@ final class ProductCheapestHistory extends Model
     public function cheapestShop(): BelongsTo
     {
         return $this->belongsTo(Shop::class, 'cheapest_shop_id');
+    }
+
+    /**
+     * The shop's host, unless the shop was pointed at another URL after this
+     * segment started: the host is then the new page's, and may not be the
+     * one that set this price.
+     */
+    public function hostOf(?Shop $shop): ?string
+    {
+        $repointed = $shop?->repointed_at;
+
+        return $repointed instanceof CarbonInterface && $this->started_at->isBefore($repointed) ? null : $shop?->host;
     }
 
     /**

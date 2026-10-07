@@ -86,6 +86,11 @@ final readonly class Entitlements
         return $this->value('shop_checks') === true;
     }
 
+    public function allowsPriceLog(): bool
+    {
+        return $this->value('price_log') === true;
+    }
+
     private function number(string $key, string $fallbackKey): int
     {
         $value = $this->value($key);

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Billing\ProUsers;
 use App\Jobs\PruneOldHistory;
+use App\Models\LargeDropCheck;
 use App\Models\Product;
 use App\Models\TargetPriceEvent;
 use Illuminate\Console\Attributes\Description;
@@ -12,7 +13,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 #[Signature('dipcatch:prune-checks')]
-#[Description('Prune price_checks / price_drop_events / cheapest_history older than 365 days, keeping at least 50 most-recent rows per offer/product, and target_price_events older than 365 days.')]
+#[Description('Prune price_checks / price_drop_events / cheapest_history older than 365 days, keeping at least 50 most-recent rows per offer/product, and target_price_events and large_drop_checks older than 365 days.')]
 final class PruneOldChecksCommand extends Command
 {
     /** No plan keeps price history longer; the plan pages show this. */
@@ -22,15 +23,18 @@ final class PruneOldChecksCommand extends Command
     {
         $this->stampKeptHistory();
 
-        // Only the daily digest reads these, so no plan keeps them longer.
+        // The daily digest and the price changes list read these, and no
+        // plan keeps history longer.
         $deleted = TargetPriceEvent::query()->where('fired_at', '<', now()->subDays(self::RETAIN_DAYS))->delete();
         $reachedDeleted = is_int($deleted) ? $deleted : 0;
+        $deleted = LargeDropCheck::query()->where('asked_at', '<', now()->subDays(self::RETAIN_DAYS))->delete();
+        $recheckedDeleted = is_int($deleted) ? $deleted : 0;
 
         // The rest is a pass over every product and shop, which can outgrow the
         // App's few awake minutes after a scheduled run. It runs on the queue.
         dispatch(new PruneOldHistory());
 
-        $this->info("Pruned {$reachedDeleted} target_price_events; queued the price_checks, price_drop_events and cheapest_history pass.");
+        $this->info("Pruned {$reachedDeleted} target_price_events and {$recheckedDeleted} large_drop_checks; queued the price_checks, price_drop_events and cheapest_history pass.");
 
         return self::SUCCESS;
     }

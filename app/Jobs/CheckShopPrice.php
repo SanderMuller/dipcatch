@@ -8,8 +8,10 @@ use App\Actions\Shops\CheckOutcome;
 use App\Actions\Shops\RegularPriceClaim;
 use App\Actions\Shops\ResolvedBundlePricing;
 use App\Enums\ConsumerPriceIssue;
+use App\Enums\LargeDropCheckOutcome;
 use App\Enums\ScrapeStatus;
 use App\Enums\ShopHealth;
+use App\Models\LargeDropCheck;
 use App\Models\PriceCheck;
 use App\Models\Shop;
 use App\PriceAdapters\AdapterContext;
@@ -405,6 +407,17 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             $pairKey = AltPackSize::afterWrite($locked, $now);
 
             $locked->product?->recomputeCheapestShop((int) $check->id);
+
+            // A large drop this shop was asked to read again, and this reading
+            // did not confirm it: the recompute above marks a confirmation, so
+            // a question still open after a good reading was a wrong price.
+            if ($check->isEligible()) {
+                LargeDropCheck::query()
+                    ->where('shop_id', $locked->id)
+                    ->whereNull('outcome')
+                    ->where('price_check_id', '<', $check->id)
+                    ->update(['outcome' => LargeDropCheckOutcome::Rejected, 'resolved_at' => $now]);
+            }
 
             // Separate from the drop engine on purpose: a rival shop cutting
             // its price changes the best value without changing which shop is

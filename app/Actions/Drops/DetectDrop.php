@@ -2,7 +2,9 @@
 
 namespace App\Actions\Drops;
 
+use App\Enums\LargeDropCheckOutcome;
 use App\Jobs\CheckShopPrice;
+use App\Models\LargeDropCheck;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
@@ -132,9 +134,11 @@ final readonly class DetectDrop
      * same price again, so it trips neither that gate nor the `down`
      * direction, and `__invoke()` would never see it.
      *
-     * Nothing is written. The second opinion is the shop's own price-check
-     * history, so a swallowed or failed confirmation job costs nothing — the
-     * next scheduled check is an equally valid second reading.
+     * The decision reads only the shop's own price-check history, so a
+     * swallowed or failed confirmation job costs nothing — the next scheduled
+     * check is an equally valid second reading. A {@see LargeDropCheck} row
+     * records the question and a confirming answer for the price changes
+     * list; `CheckShopPrice` records a reading that answers no.
      */
     public function confirmLargeDrop(
         Product $product,
@@ -165,17 +169,38 @@ final readonly class DetectDrop
         // through to an alert on one reading.
         match ($this->confirmation->verdictFor($product, $trigger, $reference)) {
             LargeDropVerdict::NotThisReading => null,
-            LargeDropVerdict::Exempt, LargeDropVerdict::Confirmed => $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit),
-            LargeDropVerdict::Awaiting => $this->askForSecondReading($trigger->shop),
+            LargeDropVerdict::Exempt => $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit),
+            LargeDropVerdict::Confirmed => $this->confirm($product, $trigger, $newPrice, $outcome, $reference->unit),
+            LargeDropVerdict::Awaiting => $this->askForSecondReading($trigger),
         };
+    }
+
+    private function confirm(Product $product, PriceCheck $trigger, string $newPrice, DropOutcome $outcome, ?string $unit): void
+    {
+        LargeDropCheck::query()
+            ->where('shop_id', $trigger->shop_id)
+            ->whereNull('outcome')
+            ->where('price_check_id', '<', $trigger->id)
+            ->update(['outcome' => LargeDropCheckOutcome::Confirmed, 'resolved_at' => now()]);
+
+        $this->triggerNotificationAtomically($product, $newPrice, $outcome, (int) $trigger->id, $unit);
     }
 
     /**
      * This reading is the transition. Ask for a second one now rather than
      * waiting for the shop's next scheduled check.
      */
-    private function askForSecondReading(Shop $shop): void
+    private function askForSecondReading(PriceCheck $trigger): void
     {
+        $shop = $trigger->shop;
+
+        LargeDropCheck::query()->firstOrCreate(['price_check_id' => $trigger->id], [
+            'product_id' => $shop->product_id,
+            'shop_id' => $shop->id,
+            'price' => $trigger->price,
+            'asked_at' => now(),
+        ]);
+
         DB::afterCommit(function () use ($shop): void {
             try {
                 dispatch(new CheckShopPrice($shop, confirmation: true))
