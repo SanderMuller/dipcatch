@@ -150,3 +150,15 @@ select:focus[data-flux-control] {
     --color-primary-500: var(--color-amber-500);
     --color-primary-600: var(--color-amber-600);
 }
+
+/* The homepage shop carousel. Two copies of the row sit side by side, so
+   moving one row's width loops without a jump. */
+@theme {
+    --animate-shop-marquee: shop-marquee 45s linear infinite;
+
+    @keyframes shop-marquee {
+        to {
+            transform: translateX(-50%);
+        }
+    }
+}

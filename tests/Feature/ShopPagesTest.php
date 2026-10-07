@@ -7,6 +7,7 @@ use App\Support\SupportedShops;
 use App\Support\UseCases;
 use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Support\Facades\Lang;
+use Symfony\Component\DomCrawler\Crawler;
 
 it('serves a page for every supported shop', function (): void {
     foreach (ShopPages::all() as $shop) {
@@ -88,7 +89,7 @@ it('states that Dierapotheker reads the article number', function (): void {
 it('lists the highlighted shops on the hub, with a link to each', function (): void {
     config()->set('site.contact_email', 'hello@example.test');
 
-    $response = $this->get(route('shops'))->assertOk()->assertSeeHtml('The biggest shops we know well')->assertSeeHtml('Paste a product link from almost any webshop and it works')->assertSeeHtml('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
+    $response = $this->get(route('shops'))->assertOk()->assertSeeHtml('The biggest shops we know well')->assertSeeHtml('Every webshop works, unless the shop blocks DipCatch')->assertSeeHtml('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
 
     foreach (ShopPages::highlights() as $shop) {
         $response->assertSeeHtml(route('shop', ['slug' => $shop->slug]));
@@ -229,7 +230,7 @@ it('offers six other shops to compare with, never the shop itself', function ():
 it('links the homepage and use-case shop rows by slug', function (): void {
     $home = (string) $this->get(route('home'))->assertOk()->getContent();
 
-    foreach (SupportedShops::homepage() as $row) {
+    foreach (SupportedShops::highlights() as $row) {
         expect(hrefsWithin($home, 'a[href*="/shops/"]'))
             ->toContain(route('shop', ['slug' => $row['slug']]));
     }
@@ -311,6 +312,18 @@ it('gives every supported shop a line of its own on the overview', function (): 
 
     $this->get(route('shops'))->assertOk()->assertSeeHtml('Pets at Home shows an Easy Repeat subscription price');
     $this->get(route('shop', ['slug' => 'medpets-nl']))->assertOk()->assertSeeHtml('Medpets lists a price for every size on one page.');
+});
+
+it('lists every supported shop on the hub, split by whether it has a reader of its own', function (): void {
+    config()->set('site.generic_hosts', ['shop.example']);
+    config()->set('site.shop_names', [...config('site.shop_names'), 'shop.example' => 'Example Shop']);
+
+    $html = (string) $this->get(route('shops'))->assertOk()->getContent();
+    $names = static fn (string $group): array => new Crawler($html)->filter("[data-test=\"{$group}\"] li")->each(static fn (Crawler $item): string => trim($item->text()));
+
+    expect($names('own-reader-shops'))->toContain('Albert Heijn', 'Lidl', 'Zooplus')->not->toContain('Hubo', 'MediaMarkt')
+        ->and($names('page-data-shops'))->toContain('Hubo', 'MediaMarkt', 'Example Shop')->not->toContain('Albert Heijn')
+        ->and(count($names('own-reader-shops')) + count($names('page-data-shops')))->toBe(count(SupportedShops::rows()) + 1);
 });
 
 it('lists the shops it cannot read below the supported ones, without a page of their own', function (): void {

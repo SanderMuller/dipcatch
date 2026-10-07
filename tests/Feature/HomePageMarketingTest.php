@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Support\MoneyFormatter;
 use App\Support\SupportedShops;
+use Symfony\Component\DomCrawler\Crawler;
 
 test('the homepage carries SEO and sharing meta', function (): void {
     $this->get(route('home'))->assertOk()->assertSeeHtml('<meta name="description"')->assertSeeHtml('property="og:title"')->assertSeeHtml('rel="canonical"')
@@ -67,11 +68,12 @@ test('the tracked-products mock shows grocery examples from supported shops only
     $response = $this->get(route('home'))->assertOk();
 
     $response->assertSeeHtml('Lay’s Naturel 200 g')->assertSeeHtml('Beemster Extra Belegen 48+ 150 g')
-        ->assertSee('Page toiletpapier 24 rollen')
-        ->assertSee('ah.nl')
-        ->assertSee('dirk.nl')
-        ->assertSee('jumbo.com')
-        ->assertDontSee('mediamarkt.nl');
+        ->assertSee('Page toiletpapier 24 rollen');
+
+    // Scoped: the shop carousel above the mock names electronics shops too.
+    $mock = new Crawler((string) $response->getContent())->filter('[role="img"]')->first()->text();
+
+    expect($mock)->toContain('ah.nl', 'dirk.nl', 'jumbo.com')->not->toContain('mediamarkt.nl');
 });
 
 test('the tracked-products mock is an informative image with a label matching the cards', function (): void {
@@ -122,7 +124,7 @@ test('every homepage picture points at a file that ships', function (): void {
 });
 
 test('the shop list names the homepage hosts without contradicting itself', function (): void {
-    $hosts = SupportedShops::homepage();
+    $hosts = SupportedShops::highlights();
 
     $content = (string) $this->get(route('home'))->assertOk()->getContent();
 
@@ -135,8 +137,7 @@ test('the shop list names the homepage hosts without contradicting itself', func
         ->and($content)->not->toContain('amazon.com')
         ->and($content)->not->toContain('etos.nl')
         ->and($content)->not->toContain(' more<')
-        ->and($content)->toContain(__('and many other webshops'))
-        ->and($content)->toMatch('/<a href="' . preg_quote(e(route('shops')), '/') . '"[^>]*>' . preg_quote(__('and many other webshops'), '/') . '<\/a>/');
+        ->and($content)->toMatch('/<a href="' . preg_quote(e(route('shops')), '/') . '"[^>]*>' . preg_quote(__('See the full shop list'), '/') . '<\/a>/');
 });
 
 test('the privacy page explains that shared product images load from the shop', function (): void {
@@ -148,9 +149,8 @@ test('the FAQ section shows every question the page defines', function (): void 
 
     $response->assertSee('Which shops work?')
         ->assertSee('What if my shop is not listed?')
-        ->assertSee('Pets at Home, The Ordinary, Lookfantastic')
-        ->assertSee('such as Etos, Walmart and Kruidvat')
-        ->assertSee('Pets Place, Medpets, Welkoop')
+        ->assertSee('Every webshop works, unless the shop blocks DipCatch')
+        ->assertSee('Etos, Walmart and Kruidvat are among the few that do')
         ->assertSee('How often are prices checked?')
         ->assertSee('Is it free?')
         ->assertSee('Do I need an extension or app?')
@@ -238,11 +238,11 @@ test('a host nobody has named falls back to the host itself', function (): void 
     expect($rows[0]['name'])->toBe('unnamed-shop.example');
 });
 
-test('a homepage host that is not a supported shop is omitted from the row', function (): void {
+test('a highlighted host that is not a supported shop is omitted from the carousel', function (): void {
     config()->set('site.supported_hosts', ['ah.nl', 'petsplace.nl']);
-    config()->set('site.homepage_hosts', ['ah.nl', 'gone.example']);
+    config()->set('site.highlight_hosts', ['ah.nl', 'gone.example']);
 
-    $hosts = array_column(SupportedShops::homepage(), 'host');
+    $hosts = array_column(SupportedShops::highlights(), 'host');
 
     expect($hosts)->toBe(['ah.nl']);
 });
@@ -260,12 +260,12 @@ test('the free-plan answer quotes the limit the app actually enforces', function
     $this->get(route('home'))->assertOk()->assertSee('your first 7 products');
 });
 
-test('the homepage says most shops work from a pasted link', function (): void {
+test('the homepage says every shop works unless it blocks us', function (): void {
     config()->set('site.contact_email', 'hello@example.test');
 
     $this->get(route('home'))
         ->assertOk()
-        ->assertSee('Paste a link from almost any webshop and it works')
+        ->assertSee('Works with every webshop, unless the shop blocks us')
         ->assertSee('What if my shop is not listed?')->assertSee('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
 });
 

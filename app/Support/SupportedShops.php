@@ -2,6 +2,10 @@
 
 namespace App\Support;
 
+use App\PriceAdapters\Hosts\HostUrl;
+use App\PriceAdapters\Hosts\StructuredDataHostAdapter;
+use App\PriceAdapters\OwnsHosts;
+
 /**
  * Shops with a dedicated adapter or data source: the host, the favicon, the
  * name people use and the slug its landing page lives at. Source:
@@ -45,14 +49,29 @@ final readonly class SupportedShops
     }
 
     /**
-     * The short "Works with" row on the homepage. Hosts missing from
-     * `supported_hosts` are skipped, so a shop dropped there disappears here too.
+     * The supported shops with a reader that knows the shop's own pages: a
+     * host adapter or a product API. Sorted by name, for the full list on
+     * the shops page.
      *
      * @return list<array{host: string, favicon: string, name: string, slug: string}>
      */
-    public static function homepage(): array
+    public static function withOwnReader(): array
     {
-        return self::pick(config('site.homepage_hosts'));
+        return self::sortedByName(array_filter(self::rows(), static fn (array $row): bool => ! self::readsFromPageData($row['host'])));
+    }
+
+    /**
+     * The shops DipCatch reads from the standard product data on the page,
+     * with no reader of their own: the supported shops on the structured-data
+     * chain, plus `site.generic_hosts`. Sorted by name.
+     *
+     * @return list<array{host: string, favicon: string, name: string, slug: string}>
+     */
+    public static function readFromPage(): array
+    {
+        $supported = array_filter(self::rows(), static fn (array $row): bool => self::readsFromPageData($row['host']));
+
+        return self::sortedByName([...$supported, ...self::fromHosts(config('site.generic_hosts'))]);
     }
 
     /**
@@ -95,6 +114,39 @@ final readonly class SupportedShops
                 'slug' => self::slug($host),
             ];
         }
+
+        return $rows;
+    }
+
+    /**
+     * Whether the adapter that owns the host only runs the generic
+     * structured-data chain. A host no adapter owns is read by a product
+     * API, so it has a reader of its own.
+     */
+    private static function readsFromPageData(string $host): bool
+    {
+        foreach (config()->array('dipcatch.adapters') as $class) {
+            if (! is_string($class) || ! is_subclass_of($class, OwnsHosts::class)) {
+                continue;
+            }
+
+            $adapter = app($class);
+
+            if ($adapter instanceof OwnsHosts && HostUrl::matchesAny("https://{$host}/", $adapter->ownedHosts())) {
+                return $adapter instanceof StructuredDataHostAdapter;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<array-key, array{host: string, favicon: string, name: string, slug: string}>  $rows
+     * @return list<array{host: string, favicon: string, name: string, slug: string}>
+     */
+    private static function sortedByName(array $rows): array
+    {
+        usort($rows, static fn (array $a, array $b): int => strnatcasecmp($a['name'], $b['name']));
 
         return $rows;
     }

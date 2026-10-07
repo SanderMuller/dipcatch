@@ -19,7 +19,7 @@
         ['n' => '02', 'icon' => 'magnifying-glass', 'title' => __('Add more shops to track'), 'body' => __('Add the same thing at other shops. DipCatch shows which one is cheapest and works out the price per kilo or per litre. So you can see whether the big pack really is the better deal.')],
         ['n' => '03', 'icon' => 'bell', 'title' => __('You hear about it'), 'body' => __('Say what a good price is for you. We check the shops and let you know the moment one of them goes below it. One email a day, a note in the app, or a message in your browser.')],
     ];
-    $supportedShops = \App\Support\SupportedShops::homepage();
+    $supportedShops = \App\Support\SupportedShops::highlights();
     $money = static fn (string $amount): string => \App\Support\MoneyFormatter::format($amount, 'EUR');
     $drop = static fn (string $old, string $new): int => (int) round((1 - (float) $new / (float) $old) * 100);
     $tracked = [
@@ -56,7 +56,7 @@
     ];
     $freeProducts = \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->maxProducts();
     $faq = [
-        ['q' => __('Which shops work?'), 'a' => __('Paste a product link. Most webshops work, as long as the price is on the page. These shops are the surest bet: Albert Heijn, Jumbo, Dirk, Lidl, Aldi, SPAR, DekaMarkt, Poiesz, Vomar, bol.com, Amazon, Zooplus, Bitiba, Dierapotheker, Pets Place, Medpets, Welkoop, Pets at Home, The Ordinary, Lookfantastic, Cult Beauty and Ulta. Offer prices such as AH Bonus and the Dirk deals come through there too. A few shops block us, such as Etos, Walmart and Kruidvat, and those will not work. You always see what we found before anything is saved.')],
+        ['q' => __('Which shops work?'), 'a' => __('Every webshop works, unless the shop blocks DipCatch or loads its price with a script after the page opens. Etos, Walmart and Kruidvat are among the few that do. Big shops such as Albert Heijn, Jumbo, Dirk, Lidl, bol.com and Amazon have a reader of their own, so offer prices such as AH Bonus and the Dirk deals come through too. The shops page lists every shop we know works, and every shop that does not. You always see what we found before anything is saved.')],
         ['q' => __('What if my shop is not listed?'), 'a' => __('Paste it anyway. The shops named on this site are not the only ones that work. If the price does not come through, send us the link and we will look at it.')],
         ['q' => __('How often are prices checked?'), 'a' => __('A shop is checked the moment you add it or change the link. After that DipCatch looks again about every :hours hours.', ['hours' => config('dipcatch.recheck.interval_hours', 6)])],
         ['q' => __('Is it free?'), 'a' => $freeProducts === null
@@ -134,29 +134,40 @@
                             @endauth
 
                             <div class="mt-12">
-                                <p class="text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ __('Works with') }}</p>
-                                <ul class="mt-3 flex flex-wrap gap-2">
-                                    @foreach ($supportedShops as $shop)
-                                        <li @class(['items-center', 'inline-flex' => $loop->index < 8, 'hidden sm:inline-flex' => $loop->index >= 8])>
-                                            {{-- Linked, not decorative: each shop has a page of its own, and
-                                                 this row is where a reader looks for it. --}}
-                                            <a href="{{ route('shop', [...$langQuery, 'slug' => $shop['slug']]) }}" class="inline-flex items-center gap-2 rounded-full bg-paper/80 py-1.5 pr-3 pl-1.5 text-sm text-zinc-700 shadow-xs ring-1 ring-line backdrop-blur-sm hover:bg-paper dark:text-zinc-200 dark:shadow-none">
-                                                {{-- Background image, not an <img>: the edge Markdown twin emits an
-                                                     image reference even for an empty alt. --}}
-                                                <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
-                                                {{-- The brand name, not the domain: a shopper looks for
-                                                     "Albert Heijn", not "ah.nl". The domain stays in the
-                                                     title so the exact site is still one hover away. --}}
-                                                <span title="{{ $shop['host'] }}">{{ $shop['name'] }}</span>
-                                            </a>
-                                        </li>
-                                    @endforeach
-                                    <li class="inline-flex items-center px-2 py-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-                                        <a href="{{ route('shops', $langQuery) }}" class="underline underline-offset-4 hover:text-brand">{{ __('and many other webshops') }}</a>
-                                    </li>
-                                </ul>
-                                <p class="mt-3 max-w-[48ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
-                                    {{ __('Paste a link from almost any webshop and it works. These are the ones we check most often.') }}
+                                <p class="text-sm font-medium text-ink">{{ __('Works with every webshop, unless the shop blocks us') }}</p>
+                                {{-- A carousel only when motion is welcome: the copy that closes the
+                                     loop is cloned here, not rendered, so the Markdown twin and a
+                                     screen reader meet each shop once. Without script, or with
+                                     reduced motion, the row stays a static wrapped list. --}}
+                                <div
+                                    x-data
+                                    x-init="if (! window.matchMedia('(prefers-reduced-motion: reduce)').matches) { const copy = $refs.shops.cloneNode(true); copy.setAttribute('aria-hidden', 'true'); copy.querySelectorAll('a').forEach((link) => link.setAttribute('tabindex', '-1')); $refs.track.append(copy); $el.dataset.moving = ''; }"
+                                    class="group/shops mt-3 data-moving:overflow-hidden data-moving:mask-x-from-90% data-moving:mask-x-to-100%"
+                                    data-test="shop-carousel"
+                                >
+                                    <div x-ref="track" class="flex w-max max-w-full group-data-moving/shops:max-w-none group-data-moving/shops:animate-shop-marquee group-hover/shops:[animation-play-state:paused] group-focus-within/shops:[animation-play-state:paused]">
+                                        <ul x-ref="shops" class="flex flex-wrap gap-2 py-1 group-data-moving/shops:flex-nowrap group-data-moving/shops:pr-2">
+                                            @foreach ($supportedShops as $shop)
+                                                <li class="inline-flex shrink-0 items-center">
+                                                    {{-- Linked, not decorative: each shop has a page of its own, and
+                                                         this row is where a reader looks for it. --}}
+                                                    <a href="{{ route('shop', [...$langQuery, 'slug' => $shop['slug']]) }}" class="inline-flex items-center gap-2 rounded-full bg-paper/80 py-1.5 pr-3 pl-1.5 text-sm text-zinc-700 shadow-xs ring-1 ring-line backdrop-blur-sm hover:bg-paper dark:text-zinc-200 dark:shadow-none">
+                                                        {{-- Background image, not an <img>: the edge Markdown twin emits an
+                                                             image reference even for an empty alt. --}}
+                                                        <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
+                                                        {{-- The brand name, not the domain: a shopper looks for
+                                                             "Albert Heijn", not "ah.nl". The domain stays in the
+                                                             title so the exact site is still one hover away. --}}
+                                                        <span title="{{ $shop['host'] }}">{{ $shop['name'] }}</span>
+                                                    </a>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                </div>
+                                <p class="mt-3 max-w-[52ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
+                                    {{ __('Paste a product link from any shop. A few shops block DipCatch or load their price with a script, and those do not work.') }}
+                                    <a href="{{ route('shops', $langQuery) }}" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('See the full shop list') }}</a>
                                     <x-shop-request-link class="hover:text-zinc-700 dark:hover:text-zinc-300" />
                                 </p>
                             </div>

@@ -60,10 +60,11 @@ return [
     ],
 
     /**
-     * The supported shops the shops hub, the footer and each shop page's
-     * "compare with" row show: a few market leaders, not every shop. The
-     * other supported shops keep their page, their sitemap entry and their
-     * place on the use-case pages.
+     * The supported shops the homepage carousel, the shops hub, the footer
+     * and each shop page's "compare with" row show: a few market leaders,
+     * not every shop. The other supported shops keep their page, their
+     * sitemap entry and their place on the use-case pages and in the full
+     * list on the shops hub.
      */
     'highlight_hosts' => [
         'ah.nl', 'jumbo.com', 'lidl.nl', 'aldi.nl', 'bol.com', 'amazon.nl',
@@ -100,13 +101,13 @@ return [
     ],
 
     /**
-     * Hosts on the homepage "Works with" row. Keep this short: one chip per
-     * brand a visitor should recognise at a glance.
+     * Shops with no reader of their own whose prices DipCatch reads from the
+     * standard product data on the page, seen working for real users in
+     * production. Listed on the shops page next to the shops with a reader.
+     * They get no landing page: that page says a reader was written for the
+     * shop. A host leaves this list when its offers stop reading.
      */
-    'homepage_hosts' => [
-        'ah.nl', 'jumbo.com', 'dirk.nl', 'lidl.nl', 'aldi.nl', 'spar.nl',
-        'dekamarkt.nl', 'poiesz-supermarkten.nl', 'vomar.nl', 'bol.com', 'amazon.nl', 'zooplus.nl',
-    ],
+    'generic_hosts' => [],
 
     /**
      * Shop names as people say them, keyed by host. The homepage shows the

@@ -72,8 +72,8 @@ test('every marketed shop host has a reader written for it', function (string $h
     return array_combine($hosts, $hosts);
 });
 
-test('every homepage chip is a host the site also supports', function (): void {
-    expect(array_diff(siteHosts('site.homepage_hosts'), siteHosts('site.supported_hosts')))->toBeEmpty();
+test('a shop read from the page alone is neither marketed nor listed as unreadable', function (): void {
+    expect(array_intersect(siteHosts('site.generic_hosts'), [...siteHosts('site.supported_hosts'), ...siteHosts('site.unsupported_hosts')]))->toBeEmpty();
 });
 
 test('every highlighted shop is a host the site also supports', function (): void {

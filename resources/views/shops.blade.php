@@ -28,7 +28,7 @@
                 <h1 class="max-w-[24ch] text-4xl font-semibold tracking-tight text-balance sm:text-5xl">{{ __('Supported shops') }}</h1>
                 <p class="mt-5 max-w-[60ch] text-lg text-pretty text-zinc-600 dark:text-zinc-300">{{ $description }}</p>
                 <p class="mt-4 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">
-                    {{ __('Paste a product link from almost any webshop and it works. These are the biggest shops, each with a reader written for it.') }}
+                    {{ __('Every webshop works, unless the shop blocks DipCatch or loads its price with a script. These are the biggest shops.') }}
                     <x-shop-request-link class="font-medium text-ink hover:text-brand" />
                 </p>
 
@@ -46,6 +46,30 @@
                         </li>
                     @endforeach
                 </ul>
+
+                <section class="mt-16" data-test="all-supported-shops">
+                    <h2 class="text-2xl font-semibold tracking-tight sm:text-3xl">{{ __('All shops that work') }}</h2>
+                    <p class="mt-3 max-w-[64ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('The shops DipCatch is known to read. A shop that is not on this list works too, unless it is one of the shops we cannot read below.') }}</p>
+                    @foreach ([
+                        ['test' => 'own-reader-shops', 'heading' => __('With a reader of their own'), 'body' => __('DipCatch has a reader written for each of these shops.'), 'shops' => \App\Support\SupportedShops::withOwnReader()],
+                        ['test' => 'page-data-shops', 'heading' => __('Read from the page'), 'body' => __('These shops put the price on the page in a standard form. DipCatch reads it there, with no reader of its own.'), 'shops' => \App\Support\SupportedShops::readFromPage()],
+                    ] as $group)
+                        @if ($group['shops'] !== [])
+                            <div class="mt-8" data-test="{{ $group['test'] }}">
+                                <h3 class="text-lg font-semibold">{{ $group['heading'] }}</h3>
+                                <p class="mt-1 max-w-[64ch] text-sm text-pretty text-zinc-600 dark:text-zinc-400">{{ $group['body'] }}</p>
+                                <ul role="list" class="mt-4 columns-2 gap-x-6 sm:columns-3 lg:columns-4">
+                                    @foreach ($group['shops'] as $shop)
+                                        <li class="flex break-inside-avoid items-center gap-2 py-1.5 text-sm text-zinc-700 dark:text-zinc-300">
+                                            <span style="background-image: url('{{ $shop['favicon'] }}')" class="size-4 shrink-0 rounded-sm bg-cover bg-center bg-no-repeat"></span>
+                                            <span>{{ $shop['name'] }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                    @endforeach
+                </section>
 
                 @php($unsupported = \App\Support\SupportedShops::unsupported())
                 @if ($unsupported !== [])
