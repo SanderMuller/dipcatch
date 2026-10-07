@@ -6,15 +6,21 @@
 //                                                    check, grocery products the daily dataset has
 //                                                    rows for, and one web finding
 //   php tools/changelog-media/seed.php video         capture-screens.mjs: products at two or three
-//                                                    shops each, most of them on the shopping list
+//                                                    shops each, most of them on the shopping list;
+//                                                    add `--dashboard` for the dashboard-* flows
 //
 // Add `--teardown` to delete that account and everything under it. Every name
 // is fictional, because the media are published. It sets a known password,
 // so it refuses anything but a local environment.
 
 use App\Enums\WebFindingStatus;
+use App\Models\LargeDropCheck;
+use App\Models\PriceCheck;
+use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
+use App\Models\TargetPriceEvent;
 use App\Models\User;
 use App\Models\WebShopFinding;
 use Carbon\CarbonImmutable;
@@ -116,6 +122,78 @@ if ($scenario === 'screenshots') {
         'fingerprint' => WebShopFinding::fingerprintFor($coffee->load('shops')),
     ]);
     $fixture['coffeeId'] = $coffee->id;
+
+    // Changes of the lowest price over two shops, each with what DipCatch
+    // did: a wrong price caught, a large drop that held and alerted, and the
+    // alert price reached.
+    $tablets = $track('Dishwasher tablets 60 pcs', ['ah.nl' => '14.99', 'jumbo.com' => '11.99']);
+    $tablets->forceFill(['target_price' => '12.49'])->save();
+    $shopAt = $tablets->shops->keyBy('host');
+    $tablets->cheapestHistory()->delete();
+    $changes = [
+        // [days ago, host, price]
+        [62, 'jumbo.com', '13.49'],
+        [44, 'jumbo.com', '4.99'],
+        [43.9, 'jumbo.com', '13.49'],
+        [27, 'ah.nl', '10.99'],
+        [19, 'ah.nl', '14.99'],
+        [5, 'jumbo.com', '11.99'],
+    ];
+    $checkIds = [];
+
+    foreach ($changes as $index => [$daysAgo, $host, $price]) {
+        $startedAt = $now->subMinutes((int) ($daysAgo * 1440));
+        $check = PriceCheck::factory()->for($shopAt[$host])->create(['price' => $price, 'checked_at' => $startedAt]);
+        $checkIds[] = $check->id;
+        $next = $changes[$index + 1] ?? null;
+        ProductCheapestHistory::query()->create([
+            'product_id' => $tablets->id,
+            'cheapest_shop_id' => $shopAt[$host]->id,
+            'cheapest_price' => $price,
+            'started_at' => $startedAt,
+            'ended_at' => $next === null ? null : $now->subMinutes((int) ($next[0] * 1440)),
+            'triggering_price_check_id' => $check->id,
+        ]);
+    }
+
+    $alert = static fn (int $checkId, string $reference, string $price, CarbonImmutable $firedAt): PriceDropEvent => PriceDropEvent::factory()->create([
+        'product_id' => $tablets->id,
+        'user_id' => $user->id,
+        'price_check_id' => $checkId,
+        'currency' => 'EUR',
+        'reference_price' => $reference,
+        'new_price' => $price,
+        'drop_pct' => round(((float) $reference - (float) $price) / (float) $reference * 100, 4),
+        'drop_abs' => round((float) $reference - (float) $price, 2),
+        'fired_at' => $firedAt,
+    ]);
+    LargeDropCheck::factory()->rejected()->create([
+        'shop_id' => $shopAt['jumbo.com']->id,
+        'product_id' => $tablets->id,
+        'price_check_id' => $checkIds[1],
+        'price' => '4.99',
+        'asked_at' => $now->subDays(44),
+    ]);
+    $answer = PriceCheck::factory()->for($shopAt['ah.nl'])->create(['price' => '10.99', 'checked_at' => $now->subDays(27)->addHour()]);
+    LargeDropCheck::factory()->confirmed()->create([
+        'shop_id' => $shopAt['ah.nl']->id,
+        'product_id' => $tablets->id,
+        'price_check_id' => $checkIds[3],
+        'price' => '10.99',
+        'asked_at' => $now->subDays(27),
+        'resolved_by_price_check_id' => $answer->id,
+    ]);
+    $alert($answer->id, '13.49', '10.99', $now->subDays(27)->addHour());
+    TargetPriceEvent::factory()->create([
+        'product_id' => $tablets->id,
+        'user_id' => $user->id,
+        'shop_id' => $shopAt['jumbo.com']->id,
+        'currency' => 'EUR',
+        'target' => '12.49',
+        'price' => '11.99',
+        'fired_at' => $now->subDays(5)->addHours(2),
+    ]);
+    $fixture['tabletsId'] = $tablets->id;
 }
 
 if ($scenario === 'video') {
@@ -141,6 +219,41 @@ if ($scenario === 'video') {
         }
 
         $fixture['products'][$art] = $product->id;
+    }
+
+    // `--dashboard`: a few products in a drop, so each shop has an offer and
+    // "Where to shop this week" fills, and two at their alert price. Behind a
+    // flag, because it regroups the Products page the other flows frame.
+    $drops = in_array('--dashboard', $argv, true) ? ['coffee' => '14.99', 'laundry' => '10.49', 'pizza' => '2.49', 'catfood' => '7.49'] : [];
+
+    foreach ($drops as $art => $reference) {
+        $product = Product::query()->with('cheapestShop')->findOrFail($fixture['products'][$art]);
+        $price = (string) $product->cheapest_price;
+        $firedAt = $now->subDays(2);
+        // A pack size read from the title puts the drop on the unit price.
+        $unit = $product->best_value_pack_unit;
+        $perUnit = static fn (string $amount): ?float => $unit === null ? null
+            : round((float) $amount / (float) $product->best_value_pack_quantity * ($unit === 'piece' ? 1 : 1000), 4);
+        PriceDropEvent::factory()->create([
+            'product_id' => $product->id,
+            'user_id' => $user->id,
+            'price_check_id' => PriceCheck::factory()->for($product->cheapestShop)->create(['price' => $price, 'checked_at' => $firedAt])->id,
+            'triggered_by_shop_id' => $product->cheapest_shop_id,
+            'currency' => 'EUR',
+            'reference_price' => $reference,
+            'new_price' => $price,
+            'comparison_unit' => $unit,
+            'reference_unit_price' => $perUnit($reference),
+            'new_unit_price' => $perUnit($price),
+            'drop_pct' => round(((float) $reference - (float) $price) / (float) $reference * 100, 4),
+            'drop_abs' => round((float) $reference - (float) $price, 2),
+            'fired_at' => $firedAt,
+        ]);
+        $product->forceFill(['last_notified_price' => $price, 'last_notified_at' => $firedAt])->save();
+    }
+
+    foreach ($drops === [] ? [] : ['toothpaste' => '2.99', 'litter' => '5.99'] as $art => $target) {
+        Product::query()->whereKey($fixture['products'][$art])->update(['target_price' => $target]);
     }
 }
 

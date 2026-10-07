@@ -145,6 +145,55 @@ const flows = {
             await shot(await focusOf(page, [toolbar, filter, cards.first(), cards.nth(row)]), undefined, await focusOf(page, [cards.first(), cards.nth(row)], 6));
         },
     },
+    // The dashboard-* flows need `seed.php video --dashboard`: products in a
+    // drop and at their alert price. The other flows need the seed without it.
+    // A shop's offers in "Where to shop this week" open its best buys on offer.
+    'dashboard-trips': {
+        viewport: { width: 1024, height: 900 },
+        steps: async (page, shot) => {
+            await page.goto(`${BASE}/app`);
+            await settle(page);
+            const trips = page.locator('[data-test="shopping-trips"]');
+            const ah = trips.locator('li').filter({ hasText: 'ah.nl' });
+            const offers = ah.getByRole('link', { name: /on offer/ });
+            // The heading and the first shop: all three shops are too small to read.
+            await shot(await focusOf(page, [trips.getByRole('heading', { name: 'Where to shop this week' }), ah]), await clickOf(page, offers));
+            await offers.click();
+            await page.waitForURL((url) => url.pathname === '/app/products');
+            await page.locator('[data-test="product-card"]').first().waitFor();
+            await settle(page);
+            const cards = page.locator('[data-test="product-card"]');
+            const toolbar = page.locator('[data-test="product-discount-filter"]');
+            const last = (await cards.count()) - 1;
+            await shot(await focusOf(page, [toolbar, cards.first(), cards.nth(last)]), undefined, await focusOf(page, [cards.first(), cards.nth(last)], 6));
+        },
+    },
+    // Products at their alert price lead, the biggest drops follow.
+    'dashboard-drops': {
+        viewport: { width: 1024, height: 900 },
+        steps: async (page, shot) => {
+            await page.goto(`${BASE}/app`);
+            await settle(page);
+            const atAlert = page.locator('[data-test="at-alert"]');
+            const drops = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Biggest drops' }) });
+            const all = drops.getByRole('link', { name: 'All drops' });
+            const dropsHeading = drops.locator('div').first();
+            await atAlert.scrollIntoViewIfNeeded();
+            // The alert cards and the drops' heading: the whole section is too tall to read.
+            await shot(await focusOf(page, [atAlert, dropsHeading]), await clickOf(page, all));
+            await all.click();
+            await page.waitForURL((url) => url.pathname === '/app/products');
+            await page.locator('[data-test="product-card"]').first().waitFor();
+            await settle(page);
+            // The list opens with the products at their alert price; the drops
+            // are the group under it, first row.
+            const first = card(page, 'Pepperoni pizza');
+            const third = card(page, 'Coffee beans');
+            const heading = page.getByText('On discount now', { exact: true });
+            await first.scrollIntoViewIfNeeded();
+            await shot(await focusOf(page, [heading, first, third]), undefined, await focusOf(page, [first, third], 6));
+        },
+    },
     // Crossing an item off in the shop.
     'shopping-list-tick': {
         viewport: { width: 560, height: 900 },

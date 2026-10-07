@@ -1,0 +1,20 @@
+{
+  "features": [
+    {
+      "kicker": "Dashboard",
+      "headline": ["Where to shop", "this week."],
+      "accent": "shop",
+      "sub": "Shops where several of your products are cheapest, and what is on offer there.",
+      "moment": {"kind": "screens", "capture": "dashboard-trips"}
+    },
+    {
+      "kicker": "Dashboard",
+      "headline": ["What to buy", "now."],
+      "accent": "now.",
+      "sub": "Products at your alert price come first, then the biggest drops.",
+      "moment": {"kind": "screens", "capture": "dashboard-drops"}
+    }
+  ],
+  "where": "Dashboard",
+  "music": true
+}

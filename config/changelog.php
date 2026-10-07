@@ -40,6 +40,7 @@ return [
             'category' => 'pro',
             'title' => 'See every price change on a product',
             'body' => "With Pro, the product page lists each change of the lowest price under the chart, with the shop and what DipCatch did about it.\n\nWhen a price drops sharply, DipCatch checks the shop again before it alerts you. If the low price is gone by then, the list shows that it caught a wrong price.",
+            'image' => ['src' => 'changelog/price-changes.png', 'alt' => 'The price chart of a product with the list of price changes under it. Each change shows the shop and what DipCatch did, such as a price alert or a wrong price it caught.'],
         ],
         [
             'date' => '2026-10-07',
@@ -76,6 +77,7 @@ return [
             'category' => 'feature',
             'title' => 'A clearer dashboard',
             'body' => "Your dashboard now opens with what's worth buying: the shops where several of your products are cheapest and something is on offer, then products at your alert price and the biggest drops.\n\nSuggested shops and things to check are in a column on the right.",
+            'video' => 'dashboard',
             'link' => ['route' => 'app.dashboard', 'label' => 'Go to your dashboard'],
         ],
         [
@@ -88,7 +90,7 @@ return [
             'date' => '2026-10-05',
             'category' => 'fix',
             'title' => 'No more suggested shops from abroad',
-            'body' => "The barcode search sometimes suggested French, German or Slovenian shops. Suggested shops are now only ones that sell to shoppers in the Netherlands.",
+            'body' => 'The barcode search sometimes suggested French, German or Slovenian shops. Suggested shops are now only ones that sell to shoppers in the Netherlands.',
         ],
         [
             'date' => '2026-10-04',
@@ -125,7 +127,7 @@ return [
             'date' => '2026-10-02',
             'category' => 'feature',
             'title' => 'Your products in three groups',
-            'body' => "Sorted by biggest drop, your products now come in three groups: the ones at your alert price, the ones on discount at a shop, and the rest. A product with a shop deal no longer ends up under \"No discount right now\".",
+            'body' => 'Sorted by biggest drop, your products now come in three groups: the ones at your alert price, the ones on discount at a shop, and the rest. A product with a shop deal no longer ends up under "No discount right now".',
             'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],
         ],
         [
@@ -138,7 +140,7 @@ return [
             'date' => '2026-10-02',
             'category' => 'feature',
             'title' => 'Faster shop suggestions',
-            'body' => "With Pro, finding more shops for a product is faster now. They come in one by one, so you can look at the first ones while DipCatch keeps searching.",
+            'body' => 'With Pro, finding more shops for a product is faster now. They come in one by one, so you can look at the first ones while DipCatch keeps searching.',
             'link' => ['route' => 'app.products.create', 'label' => 'Add a product'],
         ],
         [
@@ -187,7 +189,7 @@ return [
             'date' => '2026-09-30',
             'category' => 'feature',
             'title' => 'Is that "was" price real?',
-            'body' => "Some shops show a deal as \"was €12.99, now €9.99\" while the product cost €9.99 last week. When DipCatch saw a lower price at that shop in the month before, the product page now tells you.",
+            'body' => 'Some shops show a deal as "was €12.99, now €9.99" while the product cost €9.99 last week. When DipCatch saw a lower price at that shop in the month before, the product page now tells you.',
         ],
         [
             'date' => '2026-09-30',

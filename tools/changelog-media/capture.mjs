@@ -59,6 +59,16 @@ const shots = {
 
         return { element: panel, frame: panel.locator('xpath=ancestor::*[@data-flux-card][1]') };
     },
+    'price-changes': async (page) => {
+        // The chart and the list under it: each change and what DipCatch did fit one line.
+        await page.setViewportSize({ width: 1000, height: 1000 });
+        await page.goto(`${BASE}/app/products/${fixture.tabletsId}`, { waitUntil: 'networkidle' });
+        const list = page.locator('[data-test="price-changes"]');
+        await list.getByRole('button', { name: 'Show price changes' }).click();
+        await list.locator('[data-test="price-change-action"]').first().waitFor({ state: 'visible', timeout: 10000 });
+
+        return { element: list.locator('xpath=ancestor::*[@data-flux-card][1]') };
+    },
     'header-search': async (page) => {
         await page.goto(`${BASE}/app`, { waitUntil: 'networkidle' });
         await page.locator('[data-test="app-search-bar"]').click();
