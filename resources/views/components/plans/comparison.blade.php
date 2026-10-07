@@ -45,9 +45,11 @@
             [__('Public links'), __('Share a product page with its prices and shops.'), false, true],
         ],
         __('AI help, off until you switch it on') => [
-            [__('Automatic categories'), __('New products filed for you.'), false, true],
+            [__('More shops found'), __('A web search, by name and by barcode, for other shops that sell it. AI checks each one first.'), false, true],
             [__('Same-product check'), __('A warning when a new shop sells another flavour or pack.'), false, true],
-            [__('More shops found'), __('Other shops that sell what you track, confirmed.'), false, true],
+            [__('Pack-size check'), __('A shop that hides its pack size is checked, so the price per kilo stays right.'), false, true],
+            [__('Alert price from past offers'), __('A suggested alert price, from how deep this product usually goes on sale.'), false, true],
+            [__('Automatic categories'), __('New products filed for you.'), false, true],
         ],
     ];
     $tick = '<svg viewBox="0 0 16 16" class="size-5 fill-savings-strong" aria-hidden="true"><path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>';
@@ -67,6 +69,8 @@
         __('Automatic categories') => __('Pro only'),
         __('Same-product check') => __('Pro only'),
         __('More shops found') => __('Pro only'),
+        __('Pack-size check') => __('Pro only'),
+        __('Alert price from past offers') => __('Pro only'),
         __('Price changes list') => __('Pro only'),
         __('Public links') => __('Pro only'),
     ];

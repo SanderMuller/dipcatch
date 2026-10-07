@@ -254,7 +254,6 @@
     "Open dashboard": "Dashboard openen",
     "Open the contact form": "Open het contactformulier",
     "Or email": "Of mail naar",
-    "Other shops that sell what you track, confirmed.": "Andere winkels die verkopen wat je volgt, gecontroleerd.",
     "Our rights and yours": "Onze rechten en de jouwe",
     "Packs of different sizes compared fairly.": "Verpakkingen van verschillende grootte eerlijk vergeleken.",
     "Page not found": "Pagina niet gevonden",
@@ -565,5 +564,10 @@
     "Price changes list": "Lijst met prijswijzigingen",
     "Every change of the lowest price, and what DipCatch did about it.": "Elke wijziging van de laagste prijs, en wat DipCatch ermee deed.",
     "Public links": "Openbare links",
-    "Share a product page with its prices and shops.": "Deel een productpagina met de prijzen en winkels."
+    "Share a product page with its prices and shops.": "Deel een productpagina met de prijzen en winkels.",
+    "A web search, by name and by barcode, for other shops that sell it. AI checks each one first.": "Een zoektocht op het web, op naam en op barcode, naar andere winkels die het verkopen. AI controleert elke winkel eerst.",
+    "Pack-size check": "Controle van de verpakking",
+    "A shop that hides its pack size is checked, so the price per kilo stays right.": "Een winkel die de verpakkingsgrootte niet noemt, wordt gecontroleerd, zodat de kiloprijs klopt.",
+    "Alert price from past offers": "Alarmprijs uit eerdere aanbiedingen",
+    "A suggested alert price, from how deep this product usually goes on sale.": "Een voorgestelde alarmprijs, op basis van hoe diep dit product meestal in de aanbieding gaat."
 }
