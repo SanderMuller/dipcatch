@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-07',
+            'category' => 'feature',
+            'title' => 'Shops by the piece and by weight compared together',
+            'body' => "When some shops sell a product by the piece and others by weight, DipCatch now compares them all in one unit. Fish fingers, for example, now compare every shop per kilo.\n\nIf your alert price was set in the other unit, it's converted for you. If it can't be, the product page shows it as paused.",
+        ],
+        [
             'date' => '2026-10-06',
             'category' => 'shop',
             'title' => 'Willys and Hemköp in Sweden',
