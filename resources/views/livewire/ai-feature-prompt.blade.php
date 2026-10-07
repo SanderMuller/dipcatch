@@ -11,7 +11,14 @@
     @elseif ($offered)
         <div class="@container rounded-2xl bg-linear-to-r from-brand/5 via-white/40 to-violet-500/5 p-4 shadow-sm ring-1 ring-brand/15 backdrop-blur-md dark:from-brand/10 dark:via-zinc-900/60 dark:to-violet-500/10 dark:shadow-none dark:ring-white/10" data-test="ai-feature-prompt" data-place="{{ $aiPlace->value }}" data-ai-feature="{{ $aiFeature->value }}"
             {{-- A prompt from a later request (lazy load, a form opened later) hides when an earlier one for the feature is in the DOM: the server claim covers one request. --}}
-            x-data x-init="if (document.querySelector('[data-ai-feature={{ $aiFeature->value }}]') !== $el) { $el.hidden = true }">
+            x-init="if (document.querySelector('[data-ai-feature={{ $aiFeature->value }}]') !== $el) { $el.hidden = true }"
+            x-data="{
+                notNow() {
+                    const next = [...document.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')]
+                        .find((el) => el.tabIndex >= 0 && ! el.disabled && el.offsetParent !== null && ! $root.contains(el) && ($root.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING));
+                    $wire.dismiss().then(() => next?.focus());
+                },
+            }">
             <div class="flex flex-col gap-3 @xl:flex-row @xl:items-center @xl:justify-between @xl:gap-6">
                 <div class="flex min-w-0 flex-col gap-2 @md:flex-row @md:items-start @md:gap-3">
                     <x-pro-badge class="self-start @md:mt-px" />
@@ -25,7 +32,8 @@
                         <flux:icon.sparkles variant="micro" class="shrink-0" />
                         {{ __('Switch on') }}
                     </button>
-                    <flux:button size="sm" variant="ghost" wire:click="dismiss" data-test="ai-feature-not-now">{{ __('Not now') }}</flux:button>
+                    {{-- The prompt goes away with the button that has focus: focus moves on to what follows it on the page. --}}
+                    <flux:button size="sm" variant="ghost" x-on:click="notNow()" data-test="ai-feature-not-now">{{ __('Not now') }}</flux:button>
                 </div>
             </div>
         </div>
