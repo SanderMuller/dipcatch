@@ -17,7 +17,8 @@ test('guests see the supported shops, a bottom call to action, and the footer li
         ->assertSee('Albert Heijn')
         ->assertSee('Stop checking prices by hand.')
         ->assertSee(route('privacy'))
-        ->assertSee('to check the address is yours');
+        ->assertSee('The standard features are always free.')
+        ->assertDontSee('to check the address is yours');
 });
 
 test('the header offers account creation to guests and the app to members', function (): void {

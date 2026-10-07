@@ -126,7 +126,7 @@
                                         <a href="{{ route('register') }}" class="inline-flex items-center rounded-full bg-ink px-5 py-3 text-base font-medium text-paper shadow-md hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:text-sm dark:shadow-none">{{ __('Create a free account') }} <span aria-hidden="true" class="ml-1">&rarr;</span></a>
                                     </div>
                                     <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                                        {{ __('Free while we are in beta. We send one email first, to check the address is yours.') }}
+                                        {{ __('The standard features are always free. Pro gets the most out of DipCatch.') }}
                                         {{ __('Already have an account?') }}
                                         <a href="{{ route('login') }}" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('Sign in') }}</a>
                                     </p>
