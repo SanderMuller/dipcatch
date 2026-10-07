@@ -7,28 +7,36 @@
 
      safeImageUrl() and not image_url: the value is scraped markup or user
      input, and a `javascript:` payload must never reach an <img src>. --}}
-@php($src = $product->safeImageUrl())
+@php
+    $src = $product->safeImageUrl();
+@endphp
 
-<div {{ $attributes->class([$size, 'relative shrink-0 overflow-hidden rounded-xl bg-white outline-1 -outline-offset-1 outline-black/5 dark:bg-white/5 dark:outline-white/10']) }} @if ($src) x-data="{ loaded: false }" @endif>
-    <div class="flex size-full items-center justify-center bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
-        <flux:icon.photo variant="micro" />
+<div {{ $attributes->class([
+        $size,
+        'relative shrink-0 overflow-hidden rounded-xl bg-white outline-1 -outline-offset-1 outline-black/5 dark:bg-white/5 dark:outline-white/10',
+    ]) }}
+     @if($src) x-data="{ loaded: false }" @endif>
+    <div class="flex size-full items-center justify-center
+                bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+        <flux:icon.photo variant="micro"/>
     </div>
 
-    @if ($src)
+    @if($src)
         {{-- The white backing for transparent photos waits for the image, so a
              photo still loading shows the tile, not a blank white box. x-show,
              not a class: a Livewire morph resets classes Alpine added. --}}
-        <div x-show="loaded" x-cloak class="absolute inset-0 bg-white dark:bg-white/90"></div>
-        <img
-            src="{{ $src }}"
-            alt=""
-            loading="lazy"
-            class="absolute inset-0 size-full object-contain"
-            {{-- A cached image fired its load or error event before Alpine
-                 bound the listener, and neither fires twice. --}}
-            x-init="if ($el.complete) { $el.naturalWidth === 0 ? $el.remove() : (loaded = true) }"
-            x-on:load="loaded = true"
-            x-on:error="$el.remove()"
-        />
+        <div x-show="loaded"
+             x-cloak
+             class="absolute inset-0 bg-paper dark:bg-white/90"></div>
+
+        <img src="{{ $src }}"
+             alt=""
+             loading="lazy"
+             class="absolute inset-0 size-full object-contain"
+             {{-- A cached image fired its load or error event before Alpine
+                  bound the listener, and neither fires twice. --}}
+             x-init="if ($el.complete) { $el.naturalWidth === 0 ? $el.remove() : (loaded = true) }"
+             x-on:load="loaded = true"
+             x-on:error="$el.remove()"/>
     @endif
 </div>
