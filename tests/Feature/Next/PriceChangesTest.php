@@ -228,3 +228,63 @@ test('the product page shows the toggle and the public page does not', function 
 
     $this->get((string) $product->publicShareUrl())->assertOk()->assertDontSeeHtml('data-test="price-changes"');
 });
+
+/** One segment on a product compared per litre: the cheapest pack at one shop, the best value at another. */
+function unitSegment(Shop $cheapest, Shop $bestValue, string $cheapestPrice, string $bestValuePrice, float $daysAgo, ?float $endedDaysAgo = null, string $quantity = '250.00', string $unit = 'ml'): int
+{
+    $check = PriceCheck::factory()->for($bestValue)->create(['price' => $bestValuePrice]);
+
+    ProductCheapestHistory::factory()->for($cheapest->product()->sole())->create([
+        'cheapest_shop_id' => $cheapest->id,
+        'cheapest_price' => $cheapestPrice,
+        'best_value_shop_id' => $bestValue->id,
+        'best_value_price' => $bestValuePrice,
+        'pack_quantity' => $quantity,
+        'pack_unit' => $unit,
+        'started_at' => now()->subMinutes((int) ($daysAgo * 1440)),
+        'ended_at' => $endedDaysAgo === null ? null : now()->subMinutes((int) ($endedDaysAgo * 1440)),
+        'triggering_price_check_id' => $check->id,
+    ]);
+
+    return (int) $check->id;
+}
+
+test('follows the best value per unit on a product compared in a unit, as its alerts do', function (): void {
+    $cheapest = priceLogProduct();
+    $product = $cheapest->product()->sole();
+    $product->forceFill(['best_value_pack_unit' => 'ml'])->save();
+    $bestValue = Shop::factory()->for($product)->create(['url' => 'https://value.test/p/1']);
+
+    unitSegment($cheapest, $bestValue, '3.75', '6.49', 10, 5);
+    // Only the cheapest pack moved: the best value per litre did not.
+    unitSegment($cheapest, $bestValue, '3.50', '6.49', 5, 2);
+    $dip = unitSegment($cheapest, $bestValue, '3.50', '3.39', 2);
+    LargeDropCheck::factory()->rejected()->create(['shop_id' => $bestValue->id, 'product_id' => $product->id, 'price_check_id' => $dip]);
+
+    $rows = logRows($cheapest);
+
+    expect($rows)->toHaveCount(2)
+        ->and($rows[0])->toMatchArray(['shop' => 'value.test', 'from' => '25.9600', 'to' => '13.5600', 'unit' => 'ml', 'action' => PriceChangeAction::WrongPriceCaught])
+        ->and($rows[1])->toMatchArray(['from' => null, 'to' => '25.9600', 'unit' => 'ml']);
+
+    $this->actingAs($product->user()->sole());
+
+    livewire(PriceChanges::class, ['product' => $product, 'range' => '90'])
+        ->toggle('open')
+        ->assertSeeText('25.96 per litre')
+        ->assertSeeText('13.56 per litre');
+});
+
+test('leaves out a segment measured in another unit than the product compares in now', function (): void {
+    $cheapest = priceLogProduct();
+    $product = $cheapest->product()->sole();
+    $product->forceFill(['best_value_pack_unit' => 'g'])->save();
+
+    unitSegment($cheapest, $cheapest, '4.99', '4.99', 10, 5, '20.00', 'piece');
+    unitSegment($cheapest, $cheapest, '3.99', '3.99', 5, null, '560.00', 'g');
+
+    $rows = logRows($cheapest);
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0])->toMatchArray(['from' => null, 'to' => '7.1250', 'unit' => 'g']);
+});

@@ -11,17 +11,23 @@
                 @elseif ($rows === [])
                     <p class="text-base text-zinc-500 sm:text-sm dark:text-zinc-400">{{ __('No price changes in this period.') }}</p>
                 @else
+                    {{-- Per kilo, litre or piece once the product compares in a unit, as its alerts do. --}}
+                    @php
+                        $money = fn (string $amount, ?string $unit): string => $unit === null
+                            ? \App\Support\MoneyFormatter::format($amount, $product->currency)
+                            : \App\Support\MoneyFormatter::unitPrice($amount, $product->currency) . ' ' . \App\Support\UnitWord::forCode($unit);
+                    @endphp
                     <ol role="list" class="divide-y divide-line">
                         @foreach ($rows as $row)
                             <li class="py-3" wire:key="price-change-{{ $row['at']->timestamp }}-{{ $loop->index }}">
                                 <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                     <p class="text-base font-medium tabular-nums sm:text-sm">
                                         @if ($row['from'] !== null)
-                                            <span class="text-zinc-500 dark:text-zinc-400">{{ \App\Support\MoneyFormatter::format($row['from'], $product->currency) }}</span>
+                                            <span class="text-zinc-500 dark:text-zinc-400">{{ $money($row['from'], $row['unit']) }}</span>
                                             <span aria-hidden="true" class="text-zinc-400">&rarr;</span>
                                             <span class="sr-only">{{ __('to') }}</span>
                                         @endif
-                                        {{ $row['to'] === null ? __('No price') : \App\Support\MoneyFormatter::format($row['to'], $product->currency) }}
+                                        {{ $row['to'] === null ? __('No price') : $money($row['to'], $row['unit']) }}
                                         @if ($row['changePct'] !== null && $row['changePct'] !== 0)
                                             <span @class(['ml-1 text-sm', 'text-savings-strong dark:text-savings' => $row['changePct'] < 0, 'text-zinc-500 dark:text-zinc-400' => $row['changePct'] > 0])>
                                                 {{ $row['changePct'] > 0 ? '+' : '' }}{{ $row['changePct'] }}%

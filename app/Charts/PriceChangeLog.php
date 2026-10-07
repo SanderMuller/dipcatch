@@ -7,6 +7,7 @@ use App\Models\LargeDropCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
+use App\Models\Shop;
 use App\Models\TargetPriceEvent;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Database\Eloquent\Builder;
@@ -15,9 +16,12 @@ use Illuminate\Contracts\Database\Eloquent\Builder;
  * The changes of a product's lowest price, newest first, each with what
  * DipCatch did about it: the list under the price chart.
  *
- * Built from the "Lowest price" segments. A segment that moved only the best
- * value, the pack size or a bundle is not a price change: it is skipped, and
- * the change before it runs on through it.
+ * Built from the history segments, on the basis the product's alerts use: the
+ * best value per kilo, litre or piece once the product compares in a unit,
+ * the lowest pack price otherwise. A large drop is judged on that same basis,
+ * so its re-check lands on a row here. A segment that moves nothing on the
+ * basis is not a change: it is skipped, and the change before it runs on
+ * through it.
  */
 final readonly class PriceChangeLog
 {
@@ -26,7 +30,10 @@ final readonly class PriceChangeLog
     public function __construct(private Product $product, private ?CarbonImmutable $windowStart) {}
 
     /**
-     * @return list<array{at: CarbonImmutable, shop: ?string, from: ?string, to: ?string, changePct: ?int, action: ?PriceChangeAction}>
+     * `unit` is the comparison unit the prices are per (`g`, `ml`, `piece`), or
+     * null when they are pack prices.
+     *
+     * @return list<array{at: CarbonImmutable, shop: ?string, from: ?string, to: ?string, unit: ?string, changePct: ?int, action: ?PriceChangeAction}>
      */
     public function rows(): array
     {
@@ -57,11 +64,12 @@ final readonly class PriceChangeLog
 
             $rows[] = [
                 'at' => $segment->started_at,
-                'shop' => $segment->hostOf($segment->cheapestShop),
+                'shop' => $segment->hostOf($change['shop']),
                 'from' => $change['from'],
-                'to' => $segment->cheapest_price,
-                'changePct' => self::changePct($change['from'], $segment->cheapest_price),
-                'action' => self::actionFor($check, $wasAlerted, self::reachedIn($reached, $segment, $change['until'])),
+                'to' => $change['to'],
+                'unit' => $this->unit(),
+                'changePct' => self::changePct($change['from'], $change['to']),
+                'action' => self::actionFor($check, $wasAlerted, self::reachedIn($reached, $change['shopId'], $segment->started_at, $change['until'])),
             ];
         }
 
@@ -69,28 +77,36 @@ final readonly class PriceChangeLog
     }
 
     /**
-     * Each change of the lowest price or its shop, in order, with the price
-     * before it and the moment the next change took over.
+     * Each change of the price on the basis or of its shop, in order, with the
+     * price before it and the moment the next change took over.
      *
-     * @return list<array{segment: ProductCheapestHistory, from: ?string, until: ?CarbonImmutable}>
+     * @return list<array{segment: ProductCheapestHistory, shop: ?Shop, shopId: ?string, from: ?string, to: ?string, until: ?CarbonImmutable}>
      */
     private function changes(): array
     {
         $segments = $this->product->cheapestHistory()
             ->inOrder()
             ->overlapping($this->windowStart)
-            ->with('cheapestShop')
+            ->with('cheapestShop', 'bestValueShop')
             ->get();
 
         $starts = [];
         $previous = null;
 
         foreach ($segments as $segment) {
-            if ($previous === null || $segment->cheapest_price !== $previous->cheapest_price || $segment->cheapest_shop_id !== $previous->cheapest_shop_id) {
-                $starts[] = ['segment' => $segment, 'from' => $previous?->cheapest_price];
+            $point = $this->pointOf($segment);
+
+            // A segment in another unit, or one with no size, says nothing on
+            // a per-unit basis: a kilo price beside a piece price is no change.
+            if ($point === null) {
+                continue;
             }
 
-            $previous = $segment;
+            if ($previous === null || $point['price'] !== $previous['price'] || $point['shopId'] !== $previous['shopId']) {
+                $starts[] = ['segment' => $segment, 'shop' => $point['shop'], 'shopId' => $point['shopId'], 'from' => $previous['price'] ?? null, 'to' => $point['price']];
+            }
+
+            $previous = $point;
         }
 
         $changes = [];
@@ -123,13 +139,49 @@ final readonly class PriceChangeLog
     }
 
     /**
+     * The comparison unit the alerts measure in, or null for pack prices. The
+     * product's own column: the history may hold an older unit, which the
+     * alerts no longer read.
+     */
+    private function unit(): ?string
+    {
+        return is_string($this->product->best_value_pack_unit) ? $this->product->best_value_pack_unit : null;
+    }
+
+    /**
+     * The price and shop a segment puts on the basis: the best value per unit,
+     * or the cheapest pack. Null when the segment has no price on a per-unit
+     * basis.
+     *
+     * @return array{price: ?string, shop: ?Shop, shopId: ?string}|null
+     */
+    private function pointOf(ProductCheapestHistory $segment): ?array
+    {
+        $unit = $this->unit();
+
+        if ($unit === null) {
+            return ['price' => $segment->cheapest_price, 'shop' => $segment->cheapestShop, 'shopId' => $segment->cheapest_shop_id];
+        }
+
+        $unitPrice = $segment->packSize()?->unit === $unit ? $segment->unitPrice() : null;
+
+        if ($unitPrice === null) {
+            return null;
+        }
+
+        return $segment->best_value_price === null
+            ? ['price' => $unitPrice, 'shop' => $segment->cheapestShop, 'shopId' => $segment->cheapest_shop_id]
+            : ['price' => $unitPrice, 'shop' => $segment->bestValueShop, 'shopId' => $segment->best_value_shop_id];
+    }
+
+    /**
      * @param  iterable<TargetPriceEvent>  $reached
      */
-    private static function reachedIn(iterable $reached, ProductCheapestHistory $segment, ?CarbonImmutable $until): bool
+    private static function reachedIn(iterable $reached, ?string $shopId, CarbonImmutable $from, ?CarbonImmutable $until): bool
     {
         foreach ($reached as $event) {
-            if ($event->shop_id === $segment->cheapest_shop_id
-                && ! $event->fired_at->isBefore($segment->started_at)
+            if ($event->shop_id === $shopId
+                && ! $event->fired_at->isBefore($from)
                 && ($until === null || $event->fired_at->isBefore($until))) {
                 return true;
             }
