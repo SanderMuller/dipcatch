@@ -91,7 +91,7 @@ it('lets a second size Jev confirms into the comparison', function (): void {
 
 it('keeps a second size Jev rejects out, even once the prices make it look right', function (): void {
     $shop = doubtfulAltShop();
-    fakeAltAnswer(0.2);
+    fakeAltAnswer(0.1);
 
     confirmAlt($shop);
     $shop->forceFill(['current_price' => '4.00'])->save();
@@ -113,7 +113,7 @@ it('stores nothing without an answer, so a later check asks again', function ():
 
 it('asks once per pair', function (): void {
     $shop = doubtfulAltShop();
-    fakeAltAnswer(0.2);
+    fakeAltAnswer(0.1);
 
     confirmAlt($shop);
     confirmAlt($shop->refresh());
@@ -226,7 +226,7 @@ it('queues the question from a price check that reads a doubtful second size', f
 
 it('does not judge a pair that changed while the question waited in the queue on the old title', function (): void {
     $shop = doubtfulAltShop();
-    fakeAltAnswer(0.2);
+    fakeAltAnswer(0.1);
     $job = new ConfirmAltPackSize((string) $shop->id, 'Iglo 20 Vissticks', (string) $shop->url, ConfirmAltPackSize::pairKey($shop));
 
     $shop->forceFill(['pack_quantity' => '10.00'])->save();
@@ -245,4 +245,17 @@ it('does not queue a question when a newer pair was stored after this read', fun
     ConfirmAltPackSize::afterRead((string) $shop->id, (string) $shop->url, readOutcome(), $readKey);
 
     Queue::assertNothingPushed();
+});
+
+it('decides nothing on an answer between a sure yes and a sure no, and does not ask again', function (): void {
+    $shop = doubtfulAltShop();
+    fakeAltAnswer(0.54);
+
+    confirmAlt($shop);
+    confirmAlt($shop->refresh());
+
+    expect($shop->refresh()->alt_pack_confirmed)->toBeNull()
+        ->and($shop->alt_pack_check_key)->not->toBeNull()
+        ->and($shop->product?->refresh()->comparablePacks()->altInDoubt($shop))->toBeTrue();
+    Http::assertSentCount(1);
 });

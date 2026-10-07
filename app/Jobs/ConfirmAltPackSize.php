@@ -27,10 +27,10 @@ use Illuminate\Support\Facades\DB;
  *
  * A sure yes lets a second size past the plausibility guard. On an item size
  * outside the band it blocks the conversion for good instead, because the
- * shops then sell different items. A no keeps it out for good, whatever the
- * prices do later. Once
- * Jev answers about a pair it is not asked again; a pair that changes is a
- * new question.
+ * shops then sell different items. A sure no keeps it out for good, whatever
+ * the prices do later. An answer in between decides nothing, and the size
+ * stays in doubt. Once Jev answers about a pair it is not asked again; a pair
+ * that changes is a new question.
  *
  * Unique until it has run, not until it starts like {@see ConfirmPackSize}:
  * a second read of the page while Jev is still answering must not pay for
@@ -41,6 +41,17 @@ use Illuminate\Support\Facades\DB;
 final class ConfirmAltPackSize implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
+
+    /**
+     * Jev's chance under which the pair counts as wrong.
+     *
+     * Far below {@see ConfirmPackSize::CONFIRM_FROM}, because a title rarely
+     * states both sizes. Asked live on 2026-10-07 about Iglo fish fingers,
+     * Jev gave the right pairs 0.54 to 0.73, a wrong weight 0.32 to 0.51,
+     * and a wrong count 0.02 to 0.05. Rejecting under 0.8 would throw out
+     * the right pairs for good.
+     */
+    public const float REJECT_BELOW = 0.2;
 
     /** @param  string  $url  The page the title was read from: an answer about it is not stored for another. */
     /** @param  string  $pairKey  The two sizes the title was read beside: a newer pair is not judged on this title. */
@@ -112,7 +123,11 @@ final class ConfirmAltPackSize implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $confirmed = $answers['page'] >= ConfirmPackSize::CONFIRM_FROM;
+        $confirmed = match (true) {
+            $answers['page'] >= ConfirmPackSize::CONFIRM_FROM => true,
+            $answers['page'] < self::REJECT_BELOW => false,
+            default => null,
+        };
 
         // Shop row first, as a price check locks it, and in one transaction
         // with the recompute. Either answer moves derived state: a yes lets
@@ -130,7 +145,7 @@ final class ConfirmAltPackSize implements ShouldBeUnique, ShouldQueue
             $locked->forceFill([
                 'alt_pack_check_key' => $key,
                 'alt_pack_confirmed' => $confirmed,
-                ...($confirmed ? ['alt_pack_since' => now()] : []),
+                ...($confirmed === true ? ['alt_pack_since' => now()] : []),
             ])->save();
 
             $product->refresh()->recomputeCheapestShop(sizesChanged: true);
