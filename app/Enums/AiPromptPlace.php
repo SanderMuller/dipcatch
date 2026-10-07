@@ -46,21 +46,12 @@ enum AiPromptPlace: string
         };
     }
 
-    /**
-     * Whether "Not now" was clicked here in the last {@see self::QUIET_DAYS}
-     * days. The old account-wide "Not now" counts for every place, so it
-     * runs out the same way.
-     */
+    /** Whether "Not now" was clicked here in the last {@see self::QUIET_DAYS} days. */
     public function isQuietFor(User $user): bool
     {
-        $since = now()->subDays(self::QUIET_DAYS);
         $dismissed = $user->ai_prompt_dismissals[$this->value] ?? null;
 
-        if (is_string($dismissed) && CarbonImmutable::parse($dismissed)->isAfter($since)) {
-            return true;
-        }
-
-        return $user->ai_prompts_dismissed_at !== null && $user->ai_prompts_dismissed_at->isAfter($since);
+        return is_string($dismissed) && CarbonImmutable::parse($dismissed)->isAfter(now()->subDays(self::QUIET_DAYS));
     }
 
     public function dismissFor(User $user): void

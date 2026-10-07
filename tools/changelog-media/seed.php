@@ -73,7 +73,6 @@ $user->forceFill([
     'trial_ends_at' => $now->addDays(30),
     'shop_checks' => $scenario === 'screenshots',
     // The AI offers (the Pro dialog, each place's prompt) are not what these shots are about.
-    'ai_prompts_dismissed_at' => $scenario === 'video' ? $now : null,
     'ai_offer_shown_at' => $now,
     'ai_prompt_dismissals' => array_fill_keys(array_column(AiPromptPlace::cases(), 'value'), $now->toIso8601String()),
 ])->save();

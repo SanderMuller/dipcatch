@@ -5,6 +5,8 @@ use App\Livewire\AiFeaturePrompt;
 use App\Livewire\Products\ProductList;
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\ViewException;
 
 use function Pest\Livewire\livewire;
@@ -56,7 +58,6 @@ test('nothing is offered to a free account, an account that has it on, or one th
     'free account' => fn (): User => User::factory()->create(),
     'already on' => fn (): User => proAccountWithAi(['shop_checks' => true]),
     'said not now here' => fn (): User => proAccountWithAi(['ai_prompt_dismissals' => ['add_shop' => now()->subDays(29)->toIso8601String()]]),
-    'said not now to every prompt' => fn (): User => proAccountWithAi(['ai_prompts_dismissed_at' => now()->subDays(29)]),
 ]);
 
 test('not now hides only that place, and only for 30 days', function (): void {
@@ -88,12 +89,6 @@ test('a quiet place does not take the page\'s one prompt for the feature', funct
 
     promptOnNewPage('shop_suggestions')->assertDontSeeHtml('data-test="ai-feature-prompt"');
     livewire(AiFeaturePrompt::class, ['place' => 'pack_size'])->assertSeeHtml('data-test="ai-feature-prompt"');
-});
-
-test('a not now on every prompt from before places runs out after 30 days too', function (): void {
-    $this->actingAs(proAccountWithAi(['ai_prompts_dismissed_at' => now()->subDays(AiPromptPlace::QUIET_DAYS + 1)]));
-
-    promptOnNewPage('alert')->assertSeeHtml('data-test="ai-feature-prompt"');
 });
 
 test('a page offers each feature once, and a switch elsewhere hides the rest', function (): void {
@@ -141,3 +136,19 @@ test('an unknown place cannot be mounted', function (): void {
 
     promptOnNewPage('everywhere');
 })->throws(ViewException::class, 'is not a valid backing value');
+
+test('dropping the account-wide not now keeps a recent one quiet at every place', function (): void {
+    $migration = require database_path('migrations/2026_10_07_220756_drop_ai_prompts_dismissed_at_from_users_table.php');
+    $migration->down();
+    $recent = proAccountWithAi(['ai_prompt_dismissals' => ['alert' => now()->toIso8601String()]]);
+    $old = proAccountWithAi();
+    DB::table('users')->where('id', $recent->id)->update(['ai_prompts_dismissed_at' => now()->subDays(10)]);
+    DB::table('users')->where('id', $old->id)->update(['ai_prompts_dismissed_at' => now()->subDays(AiPromptPlace::QUIET_DAYS + 1)]);
+
+    $migration->up();
+
+    expect(Schema::hasColumn('users', 'ai_prompts_dismissed_at'))->toBeFalse()
+        ->and(array_keys($recent->refresh()->ai_prompt_dismissals ?? []))->toEqualCanonicalizing(array_column(AiPromptPlace::cases(), 'value'))
+        ->and($recent->ai_prompt_dismissals['alert'])->toBeGreaterThan($recent->ai_prompt_dismissals['add_shop'])
+        ->and($old->refresh()->ai_prompt_dismissals)->toBeNull();
+});

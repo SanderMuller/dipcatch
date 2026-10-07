@@ -47,7 +47,6 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property bool $auto_categories
  * @property bool $shop_checks
  * @property bool $affiliate_links_excluded
- * @property CarbonImmutable|null $ai_prompts_dismissed_at
  * @property CarbonImmutable|null $ai_offer_shown_at When the one-time dialog offering the AI features opened.
  * @property array<string, string>|null $ai_prompt_dismissals Place => when "Not now" was clicked there, see {@see AiPromptPlace}.
  * @property CarbonImmutable|null $digest_processed_until
@@ -100,7 +99,6 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
             'auto_categories' => 'boolean',
             'shop_checks' => 'boolean',
             'affiliate_links_excluded' => 'boolean',
-            'ai_prompts_dismissed_at' => 'datetime',
             'ai_offer_shown_at' => 'datetime',
             'ai_prompt_dismissals' => 'array',
             'digest_processed_until' => 'datetime',
