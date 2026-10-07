@@ -6,6 +6,7 @@ use App\Support\ShopPages;
 use App\Support\SupportedShops;
 use App\Support\UseCases;
 use Illuminate\Contracts\Translation\Translator;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Lang;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -316,7 +317,7 @@ it('gives every supported shop a line of its own on the overview', function (): 
 
 it('lists every supported shop on the hub, split by whether it has a reader of its own', function (): void {
     config()->set('site.generic_hosts', ['shop.example']);
-    config()->set('site.shop_names', [...config('site.shop_names'), 'shop.example' => 'Example Shop']);
+    config()->set('site.shop_names', [...Config::array('site.shop_names'), 'shop.example' => 'Example Shop']);
 
     $html = (string) $this->get(route('shops'))->assertOk()->getContent();
     $names = static fn (string $group): array => new Crawler($html)->filter("[data-test=\"{$group}\"] li")->each(static fn (Crawler $item): string => trim($item->text()));
