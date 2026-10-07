@@ -234,7 +234,7 @@
                     @php($useCases = \App\Support\UseCases::all())
 
                     @if ($useCases !== [])
-                        @php($useCaseImages = ['groceries' => 'category-groceries.webp', 'pet-food' => 'category-pet-food.webp', 'coffee' => 'category-coffee.webp', 'beauty' => 'category-beauty.webp', 'filters' => 'category-filters.webp', 'ask-your-assistant' => 'category-ask-your-assistant.webp'])
+                        @php($useCaseImages = ['groceries' => 'category-groceries.webp', 'pet-food' => 'category-pet-food.webp', 'coffee' => 'category-coffee.webp', 'beauty' => 'category-beauty.webp', 'filters' => 'category-filters.webp', 'ask-your-assistant' => 'category-ask-your-assistant.webp', 'electronics' => 'category-electronics.webp', 'toys' => 'category-toys.webp', 'diy' => 'category-diy.webp'])
                         <section id="categories">
                             <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('Price alerts for') }}</h2>
                             <nav class="mt-10" aria-label="{{ __('Price alerts by category') }}">

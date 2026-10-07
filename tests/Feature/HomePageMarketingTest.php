@@ -117,7 +117,7 @@ test('every homepage picture points at a file that ships', function (): void {
 
     preg_match_all('#url\\(\'' . preg_quote(asset('images/home') . '/', '#') . '([^\']+)\'\\)#', $content, $matches);
 
-    expect($matches[1])->toContain('product-chips.webp', 'product-cheese.webp', 'product-toilet-paper.webp', 'category-filters.webp', 'category-ask-your-assistant.webp');
+    expect($matches[1])->toContain('product-chips.webp', 'product-cheese.webp', 'product-toilet-paper.webp', 'category-filters.webp', 'category-ask-your-assistant.webp', 'category-electronics.webp', 'category-toys.webp', 'category-diy.webp');
 
     foreach ($matches[1] as $file) {
         expect(public_path('images/home/' . $file))->toBeFile();
