@@ -69,8 +69,8 @@ it('counts a Serper search, and a search the daily cap refused', function (): vo
     config()->set('dipcatch.web_discovery.daily_search_limit', 1);
     Http::fake([SerperProvider::ENDPOINT => Http::response(['organic' => [['title' => 'Kattenvoer', 'link' => 'https://shop.test/p/1']]])]);
 
-    app(WebSearches::class)->forQuery('kattenvoer 2 kg');
-    app(WebSearches::class)->forQuery('hondenvoer 4 kg');
+    app(WebSearches::class)->forQuery('kattenvoer 2 kg', 'nl');
+    app(WebSearches::class)->forQuery('hondenvoer 4 kg', 'nl');
 
     expect(usageToday(ApiService::Serper, SerperProvider::PURPOSE))
         ->calls->toBe(1)
@@ -136,7 +136,7 @@ it('counts a categorisation a daily cap refused under categorise', function (): 
 it('counts an unreachable Serper as a failed call', function (): void {
     Http::fake([SerperProvider::ENDPOINT => fn () => throw new ConnectionException('timed out')]);
 
-    expect(app(WebSearches::class)->forQuery('kattenvoer 2 kg'))->toBeNull()
+    expect(app(WebSearches::class)->forQuery('kattenvoer 2 kg', 'nl'))->toBeNull()
         ->and(usageToday(ApiService::Serper, SerperProvider::PURPOSE))->calls->toBe(1)->failures->toBe(1);
 });
 

@@ -12,6 +12,7 @@ use App\Models\ShopSuggestionDismissal;
 use App\Models\WebShopFinding;
 use App\Services\BolFeed\BolCatalogRows;
 use App\Services\Checkjebon\CatalogueLinks;
+use App\Services\ShopDiscovery\ShoppersCountry;
 use App\Services\Suggestions\QueryTokens;
 use App\Services\Suggestions\RowScore;
 use App\Services\Suggestions\ShopSuggestion;
@@ -92,7 +93,9 @@ final class SuggestShops
      */
     private function compute(Product $product, bool $verify): array
     {
-        if (strcasecmp($product->currency, 'EUR') !== 0) {
+        // The catalogue holds Dutch shops only: an owner in another country
+        // gets shops from web discovery, which searches in their country.
+        if (strcasecmp($product->currency, 'EUR') !== 0 || ShoppersCountry::forProduct($product) !== 'nl') {
             return [];
         }
 

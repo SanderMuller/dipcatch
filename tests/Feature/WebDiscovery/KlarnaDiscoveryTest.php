@@ -548,7 +548,7 @@ test('a job of a replaced generation writes nothing', function (): void {
 test('the nightly run picks up a product whose Klarna work is unfinished', function (): void {
     Queue::fake();
     $product = klarnaProduct();
-    $search = WebSearch::query()->forceCreate(['query_hash' => WebSearch::hashOf($product->title), 'query' => $product->title, 'results' => [], 'searched_at' => now()]);
+    $search = WebSearch::query()->forceCreate(['query_hash' => WebSearch::hashOf($product->title, 'nl'), 'query' => $product->title, 'results' => [], 'searched_at' => now()]);
     WebDiscovery::query()->forceCreate(['product_id' => $product->id, 'web_search_id' => $search->id, 'search_searched_at' => $search->searched_at, 'state' => WebDiscoveryState::Done->value]);
 
     $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
@@ -799,7 +799,7 @@ test('the nightly run counts Klarna work against the day’s searches', function
     Queue::fake();
     config()->set('dipcatch.web_discovery.daily_search_limit', 3);
     $product = klarnaProduct();
-    $search = WebSearch::query()->forceCreate(['query_hash' => WebSearch::hashOf($product->title), 'query' => $product->title, 'results' => [], 'searched_at' => now()]);
+    $search = WebSearch::query()->forceCreate(['query_hash' => WebSearch::hashOf($product->title, 'nl'), 'query' => $product->title, 'results' => [], 'searched_at' => now()]);
     WebDiscovery::query()->forceCreate(['product_id' => $product->id, 'web_search_id' => $search->id, 'search_searched_at' => $search->searched_at, 'state' => WebDiscoveryState::Done->value]);
 
     $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();

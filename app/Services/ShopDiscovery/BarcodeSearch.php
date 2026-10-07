@@ -28,7 +28,7 @@ final readonly class BarcodeSearch
     public function run(Product $product, Closure $store): void
     {
         $barcode = self::barcodeOf($product);
-        $search = $barcode === null ? null : $this->searches->fresh(WebSearch::hashOf($barcode));
+        $search = $barcode === null ? null : $this->searches->fresh(WebSearch::hashOf($barcode, ShoppersCountry::forProduct($product)));
 
         if ($barcode !== null && ! $search instanceof WebSearch) {
             SearchProductBarcode::queueFor($product);
@@ -46,7 +46,7 @@ final readonly class BarcodeSearch
     {
         $barcode = self::barcodeOf($product);
 
-        return $barcode !== null && $this->searches->forQuery($barcode) instanceof WebSearch;
+        return $barcode !== null && $this->searches->forQuery($barcode, ShoppersCountry::forProduct($product)) instanceof WebSearch;
     }
 
     /** Whether a run for the product would spend a search on its barcode. */
@@ -54,7 +54,7 @@ final readonly class BarcodeSearch
     {
         $barcode = self::barcodeOf($product);
 
-        return $barcode !== null && ! $this->searches->fresh(WebSearch::hashOf($barcode)) instanceof WebSearch;
+        return $barcode !== null && ! $this->searches->fresh(WebSearch::hashOf($barcode, ShoppersCountry::forProduct($product))) instanceof WebSearch;
     }
 
     /**

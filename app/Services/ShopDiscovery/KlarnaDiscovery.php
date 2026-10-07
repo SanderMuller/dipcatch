@@ -181,7 +181,7 @@ final readonly class KlarnaDiscovery
             return;
         }
 
-        $outcome = $this->searches->lookUp("site:{$host} {$entry['title']}");
+        $outcome = $this->searches->lookUp("site:{$host} {$entry['title']}", ShoppersCountry::forProduct($product));
 
         if ($outcome->isDeferred()) {
             return;

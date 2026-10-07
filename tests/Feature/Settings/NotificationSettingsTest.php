@@ -109,3 +109,19 @@ test('the default currency must be a real currency code', function (): void {
 
     expect($user->refresh()->default_currency)->toBe('GBP');
 });
+
+test('regional settings show the country from the timezone, and keep a country the user picks', function (): void {
+    $user = User::factory()->create(['timezone' => 'Europe/Paris', 'country' => null]);
+    $this->actingAs($user);
+
+    livewire(RegionalPreferences::class)
+        ->assertSet('country', 'fr')
+        ->set('country', 'be')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($user->refresh()->country)->toBe('be');
+
+    livewire(RegionalPreferences::class)->set('country', 'xx')->call('save')->assertHasErrors('country');
+    expect($user->refresh()->country)->toBe('be');
+});

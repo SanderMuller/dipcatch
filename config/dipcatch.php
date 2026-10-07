@@ -219,6 +219,10 @@ return [
         // Klarna pages as a source of shop leads (specs/klarna-shop-leads.md).
         // Switch off when Klarna changes its page or refuses DipCatch.
         'klarna_leads' => (bool) env('DIPCATCH_WEB_DISCOVERY_KLARNA_LEADS', true),
+        // The countries DipCatch searches for a product's Klarna page, comma
+        // separated. Elsewhere that search would spend a paid search for
+        // nothing; a Klarna page found another way is still used.
+        'klarna_countries' => array_values(array_filter(array_map(trim(...), explode(',', strtolower((string) env('DIPCATCH_WEB_DISCOVERY_KLARNA_COUNTRIES', 'nl')))))),
         // Shops looked up per product (also the read cap for lead findings),
         // results per shop sent to the first check, and attempts per Klarna
         // step or lead before it gives up.

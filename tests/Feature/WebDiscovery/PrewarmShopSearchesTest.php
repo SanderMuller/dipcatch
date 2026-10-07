@@ -125,13 +125,31 @@ it('stores the shop search and the Klarna search, which discovery then reuses fo
     new PrewarmShopSearches('Ecodor UF2000')->handle(app(WebSearches::class));
 
     expect(WebSearch::query()->pluck('query')->sort()->values()->all())
-        ->toBe(['ecodor uf2000', mb_strtolower(KlarnaPageSearch::queryFor('Ecodor UF2000'))]);
+        ->toBe(['ecodor uf2000', mb_strtolower(KlarnaPageSearch::queryFor('Ecodor UF2000', 'nl'))]);
 
-    app(WebSearches::class)->forQuery('Ecodor UF2000');
-    app(WebSearches::class)->lookUp(KlarnaPageSearch::queryFor('Ecodor UF2000'));
+    app(WebSearches::class)->forQuery('Ecodor UF2000', 'nl');
+    app(WebSearches::class)->lookUp(KlarnaPageSearch::queryFor('Ecodor UF2000', 'nl'), 'nl');
 
     Http::assertSentCount(2);
     Http::assertSent(fn (Request $request): bool => $request['q'] === 'Ecodor UF2000');
+});
+
+it('searches for the account\'s country, and skips the Klarna search where DipCatch does not search Klarna', function (): void {
+    Queue::fake();
+    $user = shopCheckUser();
+    $user->forceFill(['country' => 'fr'])->save();
+
+    PrewarmShopSearches::dispatchFor($user, 'Ecodor UF2000', 'EUR');
+
+    Queue::assertPushed(PrewarmShopSearches::class, fn (PrewarmShopSearches $job): bool => $job->country === 'fr');
+
+    Http::preventStrayRequests();
+    Http::fake([SerperProvider::ENDPOINT => Http::response(['organic' => [['title' => 'Ecodor 2 x 1 liter', 'link' => 'https://shop.test/p/1']]])]);
+
+    new PrewarmShopSearches('Ecodor UF2000', 'fr')->handle(app(WebSearches::class));
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn (Request $request): bool => $request['gl'] === 'fr');
 });
 
 it('skips the Klarna search when the open search already found the Klarna page', function (): void {

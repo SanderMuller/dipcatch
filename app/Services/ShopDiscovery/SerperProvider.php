@@ -21,7 +21,7 @@ final readonly class SerperProvider implements WebSearchProvider
         return self::key() !== '';
     }
 
-    public function search(string $query): array
+    public function search(string $query, string $country): array
     {
         try {
             $response = Http::withHeaders(['X-API-KEY' => self::key()])
@@ -29,8 +29,8 @@ final readonly class SerperProvider implements WebSearchProvider
                 ->timeout(self::TIMEOUT_SECONDS)
                 ->post(self::ENDPOINT, [
                     'q' => $query,
-                    'gl' => Config::string('dipcatch.web_discovery.country'),
-                    'hl' => Config::string('dipcatch.web_discovery.language'),
+                    'gl' => $country,
+                    'hl' => ShoppersCountry::language($country),
                     'num' => Config::integer('dipcatch.web_discovery.results_per_search'),
                 ]);
         } catch (ConnectionException $e) {

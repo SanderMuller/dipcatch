@@ -27,12 +27,31 @@ function fakeSerper(array $organic = [], int $status = 200): void
     Http::fake([SerperProvider::ENDPOINT => Http::response(['organic' => $organic], $status)]);
 }
 
+it('keeps the hash a Dutch search had before searches had a country', function (): void {
+    expect(WebSearch::hashOf('  Coffee   BEANS ', 'nl'))->toBe(hash('sha256', 'coffee beans'))
+        ->and(WebSearch::hashOf('Coffee beans', 'fr'))->not->toBe(WebSearch::hashOf('Coffee beans', 'nl'));
+});
+
+it('searches one query once per country, each in its own country and language', function (): void {
+    fakeSerper([['title' => 'Coffee', 'link' => 'https://a.test/p']]);
+    $searches = app(WebSearches::class);
+
+    $dutch = $searches->forQuery('Coffee beans', 'nl');
+    $french = $searches->forQuery('Coffee beans', 'fr');
+    $searches->forQuery('Coffee beans', 'fr');
+
+    expect($french?->id)->not->toBe($dutch?->id);
+    Http::assertSentCount(2);
+    Http::assertSent(fn (Request $request): bool => $request['gl'] === 'nl' && $request['hl'] === 'nl');
+    Http::assertSent(fn (Request $request): bool => $request['gl'] === 'fr' && $request['hl'] === 'fr');
+});
+
 it('searches once and serves the stored search while it is fresh', function (): void {
     fakeSerper([['title' => 'Coffee beans 1 kg', 'link' => 'https://shop.test/p/1', 'snippet' => 'Beans']]);
     $searches = app(WebSearches::class);
 
-    $first = $searches->forQuery('Coffee beans');
-    $second = $searches->forQuery('  coffee   BEANS ');
+    $first = $searches->forQuery('Coffee beans', 'nl');
+    $second = $searches->forQuery('  coffee   BEANS ', 'nl');
 
     expect($first?->id)->toBe($second?->id)
         ->and($first?->results[0]['link'])->toBe('https://shop.test/p/1');
@@ -43,9 +62,9 @@ it('searches once and serves the stored search while it is fresh', function (): 
 
 it('searches again once the stored search is older than the maximum age', function (): void {
     fakeSerper([['title' => 'New', 'link' => 'https://shop.test/p/2']]);
-    WebSearch::query()->create(['query_hash' => WebSearch::hashOf('Coffee'), 'query' => 'coffee', 'results' => [], 'searched_at' => now()->subDays(91)]);
+    WebSearch::query()->create(['query_hash' => WebSearch::hashOf('Coffee', 'nl'), 'query' => 'coffee', 'results' => [], 'searched_at' => now()->subDays(91)]);
 
-    $search = app(WebSearches::class)->forQuery('Coffee');
+    $search = app(WebSearches::class)->forQuery('Coffee', 'nl');
 
     expect($search?->results)->toHaveCount(1)
         ->and(WebSearch::query()->count())->toBe(1);
@@ -57,8 +76,8 @@ it('stops at the daily search limit, also when the next query differs', function
     fakeSerper([]);
     $searches = app(WebSearches::class);
 
-    expect($searches->forQuery('One'))->not->toBeNull()
-        ->and($searches->forQuery('Two'))->toBeNull();
+    expect($searches->forQuery('One', 'nl'))->not->toBeNull()
+        ->and($searches->forQuery('Two', 'nl'))->toBeNull();
     Http::assertSentCount(1);
 });
 
@@ -68,13 +87,13 @@ it('lets one of two workers take the last search of the day', function (): void 
     Cache::put('web-discovery:searches:' . now()->toDateString(), 1, now()->endOfDay());
     fakeSerper([]);
 
-    expect(app(WebSearches::class)->forQuery('Other query'))->toBeNull();
+    expect(app(WebSearches::class)->forQuery('Other query', 'nl'))->toBeNull();
     Http::assertNothingSent();
 });
 
 it('spends one search when another worker stored it while this one waited for the lock', function (): void {
     fakeSerper([]);
-    $hash = WebSearch::hashOf('Shared title');
+    $hash = WebSearch::hashOf('Shared title', 'nl');
 
     // The lock is granted only after the other worker stored the search, so
     // the check inside the lock is what finds it.
@@ -86,32 +105,32 @@ it('spends one search when another worker stored it while this one waited for th
     });
     Cache::shouldReceive('lock')->once()->with("web-discovery:search:{$hash}", 60)->andReturn($lock);
 
-    expect(app(WebSearches::class)->forQuery('Shared title'))->not->toBeNull();
+    expect(app(WebSearches::class)->forQuery('Shared title', 'nl'))->not->toBeNull();
     Http::assertNothingSent();
 });
 
 it('stores nothing when the provider fails, so the next run tries again', function (): void {
     fakeSerper([], 500);
 
-    expect(app(WebSearches::class)->forQuery('Coffee'))->toBeNull()
+    expect(app(WebSearches::class)->forQuery('Coffee', 'nl'))->toBeNull()
         ->and(WebSearch::query()->count())->toBe(0);
 });
 
 it('stores nothing when the provider times out', function (): void {
     Http::fake([SerperProvider::ENDPOINT => Http::failedConnection()]);
 
-    expect(app(WebSearches::class)->forQuery('Coffee'))->toBeNull()
+    expect(app(WebSearches::class)->forQuery('Coffee', 'nl'))->toBeNull()
         ->and(WebSearch::query()->count())->toBe(0);
 });
 
 it('does nothing without a key or when switched off', function (): void {
     fakeSerper([]);
     config()->set('services.serper.key', '');
-    expect(app(WebSearches::class)->forQuery('Coffee'))->toBeNull();
+    expect(app(WebSearches::class)->forQuery('Coffee', 'nl'))->toBeNull();
 
     config()->set('services.serper.key', 'test-key');
     config()->set('dipcatch.web_discovery.enabled', false);
-    expect(app(WebSearches::class)->forQuery('Coffee'))->toBeNull();
+    expect(app(WebSearches::class)->forQuery('Coffee', 'nl'))->toBeNull();
 
     Http::assertNothingSent();
 });
@@ -144,7 +163,7 @@ it('keeps one result per new shop, and drops tracked, non-shop and hidden ones',
 it('stores nothing when Serper answers without a readable result list', function (array $body): void {
     Http::fake([SerperProvider::ENDPOINT => Http::response($body)]);
 
-    expect(app(WebSearches::class)->forQuery('Coffee'))->toBeNull()
+    expect(app(WebSearches::class)->forQuery('Coffee', 'nl'))->toBeNull()
         ->and(WebSearch::query()->count())->toBe(0);
 })->with([
     'no organic key' => [['searchParameters' => ['q' => 'Coffee']]],
@@ -154,5 +173,5 @@ it('stores nothing when Serper answers without a readable result list', function
 it('stores a search that found nothing', function (): void {
     fakeSerper([]);
 
-    expect(app(WebSearches::class)->forQuery('Coffee')?->results)->toBe([]);
+    expect(app(WebSearches::class)->forQuery('Coffee', 'nl')?->results)->toBe([]);
 });

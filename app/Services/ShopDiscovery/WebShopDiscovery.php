@@ -123,7 +123,7 @@ final readonly class WebShopDiscovery
         WebDiscovery::mark($product, WebDiscoveryState::Running);
         // Without a new search (the day's searches spent, or the provider
         // down) the stored one still lets stale findings start over.
-        $search = $this->searches->forQuery($product->title)
+        $search = $this->searches->forQuery($product->title, ShoppersCountry::forProduct($product))
             ?? WebDiscovery::query()->find($product->id)?->search;
 
         // The findings stored before still go on.
@@ -297,7 +297,7 @@ final readonly class WebShopDiscovery
         // A Klarna lead may point at the product in another size.
         $anyPack = array_values($pending->filter(static fn (WebShopFinding $finding): bool => $finding->isLead())->keys()->all());
 
-        $answers = $this->shopMatch->ask($product, ShopCheckPurpose::WebDiscovery, $candidates, quick: false, anyPackKeys: $anyPack, shoppersCountry: ShoppersCountry::name());
+        $answers = $this->shopMatch->ask($product, ShopCheckPurpose::WebDiscovery, $candidates, quick: false, anyPackKeys: $anyPack, shoppersCountry: ShoppersCountry::name(ShoppersCountry::forProduct($product)));
         arsort($answers);
 
         $readFrom = Config::float('dipcatch.web_discovery.read_from');

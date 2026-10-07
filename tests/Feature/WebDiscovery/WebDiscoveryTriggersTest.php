@@ -153,7 +153,7 @@ it('queues a finished product whose barcode has no fresh search', function (): v
     $searched = gatedProduct($owner);
     $searched->shops()->update(['gtin' => '8711000000014']);
     WebDiscovery::query()->create(['product_id' => $searched->id, 'web_search_id' => $search->id, 'search_searched_at' => $search->searched_at, 'state' => WebDiscoveryState::Done]);
-    WebSearch::query()->create(['query_hash' => WebSearch::hashOf('8711000000014'), 'query' => '8711000000014', 'results' => [], 'searched_at' => now()]);
+    WebSearch::query()->create(['query_hash' => WebSearch::hashOf('8711000000014', 'nl'), 'query' => '8711000000014', 'results' => [], 'searched_at' => now()]);
 
     $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
 

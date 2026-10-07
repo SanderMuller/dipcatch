@@ -425,9 +425,9 @@ it('declines a shop abroad that the check rejects, even with the tracked barcode
         ->and(WebShopFinding::shownFor($product->refresh())->all())->toBeEmpty();
 });
 
-it('asks both checks whether the shop sells to shoppers in the searched country', function (): void {
-    config()->set('dipcatch.web_discovery.country', 'be');
+it('searches and asks both checks for the owner\'s country', function (): void {
     $product = discoveryProduct();
+    $product->user->forceFill(['country' => 'be'])->save();
     fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p']], ['https://a.test/p' => htmlPage(discoveryPage('Coffee beans'))]);
 
     discover($product);
@@ -436,6 +436,8 @@ it('asks both checks whether the shop sells to shoppers in the searched country'
     expect($requests)->toHaveCount(2)
         ->each(fn ($body) => $body->toHaveKey('state.shoppers_country', 'Belgium'))
         ->and(substr_count(json_encode($requests->all(), JSON_THROW_ON_ERROR), 'is `candidate` a shop for shoppers in Belgium'))->toBe(2);
+    Http::assertSent(fn (Request $request): bool => $request->url() === SerperProvider::ENDPOINT && $request['gl'] === 'be' && $request['hl'] === 'nl');
+    Http::assertNotSent(fn (Request $request): bool => $request->url() === SerperProvider::ENDPOINT && $request['gl'] !== 'be');
 });
 
 it('rejects a page whose price is not a consumer price', function (): void {

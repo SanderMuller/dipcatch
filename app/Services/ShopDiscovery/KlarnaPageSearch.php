@@ -38,7 +38,13 @@ final readonly class KlarnaPageSearch
      */
     public function for(Product $product): array|string
     {
-        $outcome = $this->searches->lookUp(self::queryFor($product->title));
+        $country = ShoppersCountry::forProduct($product);
+
+        if (! self::searchesIn($country)) {
+            return self::NONE;
+        }
+
+        $outcome = $this->searches->lookUp(self::queryFor($product->title, $country), $country);
 
         if (! $outcome->search instanceof WebSearch) {
             return $outcome->isDeferred() ? self::DEFERRED : self::FAILED;
@@ -74,12 +80,16 @@ final readonly class KlarnaPageSearch
         return count($answers) === count($candidates) ? self::NONE : self::FAILED;
     }
 
-    /** The search for a title's Klarna product page. */
-    public static function queryFor(string $title): string
+    /** The search for a title's Klarna product page in a country. */
+    public static function queryFor(string $title, string $country): string
     {
-        $country = Config::string('dipcatch.web_discovery.country');
-
         return "site:klarna.com/{$country}/shopping/pl {$title}";
+    }
+
+    /** Whether DipCatch searches for Klarna pages in the country. */
+    public static function searchesIn(string $country): bool
+    {
+        return in_array($country, Config::array('dipcatch.web_discovery.klarna_countries'), strict: true);
     }
 
     /**

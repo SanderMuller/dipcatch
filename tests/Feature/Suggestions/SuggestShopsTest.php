@@ -66,6 +66,15 @@ test('it offers the chains that carry the article and rejects the ones that do n
         ->toBe(['ah', 'dirk', 'hoogvliet', 'jumbo', 'plus', 'spar']);
 });
 
+test('it suggests no Dutch catalogue shop to an owner in another country', function (): void {
+    seedChains();
+    seedBeemsterCatalogue();
+    $product = beemsterProduct();
+    $product->user->forceFill(['country' => 'fr'])->save();
+
+    expect(suggest($product->refresh()))->toBe([]);
+});
+
 test('it builds the product url from the chain base url and the stored link', function (): void {
     seedChains();
     seedRow('jumbo', 'Beemster Extra Belegen Plakken 150 g', null, '3.49', link: 'beemster-extra-belegen-plakken-150-g-729242ZK');

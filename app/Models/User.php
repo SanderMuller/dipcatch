@@ -50,6 +50,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property CarbonImmutable|null $digest_processed_until
  * @property CarbonImmutable|null $tracking_ideas_hidden_at
  * @property CarbonImmutable|null $timezone_detected_at
+ * @property string|null $country The country web discovery finds shops for; null lets the timezone decide.
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property CarbonImmutable|null $two_factor_confirmed_at

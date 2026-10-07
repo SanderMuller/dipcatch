@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
 /**
- * One stored search per query, shared by every product that asks it, and
- * repeated only once it is older than `search_max_age_days`.
+ * One stored search per query and country, shared by every product that
+ * asks it, and repeated only once it is older than `search_max_age_days`.
  */
 final readonly class WebSearches
 {
@@ -34,19 +34,19 @@ final readonly class WebSearches
      * limit spent, the provider failed, or another worker held the lock too
      * long.
      */
-    public function forQuery(string $query): ?WebSearch
+    public function forQuery(string $query, string $country): ?WebSearch
     {
-        return $this->lookUp($query)->search;
+        return $this->lookUp($query, $country)->search;
     }
 
     /** As {@see forQuery()}, with the reason when there is no search. */
-    public function lookUp(string $query): WebSearchOutcome
+    public function lookUp(string $query, string $country): WebSearchOutcome
     {
         if (! $this->enabled()) {
             return WebSearchOutcome::failed();
         }
 
-        $hash = WebSearch::hashOf($query);
+        $hash = WebSearch::hashOf($query, $country);
         $fresh = $this->fresh($hash);
 
         if ($fresh instanceof WebSearch) {
@@ -57,7 +57,7 @@ final readonly class WebSearches
             // Under a lock on the query, and checked again inside it: two
             // products with the same title that miss together spend one search.
             $outcome = Cache::lock("web-discovery:search:{$hash}", self::LOCK_SECONDS)
-                ->block(self::LOCK_WAIT_SECONDS, fn (): WebSearchOutcome => ($fresh = $this->fresh($hash)) instanceof WebSearch ? WebSearchOutcome::found($fresh) : $this->search($query, $hash));
+                ->block(self::LOCK_WAIT_SECONDS, fn (): WebSearchOutcome => ($fresh = $this->fresh($hash)) instanceof WebSearch ? WebSearchOutcome::found($fresh) : $this->search($query, $country, $hash));
         } catch (LockTimeoutException) {
             Log::info('Web shop discovery skipped a search: another worker held it too long; the next run tries again.', ['query_hash' => $hash]);
 
@@ -80,7 +80,7 @@ final readonly class WebSearches
         return $search instanceof WebSearch && self::isFresh($search) ? $search : null;
     }
 
-    private function search(string $query, string $hash): WebSearchOutcome
+    private function search(string $query, string $country, string $hash): WebSearchOutcome
     {
         if (! self::reserveSearch()) {
             Log::info('Web shop discovery skipped a search: the daily limit is spent.');
@@ -90,7 +90,7 @@ final readonly class WebSearches
         }
 
         try {
-            $results = $this->provider->search($query);
+            $results = $this->provider->search($query, $country);
         } catch (WebSearchFailed $e) {
             // A refused key or spent credit does not pass by itself.
             $level = in_array($e->getCode(), [401, 402, 403], strict: true) ? 'error' : 'warning';

@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\WebSearch;
 use App\Services\ShopDiscovery\KlarnaPageSearch;
 use App\Services\ShopDiscovery\KlarnaSource;
+use App\Services\ShopDiscovery\ShoppersCountry;
 use App\Services\ShopDiscovery\WebSearches;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -35,7 +36,8 @@ final class PrewarmShopSearches implements ShouldQueue
 
     public const int PER_DAY = 30;
 
-    public function __construct(public string $title) {}
+    /** `nl` for a job queued before searches had a country. */
+    public function __construct(public string $title, public string $country = 'nl') {}
 
     /** Only where discovery would search after the save, and within the account's budget. */
     public static function dispatchFor(User $user, string $title, string $currency): void
@@ -51,7 +53,7 @@ final class PrewarmShopSearches implements ShouldQueue
             return;
         }
 
-        dispatch(new self($title));
+        dispatch(new self($title, ShoppersCountry::of($user)));
     }
 
     /**
@@ -67,12 +69,12 @@ final class PrewarmShopSearches implements ShouldQueue
 
     public function handle(WebSearches $searches): void
     {
-        $search = $searches->lookUp($this->title)->search;
+        $search = $searches->lookUp($this->title, $this->country)->search;
 
         // Discovery searches for the Klarna page only when the open search
         // has none among its results.
-        if (KlarnaSource::enabled() && $search instanceof WebSearch && KlarnaPageSearch::klarnaResults($search) === []) {
-            $searches->lookUp(KlarnaPageSearch::queryFor($this->title));
+        if (KlarnaSource::enabled() && KlarnaPageSearch::searchesIn($this->country) && $search instanceof WebSearch && KlarnaPageSearch::klarnaResults($search) === []) {
+            $searches->lookUp(KlarnaPageSearch::queryFor($this->title, $this->country), $this->country);
         }
     }
 }

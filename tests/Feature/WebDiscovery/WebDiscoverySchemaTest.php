@@ -41,7 +41,7 @@ it('keeps one finding per product and URL', function (): void {
 
 it('removes the findings and the discovery state with the product, and keeps the shared search', function (): void {
     $product = Product::factory()->create();
-    $search = WebSearch::query()->create(['query_hash' => WebSearch::hashOf('Coffee'), 'query' => 'Coffee', 'results' => [], 'searched_at' => now()]);
+    $search = WebSearch::query()->create(['query_hash' => WebSearch::hashOf('Coffee', 'nl'), 'query' => 'Coffee', 'results' => [], 'searched_at' => now()]);
     webFinding($product, ['web_search_id' => $search->id]);
     WebDiscovery::markQueued($product);
 
@@ -68,13 +68,13 @@ it('fingerprints the title and the distinct pack sizes, not the shops or their b
     expect(WebShopFinding::fingerprintFor($product->refresh()))->not->toBe($before);
 });
 
-it('fingerprints the shoppers\' country, which both checks ask about', function (): void {
+it('fingerprints the owner\'s country, which both checks ask about', function (): void {
     $product = Product::factory()->create(['title' => 'Coffee beans']);
     $before = WebShopFinding::fingerprintFor($product);
 
-    config()->set('dipcatch.web_discovery.country', 'be');
+    $product->user->forceFill(['country' => 'be'])->save();
 
-    expect(WebShopFinding::fingerprintFor($product))->not->toBe($before);
+    expect(WebShopFinding::fingerprintFor($product->refresh()))->not->toBe($before);
 });
 
 it('treats a removed barcode as stale and an added one as not', function (): void {
