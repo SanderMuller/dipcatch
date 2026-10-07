@@ -41,6 +41,9 @@
     /* The chart line: #f6a900 is under 2:1 on paper, short of 3:1 for a graphic. */
     --color-chart-line: #c27c00;
     --color-alert: #ec145a;
+    /* The Pro gradient behind white text: violet-500 at its end is 4.4:1, short of AA. */
+    --color-pro: #3554ff;
+    --color-pro-end: var(--color-violet-600);
     --color-soft-yellow: #fff0b8;
     --color-soft-blush: #fde7e0;
 }
@@ -59,6 +62,9 @@
         --color-savings: #34d399;
         --color-savings-strong: #34d399;
         --color-chart-line: #f6a900;
+        /* The dark brand (#8a9bff) is 2.6:1 under white text. */
+        --color-pro: var(--color-blue-700);
+        --color-pro-end: var(--color-violet-700);
         --color-soft-yellow: #3a2f0b;
         --color-soft-blush: var(--color-zinc-950);
     }

@@ -2,7 +2,7 @@
 <div @class(['mb-6' => $spaced && ($switchedOn || $offered), 'mt-3' => $below && ($switchedOn || $offered)])>
     @if ($switchedOn)
         {{-- Focused, so a keyboard or screen reader user lands on the result rather than on the page top. --}}
-        <flux:callout icon="check-circle" color="green" data-test="ai-feature-on" tabindex="-1" x-init="$el.focus()">
+        <flux:callout icon="check-circle" color="green" class="[--callout-heading:var(--color-green-700)]! [--callout-text:var(--color-green-700)]! dark:[--callout-heading:var(--color-green-200)]! dark:[--callout-text:var(--color-green-300)]!" data-test="ai-feature-on" tabindex="-1" x-init="$el.focus()">
             <flux:callout.text>
                 {{ $aiFeature->switchedOnText() }}
                 <flux:link :href="route('product-features.edit')" wire:navigate>{{ __('Change it in settings') }}</flux:link>
@@ -21,7 +21,7 @@
                     </p>
                 </div>
                 <div class="flex shrink-0 items-center gap-2 self-start @xl:self-auto">
-                    <button type="button" wire:click="switchOn" class="inline-flex items-center gap-1.5 rounded-full bg-linear-to-r from-brand to-violet-500 py-2 pr-3.5 pl-3 text-sm font-medium text-white shadow-sm hover:from-brand/90 hover:to-violet-500/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:shadow-none" data-test="ai-feature-switch-on">
+                    <button type="button" wire:click="switchOn" class="inline-flex items-center gap-1.5 rounded-full bg-linear-to-r from-pro to-pro-end py-2 pr-3.5 pl-3 text-sm font-medium text-white shadow-sm hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:shadow-none" data-test="ai-feature-switch-on">
                         <flux:icon.sparkles variant="micro" class="shrink-0" />
                         {{ __('Switch on') }}
                     </button>

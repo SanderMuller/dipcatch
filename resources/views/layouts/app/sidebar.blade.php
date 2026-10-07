@@ -135,7 +135,7 @@
                     @if ($proPitch?->canBuy === true)
                         {{-- The one standing way to Pro for a free account: brand blue on the
                              amber bar, so it is findable without shouting. --}}
-                        <a href="{{ route('app.pro') }}" wire:navigate class="items-center gap-1.5 rounded-full bg-linear-to-r from-brand to-violet-500 dark:from-blue-700 dark:to-violet-700 py-1.5 pr-3.5 pl-3 text-sm font-medium whitespace-nowrap text-white shadow-sm hover:from-brand/90 hover:to-violet-500/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand inline-flex max-sm:hidden dark:shadow-none" data-test="header-pro-link">
+                        <a href="{{ route('app.pro') }}" wire:navigate class="items-center gap-1.5 rounded-full bg-linear-to-r from-pro to-pro-end py-1.5 pr-3.5 pl-3 text-sm font-medium whitespace-nowrap text-white shadow-sm hover:brightness-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand inline-flex max-sm:hidden dark:shadow-none" data-test="header-pro-link">
                             <flux:icon.sparkles variant="micro" />
                             {{ $proPitch->offersTrial ? __('Try Pro') : __('Get Pro') }}
                         </a>
@@ -176,7 +176,7 @@
                     @endforeach
 
                     @if ($proPitch?->canBuy === true)
-                        <a href="{{ route('app.pro') }}" wire:navigate class="mt-2 flex items-center gap-2 rounded-xl bg-linear-to-r from-brand to-violet-500 dark:from-blue-700 dark:to-violet-700 px-3 py-2.5 text-base font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:hidden">
+                        <a href="{{ route('app.pro') }}" wire:navigate class="mt-2 flex items-center gap-2 rounded-xl bg-linear-to-r from-pro to-pro-end px-3 py-2.5 text-base font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:hidden">
                             <flux:icon.sparkles variant="micro" />
                             {{ $proPitch->buttonLabel() }}
                         </a>

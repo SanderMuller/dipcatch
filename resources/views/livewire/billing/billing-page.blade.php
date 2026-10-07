@@ -8,7 +8,7 @@
     @if ($checkoutDone)
         <div role="status">
         @if ($isPro && ! $isBlocked)
-            <flux:callout class="mt-6" icon="check-circle" color="green" data-test="checkout-welcome">
+            <flux:callout class="mt-6 [--callout-heading:var(--color-green-700)]! [--callout-text:var(--color-green-700)]! dark:[--callout-heading:var(--color-green-200)]! dark:[--callout-text:var(--color-green-300)]!" icon="check-circle" color="green" data-test="checkout-welcome">
                 <flux:callout.heading>{{ __('Welcome to Pro') }}</flux:callout.heading>
                 <flux:callout.text>{{ __('Every Pro feature is yours now.') }}</flux:callout.text>
             </flux:callout>
