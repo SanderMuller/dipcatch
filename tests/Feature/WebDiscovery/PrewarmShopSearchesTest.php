@@ -160,3 +160,9 @@ it('skips the Klarna search when the open search already found the Klarna page',
 
     Http::assertSentCount(1);
 });
+
+it('reads a job queued before searches had a country as a Dutch one', function (): void {
+    $job = new ReflectionClass(PrewarmShopSearches::class)->newInstanceWithoutConstructor();
+
+    expect($job->country)->toBe('nl');
+});

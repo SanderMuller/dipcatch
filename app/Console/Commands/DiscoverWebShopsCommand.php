@@ -6,9 +6,12 @@ use App\Billing\ProUsers;
 use App\Enums\WebDiscoveryState;
 use App\Enums\WebFindingStatus;
 use App\Models\Product;
+use App\Models\User;
 use App\Models\WebDiscovery;
+use App\Models\WebSearch;
 use App\Models\WebShopFinding;
 use App\Services\ShopDiscovery\BarcodeSearch;
+use App\Services\ShopDiscovery\ShoppersCountry;
 use App\Services\ShopDiscovery\WebSearches;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Services\TypeSafe\TypeSafeClient;
@@ -114,7 +117,7 @@ final class DiscoverWebShopsCommand extends Command
             ->get();
 
         $discoveries = WebDiscovery::query()
-            ->with('search:id,searched_at')
+            ->with('search:id,searched_at,query,query_hash')
             ->whereIn('product_id', $products->modelKeys())
             ->get()
             ->keyBy('product_id');
@@ -151,7 +154,10 @@ final class DiscoverWebShopsCommand extends Command
             return self::SEARCH_NEW;
         }
 
-        if (! WebSearches::isFresh($search)) {
+        // A search for another country than the owner's now: the owner
+        // changed the country setting, and the old results are for shops
+        // that do not sell there.
+        if (! WebSearches::isFresh($search) || ($product->user instanceof User && WebSearch::hashOf($search->query, ShoppersCountry::of($product->user)) !== $search->query_hash)) {
             return self::SEARCH_AGAIN;
         }
 

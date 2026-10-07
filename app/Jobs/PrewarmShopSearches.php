@@ -36,8 +36,17 @@ final class PrewarmShopSearches implements ShouldQueue
 
     public const int PER_DAY = 30;
 
-    /** `nl` for a job queued before searches had a country. */
-    public function __construct(public string $title, public string $country = 'nl') {}
+    /**
+     * `nl` for a job queued before searches had a country. A declared default,
+     * not a promoted one: a job serialised without the field skips the
+     * constructor and would otherwise read an uninitialised property.
+     */
+    public string $country = 'nl';
+
+    public function __construct(public string $title, string $country = 'nl')
+    {
+        $this->country = $country;
+    }
 
     /** Only where discovery would search after the save, and within the account's budget. */
     public static function dispatchFor(User $user, string $title, string $currency): void

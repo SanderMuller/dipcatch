@@ -87,7 +87,7 @@ it('queues nothing for an owner without shop checks, a non-euro product, or with
 it('queues unfinished runs, then stale findings, then never-searched products, and stops at the search limit', function (): void {
     config()->set('dipcatch.web_discovery.daily_search_limit', 1);
     $owner = triggerOwner();
-    $search = WebSearch::query()->create(['query_hash' => 'h', 'query' => 'q', 'results' => [], 'searched_at' => now()]);
+    $search = WebSearch::query()->create(['query_hash' => WebSearch::hashOf('q', 'nl'), 'query' => 'q', 'results' => [], 'searched_at' => now()]);
 
     $neverA = gatedProduct($owner, ['created_at' => now()->subDays(3)]);
     $neverB = gatedProduct($owner, ['created_at' => now()->subDays(2)]);
@@ -104,7 +104,7 @@ it('queues unfinished runs, then stale findings, then never-searched products, a
     WebDiscovery::query()->create(['product_id' => $refreshedElsewhere->id, 'web_search_id' => $search->id, 'search_searched_at' => now()->subDay(), 'state' => WebDiscoveryState::Done]);
 
     $searchedLongAgo = gatedProduct($owner, ['created_at' => now()->subDays(9)]);
-    $oldSearch = WebSearch::query()->create(['query_hash' => 'old', 'query' => 'old', 'results' => [], 'searched_at' => now()->subDays(91)]);
+    $oldSearch = WebSearch::query()->create(['query_hash' => WebSearch::hashOf('old', 'nl'), 'query' => 'old', 'results' => [], 'searched_at' => now()->subDays(91)]);
     WebDiscovery::query()->create(['product_id' => $searchedLongAgo->id, 'web_search_id' => $oldSearch->id, 'search_searched_at' => $oldSearch->searched_at, 'state' => WebDiscoveryState::Done]);
 
     $upToDate = gatedProduct($owner);
@@ -146,7 +146,7 @@ it('still queues the title search when the barcode search does not fit', functio
 
 it('queues a finished product whose barcode has no fresh search', function (): void {
     $owner = triggerOwner();
-    $search = WebSearch::query()->create(['query_hash' => 'h', 'query' => 'q', 'results' => [], 'searched_at' => now()]);
+    $search = WebSearch::query()->create(['query_hash' => WebSearch::hashOf('q', 'nl'), 'query' => 'q', 'results' => [], 'searched_at' => now()]);
     $product = gatedProduct($owner);
     $product->shops()->update(['gtin' => '8711000000007']);
     WebDiscovery::query()->create(['product_id' => $product->id, 'web_search_id' => $search->id, 'search_searched_at' => $search->searched_at, 'state' => WebDiscoveryState::Done]);
@@ -154,6 +154,18 @@ it('queues a finished product whose barcode has no fresh search', function (): v
     $searched->shops()->update(['gtin' => '8711000000014']);
     WebDiscovery::query()->create(['product_id' => $searched->id, 'web_search_id' => $search->id, 'search_searched_at' => $search->searched_at, 'state' => WebDiscoveryState::Done]);
     WebSearch::query()->create(['query_hash' => WebSearch::hashOf('8711000000014', 'nl'), 'query' => '8711000000014', 'results' => [], 'searched_at' => now()]);
+
+    $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
+
+    expect(Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $product->id]);
+});
+
+it('searches again when the owner changed the country the last search was for', function (): void {
+    $owner = triggerOwner();
+    $owner->forceFill(['country' => 'de'])->save();
+    $dutch = WebSearch::query()->create(['query_hash' => WebSearch::hashOf('q', 'nl'), 'query' => 'q', 'results' => [], 'searched_at' => now()]);
+    $product = gatedProduct($owner);
+    WebDiscovery::query()->create(['product_id' => $product->id, 'web_search_id' => $dutch->id, 'search_searched_at' => $dutch->searched_at, 'state' => WebDiscoveryState::Done]);
 
     $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
 
