@@ -169,6 +169,27 @@ it('says so when there is nothing to suggest', function (): void {
     Livewire::withoutLazyLoading()->test(DashboardSuggestedShops::class)->assertSee('No suggested shops right now.');
 });
 
+it('points a free account with nothing to suggest at what Pro finds, and not a Pro account', function (): void {
+    configureStripe();
+
+    $free = User::factory()->create();
+    dashboardProduct($free, 'Beemster Extra belegen 48+ plakken');
+    $this->actingAs($free);
+
+    Livewire::withoutLazyLoading()->test(DashboardSuggestedShops::class)
+        ->assertSee('No suggested shops right now.')
+        ->assertSeeHtml('data-test="suggestions-pro-hint"');
+
+    $pro = User::factory()->create();
+    subscribeUser($pro);
+    dashboardProduct($pro, 'Beemster Extra belegen 48+ plakken');
+    $this->actingAs($pro);
+
+    Livewire::withoutLazyLoading()->test(DashboardSuggestedShops::class)
+        ->assertSee('No suggested shops right now.')
+        ->assertDontSeeHtml('data-test="suggestions-pro-hint"');
+});
+
 it('loads the suggestions lazily in the sidebar, above Worth a look', function (): void {
     $user = User::factory()->create();
     // One shop only, so Worth a look lists it.

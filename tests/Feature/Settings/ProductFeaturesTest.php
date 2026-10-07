@@ -14,17 +14,22 @@ test('the automatic categories switch is absent when no key is configured', func
         ->assertSeeHtml('data-test="product-features-unavailable"');
 });
 
-test('a free account sees the automatic categories switch disabled with the upgrade note', function (): void {
+test('a free account sees what each AI check does, and the way to Pro instead of a switch it cannot use', function (): void {
     config()->set('services.typesafe.key', 'test-key');
+    configureStripe();
     $this->actingAs(User::factory()->create());
 
     $html = livewire(ProductFeatures::class)
         ->assertSee('Sort new products into a category automatically')
-        ->assertSee('Pro sorts products for you. Your choice is kept, and it starts working when you upgrade.')
+        ->assertSee('Products you add, and the ones already here without a category.')
+        ->assertSeeHtml('data-test="product-features-pro-hint"')
+        ->assertSeeHtml('href="' . route('app.pro') . '"')
+        ->assertDontSee('Save')
         ->html();
 
-    expect($html)->toMatch('/disabled="disabled"[^>]*data-test="auto-categories"/')
-        ->toMatch('/data-test="auto-categories-pro"[^>]*>\s*Pro\s*</');
+    expect($html)->not->toMatch('/data-test="auto-categories"/')
+        ->toMatch('/data-test="auto-categories-locked"/')
+        ->toMatch('/data-test="auto-categories-pro"/');
 });
 
 test('a Pro account sees the automatic categories switch enabled', function (): void {
@@ -41,7 +46,7 @@ test('a Pro account sees the automatic categories switch enabled', function (): 
     expect($html)->toMatch('/data-test="auto-categories"/')
         ->not->toMatch('/disabled="disabled"[^>]*data-test="auto-categories"/')
         // Marked Pro on a Pro account too, so a subscriber sees what the plan pays for.
-        ->toMatch('/data-test="auto-categories-pro"[^>]*>\s*Pro\s*</');
+        ->toMatch('/data-test="auto-categories-pro"/');
 });
 
 test('save persists the automatic categories choice', function (): void {

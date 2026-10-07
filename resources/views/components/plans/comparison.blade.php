@@ -102,7 +102,7 @@
                         <a href="{{ $freeCta['href'] }}" class="{{ $freeButton }} mt-3 max-sm:hidden">{{ $freeCta['label'] }}</a>
                     @endif
                 </th>
-                <th scope="col" class="rounded-t-2xl border-b border-ink/10 bg-soft-yellow/90 px-3 py-4 align-top backdrop-blur-sm sm:px-6 dark:border-white/10">
+                <th scope="col" class="rounded-t-2xl border-b border-ink/10 bg-soft-yellow/90 px-3 py-4 dark:bg-zinc-900/90 align-top backdrop-blur-sm sm:px-6 dark:border-white/10">
                     <p class="flex flex-wrap items-center gap-2 text-base font-semibold">
                         {{ __('Pro') }}
                         @if ($onSale && $trialDays > 0 && ! $isPro)
@@ -126,7 +126,7 @@
                 <tr>
                     <th scope="colgroup" class="pt-8 pb-3 text-sm font-medium whitespace-nowrap text-brand">{{ $section }}</th>
                     <td></td>
-                    <td class="bg-soft-yellow/60"></td>
+                    <td class="bg-soft-yellow/60 dark:bg-zinc-900"></td>
                 </tr>
                 @foreach ($rows as [$label, $hint, $freeValue, $proValue])
                     <tr>
@@ -135,7 +135,7 @@
                             <span class="mt-0.5 block text-sm text-zinc-500 max-sm:hidden dark:text-zinc-400">{{ $hint }}</span>
                         </th>
                         <td class="border-b border-ink/5 px-3 py-4 text-base sm:px-6 sm:text-lg dark:border-white/10">{!! $cell($freeValue, false) !!}</td>
-                        <td class="border-b border-ink/5 bg-soft-yellow/60 px-3 py-4 text-base sm:px-6 sm:text-lg dark:border-white/10">
+                        <td class="border-b border-ink/5 bg-soft-yellow/60 px-3 dark:bg-zinc-900 py-4 text-base sm:px-6 sm:text-lg dark:border-white/10">
                             <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 {!! $cell($proValue, true) !!}
                                 @isset($gains[$label])
@@ -151,7 +151,7 @@
             <tr>
                 <td class="pt-6 pr-4 align-top text-sm text-zinc-500 dark:text-zinc-400">{{ __('VAT included.') }}</td>
                 <td class="px-3 pt-6 align-top sm:px-6">@if ($freeCta !== null)<a href="{{ $freeCta['href'] }}" class="{{ $freeButton }} max-sm:hidden">{{ $freeCta['label'] }}</a>@endif</td>
-                <td class="rounded-b-2xl bg-soft-yellow/60 px-3 pt-6 pb-6 align-top sm:px-6">
+                <td class="rounded-b-2xl bg-soft-yellow/60 px-3 dark:bg-zinc-900 pt-6 pb-6 align-top sm:px-6">
                     {{-- On a phone the buttons sit full width under the table. --}}
                     @if ($onSale && $proCta !== null)
                         <a href="{{ $proCta['href'] }}" class="{{ $proButton }} max-sm:hidden">{{ $proCta['label'] }}</a>
