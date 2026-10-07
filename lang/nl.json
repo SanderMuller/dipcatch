@@ -550,8 +550,6 @@
     "Hemköp shares its product data with Willys. DipCatch reads the price in Swedish kronor, offers for everyone included.": "Hemköp deelt zijn productgegevens met Willys. DipCatch leest de prijs in Zweedse kronen, aanbiedingen voor iedereen inbegrepen.",
     "All shops that work": "Alle winkels die werken",
     "Works with every webshop, unless the shop blocks us": "Werkt met elke webshop, tenzij de winkel ons blokkeert",
-    "Paste a product link from any shop. A few shops block DipCatch or load their price with a script, and those do not work.": "Plak een productlink van elke winkel. Een paar winkels blokkeren DipCatch of laden hun prijs met een script, en die werken niet.",
-    "See the full shop list": "Bekijk de volledige winkellijst",
     "Every webshop works, unless the shop blocks DipCatch or loads its price with a script after the page opens. Etos, Walmart and Kruidvat are among the few that do. Big shops such as Albert Heijn, Jumbo, Dirk, Lidl, bol.com and Amazon have a reader of their own, so offer prices such as AH Bonus and the Dirk deals come through too. The shops page lists every shop we know works, and every shop that does not. You always see what we found before anything is saved.": "Elke webshop werkt, tenzij de winkel DipCatch blokkeert of de prijs pas met een script laadt nadat de pagina opent. Etos, Walmart en Kruidvat horen bij die paar winkels. Grote winkels zoals Albert Heijn, Jumbo, Dirk, Lidl, bol.com en Amazon hebben een eigen lezer, dus aanbiedingsprijzen zoals AH Bonus en de Dirk-deals komen ook mee. De winkelpagina toont elke winkel waarvan we weten dat die werkt, en elke winkel die niet werkt. Je ziet altijd wat we vonden voordat er iets wordt opgeslagen.",
     "Every webshop works, unless the shop blocks DipCatch or loads its price with a script. These are the biggest shops.": "Elke webshop werkt, tenzij de winkel DipCatch blokkeert of de prijs met een script laadt. Dit zijn de grootste winkels.",
     "The shops DipCatch is known to read. A shop that is not on this list works too, unless it is one of the shops we cannot read below.": "De winkels waarvan we weten dat DipCatch ze kan lezen. Een winkel die hier niet staat, werkt ook, tenzij het een van de winkels hieronder is die we niet kunnen lezen.",
@@ -559,5 +557,8 @@
     "DipCatch has a reader written for each of these shops.": "DipCatch heeft voor elk van deze winkels een eigen lezer.",
     "Read from the page": "Gelezen van de pagina",
     "These shops put the price on the page in a standard form. DipCatch reads it there, with no reader of its own.": "Deze winkels zetten de prijs in een standaardvorm op de pagina. DipCatch leest hem daar, zonder eigen lezer.",
-    "The standard features are always free. Pro gets the most out of DipCatch.": "De standaardfuncties zijn altijd gratis. Met Pro haal je het meeste uit DipCatch."
+    "The standard features are always free. Pro gets the most out of DipCatch.": "De standaardfuncties zijn altijd gratis. Met Pro haal je het meeste uit DipCatch.",
+    "Most shops work.": "De meeste winkels werken.",
+    "Favourite shop not working?": "Werkt je favoriete winkel niet?",
+    "Let us know": "Laat het ons weten"
 }

@@ -166,9 +166,9 @@
                                     </div>
                                 </div>
                                 <p class="mt-3 max-w-[52ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">
-                                    {{ __('Paste a product link from any shop. A few shops block DipCatch or load their price with a script, and those do not work.') }}
-                                    <a href="{{ route('shops', $langQuery) }}" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('See the full shop list') }}</a>
-                                    <x-shop-request-link class="hover:text-zinc-700 dark:hover:text-zinc-300" />
+                                    {{ __('Most shops work.') }}
+                                    {{ __('Favourite shop not working?') }}
+                                    <x-shop-request-link class="hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Let us know') }}</x-shop-request-link>
                                 </p>
                             </div>
                         </div>

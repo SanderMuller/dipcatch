@@ -138,7 +138,7 @@ test('the shop list names the homepage hosts without contradicting itself', func
         ->and($content)->not->toContain('amazon.com')
         ->and($content)->not->toContain('etos.nl')
         ->and($content)->not->toContain(' more<')
-        ->and($content)->toMatch('/<a href="' . preg_quote(e(route('shops')), '/') . '"[^>]*>' . preg_quote(__('See the full shop list'), '/') . '<\/a>/');
+        ->and($content)->toContain('Most shops work.');
 });
 
 test('the privacy page explains that shared product images load from the shop', function (): void {
@@ -267,7 +267,7 @@ test('the homepage says every shop works unless it blocks us', function (): void
     $this->get(route('home'))
         ->assertOk()
         ->assertSee('Works with every webshop, unless the shop blocks us')
-        ->assertSee('What if my shop is not listed?')->assertSee('Request a shop')->assertSeeHtml('mailto:hello@example.test?subject=');
+        ->assertSee('What if my shop is not listed?')->assertSee('Favourite shop not working?')->assertSeeHtml('mailto:hello@example.test?subject=');
 });
 
 test('the FAQ answers how to catch a lower price at another shop', function (): void {
