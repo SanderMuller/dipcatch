@@ -145,7 +145,7 @@
                                     class="group/shops mt-3 data-moving:overflow-hidden data-moving:mask-x-from-90% data-moving:mask-x-to-100%"
                                     data-test="shop-carousel"
                                 >
-                                    <div x-ref="track" class="flex w-max max-w-full group-data-moving/shops:max-w-none group-data-moving/shops:animate-shop-marquee group-hover/shops:[animation-play-state:paused] group-focus-within/shops:[animation-play-state:paused]">
+                                    <div x-ref="track" class="flex w-max max-w-full group-data-moving/shops:max-w-none group-data-moving/shops:animate-shop-marquee group-hover/shops:[animation-play-state:paused]! group-focus-within/shops:[animation-play-state:paused]!">
                                         <ul x-ref="shops" class="flex flex-wrap gap-2 py-1 group-data-moving/shops:flex-nowrap group-data-moving/shops:pr-2">
                                             @foreach ($supportedShops as $shop)
                                                 <li class="inline-flex shrink-0 items-center">
