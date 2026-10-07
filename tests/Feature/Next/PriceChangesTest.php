@@ -81,25 +81,49 @@ test('names the alert, the reached alert price and the re-check by what happened
     $shop = priceLogProduct();
     segment($shop, '9.00', 20, 15);
     $confirmed = segment($shop, '4.00', 15, 12);
+    $answer = PriceCheck::factory()->for($shop)->create(['price' => '4.00']);
     $small = segment($shop, '8.00', 12, 9);
     segment($shop, '7.00', 9, 6);
-    $waiting = segment($shop, '3.00', 6, 3);
-    $stale = segment($shop, '2.00', 0.5);
+    $givenUp = segment($shop, '3.00', 6, 3);
+    $waiting = segment($shop, '2.00', 0.5);
 
-    LargeDropCheck::factory()->confirmed()->create(['shop_id' => $shop->id, 'product_id' => $shop->product_id, 'price_check_id' => $confirmed]);
+    LargeDropCheck::factory()->confirmed()->create(['shop_id' => $shop->id, 'product_id' => $shop->product_id, 'price_check_id' => $confirmed, 'resolved_by_price_check_id' => $answer->id]);
+    PriceDropEvent::factory()->create(['product_id' => $shop->product_id, 'price_check_id' => $answer->id]);
     PriceDropEvent::factory()->create(['product_id' => $shop->product_id, 'price_check_id' => $small]);
     TargetPriceEvent::factory()->create(['product_id' => $shop->product_id, 'shop_id' => $shop->id, 'fired_at' => now()->subDays(8)]);
-    LargeDropCheck::factory()->create(['shop_id' => $shop->id, 'product_id' => $shop->product_id, 'price_check_id' => $waiting, 'asked_at' => now()->subDays(6)]);
-    LargeDropCheck::factory()->create(['shop_id' => $shop->id, 'product_id' => $shop->product_id, 'price_check_id' => $stale, 'asked_at' => now()->subHours(12)]);
+    LargeDropCheck::factory()->create(['shop_id' => $shop->id, 'product_id' => $shop->product_id, 'price_check_id' => $givenUp, 'asked_at' => now()->subDays(6)]);
+    LargeDropCheck::factory()->create(['shop_id' => $shop->id, 'product_id' => $shop->product_id, 'price_check_id' => $waiting, 'asked_at' => now()->subHours(12)]);
 
     expect(array_column(logRows($shop), 'action'))->toBe([
         PriceChangeAction::Rechecking,
         PriceChangeAction::RecheckFailed,
         PriceChangeAction::ReachedAlertPrice,
         PriceChangeAction::Alert,
-        PriceChangeAction::Alert,
+        PriceChangeAction::ConfirmedAlert,
         null,
     ]);
+});
+
+test('says the price held when a confirmed drop sent no alert', function (): void {
+    $shop = priceLogProduct();
+    segment($shop, '9.00', 20, 15);
+    $dip = segment($shop, '4.00', 15);
+    LargeDropCheck::factory()->confirmed()->create(['shop_id' => $shop->id, 'product_id' => $shop->product_id, 'price_check_id' => $dip]);
+
+    expect(logRows($shop)[0]['action'])->toBe(PriceChangeAction::Confirmed);
+});
+
+test('finds the alert price reached after a skipped segment, under the change before it', function (): void {
+    $shop = priceLogProduct();
+    segment($shop, '9.00', 20, 10);
+    segment($shop, '5.00', 10, 5);
+    segment($shop, '5.00', 5, attributes: ['pack_quantity' => '250.00', 'pack_unit' => 'ml']);
+    TargetPriceEvent::factory()->create(['product_id' => $shop->product_id, 'shop_id' => $shop->id, 'fired_at' => now()->subDays(2)]);
+
+    $rows = logRows($shop);
+
+    expect($rows)->toHaveCount(2)
+        ->and($rows[0]['action'])->toBe(PriceChangeAction::ReachedAlertPrice);
 });
 
 test('skips a segment that moved only the best value or the pack size', function (): void {
@@ -153,7 +177,7 @@ test('a Pro owner opens the list and pages it ten at a time', function (): void 
 
     $component = livewire(PriceChanges::class, ['product' => $shop->product()->sole(), 'range' => '90'])
         ->assertDontSee('drogist.test')
-        ->call('toggle')
+        ->toggle('open')
         ->assertViewHas('rows', fn (array $rows): bool => count($rows) === 10)
         ->assertViewHas('hasMore', true)
         ->call('showMore')
@@ -170,7 +194,7 @@ test('a Free owner sees the Pro note and no rows', function (): void {
     $this->actingAs($shop->product()->sole()->user()->sole());
 
     livewire(PriceChanges::class, ['product' => $shop->product()->sole(), 'range' => '90'])
-        ->call('toggle')
+        ->toggle('open')
         ->assertSeeHtml('data-test="price-changes-pro"')
         ->assertViewHas('rows', []);
 });

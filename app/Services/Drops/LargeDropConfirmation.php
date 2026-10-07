@@ -17,7 +17,8 @@ use App\Support\Numeric;
  * mis-extraction looks like, so it alerts only when the shop's previous
  * eligible reading agreed. `DetectDrop::confirmLargeDrop()` applies the rule as
  * a reading lands; the product page asks whether a drop is still waiting.
- * Nothing is stored: the shop's own price-check history is the record.
+ * The verdict stores nothing: it reads only the shop's own price-check
+ * history.
  */
 final readonly class LargeDropConfirmation
 {

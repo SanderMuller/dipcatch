@@ -15,8 +15,8 @@ use Livewire\Component;
 
 /**
  * The lowest-price changes under the product chart, and what DipCatch did
- * about each. Pro only. Collapsed until opened, so a closed list costs no
- * queries.
+ * about each. Pro only. Collapsed until opened, so a closed list does not
+ * build the log.
  */
 final class PriceChanges extends Component
 {
@@ -24,7 +24,6 @@ final class PriceChanges extends Component
 
     public Product $product;
 
-    /** The chart's range, so the list covers what the chart shows. */
     #[Reactive]
     public string $range = '90';
 
@@ -40,11 +39,6 @@ final class PriceChanges extends Component
         $this->range = $range;
     }
 
-    public function toggle(): void
-    {
-        $this->open = ! $this->open;
-    }
-
     public function showMore(): void
     {
         $this->limit += self::PAGE;
@@ -53,7 +47,7 @@ final class PriceChanges extends Component
     public function render(): View
     {
         $owner = $this->product->user;
-        $allowed = $owner instanceof User && $owner->entitlements()->allowsPriceLog();
+        $allowed = $owner instanceof User && $owner->entitlements()->allowsPriceChanges();
         $rows = $this->open && $allowed ? $this->rows($owner) : [];
 
         return view('livewire.products.price-changes', [

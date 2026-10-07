@@ -4,11 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * A large drop DipCatch read once and asked a second reading about, and what
- * that reading said. The price changes list on the product page reads it to
- * show a caught wrong price; the alert decision itself never does.
- */
 return new class extends Migration {
     public function up(): void
     {
@@ -20,9 +15,10 @@ return new class extends Migration {
             $table->decimal('price', 12, 2);
             $table->timestampTz('asked_at');
             $table->string('outcome')->nullable();
+            $table->foreignId('resolved_by_price_check_id')->nullable()->constrained('price_checks')->nullOnDelete();
             $table->timestampTz('resolved_at')->nullable();
 
-            $table->index(['product_id', 'asked_at']);
+            $table->index(['shop_id', 'outcome']);
         });
     }
 

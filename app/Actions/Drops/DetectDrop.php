@@ -2,7 +2,6 @@
 
 namespace App\Actions\Drops;
 
-use App\Enums\LargeDropCheckOutcome;
 use App\Jobs\CheckShopPrice;
 use App\Models\LargeDropCheck;
 use App\Models\PriceCheck;
@@ -137,8 +136,8 @@ final readonly class DetectDrop
      * The decision reads only the shop's own price-check history, so a
      * swallowed or failed confirmation job costs nothing — the next scheduled
      * check is an equally valid second reading. A {@see LargeDropCheck} row
-     * records the question and a confirming answer for the price changes
-     * list; `CheckShopPrice` records a reading that answers no.
+     * records the question for the price changes list; the shop's next
+     * successful reading answers it.
      */
     public function confirmLargeDrop(
         Product $product,
@@ -169,21 +168,9 @@ final readonly class DetectDrop
         // through to an alert on one reading.
         match ($this->confirmation->verdictFor($product, $trigger, $reference)) {
             LargeDropVerdict::NotThisReading => null,
-            LargeDropVerdict::Exempt => $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit),
-            LargeDropVerdict::Confirmed => $this->confirm($product, $trigger, $newPrice, $outcome, $reference->unit),
+            LargeDropVerdict::Exempt, LargeDropVerdict::Confirmed => $this->triggerNotificationAtomically($product, $newPrice, $outcome, $triggeringPriceCheckId, $reference->unit),
             LargeDropVerdict::Awaiting => $this->askForSecondReading($trigger),
         };
-    }
-
-    private function confirm(Product $product, PriceCheck $trigger, string $newPrice, DropOutcome $outcome, ?string $unit): void
-    {
-        LargeDropCheck::query()
-            ->where('shop_id', $trigger->shop_id)
-            ->whereNull('outcome')
-            ->where('price_check_id', '<', $trigger->id)
-            ->update(['outcome' => LargeDropCheckOutcome::Confirmed, 'resolved_at' => now()]);
-
-        $this->triggerNotificationAtomically($product, $newPrice, $outcome, (int) $trigger->id, $unit);
     }
 
     /**

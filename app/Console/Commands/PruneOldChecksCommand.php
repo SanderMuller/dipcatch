@@ -23,8 +23,7 @@ final class PruneOldChecksCommand extends Command
     {
         $this->stampKeptHistory();
 
-        // The daily digest and the price changes list read these, and no
-        // plan keeps history longer.
+        // The daily digest and the price changes list read these two tables.
         $deleted = TargetPriceEvent::query()->where('fired_at', '<', now()->subDays(self::RETAIN_DAYS))->delete();
         $reachedDeleted = is_int($deleted) ? $deleted : 0;
         $deleted = LargeDropCheck::query()->where('asked_at', '<', now()->subDays(self::RETAIN_DAYS))->delete();

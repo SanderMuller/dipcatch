@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Drives specs/price-changes-log.md in the browser: the collapsed "Show price
 // changes" toggle under the product chart opens a list of lowest-price
-// changes, each naming what DipCatch did, a caught wrong price first among
-// them. Checked in light, dark and at 390 px; a failing request shows an error.
+// changes, each naming what DipCatch did, a caught wrong price among them.
+// Checked in light, dark and at 390 px; a failing request shows an error.
 //
 // Needs `php .github/eye-verify/price-changes-seed.php`; tear down with
 // `php .github/eye-verify/price-changes-seed.php --teardown`.
@@ -71,7 +71,6 @@ async function open(page) {
     await page.waitForTimeout(800);
     checker.check('a range change keeps the list open', (await page.locator('#price-changes-list li').count()) === 6);
 
-    // A failing request: the toggle must not leave a silent dead button.
     await page.getByRole('button', { name: 'Hide price changes' }).click();
     await page.waitForTimeout(500);
     await page.route('**/livewire*/update', (route) => route.fulfill({ status: 500, body: 'boom' }));

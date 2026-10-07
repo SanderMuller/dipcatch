@@ -1,5 +1,5 @@
 <div class="mt-6 border-t border-line pt-4" data-test="price-changes">
-    <flux:button variant="subtle" size="sm" inset="left" :icon:trailing="$open ? 'chevron-up' : 'chevron-down'" wire:click="toggle" aria-controls="price-changes-list" :aria-expanded="$open ? 'true' : 'false'">
+    <flux:button variant="subtle" size="sm" inset="left" :icon:trailing="$open ? 'chevron-up' : 'chevron-down'" wire:click="$toggle('open')" aria-controls="price-changes-list" :aria-expanded="$open ? 'true' : 'false'">
         {{ $open ? __('Hide price changes') : __('Show price changes') }}
     </flux:button>
 
@@ -45,7 +45,8 @@
                                 ]) data-test="price-change-action">
                                     <flux:icon :icon="match ($row['action']) {
                                         \App\Charts\PriceChangeAction::WrongPriceCaught => 'shield-check',
-                                        \App\Charts\PriceChangeAction::Alert, \App\Charts\PriceChangeAction::ReachedAlertPrice => 'bell',
+                                        \App\Charts\PriceChangeAction::Alert, \App\Charts\PriceChangeAction::ConfirmedAlert, \App\Charts\PriceChangeAction::ReachedAlertPrice => 'bell',
+                                        \App\Charts\PriceChangeAction::Confirmed => 'check-circle',
                                         default => 'clock',
                                     }" variant="micro" class="mt-0.5 size-4 shrink-0" />
                                     <span>{{ $row['action']->label() }}</span>

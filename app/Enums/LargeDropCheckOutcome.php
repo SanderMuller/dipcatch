@@ -2,12 +2,12 @@
 
 namespace App\Enums;
 
-/** What the second reading of a large drop said. */
+/** What the shop's next successful reading said about a large drop. */
 enum LargeDropCheckOutcome: string
 {
-    /** The shop still charged the low price, so the drop alerted. */
+    /** The shop still charged the low price, or less. */
     case Confirmed = 'confirmed';
 
-    /** The shop read something else, so the drop was a wrong price and nothing alerted. */
+    /** The shop charged more again, or the offer was out of stock. */
     case Rejected = 'rejected';
 }

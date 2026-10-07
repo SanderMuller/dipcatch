@@ -53,8 +53,7 @@ return [
         'notifications_hourly_limit' => env('PLAN_FREE_NOTIFICATIONS_HOURLY_LIMIT'),
         'auto_categories' => false,
         'shop_checks' => false,
-        // The price changes list under the product chart.
-        'price_log' => false,
+        'price_changes' => false,
         // Days of price history the chart will plot. Null is unlimited.
         // Data older than this is still stored — see the retention rule in
         // PruneOldChecksCommand — it simply cannot be read on this plan.
@@ -70,7 +69,7 @@ return [
         'notifications_hourly_limit' => (int) env('PLAN_PRO_NOTIFICATIONS_HOURLY_LIMIT', 200),
         'auto_categories' => true,
         'shop_checks' => true,
-        'price_log' => true,
+        'price_changes' => true,
         'history_days' => null,
     ],
 
