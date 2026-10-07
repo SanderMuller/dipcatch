@@ -23,7 +23,10 @@
     'border border-dashed border-zinc-300 bg-zinc-100/70 dark:border-white/15 dark:bg-zinc-900/40' => ! $product->active,
 ]) }}>
     <div class="relative p-3 pb-0">
-        <x-product-thumb :product="$product" size="aspect-[4/3] w-full" @class(['opacity-40 grayscale' => ! $product->active]) data-fly-source />
+        <x-product-thumb :product="$product"
+                         size="aspect-[4/3] w-full"
+                         @class(['opacity-40 grayscale' => ! $product->active])
+                         data-fly-source />
         {{-- Outside the faded image, so the label itself stays readable. --}}
         @if (! $product->active)
             <span class="absolute top-5 right-5 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium text-zinc-700 shadow-xs ring-1 ring-black/5 backdrop-blur-sm dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-white/10" data-test="paused-label">
