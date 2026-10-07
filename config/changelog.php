@@ -30,6 +30,12 @@ return [
     'entries' => [
         [
             'date' => '2026-10-07',
+            'category' => 'pro',
+            'title' => 'See every price change on a product',
+            'body' => "With Pro, the product page lists each change of the lowest price under the chart, with the shop and what DipCatch did about it.\n\nWhen a price drops sharply, DipCatch checks the shop again before it alerts you. If the low price is gone by then, the list shows that it caught a wrong price.",
+        ],
+        [
+            'date' => '2026-10-07',
             'category' => 'feature',
             'title' => 'Shops by the piece and by weight compared together',
             'body' => "When some shops sell a product by the piece and others by weight, DipCatch now compares them all in one unit. Fish fingers, for example, now compare every shop per kilo.\n\nIf your alert price was set in the other unit, it's converted for you. If it can't be, the product page shows it as paused.",
