@@ -107,7 +107,14 @@ return [
      * They get no landing page: that page says a reader was written for the
      * shop. A host leaves this list when its offers stop reading.
      */
-    'generic_hosts' => [],
+    'generic_hosts' => [
+        // Three or more product pages, all reading, none failing, last read
+        // 2026-10-07 (production export).
+        'deonlinedrogist.nl', 'koopjesdrogisterij.nl', 'boodschaapje.nl',
+        'drogist.nl', 'gezondheidaanhuis.nl', 'gezonderwinkelen.nl',
+        'fitnesscandy.nl', 'musclehouse.nl', 'bodyandshapestore.nl',
+        'supspace.nl', 'bodyandfit.com', 'barebells.nl',
+    ],
 
     /**
      * Shop names as people say them, keyed by host. The homepage shows the
@@ -169,6 +176,18 @@ return [
         'action.com' => 'Action',
         'debijenkorf.nl' => 'de Bijenkorf',
         'lego.com' => 'LEGO',
+        'deonlinedrogist.nl' => 'De Online Drogist',
+        'koopjesdrogisterij.nl' => 'KoopjesDrogisterij',
+        'boodschaapje.nl' => 'Boodschaapje',
+        'drogist.nl' => 'Drogist.nl',
+        'gezondheidaanhuis.nl' => 'Gezondheid aan huis',
+        'gezonderwinkelen.nl' => 'Gezonderwinkelen',
+        'fitnesscandy.nl' => 'Fitness Candy',
+        'musclehouse.nl' => 'MuscleHouse',
+        'bodyandshapestore.nl' => 'Body & Shape Store',
+        'supspace.nl' => 'Supspace',
+        'bodyandfit.com' => 'Body&Fit',
+        'barebells.nl' => 'Barebells',
     ],
 
     /**
