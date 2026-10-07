@@ -148,6 +148,11 @@ final class ConfirmAltPackSize implements ShouldBeUnique, ShouldQueue
                 ...($confirmed === true ? ['alt_pack_since' => now()] : []),
             ])->save();
 
+            // An answer that decides nothing moves nothing the recompute reads.
+            if ($confirmed === null) {
+                return;
+            }
+
             $product->refresh()->recomputeCheapestShop(sizesChanged: true);
             app(DetectUnitPriceTarget::class)($product->refresh());
         });
