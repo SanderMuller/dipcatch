@@ -6,8 +6,8 @@
     $canonical = $locale === 'nl' ? route('pricing', ['lang' => 'nl']) : route('pricing');
     $free = \App\Billing\Entitlements::of(\App\Billing\Plan::Free);
     $pro = \App\Billing\Entitlements::of(\App\Billing\Plan::Pro);
-    $price = \App\Billing\ProPrice::label();
-    $trialDays = \App\Billing\ProPrice::trialDays();
+    // A former subscriber gets no second trial, so the page must not promise one.
+    $trialDays = auth()->user()?->qualifiesForTrial() === false ? 0 : \App\Billing\ProPrice::trialDays();
     $authed = auth()->check();
     $ctaHref = $authed ? url('/app/billing') : route('register');
     // Pro has its own destination: `upgrade` decides between registration,
@@ -64,6 +64,7 @@
                     :yearly-cta="! $isPro && \App\Billing\ProPrice::hasYearly() ? ['href' => route('upgrade', ['interval' => 'yearly']), 'label' => __('Pay yearly instead: :price', ['price' => \App\Billing\ProPrice::yearlyLabel()])] : null"
                     :note="$isPro ? null : $trialNote"
                     :is-pro="$isPro"
+                    :offers-trial="$trialDays > 0"
                 />
 
                 <p class="mt-10 max-w-[64ch] text-sm text-pretty text-zinc-500 dark:text-zinc-400">

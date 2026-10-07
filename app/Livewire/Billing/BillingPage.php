@@ -26,7 +26,6 @@ final class BillingPage extends Component
         return view('livewire.billing.billing-page', [
             'plan' => $this->user()->plan(),
             'entitlements' => $this->entitlements(),
-            'free' => Entitlements::of(Plan::Free),
             'pro' => Entitlements::of(Plan::Pro),
             'productCount' => $this->productCount(),
             'remainingProducts' => app(PlanLimits::class)->remainingProducts($this->user()),

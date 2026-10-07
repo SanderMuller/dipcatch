@@ -162,6 +162,12 @@ final class ProductShow extends Component
     {
         $this->authorize('update', $this->product);
 
+        // Replacing needs a link to replace: without one this would create a
+        // first link, which a free account may no longer do.
+        if ($this->product->share_slug === null) {
+            return;
+        }
+
         // Conditional on the slug we saw rather than merely on "still shared":
         // a stop-then-share elsewhere has already issued a new URL, and
         // rotating would silently revoke it.

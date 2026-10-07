@@ -168,3 +168,14 @@ it('keeps a link a free account made before, which it can still replace or stop'
         ->call('stopSharing')
         ->assertSet('shareMessage', 'Public sharing stopped. The link now returns a 404.');
 });
+
+it('does not let a free account create a first link by replacing one it does not have', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'share_slug' => null]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])->call('rotateShareLink');
+
+    expect($product->fresh()?->share_slug)->toBeNull();
+});

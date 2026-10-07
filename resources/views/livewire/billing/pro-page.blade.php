@@ -4,7 +4,7 @@
     $benefits = [
         ['building-storefront', __('Every shop you like'), __('Compare a product at as many shops as you want. Free stops at :count.', ['count' => $free->maxShopsPerProduct()])],
         ['clock', __('Checked every :hours hours', ['hours' => $pro->recheckIntervalHours()]), __('A short deal reaches you the same day, not the day after.')],
-        ['chart-bar', __('Your full price history'), __('A year of prices, so you can tell a real low from the usual offer.')],
+        ['chart-bar', __('Your full price history'), __(':days days of prices, so you can tell a real low from the usual offer.', ['days' => $pro->historyKeptDays()])],
         ['shield-check', __('Every price change explained'), __('Each move of the lowest price, with its price alerts and the wrong prices DipCatch caught.')],
         ['share', __('Public links'), __('Share a product page with its prices and shops, for a friend or a group chat.')],
         ['magnifying-glass', __('More shops, found for you'), __('DipCatch searches the web for other shops that sell what you follow, by name and by barcode.')],
@@ -90,6 +90,7 @@
             <x-plans.comparison
                 class="mt-8"
                 sticky-top="top-[4.75rem]"
+                :offers-trial="$offersTrial"
                 :pro-cta="['href' => route('billing.checkout'), 'label' => $offersTrial ? __('Try Pro free') : __('Get Pro'), 'short' => $offersTrial ? __('Try free') : __('Get Pro')]"
                 :yearly-cta="$yearlyLabel === null ? null : ['href' => route('billing.checkout', ['interval' => 'yearly']), 'label' => $yearlyLabel]"
             />

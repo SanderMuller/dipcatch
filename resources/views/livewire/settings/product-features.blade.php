@@ -39,7 +39,9 @@
                                 <flux:switch wire:model="{{ $model }}" :aria-label="$title" data-test="{{ $test }}" />
                                 <flux:error name="{{ $model }}" />
                             @else
-                                <a href="{{ route('app.pro') }}" wire:navigate class="text-sm font-medium text-brand hover:text-violet-600 dark:text-blue-300">{{ __('Unlock with Pro') }}</a>
+                                @if (\App\Billing\ProPitch::for(auth()->user())?->canBuy === true)
+                                    <a href="{{ route('app.pro') }}" wire:navigate class="text-sm font-medium text-brand hover:text-violet-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand dark:text-blue-300">{{ __('Unlock with Pro') }}</a>
+                                @endif
                             @endif
                         </div>
                         <ul role="list" class="mt-3 grid gap-3">

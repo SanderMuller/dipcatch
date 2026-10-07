@@ -10,9 +10,11 @@
         <div class="mt-4 rounded-2xl border border-dashed border-line px-6 py-10 text-center">
             <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('No suggested shops right now.') }}</flux:text>
         </div>
+        @if (\App\Services\TypeSafe\TypeSafeClient::configured())
         <x-pro-hint upsell class="mt-3" data-test="suggestions-pro-hint">
             {{ __('Pro finds more shops for you. It searches the web by name and by barcode, reads comparison sites, and checks with AI that each shop sells the same product and pack.') }}
         </x-pro-hint>
+        @endif
     @else
         {{-- How sure the match is: Jev's chance, a barcode, or with the AI
              check on, a name match Jev has not answered yet. --}}

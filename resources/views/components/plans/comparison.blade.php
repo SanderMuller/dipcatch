@@ -13,6 +13,8 @@
     'yearlyCta' => null,
     'note' => null,
     'isPro' => false,
+    /** Whether checkout starts a free trial for whoever reads this; a former subscriber gets none. */
+    'offersTrial' => \App\Billing\ProPrice::trialDays() > 0,
     'stickyTop' => 'top-16',
 ])
 
@@ -105,7 +107,7 @@
                 <th scope="col" class="rounded-t-2xl border-b border-ink/10 bg-soft-yellow/90 px-3 py-4 dark:bg-zinc-900/90 align-top backdrop-blur-sm sm:px-6 dark:border-white/10">
                     <p class="flex flex-wrap items-center gap-2 text-base font-semibold">
                         {{ __('Pro') }}
-                        @if ($onSale && $trialDays > 0 && ! $isPro)
+                        @if ($onSale && $offersTrial && ! $isPro)
                             <span class="rounded-full bg-savings/15 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-savings-strong">{{ __(':days days free', ['days' => $trialDays]) }}</span>
                         @endif
                     </p>

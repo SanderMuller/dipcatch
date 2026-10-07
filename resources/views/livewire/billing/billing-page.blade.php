@@ -108,6 +108,7 @@
             <x-plans.comparison
                 class="mt-6 max-w-none!"
                 sticky-top="top-[4.75rem]"
+                :offers-trial="$offersTrial"
                 :pro-cta="['href' => route('billing.checkout'), 'label' => $offersTrial ? __('Start :days-day trial', ['days' => $trialDays]) : __('Upgrade to Pro'), 'short' => $offersTrial ? __('Try free') : __('Get Pro')]"
                 :yearly-cta="$yearlyLabel === null ? null : ['href' => route('billing.checkout', ['interval' => 'yearly']), 'label' => $offersTrial ? __('Or :price a year after the trial', ['price' => $yearlyLabel]) : __('Or :price a year', ['price' => $yearlyLabel])]"
             />

@@ -31,6 +31,13 @@ return [
         [
             'date' => '2026-10-07',
             'category' => 'pro',
+            'title' => 'Public links are now part of Pro',
+            'body' => "Making a new public link for a product now needs Pro. Links you already shared keep working, and you can still replace or stop them.\n\nThe new Pro page shows everything Pro adds, AI checks included.",
+            'link' => ['route' => 'app.pro', 'label' => 'See what Pro adds'],
+        ],
+        [
+            'date' => '2026-10-07',
+            'category' => 'pro',
             'title' => 'See every price change on a product',
             'body' => "With Pro, the product page lists each change of the lowest price under the chart, with the shop and what DipCatch did about it.\n\nWhen a price drops sharply, DipCatch checks the shop again before it alerts you. If the low price is gone by then, the list shows that it caught a wrong price.",
         ],

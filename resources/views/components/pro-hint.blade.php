@@ -21,7 +21,7 @@
                 <p class="text-base text-pretty text-ink sm:text-sm dark:text-zinc-100">{{ $slot }}</p>
             </div>
             @if ($pitch->canBuy)
-                <a href="{{ route('app.pro') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-linear-to-r from-brand to-violet-500 py-2 pr-3.5 pl-3 text-sm font-medium text-white shadow-sm hover:from-brand/90 hover:to-violet-500/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand @xl:self-auto dark:shadow-none">
+                <a href="{{ route('app.pro') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-linear-to-r from-brand to-violet-500 dark:from-blue-700 dark:to-violet-700 py-2 pr-3.5 pl-3 text-sm font-medium text-white shadow-sm hover:from-brand/90 hover:to-violet-500/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand @xl:self-auto dark:shadow-none">
                     <flux:icon.sparkles variant="micro" class="shrink-0" />
                     {{ $pitch->buttonLabel() }}
                 </a>

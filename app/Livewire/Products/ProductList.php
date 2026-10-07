@@ -577,17 +577,26 @@ final class ProductList extends Component
         }
 
         $limit = $user->entitlements()->maxProducts();
-        $remaining = app(PlanLimits::class)->remainingProducts($user);
 
-        if ($limit === null || $remaining === null || $remaining > self::PRODUCT_LIMIT_HINT_FROM) {
+        if ($limit === null) {
+            return null;
+        }
+
+        $count = Product::query()->where('user_id', $user->id)->count();
+
+        if ($limit - $count > self::PRODUCT_LIMIT_HINT_FROM) {
             return null;
         }
 
         $proLimit = Entitlements::of(Plan::Pro)->maxProducts();
 
-        return $remaining === 0
-            ? __('You follow all :limit products your plan allows. Pro follows up to :pro.', ['limit' => $limit, 'pro' => $proLimit])
-            : __('You follow :count of the :limit products your plan allows. Pro follows up to :pro.', ['count' => $limit - $remaining, 'limit' => $limit, 'pro' => $proLimit]);
+        // An account back on Free can follow more than the plan allows; it
+        // keeps them all, so the hint says so rather than claim the limit.
+        return match (true) {
+            $count > $limit => __('You follow :count products. Your plan allows :limit, so you cannot add more. Pro follows up to :pro.', ['count' => $count, 'limit' => $limit, 'pro' => $proLimit]),
+            $count === $limit => __('You follow all :limit products your plan allows. Pro follows up to :pro.', ['limit' => $limit, 'pro' => $proLimit]),
+            default => __('You follow :count of the :limit products your plan allows. Pro follows up to :pro.', ['count' => $count, 'limit' => $limit, 'pro' => $proLimit]),
+        };
     }
 
     private function canAddProduct(): bool

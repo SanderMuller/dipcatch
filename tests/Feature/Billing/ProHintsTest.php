@@ -5,6 +5,7 @@ use App\Livewire\Products\ProductList;
 use App\Livewire\Products\ProductShow;
 use App\Models\Product;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 
 use function Pest\Livewire\livewire;
 
@@ -70,6 +71,7 @@ it('warns a free account three products before its limit, and at it', function (
     'far from it' => [16, null],
     'three left' => [17, 'You follow 17 of the 20 products your plan allows. Pro follows up to 250.'],
     'at it' => [20, 'You follow all 20 products your plan allows. Pro follows up to 250.'],
+    'over it, after leaving Pro' => [24, 'You follow 24 products. Your plan allows 20, so you cannot add more. Pro follows up to 250.'],
 ]);
 
 it('shows the header Pro link to a free account while Pro can be bought', function (): void {
@@ -107,4 +109,25 @@ it('sells nothing on the Pro page while Pro cannot be bought', function (): void
         ->assertOk()
         ->assertSee('Pro is not on sale yet.')
         ->assertDontSeeHtml('href="' . route('billing.checkout') . '"');
+});
+
+it('offers no Pro button to an account checkout would refuse', function (): void {
+    configureStripe();
+
+    $blocked = User::factory()->create(['billing_blocked_at' => now()]);
+
+    expect(ProPitch::for($blocked))->canBuy->toBeFalse();
+});
+
+it('promises no free trial to a former subscriber', function (): void {
+    configureStripe();
+    config()->set('cashier.trial_days', 14);
+
+    $former = User::factory()->create();
+    subscribeUser($former, 'canceled', endsAt: CarbonImmutable::now()->subMonth());
+
+    expect(ProPitch::for($former))->offersTrial->toBeFalse();
+
+    $this->actingAs($former)->get(route('app.pro'))->assertOk()->assertDontSee('days free');
+    $this->actingAs($former)->get(route('pricing'))->assertOk()->assertDontSee('days free');
 });
