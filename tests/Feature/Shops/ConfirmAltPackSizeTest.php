@@ -259,3 +259,33 @@ it('decides nothing on an answer between a sure yes and a sure no, and does not 
         ->and($shop->product?->refresh()->comparablePacks()->altInDoubt($shop))->toBeTrue();
     Http::assertSentCount(1);
 });
+
+it('confirms from 0.8 and rejects only under 0.2', function (float $chance, ?bool $verdict): void {
+    $shop = doubtfulAltShop();
+    fakeAltAnswer($chance);
+
+    confirmAlt($shop);
+
+    expect($shop->refresh()->alt_pack_confirmed)->toBe($verdict);
+})->with([
+    '0.8 confirms' => [0.8, true],
+    'just under 0.8 decides nothing' => [0.79, null],
+    '0.2 decides nothing' => [0.2, null],
+    'just under 0.2 rejects' => [0.19, false],
+]);
+
+it('forgets the rejections stored under the old cutoff, and keeps confirmations', function (): void {
+    $rejected = doubtfulAltShop();
+    $rejected->forceFill(['alt_pack_confirmed' => false, 'alt_pack_check_key' => 'old'])->save();
+    $confirmed = altCheckShop($rejected->product()->sole(), 'plus.nl', '3.90', '20.00', 'piece', '560.00', 'g');
+    $confirmed->forceFill(['alt_pack_confirmed' => true, 'alt_pack_check_key' => 'kept'])->save();
+
+    (require database_path('migrations/2026_10_07_113701_forget_alt_pack_rejections_from_the_old_cutoff.php'))->up();
+
+    expect($rejected->refresh())
+        ->alt_pack_confirmed->toBeNull()
+        ->alt_pack_check_key->toBeNull()
+        ->and($confirmed->refresh())
+        ->alt_pack_confirmed->toBeTrue()
+        ->alt_pack_check_key->toBe('kept');
+});
