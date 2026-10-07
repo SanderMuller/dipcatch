@@ -90,6 +90,8 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, OwnsHosts, Sh
         $image = NuxtData::value($data, $record, 'image');
         $packageDescription = NuxtData::value($data, $record, 'packageDescription');
 
+        $content = self::content($data, $record);
+
         return ExtractionResult::success(new ShopSnapshot(
             title: is_string($title) && $title !== '' ? $title : 'Unknown',
             imageUrl: is_string($image) && $image !== '' ? $image : null,
@@ -112,7 +114,38 @@ final readonly class PoieszAdapter implements HostSpecificAdapter, OwnsHosts, Sh
             bundleOfferAuthoritative: $statesOffer && (! $onOffer || $label !== null),
             claimedRegularPrice: self::claimedRegularPrice($data, $record, $price),
             claimAuthoritative: array_key_exists('strikeThroughPrice', $record),
+            altPackSizes: $content,
+            // A content field in a unit code this reader does not know says
+            // nothing, and must not clear what an earlier read stored.
+            altPackSizesAuthoritative: array_key_exists('volumeCe', $record) && ($content !== [] || NuxtData::value($data, $record, 'volumeCe') === null),
         ));
+    }
+
+    /**
+     * The pack's content as a number and a unit code apart from the
+     * description: "20.00 Stuks" for Iglo fish fingers, with `volumeCe` 560
+     * and `unitId` GR beside it. Codes verified live on 2026-10-07: GR, ML
+     * and ST. Any other code states nothing.
+     *
+     * @param  list<mixed>  $data
+     * @param  array<string, mixed>  $record
+     * @return list<string>
+     */
+    private static function content(array $data, array $record): array
+    {
+        $volume = NuxtData::value($data, $record, 'volumeCe');
+        $unit = match (NuxtData::value($data, $record, 'unitId')) {
+            'GR' => 'g',
+            'ML' => 'ml',
+            'ST' => 'stuks',
+            default => null,
+        };
+
+        if (! is_numeric($volume) || (float) $volume <= 0 || $unit === null) {
+            return [];
+        }
+
+        return [Numeric::trimmed(number_format((float) $volume, 3, '.', '')) . ' ' . $unit];
     }
 
     private function runningWindow(string $productId, ?string $label): ?PromotionWindow

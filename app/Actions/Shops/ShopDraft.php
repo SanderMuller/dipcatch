@@ -6,6 +6,7 @@ use App\Enums\ConsumerPriceIssue;
 use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
+use App\Support\AltPackSize;
 use App\Support\ImageUrl;
 use App\Support\PackSize;
 use App\Support\ProductTitle;
@@ -61,6 +62,8 @@ final readonly class ShopDraft
         public bool $claimRead = false,
         /** The marketplace seller the page named. */
         public ?string $seller = null,
+        /** The same pack in another unit, as the page states it; see {@see AltPackSize::first()}. */
+        public ?PackSize $altPackSize = null,
     ) {}
 
     /** The claim the first reading keeps: see {@see RegularPriceClaim}. */
@@ -144,6 +147,8 @@ final readonly class ShopDraft
             'stock_signal' => $snapshot->stockSignal,
             'pack_size' => $snapshot->packSize,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
+            'alt_pack_sizes' => $snapshot->altPackSizes,
+            'alt_pack_sizes_authoritative' => $snapshot->altPackSizesAuthoritative,
             'consumer_price_issue' => $snapshot->consumerPriceIssue?->value,
             'consumer_price_note' => $snapshot->consumerPriceNote,
             'variants_on_page' => $snapshot->variantsOnPage,
@@ -203,6 +208,15 @@ final readonly class ShopDraft
             $bundleOffer = null;
         }
 
+        $packSize = PackSize::resolve(
+            self::string($snapshot, 'pack_size'),
+            (bool) ($snapshot['pack_size_authoritative'] ?? false),
+            self::string($snapshot, 'title'),
+        );
+        $altSizes = is_array($snapshot['alt_pack_sizes'] ?? null)
+            ? array_values(array_filter($snapshot['alt_pack_sizes'], is_string(...)))
+            : [];
+
         return new self(
             url: $url,
             adapterKey: $adapterKey,
@@ -215,11 +229,7 @@ final readonly class ShopDraft
             imageUrl: self::string($snapshot, 'image_url'),
             gtin: self::string($snapshot, 'gtin'),
             variantKey: $variantKey,
-            packSize: PackSize::resolve(
-                self::string($snapshot, 'pack_size'),
-                (bool) ($snapshot['pack_size_authoritative'] ?? false),
-                self::string($snapshot, 'title'),
-            ),
+            packSize: $packSize,
             title: self::string($snapshot, 'title'),
             singleItemPrice: $singleItemPrice,
             bundleOffer: $bundleOffer,
@@ -230,6 +240,12 @@ final readonly class ShopDraft
             claimedRegularPrice: self::string($snapshot, 'claimed_regular_price'),
             claimRead: ($snapshot['claim_read'] ?? false) === true,
             seller: self::string($snapshot, 'seller'),
+            altPackSize: $packSize === null ? null : AltPackSize::first(
+                $altSizes,
+                (bool) ($snapshot['alt_pack_sizes_authoritative'] ?? false),
+                $packSize,
+                self::string($snapshot, 'title'),
+            ),
         );
     }
 

@@ -79,13 +79,15 @@ final class PublicProductController extends Controller
     {
         /** @var Product $product */
         $product = Product::query()
-            ->select(['id', 'title', 'image_url', 'currency', 'cheapest_price', 'share_slug', 'price_display'])
+            // `best_value_pack_unit` breaks a tie in the comparison unit, as on
+            // the owner page; without it the two pages could pick different ones.
+            ->select(['id', 'title', 'image_url', 'currency', 'cheapest_price', 'share_slug', 'price_display', 'best_value_pack_unit'])
             ->where('share_slug', $slug)
             ->firstOrFail();
 
         /** @var EloquentCollection<int, Shop> $tracked */
         $tracked = $product->shops()
-            ->select(['id', 'product_id', 'host', 'current_price', 'single_item_price', 'bundle_quantity', 'bundle_total_price', 'promotion_starts_at', 'promotion_ends_at', 'promotion_label', 'current_in_stock', 'currency', 'last_checked_at', 'last_success_at', 'consecutive_failures', 'url', 'pack_quantity', 'pack_unit', 'created_at', 'active', 'health', 'kind', 'consumer_price_issue'])
+            ->select(['id', 'product_id', 'host', 'current_price', 'single_item_price', 'bundle_quantity', 'bundle_total_price', 'promotion_starts_at', 'promotion_ends_at', 'promotion_label', 'current_in_stock', 'currency', 'last_checked_at', 'last_success_at', 'consecutive_failures', 'url', 'pack_quantity', 'pack_unit', 'alt_pack_quantity', 'alt_pack_unit', 'alt_pack_confirmed', 'confirmed_pack_quantity', 'confirmed_pack_unit', 'created_at', 'active', 'health', 'kind', 'consumer_price_issue'])
             ->where('active', true)
             ->where('health', '!=', ShopHealth::Dead->value)
             ->where('currency', $product->currency)

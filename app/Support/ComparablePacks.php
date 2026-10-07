@@ -3,7 +3,7 @@
 namespace App\Support;
 
 use App\Enums\PackExclusion;
-use App\Models\Product;
+use App\Jobs\ConfirmAltPackSize;
 use App\Models\Shop;
 use Illuminate\Support\Collection;
 
@@ -16,21 +16,21 @@ use Illuminate\Support\Collection;
  * size only when every stating sibling agrees, and the plausibility guard needs
  * the field's median to test against.
  *
- * There is no third, "derived" provenance. Expressing a counted pack in weight
- * would need an item size from that shop's own page, and the write path has
- * already spent that evidence — {@see PackSize::resolve()} runs
- * {@see StatedPackSize::wholePack()} against the title, so a page reading
- * `12 x 55 g` is stored as 660 g. A row still saying `12 piece` is one whose
- * page stated no item size, and it is excluded rather than converted. Dividing a
- * sibling's weight by that count and multiplying it back returns the sibling's
- * weight: the count contributes nothing, and the arithmetic hides an assumption
- * that a 6-pack listed beside 12-packs makes catastrophically wrong.
+ * A shop can state its pack twice, in two units — AH lists Iglo fish fingers
+ * as 20 pieces and as 560 g — and the second size is kept apart from the pack
+ * columns ({@see AltPackSize}). Either one is the shop's own word, so a shop
+ * compared on its second size is `Stated`, not derived. What is never done is
+ * borrowing: a row that says only `12 piece` is not given a weight by dividing
+ * a sibling's grams by its count, because that returns the sibling's weight
+ * and hides an assumption a 6-pack listed beside 12-packs makes
+ * catastrophically wrong.
  */
 final readonly class ComparablePacks
 {
     /**
-     * How far from the stating shops' median unit price an inherited size may
-     * land before it reads as a wrong size rather than a real offer.
+     * How far from the stating shops' median unit price an inherited size, or
+     * a shop's second size, may land before it reads as a wrong size rather
+     * than a real offer.
      *
      * Tested in both directions. It used to refuse only the implausibly cheap,
      * reasoning that a row stamped too expensive loses nothing a reader acts on
@@ -47,11 +47,14 @@ final readonly class ComparablePacks
 
     /**
      * @param  array<string, ComparablePack>  $packs  keyed by shop id
+     * @param  array<string, true>  $altsInDoubt  keyed by shop id
      */
     private function __construct(
         private ?string $unit,
         private array $packs,
+        private ItemSizes $itemSizes,
         private ?PackSize $agreed = null,
+        private array $altsInDoubt = [],
     ) {}
 
     /**
@@ -68,31 +71,41 @@ final readonly class ComparablePacks
      *
      * `$voters` must be a subset of `$shops`. The guarantee that a resolved
      * unit always has a shop that can win in it rests on it: the unit is the
-     * majority among the voters that state a size, so one of them is `Stated`
-     * and winnable — but only if that voter is also a shop this resolver
-     * answers for.
+     * one most voters have a size in — their own, or a second size that holds
+     * — so one of them is `Stated` and winnable, but only if that voter is also
+     * a shop this resolver answers for. `$currentUnit`, the unit the product
+     * compares in now, breaks a tie.
      *
      * @param  Collection<int, Shop>  $shops
      * @param  Collection<int, Shop>|null  $voters  a subset of `$shops`; defaults to all of them
      */
-    public static function of(Collection $shops, string $currency, ?Collection $voters = null): self
+    public static function of(Collection $shops, string $currency, ?Collection $voters = null, ?string $currentUnit = null): self
     {
-        $voters ??= $shops;
+        $voters = ($voters ?? $shops)->filter(fn (Shop $shop): bool => $shop->currency === $currency);
 
-        $stated = $voters
-            ->filter(fn (Shop $shop): bool => $shop->currency === $currency)
-            ->map(fn (Shop $shop): ?PackSize => self::statedSize($shop))
-            ->filter();
+        $primaries = $voters->map(fn (Shop $shop): ?PackSize => self::statedSize($shop))->filter();
+        $alts = $voters->map(fn (Shop $shop): ?PackSize => self::usableAlt($shop))->filter();
 
-        $unit = self::majorityUnit($stated);
+        $vote = UnitVote::tally(
+            $voters,
+            $primaries,
+            $alts,
+            fn (Collection $inUnit): ?float => self::medianUnitPrice($voters, $inUnit),
+            self::altHolds(...),
+        );
+        $medians = $vote->medians;
+        $altsInDoubt = $vote->altsInDoubt;
+        $unit = $vote->winner($primaries, $alts->isNotEmpty() ? $currentUnit : null);
+
+        $itemSizes = ItemSizes::of($voters, fn (Shop $shop, PackSize $alt): bool => self::altHolds($shop, $alt, $medians[$alt->unit] ?? null));
 
         if ($unit === null) {
-            return new self(unit: null, packs: []);
+            return new self(unit: null, packs: [], itemSizes: $itemSizes, altsInDoubt: $altsInDoubt);
         }
 
-        $inUnit = $stated->filter(fn (PackSize $size): bool => $size->unit === $unit);
-        $agreed = self::agreedSize($inUnit);
-        $median = self::medianUnitPrice($voters, $inUnit);
+        $median = $medians[$unit] ?? null;
+        $used = $voters->map(fn (Shop $shop): ?PackSize => self::sizeIn($shop, $unit, $median))->filter();
+        $agreed = self::agreedSize($used);
 
         $packs = [];
 
@@ -100,7 +113,68 @@ final readonly class ComparablePacks
             $packs[(string) $shop->id] = self::resolveOne($shop, $currency, $unit, $agreed, $median);
         }
 
-        return new self($unit, $packs, $agreed);
+        return new self($unit, $packs, $itemSizes, $agreed, $altsInDoubt);
+    }
+
+    /**
+     * How much one piece weighs or holds, in g or ml, as the shops that state
+     * both a count and a weight or volume agree on it. See {@see ItemSizes}.
+     */
+    public function itemSizeBetween(string $from, string $to): ?float
+    {
+        return $this->itemSizes->between($from, $to);
+    }
+
+    /**
+     * The shops whose item size sits outside the others' and that Jev has not
+     * answered about. See {@see ItemSizes}.
+     *
+     * @return list<string> shop ids
+     */
+    public function itemSizeOutliers(string $from, string $to): array
+    {
+        return $this->itemSizes->outliers($from, $to);
+    }
+
+    /** Whether this shop's second size failed the plausibility guard in its own unit, with no answer from Jev yet. */
+    public function altInDoubt(Shop $shop): bool
+    {
+        return isset($this->altsInDoubt[(string) $shop->id]);
+    }
+
+    /**
+     * The shop's size in this unit, its own primary first, then a second size
+     * that holds. Null when neither is in the unit.
+     */
+    private static function sizeIn(Shop $shop, string $unit, ?float $median): ?PackSize
+    {
+        $primary = self::statedSize($shop);
+
+        if ($primary instanceof PackSize && $primary->unit === $unit) {
+            return $primary;
+        }
+
+        $alt = self::usableAlt($shop);
+
+        return $alt instanceof PackSize && $alt->unit === $unit && self::altHolds($shop, $alt, $median) ? $alt : null;
+    }
+
+    /** The second size, unless Jev rejected it or it repeats the primary's unit. */
+    private static function usableAlt(Shop $shop): ?PackSize
+    {
+        $alt = $shop->altPackSize();
+
+        if (! $alt instanceof PackSize || $shop->alt_pack_confirmed === false || $alt->unit === self::statedSize($shop)?->unit) {
+            return null;
+        }
+
+        return $alt;
+    }
+
+    /** A second size holds when Jev confirmed it, or when it lands inside the field's band. */
+    private static function altHolds(Shop $shop, PackSize $alt, ?float $median): bool
+    {
+        return $shop->alt_pack_confirmed === true || ! self::isImplausible($shop, $alt, $median);
     }
 
     /** The size the shops that state one agree on, which a silent page borrows. */
@@ -258,6 +332,15 @@ final readonly class ComparablePacks
                 return ComparablePack::stated($size);
             }
 
+            // The same pack, stated by the shop itself in this unit.
+            $alt = self::usableAlt($shop);
+
+            if ($alt instanceof PackSize && $alt->unit === $unit) {
+                return self::altHolds($shop, $alt, $median)
+                    ? ComparablePack::stated($alt)
+                    : ComparablePack::excluded(PackExclusion::SizeImplausible);
+            }
+
             return ComparablePack::excluded($size->unit === 'piece'
                 ? PackExclusion::SoldByThePiece
                 : PackExclusion::UnitDoesNotConvert);
@@ -281,21 +364,22 @@ final readonly class ComparablePacks
     }
 
     /**
-     * An inherited size that puts this shop far from every shop that stated its
-     * own is evidence the size is wrong, whichever way it lands.
+     * A size that puts this shop far from every shop that leads with its own
+     * is evidence the size is wrong, whichever way it lands.
      *
-     * The size is a guess borrowed from the siblings, so a figure far off the
-     * field says the guess does not hold rather than that the shop is unusual.
-     * "Pack size unknown" is the honest answer, and it costs nothing a reader
-     * acts on: the row could not win on an inferred size either way.
+     * For an inherited size that is a guess borrowed from the siblings not
+     * holding; the row could not win on it either way. A shop's second size
+     * is its own word but a less tended field, and it can win once it holds,
+     * so the guard matters more there, not less: such a size stays out until
+     * Jev confirms it ({@see ConfirmAltPackSize}).
      */
-    private static function isImplausible(Shop $shop, PackSize $agreed, ?float $median): bool
+    private static function isImplausible(Shop $shop, PackSize $size, ?float $median): bool
     {
         if ($median === null || $median <= 0.0) {
             return false;
         }
 
-        $implied = $agreed->unitPriceValueFor((string) ($shop->current_price ?? ''));
+        $implied = $size->unitPriceValueFor((string) ($shop->current_price ?? ''));
 
         return $implied !== null
             && ($implied < $median * self::IMPLAUSIBLE_RATIO || $implied > $median / self::IMPLAUSIBLE_RATIO);
@@ -311,32 +395,8 @@ final readonly class ComparablePacks
     }
 
     /**
-     * The unit most of the product's stating shops use. An even split falls back
-     * to the alphabetically first, so one product always answers the same way —
-     * the same determinism rule {@see Product::unitPriceUnit()} uses.
-     *
-     * @param  Collection<int, PackSize>  $stated
-     */
-    private static function majorityUnit(Collection $stated): ?string
-    {
-        $counts = [];
-
-        foreach ($stated as $size) {
-            $counts[$size->unit] = ($counts[$size->unit] ?? 0) + 1;
-        }
-
-        if ($counts === []) {
-            return null;
-        }
-
-        ksort($counts);
-        arsort($counts);
-
-        return array_key_first($counts);
-    }
-
-    /**
-     * The one size every stating shop agrees on, or null when they disagree.
+     * The one size every shop compared in the unit agrees on, or null when
+     * they disagree.
      * Disagreement is the signal that these shops genuinely sell different
      * packs, which per-unit comparison already handles without inventing
      * anything.
@@ -355,8 +415,9 @@ final readonly class ComparablePacks
     }
 
     /**
-     * Median unit price across the shops that stated a size in the comparison
-     * unit — the field an inherited size is tested against.
+     * Median unit price across the given sizes, which are the shops leading
+     * with a unit, or their second sizes when none does — the field an
+     * inherited or second size is tested against.
      *
      * @param  Collection<int, Shop>  $shops
      * @param  Collection<int, PackSize>  $inUnit  keyed by the same shop keys

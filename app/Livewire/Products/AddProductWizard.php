@@ -300,6 +300,8 @@ final class AddProductWizard extends Component
 
     public function useSuggestion(): void
     {
+        // The suggestion is in today's unit, so the field has to be too.
+        $this->rebaseUnitPriceTarget($this->product());
         $target = $this->alertSuggestion($this->product())->unitTarget;
 
         if ($target === null) {
@@ -442,6 +444,10 @@ final class AddProductWizard extends Component
     public function render(): View
     {
         $product = $this->productId === '' ? null : $this->product();
+
+        // The pack prices beside the per-unit field follow the shops added in
+        // this wizard, so the field follows them into a new unit too.
+        $this->rebaseUnitPriceTarget($product);
 
         return view('livewire.products.add-product-wizard', [
             'product' => $product,

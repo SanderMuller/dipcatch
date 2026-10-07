@@ -30,19 +30,30 @@ final readonly class AlertRules
         $packs = $product->comparablePacks();
         $unitLabel = UnitWord::labelFor($packs->unit());
 
+        $effective = $product->effectiveUnitPriceTarget();
+
         // Without a unit the figure would read as a pack price.
-        if ($product->unit_price_target !== null && $unitLabel !== '') {
+        if ($effective !== null && $unitLabel !== '') {
             $rule = [
-                'value' => MoneyFormatter::unitPrice((string) $product->unit_price_target, $product->currency) . ' ' . $unitLabel,
+                'value' => MoneyFormatter::unitPrice($effective, $product->currency) . ' ' . $unitLabel,
                 'below' => true,
             ];
             $size = $packs->sharedSize();
 
             if ($size !== null) {
-                $rule['pack'] = PackLine::forUnitPrice((string) $product->unit_price_target, (string) $product->currency, $size);
+                $rule['pack'] = PackLine::forUnitPrice(Numeric::str($effective), (string) $product->currency, $size);
             }
 
             $rules[] = $rule;
+        } elseif ($product->isUnitTargetSuspended()) {
+            // In the unit it was set in, and named as not firing: read in
+            // today's unit it would be a different price altogether.
+            $rules[] = [
+                'value' => __(':target (paused: this product now compares in another unit)', [
+                    'target' => MoneyFormatter::unitPrice((string) $product->unit_price_target, $product->currency) . ' ' . UnitWord::labelFor($product->unit_price_target_unit),
+                ]),
+                'below' => false,
+            ];
         }
 
         // An empty drop threshold is not off: the drop check falls back to a

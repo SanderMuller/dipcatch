@@ -19,6 +19,7 @@ use App\Models\Shop;
 use App\PriceAdapters\VariantCandidate;
 use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\TypeSafe\ShopMatchCheck;
+use App\Support\AltPackSize;
 use App\Support\PackSize;
 use App\Support\UrlNormalizer;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -209,6 +210,23 @@ final class AddShopTool extends Tool
         }
 
         if ($existing->first() === $drafted->quantity . '|' . $drafted->unit) {
+            return null;
+        }
+
+        // A shop that states the same pack twice — 20 pieces and 560 g — sells
+        // the 560 g this page offers, whichever size it leads with.
+        if ($product->shops->contains(fn (Shop $shop): bool => $shop->altPackSize()?->isSameSizeAs($drafted) === true)) {
+            return null;
+        }
+
+        $draftedAlt = AltPackSize::first(
+            is_array($snapshot['alt_pack_sizes'] ?? null) ? array_values(array_filter($snapshot['alt_pack_sizes'], is_string(...))) : [],
+            (bool) ($snapshot['alt_pack_sizes_authoritative'] ?? false),
+            $drafted,
+            is_string($snapshot['title'] ?? null) ? $snapshot['title'] : null,
+        );
+
+        if ($draftedAlt !== null && $existing->first() === $draftedAlt->quantity . '|' . $draftedAlt->unit) {
             return null;
         }
 

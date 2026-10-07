@@ -7,7 +7,6 @@ use App\Enums\DepthSource;
 use App\Enums\ProductCategory;
 use App\Enums\PromotionDepthBand;
 use App\Models\Product;
-use App\Models\Shop;
 use App\Support\Numeric;
 use App\Support\UnitTargetGuide;
 
@@ -105,7 +104,7 @@ final readonly class AlertSuggestion
             promotionNowHost: $deepest['host'] ?? null,
             promotionNowDepth: $deepest['depth'] ?? 0,
             cappedByLaw: $target !== null && $legalCap !== null && $prior > $legalCap,
-            alreadyMet: $target !== null && self::meets($product->bestValueShop(), $target['unit']),
+            alreadyMet: $target !== null && self::meets($product, $target['unit']),
             halfwayToOffer: $target !== null && $halfway && ! ($legalCap !== null && $prior > $legalCap),
             cheapOutliers: $target === null ? [] : $outliers,
         );
@@ -164,9 +163,12 @@ final readonly class AlertSuggestion
     }
 
     /** The detector's own comparison, so `alreadyMet` and the alert agree. */
-    private static function meets(?Shop $shop, string $target): bool
+    private static function meets(Product $product, string $target): bool
     {
-        $value = $shop?->unitPriceValue();
+        $shop = $product->bestValueShop();
+        // On the size the resolver compares the shop by, which can be the
+        // second size it states rather than its pack columns.
+        $value = $shop === null ? null : $product->comparablePacks()->unitPriceValueOf($shop);
 
         return $value !== null && DetectUnitPriceTarget::meets($value, $target);
     }

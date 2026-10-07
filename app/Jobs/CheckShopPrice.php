@@ -22,6 +22,7 @@ use App\Services\PriceSources\ApiPriceSources;
 use App\Services\ShopFetcher\Exceptions\FetchException;
 use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 use App\Services\ShopFetcher\ShopFetcher;
+use App\Support\AltPackSize;
 use App\Support\ImageUrl;
 use App\Support\Iso4217;
 use App\Support\MovedShopUrl;
@@ -270,7 +271,9 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         // One transaction spanning the price_check insert, offer state update,
         // AND the product recompute (offer → product lock order). If any step
         // fails everything rolls back together — no stale `cheapest_*` window.
-        DB::transaction(function () use ($shop, $outcome, $now): void {
+        $pairKey = null;
+
+        DB::transaction(function () use ($shop, $outcome, $now, &$pairKey): void {
             $locked = Shop::query()->lockForUpdate()->find($shop->id);
             // Gone, or repointed or kept as a link while the page was fetched:
             // drop this reading.
@@ -375,6 +378,8 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                     $updates['pack_unit'] = $packSize?->unit;
                 }
 
+                $updates += AltPackSize::updates($locked, $packSize, $snapshot);
+
                 $updates += $pricing->promotionUpdates;
             } else {
                 $updates['last_error'] = $outcome->error;
@@ -397,6 +402,8 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
             $locked->forceFill($updates)->save();
 
+            $pairKey = AltPackSize::afterWrite($locked, $now);
+
             $locked->product?->recomputeCheapestShop((int) $check->id);
 
             // Separate from the drop engine on purpose: a rival shop cutting
@@ -413,6 +420,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         });
 
         ConfirmPackSize::afterRead((string) $shop->id, (string) $shop->url, $outcome);
+        ConfirmAltPackSize::afterRead((string) $shop->id, (string) $shop->url, $outcome, $pairKey);
     }
 
     /**

@@ -14,6 +14,8 @@ use App\Support\ComparablePacks;
 use App\Support\ImageUrl;
 use App\Support\Numeric;
 use App\Support\PackSize;
+use App\Support\UnitTargetConversion;
+use App\Support\UnitVote;
 use Carbon\CarbonImmutable;
 use Closure;
 use Database\Factories\ProductFactory;
@@ -38,6 +40,10 @@ use Illuminate\Support\Facades\DB;
  * @property CarbonImmutable|null $history_kept_from
  * @property CarbonImmutable|null $listed_at
  * @property CarbonImmutable|null $list_checked_at
+ * @property string|null $unit_price_target The per-unit target as the owner set it, in {@see $unit_price_target_unit}.
+ * @property string|null $unit_price_target_unit `g`, `ml` or `piece`; null for a target set before units were recorded, or while the product had no unit.
+ * @property string|null $unit_price_target_effective The target in today's comparison unit; null while it cannot be expressed in it.
+ * @property string|null $unit_price_notified_unit The unit `unit_price_notified` is money in.
  * @property-read PriceDropEvent|null $latestPriceDropEvent
  */
 #[Unguarded]
@@ -59,8 +65,13 @@ final class Product extends Model
                 $product->target_price_notified_at = null;
             }
 
-            if ($product->isDirty('unit_price_target')) {
+            // A target given a unit for the first time keeps its latch: that
+            // only records what the number already meant. Moving it from one
+            // unit to another is a new target, even at the same number.
+            if ($product->isDirty('unit_price_target')
+                || ($product->isDirty('unit_price_target_unit') && $product->getOriginal('unit_price_target_unit') !== null)) {
                 $product->unit_price_notified = null;
+                $product->unit_price_notified_unit = null;
                 $product->unit_price_notified_at = null;
             }
         });
@@ -83,6 +94,7 @@ final class Product extends Model
             // Four, unlike the pack-money columns above: a price per piece is
             // often under a cent's worth of resolution. See PackSize.
             'unit_price_target' => 'decimal:4',
+            'unit_price_target_effective' => 'decimal:4',
             'unit_price_notified' => 'decimal:4',
             'unit_price_notified_at' => 'datetime',
             'last_notified_price' => 'decimal:2',
@@ -272,9 +284,11 @@ final class Product extends Model
     public const string AT_TARGET_SQL = <<<'SQL'
         active = TRUE AND (
             (target_price IS NOT NULL AND cheapest_price IS NOT NULL AND cheapest_price <= target_price)
-            OR (unit_price_target IS NOT NULL AND best_value_price > 0 AND best_value_pack_quantity > 0
+            OR ((CASE WHEN unit_price_target_unit IS NULL THEN unit_price_target ELSE unit_price_target_effective END) IS NOT NULL
+                AND best_value_price > 0 AND best_value_pack_quantity > 0
                 AND ROUND(best_value_price * 1.0 / best_value_pack_quantity
-                    * (CASE best_value_pack_unit WHEN 'piece' THEN 1 ELSE 1000 END), 6) <= unit_price_target)
+                    * (CASE best_value_pack_unit WHEN 'piece' THEN 1 ELSE 1000 END), 6)
+                    <= (CASE WHEN unit_price_target_unit IS NULL THEN unit_price_target ELSE unit_price_target_effective END))
         )
         SQL;
 
@@ -370,7 +384,7 @@ final class Product extends Model
     public function hasActiveTarget(): bool
     {
         return $this->target_price !== null
-            || ($this->unit_price_target !== null && $this->bestValueShop()?->unitPrice() !== null);
+            || ($this->effectiveUnitPriceTarget() !== null && $this->bestValueUnitPriceValue() !== null);
     }
 
     /**
@@ -385,13 +399,53 @@ final class Product extends Model
             return true;
         }
 
-        if ($this->unit_price_target === null) {
+        $target = $this->effectiveUnitPriceTarget();
+
+        if ($target === null) {
             return false;
         }
 
-        $unitValue = $this->bestValueShop()?->unitPriceValue();
+        $unitValue = $this->bestValueUnitPriceValue();
 
-        return $unitValue !== null && DetectUnitPriceTarget::meets($unitValue, (string) $this->unit_price_target);
+        return $unitValue !== null && DetectUnitPriceTarget::meets($unitValue, $target);
+    }
+
+    /** The best value's price per unit, on the size the resolver compares it by. */
+    private function bestValueUnitPriceValue(): ?float
+    {
+        $packs = $this->comparablePacks();
+        $shop = self::bestValueAmong($this->eligibleShops(), $packs);
+
+        return $shop === null ? null : $packs->unitPriceValueOf($shop);
+    }
+
+    /**
+     * The per-unit target in the unit the product compares in today — the
+     * figure every comparison reads. A target with no recorded unit means
+     * today's unit, as it always did; one that cannot be expressed in today's
+     * unit answers null and does not fire.
+     */
+    public function effectiveUnitPriceTarget(): ?string
+    {
+        if ($this->unit_price_target === null) {
+            return null;
+        }
+
+        if ($this->unit_price_target_unit === null) {
+            return (string) $this->unit_price_target;
+        }
+
+        // Live, not the stored column: that one is as of the last recompute,
+        // and a product whose shops have all sold out can resolve another
+        // unit since. Only SQL reads the stored figure, and a product with no
+        // winner is at no target there either way.
+        return UnitTargetConversion::effective((string) $this->unit_price_target, $this->unit_price_target_unit, $this->comparablePacks());
+    }
+
+    /** True while the owner's per-unit target cannot be expressed in today's comparison unit. */
+    public function isUnitTargetSuspended(): bool
+    {
+        return $this->unit_price_target !== null && $this->effectiveUnitPriceTarget() === null;
     }
 
     public function isPubliclyShared(): bool
@@ -449,45 +503,9 @@ final class Product extends Model
      * always the lowest price: a 370 g bag at EUR 1.99 beats a 200 g bag at
      * EUR 1.69 by a third per kilo.
      *
-     * Only shops that state a pack size can take part, and only those
-     * sharing one unit: EUR/kg and EUR/piece are not comparable numbers.
-     * When the sized shops disagree on the unit, the largest group wins.
+     * Only shops with a size in the product's comparison unit take part:
+     * EUR/kg and EUR/piece are not comparable numbers. See {@see UnitVote}.
      */
-    /**
-     * The unit the unit-price comparison runs in — `g`, `ml` or `piece` — or
-     * null while no shop has read a pack size.
-     *
-     * Shops can disagree: one reporting pieces while the rest report grams is
-     * ordinary, and {@see bestValueShop()} resolves it by comparing only
-     * inside the largest group. This answers with that same group's unit, so
-     * a screen can name the unit the alert will actually use instead of
-     * offering the reader a choice it does not have.
-     *
-     * Not filtered by stock or health, unlike best value: a label describes
-     * the product, and it should not change because a shop went out of stock.
-     */
-    public function unitPriceUnit(): ?string
-    {
-        $counts = [];
-
-        foreach ($this->shops as $shop) {
-            if (is_string($shop->pack_unit) && $shop->pack_unit !== '') {
-                $counts[$shop->pack_unit] = ($counts[$shop->pack_unit] ?? 0) + 1;
-            }
-        }
-
-        if ($counts === []) {
-            return null;
-        }
-
-        // Most shops win; an even split falls back to the alphabetically
-        // first unit, so the same product always answers the same way.
-        ksort($counts);
-        arsort($counts);
-
-        return array_key_first($counts);
-    }
-
     /**
      * The resolver for this product's shops: which of them can be compared per
      * unit, on what size, and why the others cannot.
@@ -497,7 +515,7 @@ final class Product extends Model
         // Every shop gets an answer; only the ones still being tracked get a
         // vote on what this product is measured in. See
         // {@see ComparablePacks::of()}.
-        return ComparablePacks::of($this->shops, (string) $this->currency, $this->votingShops());
+        return ComparablePacks::of($this->shops, (string) $this->currency, $this->votingShops(), $this->best_value_pack_unit);
     }
 
     /**
@@ -721,6 +739,8 @@ final class Product extends Model
                 ? null
                 : (string) $bestValue->current_price;
 
+            self::stampUnitBasis($locked, $packs);
+
             $locked->forceFill([
                 'cheapest_shop_id' => $newOfferId,
                 'cheapest_price' => $newPrice,
@@ -728,6 +748,11 @@ final class Product extends Model
                 'best_value_price' => $bestValuePrice,
                 'best_value_pack_quantity' => $bestValueSize?->quantity,
                 'best_value_pack_unit' => $bestValueSize?->unit,
+                'unit_price_target_effective' => UnitTargetConversion::effective(
+                    $locked->unit_price_target === null ? null : (string) $locked->unit_price_target,
+                    $locked->unit_price_target_unit,
+                    $packs,
+                ),
             ])->save();
 
             // The reference was computed before the lock, and a sibling check on
@@ -820,6 +845,35 @@ final class Product extends Model
         });
 
         $this->refresh();
+    }
+
+    /**
+     * Records the unit of a target or latch from before units were recorded:
+     * the unit the product compared in until this recompute, which is the one
+     * it was read in, or the unit it compares in now when it had none. Never
+     * the unit this recompute just moved to: a €0.25 target read per piece
+     * would become €0.25 a kilo.
+     */
+    private static function stampUnitBasis(self $locked, ComparablePacks $packs): void
+    {
+        $unit = $locked->best_value_pack_unit ?? $packs->unit();
+
+        if ($unit === null) {
+            return;
+        }
+
+        $stamps = array_filter([
+            'unit_price_target_unit' => $locked->unit_price_target !== null && $locked->unit_price_target_unit === null,
+            'unit_price_notified_unit' => $locked->unit_price_notified !== null && $locked->unit_price_notified_unit === null,
+        ]);
+
+        if ($stamps === []) {
+            return;
+        }
+
+        $columns = array_fill_keys(array_keys($stamps), $unit);
+        self::query()->whereKey($locked->id)->update($columns);
+        $locked->forceFill($columns)->syncOriginalAttributes(array_keys($columns));
     }
 
     /**

@@ -31,12 +31,13 @@ final class ReferenceEpoch
      * briefly sizeless whenever a shop falls out of stock, and ending the epoch
      * there would collapse the reference to its fallback every time.
      *
-     * A shop that wins once Jev confirmed its pack size starts one too: its
-     * price was there all along, unseen, and the shops before it are no
-     * history it fell from.
+     * A shop that wins once it joined the comparison — on a pack size Jev
+     * confirmed, or on the second size it states — starts one too: its price
+     * was there all along, unseen, and the shops before it are no history it
+     * fell from.
      *
      * @param  list<ProductCheapestHistory>  $segments  oldest first
-     * @param  array<string, CarbonInterface>  $joinedAt  when each shop with a confirmed size joined the comparison
+     * @param  array<string, CarbonInterface>  $joinedAt  when each shop joined the comparison on a confirmed or second size
      * @return list<ProductCheapestHistory>
      */
     public static function currentEpoch(array $segments, string $unit, array $joinedAt = []): array
@@ -69,7 +70,7 @@ final class ReferenceEpoch
     }
 
     /**
-     * The first segment a shop wins after its pack size was confirmed. Only
+     * The first segment a shop wins after it joined the comparison. Only
      * the first: winning again later is an ordinary change of winner.
      *
      * @param  array<string, CarbonInterface>  $joinedAt

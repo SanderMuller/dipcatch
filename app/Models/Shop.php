@@ -62,6 +62,11 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $confirmed_pack_unit
  * @property string|null $pack_check_key The page and size Jev was last asked about.
  * @property CarbonInterface|null $pack_checked_at
+ * @property string|null $alt_pack_quantity A second size the page states for the same pack, in another unit than `pack_unit`.
+ * @property string|null $alt_pack_unit
+ * @property string|null $alt_pack_check_key The page and the two sizes Jev was last asked about.
+ * @property bool|null $alt_pack_confirmed Jev's answer about the second size: null not asked, true confirmed, false rejected.
+ * @property CarbonInterface|null $alt_pack_since When the second size was stored or confirmed.
  */
 #[Unguarded]
 final class Shop extends Model
@@ -84,6 +89,9 @@ final class Shop extends Model
             'pack_quantity' => 'decimal:2',
             'confirmed_pack_quantity' => 'decimal:2',
             'pack_checked_at' => 'datetime',
+            'alt_pack_quantity' => 'decimal:2',
+            'alt_pack_confirmed' => 'boolean',
+            'alt_pack_since' => 'datetime',
             'conditional_price' => 'decimal:2',
             'conditional_starts_at' => 'datetime',
             'conditional_ends_at' => 'datetime',
@@ -161,6 +169,11 @@ final class Shop extends Model
             'confirmed_pack_unit' => null,
             'pack_check_key' => null,
             'pack_checked_at' => null,
+            'alt_pack_quantity' => null,
+            'alt_pack_unit' => null,
+            'alt_pack_check_key' => null,
+            'alt_pack_confirmed' => null,
+            'alt_pack_since' => null,
             'gtin' => null,
             // Until the next successful check this offer has no known price,
             // and a leftover one keeps it eligible for
@@ -328,12 +341,6 @@ final class Shop extends Model
     public function unitPriceLabel(): ?string
     {
         return $this->unitPrice() === null ? null : $this->comparableSize()?->label();
-    }
-
-    /** `/kg`, `/l` or `/piece` for this shop's pack, whatever its price. */
-    public function packUnitLabel(): ?string
-    {
-        return $this->comparableSize()?->label();
     }
 
     /**
@@ -527,6 +534,16 @@ final class Shop extends Model
         }
 
         return PackSize::of((float) $this->pack_quantity, $this->pack_unit);
+    }
+
+    /** The second size this page states for the same pack, in another unit. */
+    public function altPackSize(): ?PackSize
+    {
+        if ($this->alt_pack_quantity === null || $this->alt_pack_unit === null) {
+            return null;
+        }
+
+        return PackSize::of((float) $this->alt_pack_quantity, $this->alt_pack_unit);
     }
 
     /** A size Jev confirmed for this page, which states none itself; see {@see ConfirmPackSize}. */

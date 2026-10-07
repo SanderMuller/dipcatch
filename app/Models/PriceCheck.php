@@ -110,11 +110,24 @@ final class PriceCheck extends Model
 
     /**
      * Readings from before Jev confirmed the shop's pack size do not count:
-     * the shop only joined the comparison then, as a new shop does.
+     * the shop only joined the comparison then, as a new shop does. The same
+     * for a shop that competes on the second size it states, from when that
+     * size was stored or confirmed — but not for a shop that competes on its
+     * own pack columns.
      */
     private function hasEarlierReadingAtItsOwnShop(): bool
     {
         $joinedAt = $this->shop?->confirmed_pack_quantity === null ? null : $this->shop->pack_checked_at;
+        $comparesIn = $this->shop?->product?->best_value_pack_unit;
+        $altSince = $this->shop !== null && $comparesIn !== null
+            && $this->shop->alt_pack_unit === $comparesIn && $this->shop->pack_unit !== $comparesIn
+            && $this->shop->alt_pack_confirmed !== false
+            ? $this->shop->alt_pack_since
+            : null;
+
+        if ($altSince !== null && ($joinedAt === null || $altSince->greaterThan($joinedAt))) {
+            $joinedAt = $altSince;
+        }
 
         return self::query()
             ->where('shop_id', $this->shop_id)

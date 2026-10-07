@@ -29,6 +29,7 @@ trait RestoresQueuedBundleSnapshot
         'snapshotBetterValueHost',
         'snapshotBetterValueUnitPrice',
         'snapshotTargetPrice',
+        'snapshotTarget',
     ];
 
     /**

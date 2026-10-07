@@ -107,6 +107,21 @@ final readonly class ShopSnapshot
          * @var list<string>
          */
         public array $imageUrls = [],
+        /**
+         * Every size the source states for this same pack, in its own words:
+         * AH lists Iglo fish fingers as `20 st` and `560 g`. Persistence keeps
+         * the one in another unit than the primary size it ends up with — a
+         * source never sees the stored primary, so it cannot choose.
+         *
+         * @var list<string>
+         */
+        public array $altPackSizes = [],
+        /**
+         * True when the source reads these sizes at all, so an empty list
+         * clears a stored second size. A source without the concept leaves
+         * it alone.
+         */
+        public bool $altPackSizesAuthoritative = false,
     ) {}
 
     public function trackedPrice(): string

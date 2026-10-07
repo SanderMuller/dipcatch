@@ -243,6 +243,11 @@ final readonly class AhApiSource
             // so it claims nothing yet.
             claimedRegularPrice: $upcoming ? null : $priceBeforeBonus,
             claimAuthoritative: true,
+            altPackSizes: AhNetContent::sizes($payload),
+            // On the `tradeItem` key, as the pack size keys on its own: a
+            // response without the block says nothing about it, and a stored
+            // second size survives it.
+            altPackSizesAuthoritative: array_key_exists('tradeItem', $payload),
         );
     }
 

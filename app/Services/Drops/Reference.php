@@ -61,7 +61,7 @@ final class Reference
 
         $contributing = $unit === null
             ? $segments->values()->all()
-            : ReferenceEpoch::currentEpoch($segments->values()->all(), $unit, self::joinedAt($product));
+            : ReferenceEpoch::currentEpoch($segments->values()->all(), $unit, self::joinedAt($product, $unit));
 
         // Only the segments that actually answer in this basis. A sizeless
         // segment stays in the epoch — products go briefly sizeless whenever a
@@ -192,11 +192,15 @@ final class Reference
     }
 
     /**
-     * When each shop whose pack size Jev confirmed joined the comparison.
+     * When each shop joined the comparison on a size it did not always
+     * compete on: one Jev confirmed for a page that states none, or the
+     * second size a shop states, while the product compares in that size's
+     * unit. A shop competing on its own pack columns that merely gains an
+     * unused second size has not joined anything, so its history stands.
      *
      * @return array<string, CarbonImmutable>
      */
-    private static function joinedAt(Product $product): array
+    private static function joinedAt(Product $product, ?string $unit): array
     {
         $joined = [];
 
@@ -206,7 +210,7 @@ final class Reference
             }
         }
 
-        return $joined;
+        return [...$joined, ...SecondSizeJoins::of($product, $unit, $joined)];
     }
 
     /**
@@ -231,7 +235,7 @@ final class Reference
             return $all->first();
         }
 
-        foreach (ReferenceEpoch::currentEpoch($all->values()->all(), $unit, self::joinedAt($product)) as $segment) {
+        foreach (ReferenceEpoch::currentEpoch($all->values()->all(), $unit, self::joinedAt($product, $unit)) as $segment) {
             // The unit check is belt and braces beside the epoch slice: this
             // reference is unbounded by the window, and a price per litre
             // measured against a price per kilo is not a drop, it is a category

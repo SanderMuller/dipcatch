@@ -242,7 +242,7 @@ function ahApiDownFakes(): array
  *
  * @return array<string, PromiseInterface>
  */
-function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBonus = '2.19', bool $isBonus = true, string $title = "Lay's Naturel", ?string $salesUnitSize = '200 g', ?string $bonusStart = '2026-08-31', ?string $bonusEnd = '2026-09-06', ?string $bonusMechanism = 'VOOR 1.69'): array
+function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBonus = '2.19', bool $isBonus = true, string $title = "Lay's Naturel", ?string $salesUnitSize = '200 g', ?string $bonusStart = '2026-08-31', ?string $bonusEnd = '2026-09-06', ?string $bonusMechanism = 'VOOR 1.69', array|false|null $netContent = false): array
 {
     $card = [
         'webshopId' => 526381,
@@ -278,6 +278,15 @@ function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBon
         'https://api.ah.nl/mobile-services/product/detail/v4/fir/*' => Http::response([
             'productId' => 526381,
             'productCard' => $card,
+            // False omits the trade item, as a partial response would; null
+            // keeps it with no net content, as AH answers for eggs. Each
+            // entry is `[value, unit code]`, e.g. `[560, 'g']`.
+            ...($netContent === false ? [] : ['tradeItem' => ['measurements' => [
+                'netContent' => $netContent === null ? null : array_map(
+                    fn (array $entry): array => ['value' => $entry[0], 'measurementUnitCode' => ['value' => $entry[1]]],
+                    $netContent,
+                ),
+            ]]]),
         ]),
     ];
 }
@@ -459,9 +468,17 @@ function poieszPage(
     ?string $strikeThroughPrice = null,
     ?string $promotionLabel = null,
     ?bool $promotion = null,
+    ?float $volumeCe = null,
+    ?string $unitId = null,
 ): string {
+    $record = ['id' => 2, 'name' => 3, 'image' => 4, 'price' => 5, 'packageDescription' => 6, 'ean' => 7, 'strikeThroughPrice' => 12, 'promotion' => 13, 'promotionLabel' => 14];
+
+    if ($volumeCe !== null) {
+        $record += ['volumeCe' => 15, 'unitId' => 16];
+    }
+
     $payload = json_encode([
-        ['id' => 2, 'name' => 3, 'image' => 4, 'price' => 5, 'packageDescription' => 6, 'ean' => 7, 'strikeThroughPrice' => 12, 'promotion' => 13, 'promotionLabel' => 14],
+        $record,
         ['id' => 8, 'name' => 9, 'image' => 4, 'price' => 10, 'packageDescription' => 6, 'ean' => 11],
         $productId,
         "Ella's Kitchen Aardbeien met Appel 4+ Mnd.",
@@ -476,6 +493,8 @@ function poieszPage(
         $strikeThroughPrice === null ? null : (float) $strikeThroughPrice,
         $promotion ?? $promotionLabel !== null,
         $promotionLabel,
+        $volumeCe,
+        $unitId,
     ], JSON_THROW_ON_ERROR);
 
     return '<html><body><script type="application/json" id="__NUXT_DATA__">' . $payload . '</script></body></html>';

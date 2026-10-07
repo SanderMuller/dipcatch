@@ -50,7 +50,9 @@ final class TargetPriceEvent extends Model
         ?string $price,
         ?string $unitPrice = null,
     ): self {
-        $packSize = $shop->comparableSize();
+        // The size the shop was compared by when the target was reached,
+        // which can be the second size it states, 560 g beside 20 pieces.
+        $packSize = $product->comparablePacks()->for($shop)->size ?? $shop->comparableSize();
         $bundle = $shop->liveBundleOffer();
 
         return self::query()->create([

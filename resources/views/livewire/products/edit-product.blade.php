@@ -90,6 +90,24 @@
 
             @php($showsSuggestion = $alertCard !== null && ($alertCard['asksJev'] || $alertCard['suggestion']->unitTarget !== null))
             <div class="mt-4 min-w-0">
+                @if ($suspendedUnitTarget !== null)
+                    {{-- One button that toggles in place, so keyboard focus stays on it. --}}
+                    <div class="max-w-2xl" data-test="suspended-unit-target">
+                        @if ($removeUnitPriceTarget)
+                            <flux:text size="sm">{{ __('Your target of :target will be removed when you save.', ['target' => $suspendedUnitTarget['target']]) }}</flux:text>
+                        @else
+                            <flux:text size="sm" class="text-amber-700 dark:text-amber-500">
+                                {{ $suspendedUnitTarget['comparesIn'] === null
+                                    ? __('Your target of :target is paused: this product no longer compares per unit.', ['target' => $suspendedUnitTarget['target']])
+                                    : __('Your target of :target is paused: this product now compares :unit. Set a new target below, or remove it.', ['target' => $suspendedUnitTarget['target'], 'unit' => $suspendedUnitTarget['comparesIn']]) }}
+                            </flux:text>
+                        @endif
+                        <flux:button size="sm" variant="ghost" class="mt-2" wire:click="{{ $removeUnitPriceTarget ? 'keepUnitTarget' : 'removeUnitTarget' }}" data-test="remove-unit-target">
+                            {{ $removeUnitPriceTarget ? __('Keep target') : __('Remove target') }}
+                        </flux:button>
+                    </div>
+                @endif
+
                 @if ($packChoices === [])
                     {{-- No shop has said how much is in its pack yet, so there is
                          nothing to translate a pack price with. --}}

@@ -47,15 +47,26 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
 
     public readonly ?string $snapshotPackUnit;
 
+    /**
+     * The target as it was compared, in the unit of the price above. Read
+     * from the product at delivery it could be in a unit the product only
+     * moved to after this alert was sent.
+     */
+    public readonly ?string $snapshotTarget;
+
     public function __construct(
         public Product $product,
         Shop $shop,
         public readonly string $snapshotUnitPrice,
+        ?string $target = null,
     ) {
+        $this->snapshotTarget = $target ?? $product->effectiveUnitPriceTarget();
         $this->snapshotHost = $shop->host;
         $this->snapshotPrice = $shop->current_price === null ? null : (string) $shop->current_price;
-        $this->snapshotUnitLabel = $shop->unitPriceLabel();
-        $packSize = $shop->comparableSize();
+        // The size the resolver compared the shop by: it can be the second
+        // size the shop states, 560 g beside its 20 pieces.
+        $packSize = $product->comparablePacks()->for($shop)->size ?? $shop->comparableSize();
+        $this->snapshotUnitLabel = $packSize?->label();
         $this->snapshotUnit = $packSize?->unit;
         $this->snapshotPackQuantity = $packSize === null ? null : (string) $packSize->quantity;
         $this->snapshotPackUnit = $packSize?->unit;
@@ -112,9 +123,8 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
             'unit' => $this->snapshotUnit,
             'pack_quantity' => $this->snapshotPackQuantity,
             'pack_unit' => $this->snapshotPackUnit,
-            'unit_price_target' => $this->product->unit_price_target === null
-                ? null
-                : (string) $this->product->unit_price_target,
+            // A payload queued before the snapshot existed reads the product.
+            'unit_price_target' => $this->snapshotTarget ?? $this->product->effectiveUnitPriceTarget(),
             'new_price' => $this->snapshotPrice,
             'single_item_price' => $this->snapshotSingleItemPrice,
             'bundle_quantity' => $this->snapshotBundle?->quantity,

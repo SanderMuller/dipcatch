@@ -2,13 +2,16 @@
 
 namespace App\Mcp\Tools;
 
+use App\Enums\PackExclusion;
 use App\Mcp\Concerns\InteractsWithOwner;
 use App\Mcp\Support\ProductPresenter;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Support\Numeric;
+use App\Support\UnitTargetConversion;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -59,24 +62,40 @@ final class SetThresholdTool extends Tool
             return Response::error('Give a percent, an amount, a target_price, a unit_price_target, or several of them.');
         }
 
-        if (is_numeric($percent)) {
-            $product->drop_threshold_pct = round((float) $percent, 2);
-        }
+        // Under the lock a price check takes: the unit a per-unit target is
+        // stored in is read here, and a check moving the product to another
+        // unit in between would store the number in a unit nobody chose.
+        $product = DB::transaction(function () use ($product, $percent, $amount, $targetPrice, $unitPriceTarget): Product {
+            $locked = Product::query()->with('shops')->lockForUpdate()->findOrFail($product->id);
 
-        if (is_numeric($amount)) {
-            $product->drop_threshold_abs = round((float) $amount, 2);
-        }
+            if (is_numeric($percent)) {
+                $locked->drop_threshold_pct = round((float) $percent, 2);
+            }
 
-        if (is_numeric($targetPrice)) {
-            $product->target_price = round((float) $targetPrice, 2);
-        }
+            if (is_numeric($amount)) {
+                $locked->drop_threshold_abs = round((float) $amount, 2);
+            }
 
-        if (is_numeric($unitPriceTarget)) {
-            // The cut decimal string, as the decimal:4 cast stores it.
-            $product->forceFill(['unit_price_target' => self::fourDecimalsDown($unitPriceTarget)]);
-        }
+            if (is_numeric($targetPrice)) {
+                $locked->target_price = round((float) $targetPrice, 2);
+            }
 
-        $product->save();
+            if (is_numeric($unitPriceTarget)) {
+                $packs = $locked->comparablePacks();
+                // The cut decimal string, as the decimal:4 cast stores it, in
+                // the unit `comparison_unit` names right now.
+                $target = self::fourDecimalsDown($unitPriceTarget);
+                $locked->forceFill([
+                    'unit_price_target' => $target,
+                    'unit_price_target_unit' => $packs->unit(),
+                    'unit_price_target_effective' => UnitTargetConversion::effective($target, $packs->unit(), $packs),
+                ]);
+            }
+
+            $locked->save();
+
+            return $locked;
+        });
 
         $summary = $this->presenter->summary($product);
 
@@ -101,25 +120,31 @@ final class SetThresholdTool extends Tool
      * Says so when a per-unit target cannot reach some of the product's shops.
      *
      * Shops can report different units — 30 pieces at one, 840 g at another —
-     * and the comparison runs inside the largest group only, so a shop outside
-     * it can never satisfy a target set in the group's unit. The target is
+     * and the comparison runs in the unit that brings in the most shops, so a
+     * shop with no size in that unit can never satisfy a target set in it. The target is
      * still stored: the caller asked for it, most of the shops answer it, and
      * a unit can change when a shop next reads a pack size. What was missing
      * was anyone saying that part of the product is out of scope.
      */
     private static function shopsOutsideTheUnitGroup(Product $product): string
     {
-        $unit = $product->unitPriceUnit();
+        // The resolver's own exclusions, so this note names the shops the page
+        // marks as in another unit or sold by the piece. A shop that also
+        // states the pack in the product's unit is inside.
+        $packs = $product->comparablePacks();
+        $unit = $packs->unit();
 
         if ($unit === null) {
             return 'No shop on this product has read a pack size yet, so there is nothing to compare per unit until one does.';
         }
 
-        $withPack = $product->shops->filter(
-            fn (Shop $shop): bool => is_string($shop->pack_unit) && $shop->pack_unit !== '',
-        );
+        $withPack = $product->shops->filter(fn (Shop $shop): bool => $shop->packSize() !== null);
 
-        $outside = $withPack->filter(fn (Shop $shop): bool => $shop->pack_unit !== $unit);
+        $outside = $withPack->filter(fn (Shop $shop): bool => in_array(
+            $packs->for($shop)?->exclusion,
+            [PackExclusion::UnitDoesNotConvert, PackExclusion::SoldByThePiece],
+            strict: true,
+        ));
 
         if ($outside->isEmpty()) {
             return '';

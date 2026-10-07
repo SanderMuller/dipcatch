@@ -115,6 +115,8 @@ final class EditProduct extends Component
      */
     public function switchToPriceAlert(): void
     {
+        // The suggestion is in today's unit, so the field has to be too.
+        $this->rebaseUnitPriceTarget($this->product);
         $suggestion = new UnitTargetGuide($this->product)->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs);
 
         if ($suggestion === null || self::blankToNull($this->unitPriceTarget) !== null) {
@@ -145,6 +147,10 @@ final class EditProduct extends Component
 
         UpdateProductDetails::fill($this->product, $this->title, self::blankToNull($this->imageUrl));
 
+        // The currency decides which shops vote on the comparison unit, so a
+        // new one can move the unit, the winner and the target under it.
+        $currencyChanged = $this->product->currency !== $this->currency;
+
         // One transaction, so the details never save without the alerts.
         DB::transaction(function () use ($saveAlert): void {
             $this->product->forceFill([
@@ -155,6 +161,10 @@ final class EditProduct extends Component
 
             $saveAlert($this->product, $this->alertFieldValues(), $this->chosenTarget);
         });
+
+        if ($currencyChanged) {
+            $this->product->refresh()->recomputeCheapestShop(sizesChanged: true);
+        }
 
         // A new title changes what the web suggestions were checked against.
         app(WebShopDiscovery::class)->requeueIfStale($this->product);
@@ -238,6 +248,7 @@ final class EditProduct extends Component
     /** Fills in the suggested per-unit target. Nothing is written until the form is saved. */
     public function useSuggestion(): void
     {
+        $this->rebaseUnitPriceTarget($this->product);
         $target = $this->alertSuggestion($this->product)->unitTarget;
 
         if ($target === null) {
@@ -274,6 +285,8 @@ final class EditProduct extends Component
 
     public function render(): View
     {
+        $this->rebaseUnitPriceTarget($this->product);
+
         $guide = new UnitTargetGuide($this->product);
         $packChoices = $guide->packs();
         $alertCard = $this->product->unit_price_target === null && $packChoices !== [] ? $this->suggestionCard($this->product) : null;
@@ -294,6 +307,7 @@ final class EditProduct extends Component
             ...$this->alertAnchors(),
             'alertCard' => $alertCard,
             'otherAlerts' => $this->otherAlertSummaries($this->currency),
+            'suspendedUnitTarget' => $this->suspendedUnitTarget($this->product),
         ]);
     }
 
