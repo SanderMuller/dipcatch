@@ -55,7 +55,7 @@ final readonly class WebShopDiscovery
     /** The part of the gate that needs no product yet: the account and the currency. */
     public function runsForOwner(User $user, string $currency): bool
     {
-        return $user->wantsShopChecks() && $this->reach->covers($currency);
+        return $user->wantsShopChecks() && $this->reach->covers($user, $currency);
     }
 
     public function queue(Product $product): bool

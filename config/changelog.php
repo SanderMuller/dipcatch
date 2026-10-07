@@ -39,7 +39,7 @@ return [
             'date' => '2026-10-07',
             'category' => 'feature',
             'title' => 'Shop suggestions for your country',
-            'body' => "With Pro, DipCatch now finds shops on the web that sell to shoppers in your country, not just in the Netherlands. It takes your country from your timezone, and you can change it in Settings, under Profile.\n\nDutch supermarkets and bol.com are only suggested when your country is the Netherlands.",
+            'body' => "With Pro, DipCatch now finds shops on the web that sell to shoppers in your country, not just in the Netherlands. It takes your country from your timezone, and you can change it in Settings, under Profile.\n\nThis works for products priced in your country's money too, like kronor or pounds. Dutch supermarkets and bol.com are only suggested when your country is the Netherlands.",
             'link' => ['route' => 'profile.edit', 'label' => 'Open your settings'],
         ],
         [

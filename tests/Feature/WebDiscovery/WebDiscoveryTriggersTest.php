@@ -81,7 +81,7 @@ it('queues nothing for an owner without shop checks, a non-euro product, or with
 
         return $owner;
     }, 'EUR'],
-    'not euros' => [fn (User $owner): User => $owner, 'USD'],
+    'not the currency of the owner\'s country' => [fn (User $owner): User => $owner, 'USD'],
     'no search key' => [function (User $owner): User {
         config()->set('services.serper.key', '');
 
@@ -268,6 +268,22 @@ it('searches at once when shop checks go on in Settings, once a day however ofte
     $this->travel(25)->hours();
     livewire(ProductFeatures::class)->set('shop_checks', false)->call('save');
     livewire(ProductFeatures::class)->set('shop_checks', true)->call('save');
+
+    Queue::assertPushed(DiscoverWebShops::class, 2);
+});
+
+it('searches for an owner abroad in the currency of their country, and not in euros', function (): void {
+    $owner = triggerOwner();
+    $owner->forceFill(['country' => 'se'])->save();
+    $kronor = gatedProduct($owner, ['currency' => 'SEK', 'created_at' => now()->subDays(2)]);
+    gatedProduct($owner, ['currency' => 'EUR', 'created_at' => now()->subDays(3)]);
+
+    $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
+
+    expect(Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $kronor->id]);
+
+    app(CreateProductWithShop::class)($owner, new ProductDraft(title: 'Kaffe'), shopDraftFor('SEK'));
+    app(CreateProductWithShop::class)($owner, new ProductDraft(title: 'Coffee'), shopDraftFor('EUR'));
 
     Queue::assertPushed(DiscoverWebShops::class, 2);
 });

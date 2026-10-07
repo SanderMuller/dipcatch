@@ -35,3 +35,11 @@ it('spends no search on a Klarna page in a country where DipCatch does not searc
     expect(app(KlarnaPageSearch::class)->for($product))->toBe(KlarnaPageSearch::NONE);
     Http::assertNothingSent();
 });
+
+it('names the currency a country\'s shoppers pay in, where a product can be priced in it', function (): void {
+    expect(ShoppersCountry::currency('nl'))->toBe('EUR')
+        ->and(ShoppersCountry::currency('se'))->toBe('SEK')
+        ->and(ShoppersCountry::currency('gb'))->toBe('GBP')
+        ->and(ShoppersCountry::currency('bg'))->toBe('EUR')
+        ->and(ShoppersCountry::currency('ke'))->toBeNull();
+});

@@ -7,6 +7,7 @@ use App\Jobs\CategoriseExistingProduct;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\WebDiscovery;
+use App\Services\ShopDiscovery\DiscoveryReach;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use Illuminate\Support\Facades\Cache;
 
@@ -47,7 +48,9 @@ final readonly class SwitchOnAiFeature
     {
         // Once a day per account: switching off and on again must not drain
         // the daily limit every account shares, ten products at a time.
-        if (! Cache::add("ai-switch-on-discovery:{$user->id}", true, now()->addDay())) {
+        $currency = DiscoveryReach::currencyFor($user);
+
+        if ($currency === null || ! Cache::add("ai-switch-on-discovery:{$user->id}", true, now()->addDay())) {
             return 0;
         }
 
@@ -55,7 +58,7 @@ final readonly class SwitchOnAiFeature
             ->where('user_id', $user->id)
             ->where('active', true)
             // Only products discovery searches, so the cap is not spent on ones it skips.
-            ->where('currency', 'EUR')
+            ->where('currency', $currency)
             ->has('shops')
             ->whereNotIn('id', WebDiscovery::query()->select('product_id'))
             ->latest()

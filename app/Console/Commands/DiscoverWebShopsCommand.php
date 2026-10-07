@@ -11,6 +11,7 @@ use App\Models\WebDiscovery;
 use App\Models\WebSearch;
 use App\Models\WebShopFinding;
 use App\Services\ShopDiscovery\BarcodeSearch;
+use App\Services\ShopDiscovery\DiscoveryReach;
 use App\Services\ShopDiscovery\ShoppersCountry;
 use App\Services\ShopDiscovery\WebSearches;
 use App\Services\ShopDiscovery\WebShopDiscovery;
@@ -107,14 +108,16 @@ final class DiscoverWebShopsCommand extends Command
      */
     private function ranked(BarcodeSearch $barcodes): array
     {
+        $reach = app(DiscoveryReach::class);
         $products = Product::query()
             ->with(['user', 'shops'])
             ->whereIn('user_id', ProUsers::ids())
             ->whereHas('user', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('shop_checks', true))
-            ->whereRaw('UPPER(currency) = ?', ['EUR'])
             ->has('shops')
             ->orderBy('created_at')
-            ->get();
+            ->get()
+            // In the currency of the owner's country: that differs per owner.
+            ->filter(fn (Product $product): bool => $reach->covers($product->user, $product->currency));
 
         $discoveries = WebDiscovery::query()
             ->with('search:id,searched_at,query,query_hash')

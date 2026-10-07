@@ -116,3 +116,13 @@ test('editing a product without a category offers automatic categories to Pro on
     $this->actingAs($free);
     livewire(EditProduct::class, ['product' => placesProduct($free)])->assertDontSeeLivewire(AiFeaturePrompt::class);
 });
+
+test('an owner abroad is offered the web search for a product in the currency of their country', function (): void {
+    $user = placesProUser(['country' => 'se']);
+    $this->actingAs($user);
+
+    livewire(ShopSuggestions::class, ['product' => placesProduct($user, currency: 'SEK')])->assertSeeHtml('data-place="shop_suggestions"');
+
+    app()->forgetScopedInstances();
+    livewire(ShopSuggestions::class, ['product' => placesProduct($user)])->assertDontSeeLivewire(AiFeaturePrompt::class);
+});

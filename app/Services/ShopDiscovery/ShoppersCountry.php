@@ -4,10 +4,12 @@ namespace App\Services\ShopDiscovery;
 
 use App\Models\Product;
 use App\Models\User;
+use App\Support\Iso4217;
 use DateTimeZone;
 use Illuminate\Support\Facades\Config;
 use IntlTimeZone;
 use Locale;
+use NumberFormatter;
 
 /**
  * The country web discovery finds shops for: the one it searches Google in.
@@ -32,6 +34,9 @@ final class ShoppersCountry
         'gr' => 'el', 'si' => 'sl', 'hr' => 'hr', 'ee' => 'et',
         'lv' => 'lv', 'lt' => 'lt', 'bg' => 'bg',
     ];
+
+    /** Where the bundled ICU data is older than the currency: Bulgaria joined the euro in 2026. */
+    private const array CURRENCIES = ['bg' => 'EUR'];
 
     /**
      * Built once per process: the list follows the bundled timezone data only.
@@ -82,6 +87,18 @@ final class ShoppersCountry
         return is_string($region) && preg_match('/^[A-Z]{2}$/', $region) === 1 && self::isKnown(mb_strtolower($region))
             ? mb_strtolower($region)
             : null;
+    }
+
+    /**
+     * The currency its shoppers pay in, as `Iso4217` writes it: `SEK` for
+     * `se`. Null for one no product can be priced in.
+     */
+    public static function currency(string $code): ?string
+    {
+        $currency = self::CURRENCIES[$code]
+            ?? new NumberFormatter('en_' . strtoupper($code), NumberFormatter::CURRENCY)->getTextAttribute(NumberFormatter::CURRENCY_CODE);
+
+        return is_string($currency) && in_array($currency, Iso4217::CODES, strict: true) ? $currency : null;
     }
 
     /** "Netherlands" for `nl`, as Jev reads it. */

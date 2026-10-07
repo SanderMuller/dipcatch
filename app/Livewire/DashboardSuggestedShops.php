@@ -41,7 +41,10 @@ final class DashboardSuggestedShops extends Component
     /** Whether discovery could search for one of the account's products. */
     private function couldSearchFor(User $user): bool
     {
-        return app(DiscoveryReach::class)->covers('EUR')
-            && Product::query()->where('user_id', $user->id)->where('currency', 'EUR')->exists();
+        $currency = DiscoveryReach::currencyFor($user);
+
+        return $currency !== null
+            && app(DiscoveryReach::class)->covers($user, $currency)
+            && Product::query()->where('user_id', $user->id)->where('currency', $currency)->exists();
     }
 }

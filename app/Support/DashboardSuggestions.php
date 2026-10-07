@@ -10,6 +10,7 @@ use App\Models\ShopSuggestionDismissal;
 use App\Models\ShopSuggestionVerdict;
 use App\Models\User;
 use App\Models\WebShopFinding;
+use App\Services\ShopDiscovery\DiscoveryReach;
 use App\Services\Suggestions\ShopSuggestion;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
@@ -260,7 +261,8 @@ final readonly class DashboardSuggestions
         return Product::query()
             ->where('user_id', $user->id)
             ->where('active', true)
-            ->whereRaw('UPPER(currency) = ?', ['EUR'])
+            // The currency discovery searches the owner's country in.
+            ->where('currency', DiscoveryReach::currencyFor($user) ?? '')
             ->has('shops');
     }
 
@@ -315,7 +317,7 @@ final readonly class DashboardSuggestions
         $size = $finding->page_pack_quantity !== null && $finding->page_pack_unit !== null
             ? PackSize::of((float) $finding->page_pack_quantity, $finding->page_pack_unit)
             : null;
-        $currency = $finding->page_currency ?? 'EUR';
+        $currency = $finding->page_currency ?? $product->currency;
         $unitPrice = $finding->page_price === null ? null : $size?->unitPriceFor($finding->page_price);
         $chance = $finding->second_chance ?? 0.0;
 

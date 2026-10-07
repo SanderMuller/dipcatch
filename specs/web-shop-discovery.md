@@ -154,9 +154,9 @@ Jev spending goes through `CategorisationBudget::allowsShopCheck()` with two new
 
 ### 5.1 Trigger
 
-- **New product:** at the end of `CreateProductWithShop` (used by the paste-a-link form and the MCP `create_product` tool), dispatch `DiscoverWebShops` when the owner passes the gate in section 2 and the product's currency is EUR. `CreateProductManual` creates a product without a shop, so there is no pack to compare against; the backfill picks it up once it has one.
+- **New product:** at the end of `CreateProductWithShop` (used by the paste-a-link form and the MCP `create_product` tool), dispatch `DiscoverWebShops` when the owner passes the gate in section 2 and the product is priced in the currency of the owner's country (`DiscoveryReach`). `CreateProductManual` creates a product without a shop, so there is no pack to compare against; the backfill picks it up once it has one.
 - **Preview of a pasted page:** before the product is saved, the add-product wizard dispatches `PrewarmShopSearches` for the preview title: the open search and the Klarna page search, stored per query as usual, so the discovery that starts on save finds them done. Same gate and currency rule as a new product, none for a page the account already tracks, and at most 10 per account per hour and 30 per day, as a preview without a save still spends paid searches.
-- **Daily command:** `dipcatch:discover-web-shops` (daily, `withoutOverlapping()->onOneServer()`, next to the others in `bootstrap/app.php`) dispatches `DiscoverWebShops` for gated EUR products with at least one shop, in this order, up to the daily search limit for the ones that need a search:
+- **Daily command:** `dipcatch:discover-web-shops` (daily, `withoutOverlapping()->onOneServer()`, next to the others in `bootstrap/app.php`) dispatches `DiscoverWebShops` for gated products in the currency of their owner's country with at least one shop, in this order, up to the daily search limit for the ones that need a search:
   1. products with unfinished discovery (3.4) and a fresh search (an unfinished product whose search is stale falls under 4), so a run cut short by Jev or the budget goes on the next day without a new search;
   2. products whose `web_discoveries.search_searched_at` is older than their search's `searched_at` (another product refreshed the shared search), and products with findings whose fingerprint or `checked_gtins` is stale, re-checked from the stored search;
   3. products with no search, then products whose search is older than `search_max_age_days`, oldest first.
@@ -219,7 +219,7 @@ The view (`resources/views/livewire/suggestions/shop-suggestions.blade.php`) dec
 
 - Adding the brand to product titles. It would fix the one brand confusion in the prototype, and is its own change.
 - Searches restricted to one shop (`site:`). The open search found 6 new shops per product; add restricted searches only if a later measure asks for them.
-- Other countries. The query uses `gl=nl`; results on other country domains are allowed through, and Jev judges them like the rest.
+- Other countries. *Superseded:* the search runs in the owner's country (`ShoppersCountry`: the country set in Settings, else the one of the timezone, else `nl`), with its language, and both checks ask whether a shop sells to shoppers there.
 - The receipt-import prototype (`MatchListCommand`, `app/Services/ListImport/`). Separate feature.
 
 ## Edge Cases
@@ -240,7 +240,7 @@ The view (`resources/views/livewire/suggestions/shop-suggestions.blade.php`) dec
 | User hides a web suggestion | `dismissed_at` set; never shown again for that product, also after a new search. `ui` tests. |
 | Another account's finding id sent to `dismissWeb` | 404. `ui` tests. |
 | User switches shop checks off or loses Pro | No new jobs; stored web suggestions stop showing (the render checks the gate). `ui` tests. |
-| Product not in euros | No job is dispatched; the search is Dutch (`gl=nl`). `triggers` tests. |
+| Product not in the currency of the owner's country | No job is dispatched: a shop there prices in that currency, and a page in another one fails the read (`currency_mismatch`). `triggers` tests. |
 | Product created by hand, without a shop | No job on create; the backfill picks it up once it has a shop. `triggers` tests. |
 | User adds one suggested web shop | Only that host drops out; the other web suggestions keep their fingerprint, because tracked shop URLs are not part of it. `ui` tests. |
 | A job runs twice, or is released and runs again | Each job does only what the findings' state still needs: no second search, no second first check, no second read of a finished page. `judge` tests. |

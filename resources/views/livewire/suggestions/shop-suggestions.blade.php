@@ -150,7 +150,7 @@
                     @foreach ($webSuggestions as $finding)
                         @php($webHost = $finding->addHost())
                         @php($webSize = $finding->page_pack_quantity !== null && $finding->page_pack_unit !== null ? \App\Support\PackSize::of((float) $finding->page_pack_quantity, $finding->page_pack_unit) : null)
-                        @php($webCurrency = $finding->page_currency ?? 'EUR')
+                        @php($webCurrency = $finding->page_currency ?? $product->currency)
                         @php($webUnitPrice = $finding->page_price !== null ? $webSize?->unitPriceFor($finding->page_price) : null)
                         <li class="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5" wire:key="web-suggestion-{{ $finding->id }}" data-test="web-suggestion">
                             <img src="{{ \App\Support\Favicon::url($webHost) }}" alt="" loading="lazy" class="size-5 shrink-0 rounded" />
