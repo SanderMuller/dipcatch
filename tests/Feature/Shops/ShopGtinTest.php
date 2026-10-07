@@ -1,10 +1,12 @@
 <?php declare(strict_types=1);
 
 use App\Jobs\CheckShopPrice;
+use App\Livewire\Products\ProductShow;
 use App\Livewire\Shops\AddShop;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\User;
 use App\PriceAdapters\AdapterResolver;
 use App\Services\AhApi\AhApiSource;
 use App\Services\Checkjebon\CheckjebonSource;
@@ -231,4 +233,34 @@ test('a nested product scope cannot donate its GTIN to the tracked offer', funct
     runGtinCheck($shop);
 
     expect($shop->refresh()->gtin)->toBeNull();
+});
+
+test('the owner hides the article number warning until a shop brings another number', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://one.example.com/p/1', 'gtin' => '8712243044506']);
+    Shop::factory()->for($product)->create(['url' => 'https://two.example.com/p/2', 'gtin' => '8712243987955']);
+
+    $this->actingAs($user);
+
+    Livewire::test(ProductShow::class, ['product' => $product])
+        ->assertSeeHtml('data-test="gtin-warning"')
+        ->call('hideGtinWarning')
+        ->assertDontSeeHtml('data-test="gtin-warning"');
+
+    Shop::factory()->for($product)->create(['url' => 'https://three.example.com/p/3', 'gtin' => '8712243000007']);
+
+    expect($product->refresh()->showsGtinWarning())->toBeTrue();
+});
+
+test('another account cannot hide the article number warning', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['url' => 'https://one.example.com/p/1', 'gtin' => '8712243044506']);
+    Shop::factory()->for($product)->create(['url' => 'https://two.example.com/p/2', 'gtin' => '8712243987955']);
+
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(ProductShow::class, ['product' => $product])->assertForbidden();
+
+    expect($product->refresh()->gtin_warning_hidden_for)->toBeNull();
 });

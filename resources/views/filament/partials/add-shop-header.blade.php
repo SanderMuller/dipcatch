@@ -111,11 +111,14 @@
     @endif
 
     {{-- Below the controls and directly above the rows it describes. --}}
-    @php($mismatchedGtinHosts = $product->mismatchedGtinHosts())
-
-    @if ($mismatchedGtinHosts !== [])
-        <flux:callout variant="warning" icon="exclamation-triangle">
-            These shops report different article numbers (EAN): {{ implode(', ', $mismatchedGtinHosts) }}. They may be different pack sizes or products.
+    @if ($product->showsGtinWarning())
+        <flux:callout variant="warning" icon="exclamation-triangle" data-test="gtin-warning">
+            <flux:callout.text>
+                These shops report different article numbers (EAN): {{ implode(', ', $product->mismatchedGtinHosts()) }}. They may be different pack sizes or products.
+            </flux:callout.text>
+            <x-slot name="actions">
+                <flux:button size="sm" wire:click="hideGtinWarning">{{ __('Hide warning') }}</flux:button>
+            </x-slot>
         </flux:callout>
     @endif
 </div>

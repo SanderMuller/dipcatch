@@ -208,6 +208,15 @@ final class ProductShow extends Component
         $this->product->refresh();
     }
 
+    /** Hides the article-number warning until a shop brings another number. */
+    public function hideGtinWarning(): void
+    {
+        $this->authorize('update', $this->product);
+
+        $this->product->forceFill(['gtin_warning_hidden_for' => $this->product->gtinWarningKey()])->save();
+        $this->product->refresh();
+    }
+
     /**
      * Puts the product on the account's shopping list, or takes it off. The
      * list writes refresh the product, so the button changes in this response.

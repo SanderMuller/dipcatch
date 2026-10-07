@@ -45,6 +45,7 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $unit_price_target_effective The target in today's comparison unit; null while it cannot be expressed in it.
  * @property string|null $unit_price_notified_unit The unit `unit_price_notified` is money in.
  * @property-read PriceDropEvent|null $latestPriceDropEvent
+ * @property string|null $gtin_warning_hidden_for The article numbers the owner hid the mismatch warning for, sorted and comma-joined.
  */
 #[Unguarded]
 final class Product extends Model
@@ -483,6 +484,27 @@ final class Product extends Model
         $hosts = $withGtin->pluck('host')->filter()->unique()->sort()->values()->all();
 
         return $hosts;
+    }
+
+    /**
+     * The article numbers behind the mismatch warning, sorted, so the owner
+     * can hide the warning for exactly this set. A shop that brings a new
+     * number makes a new set, and the warning shows again.
+     */
+    public function gtinWarningKey(): string
+    {
+        return $this->shops
+            ->pluck('gtin')
+            ->filter(static fn (mixed $gtin): bool => is_string($gtin) && $gtin !== '')
+            ->unique()
+            ->sort()
+            ->implode(',');
+    }
+
+    /** True when the shops disagree on the article number and the owner has not hidden that. */
+    public function showsGtinWarning(): bool
+    {
+        return $this->mismatchedGtinHosts() !== [] && $this->gtin_warning_hidden_for !== $this->gtinWarningKey();
     }
 
     public function safeImageUrl(): ?string
