@@ -3,54 +3,66 @@
 
     <flux:heading class="sr-only">{{ __('Product features') }}</flux:heading>
 
-    <x-settings.layout :heading="__('Product features')" :subheading="__('Features that use AI. Both are off until you switch them on.')">
+    <x-settings.layout width="max-w-2xl" :heading="__('Product features')" :subheading="__('Features that use AI. Both are off until you switch them on.')">
         @if ($available)
-            <flux:text>{{ __('DipCatch then sends the product name, its shops and their web addresses, the pack size, barcode and price, any offer a shop shows, and the category of the product to TypeSafe, our AI provider. Nothing about you.') }}</flux:text>
-
             @php
-                $features = [
-                    ['auto_categories', 'auto-categories', $allowsAutoCategories, __('Sort new products into a category automatically'), __('Products you add, and the ones already here without a category. A category you chose yourself is never changed.')],
-                    ['shop_checks', 'shop-checks', $allowsShopChecks, __('Check new shops, and suggest alerts'), __('When you add a shop, AI compares it with the shops you already track and warns you about a different product or pack size. It also finds more shops that sell your products, and suggests an alert for a new product from how products like it go on sale.')],
+                $shopChecksDoes = [
+                    __('Warns you when a new shop sells another flavour or pack size.'),
+                    __('Checks a page that hides its pack size, so the price per kilo stays right.'),
+                    __('Searches the web, by name, by barcode and on comparison sites, for more shops.'),
+                    __('Suggests an alert price from how deep a product usually goes on sale.'),
                 ];
-                $anyAllowed = $allowsAutoCategories || $allowsShopChecks;
+                $categoriesDoes = [
+                    __('Files every product you add into a category.'),
+                    __('Sorts the ones already here without a category too.'),
+                    __('Never changes a category you chose yourself.'),
+                ];
+                $isProPlan = $allowsAutoCategories || $allowsShopChecks;
+                $privacy = __('DipCatch sends the product name, its shops and their web addresses, the pack size, barcode and price, any offer a shop shows, and the category of the product to TypeSafe, our AI provider. Nothing about you.');
             @endphp
 
-            <form wire:submit="save" class="my-6 w-full space-y-6">
-                {{-- Composed by hand: `flux:switch` takes its label as a
-                     string, so it has no room for the badge. The badge
-                     shows on Pro too, so a subscriber knows what the plan
-                     pays for. A free account sees what each check does,
-                     at full strength, and one way to Pro below: a greyed
-                     switch it cannot use read as broken. --}}
-                @foreach ($features as [$model, $test, $allowed, $label, $description])
-                    @if ($allowed)
-                        <flux:field variant="inline">
-                            <flux:label>
-                                {{ $label }}
-                                <x-pro-badge class="ms-2" data-test="{{ $test }}-pro" />
-                            </flux:label>
-                            <flux:description>{{ $description }}</flux:description>
-                            <flux:switch wire:model="{{ $model }}" data-test="{{ $test }}" />
-                            <flux:error name="{{ $model }}" />
-                        </flux:field>
-                    @else
-                        <div data-test="{{ $test }}-locked">
-                            <p class="flex flex-wrap items-center gap-2 text-base font-medium text-ink sm:text-sm dark:text-white">
-                                {{ $label }}
+            {{-- Every check as its own line, under the switch that runs it. A free
+                 account sees what each switch would do at full strength, and one
+                 way to Pro: a greyed switch it cannot use read as broken. --}}
+            <form wire:submit="save" class="space-y-8">
+                @foreach ([
+                    ['shop_checks', 'shop-checks', __('Shop checks'), $shopChecksDoes, $allowsShopChecks],
+                    ['auto_categories', 'auto-categories', __('Automatic categories'), $categoriesDoes, $allowsAutoCategories],
+                ] as [$model, $test, $title, $does, $allowed])
+                    <section @unless ($allowed) data-test="{{ $test }}-locked" @endunless>
+                        <div class="flex items-center justify-between gap-4 border-b border-ink/10 pb-3 dark:border-white/10">
+                            <h3 class="flex items-center gap-2 text-base font-semibold text-ink dark:text-white">
+                                {{ $title }}
                                 <x-pro-badge data-test="{{ $test }}-pro" />
-                            </p>
-                            <p class="mt-1 max-w-[60ch] text-base text-pretty text-zinc-600 sm:text-sm dark:text-zinc-400">{{ $description }}</p>
+                            </h3>
+                            @if ($allowed)
+                                <flux:switch wire:model="{{ $model }}" :aria-label="$title" data-test="{{ $test }}" />
+                                <flux:error name="{{ $model }}" />
+                            @else
+                                <a href="{{ route('app.pro') }}" wire:navigate class="text-sm font-medium text-brand hover:text-violet-600 dark:text-blue-300">{{ __('Unlock with Pro') }}</a>
+                            @endif
                         </div>
-                    @endif
+                        <ul role="list" class="mt-3 grid gap-3">
+                            @foreach ($does as $line)
+                                <li class="flex items-start gap-2 text-base text-zinc-700 sm:text-sm dark:text-zinc-300">
+                                    <flux:icon.check variant="micro" class="h-lh shrink-0 text-savings-strong dark:text-savings" />
+                                    {{ $line }}
+                                </li>
+                            @endforeach
+                        </ul>
+                    </section>
                 @endforeach
 
-                @if (! $allowsAutoCategories || ! $allowsShopChecks)
-                    <x-pro-hint data-test="product-features-pro-hint">{{ __('These checks are part of Pro. Once you have it, switch each one on here.') }}</x-pro-hint>
-                @endif
-
-                @if ($anyAllowed)
+                @if (! $isProPlan)
+                    <x-pro-hint data-test="product-features-pro-hint">{{ __('Both checks come with Pro. Once you have it, switch them on here.') }}</x-pro-hint>
+                @else
                     <flux:button variant="primary" type="submit">{{ __('Save') }}</flux:button>
                 @endif
+
+                <p class="rounded-xl bg-ink/[0.03] p-4 text-base text-pretty text-zinc-600 sm:text-sm dark:bg-white/5 dark:text-zinc-400">
+                    <span class="font-medium text-ink dark:text-white">{{ __('What the AI sees.') }}</span>
+                    {{ $privacy }}
+                </p>
             </form>
         @else
             <flux:text data-test="product-features-unavailable">{{ __('These features are not available right now.') }}</flux:text>

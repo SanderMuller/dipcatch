@@ -10,7 +10,7 @@ test('the automatic categories switch is absent when no key is configured', func
     $this->actingAs(User::factory()->create());
 
     livewire(ProductFeatures::class)
-        ->assertDontSee('Sort new products into a category automatically')
+        ->assertDontSee('Automatic categories')
         ->assertSeeHtml('data-test="product-features-unavailable"');
 });
 
@@ -20,8 +20,8 @@ test('a free account sees what each AI check does, and the way to Pro instead of
     $this->actingAs(User::factory()->create());
 
     $html = livewire(ProductFeatures::class)
-        ->assertSee('Sort new products into a category automatically')
-        ->assertSee('Products you add, and the ones already here without a category.')
+        ->assertSee('Automatic categories')
+        ->assertSee('Files every product you add into a category.')
         ->assertSeeHtml('data-test="product-features-pro-hint"')
         ->assertSeeHtml('href="' . route('app.pro') . '"')
         ->assertDontSee('Save')
@@ -39,7 +39,7 @@ test('a Pro account sees the automatic categories switch enabled', function (): 
     $this->actingAs($user);
 
     $html = livewire(ProductFeatures::class)
-        ->assertSee('Products you add, and the ones already here without a category. A category you chose yourself is never changed.')
+        ->assertSee('Never changes a category you chose yourself.')
         ->assertDontSee('Pro sorts products for you.')
         ->html();
 
