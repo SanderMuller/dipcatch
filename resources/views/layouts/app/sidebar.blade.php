@@ -131,6 +131,16 @@
 
                     <x-appearance-toggle class="hidden sm:flex" />
 
+                    @php($proPitch = \App\Billing\ProPitch::for(auth()->user()))
+                    @if ($proPitch?->canBuy === true)
+                        {{-- The one standing way to Pro for a free account: brand blue on the
+                             amber bar, so it is findable without shouting. --}}
+                        <a href="{{ route('app.pro') }}" class="hidden items-center gap-1.5 rounded-full bg-brand/10 py-1.5 pr-3 pl-2.5 text-sm font-medium text-brand ring-1 ring-brand/20 hover:bg-brand/15 sm:inline-flex dark:bg-brand/20 dark:text-white dark:ring-brand/40 dark:hover:bg-brand/30" data-test="header-pro-link">
+                            <flux:icon.sparkles variant="micro" />
+                            {{ $proPitch->offersTrial ? __('Try Pro') : __('Get Pro') }}
+                        </a>
+                    @endif
+
                     <x-desktop-user-menu class="hidden lg:block" />
 
                     <button
@@ -164,6 +174,13 @@
                             ])
                         >{{ $link['label'] }}</a>
                     @endforeach
+
+                    @if ($proPitch?->canBuy === true)
+                        <a href="{{ route('app.pro') }}" class="mt-2 flex items-center gap-2 rounded-xl bg-brand/10 px-3 py-2.5 text-base font-medium text-brand ring-1 ring-brand/20 sm:hidden dark:bg-brand/20 dark:text-white dark:ring-brand/40">
+                            <flux:icon.sparkles variant="micro" />
+                            {{ $proPitch->offersTrial ? __('Try Pro free for :days days', ['days' => \App\Billing\ProPrice::trialDays()]) : __('Get Pro') }}
+                        </a>
+                    @endif
 
                     <div class="mt-3 flex items-center justify-between border-t border-zinc-200/70 pt-4 dark:border-zinc-800/70">
                         <x-desktop-user-menu />

@@ -457,7 +457,7 @@ it('shows a free account the suggestion button disabled, with the way to Pro', f
     livewire(EditProduct::class, ['product' => $product])
         ->assertSee('Suggest a category')
         ->assertSee('Pro suggests a category for you.')
-        ->assertSeeHtml(route('upgrade'))
+        ->assertSeeHtml(route('app.pro'))
         ->call('suggestCategory')
         ->assertSet('suggestedCategory', null);
 

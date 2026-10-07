@@ -63,7 +63,7 @@
                             <flux:tooltip :content="__('Pro suggests a category for you.')">
                                 <flux:button size="sm" icon="sparkles" disabled>{{ __('Suggest a category') }}</flux:button>
                             </flux:tooltip>
-                            <flux:link :href="route('upgrade')" class="text-sm">{{ __('Get Pro') }}</flux:link>
+                            <flux:link :href="route('app.pro')" class="text-sm">{{ __('Get Pro') }}</flux:link>
                         @endif
                     </div>
                 @endif

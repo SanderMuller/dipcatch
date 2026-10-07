@@ -57,7 +57,7 @@ it('offers Pro to a free account looking at the products without a category', fu
         ->set('category', ProductList::NO_CATEGORY)
         ->assertSeeHtml('data-test="auto-categories-promo"')
         ->assertSee('Let Pro sort your products')
-        ->assertSeeHtml('href="' . route('upgrade') . '"');
+        ->assertSeeHtml('href="' . route('app.pro') . '"');
 });
 
 it('says Try Pro while checkout would start a free trial, and Get Pro once it would not', function (): void {

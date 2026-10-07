@@ -175,7 +175,20 @@ it('tells a free account why the long ranges are missing', function (): void {
 
     livewire(ProductShow::class, ['product' => $product])
         ->assertSee('Your plan shows the last 90 days')
-        ->assertSee('Compare plans');
+        ->assertSee('This product has 6 months of price history')
+        ->assertSeeHtml('href="' . route('app.pro') . '"');
+});
+
+it('says nothing about the limit on a product with no history older than the plan shows', function (): void {
+    configureStripe();
+
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR']);
+    ProductCheapestHistory::create(['product_id' => $product->id, 'cheapest_price' => '1.99', 'started_at' => CarbonImmutable::now()->subDays(20), 'ended_at' => null]);
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertDontSeeHtml('data-test="history-pro-hint"');
 });
 
 it('does not advertise pro while the shop is shut', function (): void {
@@ -186,7 +199,7 @@ it('does not advertise pro while the shop is shut', function (): void {
 
     livewire(ProductShow::class, ['product' => $product])
         ->assertSee('Your plan shows the last 90 days')
-        ->assertDontSee('Compare plans');
+        ->assertDontSeeHtml('href="' . route('app.pro') . '"');
 });
 
 it('says nothing about plans to an account with no ceiling', function (): void {

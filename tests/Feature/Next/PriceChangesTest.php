@@ -188,6 +188,7 @@ test('a Pro owner opens the list and pages it ten at a time', function (): void 
 });
 
 test('a Free owner sees the Pro note and no rows', function (): void {
+    configureStripe();
     $shop = priceLogProduct(pro: false);
     segment($shop, '6.49', 10);
 
@@ -197,6 +198,15 @@ test('a Free owner sees the Pro note and no rows', function (): void {
         ->toggle('open')
         ->assertSeeHtml('data-test="price-changes-pro"')
         ->assertViewHas('rows', []);
+});
+
+test('a Free owner sees no list at all while Pro cannot be bought', function (): void {
+    $shop = priceLogProduct(pro: false);
+
+    $this->actingAs($shop->product()->sole()->user()->sole());
+
+    livewire(PriceChanges::class, ['product' => $shop->product()->sole(), 'range' => '90'])
+        ->assertDontSee('Show price changes');
 });
 
 test('another account cannot open the list', function (): void {

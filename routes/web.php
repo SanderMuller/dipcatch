@@ -15,6 +15,7 @@ use App\Http\Controllers\SocialLoginController;
 use App\Http\Controllers\UseCasePageController;
 use App\Http\Middleware\MarketingLocale;
 use App\Livewire\Billing\BillingPage;
+use App\Livewire\Billing\ProPage;
 use App\Livewire\Changelog\ChangelogPage;
 use App\Livewire\Connections\ConnectionsPage;
 use App\Livewire\Dashboard;
@@ -235,6 +236,7 @@ Route::prefix('app')
         Route::get('products/{product}.md', ProductMarkdownController::class)->whereUuid('product')->name('products.markdown');
         Route::livewire('products/{product}/edit', EditProduct::class)->whereUuid('product')->name('products.edit');
         Route::livewire('billing', BillingPage::class)->name('billing');
+        Route::livewire('pro', ProPage::class)->name('pro');
         // Moved into settings; the old address keeps working for bookmarks.
         Route::permanentRedirect('notifications', '/settings/notifications')->name('notifications');
         Route::livewire('connections', ConnectionsPage::class)->name('connections');

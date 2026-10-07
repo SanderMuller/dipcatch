@@ -15,6 +15,7 @@ beforeEach(function (): void {
 
 it('creates a public link and serves the page behind it', function (): void {
     $user = User::factory()->create();
+    subscribeUser($user);
     $product = Product::factory()->create(['user_id' => $user->id, 'share_slug' => null]);
 
     $this->actingAs($user);
@@ -64,6 +65,7 @@ it('withdraws the link so the page stops answering', function (): void {
 
 it('does not overwrite a link another tab just created', function (): void {
     $user = User::factory()->create();
+    subscribeUser($user);
     $product = Product::factory()->create(['user_id' => $user->id, 'share_slug' => null]);
 
     $this->actingAs($user);
@@ -113,8 +115,9 @@ it('refuses to share somebody elses product', function (): void {
         ->and($mine->fresh()?->share_slug)->toBeNull();
 });
 
-it('offers sharing on the product page', function (): void {
+it('offers sharing on the product page to a Pro account', function (): void {
     $user = User::factory()->create();
+    subscribeUser($user);
     $product = Product::factory()->create(['user_id' => $user->id]);
 
     $this->actingAs($user);
@@ -131,4 +134,37 @@ it('shows the link itself once the product is shared', function (): void {
 
     $this->get(route('app.products.show', $product))->assertOk()->assertSeeHtml(route('product.public', ['slug' => str_repeat('f', 32)]))
         ->assertSee('Stop sharing');
+});
+
+it('offers a free account Pro instead of a new public link', function (): void {
+    configureStripe();
+
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'share_slug' => null]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeHtml('data-test="sharing-pro-hint"')
+        ->assertDontSeeHtml('wire:click="generateShareLink"')
+        ->call('generateShareLink')
+        ->assertSet('shareMessage', 'Public sharing is part of Pro.');
+
+    expect($product->fresh()?->share_slug)->toBeNull();
+});
+
+it('keeps a link a free account made before, which it can still replace or stop', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->create(['user_id' => $user->id, 'share_slug' => str_repeat('g', 32)]);
+
+    $this->get(route('product.public', ['slug' => str_repeat('g', 32)]))->assertOk();
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertDontSeeHtml('data-test="sharing-pro-hint"')
+        ->call('rotateShareLink')
+        ->assertSet('shareMessage', 'Public link replaced. The old one stops working now.')
+        ->call('stopSharing')
+        ->assertSet('shareMessage', 'Public sharing stopped. The link now returns a 404.');
 });

@@ -25,6 +25,10 @@
         default => __('Nothing tracked yet.'),
     })
 
+    @if ($productLimitHint !== null)
+        <x-pro-hint class="mt-6" data-test="product-limit-pro-hint">{{ $productLimitHint }}</x-pro-hint>
+    @endif
+
     {{-- The add action sits above the categories, and the search and the
          filters above the products they narrow. --}}
     <div class="mt-6 grid gap-3 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-x-8 lg:gap-y-6">
@@ -174,7 +178,7 @@
                     <flux:callout.heading>{{ __('Let Pro sort your products') }}</flux:callout.heading>
                     <flux:callout.text>{{ __('With Pro, switch on automatic categories in your settings and DipCatch sorts your products, the ones already here too.') }}</flux:callout.text>
                     <x-slot name="actions">
-                        <flux:button size="sm" variant="primary" :href="route('upgrade')">{{ $promoOffersTrial ? __('Try Pro') : __('Get Pro') }}</flux:button>
+                        <flux:button size="sm" variant="primary" :href="route('app.pro')">{{ $promoOffersTrial ? __('Try Pro') : __('Get Pro') }}</flux:button>
                     </x-slot>
                 </flux:callout>
             @endif

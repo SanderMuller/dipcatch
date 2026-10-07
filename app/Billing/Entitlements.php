@@ -91,6 +91,12 @@ final readonly class Entitlements
         return $this->value('price_changes') === true;
     }
 
+    /** A new public link. A link made before stays, and its owner can still replace or stop it. */
+    public function allowsSharing(): bool
+    {
+        return $this->value('sharing') === true;
+    }
+
     private function number(string $key, string $fallbackKey): int
     {
         $value = $this->value($key);

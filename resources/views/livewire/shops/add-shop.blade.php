@@ -191,6 +191,7 @@
             @endif
 
             <livewire:ai-feature-prompt feature="shop_checks" wire:key="ai-prompt-add-shop" />
+            <x-pro-hint upsell data-test="shop-check-pro-hint">{{ __('Pro checks with AI whether this page sells the same product and pack as your other shops, so a wrong flavour or size does not slip in.') }}</x-pro-hint>
 
             <div class="flex flex-wrap gap-2">
                 <flux:button type="button" variant="primary" wire:click="confirm">

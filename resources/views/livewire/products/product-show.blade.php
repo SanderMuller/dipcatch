@@ -198,12 +198,14 @@
                 <flux:text size="sm" class="text-zinc-500">
                     {{ __('A preview someone already has can stay visible for a while after you stop sharing.') }}
                 </flux:text>
-            @else
+            @elseif ($canShare)
                 <flux:text>{{ __('This product has no public link yet.') }}</flux:text>
 
                 <flux:button size="sm" variant="primary" class="rounded-full!" wire:click="generateShareLink">
                     {{ __('Create a public link') }}
                 </flux:button>
+            @else
+                <x-pro-hint data-test="sharing-pro-hint">{{ __('Share a product page with its prices and shops, for a friend or a group chat. Public links are part of Pro.') }}</x-pro-hint>
             @endif
         </div>
     </flux:modal>
@@ -465,6 +467,12 @@
                         <span>{{ __('Confirming a large drop. The alert follows once a second reading agrees.') }}</span>
                     </p>
                 @endif
+                <x-pro-hint upsell class="mt-4" data-test="recheck-pro-hint">
+                    {{ __('Your plan checks each shop every :free hours. Pro checks every :pro hours, so a short deal reaches you sooner.', [
+                        'free' => \App\Billing\Entitlements::of(\App\Billing\Plan::Free)->recheckIntervalHours(),
+                        'pro' => \App\Billing\Entitlements::of(\App\Billing\Plan::Pro)->recheckIntervalHours(),
+                    ]) }}
+                </x-pro-hint>
             </flux:card>
         </section>
         <section class="min-w-0">
@@ -482,14 +490,6 @@
                         @else
                             <flux:text size="sm" class="mt-0.5 text-zinc-500" x-show="basis === 'unit'" :x-cloak="$basis !== 'unit'">{{ __('Price :unit, at the shop that is the best value.', ['unit' => $perUnit]) }}</flux:text>
                             <flux:text size="sm" class="mt-0.5 text-zinc-500" x-show="basis === 'price'" :x-cloak="$basis !== 'price'">{{ __('Price per pack, at the shop with the lowest price.') }}</flux:text>
-                        @endif
-                        @if ($historyNotice)
-                            <flux:text size="sm" class="mt-1 text-zinc-500">
-                                {{ $historyNotice['reason'] }}
-                                @if ($historyNotice['url'])
-                                    <flux:link :href="$historyNotice['url']" wire:navigate>{{ __('Compare plans') }}</flux:link>
-                                @endif
-                            </flux:text>
                         @endif
                     </div>
 
@@ -511,6 +511,10 @@
                             <flux:button icon="information-circle" size="sm" variant="subtle" inset :aria-label="__('About lowest price')" />
                         </flux:tooltip>
                     </div>
+                @endif
+
+                @if ($historyNotice !== null)
+                    <x-pro-hint class="mt-4" data-test="history-pro-hint">{{ $historyNotice }}</x-pro-hint>
                 @endif
 
                 @if ($chart['rows'] === [])

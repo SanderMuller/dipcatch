@@ -54,6 +54,7 @@ return [
         'auto_categories' => false,
         'shop_checks' => false,
         'price_changes' => false,
+        'sharing' => false,
         // Days of price history the chart will plot. Null is unlimited.
         // Data older than this is still stored — see the retention rule in
         // PruneOldChecksCommand — it simply cannot be read on this plan.
@@ -70,6 +71,7 @@ return [
         'auto_categories' => true,
         'shop_checks' => true,
         'price_changes' => true,
+        'sharing' => true,
         'history_days' => null,
     ],
 

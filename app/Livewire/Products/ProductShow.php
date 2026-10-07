@@ -3,7 +3,6 @@
 namespace App\Livewire\Products;
 
 use App\Actions\Shops\ProbeBudget;
-use App\Billing\BillingGate;
 use App\Billing\Entitlements;
 use App\Billing\HistoryWindow;
 use App\Billing\Plan;
@@ -20,6 +19,7 @@ use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Support\AlertRules;
 use App\Support\PriceBeforeDiscount;
 use App\Support\UrlNormalizer;
+use Carbon\CarbonInterface;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
@@ -140,6 +140,12 @@ final class ProductShow extends Component
     {
         $this->authorize('update', $this->product);
 
+        if (! $this->canShare()) {
+            $this->shareMessage = 'Public sharing is part of Pro.';
+
+            return;
+        }
+
         $updated = Product::query()
             ->whereKey($this->product->getKey())
             ->whereNull('share_slug')
@@ -206,6 +212,11 @@ final class ProductShow extends Component
 
         $this->product->forceFill(['active' => ! $this->product->active])->save();
         $this->product->refresh();
+    }
+
+    private function canShare(): bool
+    {
+        return $this->product->user?->entitlements()->allowsSharing() === true;
     }
 
     /** Hides the article-number warning until a shop brings another number. */
@@ -364,6 +375,7 @@ final class ProductShow extends Component
             'shops' => $shops,
             'discountChecks' => PriceBeforeDiscount::forShops($this->product, $shops),
             'shareUrl' => $this->product->publicShareUrl(),
+            'canShare' => $this->canShare(),
             'canAddShop' => app(PlanLimits::class)->canAddShop($this->product),
             'shopLimit' => $this->product->user?->entitlements()->maxShopsPerProduct(),
             'alertRules' => AlertRules::of($this->product),
@@ -406,12 +418,11 @@ final class ProductShow extends Component
     }
 
     /**
-     * Says why the long ranges are missing, and offers the way to them only
-     * when there is something to buy.
-     *
-     * @return array{reason: string, url: ?string}|null
+     * Says why the long ranges are missing, only when this product has price
+     * history older than the plan shows: on a newer product the limit hides
+     * nothing yet.
      */
-    private function historyNotice(): ?array
+    private function historyNotice(): ?string
     {
         $maxDays = $this->historyDays();
 
@@ -419,9 +430,15 @@ final class ProductShow extends Component
             return null;
         }
 
-        return [
-            'reason' => "Your plan shows the last {$maxDays} days. Pro shows the full history.",
-            'url' => BillingGate::isOpen() ? route('app.billing') : null,
-        ];
+        $oldest = $this->product->cheapestHistory()->inOrder()->first()?->started_at;
+
+        if ($oldest === null || $oldest->isAfter(now()->subDays($maxDays))) {
+            return null;
+        }
+
+        return __('This product has :age of price history. Your plan shows the last :days days, Pro shows all of it.', [
+            'age' => $oldest->diffForHumans(now(), CarbonInterface::DIFF_ABSOLUTE, parts: 1),
+            'days' => $maxDays,
+        ]);
     }
 }

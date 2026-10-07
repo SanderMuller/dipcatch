@@ -81,7 +81,7 @@
                     {{ __('Plan & billing') }}
                 </flux:command.item>
                 @if ($showUpgrade)
-                    <flux:command.item icon="sparkles" :href="route('upgrade')" keywords="pro upgrade buy premium yearly monthly price">
+                    <flux:command.item icon="sparkles" :href="route('app.pro')" keywords="pro upgrade buy premium yearly monthly price">
                         {{ __('Upgrade to Pro') }}
                     </flux:command.item>
                 @endif

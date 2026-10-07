@@ -222,6 +222,7 @@ it('shows the tracking state on the pill that toggles it', function (): void {
 
 it('shows whether the product has a public link', function (): void {
     $user = User::factory()->create();
+    subscribeUser($user);
     $product = ownedProduct($user);
 
     $this->actingAs($user);
@@ -492,13 +493,13 @@ it('clamps a forged range to the plan ceiling', function (): void {
     expect(json_encode(is_array($chart) ? $chart : []))->not->toContain('99.99');
 });
 
-it('tells a free account why the long ranges are missing', function (): void {
+it('keeps quiet about the history limit while the product history fits the plan', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => ownedProduct($user)])
-        ->assertSee('Your plan shows the last 90 days.');
+        ->assertDontSee('Your plan shows the last 90 days');
 });
 
 it('says nothing about plans to an account with no ceiling', function (): void {

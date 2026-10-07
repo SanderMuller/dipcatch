@@ -3,6 +3,8 @@
 namespace App\Livewire\Products;
 
 use App\Billing\BillingGate;
+use App\Billing\Entitlements;
+use App\Billing\Plan;
 use App\Billing\PlanLimits;
 use App\Billing\ProPrice;
 use App\Enums\ProductCategory;
@@ -70,6 +72,9 @@ final class ProductList extends Component
 
     #[Url(except: self::DEFAULT_SORT)]
     public string $sort = self::DEFAULT_SORT;
+
+    /** The hint shows from this many products left, so the limit is never a surprise. */
+    private const int PRODUCT_LIMIT_HINT_FROM = 3;
 
     private const string DEFAULT_SORT = 'biggest_drop';
 
@@ -217,6 +222,7 @@ final class ProductList extends Component
             'products' => $this->products(),
             'groupSizes' => $this->groupSizes(),
             'canAddProduct' => $this->canAddProduct(),
+            'productLimitHint' => $this->productLimitHint(),
             'categoryGroups' => $this->categoryGroups(),
             'shopHosts' => $this->shopHosts(),
             // Kept while selected, for the same reason as categoryGroups().
@@ -556,6 +562,32 @@ final class ProductList extends Component
             'biggest_drop' => 'biggest_drop desc NULLS LAST',
             default => 'created_at desc',
         };
+    }
+
+    /**
+     * A free account close to its product limit, said before the add button
+     * goes grey rather than only in its tooltip.
+     */
+    private function productLimitHint(): ?string
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User || $user->isPro()) {
+            return null;
+        }
+
+        $limit = $user->entitlements()->maxProducts();
+        $remaining = app(PlanLimits::class)->remainingProducts($user);
+
+        if ($limit === null || $remaining === null || $remaining > self::PRODUCT_LIMIT_HINT_FROM) {
+            return null;
+        }
+
+        $proLimit = Entitlements::of(Plan::Pro)->maxProducts();
+
+        return $remaining === 0
+            ? __('You follow all :limit products your plan allows. Pro follows up to :pro.', ['limit' => $limit, 'pro' => $proLimit])
+            : __('You follow :count of the :limit products your plan allows. Pro follows up to :pro.', ['count' => $limit - $remaining, 'limit' => $limit, 'pro' => $proLimit]);
     }
 
     private function canAddProduct(): bool

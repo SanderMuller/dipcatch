@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Products;
 
-use App\Billing\BillingGate;
 use App\Billing\HistoryWindow;
+use App\Billing\ProPitch;
 use App\Charts\PriceChangeAction;
 use App\Charts\PriceChangeLog;
 use App\Models\Product;
@@ -55,7 +55,7 @@ final class PriceChanges extends Component
             'rows' => array_slice($rows, 0, $this->limit),
             'hasMore' => count($rows) > $this->limit,
             'timezone' => $owner instanceof User && $owner->timezone !== '' ? $owner->timezone : 'Europe/Amsterdam',
-            'billingUrl' => BillingGate::isOpen() ? route('app.billing') : null,
+            'canBuyPro' => ProPitch::for($owner)?->canBuy === true,
         ]);
     }
 

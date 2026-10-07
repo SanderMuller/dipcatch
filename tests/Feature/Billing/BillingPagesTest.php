@@ -173,13 +173,13 @@ it('includes the target price per kilo on both plans', function (): void {
         ->assertSeeInOrder(['Target price per kilo', 'Any shop, any pack, at the price you set.', 'Included', 'Included', 'Price history']);
 });
 
-it('no longer lists the target price per kilo as something Pro adds', function (): void {
+it('lists the target price per kilo on both plans on the billing page too', function (): void {
     configureStripe();
     $this->actingAs(User::factory()->create());
 
     livewire(BillingPage::class)
-        ->assertSee('What Pro adds')
-        ->assertDontSee('Target price per kilo');
+        ->assertSee('Free and Pro, side by side')
+        ->assertSeeInOrder(['Target price per kilo', 'Included', 'Included', 'Price history']);
 });
 
 it('promises Pro no more price history than the nightly prune keeps', function (): void {
@@ -354,7 +354,7 @@ it('tells a free account at its product limit how far Pro goes', function (): vo
 
     livewire(BillingPage::class)
         ->assertSee('Full. Pro holds up to 250.')
-        ->assertSeeInOrder(['What Pro adds', 'Products', '20', '250']);
+        ->assertSeeInOrder(['Free and Pro, side by side', 'Products', '20', '250']);
 });
 
 it('shows a pro account which opt-in AI help it has switched on', function (): void {
@@ -365,7 +365,7 @@ it('shows a pro account which opt-in AI help it has switched on', function (): v
     $this->actingAs($user);
 
     livewire(BillingPage::class)
-        ->assertDontSee('What Pro adds')
+        ->assertDontSee('Free and Pro, side by side')
         ->assertSeeInOrder(['Automatic categories', 'On', 'Same-product check', 'Off'])
         ->assertSee(route('product-features.edit'));
 });
@@ -376,7 +376,7 @@ it('shows a blocked account neither what Pro adds nor the AI help it cannot use'
     $this->actingAs(User::factory()->create(['billing_blocked_at' => now(), 'auto_categories' => true]));
 
     livewire(BillingPage::class)
-        ->assertDontSee('What Pro adds')
+        ->assertDontSee('Free and Pro, side by side')
         ->assertDontSee('AI help in your plan');
 });
 
