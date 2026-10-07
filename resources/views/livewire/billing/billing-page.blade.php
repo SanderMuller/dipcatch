@@ -4,6 +4,28 @@
         {{ __('Your plan, how much of it you use, and where to change how you pay.') }}
     </flux:text>
 
+    {{-- One live region for the whole wait, so the swap from waiting to welcome or late is announced. --}}
+    @if ($checkoutDone)
+        <div role="status">
+        @if ($isPro && ! $isBlocked)
+            <flux:callout class="mt-6" icon="check-circle" color="green" data-test="checkout-welcome">
+                <flux:callout.heading>{{ __('Welcome to Pro') }}</flux:callout.heading>
+                <flux:callout.text>{{ __('Every Pro feature is yours now.') }}</flux:callout.text>
+            </flux:callout>
+        @elseif (! $isPro && $stillWaiting)
+            <flux:callout class="mt-6" icon="arrow-path" wire:poll.2s="waitForPro" data-test="checkout-waiting">
+                <flux:callout.heading>{{ __('Setting up Pro') }}</flux:callout.heading>
+                <flux:callout.text>{{ __('Thanks for your payment. Pro switches on as soon as Stripe confirms it, which takes a few seconds.') }}</flux:callout.text>
+            </flux:callout>
+        @elseif (! $isPro)
+            <flux:callout class="mt-6" icon="clock" data-test="checkout-slow">
+                <flux:callout.heading>{{ __('Pro is on its way') }}</flux:callout.heading>
+                <flux:callout.text>{{ __('Stripe has not confirmed your payment yet. Pro switches on by itself once it does, usually within a few minutes. Reload this page in a moment, or contact support if it takes longer.') }}</flux:callout.text>
+            </flux:callout>
+        @endif
+        </div>
+    @endif
+
     @if ($isBlocked)
         {{-- A lost chargeback drops the account to Free while Stripe may still
              be billing it, so the portal stays reachable below. --}}

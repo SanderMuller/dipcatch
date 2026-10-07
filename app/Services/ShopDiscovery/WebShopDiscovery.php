@@ -15,7 +15,6 @@ use App\Models\WebSearch;
 use App\Models\WebShopFinding;
 use App\Services\TypeSafe\ShopCheckPurpose;
 use App\Services\TypeSafe\ShopMatchCheck;
-use App\Services\TypeSafe\TypeSafeClient;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
@@ -41,6 +40,7 @@ final readonly class WebShopDiscovery
         private ShopMatchCheck $shopMatch,
         private KlarnaDiscovery $klarna,
         private BarcodeSearch $barcodeSearch,
+        private DiscoveryReach $reach,
     ) {}
 
     private function runsFor(Product $product): bool
@@ -55,10 +55,7 @@ final readonly class WebShopDiscovery
     /** The part of the gate that needs no product yet: the account and the currency. */
     public function runsForOwner(User $user, string $currency): bool
     {
-        return $this->searches->enabled()
-            && TypeSafeClient::configured()
-            && $user->wantsShopChecks()
-            && strcasecmp($currency, 'EUR') === 0;
+        return $user->wantsShopChecks() && $this->reach->covers($currency);
     }
 
     public function queue(Product $product): bool

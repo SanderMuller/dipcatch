@@ -12,6 +12,9 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\TypeSafe\TypeSafeClient;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -21,6 +24,34 @@ use Livewire\Component;
  */
 final class BillingPage extends Component
 {
+    public const int MAX_CHECKOUT_POLLS = 15;
+
+    /** `done` when Stripe's checkout sent the customer back here. */
+    #[Url]
+    public string $checkout = '';
+
+    #[Locked]
+    public int $checkoutWaits = 0;
+
+    /**
+     * Stripe can send the customer back before its webhook makes the account
+     * Pro. Until then the page polls here; once Pro, it tells the Pro dialog.
+     */
+    public function waitForPro(): void
+    {
+        if ($this->user()->isPro()) {
+            $this->dispatch('pro-started');
+
+            return;
+        }
+
+        $this->checkoutWaits++;
+    }
+
+    /** The Pro dialog switched a feature on: the "AI help in your plan" badges follow. */
+    #[On('ai-feature-switched-on')]
+    public function aiFeatureSwitchedOn(): void {}
+
     public function render(): View
     {
         return view('livewire.billing.billing-page', [
@@ -42,6 +73,8 @@ final class BillingPage extends Component
             'autoCategoriesOn' => $this->user()->auto_categories,
             'shopChecksOn' => $this->user()->shop_checks,
             'aiAvailable' => TypeSafeClient::configured(),
+            'checkoutDone' => $this->checkout === 'done',
+            'stillWaiting' => $this->checkoutWaits < self::MAX_CHECKOUT_POLLS,
         ]);
     }
 

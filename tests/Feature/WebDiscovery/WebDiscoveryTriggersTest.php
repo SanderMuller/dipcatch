@@ -3,9 +3,12 @@
 use App\Actions\Products\CreateProductWithShop;
 use App\Actions\Products\ProductDraft;
 use App\Actions\Shops\ShopDraft;
+use App\Actions\Users\SwitchOnAiFeature;
+use App\Enums\AiFeature;
 use App\Enums\WebDiscoveryState;
 use App\Enums\WebFindingStatus;
 use App\Jobs\DiscoverWebShops;
+use App\Livewire\Settings\ProductFeatures;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -16,6 +19,8 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
+
+use function Pest\Livewire\livewire;
 
 beforeEach(function (): void {
     config()->set('services.serper.key', 'test-key');
@@ -216,4 +221,53 @@ it('is scheduled daily', function (): void {
 
     expect($events)->toHaveCount(1)
         ->and($events->first()->expression)->toBe('40 2 * * *');
+});
+
+it('searches the newest products never searched at once when shop checks go on, up to the cap', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $products = collect(range(1, SwitchOnAiFeature::DISCOVERIES_AT_SWITCH_ON + 2))->map(function (int $day) use ($user): Product {
+        $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'created_at' => now()->subDays($day)]);
+        Shop::factory()->for($product)->create();
+
+        return $product;
+    });
+    $searched = $products->firstOrFail();
+    WebDiscovery::markQueued($searched);
+    $withoutShop = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    $someoneElses = Product::factory()->create(['currency' => 'EUR']);
+    Shop::factory()->for($someoneElses)->create();
+
+    app(SwitchOnAiFeature::class)($user, AiFeature::ShopChecks);
+
+    $queued = Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId);
+    expect($user->refresh()->shop_checks)->toBeTrue()
+        ->and($queued)->toHaveCount(SwitchOnAiFeature::DISCOVERIES_AT_SWITCH_ON)
+        ->and($queued->all())->not->toContain((string) $searched->id, (string) $withoutShop->id, (string) $products->last()->id, (string) $someoneElses->id)
+        ->and(WebDiscovery::query()->find($someoneElses->id))->toBeNull();
+
+    app(SwitchOnAiFeature::class)($user, AiFeature::ShopChecks);
+    expect(Queue::pushed(DiscoverWebShops::class)->count())->toBe(SwitchOnAiFeature::DISCOVERIES_AT_SWITCH_ON);
+});
+
+it('searches at once when shop checks go on in Settings, once a day however often they go off and on', function (): void {
+    $user = User::factory()->create();
+    subscribeUser($user);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create();
+    $this->actingAs($user);
+
+    livewire(ProductFeatures::class)->set('shop_checks', true)->call('save');
+    livewire(ProductFeatures::class)->set('shop_checks', false)->call('save');
+    $later = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    Shop::factory()->for($later)->create();
+    livewire(ProductFeatures::class)->set('shop_checks', true)->call('save');
+
+    Queue::assertPushed(DiscoverWebShops::class, 1);
+
+    $this->travel(25)->hours();
+    livewire(ProductFeatures::class)->set('shop_checks', false)->call('save');
+    livewire(ProductFeatures::class)->set('shop_checks', true)->call('save');
+
+    Queue::assertPushed(DiscoverWebShops::class, 2);
 });

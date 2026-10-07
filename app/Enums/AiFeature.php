@@ -24,19 +24,31 @@ enum AiFeature: string
         };
     }
 
-    public function promptHeading(): string
+    public function label(): string
     {
         return match ($this) {
-            self::Categories => __('Sort your products into categories with AI'),
-            self::ShopChecks => __('Let AI check that a shop sells the same product'),
+            self::Categories => __('Automatic categories'),
+            self::ShopChecks => __('Shop checks'),
         };
     }
 
-    public function promptText(): string
+    /**
+     * @return list<string> One line per thing it does.
+     */
+    public function does(): array
     {
         return match ($this) {
-            self::Categories => __('Your plan includes it. DipCatch then places your products in a category, the ones already here and each one you add, so you can filter your list. It is off until you switch it on.'),
-            self::ShopChecks => __('Your plan includes it. DipCatch then warns you when a new shop sells a different product or pack, and finds more shops that sell yours. It is off until you switch it on.'),
+            self::ShopChecks => [
+                __('Warns you when a new shop sells another flavour or pack size.'),
+                __('Checks a page that hides its pack size, so the price per kilo stays right.'),
+                __('Searches the web, by name, by barcode and on comparison sites, for more shops.'),
+                __('Suggests an alert price from how deep a product usually goes on sale.'),
+            ],
+            self::Categories => [
+                __('Files every product you add into a category.'),
+                __('Sorts the ones already here without a category too.'),
+                __('Never changes a category you chose yourself.'),
+            ],
         };
     }
 
@@ -44,7 +56,7 @@ enum AiFeature: string
     {
         return match ($this) {
             self::Categories => __('Switched on. DipCatch is sorting the products without a category now, and each one you add.'),
-            self::ShopChecks => __('Switched on. DipCatch checks the next shop you add.'),
+            self::ShopChecks => __('Switched on. DipCatch checks the shops you add and their pack sizes, and looks for more shops.'),
         };
     }
 
@@ -67,16 +79,11 @@ enum AiFeature: string
         };
     }
 
-    /**
-     * Whether to offer the feature now: available here, the plan includes
-     * it, it is still off, the person has not waved the prompts away, and
-     * there is something for it to do.
-     */
-    public function isOfferedTo(User $user): bool
+    public function isOfferedTo(User $user, AiPromptPlace $place): bool
     {
         return $this->isAvailableTo($user)
-            && $user->ai_prompts_dismissed_at === null
             && ! $this->isOn($user)
+            && ! $place->isQuietFor($user)
             && $this->hasWorkFor($user);
     }
 

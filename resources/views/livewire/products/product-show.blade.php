@@ -388,6 +388,10 @@
                     </flux:table.rows>
                 </flux:table>
 
+                @if ($packs->hasComparisonUnit() && $shops->contains(fn ($shop): bool => ! $shop->isReference() && $packs->for($shop)?->isSizeInDoubt() === true))
+                    <livewire:ai-feature-prompt place="pack_size" below :key="'ai-prompt-pack-size-' . $product->id" />
+                @endif
+
                 @if ($editingShopId)
                     @php($editing = $shops->firstWhere('id', $editingShopId))
                     @if ($editing)

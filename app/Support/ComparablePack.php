@@ -57,6 +57,16 @@ final readonly class ComparablePack
         return $this->provenance === PackProvenance::Stated || $this->provenance === PackProvenance::Confirmed;
     }
 
+    /**
+     * A size the shop check reads the page for (`ConfirmPackSize`): borrowed
+     * from the other shops, or implausible.
+     */
+    public function isSizeInDoubt(): bool
+    {
+        return $this->provenance === PackProvenance::Inferred
+            || $this->exclusion === PackExclusion::SizeImplausible;
+    }
+
     public function reason(): ?string
     {
         return $this->exclusion?->label($this->currency);

@@ -142,3 +142,19 @@ it('shows the suggestion rather than a checking card when a shop changed during 
         ->assertDontSeeHtml('data-test="alert-suggestion-checking"')
         ->assertSee('Pet food often goes about 20% off.');
 });
+
+it('offers shop checks under the suggestion to Pro with them off, and Pro itself to a free account', function (): void {
+    $pro = User::factory()->create(['shop_checks' => false]);
+    subscribeUser($pro);
+    $this->actingAs($pro);
+    livewire(EditProduct::class, ['product' => editSuggestionProduct($pro)])
+        ->assertSeeHtml('data-place="alert"')
+        ->assertDontSeeHtml('data-test="pro-teaser"');
+
+    app()->forgetScopedInstances();
+    $free = User::factory()->create();
+    $this->actingAs($free);
+    livewire(EditProduct::class, ['product' => editSuggestionProduct($free)])
+        ->assertSeeHtml('data-test="pro-teaser"')
+        ->assertDontSeeHtml('data-place="alert"');
+});

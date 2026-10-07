@@ -83,19 +83,16 @@
         </div>
     @endif
 
-    @if (! $usesJev)
+    @if (! $usesJev && $canSwitchOnAi)
+        <div data-test="switch-on-ai">
+            <livewire:ai-feature-prompt place="alert" below wire:key="ai-prompt-alert-wizard" />
+        </div>
+    @elseif (! $usesJev)
         <div class="mt-4 border-t border-zinc-950/5 pt-3 dark:border-white/10">
-            @if ($canSwitchOnAi)
-                <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400" data-test="switch-on-ai">
-                    {{ __('With AI help on, Pro also checks how products like this go on sale.') }}
-                    <flux:link :href="route('product-features.edit')" wire:navigate>{{ __('Switch on AI help') }}</flux:link>
-                </flux:text>
-            @else
-                <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400" data-test="pro-teaser">
-                    {{ __('Pro also checks how products like this go on sale.') }}
-                    <flux:link :href="route('app.billing')" wire:navigate>{{ __('Compare plans') }}</flux:link>
-                </flux:text>
-            @endif
+            <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400" data-test="pro-teaser">
+                {{ __('Pro also checks how products like this go on sale.') }}
+                <flux:link :href="route('app.billing')" wire:navigate>{{ __('Compare plans') }}</flux:link>
+            </flux:text>
         </div>
     @endif
 </section>

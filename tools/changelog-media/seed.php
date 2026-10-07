@@ -13,6 +13,7 @@
 // is fictional, because the media are published. It sets a known password,
 // so it refuses anything but a local environment.
 
+use App\Enums\AiPromptPlace;
 use App\Enums\WebFindingStatus;
 use App\Models\LargeDropCheck;
 use App\Models\PriceCheck;
@@ -71,8 +72,10 @@ $user->forceFill([
     'is_admin' => false,
     'trial_ends_at' => $now->addDays(30),
     'shop_checks' => $scenario === 'screenshots',
-    // The "switch on AI" prompt is not what any of these shots are about.
+    // The AI offers (the Pro dialog, each place's prompt) are not what these shots are about.
     'ai_prompts_dismissed_at' => $scenario === 'video' ? $now : null,
+    'ai_offer_shown_at' => $now,
+    'ai_prompt_dismissals' => array_fill_keys(array_column(AiPromptPlace::cases(), 'value'), $now->toIso8601String()),
 ])->save();
 Product::query()->where('user_id', $user->id)->get()->each(fn (Product $product) => $product->delete());
 

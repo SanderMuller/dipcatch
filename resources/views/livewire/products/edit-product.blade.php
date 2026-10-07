@@ -66,6 +66,10 @@
                             <flux:link :href="route('app.pro')" class="text-sm">{{ __('Get Pro') }}</flux:link>
                         @endif
                     </div>
+                    {{-- Mounted only when offered, so the form keeps no empty gap. --}}
+                    @if ($offersAutoCategories)
+                        <livewire:ai-feature-prompt place="product_category" wire:key="ai-prompt-product-category" />
+                    @endif
                 @endif
 
                 {{-- Only when a price per unit exists to show. Without a pack
@@ -151,15 +155,14 @@
                         @endif
                     </x-unit-target>
 
-                    @if ($showsSuggestion && ! $alertCard['usesJev'])
-                        <flux:text size="sm" class="mt-3 max-w-2xl text-zinc-500 dark:text-zinc-400" :data-test="$alertCard['canSwitchOnAi'] ? 'switch-on-ai' : 'pro-teaser'">
-                            @if ($alertCard['canSwitchOnAi'])
-                                {{ __('With AI help on, Pro also checks how products like this go on sale.') }}
-                                <flux:link :href="route('product-features.edit')" wire:navigate>{{ __('Switch on AI help') }}</flux:link>
-                            @else
-                                {{ __('Pro also checks how products like this go on sale.') }}
-                                <flux:link :href="route('app.billing')" wire:navigate>{{ __('Compare plans') }}</flux:link>
-                            @endif
+                    @if ($showsSuggestion && ! $alertCard['usesJev'] && $alertCard['canSwitchOnAi'])
+                        <div class="max-w-2xl" data-test="switch-on-ai">
+                            <livewire:ai-feature-prompt place="alert" below wire:key="ai-prompt-alert-edit" />
+                        </div>
+                    @elseif ($showsSuggestion && ! $alertCard['usesJev'])
+                        <flux:text size="sm" class="mt-3 max-w-2xl text-zinc-500 dark:text-zinc-400" data-test="pro-teaser">
+                            {{ __('Pro also checks how products like this go on sale.') }}
+                            <flux:link :href="route('app.billing')" wire:navigate>{{ __('Compare plans') }}</flux:link>
                         </flux:text>
                     @endif
                 @endif

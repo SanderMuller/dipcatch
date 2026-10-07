@@ -3,6 +3,7 @@
 use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Enums\ProductCategory;
 use App\Enums\PromotionDepthBand;
+use App\Livewire\AiFeaturePrompt;
 use App\Livewire\Products\AddProductWizard;
 use App\Models\Product;
 use App\Models\Shop;
@@ -137,6 +138,7 @@ it('points a Pro account without AI help at the switch, and asks nothing', funct
 
     alertStep(suggestionWizardProduct($user))
         ->assertSeeHtml('data-test="switch-on-ai"')
+        ->assertSeeLivewire(AiFeaturePrompt::class)
         ->assertDontSeeHtml('wire:init="askJev"')
         ->call('askJev');
 

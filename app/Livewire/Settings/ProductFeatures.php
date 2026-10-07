@@ -2,7 +2,8 @@
 
 namespace App\Livewire\Settings;
 
-use App\Jobs\CategoriseExistingProduct;
+use App\Actions\Users\SwitchOnAiFeature;
+use App\Enums\AiFeature;
 use App\Models\User;
 use App\Services\TypeSafe\TypeSafeClient;
 use Flux\Flux;
@@ -30,18 +31,22 @@ final class ProductFeatures extends Component
         $this->shop_checks = (bool) $user->shop_checks;
     }
 
-    public function save(): void
+    public function save(SwitchOnAiFeature $switchOn): void
     {
         $user = $this->user();
         $switchedOnCategories = $this->auto_categories && ! $user->auto_categories;
+        $switchedOnShopChecks = $this->shop_checks && ! $user->shop_checks;
 
         $user->forceFill([
             'auto_categories' => $this->auto_categories,
             'shop_checks' => $this->shop_checks,
         ])->save();
 
-        // Sorts the products already here now, rather than at the nightly run.
-        $queued = $switchedOnCategories ? CategoriseExistingProduct::queueFor($user) : 0;
+        $queued = $switchedOnCategories ? $switchOn->startWork($user, AiFeature::Categories) : 0;
+
+        if ($switchedOnShopChecks) {
+            $switchOn->startWork($user, AiFeature::ShopChecks);
+        }
 
         Flux::toast(variant: 'success', text: $queued > 0
             ? __('Saved. DipCatch is sorting your products without a category now.')

@@ -277,4 +277,8 @@
             {{ __('Looking for more shops…') }}
         </flux:text>
     @endif
+
+    @if ($offersWebSearch)
+        <livewire:ai-feature-prompt place="shop_suggestions" below :key="'ai-prompt-suggestions-' . $product->id" />
+    @endif
 </div>

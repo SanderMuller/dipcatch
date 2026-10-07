@@ -5,6 +5,8 @@ namespace App\Livewire\Products;
 use App\Actions\Products\CategoriseProduct;
 use App\Actions\Products\SaveAlert;
 use App\Actions\Products\UpdateProductDetails;
+use App\Enums\AiFeature;
+use App\Enums\AiPromptPlace;
 use App\Enums\CategorySource;
 use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
@@ -12,6 +14,7 @@ use App\Livewire\Concerns\EditsAlertFields;
 use App\Livewire\Concerns\SuggestsAlert;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\User;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
@@ -23,6 +26,7 @@ use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
 use SanderMuller\FluentValidation\FluentRule;
@@ -74,6 +78,10 @@ final class EditProduct extends Component
 
     public ?string $suggestionMessage = null;
 
+    /** Decided once, so the many round trips on this page do not ask again. */
+    #[Locked]
+    public bool $offersAutoCategories = false;
+
     public function mount(Product $product): void
     {
         // Route-model binding hands over any id in the URL, so ownership is
@@ -90,6 +98,8 @@ final class EditProduct extends Component
         $this->category = $product->category->value ?? '';
         $this->loadedCategory = $this->category;
         $this->suggestedCategory = $this->category === '' ? ($product->suggested_category->value ?? null) : null;
+        $user = auth()->user();
+        $this->offersAutoCategories = $user instanceof User && AiFeature::Categories->isOfferedTo($user, AiPromptPlace::ProductCategory);
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Models\WebDiscovery;
 use App\Models\WebShopFinding;
+use App\Services\ShopDiscovery\DiscoveryReach;
 use App\Services\Suggestions\ShopSuggestion;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -166,6 +167,7 @@ final class ShopSuggestions extends Component
             'product' => $product,
             'suggestions' => $suggest($product),
             'webSuggestions' => $webShown ? WebShopFinding::shownFor($product) : new EloquentCollection(),
+            'offersWebSearch' => ! $webShown && app(DiscoveryReach::class)->coversProduct($product),
             'discovering' => $discovering,
             'searchingFor' => $searchingFor,
             // The bar shows while the panel polls. Once it stops, the plain

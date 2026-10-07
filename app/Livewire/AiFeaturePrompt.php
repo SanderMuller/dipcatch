@@ -2,39 +2,53 @@
 
 namespace App\Livewire;
 
-use App\Enums\AiFeature;
-use App\Jobs\CategoriseExistingProduct;
+use App\Actions\Users\SwitchOnAiFeature;
+use App\Enums\AiPromptPlace;
 use App\Models\User;
+use App\Support\AiPromptsOnPage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
- * Offers one AI feature where it helps, with a button that switches it on.
- * Nothing is switched on without that click. "Not now" hides every AI prompt
- * for the account; the settings page still has both switches.
+ * Offers one AI feature at a place where the person does its work by hand.
+ * Nothing is switched on without the click. "Not now" hides only this place,
+ * see AiPromptPlace. A page offers each feature once: the first prompt to
+ * mount in a request claims it (AiPromptsOnPage), and the view's x-init
+ * hides one from a later request.
  */
 final class AiFeaturePrompt extends Component
 {
     #[Locked]
-    public string $feature;
+    public string $place;
 
     public bool $switchedOn = false;
+
+    /** Not shown: not offered here, claimed by another prompt, dismissed, or switched on elsewhere. */
+    public bool $hidden = false;
 
     /** Leaves a gap below the prompt, for a spot with nothing to space it. */
     #[Locked]
     public bool $spaced = false;
 
-    public function mount(string $feature, bool $spaced = false): void
+    /** Leaves a gap above the prompt, under the content it follows. */
+    #[Locked]
+    public bool $below = false;
+
+    public function mount(string $place, bool $spaced = false, bool $below = false): void
     {
-        $this->feature = AiFeature::from($feature)->value;
+        $place = AiPromptPlace::from($place);
+        $this->place = $place->value;
         $this->spaced = $spaced;
+        $this->below = $below;
+        $this->hidden = ! ($place->feature()->isOfferedTo($this->user(), $place) && app(AiPromptsOnPage::class)->claim($place->feature()));
     }
 
-    public function switchOn(): void
+    public function switchOn(SwitchOnAiFeature $switchOn): void
     {
-        $feature = AiFeature::from($this->feature);
+        $feature = AiPromptPlace::from($this->place)->feature();
         $user = $this->user();
 
         // Not the full offer rule: a click after the last product got a
@@ -43,27 +57,33 @@ final class AiFeaturePrompt extends Component
             return;
         }
 
-        $wasOn = $feature->isOn($user);
-        $user->forceFill([$feature->column() => true])->save();
+        $switchOn($user, $feature);
         $this->switchedOn = true;
+        $this->dispatch('ai-feature-switched-on', feature: $feature->value);
+    }
 
-        if ($feature === AiFeature::Categories && ! $wasOn) {
-            CategoriseExistingProduct::queueFor($user);
+    #[On('ai-feature-switched-on')]
+    public function switchedOnElsewhere(string $feature): void
+    {
+        if ($feature === AiPromptPlace::from($this->place)->feature()->value) {
+            $this->hidden = true;
         }
     }
 
     public function dismiss(): void
     {
-        $this->user()->forceFill(['ai_prompts_dismissed_at' => now()])->save();
+        AiPromptPlace::from($this->place)->dismissFor($this->user());
+        $this->hidden = true;
     }
 
     public function render(): View
     {
-        $feature = AiFeature::from($this->feature);
+        $place = AiPromptPlace::from($this->place);
 
         return view('livewire.ai-feature-prompt', [
-            'aiFeature' => $feature,
-            'offered' => ! $this->switchedOn && $feature->isOfferedTo($this->user()),
+            'aiPlace' => $place,
+            'aiFeature' => $place->feature(),
+            'offered' => ! $this->switchedOn && ! $this->hidden,
         ]);
     }
 

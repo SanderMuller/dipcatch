@@ -192,6 +192,8 @@
 
         {{ $slot }}
 
+        <livewire:pro-ai-offer />
+
         {{-- The bottom row of the marketing footer, so the legal pages are a
              click away from inside the app as well. --}}
         <footer class="mx-auto mt-auto w-full max-w-app px-4 pt-6 pb-8 sm:px-6 lg:px-8 print:hidden">

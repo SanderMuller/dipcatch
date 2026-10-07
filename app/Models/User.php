@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Concerns\Subscribes;
+use App\Enums\AiPromptPlace;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -47,6 +48,8 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
  * @property bool $shop_checks
  * @property bool $affiliate_links_excluded
  * @property CarbonImmutable|null $ai_prompts_dismissed_at
+ * @property CarbonImmutable|null $ai_offer_shown_at When the one-time dialog offering the AI features opened.
+ * @property array<string, string>|null $ai_prompt_dismissals Place => when "Not now" was clicked there, see {@see AiPromptPlace}.
  * @property CarbonImmutable|null $digest_processed_until
  * @property CarbonImmutable|null $tracking_ideas_hidden_at
  * @property CarbonImmutable|null $timezone_detected_at
@@ -98,6 +101,8 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
             'shop_checks' => 'boolean',
             'affiliate_links_excluded' => 'boolean',
             'ai_prompts_dismissed_at' => 'datetime',
+            'ai_offer_shown_at' => 'datetime',
+            'ai_prompt_dismissals' => 'array',
             'digest_processed_until' => 'datetime',
             'tracking_ideas_hidden_at' => 'datetime',
             'timezone_detected_at' => 'datetime',

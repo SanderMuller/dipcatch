@@ -273,6 +273,11 @@
                 </ul>
             @endif
 
+            {{-- Checked here too, so a step without the prompt keeps no empty gap. --}}
+            @if ($couldSearchWeb && \App\Enums\AiFeature::ShopChecks->isOfferedTo(auth()->user(), \App\Enums\AiPromptPlace::WizardShops))
+                <livewire:ai-feature-prompt place="wizard_shops" :key="'ai-prompt-wizard-shops-' . $product->id" />
+            @endif
+
             @if ($canAddShop)
                 {{-- Open, not behind the product page's disclosure: adding
                      shops is what this step is for. The form shows the

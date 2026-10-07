@@ -164,4 +164,8 @@
 
         <x-hide-shop-confirm :name="'hide-shop-' . $this->getId()" />
     @endif
+
+    @if ($offersWebSearch)
+        <livewire:ai-feature-prompt place="dashboard_suggestions" below wire:key="ai-prompt-dashboard-suggestions" />
+    @endif
 </section>

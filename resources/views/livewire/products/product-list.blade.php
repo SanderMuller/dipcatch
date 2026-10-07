@@ -183,7 +183,7 @@
                 </flux:callout>
             @endif
 
-            <livewire:ai-feature-prompt feature="categories" spaced />
+            <livewire:ai-feature-prompt place="product_list" spaced />
 
             {{-- Four across leaves room for the category list. --}}
             <x-product-card.grid :columns="4">

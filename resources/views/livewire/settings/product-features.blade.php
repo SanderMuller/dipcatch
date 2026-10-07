@@ -6,17 +6,8 @@
     <x-settings.layout width="max-w-2xl" :heading="__('Product features')" :subheading="__('Features that use AI. Both are off until you switch them on.')">
         @if ($available)
             @php
-                $shopChecksDoes = [
-                    __('Warns you when a new shop sells another flavour or pack size.'),
-                    __('Checks a page that hides its pack size, so the price per kilo stays right.'),
-                    __('Searches the web, by name, by barcode and on comparison sites, for more shops.'),
-                    __('Suggests an alert price from how deep a product usually goes on sale.'),
-                ];
-                $categoriesDoes = [
-                    __('Files every product you add into a category.'),
-                    __('Sorts the ones already here without a category too.'),
-                    __('Never changes a category you chose yourself.'),
-                ];
+                $shopChecksDoes = \App\Enums\AiFeature::ShopChecks->does();
+                $categoriesDoes = \App\Enums\AiFeature::Categories->does();
                 $isProPlan = $allowsAutoCategories || $allowsShopChecks;
                 $privacy = __('DipCatch sends the product name, its shops and their web addresses, the pack size, barcode and price, any offer a shop shows, and the category of the product to TypeSafe, our AI provider. Nothing about you.');
             @endphp
@@ -26,8 +17,8 @@
                  way to Pro: a greyed switch it cannot use read as broken. --}}
             <form wire:submit="save" class="space-y-8">
                 @foreach ([
-                    ['shop_checks', 'shop-checks', __('Shop checks'), $shopChecksDoes, $allowsShopChecks],
-                    ['auto_categories', 'auto-categories', __('Automatic categories'), $categoriesDoes, $allowsAutoCategories],
+                    ['shop_checks', 'shop-checks', \App\Enums\AiFeature::ShopChecks->label(), $shopChecksDoes, $allowsShopChecks],
+                    ['auto_categories', 'auto-categories', \App\Enums\AiFeature::Categories->label(), $categoriesDoes, $allowsAutoCategories],
                 ] as [$model, $test, $title, $does, $allowed])
                     <section @unless ($allowed) data-test="{{ $test }}-locked" @endunless>
                         <div class="flex items-center justify-between gap-4 border-b border-ink/10 pb-3 dark:border-white/10">

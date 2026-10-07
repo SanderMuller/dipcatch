@@ -84,7 +84,7 @@ it('sorts the products already here when the prompt switches it on', function ()
     existingProducts($user);
     $this->actingAs($user);
 
-    livewire(AiFeaturePrompt::class, ['feature' => 'categories'])->call('switchOn');
+    livewire(AiFeaturePrompt::class, ['place' => 'product_list'])->call('switchOn');
 
     Queue::assertPushed(CategoriseExistingProduct::class, 1);
 });
@@ -155,7 +155,7 @@ it('queues nothing from a prompt left open after the feature was switched on els
     $user = proWithCategoriesOff();
     existingProducts($user);
     $this->actingAs($user);
-    $prompt = livewire(AiFeaturePrompt::class, ['feature' => 'categories']);
+    $prompt = livewire(AiFeaturePrompt::class, ['place' => 'product_list']);
     $user->forceFill(['auto_categories' => true])->save();
 
     $prompt->call('switchOn');

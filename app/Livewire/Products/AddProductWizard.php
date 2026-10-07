@@ -21,6 +21,7 @@ use App\Models\User;
 use App\Models\WebDiscovery;
 use App\Services\Drops\Reference;
 use App\Services\Drops\TierDefaults;
+use App\Services\ShopDiscovery\DiscoveryReach;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Support\AlertSuggestion\AlertSuggestion;
 use App\Support\ConnectedAssistant;
@@ -458,6 +459,7 @@ final class AddProductWizard extends Component
             'shopImages' => $product === null ? [] : UpdateProductDetails::shopImages($product),
             'canAddShop' => $product !== null && app(PlanLimits::class)->canAddShop($product),
             'searchesWeb' => $product?->user?->wantsShopChecks() === true,
+            'couldSearchWeb' => app(DiscoveryReach::class)->coversProduct($product),
             'shopLimit' => $product?->user?->entitlements()->maxShopsPerProduct(),
             ...($product !== null && $this->step === 3 ? $this->alertStep($product) : []),
         ]);
