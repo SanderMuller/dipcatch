@@ -70,6 +70,22 @@ final readonly class ItemSizes
     }
 
     /**
+     * `$size` in `$unit`, through the item size the shops agree on: 12 pieces
+     * of a 45 g bar are 540 g, and 560 g of 28 g fish fingers are 20 pieces.
+     * Null when no agreed item size links the two units.
+     */
+    public function convert(PackSize $size, string $unit): ?PackSize
+    {
+        $factor = $this->between($size->unit, $unit);
+
+        if ($factor === null) {
+            return null;
+        }
+
+        return PackSize::of($size->unit === 'piece' ? $size->quantity * $factor : round($size->quantity / $factor), $unit);
+    }
+
+    /**
      * The shops outside the band that Jev has not answered about: the
      * questions that would let a blocked conversion through.
      *

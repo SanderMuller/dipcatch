@@ -110,7 +110,7 @@ final readonly class ComparablePacks
         $packs = [];
 
         foreach ($shops as $shop) {
-            $packs[(string) $shop->id] = self::resolveOne($shop, $currency, $unit, $agreed, $median);
+            $packs[(string) $shop->id] = self::resolveOne($shop, $currency, $unit, $agreed, $median, $itemSizes);
         }
 
         return new self($unit, $packs, $itemSizes, $agreed, $altsInDoubt);
@@ -313,6 +313,7 @@ final readonly class ComparablePacks
         string $unit,
         ?PackSize $agreed,
         ?float $median,
+        ItemSizes $itemSizes,
     ): ComparablePack {
         if ($shop->currency !== $currency) {
             return ComparablePack::excluded(PackExclusion::DifferentCurrency, $shop->currency);
@@ -341,9 +342,15 @@ final readonly class ComparablePacks
                     : ComparablePack::excluded(PackExclusion::SizeImplausible);
             }
 
-            return ComparablePack::excluded($size->unit === 'piece'
-                ? PackExclusion::SoldByThePiece
-                : PackExclusion::UnitDoesNotConvert);
+            // A count beside weights, or a weight beside counts: the item size
+            // the shops that state both agree on links the two. "12 bars" at one
+            // shop and "12 x 45 g" at the others is the same 540 g pack. Only an
+            // estimate, like a borrowed size: it is shown, never crowned.
+            $converted = $itemSizes->convert($size, $unit);
+
+            return $converted instanceof PackSize
+                ? self::inferredUnlessImplausible($shop, $converted, $median)
+                : ComparablePack::excluded(PackExclusion::outsideTheUnit($size->unit));
         }
 
         $confirmed = $shop->confirmedPackSize();
@@ -358,9 +365,15 @@ final readonly class ComparablePacks
             return ComparablePack::excluded(PackExclusion::SizeUnknown);
         }
 
-        return self::isImplausible($shop, $agreed, $median)
+        return self::inferredUnlessImplausible($shop, $agreed, $median);
+    }
+
+    /** A size the shop did not state itself: an estimate, unless it lands far from the field. */
+    private static function inferredUnlessImplausible(Shop $shop, PackSize $size, ?float $median): ComparablePack
+    {
+        return self::isImplausible($shop, $size, $median)
             ? ComparablePack::excluded(PackExclusion::SizeImplausible)
-            : ComparablePack::inferred($agreed);
+            : ComparablePack::inferred($size);
     }
 
     /**

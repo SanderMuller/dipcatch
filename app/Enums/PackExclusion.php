@@ -16,7 +16,7 @@ enum PackExclusion: string
     /** No size on the page, and the shops that do state one disagree. */
     case SizeUnknown = 'size_unknown';
 
-    /** A count with no item size anywhere on the shop's own page. */
+    /** A count, and no item size the other shops agree on to turn it into a weight or volume. */
     case SoldByThePiece = 'sold_by_the_piece';
 
     /** A size so far below the field that it is read as wrong, not as cheap. */
@@ -27,6 +27,12 @@ enum PackExclusion: string
 
     /** Priced in a currency the product does not compare in. */
     case DifferentCurrency = 'different_currency';
+
+    /** Why a shop sized in `$unit`, which is not the product's unit, sits outside. */
+    public static function outsideTheUnit(string $unit): self
+    {
+        return $unit === 'piece' ? self::SoldByThePiece : self::UnitDoesNotConvert;
+    }
 
     /**
      * One sentence a shopper can act on. `$currency` is only read by

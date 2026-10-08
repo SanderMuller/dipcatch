@@ -262,9 +262,10 @@ it('treats a conversion out of the storage range as no conversion', function ():
 it('names the same shops outside the comparison to an MCP client as the page does', function (): void {
     $product = igloField();
     $product->recomputeCheapestShop();
-    // A shop that only counts, with nothing stated by weight. Pieces now
-    // cover as many shops as grams, and the product stays per kilo.
-    pairedShop($product, 'plus.nl', '4.49', '20.00', 'piece');
+    // A shop in a unit that does not convert. A shop that only counts no
+    // longer serves here: the field agrees a fish finger is 28 g, so its
+    // count becomes an estimated weight inside the comparison.
+    pairedShop($product, 'plus.nl', '4.49', '500.00', 'ml');
 
     DipCatchServer::actingAs($product->user()->firstOrFail())
         ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 8.0])
@@ -549,4 +550,55 @@ it('sends no drop alert when a second size the guard kept out is admitted once i
 
     expect($product->refresh()->best_value_shop_id)->toBe((string) $ah->id)
         ->and(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(0);
+});
+
+/**
+ * The Barebells spread bars as read on 2026-10-08: most shops weigh the box
+ * and count the bars in the title ("12 x 45 g"), Fitness Candy counts bars
+ * only. The shops agree a bar is 45 g, so its 12 bars are an estimated 540 g.
+ */
+it('estimates the weight of a shop that only counts, from the item size the other shops agree on', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    pairedShop($product, 'musclehouse.nl', '21.99', '540.00', 'g', '12.00', 'piece');
+    pairedShop($product, 'supspace.nl', '27.99', '540.00', 'g', '12.00', 'piece');
+    pairedShop($product, 'bodyandshapestore.nl', '24.99', '540.00', 'g', '12.00', 'piece');
+    // Weighed only: these titles do not count the bars.
+    pairedShop($product, 'bodyandfit.com', '27.99', '540.00', 'g');
+    pairedShop($product, 'medpex.de', '32.69', '540.00', 'g');
+    $counts = pairedShop($product, 'fitnesscandy.nl', '34.20', '12.00', 'piece');
+
+    $pack = $product->refresh()->comparablePacks()->for($counts);
+
+    expect($pack?->exclusion)->toBeNull()
+        ->and($pack?->provenance)->toBe(PackProvenance::Inferred)
+        ->and($pack?->size?->quantity)->toBe(540.0)
+        ->and($pack?->size?->unit)->toBe('g')
+        // An estimate is shown, never crowned.
+        ->and($pack?->canWin())->toBeFalse();
+});
+
+it('estimates the count of a shop that only weighs, on a product compared per piece', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    pairedShop($product, 'a.nl', '4.99', '20.00', 'piece', '560.00', 'g');
+    pairedShop($product, 'b.nl', '5.29', '20.00', 'piece', '560.00', 'g');
+    pairedShop($product, 'd.nl', '5.49', '20.00', 'piece');
+    pairedShop($product, 'e.nl', '5.19', '20.00', 'piece');
+    $weighs = pairedShop($product, 'c.nl', '3.99', '560.00', 'g');
+
+    $packs = $product->refresh()->comparablePacks();
+
+    expect($packs->unit())->toBe('piece')
+        ->and($packs->for($weighs)?->provenance)->toBe(PackProvenance::Inferred)
+        ->and($packs->for($weighs)?->size?->quantity)->toBe(20.0);
+});
+
+it('leaves a count out when the shops disagree on what one item weighs', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    pairedShop($product, 'a.nl', '21.99', '540.00', 'g', '12.00', 'piece');
+    pairedShop($product, 'b.nl', '27.99', '600.00', 'g', '12.00', 'piece');
+    pairedShop($product, 'd.nl', '26.99', '540.00', 'g');
+    pairedShop($product, 'e.nl', '25.99', '540.00', 'g');
+    $counts = pairedShop($product, 'c.nl', '34.20', '12.00', 'piece');
+
+    expect($product->refresh()->comparablePacks()->for($counts)?->exclusion)->toBe(PackExclusion::SoldByThePiece);
 });
