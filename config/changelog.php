@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-08',
+            'category' => 'fix',
+            'title' => 'Only deals worth taking under "Worth a look"',
+            'body' => 'A deal that ends soon now shows on your dashboard only when that shop is still the cheapest place to buy. If another shop beats the deal, it stays off the list.',
+        ],
+        [
             'date' => '2026-10-07',
             'category' => 'pro',
             'title' => 'Switch on AI help where you need it',

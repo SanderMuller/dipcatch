@@ -71,6 +71,18 @@ it('lists a deal that ends within a week, and not one that ends later or cannot 
     expect(array_map(fn (array $row): string => $row['product']->title, $ending))->toBe(['Soon']);
 });
 
+it('leaves out a deal at a shop that another shop beats, and keeps one level with the best buy', function (): void {
+    $user = User::factory()->create();
+    $beaten = digestProduct($user, 'Beaten', 'ah.nl', 'jumbo.com');
+    $beaten->shops->firstWhere('host', 'jumbo.com')?->forceFill(['promotion_ends_at' => now()->addDays(2)])->save();
+    $level = digestProduct($user, 'Level', 'ah.nl', 'jumbo.com');
+    Shop::factory()->for($level)->create(['url' => 'https://dirk.nl/p/level', 'current_price' => '1.00', 'currency' => 'EUR', 'promotion_ends_at' => now()->addDays(2)]);
+
+    $ending = DashboardDigest::forUser($user)->endingSoon;
+
+    expect(array_map(fn (array $row): string => $row['product']->title . ' at ' . $row['shop']->host, $ending))->toBe(['Level at dirk.nl']);
+});
+
 it('still finds a buyable deal behind many earlier ones that cannot be bought', function (): void {
     $user = User::factory()->create();
 

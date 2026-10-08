@@ -220,8 +220,9 @@ final readonly class DashboardDigest
             ->where(fn (EloquentQueryBuilder $stock): EloquentQueryBuilder => $stock->whereNull('current_in_stock')->orWhere('current_in_stock', true))
             ->oldest('promotion_ends_at')
             ->with('product.shops')
-            // Room for the rarer rows only the full eligibility check leaves out.
-            ->limit(self::ATTENTION * 3)
+            // Room for the rows only the checks below leave out: a deal at a
+            // shop that is not the best buy is common.
+            ->limit(self::ATTENTION * 10)
             ->get();
 
         $ending = [];
@@ -230,12 +231,34 @@ final readonly class DashboardDigest
             $product = $shop->product;
             $window = $shop->promotionWindow();
 
-            if ($product instanceof Product && $window !== null && $window->isRunning($now) && $product->eligibleShops()->contains($shop)) {
+            if ($product instanceof Product && $window !== null && $window->isRunning($now) && self::isBestBuy($product, $shop)) {
                 $ending[] = ['product' => $product, 'shop' => $shop, 'endsAt' => $window->endsAt];
             }
         }
 
         return array_slice($ending, 0, self::ATTENTION);
+    }
+
+    /**
+     * Whether the deal is where to buy the product: at the shop the headline
+     * names, or one level with it. A deal another shop beats is not worth a look.
+     */
+    private static function isBestBuy(Product $product, Shop $shop): bool
+    {
+        $headline = HeadlinePrice::of($product);
+        $best = $headline->buyableShop();
+
+        if (! $best instanceof Shop || ! $product->eligibleShops()->contains($shop)) {
+            return false;
+        }
+
+        if ($best->is($shop)) {
+            return true;
+        }
+
+        return $headline->isPerUnit()
+            ? $headline->packs->unitPriceOf($shop) !== null && $headline->packs->unitPriceOf($shop) === $headline->packs->unitPriceOf($best)
+            : (string) $shop->current_price === (string) $best->current_price;
     }
 
     /**
