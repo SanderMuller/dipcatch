@@ -19,11 +19,11 @@ use Illuminate\Support\Collection;
  * A shop can state its pack twice, in two units — AH lists Iglo fish fingers
  * as 20 pieces and as 560 g — and the second size is kept apart from the pack
  * columns ({@see AltPackSize}). Either one is the shop's own word, so a shop
- * compared on its second size is `Stated`, not derived. What is never done is
- * borrowing: a row that says only `12 piece` is not given a weight by dividing
- * a sibling's grams by its count, because that returns the sibling's weight
- * and hides an assumption a 6-pack listed beside 12-packs makes
- * catastrophically wrong.
+ * compared on its second size is `Stated`, not derived. A row that says only
+ * `12 piece` is never given a sibling's weight outright: that would hand a
+ * 6-pack listed beside 12-packs the 12-pack's grams. It is given its own count
+ * times the item size the shops that state both agree on, as an estimate that
+ * is shown and never wins (`Converted`).
  */
 final readonly class ComparablePacks
 {
@@ -349,7 +349,7 @@ final readonly class ComparablePacks
             $converted = $itemSizes->convert($size, $unit);
 
             return $converted instanceof PackSize
-                ? self::inferredUnlessImplausible($shop, $converted, $median)
+                ? self::unlessImplausible($shop, $median, ComparablePack::converted($converted))
                 : ComparablePack::excluded(PackExclusion::outsideTheUnit($size->unit));
         }
 
@@ -365,15 +365,15 @@ final readonly class ComparablePacks
             return ComparablePack::excluded(PackExclusion::SizeUnknown);
         }
 
-        return self::inferredUnlessImplausible($shop, $agreed, $median);
+        return self::unlessImplausible($shop, $median, ComparablePack::inferred($agreed));
     }
 
-    /** A size the shop did not state itself: an estimate, unless it lands far from the field. */
-    private static function inferredUnlessImplausible(Shop $shop, PackSize $size, ?float $median): ComparablePack
+    /** An estimated size, unless it puts the shop far from the field. */
+    private static function unlessImplausible(Shop $shop, ?float $median, ComparablePack $estimate): ComparablePack
     {
-        return self::isImplausible($shop, $size, $median)
+        return $estimate->size instanceof PackSize && self::isImplausible($shop, $estimate->size, $median)
             ? ComparablePack::excluded(PackExclusion::SizeImplausible)
-            : ComparablePack::inferred($size);
+            : $estimate;
     }
 
     /**

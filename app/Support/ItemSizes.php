@@ -20,6 +20,9 @@ final readonly class ItemSizes
     /** How far an item size may sit from the factor, either way, and still convert: 5%. */
     private const float BAND = 0.05;
 
+    /** How far a weight may land from a whole number of items, in items, and still count them. */
+    private const float WHOLE_ITEM_SLACK = 0.25;
+
     private const string COUNTED = 'counted';
 
     private const string DOUBT = 'doubt';
@@ -72,17 +75,33 @@ final readonly class ItemSizes
     /**
      * `$size` in `$unit`, through the item size the shops agree on: 12 pieces
      * of a 45 g bar are 540 g, and 560 g of 28 g fish fingers are 20 pieces.
-     * Null when no agreed item size links the two units.
+     *
+     * Stricter than {@see between()}, because the result sizes a visible row:
+     * two shops must state both sizes, so one wrong pair cannot size every
+     * other row, and a weight must come within a quarter item of a whole number.
+     * 300 g of 28 g fingers is 10.7, which says another item or pack.
      */
     public function convert(PackSize $size, string $unit): ?PackSize
     {
         $factor = $this->between($size->unit, $unit);
 
-        if ($factor === null) {
+        if ($factor === null || $this->pairsIn($size->unit === 'piece' ? $unit : $size->unit) < 2) {
             return null;
         }
 
-        return PackSize::of($size->unit === 'piece' ? $size->quantity * $factor : round($size->quantity / $factor), $unit);
+        if ($size->unit === 'piece') {
+            return PackSize::of($size->quantity * $factor, $unit);
+        }
+
+        $pieces = $size->quantity / $factor;
+
+        return abs($pieces - round($pieces)) > self::WHOLE_ITEM_SLACK ? null : PackSize::of(round($pieces), $unit);
+    }
+
+    /** How many shops state both a count and a size in `$measure` that holds. */
+    private function pairsIn(string $measure): int
+    {
+        return count(array_filter($this->pairs, fn (array $pair): bool => $pair['unit'] === $measure && $pair['status'] === self::COUNTED));
     }
 
     /**

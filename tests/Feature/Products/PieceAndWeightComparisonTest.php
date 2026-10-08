@@ -6,6 +6,7 @@ use App\Enums\PackProvenance;
 use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
 use App\Livewire\Products\EditProduct;
+use App\Livewire\Products\ProductShow;
 use App\Mcp\Servers\DipCatchServer;
 use App\Mcp\Tools\AddShopTool;
 use App\Mcp\Tools\SetThresholdTool;
@@ -262,10 +263,9 @@ it('treats a conversion out of the storage range as no conversion', function ():
 it('names the same shops outside the comparison to an MCP client as the page does', function (): void {
     $product = igloField();
     $product->recomputeCheapestShop();
-    // A shop in a unit that does not convert. A shop that only counts no
-    // longer serves here: the field agrees a fish finger is 28 g, so its
-    // count becomes an estimated weight inside the comparison.
-    pairedShop($product, 'plus.nl', '4.49', '500.00', 'ml');
+    // A shop that only counts. The field agrees a fish finger is 28 g, so it
+    // shows an estimated weight, but a per-kilo target still never reaches it.
+    pairedShop($product, 'plus.nl', '4.49', '20.00', 'piece');
 
     DipCatchServer::actingAs($product->user()->firstOrFail())
         ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 8.0])
@@ -570,11 +570,19 @@ it('estimates the weight of a shop that only counts, from the item size the othe
     $pack = $product->refresh()->comparablePacks()->for($counts);
 
     expect($pack?->exclusion)->toBeNull()
-        ->and($pack?->provenance)->toBe(PackProvenance::Inferred)
+        ->and($pack?->provenance)->toBe(PackProvenance::Converted)
         ->and($pack?->size?->quantity)->toBe(540.0)
         ->and($pack?->size?->unit)->toBe('g')
-        // An estimate is shown, never crowned.
-        ->and($pack?->canWin())->toBeFalse();
+        // An estimate is shown, never crowned, and the AI shop check has
+        // nothing to read on a page that does state a size.
+        ->and($pack?->canWin())->toBeFalse()
+        ->and($pack?->isSizeInDoubt())->toBeFalse();
+
+    $this->actingAs($product->user()->sole());
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeHtml('data-test="pack-converted"')
+        ->assertSee('This page gives the pack as 12 pieces.');
 });
 
 it('estimates the count of a shop that only weighs, on a product compared per piece', function (): void {
@@ -588,8 +596,35 @@ it('estimates the count of a shop that only weighs, on a product compared per pi
     $packs = $product->refresh()->comparablePacks();
 
     expect($packs->unit())->toBe('piece')
-        ->and($packs->for($weighs)?->provenance)->toBe(PackProvenance::Inferred)
+        ->and($packs->for($weighs)?->provenance)->toBe(PackProvenance::Converted)
         ->and($packs->for($weighs)?->size?->quantity)->toBe(20.0);
+
+    // c.nl is the cheapest per piece on its estimate, and still not the best value.
+    $product->recomputeCheapestShop();
+
+    expect($product->refresh()->bestValueShop()?->host)->not->toBe('c.nl');
+});
+
+it('converts nothing from a single shop that states both sizes', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    pairedShop($product, 'a.nl', '21.99', '540.00', 'g', '12.00', 'piece');
+    pairedShop($product, 'b.nl', '27.99', '540.00', 'g');
+    pairedShop($product, 'c.nl', '26.99', '540.00', 'g');
+    $counts = pairedShop($product, 'd.nl', '34.20', '12.00', 'piece');
+
+    expect($product->refresh()->comparablePacks()->for($counts)?->exclusion)->toBe(PackExclusion::SoldByThePiece);
+});
+
+it('converts no weight that is not a whole number of items', function (): void {
+    $product = Product::factory()->create(['currency' => 'EUR']);
+    pairedShop($product, 'a.nl', '4.99', '20.00', 'piece', '560.00', 'g');
+    pairedShop($product, 'b.nl', '5.29', '20.00', 'piece', '560.00', 'g');
+    pairedShop($product, 'd.nl', '5.49', '20.00', 'piece');
+    pairedShop($product, 'e.nl', '5.19', '20.00', 'piece');
+    // 300 g of 28 g fingers is 10.7: another item, or another pack.
+    $weighs = pairedShop($product, 'c.nl', '2.49', '300.00', 'g');
+
+    expect($product->refresh()->comparablePacks()->for($weighs)?->exclusion)->toBe(PackExclusion::UnitDoesNotConvert);
 });
 
 it('leaves a count out when the shops disagree on what one item weighs', function (): void {

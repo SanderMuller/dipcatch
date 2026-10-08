@@ -34,7 +34,7 @@ final readonly class PackLine
             shop: $shop,
             price: $shop->current_price === null ? null : (string) $shop->current_price,
             size: $pack->size ?? $shop->packSize(),
-            estimated: $pack?->provenance === PackProvenance::Inferred,
+            estimated: in_array($pack?->provenance, [PackProvenance::Inferred, PackProvenance::Converted], strict: true),
             bundle: BundlePriceLabel::forShop($shop),
             checkedByAi: $pack?->provenance === PackProvenance::Confirmed,
         );

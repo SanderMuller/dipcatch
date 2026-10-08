@@ -239,7 +239,7 @@ final readonly class ProductMarkdown
             $pack !== null && $pack->isExcluded() => (string) $pack->reason(),
             $unitPrice !== null => MoneyFormatter::unitPrice($unitPrice, $shop->currency) . ' ' . $pack?->size?->label()
                 . match ($pack?->provenance) {
-                    PackProvenance::Inferred => ' (' . __('estimated') . ')',
+                    PackProvenance::Inferred, PackProvenance::Converted => ' (' . __('estimated') . ')',
                     PackProvenance::Confirmed => ' (' . __('size checked by AI') . ')',
                     default => '',
                 },

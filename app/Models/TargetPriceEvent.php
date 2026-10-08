@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PackProvenance;
 use App\Support\BundlePriceLabel;
 use App\Support\PackSize;
 use Carbon\CarbonImmutable;
@@ -56,7 +57,10 @@ final class TargetPriceEvent extends Model
     ): self {
         // The size the shop was compared by when the target was reached,
         // which can be the second size it states, 560 g beside 20 pieces.
-        $packSize = $product->comparablePacks()->for($shop)->size ?? $shop->comparableSize();
+        // Not an estimate made from the shop's own size in the other unit:
+        // the event keeps what the shop itself said.
+        $pack = $product->comparablePacks()->for($shop);
+        $packSize = ($pack?->provenance === PackProvenance::Converted ? null : $pack?->size) ?? $shop->comparableSize();
         $bundle = $shop->liveBundleOffer();
 
         return self::query()->create([

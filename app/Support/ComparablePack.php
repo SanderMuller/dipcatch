@@ -38,6 +38,12 @@ final readonly class ComparablePack
         return new self($size, PackProvenance::Inferred, exclusion: null);
     }
 
+    /** The shop's own size in the other unit, through the item size the shops agree on. */
+    public static function converted(PackSize $size): self
+    {
+        return new self($size, PackProvenance::Converted, exclusion: null);
+    }
+
     public static function excluded(PackExclusion $reason, ?string $currency = null): self
     {
         return new self(size: null, provenance: null, exclusion: $reason, currency: $currency);
@@ -59,7 +65,8 @@ final readonly class ComparablePack
 
     /**
      * A size the shop check reads the page for (`ConfirmPackSize`): borrowed
-     * from the other shops, or implausible.
+     * from the other shops, or implausible. Not a converted size: that page
+     * does state a size, and the check would find nothing to add.
      */
     public function isSizeInDoubt(): bool
     {

@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\PackExclusion;
+use App\Enums\PackProvenance;
 use App\Mcp\Concerns\InteractsWithOwner;
 use App\Mcp\Support\ProductPresenter;
 use App\Models\Product;
@@ -140,11 +141,13 @@ final class SetThresholdTool extends Tool
 
         $withPack = $product->shops->filter(fn (Shop $shop): bool => $shop->packSize() !== null);
 
+        // A shop given an estimated size from its count is in the list as an
+        // estimate, but it reports pieces and can never reach a per-unit target.
         $outside = $withPack->filter(fn (Shop $shop): bool => in_array(
             $packs->for($shop)?->exclusion,
             [PackExclusion::UnitDoesNotConvert, PackExclusion::SoldByThePiece],
             strict: true,
-        ));
+        ) || $packs->for($shop)?->provenance === PackProvenance::Converted);
 
         if ($outside->isEmpty()) {
             return '';
