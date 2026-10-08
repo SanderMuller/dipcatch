@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\PriceDisplay;
 use App\Livewire\Dashboard;
 use App\Models\Product;
 use App\Models\Shop;
@@ -81,6 +82,42 @@ it('leaves out a deal at a shop that another shop beats, and keeps one level wit
     $ending = DashboardDigest::forUser($user)->endingSoon;
 
     expect(array_map(fn (array $row): string => $row['product']->title . ' at ' . $row['shop']->host, $ending))->toBe(['Level at dirk.nl']);
+});
+
+it('compares per unit as the headline does: unrounded, and only a size that may win', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['title' => 'Bars', 'currency' => 'EUR']);
+    $pack = ['currency' => 'EUR', 'pack_quantity' => '800.00', 'pack_unit' => 'piece'];
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/bars', 'current_price' => '21.98', ...$pack]);
+    // 0.0275 a piece at four decimals, as the cheaper one, but dearer unrounded.
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/bars', 'current_price' => '21.99', 'promotion_ends_at' => now()->addDays(2), ...$pack]);
+    // The same price, on a size borrowed from the other shops.
+    Shop::factory()->for($product)->create(['url' => 'https://dirk.nl/p/bars', 'current_price' => '21.98', 'currency' => 'EUR', 'promotion_ends_at' => now()->addDays(2)]);
+    $product->refresh()->recomputeCheapestShop();
+
+    expect(DashboardDigest::forUser($user)->endingSoon)->toBeEmpty();
+});
+
+it('keeps the deal at the cheapest shop per unit, also for an owner who shows pack prices', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['title' => 'Coffee', 'currency' => 'EUR', 'price_display' => PriceDisplay::Pack]);
+    // €2.00 a kilo against €3.96: the bigger bag is the best buy, though the small one costs less.
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/coffee', 'current_price' => '2.00', 'currency' => 'EUR', 'pack_quantity' => '1000.00', 'pack_unit' => 'g', 'promotion_ends_at' => now()->addDays(2)]);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/coffee', 'current_price' => '0.99', 'currency' => 'EUR', 'pack_quantity' => '250.00', 'pack_unit' => 'g', 'promotion_ends_at' => now()->addDays(3)]);
+    $product->refresh()->recomputeCheapestShop();
+
+    expect(array_map(fn (array $row): string => $row['shop']->host, DashboardDigest::forUser($user)->endingSoon))->toBe(['ah.nl']);
+});
+
+it('keeps a deal level per unit at another pack size', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['title' => 'Nuts', 'currency' => 'EUR']);
+    // Both €7.00 a kilo.
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/nuts', 'current_price' => '1.40', 'currency' => 'EUR', 'pack_quantity' => '200.00', 'pack_unit' => 'g', 'promotion_ends_at' => now()->addDays(2)]);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/nuts', 'current_price' => '2.10', 'currency' => 'EUR', 'pack_quantity' => '300.00', 'pack_unit' => 'g', 'promotion_ends_at' => now()->addDays(3)]);
+    $product->refresh()->recomputeCheapestShop();
+
+    expect(array_map(fn (array $row): string => $row['shop']->host, DashboardDigest::forUser($user)->endingSoon))->toBe(['ah.nl', 'jumbo.com']);
 });
 
 it('still finds a buyable deal behind many earlier ones that cannot be bought', function (): void {

@@ -226,12 +226,17 @@ final readonly class DashboardDigest
             ->get();
 
         $ending = [];
+        $headlines = [];
 
         foreach ($shops as $shop) {
             $product = $shop->product;
             $window = $shop->promotionWindow();
 
-            if ($product instanceof Product && $window !== null && $window->isRunning($now) && self::isBestBuy($product, $shop)) {
+            if (! $product instanceof Product || $window === null || ! $window->isRunning($now)) {
+                continue;
+            }
+
+            if (self::isBestBuy($headlines[$product->id] ??= HeadlinePrice::of($product), $shop)) {
                 $ending[] = ['product' => $product, 'shop' => $shop, 'endsAt' => $window->endsAt];
             }
         }
@@ -240,15 +245,15 @@ final readonly class DashboardDigest
     }
 
     /**
-     * Whether the deal is where to buy the product: at the shop the headline
-     * names, or one level with it. A deal another shop beats is not worth a look.
+     * Whether the deal is where to buy the product: the cheapest in-stock
+     * shop per unit, or one level with it; by pack price where nothing
+     * compares per unit. A deal another shop beats is not worth a look.
      */
-    private static function isBestBuy(Product $product, Shop $shop): bool
+    private static function isBestBuy(HeadlinePrice $headline, Shop $shop): bool
     {
-        $headline = HeadlinePrice::of($product);
-        $best = $headline->buyableShop();
+        $best = $headline->bestValue ?? $headline->buyableShop();
 
-        if (! $best instanceof Shop || ! $product->eligibleShops()->contains($shop)) {
+        if (! $best instanceof Shop || ! $headline->canBuyAt($shop)) {
             return false;
         }
 
@@ -256,9 +261,19 @@ final readonly class DashboardDigest
             return true;
         }
 
-        return $headline->isPerUnit()
-            ? $headline->packs->unitPriceOf($shop) !== null && $headline->packs->unitPriceOf($shop) === $headline->packs->unitPriceOf($best)
-            : (string) $shop->current_price === (string) $best->current_price;
+        if (! $headline->bestValue instanceof Shop) {
+            return (string) $shop->current_price === (string) $best->current_price;
+        }
+
+        // Unrounded, and only for a size that may win, as the ranking compares.
+        // Equal within float noise: €1.40 for 200 g and €2.10 for 300 g are both €7 a kilo.
+        $packs = $headline->packs;
+        $price = $packs->unitPriceValueOf($shop);
+        $bestPrice = $packs->unitPriceValueOf($best);
+
+        return $packs->for($shop)?->canWin() === true
+            && $price !== null && $bestPrice !== null
+            && abs($price - $bestPrice) <= 1e-9 * max(1.0, $bestPrice);
     }
 
     /**

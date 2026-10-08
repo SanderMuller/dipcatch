@@ -125,6 +125,11 @@ final readonly class HeadlinePrice
         return $this->shop instanceof Shop && $this->eligible->contains($this->shop) ? $this->shop : null;
     }
 
+    public function canBuyAt(Shop $shop): bool
+    {
+        return $this->eligible->contains($shop);
+    }
+
     public function isPerUnit(): bool
     {
         return $this->unit !== null;
