@@ -14,6 +14,8 @@
 // so it refuses anything but a local environment.
 
 use App\Enums\AiPromptPlace;
+use App\Enums\CategorySource;
+use App\Enums\ProductCategory;
 use App\Enums\WebFindingStatus;
 use App\Models\LargeDropCheck;
 use App\Models\PriceCheck;
@@ -196,6 +198,15 @@ if ($scenario === 'screenshots') {
         'fired_at' => $now->subDays(5)->addHours(2),
     ]);
     $fixture['tabletsId'] = $tablets->id;
+
+    // A pet shop and two pet products with photos, so a search for "pet"
+    // fills the header search's Shops, Categories and Products groups.
+    // capture.mjs serves the photos for this made-up host.
+    foreach ([['Cat food 12 × 85 g', 'catfood', '6.25', ProductCategory::PetFood], ['Cat litter 10 L', 'litter', '5.99', ProductCategory::PetCare]] as [$title, $art, $price, $category]) {
+        $track($title, ['petsplace.nl' => $price, 'jumbo.com' => (string) ((float) $price + 0.5)], "https://product-photos.changelog-media.test/{$art}.png")
+            ->forceFill(['category' => $category, 'category_set_by' => CategorySource::User])
+            ->save();
+    }
 }
 
 if ($scenario === 'video') {

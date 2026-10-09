@@ -33,6 +33,7 @@ return [
             'category' => 'feature',
             'title' => 'Search now finds shops and categories',
             'body' => "The search at the top of the app now finds shops and categories too. Type Jumbo or Pets to open just those products. Results sit under headings and appear sooner.\n\nOn the Products page, searching for a shop or category offers to filter by it.",
+            'image' => ['src' => 'changelog/search-shops-categories.png', 'alt' => 'The search at the top of the app with "pet" typed: the shop Pets Place, the category Pets, and cat food and cat litter under Products.'],
             'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],
         ],
         [

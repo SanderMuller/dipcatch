@@ -16,6 +16,7 @@ import { chromium } from 'playwright';
 
 const BASE = process.env.BASE ?? 'https://dipcatch.test';
 const OUT = path.resolve('public/changelog');
+const PHOTOS = path.resolve('tools/changelog-media/photos');
 const FIXTURE = process.env.FIXTURE_PATH ?? '/tmp/changelog-media-screenshots.json';
 const PADDING = 40;
 
@@ -69,6 +70,17 @@ const shots = {
 
         return { element: list.locator('xpath=ancestor::*[@data-flux-card][1]') };
     },
+    'search-shops-categories': async (page) => {
+        await page.goto(`${BASE}/app`, { waitUntil: 'networkidle' });
+        await page.locator('[data-test="app-search-bar"]').click();
+        const dialog = page.locator('dialog[open]').first();
+        await dialog.locator('input').first().fill('pet');
+        await dialog.locator('[data-test="command-group-categories"]').waitFor({ state: 'visible', timeout: 10000 });
+        await dialog.locator('[data-test="command-product"] img').first().waitFor({ state: 'visible', timeout: 10000 });
+        await page.waitForTimeout(800);
+
+        return { element: dialog };
+    },
     'header-search': async (page) => {
         await page.goto(`${BASE}/app`, { waitUntil: 'networkidle' });
         await page.locator('[data-test="app-search-bar"]').click();
@@ -92,6 +104,11 @@ await ctx.addInitScript(() => {
         style.textContent = '.phpdebugbar, [data-flux-toast-group] { display: none !important; }';
         document.head.append(style);
     });
+});
+
+await ctx.route('https://product-photos.changelog-media.test/**', (route) => {
+    const file = path.join(PHOTOS, path.basename(new URL(route.request().url()).pathname));
+    route.fulfill(fs.existsSync(file) ? { path: file, contentType: 'image/png' } : { status: 404 });
 });
 
 const page = await ctx.newPage();
