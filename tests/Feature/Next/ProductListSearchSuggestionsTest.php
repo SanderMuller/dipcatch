@@ -116,3 +116,8 @@ it('writes a shop host into the chip as a script string, so a quote in it stays 
         ->assertSeeHtml('filterByShop(\'jumbo.com\u0027)+alert(1)+(\u0027\')')
         ->assertDontSeeHtml("filterByShop('jumbo.com')+alert(1)");
 });
+
+it('offers a shop whose host starts with the search first', function (): void {
+    expect(array_column(FilterSuggestions::for('sup', ['powersupplements.nl', 'realsupps.nl', 'supspace.nl'], [], except: []), 'key'))
+        ->toBe(['supspace.nl', 'powersupplements.nl', 'realsupps.nl']);
+});

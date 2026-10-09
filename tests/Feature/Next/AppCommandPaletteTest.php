@@ -283,3 +283,18 @@ it('shows a small copy of the product photo, where the shop can resize it', func
         ->assertSeeHtml('rendition=200x200_WEBP')
         ->assertDontSeeHtml('rendition=800x800_WEBP');
 });
+
+it('lists a shop whose host starts with the search before one that only contains it', function (): void {
+    $user = User::factory()->create();
+
+    foreach (['powersupplements.nl', 'realsupps.nl', 'superfoodstore.nl', 'supspace.nl'] as $host) {
+        Shop::factory()->for(Product::factory()->for($user)->create())->create(['url' => "https://{$host}/p/1"]);
+    }
+
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)
+        ->set('search', 'sup')
+        ->assertSeeInOrder(['superfoodstore.nl', 'supspace.nl', 'powersupplements.nl'])
+        ->assertDontSeeHtml('wire:key="command-shop-realsupps.nl"');
+});

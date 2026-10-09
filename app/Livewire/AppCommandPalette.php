@@ -129,7 +129,10 @@ final class AppCommandPalette extends Component
             ->where('active', true)
             ->whereHas('product', fn (EloquentQueryBuilder $product): EloquentQueryBuilder => $product->where('user_id', $user->id))
             ->tap(fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $this->whereHostOrNameMatches($shop, $term))
-            ->distinct()
+            // A host that starts with the term first: "sup" finds supspace.nl
+            // before powersupplements.nl, and the limit cuts the latter.
+            ->groupBy('host')
+            ->orderByRaw("CASE WHEN LOWER(host) LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END", [addcslashes($term, '%_\\') . '%'])
             ->orderBy('host')
             ->limit(self::SHOP_LIMIT)
             ->pluck('host')

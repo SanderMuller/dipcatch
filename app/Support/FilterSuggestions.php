@@ -39,10 +39,12 @@ final readonly class FilterSuggestions
         $matches = static fn (string $label): bool => str_contains(mb_strtolower($label), $term);
         $suggestions = [];
 
-        foreach ($shopHosts as $host) {
-            if ($matches($host) || in_array($host, $namedHosts, strict: true)) {
-                $suggestions[] = ['kind' => 'shop', 'key' => $host, 'label' => $host];
-            }
+        $shops = array_filter($shopHosts, static fn (string $host): bool => $matches($host) || in_array($host, $namedHosts, strict: true));
+        // A host that starts with the term first, as the header search has it.
+        usort($shops, static fn (string $a, string $b): int => str_starts_with($b, $term) <=> str_starts_with($a, $term));
+
+        foreach ($shops as $host) {
+            $suggestions[] = ['kind' => 'shop', 'key' => $host, 'label' => $host];
         }
 
         foreach ($categoryGroups as $department => $categories) {
