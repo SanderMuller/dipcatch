@@ -30,7 +30,7 @@ final class AppCommandPalette extends Component
 {
     private const int LIMIT = 8;
 
-    private const int SHOP_LIMIT = 3;
+    private const int SHOP_LIMIT = 4;
 
     public string $search = '';
 
