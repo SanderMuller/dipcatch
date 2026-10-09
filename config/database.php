@@ -174,9 +174,12 @@ return [
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
             'prefix' => env('REDIS_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')) . '-database-'),
-            'persistent' => env('REDIS_PERSISTENT', false),
+            'persistent' => env('REDIS_PERSISTENT', true),
         ],
 
+        // A connection closed while idle costs a reconnect on its next
+        // command; a short backoff keeps that to milliseconds. phpredis reads
+        // `tcp_keepalive` as on or off: the operating system sets the timing.
         'default' => [
             'url' => env('REDIS_URL'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
@@ -187,8 +190,9 @@ return [
             'timeout' => env('REDIS_TIMEOUT', 2),
             'read_timeout' => env('REDIS_READ_TIMEOUT', 5),
             'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'tcp_keepalive' => env('REDIS_TCP_KEEPALIVE', true),
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
-            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+            'backoff_base' => env('REDIS_BACKOFF_BASE', 10),
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
         ],
 
@@ -202,8 +206,9 @@ return [
             'timeout' => env('REDIS_TIMEOUT', 2),
             'read_timeout' => env('REDIS_READ_TIMEOUT', 5),
             'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'tcp_keepalive' => env('REDIS_TCP_KEEPALIVE', true),
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
-            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+            'backoff_base' => env('REDIS_BACKOFF_BASE', 10),
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
         ],
 
@@ -217,8 +222,9 @@ return [
             'timeout' => env('REDIS_TIMEOUT', 2),
             'read_timeout' => env('REDIS_READ_TIMEOUT', 5),
             'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'tcp_keepalive' => env('REDIS_TCP_KEEPALIVE', true),
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
-            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+            'backoff_base' => env('REDIS_BACKOFF_BASE', 10),
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
         ],
 
