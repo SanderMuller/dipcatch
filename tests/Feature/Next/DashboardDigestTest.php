@@ -245,3 +245,19 @@ it('lists what is worth a look, with a way to add a shop to a product at one sho
         ->assertSeeText('Tracked at one shop only.')
         ->assertSeeHtml(e(route('app.products.show', [$single, 'add-shop' => 1])));
 });
+
+it('counts a best buy at its alert price apart from the other offers', function (): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true)->update(['target_price' => '1.50']);
+    digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com', onOffer: true)->update(['target_price' => '1.00']);
+    digestProduct($user, 'Rice', 'ah.nl', 'jumbo.com', onOffer: true);
+    digestProduct($user, 'Milk', 'ah.nl', 'jumbo.com');
+    $this->actingAs($user);
+
+    expect(DashboardDigest::forUser($user)->trips[0])->toMatchArray(['count' => 4, 'atAlert' => 2, 'onOffer' => 1]);
+
+    livewire(Dashboard::class)
+        ->assertSeeHtml('data-test="trip-at-alert"')
+        ->assertSeeText('2 at alert price')
+        ->assertSeeText('1 on offer');
+});

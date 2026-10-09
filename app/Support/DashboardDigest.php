@@ -33,7 +33,7 @@ final readonly class DashboardDigest
     private const int ATTENTION = 4;
 
     /**
-     * @param  list<array{host: string, shop: Shop, products: list<Product>, count: int, onOffer: int, hasStore: bool}>  $trips
+     * @param  list<array{host: string, shop: Shop, products: list<Product>, count: int, atAlert: int, onOffer: int, hasStore: bool}>  $trips
      * @param  list<array{product: Product, shop: Shop, endsAt: CarbonImmutable}>  $endingSoon
      * @param  list<array{product: Product, shop: Shop}>  $failing
      * @param  list<Product>  $singleShop
@@ -56,7 +56,7 @@ final readonly class DashboardDigest
         $tripProducts = self::tripProducts($user);
 
         return new self(
-            trips: self::trips($tripProducts, self::inDrop($user, $tripProducts)),
+            trips: self::trips($tripProducts, self::inDrop($user, $tripProducts), self::atAlert($user, $tripProducts)),
             endingSoon: self::endingSoon($user, $now),
             failing: self::failing($user),
             singleShop: array_values(self::activeProducts($user)
@@ -103,6 +103,21 @@ final readonly class DashboardDigest
     }
 
     /**
+     * @param  EloquentCollection<int, Product>  $products
+     * @return list<string>
+     */
+    private static function atAlert(User $user, EloquentCollection $products): array
+    {
+        $ids = self::activeProducts($user)
+            ->whereKey($products->modelKeys())
+            ->atTarget()
+            ->pluck('id')
+            ->all();
+
+        return array_values(array_filter($ids, is_string(...)));
+    }
+
+    /**
      * @return EloquentCollection<int, Product>
      */
     private static function tripProducts(User $user): EloquentCollection
@@ -141,14 +156,18 @@ final readonly class DashboardDigest
      * at least two best buys, one of them on offer, makes a trip.
      *
      * @param  EloquentCollection<int, Product>  $products
+     * The trip counts a product at its alert price apart from the other
+     * offers, so `onOffer` holds only the offers that are not.
+     *
      * @param  array<int, string>  $inDrop
-     * @return list<array{host: string, shop: Shop, products: list<Product>, count: int, onOffer: int, hasStore: bool}>
+     * @param  array<int, string>  $atAlert
+     * @return list<array{host: string, shop: Shop, products: list<Product>, count: int, atAlert: int, onOffer: int, hasStore: bool}>
      */
-    private static function trips(EloquentCollection $products, array $inDrop): array
+    private static function trips(EloquentCollection $products, array $inDrop, array $atAlert): array
     {
         $trips = [];
 
-        foreach (self::itemsByHost($products, $inDrop) as $host => $items) {
+        foreach (self::itemsByHost($products, $inDrop, $atAlert) as $host => $items) {
             if (count($items) < self::TRIP_MIN_PRODUCTS) {
                 continue;
             }
@@ -157,36 +176,39 @@ final readonly class DashboardDigest
                 continue;
             }
 
-            // Offers first, so the products a trip shows are the ones worth the
+            // At the alert price first, then offers, so the products a trip shows are the ones worth the
             // trip; then by id, so equal items keep their place between visits
             // instead of following whichever product was rechecked last.
-            usort($items, fn (array $a, array $b): int => [$b['onOffer'], $a['product']->id] <=> [$a['onOffer'], $b['product']->id]);
+            usort($items, fn (array $a, array $b): int => [$b['atAlert'], $b['onOffer'], $a['product']->id] <=> [$a['atAlert'], $a['onOffer'], $b['product']->id]);
 
             $trips[] = [
                 'host' => (string) $host,
                 'shop' => $items[0]['shop'],
                 'products' => array_column(array_slice($items, 0, self::TRIP_ITEMS), 'product'),
                 'count' => count($items),
-                'onOffer' => count(array_filter($items, fn (array $item): bool => $item['onOffer'])),
+                'atAlert' => count(array_filter($items, fn (array $item): bool => $item['atAlert'])),
+                'onOffer' => count(array_filter($items, fn (array $item): bool => $item['onOffer'] && ! $item['atAlert'])),
                 'hasStore' => in_array((string) $host, (array) config('site.store_hosts'), strict: true),
             ];
         }
 
         // The host breaks a tie, so two shops with the same count do not swap
         // places from one visit to the next.
-        usort($trips, fn (array $a, array $b): int => [$b['count'], $b['onOffer'], $a['host']] <=> [$a['count'], $a['onOffer'], $b['host']]);
+        usort($trips, fn (array $a, array $b): int => [$b['count'], $b['atAlert'] + $b['onOffer'], $a['host']] <=> [$a['count'], $a['atAlert'] + $a['onOffer'], $b['host']]);
 
         return array_slice($trips, 0, self::TRIPS);
     }
 
     /**
-     * Each product under the shop it is the best buy at, and whether it counts as on offer there.
+     * Each product under the shop it is the best buy at, whether it counts as on offer there,
+     * and whether it is at its alert price.
      *
      * @param  EloquentCollection<int, Product>  $products
      * @param  array<int, string>  $inDrop
-     * @return array<string, list<array{product: Product, shop: Shop, onOffer: bool}>>
+     * @param  array<int, string>  $atAlert
+     * @return array<string, list<array{product: Product, shop: Shop, onOffer: bool, atAlert: bool}>>
      */
-    private static function itemsByHost(EloquentCollection $products, array $inDrop): array
+    private static function itemsByHost(EloquentCollection $products, array $inDrop, array $atAlert = []): array
     {
         $byHost = [];
 
@@ -200,6 +222,7 @@ final readonly class DashboardDigest
             $byHost[$shop->host][] = [
                 'product' => $product,
                 'shop' => $shop,
+                'atAlert' => in_array($product->id, $atAlert, strict: true),
                 'onOffer' => in_array($product->id, $inDrop, strict: true) || PromotionLabel::runningDeal($shop) !== null,
             ];
         }

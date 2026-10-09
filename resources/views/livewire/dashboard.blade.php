@@ -93,9 +93,12 @@
                                                 @endif
                                             </div>
                                             <div class="flex shrink-0 items-center gap-3">
+                                                @if ($trip['atAlert'] > 0)
+                                                    <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true', 'discounted' => 'true']) }}" wire:navigate class="rounded-full bg-savings/10 px-2 py-0.5 text-xs font-semibold text-savings-strong hover:bg-savings/20" data-test="trip-at-alert">{{ trans_choice(':count at alert price|:count at alert price', $trip['atAlert'], ['count' => $trip['atAlert']]) }}</a>
+                                                @endif
                                                 @if ($trip['onOffer'] > 0)
                                                     {{-- Best buys and discounted: the same products the badge counts, not every deal at the shop. --}}
-                                                    <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true', 'discounted' => 'true']) }}" wire:navigate class="rounded-full bg-savings/10 px-2 py-0.5 text-xs font-semibold text-savings-strong hover:bg-savings/20">{{ trans_choice(':count on offer|:count on offer', $trip['onOffer'], ['count' => $trip['onOffer']]) }}</a>
+                                                    <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true', 'discounted' => 'true']) }}" wire:navigate class="rounded-full bg-savings/10 px-2 py-0.5 text-xs font-semibold text-savings-strong hover:bg-savings/20" data-test="trip-on-offer">{{ trans_choice(':count on offer|:count on offer', $trip['onOffer'], ['count' => $trip['onOffer']]) }}</a>
                                                 @endif
                                                 <a href="{{ route('app.products.index', ['shop' => $trip['host']]) }}" wire:navigate class="inline-flex items-center gap-1 text-sm font-medium text-brand">{{ __('Everything at :shop', ['shop' => $trip['host']]) }} <flux:icon.arrow-right variant="micro" class="size-4" /></a>
                                             </div>
