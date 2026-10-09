@@ -168,3 +168,19 @@ select:focus[data-flux-control] {
         }
     }
 }
+
+/* Pages filter in the browser, so this hides their group once no page
+   shows. A group gets a line above it when a group before it shows. */
+[data-command-group]:not(:has(ui-option:not([data-hidden]))) {
+    display: none;
+}
+
+[data-command-group]:has(ui-option:not([data-hidden])) ~ [data-command-group] {
+    margin-top: --spacing(1);
+    padding-top: --spacing(1);
+    border-top: 1px solid var(--color-zinc-200);
+}
+
+.dark [data-command-group]:has(ui-option:not([data-hidden])) ~ [data-command-group] {
+    border-top-color: var(--color-zinc-600);
+}

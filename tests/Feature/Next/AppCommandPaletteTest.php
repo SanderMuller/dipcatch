@@ -72,10 +72,10 @@ it('treats LIKE wildcards in the search as plain text', function (): void {
     $this->actingAs($user);
 
     livewire(AppCommandPalette::class)
-        ->set('search', '%')
+        ->set('search', '0%')
         ->assertSee('100% cocoa')
         ->assertDontSee('Plain tea')
-        ->set('search', '_')
+        ->set('search', '0_')
         ->assertDontSee('100% cocoa')
         ->assertDontSee('Plain tea');
 });
@@ -119,7 +119,7 @@ it('focuses the search field when the palette opens, so you can type at once', f
 
     // The modal focuses the element marked autofocus; without it focus stays on the page.
     expect(livewire(AppCommandPalette::class)->html())
-        ->toMatch('/<input[^>]*placeholder="Search pages and products…"[^>]*\sautofocus/');
+        ->toMatch('/<input[^>]*placeholder="Search pages, products and shops…"[^>]*\sautofocus/');
 });
 
 it('records a search that found nothing, once per person and term, counting repeats', function (): void {
@@ -181,4 +181,95 @@ it('shows a product with its photo, best price and shop', function (): void {
         ->set('search', 'arabica')
         ->assertSeeHtml('data-test="command-product"')
         ->assertSeeText('€4.99 · beans.test');
+});
+
+it('lists a matching shop once, by host or by name, leading to the products at that shop', function (): void {
+    config()->set('site.shop_names', ['ah.nl' => 'Albert Heijn']);
+    $user = User::factory()->create();
+    foreach (['Coffee', 'Tea'] as $title) {
+        Shop::factory()->for(Product::factory()->for($user)->create(['title' => $title]))->create(['url' => "https://www.supspace.nl/p/{$title}"]);
+    }
+    Shop::factory()->for(Product::factory()->for($user)->create())->create(['url' => 'https://www.ah.nl/p/1']);
+    $this->actingAs($user);
+
+    $palette = livewire(AppCommandPalette::class)->set('search', 'supspace');
+    expect(substr_count($palette->html(), 'data-test="command-shop"'))->toBe(1);
+    $palette->assertSeeHtml('href="' . route('app.products.index', ['shop' => 'supspace.nl']) . '"')
+        ->set('search', 'albert')
+        ->assertSeeHtml('href="' . route('app.products.index', ['shop' => 'ah.nl']) . '"')
+        ->assertSeeText('Albert Heijn · Your products at this shop');
+});
+
+it('lists no shop the account follows nothing at, and no switched-off shop', function (): void {
+    $user = User::factory()->create();
+    Shop::factory()->for(Product::factory()->create())->create(['url' => 'https://supspace.nl/p/1']);
+    Shop::factory()->inactive()->for(Product::factory()->for($user)->create())->create(['url' => 'https://supspace.nl/p/2']);
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)->set('search', 'supspace')->assertDontSeeHtml('data-test="command-shop"');
+});
+
+it('puts pages, shops and products each under a heading, and leaves out a group with nothing in it', function (): void {
+    $user = User::factory()->create();
+    Shop::factory()->for(Product::factory()->for($user)->create(['title' => 'Protein bar']))->create(['url' => 'https://supspace.nl/p/1']);
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)
+        ->set('search', 'supspace')
+        ->assertSeeHtmlInOrder(['data-test="command-group-pages"', 'data-test="command-group-shops"', 'data-test="command-group-products"', 'Protein bar'])
+        ->set('search', 'protein')
+        ->assertDontSeeHtml('data-test="command-group-shops"')
+        ->assertSeeHtml('data-test="command-group-products"');
+});
+
+it('starts searching at two letters, and shows the newest products before that', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->for($user)->create(['title' => 'Arabica beans', 'created_at' => now()->subYear()]);
+    Product::factory()->for($user)->count(8)->create(['title' => 'Tea']);
+    Shop::factory()->for(Product::factory()->for($user)->create(['title' => 'Tea']))->create(['url' => 'https://ah.nl/p/1']);
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)
+        ->set('search', 'a')
+        ->assertDontSee('Arabica beans')
+        ->assertDontSeeHtml('data-test="command-shop"')
+        ->set('search', 'ar')
+        ->assertSee('Arabica beans');
+});
+
+it('lists a department or category the account has products in, leading to the products in it', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->for($user)->categorised(ProductCategory::PetFood)->create(['title' => 'Kibble']);
+    Product::factory()->for($user)->categorised(ProductCategory::CoffeeTea)->create(['title' => 'Arabica beans']);
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)
+        ->set('search', 'pet')
+        ->assertSeeHtml('href="' . route('app.products.index', ['category' => 'pets']) . '"')
+        ->assertDontSeeHtml('href="' . route('app.products.index', ['category' => ProductCategory::PetFood->value]) . '"')
+        ->set('search', 'dairy')
+        ->assertDontSeeHtml('data-test="command-group-categories"');
+});
+
+it('finds a product at a shop by the shop name, and does not record that search as empty', function (): void {
+    config()->set('site.shop_names', ['ah.nl' => 'Albert Heijn']);
+    $user = User::factory()->create();
+    Shop::factory()->for(Product::factory()->for($user)->create(['title' => 'Dish soap']))->create(['url' => 'https://www.ah.nl/p/1']);
+    Shop::factory()->for(Product::factory()->for($user)->create(['title' => 'Coffee']))->create(['url' => 'https://www.jumbo.com/p/1']);
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)
+        ->set('search', 'albert')
+        ->assertSeeHtml('href="' . route('app.products.show', Product::query()->where('title', 'Dish soap')->sole()) . '"')
+        ->assertDontSee('Coffee')
+        ->call('logEmptySearch', 'albert');
+
+    expect(EmptySearch::query()->count())->toBe(0);
+});
+
+it('lists no category that only another account has products in', function (): void {
+    Product::factory()->categorised(ProductCategory::DairyEggs)->create(['title' => 'Milk']);
+    $this->actingAs(User::factory()->create());
+
+    livewire(AppCommandPalette::class)->set('search', 'dairy')->assertDontSeeHtml('data-test="command-group-categories"');
 });

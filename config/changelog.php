@@ -29,6 +29,13 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-09',
+            'category' => 'feature',
+            'title' => 'Search now finds shops and categories',
+            'body' => "The search at the top of the app now finds shops and categories too. Type Jumbo or Pets to open just those products. Results sit under headings and appear sooner.\n\nOn the Products page, searching for a shop or category offers to filter by it.",
+            'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],
+        ],
+        [
             'date' => '2026-10-08',
             'category' => 'fix',
             'title' => 'Only deals worth taking under "Worth a look"',

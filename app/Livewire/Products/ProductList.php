@@ -15,6 +15,7 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Support\DashboardDigest;
+use App\Support\FilterSuggestions;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
@@ -185,6 +186,32 @@ final class ProductList extends Component
         }
     }
 
+    /**
+     * A search suggestion taken: the shop filter replaces the search that
+     * named the shop.
+     */
+    public function filterByShop(string $host): void
+    {
+        $this->shop = $host;
+        $this->search = '';
+        $this->resetPage();
+    }
+
+    /**
+     * A search suggestion taken: the category or department filter replaces
+     * the search that named it.
+     */
+    public function filterByCategory(string $key): void
+    {
+        if (ProductCategory::leavesFor($key) === null) {
+            return;
+        }
+
+        $this->category = $key;
+        $this->search = '';
+        $this->resetPage();
+    }
+
     /** A change made in the header menu, so a card does not say "On list" for a removed product. */
     #[On('shopping-list-changed')]
     public function refreshList(): void {}
@@ -217,14 +244,17 @@ final class ProductList extends Component
     public function render(): View
     {
         $showAutoCategoriesPromo = $this->category === self::NO_CATEGORY && $this->canBuyAutoCategories();
+        $categoryGroups = $this->categoryGroups();
+        $shopHosts = $this->shopHosts();
 
         return view('livewire.products.product-list', [
             'products' => $this->products(),
             'groupSizes' => $this->groupSizes(),
             'canAddProduct' => $this->canAddProduct(),
             'productLimitHint' => $this->productLimitHint(),
-            'categoryGroups' => $this->categoryGroups(),
-            'shopHosts' => $this->shopHosts(),
+            'categoryGroups' => $categoryGroups,
+            'shopHosts' => $shopHosts,
+            'searchSuggestions' => FilterSuggestions::for($this->search, $shopHosts, $categoryGroups, except: [$this->shop, $this->category]),
             // Kept while selected, for the same reason as categoryGroups().
             'hasUncategorised' => $this->category === self::NO_CATEGORY || $this->uncategorised()->exists(),
             // Kept while on, so the switch that emptied the list can turn it off.

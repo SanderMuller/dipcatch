@@ -51,6 +51,7 @@
                 wire:model.live.debounce.300ms="search"
                 icon="magnifying-glass"
                 :placeholder="__('Search your products')"
+                data-test="product-search"
                 clearable
                 autocomplete="off"
                 data-1p-ignore
@@ -160,7 +161,7 @@
                             {{ __('All shops') }}
                         </flux:navlist.item>
                         @foreach ($shopHosts as $host)
-                            <flux:navlist.item wire:click="$set('shop', '{{ $host }}')" :current="$shop === $host" :aria-current="$shop === $host ? 'true' : 'false'" wire:key="shop-{{ $host }}">
+                            <flux:navlist.item wire:click="$set('shop', {{ \Illuminate\Support\Js::from($host) }})" :current="$shop === $host" :aria-current="$shop === $host ? 'true' : 'false'" wire:key="shop-{{ $host }}">
                                 <span class="flex min-w-0 items-center gap-2.5" title="{{ $host }}">
                                     <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 shrink-0 rounded-sm" />
                                     <span class="truncate">{{ $host }}</span>
@@ -173,6 +174,29 @@
         </aside>
 
         <div class="mt-3 min-w-0 lg:mt-0">
+            {{-- Above the results: a title can match the same word, and the
+                 filter must stay in view. The row goes once a chip is taken,
+                 so focus moves back to the search. --}}
+            @if ($searchSuggestions !== [])
+                <div class="mb-6 flex flex-wrap items-center gap-2" data-test="search-suggestions">
+                    <flux:text class="text-zinc-500 dark:text-zinc-400">{{ __('Filter by') }}</flux:text>
+                    @foreach ($searchSuggestions as $suggestion)
+                        @if ($suggestion['kind'] === 'shop')
+                            <flux:button size="sm" class="rounded-full!" x-on:click="$wire.filterByShop({{ \Illuminate\Support\Js::from($suggestion['key']) }}).then(() => document.querySelector('[data-test=product-search]')?.focus())" wire:key="suggest-shop-{{ $suggestion['key'] }}" :aria-label="__('Filter by shop :shop', ['shop' => $suggestion['label']])" data-test="suggest-shop">
+                                <span class="flex items-center gap-2">
+                                    <img src="{{ \App\Support\Favicon::url($suggestion['key']) }}" alt="" loading="lazy" class="size-4 shrink-0 rounded-sm" />
+                                    {{ $suggestion['label'] }}
+                                </span>
+                            </flux:button>
+                        @else
+                            <flux:button size="sm" class="rounded-full!" icon="squares-2x2" x-on:click="$wire.filterByCategory({{ \Illuminate\Support\Js::from($suggestion['key']) }}).then(() => document.querySelector('[data-test=product-search]')?.focus())" wire:key="suggest-category-{{ $suggestion['key'] }}" :aria-label="__('Filter by category :category', ['category' => $suggestion['label']])" data-test="suggest-category">
+                                {{ $suggestion['label'] }}
+                            </flux:button>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
+
             @if ($showAutoCategoriesPromo)
                 <flux:callout icon="sparkles" color="amber" class="mb-6" data-test="auto-categories-promo">
                     <flux:callout.heading>{{ __('Let Pro sort your products') }}</flux:callout.heading>

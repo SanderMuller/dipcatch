@@ -81,3 +81,14 @@ it('keeps the selected shop offered when the category leaves it out', function (
         ->assertViewHas('shopHosts', ['ah.nl', 'jumbo.com', 'action.com'])
         ->assertSee('No product matches this filter.');
 });
+
+it('writes a shop host into the shop list as a script string, so a quote in it stays text', function (): void {
+    $user = User::factory()->create();
+    $shop = Shop::factory()->for(Product::factory()->for($user)->create())->create(['url' => 'https://www.jumbo.com/p/1']);
+    $shop->forceFill(['host' => "jumbo.com')+alert(1)+('"])->saveQuietly();
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->assertSeeHtml("\$set('shop', 'jumbo.com\\u0027)+alert(1)+(\\u0027')")
+        ->assertDontSeeHtml("\$set('shop', 'jumbo.com')+alert(1)");
+});

@@ -8,7 +8,7 @@
             data-test="app-search-bar"
         >
             <flux:icon.magnifying-glass class="size-5 shrink-0" />
-            <span class="truncate">{{ __('Search pages and products…') }}</span>
+            <span class="truncate">{{ __('Search pages, products and shops…') }}</span>
         </button>
     </flux:modal.trigger>
 
@@ -18,9 +18,10 @@
 
     <flux:modal name="app-command" variant="bare" class="my-[12vh] max-h-screen w-full max-w-[30rem] overflow-y-hidden">
         <flux:command class="inline-flex max-h-[76vh] flex-col border-none shadow-lg">
-            {{-- Pages filter in the browser. Products are searched on the server
-                 as you type, so an old product is found too. --}}
-            <flux:command.input :placeholder="__('Search pages and products…')" wire:model.live.debounce.250ms="search" closable autofocus autocomplete="off" data-1p-ignore />
+            {{-- Pages filter in the browser. Products, shops and categories are
+                 searched on the server from two letters, so an old product is
+                 found too; a keystroke renders only the results island. --}}
+            <flux:command.input :placeholder="__('Search pages, products and shops…')" :aria-label="__('Search pages, products and shops')" wire:model.live.debounce.120ms="search" wire:island="results" closable autofocus autocomplete="off" data-1p-ignore />
             {{-- `flux:command.items` itself, without its fixed "No results found":
                  Flux decides that line on typing, before the products arrive
                  from the server. The observer follows the options shown, and a
@@ -33,8 +34,29 @@
                     logged: new Set(),
                     timer: null,
                     observer: null,
+                    loadingObserver: null,
+                    heightTimer: null,
+                    holdHeight: null,
                     noMatches: false,
                     init() {
+                        const input = this.$el.parentElement.querySelector('input');
+                        {{-- Hold the list's height from a keystroke until the results
+                             arrive, at most 3 s: the pages filter at once, and the
+                             list would shrink and grow again. Capture runs before
+                             Flux filters the pages on the same event. --}}
+                        this.holdHeight = () => {
+                            this.$el.style.minHeight = this.$el.offsetHeight + 'px';
+                            clearTimeout(this.heightTimer);
+                            this.heightTimer = setTimeout(() => this.$el.style.minHeight = '', 3000);
+                        };
+                        this.$el.parentElement.addEventListener('input', this.holdHeight, true);
+                        this.loadingObserver = new MutationObserver(() => {
+                            if (! input.hasAttribute('data-loading')) {
+                                this.$el.style.minHeight = '';
+                            }
+                        });
+                        this.loadingObserver.observe(input, { attributes: true, attributeFilter: ['data-loading'] });
+
                         this.observer = new MutationObserver(() => {
                             this.noMatches = ! [...this.$el.querySelectorAll('ui-option')].some((option) => ! option.hasAttribute('data-hidden'));
                             this.$el.parentElement.querySelector('[data-test=command-empty]').hidden = ! this.noMatches;
@@ -55,83 +77,150 @@
                          without its scope. --}}
                     destroy() {
                         this.observer?.disconnect();
+                        this.loadingObserver?.disconnect();
+                        this.$el.parentElement?.removeEventListener('input', this.holdHeight, true);
                         clearTimeout(this.timer);
+                        clearTimeout(this.heightTimer);
                     },
                 }"
             >
-                <flux:command.item icon="home" :href="route('app.dashboard')" wire:navigate keywords="home overview start trips week">
-                    {{ __('Dashboard') }}
-                </flux:command.item>
-                <flux:command.item icon="shopping-bag" :href="route('app.products.index')" wire:navigate keywords="tracked list all watch">
-                    {{ __('Products') }}
-                </flux:command.item>
-                <flux:command.item icon="list-bullet" :href="route('app.shopping-list')" wire:navigate keywords="groceries boodschappen buy print">
-                    {{ __('Shopping list') }}
-                </flux:command.item>
-                <flux:command.item icon="chart-bar" :href="route('app.stats')" wire:navigate keywords="savings statistics chart history month alerts sent">
-                    {{ __('Stats') }}
-                </flux:command.item>
-                <flux:command.item icon="plus" :href="route('app.products.create')" wire:navigate keywords="add new product link url watch follow">
-                    {{ __('Track a product') }}
-                </flux:command.item>
-                <flux:command.item icon="pencil-square" :href="route('app.products.create', ['mode' => 'manual'])" wire:navigate keywords="manual by hand without link no url custom">
-                    {{ __('Add a product by hand') }}
-                </flux:command.item>
-                <flux:command.item icon="credit-card" :href="route('app.billing')" wire:navigate keywords="pro upgrade subscription payment invoice stripe plan price">
-                    {{ __('Plan & billing') }}
-                </flux:command.item>
-                @if ($showUpgrade)
-                    <flux:command.item icon="sparkles" :href="route('app.pro')" keywords="pro upgrade buy premium yearly monthly price">
-                        {{ __('Upgrade to Pro') }}
+                {{-- app.css hides an empty group and draws the line between groups. --}}
+                <div role="group" aria-labelledby="command-group-pages" data-command-group data-test="command-group-pages">
+                    <div id="command-group-pages" class="px-2 pt-2 pb-1 text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ __('Pages') }}</div>
+                    <flux:command.item icon="home" :href="route('app.dashboard')" wire:navigate keywords="home overview start trips week">
+                        {{ __('Dashboard') }}
                     </flux:command.item>
-                @endif
-                <flux:command.item icon="bell" :href="route('notifications.edit')" wire:navigate keywords="alerts email push digest price drop">
-                    {{ __('Notification settings') }}
-                </flux:command.item>
-                <flux:command.item icon="puzzle-piece" :href="route('app.connections')" wire:navigate keywords="mcp claude chatgpt openai assistant ai agent integration connect">
-                    {{ __('Connections') }}
-                </flux:command.item>
-                <flux:command.item icon="lifebuoy" :href="route('app.support')" wire:navigate keywords="help contact question bug problem feedback">
-                    {{ __('Support') }}
-                </flux:command.item>
-                <flux:command.item icon="cog-6-tooth" :href="route('profile.edit')" wire:navigate keywords="profile account name email delete account remove account close account timezone time zone currency region regional">
-                    {{ __('Settings') }}
-                </flux:command.item>
-                <flux:command.item icon="shield-check" :href="route('security.edit')" wire:navigate keywords="password change password two-factor 2fa authenticator passkey face id fingerprint login sign in sign out everywhere log out sessions devices hacked stolen wachtwoord">
-                    {{ __('Security') }}
-                </flux:command.item>
-                <flux:command.item icon="swatch" :href="route('appearance.edit')" wire:navigate keywords="theme dark mode light mode colours colors display">
-                    {{ __('Appearance') }}
-                </flux:command.item>
-                <flux:command.item icon="sparkles" :href="route('product-features.edit')" wire:navigate keywords="ai jev automatic auto categories categorise categorize sort pack same product check shop pro">
-                    {{ __('Product features') }}
-                </flux:command.item>
-                <flux:command.item icon="building-storefront" :href="route('shops')" keywords="stores supermarket which shops supported unsupported winkels">
-                    {{ __('Supported shops') }}
-                </flux:command.item>
+                    <flux:command.item icon="shopping-bag" :href="route('app.products.index')" wire:navigate keywords="tracked list all watch">
+                        {{ __('Products') }}
+                    </flux:command.item>
+                    <flux:command.item icon="list-bullet" :href="route('app.shopping-list')" wire:navigate keywords="groceries boodschappen buy print">
+                        {{ __('Shopping list') }}
+                    </flux:command.item>
+                    <flux:command.item icon="chart-bar" :href="route('app.stats')" wire:navigate keywords="savings statistics chart history month alerts sent">
+                        {{ __('Stats') }}
+                    </flux:command.item>
+                    <flux:command.item icon="plus" :href="route('app.products.create')" wire:navigate keywords="add new product link url watch follow">
+                        {{ __('Track a product') }}
+                    </flux:command.item>
+                    <flux:command.item icon="pencil-square" :href="route('app.products.create', ['mode' => 'manual'])" wire:navigate keywords="manual by hand without link no url custom">
+                        {{ __('Add a product by hand') }}
+                    </flux:command.item>
+                    <flux:command.item icon="credit-card" :href="route('app.billing')" wire:navigate keywords="pro upgrade subscription payment invoice stripe plan price">
+                        {{ __('Plan & billing') }}
+                    </flux:command.item>
+                    @if ($showUpgrade)
+                        <flux:command.item icon="sparkles" :href="route('app.pro')" keywords="pro upgrade buy premium yearly monthly price">
+                            {{ __('Upgrade to Pro') }}
+                        </flux:command.item>
+                    @endif
+                    <flux:command.item icon="bell" :href="route('notifications.edit')" wire:navigate keywords="alerts email push digest price drop">
+                        {{ __('Notification settings') }}
+                    </flux:command.item>
+                    <flux:command.item icon="puzzle-piece" :href="route('app.connections')" wire:navigate keywords="mcp claude chatgpt openai assistant ai agent integration connect">
+                        {{ __('Connections') }}
+                    </flux:command.item>
+                    <flux:command.item icon="lifebuoy" :href="route('app.support')" wire:navigate keywords="help contact question bug problem feedback">
+                        {{ __('Support') }}
+                    </flux:command.item>
+                    <flux:command.item icon="cog-6-tooth" :href="route('profile.edit')" wire:navigate keywords="profile account name email delete account remove account close account timezone time zone currency region regional">
+                        {{ __('Settings') }}
+                    </flux:command.item>
+                    <flux:command.item icon="shield-check" :href="route('security.edit')" wire:navigate keywords="password change password two-factor 2fa authenticator passkey face id fingerprint login sign in sign out everywhere log out sessions devices hacked stolen wachtwoord">
+                        {{ __('Security') }}
+                    </flux:command.item>
+                    <flux:command.item icon="swatch" :href="route('appearance.edit')" wire:navigate keywords="theme dark mode light mode colours colors display">
+                        {{ __('Appearance') }}
+                    </flux:command.item>
+                    <flux:command.item icon="sparkles" :href="route('product-features.edit')" wire:navigate keywords="ai jev automatic auto categories categorise categorize sort pack same product check shop pro">
+                        {{ __('Product features') }}
+                    </flux:command.item>
+                    <flux:command.item icon="building-storefront" :href="route('shops')" keywords="stores supermarket which shops supported unsupported winkels">
+                        {{ __('Supported shops') }}
+                    </flux:command.item>
+                </div>
 
-                @foreach ($products as ['product' => $product, 'headline' => $headline])
-                    @php($shop = $headline->buyableShop())
-                    <flux:command.item
-                        :href="route('app.products.show', $product)"
-                        wire:navigate
-                        wire:key="command-product-{{ $product->id }}"
-                        {{-- The server already matched these; the browser's
-                             text filter would hide a shop or category match. --}}
-                        filter="manual"
-                        class="h-auto! gap-3 py-2"
-                        data-test="command-product"
-                    >
-                        {{-- As the shopping list and the bell show a product. --}}
-                        <x-product-thumb :product="$product" size="size-10" />
-                        <div class="grid min-w-0 gap-0.5">
-                            <span class="truncate">{{ $product->title }}</span>
-                            <span class="truncate text-sm font-normal text-zinc-500 dark:text-zinc-400">
-                                {{ $shop === null ? __('No shop sells this now') : $headline->text() . ' · ' . $shop->host }}
-                            </span>
+                {{-- Reads `results` from the component: an island sees only public
+                     properties, not the data from render(). --}}
+                @island(name: 'results', always: true)
+                    @php(['products' => $products, 'shops' => $shops, 'categories' => $categories] = $__livewire->results)
+                    @if ($shops !== [])
+                        <div role="group" aria-labelledby="command-group-shops" wire:key="command-group-shops" data-command-group data-test="command-group-shops">
+                            <div id="command-group-shops" class="px-2 pt-2 pb-1 text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ __('Shops') }}</div>
+                            @foreach ($shops as ['host' => $host, 'name' => $name])
+                                <flux:command.item
+                                    :href="route('app.products.index', ['shop' => $host])"
+                                    wire:navigate
+                                    wire:key="command-shop-{{ $host }}"
+                                    filter="manual"
+                                    class="h-auto! gap-3 py-2"
+                                    data-test="command-shop"
+                                >
+                                    <span class="flex size-10 shrink-0 items-center justify-center">
+                                        <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-5 rounded-sm" />
+                                    </span>
+                                    <div class="grid min-w-0 gap-0.5">
+                                        <span class="truncate">{{ $host }}</span>
+                                        <span class="truncate text-sm font-normal text-zinc-600 dark:text-zinc-300">
+                                            {{ $name === null ? __('Your products at this shop') : $name . ' · ' . __('Your products at this shop') }}
+                                        </span>
+                                    </div>
+                                </flux:command.item>
+                            @endforeach
                         </div>
-                    </flux:command.item>
-                @endforeach
+                    @endif
+
+                    @if ($categories !== [])
+                        <div role="group" aria-labelledby="command-group-categories" wire:key="command-group-categories" data-command-group data-test="command-group-categories">
+                            <div id="command-group-categories" class="px-2 pt-2 pb-1 text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ __('Categories') }}</div>
+                            @foreach ($categories as ['key' => $key, 'label' => $label])
+                                <flux:command.item
+                                    :href="route('app.products.index', ['category' => $key])"
+                                    wire:navigate
+                                    wire:key="command-category-{{ $key }}"
+                                    filter="manual"
+                                    class="h-auto! gap-3 py-2"
+                                    data-test="command-category"
+                                >
+                                    <span class="flex size-10 shrink-0 items-center justify-center">
+                                        <flux:icon.squares-2x2 class="size-5 text-zinc-400" />
+                                    </span>
+                                    <div class="grid min-w-0 gap-0.5">
+                                        <span class="truncate">{{ $label }}</span>
+                                        <span class="truncate text-sm font-normal text-zinc-600 dark:text-zinc-300">{{ __('Your products in this category') }}</span>
+                                    </div>
+                                </flux:command.item>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if ($products->isNotEmpty())
+                        <div role="group" aria-labelledby="command-group-products" wire:key="command-group-products" data-command-group data-test="command-group-products">
+                            <div id="command-group-products" class="px-2 pt-2 pb-1 text-xs font-medium text-zinc-600 dark:text-zinc-300">{{ __('Products') }}</div>
+                            @foreach ($products as ['product' => $product, 'headline' => $headline])
+                                @php($shop = $headline->buyableShop())
+                                <flux:command.item
+                                    :href="route('app.products.show', $product)"
+                                    wire:navigate
+                                    wire:key="command-product-{{ $product->id }}"
+                                    {{-- The server already matched these; the browser's
+                                         text filter would hide a shop or category match. --}}
+                                    filter="manual"
+                                    class="h-auto! gap-3 py-2"
+                                    data-test="command-product"
+                                >
+                                    {{-- As the shopping list and the bell show a product. --}}
+                                    <x-product-thumb :product="$product" size="size-10" />
+                                    <div class="grid min-w-0 gap-0.5">
+                                        <span class="truncate">{{ $product->title }}</span>
+                                        <span class="truncate text-sm font-normal text-zinc-600 dark:text-zinc-300">
+                                            {{ $shop === null ? __('No shop sells this now') : $headline->text() . ' · ' . $shop->host }}
+                                        </span>
+                                    </div>
+                                </flux:command.item>
+                            @endforeach
+                        </div>
+                    @endif
+                @endisland
 
                 {{-- Flux's list expects its empty line to exist; ours is below the list. --}}
                 <ui-option-empty class="hidden"></ui-option-empty>
