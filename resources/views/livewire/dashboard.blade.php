@@ -83,7 +83,7 @@
                                                 <div class="flex shrink-0 -space-x-3">
                                                     @foreach ($trip['products'] as $product)
                                                         <a href="{{ route('app.products.show', $product) }}" wire:navigate title="{{ $product->title }}" class="rounded-xl ring-2 ring-paper">
-                                                            <x-product-thumb :product="$product" size="size-10" />
+                                                            <x-product-thumb :product="$product" thumbnail size="size-10" />
                                                             <span class="sr-only">{{ $product->title }}</span>
                                                         </a>
                                                     @endforeach
@@ -171,7 +171,7 @@
                     <ul role="list" class="mt-4 divide-y divide-ink/5 rounded-2xl bg-paper ring-1 ring-line dark:divide-white/10">
                         @foreach ($watching as $product)
                             <li class="relative flex items-center gap-3 px-4 py-2.5 hover:bg-canvas/60 dark:hover:bg-white/5" wire:key="watching-{{ $product->id }}">
-                                <x-product-thumb :product="$product" size="size-10" @class(['opacity-40 grayscale' => ! $product->active]) />
+                                <x-product-thumb :product="$product" thumbnail size="size-10" @class(['opacity-40 grayscale' => ! $product->active]) />
                                 <div class="min-w-0 flex-1">
                                     <a href="{{ route('app.products.show', $product) }}" wire:navigate class="block truncate font-medium after:absolute after:inset-0">{{ $product->title }}</a>
                                     <p class="truncate text-sm text-zinc-500 dark:text-zinc-400">
@@ -223,7 +223,7 @@
                         @foreach ($worthALook as $row)
                             <li class="relative flex items-center gap-3 px-4 py-2.5 hover:bg-canvas/60 dark:hover:bg-white/5" wire:key="list-{{ $row['key'] }}">
                                 <div class="relative shrink-0">
-                                    <x-product-thumb :product="$row['product']" size="size-10" />
+                                    <x-product-thumb :product="$row['product']" thumbnail size="size-10" />
                                     <span class="absolute -right-1.5 -bottom-1.5 flex size-5 items-center justify-center rounded-full bg-paper shadow-xs ring-1 ring-line dark:bg-zinc-900 dark:ring-white/10" aria-hidden="true">
                                         <flux:icon :name="$row['icon']" variant="micro" class="size-3.5 {{ $row['tone'] }}" />
                                     </span>

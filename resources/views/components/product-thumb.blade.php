@@ -1,4 +1,4 @@
-@props(['product', 'size' => 'size-12'])
+@props(['product', 'size' => 'size-12', 'thumbnail' => false])
 
 {{-- The image sits on top of the placeholder tile rather than replacing it:
      a scraped URL can 404 long after it was stored, and only the browser
@@ -6,9 +6,12 @@
      so a row never collapses to a broken-image glyph.
 
      safeImageUrl() and not image_url: the value is scraped markup or user
-     input, and a `javascript:` payload must never reach an <img src>. --}}
+     input, and a `javascript:` payload must never reach an <img src>.
+     `thumbnail` asks the shop's image server for a small copy, for a tile of
+     64 px at most. --}}
 @php
     $src = $product->safeImageUrl();
+    $src = $src !== null && $thumbnail ? \App\Support\ImageUrl::thumbnail($src) : $src;
 @endphp
 
 <div {{ $attributes->class([

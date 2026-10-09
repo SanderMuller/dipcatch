@@ -209,7 +209,7 @@
                                     data-test="command-product"
                                 >
                                     {{-- As the shopping list and the bell show a product. --}}
-                                    <x-product-thumb :product="$product" size="size-10" />
+                                    <x-product-thumb :product="$product" thumbnail size="size-10" />
                                     <div class="grid min-w-0 gap-0.5">
                                         <span class="truncate">{{ $product->title }}</span>
                                         <span class="truncate text-sm font-normal text-zinc-600 dark:text-zinc-300">

@@ -32,7 +32,7 @@
                     @php($cheapest = $product->cheapestShop)
                     <li class="rounded-2xl border border-ink/10 bg-paper p-3 dark:border-white/10" wire:key="suggested-{{ $product->id }}" data-test="suggested-product">
                         <div class="flex min-w-0 items-center gap-3">
-                            <x-product-thumb :product="$product" size="size-14" />
+                            <x-product-thumb :product="$product" thumbnail size="size-14" />
                             <div class="min-w-0 flex-1">
                                 <a href="{{ route('app.products.show', $product) }}" wire:navigate class="line-clamp-2 font-medium underline-offset-4 hover:underline">{{ $product->title }}</a>
                                 @if ($cheapest?->current_price !== null)
@@ -142,7 +142,7 @@
                                             <div class="rounded-xl bg-zinc-50 p-3 ring-1 ring-ink/10 dark:bg-white/5 dark:ring-white/10">
                                                 <p class="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">{{ __('Your product') }}</p>
                                                 <div class="mt-2 flex items-start gap-3">
-                                                    <x-product-thumb :product="$product" size="size-16" />
+                                                    <x-product-thumb :product="$product" thumbnail size="size-16" />
                                                     <div class="min-w-0">
                                                         <p class="text-sm font-medium"><x-title-diff :title="$product->title" :other="$row['name']" /></p>
                                                         @foreach ($product->shops as $trackedShop)

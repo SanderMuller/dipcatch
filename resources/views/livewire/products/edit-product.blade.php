@@ -7,7 +7,7 @@
 
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="flex items-start gap-4">
-            <x-product-thumb :product="$product" size="size-16" />
+            <x-product-thumb :product="$product" thumbnail size="size-16" />
             <div class="min-w-0">
                 <flux:heading size="xl" level="1" class="tracking-tight">{{ __('Edit product') }}</flux:heading>
                 <flux:text class="mt-1 text-zinc-500">{{ $product->title }}</flux:text>

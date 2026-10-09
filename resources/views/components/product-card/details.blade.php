@@ -37,7 +37,7 @@
 <div class="w-84 divide-y divide-zinc-950/5 text-left font-normal text-zinc-700 dark:divide-white/10 dark:text-zinc-300" data-test="product-card-details">
     {{-- The product and the figure the card leads with. --}}
     <div class="flex items-center gap-3 pb-3">
-        <x-product-thumb :product="$product" size="size-11 shrink-0" />
+        <x-product-thumb :product="$product" thumbnail size="size-11 shrink-0" />
         <div class="min-w-0">
             <p class="line-clamp-2 text-sm font-medium text-balance text-zinc-950 dark:text-white">{{ $product->title }}</p>
             <p class="text-xs text-zinc-500 tabular-nums dark:text-zinc-400">

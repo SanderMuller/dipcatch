@@ -95,3 +95,23 @@ test('an at sign outside the authority is not credentials', function (string $ba
     'in the query after a path' => ['https://shop.test/p/1?to=a@b.test', 'https://shop.test/a.jpg'],
     'credentials and an at sign in the query' => ['https://u:pw@shop.test/p/1?to=a@b.test', 'https://shop.test/a.jpg'],
 ]);
+
+test('thumbnail asks a resizing image server for a small copy, at a size it accepts', function (string $url, string $expected): void {
+    expect(ImageUrl::thumbnail($url))->toBe($expected);
+})->with([
+    'AH' => ['https://static.ah.nl/dam/product/AHI_1?revLabel=1&rendition=800x800_WEBP&fileType=binary', 'https://static.ah.nl/dam/product/AHI_1?revLabel=1&rendition=200x200_WEBP&fileType=binary'],
+    'Dirk' => ['https://web-fileserver.dirk.nl/artikelen/1.png?width=500&height=500&mode=crop', 'https://web-fileserver.dirk.nl/artikelen/1.png?width=160&height=160&mode=crop'],
+    'a Shopify shop' => ['https://www.bodyandfit.com/cdn/shop/files/1.png?v=17&width=1920', 'https://www.bodyandfit.com/cdn/shop/files/1.png?v=17&width=160'],
+    'the Shopify CDN' => ['https://cdn.shopify.com/s/files/1/p.jpg?v=1&width=800&height=800&crop=center', 'https://cdn.shopify.com/s/files/1/p.jpg?v=1&width=160'],
+    'Amazon' => ['https://m.media-amazon.com/images/I/51np1PVT2+L.jpg', 'https://m.media-amazon.com/images/I/51np1PVT2+L._SL160_.jpg'],
+    'Amazon with a size' => ['https://m.media-amazon.com/images/I/51np1PVT2+L._AC_SL1500_.jpg', 'https://m.media-amazon.com/images/I/51np1PVT2+L._SL160_.jpg'],
+]);
+
+test('thumbnail leaves a server that refuses other sizes, or does not resize, alone', function (string $url): void {
+    expect(ImageUrl::thumbnail($url))->toBe($url);
+})->with([
+    'Jumbo' => 'https://www.jumbo.com/dam-images/fit-in/360x360/Products/1.png',
+    'Zooplus' => 'https://media.zooplus.com/bilder/8/400/1.jpg',
+    'Spar' => 'https://media.spar.nl/productdetail/fanta-1.5-Liter.jpg',
+    'AH without a rendition' => 'https://static.ah.nl/dam/product/AHI_1',
+]);

@@ -40,7 +40,7 @@
                         data-test="shopping-menu-cross-off"
                     />
                     <flux:menu.item :href="route('app.products.show', $product)" wire:navigate class="min-w-0 flex-1 !h-auto !items-center gap-3 py-2">
-                        <x-product-thumb :product="$product" size="size-10" @class(['opacity-50 grayscale' => $item['crossedOff']]) />
+                        <x-product-thumb :product="$product" thumbnail size="size-10" @class(['opacity-50 grayscale' => $item['crossedOff']]) />
                         <div class="grid min-w-0 gap-0.5">
                             <flux:text @class(['truncate font-medium', 'text-zinc-500 line-through' => $item['crossedOff']])>{{ $product->title }}</flux:text>
                             <flux:text size="sm" class="truncate text-zinc-500">

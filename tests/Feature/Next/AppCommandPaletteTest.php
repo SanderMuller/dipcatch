@@ -273,3 +273,13 @@ it('lists no category that only another account has products in', function (): v
 
     livewire(AppCommandPalette::class)->set('search', 'dairy')->assertDontSeeHtml('data-test="command-group-categories"');
 });
+
+it('shows a small copy of the product photo, where the shop can resize it', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->for($user)->create(['title' => 'Arabica beans', 'image_url' => 'https://static.ah.nl/dam/product/AHI_1?revLabel=1&rendition=800x800_WEBP&fileType=binary']);
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)
+        ->assertSeeHtml('rendition=200x200_WEBP')
+        ->assertDontSeeHtml('rendition=800x800_WEBP');
+});

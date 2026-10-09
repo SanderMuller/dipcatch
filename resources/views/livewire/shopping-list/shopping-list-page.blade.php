@@ -136,7 +136,7 @@
                                 />
                                 <span class="hidden size-[5mm] shrink-0 rounded-[1mm] border-[1.5pt] border-black print:inline-block" aria-hidden="true"></span>
 
-                                <x-product-thumb :product="$product" size="size-12" @class(['print:hidden', 'opacity-50 grayscale' => $item['crossedOff']]) />
+                                <x-product-thumb :product="$product" thumbnail size="size-12" @class(['print:hidden', 'opacity-50 grayscale' => $item['crossedOff']]) />
 
                                 <div class="min-w-0 flex-1">
                                     <a
