@@ -30,7 +30,7 @@ test('a Pro account with AI features off is asked once, on any app page', functi
     $user = proForOffer(['shop_checks' => true]);
     $this->actingAs($user);
 
-    $this->get(route('app.dashboard'))->assertOk()->assertSee('data-test="pro-ai-offer"', escape: false);
+    $this->get(route('app.dashboard'))->assertOk()->assertSeeHtml('data-test="pro-ai-offer"');
 
     livewire(ProAiOffer::class)->assertSet('open', false);
 

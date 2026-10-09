@@ -799,7 +799,7 @@ it('leaves the barcode search to its own job, so one discovery job makes one sea
     discover($product);
 
     expect(serperCalls())->toBe(1)
-        ->and(barcodeSearches())->toBe([]);
+        ->and(barcodeSearches())->toBeEmpty();
     Queue::assertPushed(SearchProductBarcode::class, fn (SearchProductBarcode $job): bool => $job->productId === (string) $product->id);
 });
 
@@ -826,7 +826,7 @@ it('makes no barcode search once the owner no longer has shop checks', function 
 
     new SearchProductBarcode((string) $product->id)->handle(app(BarcodeSearch::class), app(WebShopDiscovery::class));
 
-    expect(barcodeSearches())->toBe([]);
+    expect(barcodeSearches())->toBeEmpty();
 });
 
 it('queues no discovery after a barcode search the daily limit refused', function (): void {
@@ -838,7 +838,7 @@ it('queues no discovery after a barcode search the daily limit refused', functio
 
     new SearchProductBarcode((string) $product->id)->handle(app(BarcodeSearch::class), app(WebShopDiscovery::class));
 
-    expect(barcodeSearches())->toBe([]);
+    expect(barcodeSearches())->toBeEmpty();
     Queue::assertNotPushed(DiscoverWebShops::class);
 });
 
@@ -849,7 +849,7 @@ it('makes no barcode search for a product without a barcode', function (): void 
     discover($product);
 
     expect(serperCalls())->toBe(1)
-        ->and(barcodeSearches())->toBe([]);
+        ->and(barcodeSearches())->toBeEmpty();
 });
 
 it('searches the barcode most shops report, in its 13-digit form', function (): void {
@@ -942,7 +942,7 @@ it('still makes the title search when the day has room for one search only', fun
     discover($product);
 
     expect(serperCalls())->toBe(1)
-        ->and(barcodeSearches())->toBe([])
+        ->and(barcodeSearches())->toBeEmpty()
         ->and(findingAt($product, 'a.test')->status)->toBe(WebFindingStatus::Proposed);
 });
 

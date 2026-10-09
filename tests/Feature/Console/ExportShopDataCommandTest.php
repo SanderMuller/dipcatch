@@ -19,7 +19,7 @@ test('the hosts dataset prints one CSV row per host without owner data', functio
 });
 
 test('a subdomain of a supported shop counts as supported', function (): void {
-    config(['site.supported_hosts' => ['winkel.example.de']]);
+    config()->set('site.supported_hosts', ['winkel.example.de']);
     Shop::factory()->create(['url' => 'https://webwinkel.winkel.example.de/p/kaffee']);
     Shop::factory()->create(['url' => 'https://otherwinkel.example.de/p/kaffee']);
 

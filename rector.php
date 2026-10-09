@@ -22,11 +22,13 @@ use Rector\CodeQuality\Rector\If_\SimplifyIfReturnBoolRector;
 use Rector\CodingStyle\Rector\PostInc\PostIncDecToPreIncDecRector;
 use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
+use Rector\DeadCode\Rector\Property\RemoveDefaultValueFromAssignedPropertyRector;
 use Rector\DeadCode\Rector\PropertyProperty\RemoveNullPropertyInitializationRector;
 use Rector\DeadCode\Rector\Stmt\RemoveUnreachableStatementRector;
 use Rector\DeadCode\Rector\StmtsAwareInterface\RemoveDeadInstanceOfAssertRector;
 use Rector\Php74\Rector\Closure\ClosureToArrowFunctionRector;
 use Rector\Php74\Rector\Property\RestoreDefaultNullToNullableTypePropertyRector;
+use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 use Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector;
 use Rector\Php81\Rector\MethodCall\SpatieEnumMethodCallToEnumConstRector;
 use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
@@ -187,6 +189,14 @@ return RectorConfig::configure()
      */
     ->withSkip([
         AddOverrideAttributeToOverriddenPropertiesRector::class,
+        // A queued job's declared default is what a job serialised before the
+        // property existed reads; a promoted property has none.
+        ClassPropertyAssignToConstructorPromotionRector::class => [
+            __DIR__ . '/app/Jobs/PrewarmShopSearches.php',
+        ],
+        RemoveDefaultValueFromAssignedPropertyRector::class => [
+            __DIR__ . '/app/Jobs/PrewarmShopSearches.php',
+        ],
         // Larastan can't introspect models that declare their table via
         // #[Table] attribute — it still reads `protected $table`. Keep the
         // property form until the larastan upgrade resolves.

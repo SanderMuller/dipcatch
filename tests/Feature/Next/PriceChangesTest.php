@@ -157,7 +157,7 @@ test('keeps a change before the window out, but uses it as the old price', funct
 test('reads the list in a fixed number of queries', function (): void {
     $shop = priceLogProduct();
     foreach (range(1, 12) as $day) {
-        segment($shop, (string) (5 + $day) . '.00', 40 - $day * 2, 38 - $day * 2);
+        segment($shop, (5 + $day) . '.00', 40 - $day * 2, 38 - $day * 2);
     }
 
     $log = new PriceChangeLog($shop->product()->sole(), windowStart: null);
@@ -171,7 +171,7 @@ test('reads the list in a fixed number of queries', function (): void {
 test('a Pro owner opens the list and pages it ten at a time', function (): void {
     $shop = priceLogProduct();
     foreach (range(1, 12) as $day) {
-        segment($shop, (string) (5 + $day) . '.00', 40 - $day * 2, 38 - $day * 2);
+        segment($shop, (5 + $day) . '.00', 40 - $day * 2, 38 - $day * 2);
     }
 
     $this->actingAs($shop->product()->sole()->user()->sole());

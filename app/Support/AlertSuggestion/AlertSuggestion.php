@@ -105,7 +105,7 @@ final readonly class AlertSuggestion
             promotionNowDepth: $deepest['depth'] ?? 0,
             cappedByLaw: $target !== null && $legalCap !== null && $prior > $legalCap,
             alreadyMet: $target !== null && self::meets($product, $target['unit']),
-            halfwayToOffer: $target !== null && $halfway && ! ($legalCap !== null && $prior > $legalCap),
+            halfwayToOffer: $target !== null && $halfway && ($legalCap === null || $prior <= $legalCap),
             cheapOutliers: $target === null ? [] : $outliers,
         );
     }

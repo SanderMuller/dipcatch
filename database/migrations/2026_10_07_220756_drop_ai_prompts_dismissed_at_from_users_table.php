@@ -23,6 +23,10 @@ return new class extends Migration {
             ->where('ai_prompts_dismissed_at', '>', now()->subDays(30))
             ->orderBy('id')
             ->each(function (object $user): void {
+                if (! is_string($user->ai_prompts_dismissed_at)) {
+                    return;
+                }
+
                 $dismissals = is_string($user->ai_prompt_dismissals) ? (array) json_decode($user->ai_prompt_dismissals, true) : [];
                 $at = CarbonImmutable::parse($user->ai_prompts_dismissed_at)->toIso8601String();
 

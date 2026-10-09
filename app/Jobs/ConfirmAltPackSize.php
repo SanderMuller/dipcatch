@@ -17,6 +17,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -38,6 +39,8 @@ use Illuminate\Support\Facades\DB;
  */
 #[Tries(1)]
 #[Timeout(75)]
+// Longer than the job's timeout, so a job lost from the queue frees the shop again.
+#[UniqueFor(600)]
 final class ConfirmAltPackSize implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
@@ -81,9 +84,6 @@ final class ConfirmAltPackSize implements ShouldBeUnique, ShouldQueue
             dispatch(new self((string) $shop->id, mb_substr($title, 0, 255), (string) $shop->url, self::pairKey($shop)));
         }
     }
-
-    /** Longer than the job's timeout, so a job lost from the queue frees the shop again. */
-    public int $uniqueFor = 600;
 
     public function uniqueId(): string
     {

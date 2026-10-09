@@ -100,9 +100,8 @@ it('offers shops before categories, and at most three', function (): void {
 
     expect(FilterSuggestions::for('co', ['coolblue.nl', 'coop.nl', 'cool.com', 'costco.nl'], $groups, except: []))
         ->toHaveCount(3)
-        ->each(fn ($suggestion) => $suggestion->kind->toBe('shop'));
-
-    expect(array_column(FilterSuggestions::for('co', ['coop.nl'], $groups, except: []), 'kind'))->toBe(['shop', 'category']);
+        ->each(fn ($suggestion) => $suggestion->kind->toBe('shop'))
+        ->and(array_column(FilterSuggestions::for('co', ['coop.nl'], $groups, except: []), 'kind'))->toBe(['shop', 'category']);
 });
 
 it('writes a shop host into the chip as a script string, so a quote in it stays text', function (): void {

@@ -146,9 +146,11 @@ test('dropping the account-wide not now keeps a recent one quiet at every place'
     DB::table('users')->where('id', $old->id)->update(['ai_prompts_dismissed_at' => now()->subDays(AiPromptPlace::QUIET_DAYS + 1)]);
 
     $migration->up();
+    $dismissals = $recent->refresh()->ai_prompt_dismissals ?? [];
 
     expect(Schema::hasColumn('users', 'ai_prompts_dismissed_at'))->toBeFalse()
-        ->and(array_keys($recent->refresh()->ai_prompt_dismissals ?? []))->toEqualCanonicalizing(array_column(AiPromptPlace::cases(), 'value'))
-        ->and($recent->ai_prompt_dismissals['alert'])->toBeGreaterThan($recent->ai_prompt_dismissals['add_shop'])
+        ->and(array_keys($dismissals))->toEqualCanonicalizing(array_column(AiPromptPlace::cases(), 'value'))
+        ->and($dismissals)->toHaveKeys(['alert', 'add_shop'])
+        ->and($dismissals['alert'] ?? null)->toBeGreaterThan($dismissals['add_shop'] ?? '')
         ->and($old->refresh()->ai_prompt_dismissals)->toBeNull();
 });

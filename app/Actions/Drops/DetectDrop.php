@@ -7,7 +7,6 @@ use App\Models\LargeDropCheck;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
-use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\DropEvaluator;

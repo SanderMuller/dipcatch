@@ -47,13 +47,7 @@ final class CatalogueLinks
 
         $path = rtrim((string) parse_url($finalUrl, PHP_URL_PATH), '/');
 
-        foreach (self::NOT_FOUND_PATHS as $host => $notFound) {
-            if (HostUrl::matches($finalUrl, $host) && $path === $notFound) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(self::NOT_FOUND_PATHS, fn (string $notFound, string $host): bool => HostUrl::matches($finalUrl, $host) && $path === $notFound);
     }
 
     /**

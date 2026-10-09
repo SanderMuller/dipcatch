@@ -212,7 +212,7 @@ it('links every highlighted shop from the footer by its own slug', function (): 
     }
 
     expect(array_values(array_filter($hrefs, static fn (string $href): bool => str_contains($href, '/shops/'))))
-        ->toHaveCount(count(SupportedShops::highlights()));
+        ->toHaveSameSize(SupportedShops::highlights());
 });
 
 it('offers six other shops to compare with, never the shop itself', function (): void {

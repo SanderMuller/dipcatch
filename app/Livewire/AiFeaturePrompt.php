@@ -43,7 +43,7 @@ final class AiFeaturePrompt extends Component
         $this->place = $place->value;
         $this->spaced = $spaced;
         $this->below = $below;
-        $this->hidden = ! ($place->feature()->isOfferedTo($this->user(), $place) && app(AiPromptsOnPage::class)->claim($place->feature()));
+        $this->hidden = ! $place->feature()->isOfferedTo($this->user(), $place) || ! app(AiPromptsOnPage::class)->claim($place->feature());
     }
 
     public function switchOn(SwitchOnAiFeature $switchOn): void

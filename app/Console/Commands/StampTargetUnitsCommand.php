@@ -8,7 +8,7 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 #[Signature('dipcatch:stamp-target-units')]
 #[Description('Record the unit every per-unit target, and every target latch, was set in, as the unit its product compares in today. Run once before shops start stating a second pack size; safe to run again.')]
@@ -29,7 +29,7 @@ final class StampTargetUnitsCommand extends Command
                 ->where(fn (Builder $target): Builder => $target->whereNotNull('unit_price_target')->whereNull('unit_price_target_unit'))
                 ->orWhere(fn (Builder $latch): Builder => $latch->whereNotNull('unit_price_notified')->whereNull('unit_price_notified_unit')))
             ->with('shops')
-            ->chunkById(200, function (Collection $products) use (&$stamped): void {
+            ->chunkById(200, function (EloquentCollection $products) use (&$stamped): void {
                 foreach ($products as $product) {
                     $packs = $product->comparablePacks();
                     // The unit it was last compared in, which is the one the

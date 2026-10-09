@@ -72,7 +72,7 @@ test('it suggests no Dutch catalogue shop to an owner in another country', funct
     $product = beemsterProduct();
     $product->user->forceFill(['country' => 'fr'])->save();
 
-    expect(suggest($product->refresh()))->toBe([]);
+    expect(suggest($product->refresh()))->toBeEmpty();
 });
 
 test('it builds the product url from the chain base url and the stored link', function (): void {

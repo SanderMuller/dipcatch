@@ -124,7 +124,7 @@ final readonly class EfarmaAdapter implements HostSpecificAdapter, OwnsHosts, Sh
     private static function gtin(Crawler $crawler): ?string
     {
         foreach ($crawler->filter('p') as $node) {
-            if (preg_match('/EAN:\s*(\d{8,14})/', (string) $node->textContent, $m) === 1) {
+            if (preg_match('/EAN:\s*(\d{8,14})/', $node->textContent, $m) === 1) {
                 return Gtin::normalize($m[1]);
             }
         }

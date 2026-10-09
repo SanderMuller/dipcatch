@@ -157,7 +157,7 @@ it('keeps the cheapest shop with only two shops to compare', function (): void {
         ['url' => 'https://www.ah.nl/p/1', 'current_price' => '17.99', 'pack_quantity' => '16.00', 'pack_unit' => 'piece'],
     ], ProductCategory::PaperDisposables);
 
-    expect(AlertSuggestion::for($product)->cheapOutliers)->toBe([])
+    expect(AlertSuggestion::for($product)->cheapOutliers)->toBeEmpty()
         ->and(AlertSuggestion::for($product)->normalUnitPrice)->toBe('0.7468');
 });
 

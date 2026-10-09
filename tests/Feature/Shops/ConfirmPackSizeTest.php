@@ -218,5 +218,5 @@ it('starts the reference anew only at the first win of a confirmed shop, not eac
     $epoch = ReferenceEpoch::currentEpoch($segments, 'piece', ['c' => $joined]);
 
     // From C's first win on: A's second stretch and C's return stay in.
-    expect(count($epoch))->toBe(3);
+    expect($epoch)->toHaveCount(3);
 });
