@@ -282,3 +282,9 @@ it('shows the product picture beside an alert, and only for this account\'s prod
         ->assertDontSeeHtml('https://example.test/theirs.png')
         ->assertSee('Broken id');
 });
+
+it('checks for new notifications once a minute, as the shopping-list menu does', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    livewire(Bell::class)->assertSeeHtml('wire:poll.60s');
+});

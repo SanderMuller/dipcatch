@@ -1,5 +1,5 @@
 {{-- Polls so a drop that fires while the page is open appears without a reload. --}}
-<flux:dropdown position="bottom" align="end" wire:poll.30s>
+<flux:dropdown position="bottom" align="end" wire:poll.60s>
     <flux:button variant="ghost" size="sm" icon="bell" class="relative" aria-label="{{ __('Notifications') }}">
         @if ($unreadCount > 0)
             <flux:badge color="red" size="sm" class="absolute -end-1 -top-1">{{ $unreadCount > 9 ? '9+' : $unreadCount }}</flux:badge>
