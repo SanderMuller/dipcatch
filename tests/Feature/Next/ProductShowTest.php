@@ -70,6 +70,18 @@ it('links each tracked shop to a prefilled problem report', function (): void {
         ]));
 });
 
+it('links each shop to the products page filtered on that shop', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://www.webwinkel.poiesz-supermarkten.nl/p/1']);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee('Your products at this shop')
+        ->assertSeeHtml('href="' . route('app.products.index', ['shop' => 'webwinkel.poiesz-supermarkten.nl']) . '"');
+});
+
 it('discloses bundle terms in headline and shop row', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user, cheapestPrice: '2.00');

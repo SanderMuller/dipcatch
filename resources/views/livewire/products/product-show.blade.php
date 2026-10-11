@@ -360,6 +360,11 @@
                                             <flux:menu.item icon="arrow-top-right-on-square" :href="\App\Support\AffiliateLink::for($shop->url)" target="_blank" :rel="\App\Support\AffiliateLink::rel($shop->url)">
                                                 {{ __('Open') }}
                                             </flux:menu.item>
+                                            @if (filled($shop->host))
+                                                <flux:menu.item icon="building-storefront" :href="route('app.products.index', ['shop' => $shop->host])" wire:navigate data-test="shop-products">
+                                                    {{ __('Your products at this shop') }}
+                                                </flux:menu.item>
+                                            @endif
                                             <flux:menu.item icon="pencil-square" wire:click="editShop('{{ $shop->id }}')">
                                                 {{ __('Edit shop') }}
                                             </flux:menu.item>
