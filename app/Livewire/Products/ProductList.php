@@ -82,10 +82,12 @@ final class ProductList extends Component
     /**
      * The group of a product sorted by drop. 0: at its alert price, as
      * {@see Product::AT_TARGET_SQL} reads it; 1: in a drop, or with a deal as the "Only
-     * discounts" switch reads one; 2: the rest.
+     * discounts" switch reads one; 2: the rest. With a shop chosen, the alert
+     * price and the drop count only where that shop has the price they are
+     * read at (`price_here`), as the switch has it.
      */
-    private const string LIST_GROUP = 'CASE WHEN ' . Product::AT_TARGET_SQL . ' THEN 0'
-        . ' WHEN biggest_drop >= 0.5 OR deals_now > 0 THEN 1'
+    private const string LIST_GROUP = 'CASE WHEN (' . Product::AT_TARGET_SQL . ') AND price_here > 0 THEN 0'
+        . ' WHEN (biggest_drop >= 0.5 AND price_here > 0) OR deals_now > 0 THEN 1'
         . ' ELSE 2 END';
 
     /** @var list<string>|null Memo for {@see bestBuyIds()}; not public, so it lives for one request. */
@@ -369,6 +371,18 @@ final class ProductList extends Component
             'biggest_drop' => Product::liveDropPercentQuery(),
             'deals_now' => self::dealRunningNow($shops->selectRaw('COUNT(*)')),
         ]);
+
+        if ($this->shop === '') {
+            $inner->selectRaw('1 AS price_here');
+        } else {
+            // The lowest price or the best value is at the chosen shop.
+            $inner->addSelect(['price_here' => Shop::query()->selectRaw('COUNT(*)')
+                ->whereColumn('shops.product_id', 'products.id')
+                ->where('host', $this->shop)
+                ->where(fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $shop
+                    ->whereColumn('shops.id', 'products.cheapest_shop_id')
+                    ->orWhereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id'))]);
+        }
 
         return Product::query()->fromSub($inner, 'products')->select('*')->selectRaw(self::LIST_GROUP . ' AS list_group');
     }

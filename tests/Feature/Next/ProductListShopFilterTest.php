@@ -92,3 +92,22 @@ it('writes a shop host into the shop list as a script string, so a quote in it s
         ->assertSeeHtml("\$set('shop', 'jumbo.com\\u0027)+alert(1)+(\\u0027')")
         ->assertDontSeeHtml("\$set('shop', 'jumbo.com')+alert(1)");
 });
+
+it('groups by the alert price only where the chosen shop has the price', function (): void {
+    $user = User::factory()->create();
+
+    foreach (['At the alert here' => ['jumbo.com', 'musclehouse.nl'], 'At the alert elsewhere' => ['musclehouse.nl', 'jumbo.com']] as $title => [$cheapHost, $dearHost]) {
+        $product = Product::factory()->for($user)->create(['title' => $title, 'currency' => 'EUR', 'target_price' => '1.50']);
+        Shop::factory()->for($product)->create(['url' => "https://{$cheapHost}/p/1", 'current_price' => '1.00', 'currency' => 'EUR']);
+        Shop::factory()->for($product)->create(['url' => "https://{$dearHost}/p/1", 'current_price' => '2.00', 'currency' => 'EUR']);
+        $product->refresh()->recomputeCheapestShop();
+    }
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        // Both at their alert price, so no other group and no line.
+        ->assertDontSeeHtml('data-test="drop-divider"')
+        ->set('shop', 'jumbo.com')
+        ->assertSeeHtmlInOrder(['data-test="at-alert-divider"', 'At the alert here', 'data-test="drop-divider"', 'At the alert elsewhere']);
+});
