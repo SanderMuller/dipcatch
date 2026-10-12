@@ -17,6 +17,7 @@ use App\Support\Numeric;
 use App\Support\ProductMarkdown;
 use App\Support\PromotionLabel;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
@@ -1233,29 +1234,53 @@ it('shows no unit figure from a shop\'s own size when the product compares none'
     expect(ProductMarkdown::of($product->refresh()))->not->toContain('/kg');
 });
 
+/**
+ * Shops selling 12 pieces, or stating no size when the quantity is null, so
+ * their size is estimated from the others.
+ *
+ * @param  array<string, array{0: string, 1: string|null}>  $rows  host => [price, quantity]
+ */
+function piecePacks(Product $product, array $rows): void
+{
+    foreach ($rows as $host => [$price, $quantity]) {
+        Shop::factory()->for($product)->create(['url' => "https://{$host}/p/1"])
+            ->forceFill([
+                'currency' => 'EUR',
+                'current_price' => $price,
+                'current_in_stock' => true,
+                'pack_quantity' => $quantity,
+                'pack_unit' => $quantity === null ? null : 'piece',
+            ])->save();
+    }
+}
+
 it('lists a shop with an estimated size by its price per unit, under the best value but above dearer shops', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user, 'Protein bars');
-
-    foreach ([
-        ['host' => 'dearest.nl', 'price' => '34.90', 'quantity' => '12.00'],
-        ['host' => 'dearer.nl', 'price' => '31.90', 'quantity' => '12.00'],
-        ['host' => 'estimate.nl', 'price' => '23.99', 'quantity' => null],
-        ['host' => 'cheapest.nl', 'price' => '2.23', 'quantity' => '12.00'],
-    ] as $row) {
-        Shop::factory()->for($product)->create(['url' => 'https://' . $row['host'] . '/p/1'])
-            ->forceFill([
-                'currency' => 'EUR',
-                'current_price' => $row['price'],
-                'current_in_stock' => true,
-                'pack_quantity' => $row['quantity'],
-                'pack_unit' => $row['quantity'] === null ? null : 'piece',
-            ])->save();
-    }
+    piecePacks($product, ['dearest.nl' => ['34.90', '12.00'], 'dearer.nl' => ['31.90', '12.00'], 'estimate.nl' => ['23.99', null], 'cheapest.nl' => ['2.23', '12.00']]);
 
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
         ->assertSee('estimated')
         ->assertSeeInOrder(['cheapest.nl', 'estimate.nl', 'dearer.nl', 'dearest.nl']);
+
+    // The Markdown copy lists the shops in the same order.
+    $markdown = (string) $this->get(route('app.products.markdown', $product))->getContent();
+    $positions = array_map(fn (string $host): int|false => strpos($markdown, "| [{$host}]"), ['cheapest.nl', 'estimate.nl', 'dearer.nl', 'dearest.nl']);
+
+    expect($positions)->not->toContain(false)
+        ->and($positions)->toBe(array_values(Arr::sort($positions)));
+});
+
+it('keeps the best value first when a shop with an estimated size is cheaper per unit', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, 'Protein bars');
+    piecePacks($product, ['stated.nl' => ['31.90', '12.00'], 'dearer.nl' => ['34.90', '12.00'], 'estimate.nl' => ['21.60', null]]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('estimated')
+        ->assertSeeHtmlInOrder(['stated.nl', 'data-test="best-value-chip"', 'estimate.nl', 'dearer.nl']);
 });

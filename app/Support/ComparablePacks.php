@@ -250,15 +250,20 @@ final readonly class ComparablePacks
      */
     public function rankedPerUnit(Collection $shops): Collection
     {
-        return $this->winnable($shops)
-            ->sort(fn (Shop $a, Shop $b): int => [$this->unitPriceValueOf($a), $a->created_at, (string) $a->id]
-                <=> [$this->unitPriceValueOf($b), $b->created_at, (string) $b->id])
-            ->values();
+        return $this->winnable($shops)->sort($this->byUnitPrice(...))->values();
+    }
+
+    /** Cheaper per unit first; the oldest, then the id, breaks a tie. */
+    private function byUnitPrice(Shop $a, Shop $b): int
+    {
+        return [$this->unitPriceValueOf($a), $a->created_at, (string) $a->id]
+            <=> [$this->unitPriceValueOf($b), $b->created_at, (string) $b->id];
     }
 
     /**
      * The order the product page, its Markdown copy and the public page list
-     * shops in, led by the shop the headline names:
+     * shops in, led by the shop that wins per unit or, when none can, by the
+     * shop the pack-price headline names:
      *
      *  1. the shop that wins per unit;
      *  2. the other eligible shops with a price per unit, by that price: a
@@ -282,13 +287,18 @@ final readonly class ComparablePacks
         $eligibleKeys = $eligible->map(fn (Shop $shop): string => $shop->id)->all();
         $isEligible = fn (Shop $shop): bool => in_array($shop->id, $eligibleKeys, strict: true);
 
-        $leader = $this->rankedPerUnit($shops->filter($isEligible))->first();
-        $ranked = $leader === null ? new Collection() : collect([$leader])->concat($shops
-            ->filter($isEligible)
-            ->reject(fn (Shop $shop): bool => $shop->id === $leader->id)
-            ->filter(fn (Shop $shop): bool => $this->unitPriceValueOf($shop) !== null)
-            ->sort(fn (Shop $a, Shop $b): int => [$this->unitPriceValueOf($a), $a->created_at, (string) $a->id]
-                <=> [$this->unitPriceValueOf($b), $b->created_at, (string) $b->id]));
+        $eligibleShops = $shops->filter($isEligible);
+        $leader = $this->rankedPerUnit($eligibleShops)->first();
+        $ranked = new Collection();
+
+        if ($leader !== null) {
+            $ranked = $eligibleShops
+                ->reject(fn (Shop $shop): bool => $shop->id === $leader->id)
+                ->filter(fn (Shop $shop): bool => $this->unitPriceValueOf($shop) !== null)
+                ->sort($this->byUnitPrice(...))
+                ->prepend($leader);
+        }
+
         $rankedKeys = $ranked->map(fn (Shop $shop): string => $shop->id)->all();
         $unranked = $shops->reject(fn (Shop $shop): bool => in_array($shop->id, $rankedKeys, strict: true));
 
