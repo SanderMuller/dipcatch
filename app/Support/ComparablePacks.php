@@ -260,10 +260,13 @@ final readonly class ComparablePacks
      * The order the product page, its Markdown copy and the public page list
      * shops in, led by the shop the headline names:
      *
-     *  1. the shops that may win per unit, in the ranking's own order;
-     *  2. the other eligible shops by pack price, as the pack-price headline
+     *  1. the shop that wins per unit;
+     *  2. the other eligible shops with a price per unit, by that price: a
+     *     shop with an estimated size cannot win, but it still sits where its
+     *     price per unit puts it, not under dearer shops;
+     *  3. the other eligible shops by pack price, as the pack-price headline
      *     picks among them;
-     *  3. every other row by price per unit, then pack price, unpriced last.
+     *  4. every other row by price per unit, then pack price, unpriced last.
      *
      * A cheaper row that cannot be bought from — sold out, a size it did not
      * state, a trade-only price — never sits above the headline's shop.
@@ -279,7 +282,13 @@ final readonly class ComparablePacks
         $eligibleKeys = $eligible->map(fn (Shop $shop): string => $shop->id)->all();
         $isEligible = fn (Shop $shop): bool => in_array($shop->id, $eligibleKeys, strict: true);
 
-        $ranked = $this->rankedPerUnit($shops->filter($isEligible));
+        $leader = $this->rankedPerUnit($shops->filter($isEligible))->first();
+        $ranked = $leader === null ? new Collection() : collect([$leader])->concat($shops
+            ->filter($isEligible)
+            ->reject(fn (Shop $shop): bool => $shop->id === $leader->id)
+            ->filter(fn (Shop $shop): bool => $this->unitPriceValueOf($shop) !== null)
+            ->sort(fn (Shop $a, Shop $b): int => [$this->unitPriceValueOf($a), $a->created_at, (string) $a->id]
+                <=> [$this->unitPriceValueOf($b), $b->created_at, (string) $b->id]));
         $rankedKeys = $ranked->map(fn (Shop $shop): string => $shop->id)->all();
         $unranked = $shops->reject(fn (Shop $shop): bool => in_array($shop->id, $rankedKeys, strict: true));
 

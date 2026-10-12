@@ -1232,3 +1232,30 @@ it('shows no unit figure from a shop\'s own size when the product compares none'
 
     expect(ProductMarkdown::of($product->refresh()))->not->toContain('/kg');
 });
+
+it('lists a shop with an estimated size by its price per unit, under the best value but above dearer shops', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, 'Protein bars');
+
+    foreach ([
+        ['host' => 'dearest.nl', 'price' => '34.90', 'quantity' => '12.00'],
+        ['host' => 'dearer.nl', 'price' => '31.90', 'quantity' => '12.00'],
+        ['host' => 'estimate.nl', 'price' => '23.99', 'quantity' => null],
+        ['host' => 'cheapest.nl', 'price' => '2.23', 'quantity' => '12.00'],
+    ] as $row) {
+        Shop::factory()->for($product)->create(['url' => 'https://' . $row['host'] . '/p/1'])
+            ->forceFill([
+                'currency' => 'EUR',
+                'current_price' => $row['price'],
+                'current_in_stock' => true,
+                'pack_quantity' => $row['quantity'],
+                'pack_unit' => $row['quantity'] === null ? null : 'piece',
+            ])->save();
+    }
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSee('estimated')
+        ->assertSeeInOrder(['cheapest.nl', 'estimate.nl', 'dearer.nl', 'dearest.nl']);
+});
