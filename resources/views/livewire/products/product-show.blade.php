@@ -276,13 +276,7 @@
                                             ? __('Pack price: what :shop charges for one pack.', ['shop' => $shop->host])
                                             : __('Pack price: what :shop charges for :size.', ['shop' => $shop->host, 'size' => \App\Support\UnitWord::pack($packLine->size)]))
                                         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-base font-medium text-zinc-900 sm:text-sm dark:text-zinc-100">
-                                            @if ($packs->unitPriceOf($shop) !== null)
-                                                <flux:tooltip :content="__('Price :unit: the pack price divided by the pack size, so packs of different sizes compare fairly.', ['unit' => \App\Support\UnitWord::forCode($packs->unit())])">
-                                                    <span tabindex="0" class="cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" data-test="unit-price-hint"><x-shop-unit-price :shop="$shop" :packs="$packs" /></span>
-                                                </flux:tooltip>
-                                            @else
-                                                <x-shop-unit-price :shop="$shop" :packs="$packs" />
-                                            @endif
+                                            <x-shop-unit-price :shop="$shop" :packs="$packs" :hint="__('Price :unit: the pack price divided by the pack size, so packs of different sizes compare fairly.', ['unit' => \App\Support\UnitWord::forCode($packs->unit())])" />
                                             {{-- The per-unit winner, marked in the row whichever price the
                                                  headline leads with: the table is sorted per unit. --}}
                                             @if ($headline->bestValue?->id === $shop->id && $shops->count() > 1)

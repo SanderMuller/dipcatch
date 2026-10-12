@@ -1284,3 +1284,17 @@ it('keeps the best value first when a shop with an estimated size is cheaper per
         ->assertSee('estimated')
         ->assertSeeHtmlInOrder(['stated.nl', 'data-test="best-value-chip"', 'estimate.nl', 'dearer.nl']);
 });
+
+it('gives the price per unit its tooltip apart from the estimated badge beside it', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, 'Protein bars');
+    piecePacks($product, ['stated.nl' => ['31.90', '12.00'], 'estimate.nl' => ['23.99', null]]);
+
+    $this->actingAs($user);
+
+    $html = livewire(ProductShow::class, ['product' => $product->refresh()])->html();
+
+    // The hint closes on the price; the badge and its own tooltip follow it.
+    expect($html)->toMatch('/data-test="unit-price-hint">\s*€2\.00 \/piece\s*<\/span>/')
+        ->and($html)->toContain('estimated');
+});

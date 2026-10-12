@@ -1,6 +1,9 @@
 @props([
     'shop',
     'packs' => null,
+    // A tooltip on the price alone: wrapped around the whole figure it also
+    // fired over the badge beside it, whose own tooltip it then covered.
+    'hint' => null,
 ])
 
 {{-- What this shop costs per kilo, litre or piece *for this product* — or the
@@ -32,7 +35,13 @@
     <flux:text size="sm" class="text-zinc-500">{{ $pack->reason() }}</flux:text>
 @elseif ($unitPrice !== null)
     <span class="inline-flex flex-wrap items-baseline gap-x-2 tabular-nums">
-        <span>{{ \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) }} {{ $pack?->size?->label() }}</span>
+        @if ($hint !== null)
+            <flux:tooltip :content="$hint">
+                <span tabindex="0" class="cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" data-test="unit-price-hint">{{ \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) }} {{ $pack?->size?->label() }}</span>
+            </flux:tooltip>
+        @else
+            <span>{{ \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) }} {{ $pack?->size?->label() }}</span>
+        @endif
         @if ($pack?->provenance === \App\Enums\PackProvenance::Inferred)
             <flux:tooltip content="{{ __('No pack size on this page. Taken from the other shops on this product, which all agree.') }}">
                 <flux:badge size="sm" color="zinc">{{ __('estimated') }}</flux:badge>
