@@ -55,10 +55,6 @@ pest()->extend(TestCase::class)
 |
 */
 
-expect()->extend('toBeOne', function () {
-    return $this->toBe(1);
-});
-
 /**
  * Assert that the value under test (a DateTimeInterface-like) has the same
  * UNIX timestamp as the expected value. Narrows the value to

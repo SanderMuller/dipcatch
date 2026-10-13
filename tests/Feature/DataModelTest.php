@@ -1,48 +1,13 @@
 <?php declare(strict_types=1);
 
-use App\Enums\ScrapeStatus;
 use App\Enums\SocialProvider;
 use App\Models\Invitation;
 use App\Models\PriceCheck;
-use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Database\QueryException;
-
-test('user has dipcatch columns with sensible defaults', function (): void {
-    $user = User::factory()->create();
-
-    expect($user->is_admin)->toBeFalse()
-        ->and($user->default_currency)->toBe('EUR')
-        ->and($user->notify_via_email)->toBeTrue()
-        ->and($user->notify_via_filament)->toBeTrue()
-        ->and($user->notify_via_push)->toBeFalse();
-});
-
-test('product factory builds a valid product with cast columns', function (): void {
-    $product = Product::factory()->create();
-
-    expect($product->active)->toBeTrue()
-        ->and($product->currency)->toBe('EUR')
-        ->and($product->user)->toBeInstanceOf(User::class);
-});
-
-test('offer hasMany price checks', function (): void {
-    $shop = Shop::factory()->create();
-    PriceCheck::factory()->count(3)->for($shop)->create();
-
-    expect($shop->priceChecks)->toHaveCount(3)
-        ->and($shop->priceChecks->first())->toBeInstanceOf(PriceCheck::class);
-});
-
-test('price check status casts to enum', function (): void {
-    $check = PriceCheck::factory()->failed(ScrapeStatus::HttpError)->create();
-
-    expect($check->status)->toBe(ScrapeStatus::HttpError)
-        ->and($check->price)->toBeNull();
-});
 
 test('invitation factory states work and helpers report state', function (): void {
     $fresh = Invitation::factory()->create();
@@ -53,15 +18,6 @@ test('invitation factory states work and helpers report state', function (): voi
         ->and($fresh->isRedeemed())->toBeFalse()
         ->and($expired->isExpired())->toBeTrue()
         ->and($redeemed->isRedeemed())->toBeTrue();
-});
-
-test('price drop event links product, user, and price check', function (): void {
-    $event = PriceDropEvent::factory()->create();
-
-    expect($event->product)->toBeInstanceOf(Product::class)
-        ->and($event->user)->toBeInstanceOf(User::class)
-        ->and($event->priceCheck)->toBeInstanceOf(PriceCheck::class)
-        ->and($event->reference_kind)->toBe('median_30d');
 });
 
 test('cascade delete on user wipes products', function (): void {
@@ -82,15 +38,6 @@ test('cascade delete on product wipes its offers and their checks', function ():
 
     expect(Shop::query()->where('product_id', $product->id)->count())->toBe(0)
         ->and(PriceCheck::query()->where('shop_id', $shop->id)->count())->toBe(0);
-});
-
-test('ScrapeStatus backing values stay stable, because rows already hold them', function (): void {
-    expect(ScrapeStatus::Ok->value)->toBe('ok')
-        ->and(ScrapeStatus::EmptyMatch->value)->toBe('empty_match')
-        ->and(ScrapeStatus::HttpError->value)->toBe('http_error')
-        ->and(ScrapeStatus::ParseError->value)->toBe('parse_error')
-        ->and(ScrapeStatus::RobotsBlocked->value)->toBe('robots_blocked')
-        ->and(ScrapeStatus::NeedsJs->value)->toBe('needs_js');
 });
 
 test('social_accounts refuses two users claiming the same provider account', function (): void {

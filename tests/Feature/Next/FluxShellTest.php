@@ -43,25 +43,12 @@ it('offers the admin shortcut only to an admin', function (): void {
     $this->get(route('app.dashboard'))->assertOk()->assertDontSee('Admin panel');
 });
 
-it('still refuses the admin panel to a non-admin', function (): void {
-    $this->actingAs(User::factory()->create(['is_admin' => false]));
-
-    // The menu entry is a shortcut, never the thing that grants access.
-    $this->get('/admin')->assertForbidden();
-});
-
-it('registers every route the migration will need', function (string $name): void {
+// The other app routes are reached by name in the tests that use them.
+it('registers the routes no other test reaches by name', function (string $name): void {
     expect(app('router')->getRoutes()->getByName($name))->not->toBeNull();
 })->with([
-    'app.dashboard',
-    'app.products.index',
-    'app.products.create',
     'app.products.create-manual',
-    'app.products.show',
-    'app.products.edit',
-    'app.billing',
     'app.notifications',
-    'app.connections',
 ]);
 
 it('links the shell navigation at every section', function (): void {

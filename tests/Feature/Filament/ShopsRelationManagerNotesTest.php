@@ -69,14 +69,16 @@ test('edit_notes with an empty string clears the note back to null', function ()
     expect($shop->fresh()->notes)->toBeNull();
 });
 
-test('indicator column state is true only for shops with non-empty notes', function (): void {
+test('the notes indicator shows only for a shop with non-empty notes', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create();
-    $withNotes = Shop::factory()->for($product)->create(['notes' => 'has a note']);
-    $blankNotes = Shop::factory()->for($product)->create(['notes' => '']);
-    $nullNotes = Shop::factory()->for($product)->create(['notes' => null]);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'notes' => 'has a note']);
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'notes' => '']);
+    Shop::factory()->for($product)->create(['url' => 'https://dirk.nl/p/1', 'notes' => null]);
 
     $this->actingAs($user);
 
-    mountShopsRelationManager($product);
+    $html = mountShopsRelationManager($product)->html();
+
+    expect(substr_count($html, 'data-slot="notes_indicator"'))->toBe(1);
 });

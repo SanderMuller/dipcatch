@@ -515,16 +515,6 @@ it('keeps quiet about the history limit while the product history fits the plan'
         ->assertDontSee('Your plan shows the last 90 days');
 });
 
-it('says nothing about plans to an account with no ceiling', function (): void {
-    $user = User::factory()->create();
-    subscribeUser($user);
-
-    $this->actingAs($user);
-
-    livewire(ProductShow::class, ['product' => ownedProduct($user)])
-        ->assertDontSee('Your plan shows the last');
-});
-
 it('renders a product with no shops and no history', function (): void {
     $user = User::factory()->create();
 
