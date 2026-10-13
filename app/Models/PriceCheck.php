@@ -35,6 +35,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $promotion_starts_at
  * @property CarbonImmutable|null $promotion_ends_at The end of the promotion window the shop ran under at this check.
  * @property string|null $promotion_label
+ * @property string|null $pack_quantity The shop's pack size after this check.
+ * @property string|null $pack_unit
  * @property-read Shop $shop
  */
 #[WithoutTimestamps]
@@ -62,6 +64,7 @@ final class PriceCheck extends Model
             'checked_at' => 'datetime',
             'promotion_starts_at' => 'datetime',
             'promotion_ends_at' => 'datetime',
+            'pack_quantity' => 'decimal:2',
             'status' => ScrapeStatus::class,
         ];
     }

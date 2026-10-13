@@ -298,3 +298,24 @@ it('records the promotion window on the first price check', function (): void {
     expect($check->promotion_label)->toBe('2 VOOR 2.99')
         ->and($check->promotion_ends_at?->toDateTimeString())->toBe($shop->promotion_ends_at?->toDateTimeString());
 });
+
+it('records the pack size on the first price check', function (): void {
+    $product = Product::factory()->create();
+    $draft = ShopDraft::fromSnapshot(
+        snapshot: [
+            'price' => '1.50',
+            'currency' => 'EUR',
+            'in_stock' => true,
+            'pack_size' => '500 g',
+            'pack_size_authoritative' => true,
+        ],
+        url: 'https://shop.test/p/4',
+        adapterKey: 'json-ld',
+    );
+
+    $shop = app(AttachShop::class)($product, $draft);
+    $check = PriceCheck::query()->where('shop_id', $shop->id)->sole();
+
+    expect($check->pack_quantity)->toBe('500.00')
+        ->and($check->pack_unit)->toBe('g');
+});

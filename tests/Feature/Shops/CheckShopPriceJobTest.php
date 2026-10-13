@@ -343,8 +343,11 @@ test('a scraped check parses the pack size from the JSON-LD title', function ():
     new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
 
     $shop->refresh();
+    $check = $shop->priceChecks()->sole();
     expect((string) $shop->pack_quantity)->toBe('300.00')
         ->and($shop->pack_unit)->toBe('ml')
+        ->and($check->pack_quantity)->toBe('300.00')
+        ->and($check->pack_unit)->toBe('ml')
         ->and($shop->unitPrice())->toBe('5.9667')
         ->and($shop->unitPriceLabel())->toBe('/l');
 });
@@ -361,8 +364,11 @@ test('a title without a size keeps the stored pack columns', function (): void {
     new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
 
     $shop->refresh();
+    $check = $shop->priceChecks()->sole();
     expect((string) $shop->pack_quantity)->toBe('300.00')
-        ->and($shop->pack_unit)->toBe('ml');
+        ->and($shop->pack_unit)->toBe('ml')
+        ->and($check->pack_quantity)->toBe('300.00')
+        ->and($check->pack_unit)->toBe('ml');
 });
 
 test('a failed check never touches the pack columns', function (): void {
@@ -380,9 +386,12 @@ test('a failed check never touches the pack columns', function (): void {
     new CheckShopPrice($shop)->handle(app(ShopFetcher::class), app(AdapterResolver::class), app(CheckjebonSource::class), app(AhApiSource::class));
 
     $shop->refresh();
+    $check = $shop->priceChecks()->sole();
     expect($shop->last_status)->toBe(ScrapeStatus::ParseError)
         ->and((string) $shop->pack_quantity)->toBe('250.00')
-        ->and($shop->pack_unit)->toBe('g');
+        ->and($shop->pack_unit)->toBe('g')
+        ->and($check->pack_quantity)->toBe('250.00')
+        ->and($check->pack_unit)->toBe('g');
 });
 
 test('a host adapter that loses its payload fails the check instead of taking a stray number', function (): void {

@@ -400,7 +400,8 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'error' => $outcome->error,
                 'checked_at' => $now,
             ] + self::claimEvidence($succeeded ? $snapshot : null, $claim, $pricing->inherited)
-              + $pricing->promotionCheckAttributes($locked, $succeeded));
+              + $pricing->promotionCheckAttributes($locked, $succeeded)
+              + self::packSizeAfter($locked, $updates));
 
             $locked->forceFill($updates)->save();
 
@@ -464,6 +465,21 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         }
 
         return ScrapeStatus::CurrencyMismatch;
+    }
+
+    /**
+     * The pack size the shop has once this check is saved: the size the check
+     * wrote, or the stored one when it wrote none.
+     *
+     * @param array<string, mixed> $updates
+     * @return array{pack_quantity: mixed, pack_unit: mixed}
+     */
+    private static function packSizeAfter(Shop $shop, array $updates): array
+    {
+        return [
+            'pack_quantity' => array_key_exists('pack_quantity', $updates) ? $updates['pack_quantity'] : $shop->pack_quantity,
+            'pack_unit' => array_key_exists('pack_unit', $updates) ? $updates['pack_unit'] : $shop->pack_unit,
+        ];
     }
 
     /**

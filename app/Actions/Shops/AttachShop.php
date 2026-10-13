@@ -89,6 +89,8 @@ final readonly class AttachShop
             'promotion_starts_at' => $shop->promotion_starts_at,
             'promotion_ends_at' => $shop->promotion_ends_at,
             'promotion_label' => $shop->promotion_label,
+            'pack_quantity' => $shop->pack_quantity,
+            'pack_unit' => $shop->pack_unit,
         ]);
 
         // With the triggering id, not bare: drop detection reads it.
