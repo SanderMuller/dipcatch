@@ -1,4 +1,4 @@
-@props(['product', 'compare' => true, 'listToggle' => false])
+@props(['product', 'compare' => true, 'listToggle' => false, 'verdict' => null])
 
 {{--
     `compare` lists the shops and notes the lowest pack price. The dashboard
@@ -8,6 +8,9 @@
     `listToggle` turns the "On list" label into a button that puts the product
     on the shopping list or takes it off. The parent Livewire component must
     have a `toggleShoppingList(string $productId)` action.
+
+    `verdict` is the price verdict of the headline shop, from
+    `PriceVerdicts::forProducts()`, read once for the whole list.
 --}}
 @php($headline = \App\Support\HeadlinePrice::of($product))
 
@@ -104,6 +107,7 @@
         @endif
 
         <x-product-card.price :product="$product" :headline="$headline" class="mt-3" />
+        <x-price-verdict :verdict="$verdict" :range="false" class="mt-1.5" />
 
         {{-- The pack behind a per-unit figure, and during a bundle the regular
              price per unit — named, on this line rather than beside the drop

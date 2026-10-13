@@ -7,6 +7,7 @@ use App\Models\LargeDropCheck;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\DropEvaluator;
@@ -18,6 +19,7 @@ use App\Services\Drops\NotificationBudget;
 use App\Services\Drops\Reference;
 use App\Services\Drops\ReferenceValue;
 use App\Support\Numeric;
+use App\Support\PriceVerdicts;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -298,6 +300,7 @@ final readonly class DetectDrop
                 // The size the unit price was measured on, for "€2.75 for 227 g".
                 'pack_quantity' => $unit === null ? null : $locked->bestValuePackSize()?->quantity,
                 'pack_unit' => $unit === null ? null : $locked->bestValuePackSize()?->unit,
+                'lowest_in_90_days' => $triggerCheck->shop instanceof Shop && PriceVerdicts::isLowestIn90Days($triggerCheck->shop),
                 'fired_at' => now(),
             ]);
 
@@ -307,7 +310,7 @@ final readonly class DetectDrop
             DB::afterCommit(function () use ($locked, $outcome, $event, $user, $triggerCheck): void {
                 try {
                     if ($this->withinHourlyLimit($user)) {
-                        $user->notify(new PriceDropNotification($locked, $outcome, $event->id, $triggerCheck));
+                        $user->notify(new PriceDropNotification($locked, $outcome, $event->id, $triggerCheck, $event->lowest_in_90_days === true));
                     } else {
                         Log::warning('Notification suppressed by hourly rate limit', [
                             'alert' => 'price_drop',

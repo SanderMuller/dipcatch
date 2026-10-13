@@ -54,7 +54,7 @@
             @if ($digest->trips !== [])
                 <section data-test="shopping-trips">
                     <flux:heading size="xl" level="2" class="font-semibold! tracking-tight">{{ __('Where to shop this week') }}</flux:heading>
-                    <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('Shops where several of your products are cheapest, and at least one is on offer.') }}</flux:text>
+                    <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('Shops where several of your products are cheapest and worth buying now, and at least one is on offer.') }}</flux:text>
 
                     @foreach ([
                         ['trips' => $storeTrips, 'label' => __('Shops with a store'), 'note' => __('Go there, or order online where the shop delivers.'), 'icon' => 'building-storefront'],
@@ -120,7 +120,7 @@
                         <x-product-card.grid :columns="0" class="@3xl:grid-cols-3">
                             @foreach ($atAlert as $product)
                                 <li class="min-w-0" wire:key="alert-{{ $product->id }}">
-                                    <x-product-card :product="$product" :compare="false" />
+                                    <x-product-card :product="$product" :verdict="$verdicts[$product->id] ?? null" :compare="false" />
                                 </li>
                             @endforeach
                         </x-product-card.grid>
@@ -151,7 +151,7 @@
                             <x-product-card.grid :columns="0" class="@3xl:grid-cols-3">
                                 @foreach ($dropCards as $product)
                                     <li class="min-w-0" wire:key="drop-{{ $product->id }}">
-                                        <x-product-card :product="$product" :compare="false">
+                                        <x-product-card :product="$product" :verdict="$verdicts[$product->id] ?? null" :compare="false">
                                             @if ($product->last_notified_at)
                                                 <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">
                                                     {{ __('Dropped :ago', ['ago' => $product->last_notified_at->diffForHumans()]) }}

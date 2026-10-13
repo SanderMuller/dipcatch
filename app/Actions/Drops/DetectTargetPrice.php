@@ -117,12 +117,12 @@ final readonly class DetectTargetPrice
 
         // Before the budget: an alert the hourly ceiling holds back still
         // reaches the daily email.
-        TargetPriceEvent::record($product, $shop, (string) $product->target_price, price: $price);
+        $event = TargetPriceEvent::record($product, $shop, (string) $product->target_price, price: $price);
 
         // Asked here and nowhere earlier: asking spends a slot of the hourly
         // ceiling, the limiter is cache-backed and does not roll back, and
         // `CheckShopPrice` runs this action inside a transaction.
-        DB::afterCommit(function () use ($product, $shop, $price, $user): void {
+        DB::afterCommit(function () use ($product, $shop, $price, $user, $event): void {
             try {
                 if (! app(NotificationBudget::class)->allows($user)) {
                     Log::warning('Notification suppressed by hourly rate limit', [
@@ -134,7 +134,7 @@ final readonly class DetectTargetPrice
                     return;
                 }
 
-                $user->notify(new TargetPriceNotification($product, $shop, $price));
+                $user->notify(new TargetPriceNotification($product, $shop, $price, $event->lowest_in_90_days === true));
             } catch (Throwable $e) {
                 // This alert is already lost. The claim is committed and the
                 // latch is armed, and `CheckShopPrice` sets

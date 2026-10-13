@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Support\DashboardDigest;
 use App\Support\MoneyFormatter;
+use App\Support\PriceVerdicts;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Livewire\Component;
@@ -24,6 +25,8 @@ final class Dashboard extends Component
     {
         $activeDrops = $this->activeDrops();
         $atAlert = $this->atAlert();
+        // Excluded in the query, not after it, so six cards still fill.
+        $dropCards = $this->activeDrops(limit: 6, except: $atAlert->modelKeys());
         $watching = $this->watching();
         $digest = DashboardDigest::forUser($this->user());
 
@@ -32,8 +35,8 @@ final class Dashboard extends Component
             'activeDropCount' => $activeDrops->count(),
             'activeDrops' => $activeDrops,
             'atAlert' => $atAlert,
-            // Excluded in the query, not after it, so six cards still fill.
-            'dropCards' => $this->activeDrops(limit: 6, except: $atAlert->modelKeys()),
+            'dropCards' => $dropCards,
+            'verdicts' => PriceVerdicts::forProducts([...$atAlert, ...$dropCards]),
             'watching' => $watching,
             'lifetimeSavings' => $this->lifetimeSavings(),
             'needsSecondShop' => $this->needsSecondShop($watching),

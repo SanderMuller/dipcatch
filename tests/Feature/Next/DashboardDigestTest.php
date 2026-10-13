@@ -12,13 +12,15 @@ use function Pest\Livewire\livewire;
 
 /**
  * A product at two shops, with the lower price at `$cheapHost`, and a deal
- * running there when `$onOffer`.
+ * running there when `$onOffer`. Without a deal, `$usualPrice` decides
+ * whether €1.00 is a good price at that shop or the price it always has.
  */
-function digestProduct(User $user, string $title, string $cheapHost, string $dearHost, bool $onOffer = false): Product
+function digestProduct(User $user, string $title, string $cheapHost, string $dearHost, bool $onOffer = false, string $usualPrice = '1.30'): Product
 {
     $product = Product::factory()->for($user)->create(['title' => $title, 'currency' => 'EUR']);
-    Shop::factory()->for($product)->create(['url' => "https://{$cheapHost}/p/" . Str::slug($title), 'current_price' => '1.00', 'currency' => 'EUR', 'promotion_ends_at' => $onOffer ? now()->addDays(2) : null]);
+    $cheap = Shop::factory()->for($product)->create(['url' => "https://{$cheapHost}/p/" . Str::slug($title), 'current_price' => '1.00', 'currency' => 'EUR', 'promotion_ends_at' => $onOffer ? now()->addDays(2) : null]);
     Shop::factory()->for($product)->create(['url' => "https://{$dearHost}/p/" . Str::slug($title), 'current_price' => '2.00', 'currency' => 'EUR']);
+    priceHistory($cheap, $usualPrice);
     $product->refresh()->recomputeCheapestShop();
 
     return $product->refresh();
@@ -261,3 +263,41 @@ it('counts a best buy at its alert price apart from the other offers', function 
         ->assertSeeText('2 at alert price')
         ->assertSeeText('1 on offer');
 });
+
+it('leaves out a product at the price it usually has there, so a trip can fall below two', function (): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
+    digestProduct($user, 'Pizza', 'ah.nl', 'jumbo.com', usualPrice: '1.00');
+
+    expect(DashboardDigest::forUser($user)->trips)->toBeEmpty()
+        ->and(DashboardDigest::bestBuyIds($user, 'ah.nl'))->toHaveCount(1);
+});
+
+it('leaves out a product with too little history to say its price is good', function (): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
+    $new = digestProduct($user, 'New', 'ah.nl', 'jumbo.com');
+    $new->shops->firstWhere('host', 'ah.nl')?->priceChecks()->where('checked_at', '<', now()->subDays(10))->delete();
+
+    expect(DashboardDigest::forUser($user)->trips)->toBeEmpty();
+});
+
+it('counts a product at its alert price when another shop sells it too, even at its usual price', function (): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
+    digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com', usualPrice: '1.00')->update(['target_price' => '1.50']);
+
+    expect(DashboardDigest::forUser($user)->trips[0] ?? null)->toMatchArray(['host' => 'ah.nl', 'count' => 2, 'atAlert' => 1]);
+});
+
+it('counts a product sold at one shop only when it is on offer there', function (bool $onOffer): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
+    $only = Product::factory()->for($user)->create(['title' => 'Only at ah', 'currency' => 'EUR', 'target_price' => '1.50']);
+    $shop = Shop::factory()->for($only)->create(['url' => 'https://ah.nl/p/only', 'current_price' => '1.00', 'currency' => 'EUR', 'promotion_ends_at' => $onOffer ? now()->addDays(2) : null]);
+    // A good price and at the alert price: neither is enough on its own here.
+    priceHistory($shop, '1.30');
+    $only->refresh()->recomputeCheapestShop();
+
+    expect(array_column(DashboardDigest::forUser($user)->trips, 'count'))->toBe($onOffer ? [2] : []);
+})->with(['on offer' => true, 'not on offer' => false]);

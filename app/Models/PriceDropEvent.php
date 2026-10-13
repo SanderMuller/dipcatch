@@ -35,6 +35,7 @@ final class PriceDropEvent extends Model
             'reference_unit_price' => 'decimal:4',
             'new_unit_price' => 'decimal:4',
             'pack_quantity' => 'decimal:2',
+            'lowest_in_90_days' => 'boolean',
             'fired_at' => 'datetime',
         ];
     }

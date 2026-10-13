@@ -94,6 +94,7 @@ For one shop:
 | Product page, per shop row | `rhythm` | The rhythm line under the price, beside the promotion window line |
 | Product page, per shop row, a new tooltip on the verdict badge | `verdict` | P25 to P75 as "Usually €X to €Y for this pack", only when P25 and P75 differ. A tooltip on the badge works for every product. The existing price tooltips (`pack-price-hint`, `unit-price-hint`) render only on products compared per unit (`product-show.blade.php:285-301`); a product priced per pack renders `<x-shop-price>` with no tooltip. The words "for this pack" keep the range from being read as a price per unit. |
 | Product cards and product list | `cards` | The verdict of the leading shop only |
+| Dashboard "Where to shop this week" and the "Best buys here" filter | `cards` | Count a product as a best buy only when buying it now is worth it, by Resolved Question 6. A product at its usual price, or above it, is not a reason to go to a shop: the shopping list serves "where is it cheapest if I need it now". Today `DashboardDigest::itemsByHost()` counts every product whose card leads with the shop, and a trip needs 2 of them, 1 on offer. |
 | Price alerts: the daily digest e-mail and push | `cards` | "Lowest in 90 days" when it held at the moment the alert fired. Store it as a boolean on the event row (`price_drop_events`, `target_price_events`) when the event is written, against the event's shop and price. Never compute it when the e-mail or push renders: push snapshots its price and shop (`PriceDropNotification`), and the digest shows past events, so a later price change would describe another offer. |
 
 The public share page and the MCP tools are out of scope for this spec.
@@ -141,11 +142,11 @@ The public share page and the MCP tools are out of scope for this spec.
 
 **ID:** verdict · **Depends:** none
 
-- [ ] Migration: `pack_quantity` and `pack_unit` on `price_checks`, nullable, guarded, the same types as on `shops`; written by both write sites. Ship it first, as its own commit
-- [ ] The evidence rules of section 1, as a scope on `PriceCheck`
-- [ ] A class that returns the verdict, P25, the median, P75 and "lowest in 90 days" per shop, for all the shops of a product in one query
-- [ ] Badges on the product page shop rows, with the range tooltip on the badge
-- [ ] Tests:
+- [x] Migration: `pack_quantity` and `pack_unit` on `price_checks`, nullable, guarded, the same types as on `shops`; written by both write sites. Ship it first, as its own commit
+- [x] The evidence rules of section 1, as a scope on `PriceCheck` (`verdictEvidence()`)
+- [x] A class that returns the verdict, P25, the median, P75 and "lowest in 90 days" per shop, for all the shops of a product in one query
+- [x] Badges on the product page shop rows, with the range tooltip on the badge
+- [x] Tests:
   - each verdict at its boundary, with the 5% margin;
   - not enough days, a long gap and a stale newest reading;
   - the newest reading out of stock, failed, or from another seller;
@@ -158,20 +159,22 @@ The public share page and the MCP tools are out of scope for this spec.
   - out of stock and an inherited price left out;
   - a shop without `claim_read` still gets a verdict;
   - a query count for a product with many shops
-- [ ] Eye-verify: light, dark, 390 px; a shop with each verdict and one with too little history
+- [x] Eye-verify: light, dark, 390 px; a shop with each verdict and one with too little history
 
 ### Phase 2: Cards, List and Alerts (Priority: MEDIUM)
 
 **ID:** cards · **Depends:** verdict
 
-- [ ] The verdict of `HeadlinePrice::buyableShop()` on the product cards and the product list, without a query per card
-- [ ] Migration: a nullable boolean `lowest_in_90_days` on `price_drop_events` and `target_price_events`, set when the event is written
-- [ ] "Lowest in 90 days" in the digest e-mail and push, from that column
-- [ ] Tests:
+- [x] The verdict of `HeadlinePrice::buyableShop()` on the product cards and the product list, without a query per card
+- [x] Migration: a nullable boolean `lowest_in_90_days` on `price_drop_events` and `target_price_events`, set when the event is written
+- [x] "Lowest in 90 days" in the digest e-mail and push, from that column
+- [x] "Where to shop this week" and "Best buys here" (`DashboardDigest::trips()`, `bestBuyIds()`) count only the products worth buying now, by Resolved Question 6
+- [x] Tests:
   - the card shows the verdict of the buyable headline shop;
   - pack winner and unit winner differ;
   - no buyable shop gives no verdict;
   - a fixed number of queries for the list;
+  - a product at its usual price is not a best buy in a trip, and a trip that keeps fewer than 2 best buys is not shown;
   - the alert text, and a price change between the event and the digest;
   - if a cache is added: invalidation on check, attach and repoint
 
@@ -219,9 +222,31 @@ None.
 3. **Too little history: say so, or show nothing?** **Decision:** Show nothing, in every place. **Rationale:** User choice: a new product must not look broken.
 4. **Wording?** **Decision:** "Good price", "Normal price", "High price". **Rationale:** User choice: it says what the price means for the user.
 5. **Store offer history now?** **Decision:** Yes, shipped in `ef44986` on 2026-10-13. **Rationale:** Each week without it is a week of rhythm data lost.
+6. **Which products count as a best buy in "Where to shop this week"?** **Decision:** A product counts when its headline shop is on offer (a running deal or a visible drop), or, for a product tracked at more than one shop, when it is at the alert price or the shop has "Good price". A product with "Normal price", "High price" or no verdict yet counts only when it is on offer. A product tracked at one shop counts only when it is on offer. **Rationale:** User report and choice (2026-10-13): the dashboard sent the user to a shop for products at their usual price. The shopping list answers "where is it cheapest if I need it now"; the dashboard only says where a trip is worth it.
 
 ---
 
 ## Findings
 
 <!-- Notes added during implementation. Do not remove this section. -->
+
+**Phase `verdict` (2026-10-13):**
+
+- **Plain rows, not models.** With models, 10 Pro shops (3,600 readings) took about 1.2 s in the test environment, almost all of it in the attribute casts. The verdict reads plain rows (`toBase()`) through `App\Support\VerdictReading`. Phase `cards` changed the query further; see below.
+- **STOP 1 holds.** A fixed number of queries per product reads the history; PHP builds the percentiles. `percentile()` interpolates linearly, as `percentile_cont` does, so a later move to SQL gives the same numbers.
+- **Size cutoff:** `PriceVerdicts::SIZE_CUTOFF` is 2026-10-14 00:00 Europe/Amsterdam, the first midnight after `482eef3` was pushed. The exact deploy time is not known in the code. Only a row with no stored size uses the cutoff; a row with a size uses that size whatever its date.
+- **No reading after the cutoff yet:** legacy rows count. Nothing can show a size change, and without this rule no shop gets a verdict until the first check after the deploy.
+- **Deviation: "Lowest in 90 days" also needs today's price below the median.** Without it, a price that never moved is always "at or below the lowest daily price", and every flat product showed the badge beside "Normal price".
+- **The "Lowest in 90 days" badge has no icon.** At 390 px the icon made the table 11 px wider than its card.
+- **STOP 3 on dev data:** 0 of 328 active priced shops get a verdict today, because the dev database has no check after 2026-10-09 (the 3-day freshness rule). As of 2026-10-09 12:00, 322 of 328 get one. All 322 are "Good price": the dev history is a seeded falling trend, not real prices. The slowest product took 73 ms.
+- **Eye-verify:** a seeded product in the `screenshots` scenario of `tools/changelog-media/seed.php` (`pastaId`) has one shop per verdict and one with 12 days of history. Checked in light and dark, at 1280 px and 390 px: each badge shows, the new shop shows nothing, the tooltip reads "Usually €1.69 to €1.79 for this pack", no console errors, no horizontal overflow.
+
+**Phase `cards` (2026-10-13):**
+
+- **Two queries, not one.** `PriceVerdicts::forShops()` now reads one row per shop, day, seller and pack size (`min(price)`, first and last `checked_at`), grouped in SQL with the `PriceCheck::verdictEvidence()` scope, and a second query for each shop's newest reading of any status (`distinct on`). The repoint rule is a `not exists` on `shops` in both. The count stays 2 whatever the number of shops, which is what STOP 1 protects. `VerdictReading::fromNewestRow()` repeats the scope's rules for that one row in PHP.
+- **Speed:** 10 Pro shops (3,600 readings) take about 19 ms, 250 Pro shops (90,000) about 420 ms in the test environment. The dashboard reads the history only for trip products that nothing else qualifies (not on offer, not at the alert price, sold at more than one shop), and the product list only for the page. No cache was needed, so the cache invalidation tests do not apply.
+- **The "Lowest in 90 days" flag** is computed with `PriceVerdicts::isLowestIn90Days()` for the alert's shop when the event row is written: the triggering check's shop for a drop, the shop that reached the target for a target alert. The push notifications get it as a constructor argument from the event row. The property is not readonly and has a default, so a payload queued before the deploy still renders.
+- **The product card** shows the verdict badges without the range tooltip: the card already sits inside a tooltip of its own. It shows on the product list and on the dashboard's "At your alert price" and "Biggest drops" cards.
+- **Interpretation of Resolved Question 6:** "a product with no verdict does not count" means no verdict gives no reason of its own. Such a product still counts when it is on offer, or at the alert price at a product with more than one shop. The trip rule that needs at least one offer per shop stays.
+- **Copy:** the "Where to shop this week" line now reads "Shops where several of your products are cheapest and worth buying now, and at least one is on offer."
+- **Eye-verify:** the product list card shows "Good price" and "Lowest in 90 days" under the price, in light at 1280 px and dark at 390 px, with no overflow and no console errors.

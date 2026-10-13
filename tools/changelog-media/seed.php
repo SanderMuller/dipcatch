@@ -199,6 +199,29 @@ if ($scenario === 'screenshots') {
     ]);
     $fixture['tabletsId'] = $tablets->id;
 
+    // A price verdict per shop: 90 days of daily readings that make one shop
+    // a good price at its 90-day low, one normal, one high, and one too new
+    // to say anything.
+    $pasta = $track('Penne rigate 500 g', ['ah.nl' => '1.39', 'jumbo.com' => '1.79', 'plus.nl' => '2.19', 'dirk.nl' => '1.69']);
+    $histories = [
+        // host => [days, usual price, today]
+        'ah.nl' => [90, '1.79', '1.39'],
+        'jumbo.com' => [90, '1.79', '1.79'],
+        'plus.nl' => [90, '1.89', '2.19'],
+        'dirk.nl' => [12, '1.69', '1.69'],
+    ];
+
+    foreach ($pasta->shops as $shop) {
+        [$days, $usual, $today] = $histories[$shop->host];
+
+        foreach (range($days - 1, 0) as $daysAgo) {
+            // Every third week a little cheaper, so the usual range is a range.
+            $price = $daysAgo === 0 ? $today : (intdiv($daysAgo, 7) % 3 === 0 ? (string) ((float) $usual - 0.10) : $usual);
+            PriceCheck::factory()->for($shop)->create(['price' => $price, 'checked_at' => $now->subDays($daysAgo)->subMinutes(30)]);
+        }
+    }
+    $fixture['pastaId'] = $pasta->id;
+
     // A pet shop and two pet products with photos, so a search for "pet"
     // fills the header search's Shops, Categories and Products groups.
     // capture.mjs serves the photos for this made-up host.

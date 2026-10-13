@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\ConsumerPriceIssue;
 use App\Enums\ScrapeStatus;
 use App\PriceAdapters\BundleOffer;
+use App\Support\PriceBeforeDiscount;
+use App\Support\VerdictReading;
 use Carbon\CarbonImmutable;
 use Database\Factories\PriceCheckFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -86,6 +88,28 @@ final class PriceCheck extends Model
             ->where(fn (EloquentQueryBuilder $stock): EloquentQueryBuilder => $stock
                 ->where('in_stock', true)
                 ->orWhereNull('in_stock'));
+    }
+
+    /**
+     * An eligible reading a price verdict may use: read on the page rather
+     * than carried over, and a price a shopper can pay. Null `shelf_inherited`
+     * counts as read: rows from before 2026-09-30 have no value. Unlike the
+     * evidence of {@see PriceBeforeDiscount}, `claim_read` is not
+     * needed, because a reader without a "was" price never sets it.
+     *
+     * {@see VerdictReading::fromNewestRow()} applies the same
+     * rules to one row in PHP.
+     *
+     * @param EloquentQueryBuilder<PriceCheck> $query
+     */
+    #[Scope]
+    protected function verdictEvidence(EloquentQueryBuilder $query): void
+    {
+        $query->eligible()
+            ->where(fn (EloquentQueryBuilder $inherited): EloquentQueryBuilder => $inherited
+                ->whereNull('shelf_inherited')
+                ->orWhere('shelf_inherited', false))
+            ->whereNull('consumer_price_issue');
     }
 
     /**

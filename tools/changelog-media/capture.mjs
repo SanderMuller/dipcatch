@@ -70,6 +70,15 @@ const shots = {
 
         return { element: list.locator('xpath=ancestor::*[@data-flux-card][1]') };
     },
+    'price-verdict': async (page) => {
+        // The shop table of a product with one shop per verdict and one too new for any.
+        await page.setViewportSize({ width: 1000, height: 1000 });
+        await page.goto(`${BASE}/app/products/${fixture.pastaId}`, { waitUntil: 'networkidle' });
+        const table = page.locator('[data-test="shop-price-cell"]').first().locator('xpath=ancestor::table[1]');
+        await table.locator('[data-test="price-verdict"]').first().waitFor({ state: 'visible', timeout: 10000 });
+
+        return { element: table.locator('xpath=ancestor::*[@data-flux-card][1]') };
+    },
     'search-shops-categories': async (page) => {
         await page.goto(`${BASE}/app`, { waitUntil: 'networkidle' });
         await page.locator('[data-test="app-search-bar"]').click();

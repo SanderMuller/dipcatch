@@ -308,6 +308,7 @@
                                             </p>
                                         @endif
                                     @endif
+                                    <x-price-verdict :verdict="$verdicts[$shop->id] ?? null" class="mt-1.5" />
                                     {{-- A price that is only good until a date says so, or the
                                          number reads as permanent when it is not. --}}
                                     <x-shop-deal :shop="$shop" :before-discount="$discountChecks[$shop->id] ?? null" class="mt-2 max-w-xl" />

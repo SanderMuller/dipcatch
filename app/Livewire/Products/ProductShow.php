@@ -18,6 +18,7 @@ use App\Services\Drops\LargeDropConfirmation;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Support\AlertRules;
 use App\Support\PriceBeforeDiscount;
+use App\Support\PriceVerdicts;
 use App\Support\UrlNormalizer;
 use Carbon\CarbonInterface;
 use Flux\Flux;
@@ -380,6 +381,7 @@ final class ProductShow extends Component
             'historyNotice' => $this->historyNotice(),
             'shops' => $shops,
             'discountChecks' => PriceBeforeDiscount::forShops($this->product, $shops),
+            'verdicts' => PriceVerdicts::forShops($shops),
             'shareUrl' => $this->product->publicShareUrl(),
             'canShare' => $this->canShare(),
             'canAddShop' => app(PlanLimits::class)->canAddShop($this->product),

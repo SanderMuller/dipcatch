@@ -53,12 +53,21 @@ final class PriceDropNotification extends Notification implements ShouldQueue
 
     public readonly ?string $snapshotPackUnit;
 
+    /**
+     * Whether the shop was at its lowest price in 90 days when the alert
+     * fired, as the event row stores it. Not readonly, with a default, so a
+     * payload queued before it existed still renders.
+     */
+    public bool $snapshotLowestIn90Days = false;
+
     public function __construct(
         public Product $product,
         public DropOutcome $outcome,
         public string $priceDropEventId,
         ?PriceCheck $triggeringCheck = null,
+        bool $lowestIn90Days = false,
     ) {
+        $this->snapshotLowestIn90Days = $lowestIn90Days;
         // The shop the drop was measured on, which is the best-value winner
         // once the product has a comparison unit. Naming the lowest-outlay shop
         // instead would put a different host and a different price in the alert
@@ -118,7 +127,8 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             : MoneyFormatter::format($this->snapshotPrice, $currency) . $bundle;
 
         $body = $this->product->title . ' is now ' . $priceLine
-            . ($this->snapshotHost !== null ? ' at ' . $this->snapshotHost : '');
+            . ($this->snapshotHost !== null ? ' at ' . $this->snapshotHost : '')
+            . ($this->snapshotLowestIn90Days ? ' · lowest in 90 days' : '');
 
         return new WebPushMessage()
             ->title('Price drop: ' . $this->product->title)

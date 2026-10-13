@@ -2,10 +2,13 @@
 
 use App\Billing\Plan;
 use App\Enums\ProductDepartment;
+use App\Enums\ScrapeStatus;
 use App\Livewire\Products\ProductShow;
 use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
+use App\Models\PriceCheck;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -856,4 +859,32 @@ function typesafeAnswer(array $departments, array $leaves = [], array $trackingI
 function withoutCardDetails(string $html): string
 {
     return (string) preg_replace('#<div popover="manual"[^>]*data-flux-tooltip-content[^>]*>\s*<div[^>]*data-test="product-card-details".*?</ui-tooltip>#s', '</ui-tooltip>', $html);
+}
+
+/**
+ * Price checks for a shop in one INSERT. A factory call per row costs about
+ * 10 ms, and a price history of 90 days is 90 rows.
+ *
+ * @param  list<array<string, mixed>>  $rows  Each needs `price` and `checked_at`; the rest defaults to a good reading.
+ */
+function insertPriceChecks(Shop $shop, array $rows): void
+{
+    PriceCheck::query()->insert(array_map(fn (array $row): array => $row + [
+        'shop_id' => $shop->id,
+        'currency' => 'EUR',
+        'in_stock' => true,
+        'status' => ScrapeStatus::Ok->value,
+    ], $rows));
+}
+
+/**
+ * One reading a day at the usual price for `$days` days, then one at the
+ * shop's current price an hour ago.
+ */
+function priceHistory(Shop $shop, string $usualPrice, int $days = 40): void
+{
+    $rows = array_map(fn (int $daysAgo): array => ['price' => $usualPrice, 'checked_at' => now()->subDays($daysAgo)], range($days, 1));
+    $rows[] = ['price' => $shop->current_price, 'checked_at' => now()->subHour()];
+
+    insertPriceChecks($shop, $rows);
 }

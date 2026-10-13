@@ -1030,8 +1030,10 @@ it('with a shop chosen, shows only the products that shop is the best buy for', 
     $user = User::factory()->create();
     $make = function (string $title, string $cheapHost, string $dearHost) use ($user): void {
         $product = Product::factory()->for($user)->create(['title' => $title, 'currency' => 'EUR']);
-        Shop::factory()->for($product)->create(['url' => "https://{$cheapHost}/p/1", 'current_price' => '1.00', 'currency' => 'EUR']);
+        $cheap = Shop::factory()->for($product)->create(['url' => "https://{$cheapHost}/p/1", 'current_price' => '1.00', 'currency' => 'EUR']);
         Shop::factory()->for($product)->create(['url' => "https://{$dearHost}/p/1", 'current_price' => '2.00', 'currency' => 'EUR']);
+        // A good price there: €1.30 for 40 days before today's €1.00.
+        priceHistory($cheap, '1.30');
         $product->refresh()->recomputeCheapestShop();
     };
     $make('Cheapest at ah', 'ah.nl', 'jumbo.com');

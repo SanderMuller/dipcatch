@@ -4,12 +4,14 @@ namespace App\Support;
 
 use App\Billing\Entitlements;
 use App\Billing\Plan;
+use App\Enums\PriceVerdict;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 
 /**
  * What the dashboard adds over the product list: where to shop this week, the
@@ -79,7 +81,7 @@ final readonly class DashboardDigest
     public static function bestBuyIds(User $user, string $host, bool $onOfferOnly = false): array
     {
         $products = self::tripProducts($user);
-        $items = self::itemsByHost($products, self::inDrop($user, $products))[$host] ?? [];
+        $items = self::itemsByHost($products, self::inDrop($user, $products), self::atAlert($user, $products))[$host] ?? [];
 
         return array_values(array_map(
             fn (array $item): string => (string) $item['product']->id,
@@ -200,17 +202,23 @@ final readonly class DashboardDigest
     }
 
     /**
-     * Each product under the shop it is the best buy at, whether it counts as on offer there,
-     * and whether it is at its alert price.
+     * Each product under the shop it is the best buy at, whether it counts as
+     * on offer there, and whether it is at its alert price. Only a product
+     * worth buying now is listed: on offer, or, when another shop also sells
+     * it, at the alert price or at a good price for that shop. A product at
+     * its usual price is no reason for a trip; the shopping list says where to
+     * buy it when it is needed. See specs/buy-now-or-wait.md, Resolved
+     * Question 6.
      *
      * @param  EloquentCollection<int, Product>  $products
      * @param  array<int, string>  $inDrop
      * @param  array<int, string>  $atAlert
      * @return array<string, list<array{product: Product, shop: Shop, onOffer: bool, atAlert: bool}>>
      */
-    private static function itemsByHost(EloquentCollection $products, array $inDrop, array $atAlert = []): array
+    private static function itemsByHost(EloquentCollection $products, array $inDrop, array $atAlert): array
     {
-        $byHost = [];
+        $items = [];
+        $needVerdict = [];
 
         foreach ($products as $product) {
             $shop = HeadlinePrice::of($product)->buyableShop();
@@ -219,15 +227,43 @@ final readonly class DashboardDigest
                 continue;
             }
 
-            $byHost[$shop->host][] = [
+            $item = [
                 'product' => $product,
                 'shop' => $shop,
                 'atAlert' => in_array($product->id, $atAlert, strict: true),
                 'onOffer' => in_array($product->id, $inDrop, strict: true) || PromotionLabel::runningDeal($shop) !== null,
             ];
+
+            // At one shop, it is always the best buy there: only an offer says go now.
+            if (! $item['onOffer'] && ! self::soldElsewhere($product, $shop)) {
+                continue;
+            }
+
+            $items[] = $item;
+
+            if (! $item['onOffer'] && ! $item['atAlert']) {
+                $needVerdict[] = $shop;
+            }
+        }
+
+        // Only the products nothing else qualifies, so the history is read
+        // for as few shops as possible.
+        $verdicts = PriceVerdicts::forShops(new Collection($needVerdict));
+        $byHost = [];
+
+        foreach ($items as $item) {
+            if ($item['onOffer'] || $item['atAlert'] || ($verdicts[$item['shop']->id] ?? null)?->verdict === PriceVerdict::Good) {
+                $byHost[$item['shop']->host][] = $item;
+            }
         }
 
         return $byHost;
+    }
+
+    /** Whether another shop that is read and switched on also sells the product. */
+    private static function soldElsewhere(Product $product, Shop $shop): bool
+    {
+        return $product->shops->contains(fn (Shop $other): bool => ! $other->is($shop) && $other->active && ! $other->isReference());
     }
 
     /**

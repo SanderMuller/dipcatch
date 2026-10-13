@@ -231,7 +231,7 @@
                         </li>
                     @endif
                     <li wire:key="product-{{ $product->id }}" class="min-w-0">
-                        <x-product-card :product="$product" list-toggle />
+                        <x-product-card :product="$product" :verdict="$verdicts[$product->id] ?? null" list-toggle />
                     </li>
                 @empty
                     <li class="col-span-full py-10 text-center"><flux:text class="text-zinc-500">{{ $emptyMessage }}</flux:text></li>

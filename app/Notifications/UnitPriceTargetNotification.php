@@ -54,12 +54,21 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
      */
     public readonly ?string $snapshotTarget;
 
+    /**
+     * Whether the shop was at its lowest price in 90 days when the alert
+     * fired, as the event row stores it. Not readonly, with a default, so a
+     * payload queued before it existed still renders.
+     */
+    public bool $snapshotLowestIn90Days = false;
+
     public function __construct(
         public Product $product,
         Shop $shop,
         public readonly string $snapshotUnitPrice,
         ?string $target = null,
+        bool $lowestIn90Days = false,
     ) {
+        $this->snapshotLowestIn90Days = $lowestIn90Days;
         $this->snapshotTarget = $target ?? $product->effectiveUnitPriceTarget();
         $this->snapshotHost = $shop->host;
         $this->snapshotPrice = $shop->current_price === null ? null : (string) $shop->current_price;
@@ -148,6 +157,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
             ? ''
             : ' (' . PackLine::format($this->snapshotPrice, $this->product->currency, $packSize) . $bundle . ')';
 
-        return $this->product->title . ' is ' . $unit . $price . ' at ' . $this->snapshotHost;
+        return $this->product->title . ' is ' . $unit . $price . ' at ' . $this->snapshotHost
+            . ($this->snapshotLowestIn90Days ? ' · lowest in 90 days' : '');
     }
 }

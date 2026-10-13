@@ -51,11 +51,20 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
     /** The target as it stood when it was reached, not when the push is rendered. */
     public readonly ?string $snapshotTargetPrice;
 
+    /**
+     * Whether the shop was at its lowest price in 90 days when the alert
+     * fired, as the event row stores it. Not readonly, with a default, so a
+     * payload queued before it existed still renders.
+     */
+    public bool $snapshotLowestIn90Days = false;
+
     public function __construct(
         public Product $product,
         Shop $shop,
         public readonly string $snapshotPrice,
+        bool $lowestIn90Days = false,
     ) {
+        $this->snapshotLowestIn90Days = $lowestIn90Days;
         $this->snapshotHost = $shop->host;
         $this->snapshotBundle = $shop->liveBundleOffer();
         $this->snapshotSingleItemPrice = $this->snapshotBundle === null ? null : $shop->singleItemPrice();
@@ -171,6 +180,10 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
         if ($this->snapshotBetterValueHost !== null && $this->snapshotBetterValueUnitPrice !== null) {
             $body .= ' · better value ' . MoneyFormatter::unitPrice($this->snapshotBetterValueUnitPrice, $currency) . ' ' . $label
                 . ' at ' . $this->snapshotBetterValueHost;
+        }
+
+        if ($this->snapshotLowestIn90Days) {
+            $body .= ' · lowest in 90 days';
         }
 
         return $body;

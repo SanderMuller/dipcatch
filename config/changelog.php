@@ -29,6 +29,21 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-13',
+            'category' => 'feature',
+            'title' => 'See if today\'s price is a good one',
+            'body' => "Each shop on a product page now shows whether today's price is good, normal or high for that shop, based on its last 90 days. Hover the label for the usual price range. When a shop hits its lowest price in 90 days, the page and your alerts say so.\n\nA shop gets a label once it has about a month of prices.",
+            'image' => ['src' => 'changelog/price-verdict.png', 'alt' => 'The shop comparison on a product page: ah.nl marked Good price and Lowest in 90 days, jumbo.com Normal price, plus.nl High price, and dirk.nl with no label yet.'],
+            'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],
+        ],
+        [
+            'date' => '2026-10-13',
+            'category' => 'feature',
+            'title' => 'Where to shop this week skips usual prices',
+            'body' => "Where to shop this week on your dashboard now counts a product only when it's worth buying now: on offer, at your alert price, or at a good price. A product at its usual price won't send you to a shop anymore. Best buys here on the Products page uses the same rule.",
+            'link' => ['route' => 'app.dashboard', 'label' => 'Go to your dashboard'],
+        ],
+        [
             'date' => '2026-10-09',
             'category' => 'feature',
             'title' => 'Search now finds shops and categories',

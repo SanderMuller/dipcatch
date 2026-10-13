@@ -16,8 +16,8 @@ it('orders shops with equal counts the same way on every visit, whatever was rec
     foreach (['zooplus.nl', 'ah.nl', 'jumbo.com'] as $host) {
         foreach (['A', 'B'] as $n) {
             $product = Product::factory()->for($user)->create(['title' => "{$host} {$n}", 'currency' => 'EUR']);
-            // One deal per shop, so each one qualifies as a trip.
-            Shop::factory()->for($product)->create(['url' => "https://{$host}/p/{$n}", 'current_price' => '1.00', 'currency' => 'EUR', 'promotion_ends_at' => $n === 'A' ? now()->addDays(2) : null]);
+            // On offer: a product sold at one shop only counts as a best buy then.
+            Shop::factory()->for($product)->create(['url' => "https://{$host}/p/{$n}", 'current_price' => '1.00', 'currency' => 'EUR', 'promotion_ends_at' => now()->addDays(2)]);
             $product->refresh()->recomputeCheapestShop();
         }
     }

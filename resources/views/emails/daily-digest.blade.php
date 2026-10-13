@@ -51,6 +51,9 @@ $image = $product->safeImageUrl();
 <span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::format($hit->price === null ? null : (string) $hit->price, $hit->currency) }}</span>
 @endif
 <span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dbeafe; color: #1e40af; font-size: 12px; font-weight: 700; white-space: nowrap;">Reached your price</span>
+@if ($hit->lowest_in_90_days)
+<span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; white-space: nowrap;">Lowest in 90 days</span>
+@endif
 <div style="margin-top: 4px; color: #71717a; font-size: 13px;">@if ($perUnit && $hit->price !== null){{ \App\Support\PackLine::format((string) $hit->price, $hit->currency, $hit->packSize()) }} · @endif your price {{ $yourPrice }}</div>
 </td>
 </tr>
@@ -101,6 +104,9 @@ $image = $product->safeImageUrl();
 @endif
 @endif
 <span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; white-space: nowrap;">{{ $changeLabel }}</span>
+@if ($event->lowest_in_90_days)
+<span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; white-space: nowrap;">Lowest in 90 days</span>
+@endif
 @if ($perUnit)
 <div style="margin-top: 4px; color: #71717a; font-size: 13px;">{{ \App\Support\PackLine::format((string) $event->new_price, $event->currency, $event->packSize()) }}@if ($bundle !== null && $singleItemPrice !== null) <del title="Regular price" style="color: #a1a1aa;">{{ \App\Support\MoneyFormatter::format($singleItemPrice, $event->currency) }}</del>@endif @if ($event->reference_unit_price !== null)· {{ __('was') }} {{ \App\Support\MoneyFormatter::unitPrice((string) $event->reference_unit_price, $event->currency) }} {{ $unitLabel }}@endif</div>
 @endif

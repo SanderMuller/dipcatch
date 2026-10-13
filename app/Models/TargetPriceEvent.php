@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\PackProvenance;
 use App\Support\BundlePriceLabel;
 use App\Support\PackSize;
+use App\Support\PriceVerdicts;
 use Carbon\CarbonImmutable;
 use Database\Factories\TargetPriceEventFactory;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * The push and the bell go out when it happens.
  *
  * @property string|null $shop_id
+ * @property bool|null $lowest_in_90_days Whether the shop's price was its lowest in 90 days when this fired; null before 2026-10-13.
  * @property CarbonImmutable $fired_at
  */
 #[WithoutTimestamps]
@@ -38,6 +40,7 @@ final class TargetPriceEvent extends Model
             'price' => 'decimal:2',
             'unit_price' => 'decimal:4',
             'pack_quantity' => 'decimal:2',
+            'lowest_in_90_days' => 'boolean',
             'fired_at' => 'datetime',
         ];
     }
@@ -75,6 +78,7 @@ final class TargetPriceEvent extends Model
             'pack_quantity' => $packSize?->quantity,
             'pack_unit' => $packSize?->unit,
             'deal' => $bundle === null ? null : BundlePriceLabel::condition($bundle, $product->currency),
+            'lowest_in_90_days' => PriceVerdicts::isLowestIn90Days($shop),
             'fired_at' => now(),
         ]);
     }

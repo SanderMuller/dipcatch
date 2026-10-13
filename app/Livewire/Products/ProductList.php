@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Support\DashboardDigest;
 use App\Support\FilterSuggestions;
+use App\Support\PriceVerdicts;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
@@ -248,9 +249,12 @@ final class ProductList extends Component
         $showAutoCategoriesPromo = $this->category === self::NO_CATEGORY && $this->canBuyAutoCategories();
         $categoryGroups = $this->categoryGroups();
         $shopHosts = $this->shopHosts();
+        $products = $this->products();
 
         return view('livewire.products.product-list', [
-            'products' => $this->products(),
+            'products' => $products,
+            // One read for the page, not one per card.
+            'verdicts' => PriceVerdicts::forProducts($products->items()),
             'groupSizes' => $this->groupSizes(),
             'canAddProduct' => $this->canAddProduct(),
             'productLimitHint' => $this->productLimitHint(),
