@@ -32,6 +32,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool|null $claim_read True when the reader can state a claim, so null means the page stated none.
  * @property bool|null $shelf_inherited True when the prices were carried over from an earlier reading.
  * @property ConsumerPriceIssue|null $consumer_price_issue Why this price is not one a shopper can pay.
+ * @property CarbonImmutable|null $promotion_starts_at
+ * @property CarbonImmutable|null $promotion_ends_at The end of the promotion window the shop ran under at this check.
+ * @property string|null $promotion_label
  * @property-read Shop $shop
  */
 #[WithoutTimestamps]
@@ -57,6 +60,8 @@ final class PriceCheck extends Model
             'consumer_price_issue' => ConsumerPriceIssue::class,
             'in_stock' => 'boolean',
             'checked_at' => 'datetime',
+            'promotion_starts_at' => 'datetime',
+            'promotion_ends_at' => 'datetime',
             'status' => ScrapeStatus::class,
         ];
     }

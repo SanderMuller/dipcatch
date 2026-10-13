@@ -399,7 +399,8 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 'status' => $status,
                 'error' => $outcome->error,
                 'checked_at' => $now,
-            ] + self::claimEvidence($succeeded ? $snapshot : null, $claim, $pricing->inherited));
+            ] + self::claimEvidence($succeeded ? $snapshot : null, $claim, $pricing->inherited)
+              + $pricing->promotionCheckAttributes($locked, $succeeded));
 
             $locked->forceFill($updates)->save();
 

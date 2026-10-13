@@ -133,6 +133,28 @@ final readonly class ResolvedBundlePricing
         ];
     }
 
+    /**
+     * The window the check ran under: the one just read, or the stored one
+     * that a source without the concept leaves in place. A failed check read
+     * nothing, so it records none.
+     *
+     * @return array{promotion_starts_at: mixed, promotion_ends_at: mixed, promotion_label: mixed}
+     */
+    public function promotionCheckAttributes(Shop $shop, bool $successful): array
+    {
+        $window = match (true) {
+            ! $successful => [],
+            $this->promotionUpdates !== [] => $this->promotionUpdates,
+            default => $shop->only(['promotion_starts_at', 'promotion_ends_at', 'promotion_label']),
+        };
+
+        return [
+            'promotion_starts_at' => $window['promotion_starts_at'] ?? null,
+            'promotion_ends_at' => $window['promotion_ends_at'] ?? null,
+            'promotion_label' => $window['promotion_label'] ?? null,
+        ];
+    }
+
     /** @return array<string, int|string|null> */
     public static function expiredFailureUpdates(Shop $shop): array
     {

@@ -276,3 +276,25 @@ it('keeps an image another request saved after the product was loaded', function
 
     expect($product->fresh()?->image_url)->toBe('https://example.com/own.png');
 });
+
+it('records the promotion window on the first price check', function (): void {
+    $product = Product::factory()->create();
+    $draft = ShopDraft::fromSnapshot(
+        snapshot: [
+            'price' => '1.50',
+            'currency' => 'EUR',
+            'in_stock' => true,
+            'promotion_starts_at' => now()->subDay()->toIso8601String(),
+            'promotion_ends_at' => now()->addDays(3)->toIso8601String(),
+            'promotion_label' => '2 VOOR 2.99',
+        ],
+        url: 'https://ah.nl/p/3',
+        adapterKey: 'ah',
+    );
+
+    $shop = app(AttachShop::class)($product, $draft);
+    $check = PriceCheck::query()->where('shop_id', $shop->id)->sole();
+
+    expect($check->promotion_label)->toBe('2 VOOR 2.99')
+        ->and($check->promotion_ends_at?->toDateTimeString())->toBe($shop->promotion_ends_at?->toDateTimeString());
+});

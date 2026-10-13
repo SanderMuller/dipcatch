@@ -238,3 +238,68 @@ test('a source with no promotion concept leaves the stored window alone', functi
     expect($shop->refresh()->promotion_label)->toBe('VOOR 1.69')
         ->and($shop->promotion_ends_at)->not->toBeNull();
 });
+
+test('the check records the window it read, so a past offer can be dated', function (): void {
+    $shop = shopWithStoredWindow();
+    shopReporting(snapshotWith(
+        PromotionWindow::make(
+            endsAt: CarbonImmutable::parse('2026-09-20 21:59:59'),
+            startsAt: CarbonImmutable::parse('2026-09-14 22:00:00'),
+            label: '2 VOOR 3.00',
+        ),
+        authoritative: true,
+    ));
+
+    dispatch_sync(new CheckShopPrice($shop));
+
+    $check = $shop->priceChecks()->sole();
+
+    expect($check->promotion_label)->toBe('2 VOOR 3.00')
+        ->and($check->promotion_starts_at?->toDateTimeString())->toBe($shop->refresh()->promotion_starts_at?->toDateTimeString())
+        ->and($check->promotion_ends_at?->toDateTimeString())->toBe($shop->promotion_ends_at?->toDateTimeString());
+});
+
+test('the check records no window when an authoritative source reports none', function (): void {
+    $shop = shopWithStoredWindow();
+    shopReporting(snapshotWith(null, authoritative: true));
+
+    dispatch_sync(new CheckShopPrice($shop));
+
+    $check = $shop->priceChecks()->sole();
+
+    expect($check->promotion_label)->toBeNull()
+        ->and($check->promotion_ends_at)->toBeNull();
+});
+
+test('the check records the stored window when the source has no promotion concept', function (): void {
+    $shop = shopWithStoredWindow();
+    shopReporting(snapshotWith(null, authoritative: false));
+
+    dispatch_sync(new CheckShopPrice($shop));
+
+    $check = $shop->priceChecks()->sole();
+
+    expect($check->promotion_label)->toBe('VOOR 1.69')
+        ->and($check->promotion_ends_at?->toDateTimeString())->toBe($shop->refresh()->promotion_ends_at?->toDateTimeString());
+});
+
+test('a failed check records no window, because it read nothing', function (): void {
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => Http::response('boom', 500),
+    ]);
+
+    $shop = Shop::factory()->for(Product::factory()->create(['currency' => 'EUR']))->create([
+        'url' => 'https://shop.test/p/1',
+        'promotion_ends_at' => now()->addDays(3),
+        'promotion_label' => 'VOOR 1.69',
+    ]);
+
+    dispatch_sync(new CheckShopPrice($shop));
+
+    $check = $shop->priceChecks()->sole();
+
+    expect($check->status)->not->toBe(ScrapeStatus::Ok)
+        ->and($check->promotion_label)->toBeNull()
+        ->and($check->promotion_ends_at)->toBeNull();
+});

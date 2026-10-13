@@ -86,6 +86,9 @@ final readonly class AttachShop
             'claim_read' => $draft->claimRead,
             'shelf_inherited' => false,
             'consumer_price_issue' => $draft->consumerPriceIssue,
+            'promotion_starts_at' => $shop->promotion_starts_at,
+            'promotion_ends_at' => $shop->promotion_ends_at,
+            'promotion_label' => $shop->promotion_label,
         ]);
 
         // With the triggering id, not bare: drop detection reads it.
