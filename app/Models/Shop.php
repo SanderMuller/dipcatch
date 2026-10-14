@@ -16,6 +16,7 @@ use App\Support\Favicon;
 use App\Support\ImageUrl;
 use App\Support\NotAShop;
 use App\Support\PackSize;
+use App\Support\PriceVerdicts;
 use App\Support\UrlNormalizer;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -122,6 +123,9 @@ final class Shop extends Model
             $shop->url_hash = UrlNormalizer::hash($normalized);
             $shop->host = UrlNormalizer::normalizeHost(parse_url($normalized, PHP_URL_HOST) ?: '');
         });
+
+        // A repoint or a new pack size moves the verdict's history.
+        self::updated(static fn (self $shop) => PriceVerdicts::forget($shop->id));
     }
 
     /**

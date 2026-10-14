@@ -243,7 +243,9 @@
                         <flux:table.column>{{ $packs->hasComparisonUnit() ? __('Price :unit', ['unit' => \App\Support\UnitWord::forCode($packs->unit())]) : __('Price') }}</flux:table.column>
                         <flux:table.column class="hidden @4xl:table-cell">{{ __('In stock') }}</flux:table.column>
                         <flux:table.column class="hidden @4xl:table-cell">{{ __('Price read') }}</flux:table.column>
-                        <flux:table.column align="end">{{ __('Actions') }}</flux:table.column>
+                        {{-- Named for screen readers only on a narrow table: the word
+                             is wider than the menu button under it. --}}
+                        <flux:table.column align="end"><span class="sr-only @2xl:not-sr-only">{{ __('Actions') }}</span></flux:table.column>
                     </flux:table.columns>
                     <flux:table.rows>
                         @forelse ($shops as $shop)
@@ -320,24 +322,23 @@
                                             {{ $conditional->label }} · {{ \App\Support\MoneyFormatter::format($conditional->price, $shop->currency) }}
                                         </flux:text>
                                     @endif
-                                    <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-zinc-500 sm:text-sm @4xl:hidden dark:text-zinc-400">
-                                        @if ($shop->current_in_stock === true)
-                                            <flux:badge size="sm" color="green">{{ __('In stock') }}</flux:badge>
-                                        @elseif ($shop->current_in_stock === false)
-                                            <flux:badge size="sm" color="amber">{{ __('Out of stock') }}</flux:badge>
-                                        @else
-                                            <flux:badge size="sm" color="zinc">{{ __('Stock unknown') }}</flux:badge>
-                                        @endif
-                                        <span aria-hidden="true">·</span>
-                                        <x-shop-freshness :shop="$shop" />
-                                    </div>
-                                </flux:table.cell>
-                                <flux:table.cell class="hidden align-top @4xl:table-cell" data-test="shop-stock-cell">
                                     @php($stock = match ($shop->current_in_stock) {
                                         true => ['label' => __('In stock'), 'icon' => 'check-circle', 'class' => 'text-savings-strong'],
                                         false => ['label' => __('Out of stock'), 'icon' => 'x-circle', 'class' => 'text-amber-600 dark:text-amber-500'],
                                         default => ['label' => __('Stock unknown'), 'icon' => 'question-mark-circle', 'class' => 'text-zinc-400'],
                                     })
+                                    {{-- Stock is plain text with an icon, not a badge: the badges
+                                         above say how good the price is. --}}
+                                    <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-zinc-500 sm:text-sm @4xl:hidden dark:text-zinc-400">
+                                        <span class="inline-flex items-center gap-1" data-test="shop-stock">
+                                            <flux:icon :icon="$stock['icon']" variant="micro" :class="'size-4 shrink-0 ' . $stock['class']" />
+                                            {{ $stock['label'] }}
+                                        </span>
+                                        <span aria-hidden="true">·</span>
+                                        <x-shop-freshness :shop="$shop" />
+                                    </div>
+                                </flux:table.cell>
+                                <flux:table.cell class="hidden align-top @4xl:table-cell" data-test="shop-stock-cell">
                                     <flux:tooltip :content="$stock['label']">
                                         <span class="inline-flex">
                                             <flux:icon :icon="$stock['icon']" variant="micro" :class="'size-4 shrink-0 ' . $stock['class']" />

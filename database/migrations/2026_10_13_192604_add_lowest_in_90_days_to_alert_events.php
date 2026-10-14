@@ -9,9 +9,7 @@ use Illuminate\Support\Facades\Schema;
  * Stored, not computed when the digest or push renders: by then the price
  * can have moved, and the badge would describe another offer.
  *
- * Null on rows written before this column. A nullable column without a
- * default: Postgres adds it without rewriting the table. Each is guarded so a
- * retry after a half-run migration skips what already exists.
+ * Null on rows written before this column: unknown, not false.
  */
 return new class extends Migration {
     public function up(): void

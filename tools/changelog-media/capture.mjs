@@ -71,7 +71,6 @@ const shots = {
         return { element: list.locator('xpath=ancestor::*[@data-flux-card][1]') };
     },
     'price-verdict': async (page) => {
-        // The shop table of a product with one shop per verdict and one too new for any.
         await page.setViewportSize({ width: 1000, height: 1000 });
         await page.goto(`${BASE}/app/products/${fixture.pastaId}`, { waitUntil: 'networkidle' });
         const table = page.locator('[data-test="shop-price-cell"]').first().locator('xpath=ancestor::table[1]');

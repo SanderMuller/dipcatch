@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * The push and the bell go out when it happens.
  *
  * @property string|null $shop_id
- * @property bool|null $lowest_in_90_days Whether the shop's price was its lowest in 90 days when this fired; null before 2026-10-13.
+ * @property bool|null $lowest_in_90_days Whether the shop's price was its lowest in 90 days when this fired; null on rows written before the column existed.
  * @property CarbonImmutable $fired_at
  */
 #[WithoutTimestamps]

@@ -253,7 +253,6 @@ final class ProductList extends Component
 
         return view('livewire.products.product-list', [
             'products' => $products,
-            // One read for the page, not one per card.
             'verdicts' => PriceVerdicts::forProducts($products->items()),
             'groupSizes' => $this->groupSizes(),
             'canAddProduct' => $this->canAddProduct(),

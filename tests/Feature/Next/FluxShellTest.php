@@ -43,7 +43,6 @@ it('offers the admin shortcut only to an admin', function (): void {
     $this->get(route('app.dashboard'))->assertOk()->assertDontSee('Admin panel');
 });
 
-// The other app routes are reached by name in the tests that use them.
 it('registers the routes no other test reaches by name', function (string $name): void {
     expect(app('router')->getRoutes()->getByName($name))->not->toBeNull();
 })->with([

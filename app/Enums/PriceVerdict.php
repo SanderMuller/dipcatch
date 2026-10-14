@@ -21,6 +21,16 @@ enum PriceVerdict: string
         };
     }
 
+    /** A Heroicon, so the label is told apart from the other badges without reading it. */
+    public function icon(): string
+    {
+        return match ($this) {
+            self::Good => 'arrow-trending-down',
+            self::Normal => 'equals',
+            self::High => 'arrow-trending-up',
+        };
+    }
+
     /** The Flux badge colour. */
     public function color(): string
     {

@@ -2,6 +2,7 @@
 
 use App\Actions\Drops\DetectDrop;
 use App\Actions\Drops\DetectTargetPrice;
+use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
 use App\Mail\DailyDigestMail;
 use App\Models\PriceCheck;
@@ -13,6 +14,7 @@ use App\Models\TargetPriceEvent;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Notifications\TargetPriceNotification;
+use App\Notifications\UnitPriceTargetNotification;
 use App\Support\HeadlinePrice;
 use App\Support\PriceVerdicts;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -51,7 +53,6 @@ it('shows the verdict of the headline shop on the product card', function (): vo
 it('reads the verdict of the shop the headline names when the pack and unit winners differ', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
-    // The cheapest pack at ah.nl, the cheapest per kilo at lidl.nl.
     $pack = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
     priceHistory($pack, '2.00', days: 90);
     $unit = Shop::factory()->for($product)->create(['url' => 'https://lidl.nl/p/1', 'current_price' => '1.99', 'pack_quantity' => '370.00', 'pack_unit' => 'g']);
@@ -91,7 +92,6 @@ it('stores the lowest-in-90-days moment on a target alert, and the digest keeps 
     expect($event->lowest_in_90_days)->toBeTrue();
     Notification::assertSentTo($user, TargetPriceNotification::class, fn (TargetPriceNotification $notification): bool => pushBody($notification->toWebPush($user)->toArray())->endsWith(' · lowest in 90 days'));
 
-    // The price climbs back before the digest goes out.
     $shop->forceFill(['current_price' => '2.40'])->save();
     PriceCheck::factory()->for($shop)->create(['price' => '2.40', 'checked_at' => now()]);
     Mail::swap(app('mail.manager'));
@@ -134,4 +134,50 @@ it('stores the lowest-in-90-days moment on a price drop and says it in the push'
     expect(PriceDropEvent::query()->sole()->lowest_in_90_days)->toBeTrue();
     Notification::assertSentTo($user, PriceDropNotification::class, fn (PriceDropNotification $notification): bool => $user instanceof User
         && pushBody($notification->toWebPush($user)->toArray())->endsWith(' · lowest in 90 days'));
+});
+
+it('shows the verdict on a dashboard card', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['title' => 'Coffee', 'currency' => 'EUR', 'target_price' => '1.50']);
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.00']);
+    priceHistory($shop, '1.30', days: 90);
+    $product->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertSeeHtml('data-test="price-verdict"')
+        ->assertSee('Good price');
+});
+
+it('says lowest in 90 days on a drop in the digest only when the event stored it', function (bool $lowest): void {
+    Mail::swap(app('mail.manager'));
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create(['title' => 'Digest product']);
+    $shop = Shop::factory()->for($product)->create();
+    PriceDropEvent::factory()->for($user)->create([
+        'product_id' => $product->id,
+        'triggered_by_shop_id' => $shop->id,
+        'currency' => 'EUR',
+        'new_price' => '1.69',
+        'drop_abs' => '0.50',
+        'drop_pct' => '22.8',
+        'lowest_in_90_days' => $lowest,
+    ]);
+
+    $html = new DailyDigestMail($user, PriceDropEvent::query()->get())->render();
+
+    expect(str_contains($html, 'Lowest in 90 days'))->toBe($lowest);
+})->with(['stored' => true, 'not stored' => false]);
+
+it('says lowest in 90 days in a unit-price alert push when the event stored it', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Crisps']);
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+
+    $with = new UnitPriceTargetNotification($product, $shop, '8.4500', '9.00', lowestIn90Days: true);
+    $without = new UnitPriceTargetNotification($product, $shop, '8.4500', '9.00');
+
+    expect(pushBody($with->toWebPush($user)->toArray())->endsWith(' · lowest in 90 days'))->toBeTrue()
+        ->and(pushBody($without->toWebPush($user)->toArray())->contains('lowest in 90 days'))->toBeFalse();
 });

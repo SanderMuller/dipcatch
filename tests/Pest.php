@@ -858,8 +858,8 @@ function withoutCardDetails(string $html): string
 }
 
 /**
- * Price checks for a shop in one INSERT. A factory call per row costs about
- * 10 ms, and a price history of 90 days is 90 rows.
+ * Price checks for a shop in one INSERT: a factory call per row is slow for a
+ * 90-day history.
  *
  * @param  list<array<string, mixed>>  $rows  Each needs `price` and `checked_at`; the rest defaults to a good reading.
  */
@@ -875,12 +875,14 @@ function insertPriceChecks(Shop $shop, array $rows): void
 
 /**
  * One reading a day at the usual price for `$days` days, then one at the
- * shop's current price an hour ago.
+ * shop's current price an hour ago. Each holds the shop's pack size, as a
+ * check stores it.
  */
 function priceHistory(Shop $shop, string $usualPrice, int $days = 40): void
 {
-    $rows = array_map(fn (int $daysAgo): array => ['price' => $usualPrice, 'checked_at' => now()->subDays($daysAgo)], range($days, 1));
-    $rows[] = ['price' => $shop->current_price, 'checked_at' => now()->subHour()];
+    $size = ['pack_quantity' => $shop->pack_quantity, 'pack_unit' => $shop->pack_unit];
+    $rows = array_map(fn (int $daysAgo): array => ['price' => $usualPrice, 'checked_at' => now()->subDays($daysAgo)] + $size, range($days, 1));
+    $rows[] = ['price' => $shop->current_price, 'checked_at' => now()->subHour()] + $size;
 
     insertPriceChecks($shop, $rows);
 }

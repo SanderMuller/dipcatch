@@ -677,6 +677,10 @@ final class DemoSeeder extends Seeder
                 'status' => ScrapeStatus::Ok->value,
                 'error' => null,
                 'checked_at' => $checkedAt,
+                // A check stores the shop's size; without it the price verdict
+                // leaves every reading out as another pack.
+                'pack_quantity' => $shop->pack_quantity,
+                'pack_unit' => $shop->pack_unit,
             ];
         }
 
@@ -695,6 +699,8 @@ final class DemoSeeder extends Seeder
                     'status' => ($state === 'dead' ? ScrapeStatus::HttpError : ScrapeStatus::EmptyMatch)->value,
                     'error' => $state === 'dead' ? 'HTTP 404 Not Found' : 'Price selector matched no element',
                     'checked_at' => now()->subHours($i * 6),
+                    'pack_quantity' => $shop->pack_quantity,
+                    'pack_unit' => $shop->pack_unit,
                 ];
             }
         }

@@ -6,6 +6,7 @@ use App\Enums\ConsumerPriceIssue;
 use App\Enums\ScrapeStatus;
 use App\PriceAdapters\BundleOffer;
 use App\Support\PriceBeforeDiscount;
+use App\Support\PriceVerdicts;
 use App\Support\VerdictReading;
 use Carbon\CarbonImmutable;
 use Database\Factories\PriceCheckFactory;
@@ -47,6 +48,11 @@ final class PriceCheck extends Model
 {
     /** @use HasFactory<PriceCheckFactory> */
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        self::created(static fn (self $check) => PriceVerdicts::forget($check->shop_id));
+    }
 
     /**
      * @return array<string, string>

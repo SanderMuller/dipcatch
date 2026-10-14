@@ -204,15 +204,14 @@ if ($scenario === 'screenshots') {
     // to say anything.
     $pasta = $track('Penne rigate 500 g', ['ah.nl' => '1.39', 'jumbo.com' => '1.79', 'plus.nl' => '2.19', 'dirk.nl' => '1.69']);
     $histories = [
-        // host => [days, usual price, today]
-        'ah.nl' => [90, '1.79', '1.39'],
-        'jumbo.com' => [90, '1.79', '1.79'],
-        'plus.nl' => [90, '1.89', '2.19'],
-        'dirk.nl' => [12, '1.69', '1.69'],
+        'ah.nl' => ['days' => 90, 'usual' => '1.79', 'today' => '1.39'],
+        'jumbo.com' => ['days' => 90, 'usual' => '1.79', 'today' => '1.79'],
+        'plus.nl' => ['days' => 90, 'usual' => '1.89', 'today' => '2.19'],
+        'dirk.nl' => ['days' => 12, 'usual' => '1.69', 'today' => '1.69'],
     ];
 
     foreach ($pasta->shops as $shop) {
-        [$days, $usual, $today] = $histories[$shop->host];
+        ['days' => $days, 'usual' => $usual, 'today' => $today] = $histories[$shop->host];
 
         foreach (range($days - 1, 0) as $daysAgo) {
             // Every third week a little cheaper, so the usual range is a range.

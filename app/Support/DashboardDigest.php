@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Billing\Entitlements;
 use App\Billing\Plan;
 use App\Enums\PriceVerdict;
@@ -153,14 +154,12 @@ final readonly class DashboardDigest
     }
 
     /**
-     * Each product under the shop the product card leads with, so a trip to
-     * that shop buys every product in it at its best price. Only a shop with
-     * at least two best buys, one of them on offer, makes a trip.
+     * Each shop where at least two products are worth buying now, one of them
+     * on offer. The trip counts a product at its alert price apart from the
+     * offers, so `onOffer` holds only the offers that are not at the alert
+     * price.
      *
      * @param  EloquentCollection<int, Product>  $products
-     * The trip counts a product at its alert price apart from the other
-     * offers, so `onOffer` holds only the offers that are not.
-     *
      * @param  array<int, string>  $inDrop
      * @param  array<int, string>  $atAlert
      * @return list<array{host: string, shop: Shop, products: list<Product>, count: int, atAlert: int, onOffer: int, hasStore: bool}>
@@ -202,12 +201,10 @@ final readonly class DashboardDigest
     }
 
     /**
-     * Each product under the shop it is the best buy at, whether it counts as
-     * on offer there, and whether it is at its alert price. Only a product
-     * worth buying now is listed: on offer, or, when another shop also sells
-     * it, at the alert price or at a good price for that shop. A product at
-     * its usual price is no reason for a trip; the shopping list says where to
-     * buy it when it is needed. See specs/buy-now-or-wait.md, Resolved
+     * Each product under the shop it is the best buy at, with whether it is on
+     * offer and at its alert price there. Only a product worth buying now is
+     * listed: on offer, or, when another shop also sells it, at the alert
+     * price or at a good price there. See specs/buy-now-or-wait.md, Resolved
      * Question 6.
      *
      * @param  EloquentCollection<int, Product>  $products
@@ -221,7 +218,8 @@ final readonly class DashboardDigest
         $needVerdict = [];
 
         foreach ($products as $product) {
-            $shop = HeadlinePrice::of($product)->buyableShop();
+            $headline = HeadlinePrice::of($product);
+            $shop = $headline->buyableShop();
 
             if (! $shop instanceof Shop) {
                 continue;
@@ -230,11 +228,10 @@ final readonly class DashboardDigest
             $item = [
                 'product' => $product,
                 'shop' => $shop,
-                'atAlert' => in_array($product->id, $atAlert, strict: true),
+                'atAlert' => in_array($product->id, $atAlert, strict: true) && self::atAlertAt($product, $shop, $headline),
                 'onOffer' => in_array($product->id, $inDrop, strict: true) || PromotionLabel::runningDeal($shop) !== null,
             ];
 
-            // At one shop, it is always the best buy there: only an offer says go now.
             if (! $item['onOffer'] && ! self::soldElsewhere($product, $shop)) {
                 continue;
             }
@@ -246,8 +243,6 @@ final readonly class DashboardDigest
             }
         }
 
-        // Only the products nothing else qualifies, so the history is read
-        // for as few shops as possible.
         $verdicts = PriceVerdicts::forShops(new Collection($needVerdict));
         $byHost = [];
 
@@ -258,6 +253,23 @@ final readonly class DashboardDigest
         }
 
         return $byHost;
+    }
+
+    /**
+     * Whether this shop's own price meets an alert: the product can be at its
+     * alert price at another shop than the one its headline leads with.
+     */
+    private static function atAlertAt(Product $product, Shop $shop, HeadlinePrice $headline): bool
+    {
+        if ($product->target_price !== null && is_numeric($shop->current_price)
+            && bccomp(Numeric::str((string) $shop->current_price), Numeric::str((string) $product->target_price), 4) <= 0) {
+            return true;
+        }
+
+        $target = $product->effectiveUnitPriceTarget();
+        $unitValue = $headline->packs->unitPriceValueOf($shop);
+
+        return $target !== null && $unitValue !== null && DetectUnitPriceTarget::meets($unitValue, $target);
     }
 
     /** Whether another shop that is read and switched on also sells the product. */

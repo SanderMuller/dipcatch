@@ -7,6 +7,7 @@ use App\Models\PriceCheck;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * What {@see PriceVerdicts} reads from `price_checks`: either one day of a
@@ -17,7 +18,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 final readonly class VerdictReading
 {
     /** Days are calendar days in Amsterdam, the boundary the promotion windows use. */
-    private const string DAY_TIMEZONE = 'Europe/Amsterdam';
+    public const string DAY_TIMEZONE = 'Europe/Amsterdam';
 
     /**
      * @param  int  $firstAt  The first `checked_at` in the row, as a Unix timestamp.
@@ -37,14 +38,15 @@ final readonly class VerdictReading
 
     /**
      * The shops' history in the window, from two queries whatever their
-     * number: one row per shop, day, seller and pack size of evidence, and
-     * each shop's newest reading of any status. Readings from before a shop's
-     * repoint are left out: they describe another offer.
+     * number: one row per shop, day, seller and pack size of evidence; and per
+     * shop the newest reading of any status, with the pack size of the first
+     * reading of any status from `$sizeCutoff` on. Readings from before a
+     * shop's repoint are left out: they describe another offer.
      *
      * @param  list<string>  $shopIds
-     * @return array{0: array<string, list<self>>, 1: array<string, self>}
+     * @return array{0: array<string, list<self>>, 1: array<string, self>, 2: array<string, string|null>}
      */
-    public static function read(array $shopIds, CarbonImmutable $from): array
+    public static function read(array $shopIds, CarbonImmutable $from, CarbonImmutable $sizeCutoff): array
     {
         $days = [];
 
@@ -60,21 +62,43 @@ final readonly class VerdictReading
         }
 
         $newest = [];
+        $sizesAfterCutoff = [];
+        $placeholders = implode(', ', array_fill(0, count($shopIds), '?'));
+        $afterRepoint = 'pc.checked_at >= ? and (s.repointed_at is null or pc.checked_at > s.repointed_at)';
 
-        foreach (self::readings($shopIds, $from)
-            ->toBase()
-            ->distinct(['shop_id'])
-            ->select(['shop_id', 'price', 'status', 'in_stock', 'checked_at', 'seller', 'shelf_inherited', 'consumer_price_issue', 'pack_quantity', 'pack_unit'])
-            ->orderBy('shop_id')
-            ->orderByDesc('checked_at')
-            ->orderByDesc('id')
-            ->get() as $row) {
-            if (is_string($row->shop_id)) {
-                $newest[$row->shop_id] = self::fromNewestRow($row);
+        // One index lookup per shop, not a scan of its window: LATERAL with
+        // LIMIT 1 walks (shop_id, checked_at) from the end it needs.
+        $rows = DB::select(
+            "select s.id as shop_id, n.price, n.status, n.in_stock, n.checked_at, n.seller, n.shelf_inherited, n.consumer_price_issue, n.pack_quantity, n.pack_unit,
+                f.checked_at as first_checked_at, f.pack_quantity as first_pack_quantity, f.pack_unit as first_pack_unit
+            from shops s
+            left join lateral (
+                select pc.* from price_checks pc where pc.shop_id = s.id and {$afterRepoint}
+                order by pc.checked_at desc, pc.id desc limit 1
+            ) n on true
+            left join lateral (
+                select pc.checked_at, pc.pack_quantity, pc.pack_unit from price_checks pc where pc.shop_id = s.id and {$afterRepoint}
+                order by pc.checked_at asc, pc.id asc limit 1
+            ) f on true
+            where s.id in ({$placeholders})",
+            // With the offset: a Carbon binding is sent without one, and the
+            // database would read it in its own session time zone.
+            [$from->toIso8601String(), $from->max($sizeCutoff)->toIso8601String(), ...$shopIds],
+        );
+
+        foreach ($rows as $row) {
+            if (! is_object($row) || ! is_string($row->shop_id) || $row->checked_at === null) {
+                continue;
+            }
+
+            $newest[$row->shop_id] = self::fromNewestRow($row);
+
+            if ($row->first_checked_at !== null) {
+                $sizesAfterCutoff[$row->shop_id] = self::sizeKey($row->first_pack_quantity, $row->first_pack_unit);
             }
         }
 
-        return [$days, $newest];
+        return [$days, $newest, $sizesAfterCutoff];
     }
 
     /**
@@ -94,7 +118,7 @@ final readonly class VerdictReading
     }
 
     /** A day of evidence, which the query already filtered with {@see PriceCheck::verdictEvidence()}. */
-    public static function fromDayRow(object $row): self
+    private static function fromDayRow(object $row): self
     {
         return new self(
             firstAt: self::timestamp($row->first_at ?? null),
@@ -108,7 +132,7 @@ final readonly class VerdictReading
     }
 
     /** The newest reading of any status, judged by the rules of {@see PriceCheck::verdictEvidence()}. */
-    public static function fromNewestRow(object $row): self
+    private static function fromNewestRow(object $row): self
     {
         $at = self::timestamp($row->checked_at ?? null);
         $price = self::price($row->price ?? null);

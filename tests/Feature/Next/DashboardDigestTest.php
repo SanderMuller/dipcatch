@@ -1,11 +1,13 @@
 <?php declare(strict_types=1);
 
 use App\Enums\PriceDisplay;
+use App\Enums\ShopKind;
 use App\Livewire\Dashboard;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Support\DashboardDigest;
+use App\Support\HeadlinePrice;
 use Illuminate\Support\Str;
 
 use function Pest\Livewire\livewire;
@@ -301,3 +303,37 @@ it('counts a product sold at one shop only when it is on offer there', function 
 
     expect(array_column(DashboardDigest::forUser($user)->trips, 'count'))->toBe($onOffer ? [2] : []);
 })->with(['on offer' => true, 'not on offer' => false]);
+
+it('counts a product only on offer when its other shop is switched off or only a link', function (bool $active, ShopKind $kind): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
+    $tea = digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com');
+    $tea->shops->firstWhere('host', 'jumbo.com')?->forceFill(['active' => $active, 'kind' => $kind, 'current_price' => $kind === ShopKind::Reference ? null : '2.00'])->save();
+
+    expect(DashboardDigest::forUser($user->refresh())->trips)->toBeEmpty();
+})->with([
+    'switched off' => [false, ShopKind::Tracked],
+    'a link only' => [true, ShopKind::Reference],
+]);
+
+it('lists a product at its alert price under best buys here, even at its usual price', function (): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com', usualPrice: '1.00')->update(['target_price' => '1.50']);
+
+    expect(DashboardDigest::bestBuyIds($user, 'ah.nl'))->toHaveCount(1);
+});
+
+it('does not count the alert price of another shop than the one the product leads with', function (): void {
+    $user = User::factory()->create();
+    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
+    // The cheapest pack at jumbo.com meets the €1.50 target; ah.nl leads per kilo at €5.00.
+    $rice = Product::factory()->for($user)->create(['title' => 'Rice', 'currency' => 'EUR', 'target_price' => '1.50']);
+    Shop::factory()->for($rice)->create(['url' => 'https://jumbo.com/p/rice', 'current_price' => '1.00', 'pack_quantity' => '100.00', 'pack_unit' => 'g']);
+    $ah = Shop::factory()->for($rice)->create(['url' => 'https://ah.nl/p/rice', 'current_price' => '5.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g']);
+    priceHistory($ah, '5.00');
+    $rice->refresh()->recomputeCheapestShop();
+
+    expect(HeadlinePrice::of($rice->refresh())->buyableShop()?->host)->toBe('ah.nl')
+        ->and(DashboardDigest::forUser($user)->trips)->toBeEmpty()
+        ->and(DashboardDigest::bestBuyIds($user, 'ah.nl'))->toHaveCount(1);
+});
