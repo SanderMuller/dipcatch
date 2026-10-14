@@ -30,6 +30,12 @@ return [
     'entries' => [
         [
             'date' => '2026-10-14',
+            'category' => 'fix',
+            'title' => 'No more repeat price alerts',
+            'body' => "You could get the same alert twice for the same price, for example after a shop was out of stock for a moment. Now an alert only comes again when the price drops further, or after a week.",
+        ],
+        [
+            'date' => '2026-10-14',
             'category' => 'feature',
             'title' => 'Shops go by their names',
             'body' => "Your products now show each shop by the name you know, like Jumbo or Albert Heijn, instead of its web address. Hover over a shop to see the address.\n\nA shop DipCatch doesn't know a name for keeps its address.",

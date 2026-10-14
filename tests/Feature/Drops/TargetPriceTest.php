@@ -392,3 +392,64 @@ test('the better-buy note keeps its unit when the shop that fired has no size of
     expect($body)->toContain('better value €5.38 /kg at Lidl')
         ->not->toContain('· €7.45');
 });
+
+test('a short rise above the target does not send the same news again', function (): void {
+    $product = targetPriceProduct('18.00');
+
+    app(DetectTargetPrice::class)($product);
+
+    // One bad read lets the latch go.
+    $product->shops()->first()?->update(['current_price' => '21.00']);
+    $product->recomputeCheapestShop();
+    app(DetectTargetPrice::class)($product->refresh());
+
+    $product->shops()->first()?->update(['current_price' => '17.05']);
+    $product->recomputeCheapestShop();
+    app(DetectTargetPrice::class)($product->refresh());
+
+    Notification::assertSentToTimes($product->user, TargetPriceNotification::class);
+    expect(TargetPriceEvent::query()->count())->toBe(1)
+        ->and((string) $product->refresh()->target_price_notified)->toBe('17.05');
+
+    // Re-armed, so the same price stays quiet after the window too.
+    $this->travel(8)->days();
+    app(DetectTargetPrice::class)($product->refresh());
+
+    Notification::assertSentToTimes($product->user, TargetPriceNotification::class);
+});
+
+test('a shop out of stock for one check does not send the same news again', function (): void {
+    $product = targetPriceProduct('18.00');
+
+    app(DetectTargetPrice::class)($product);
+
+    $product->shops()->first()?->update(['current_in_stock' => false]);
+    $product->recomputeCheapestShop();
+    app(DetectTargetPrice::class)($product->refresh());
+
+    expect($product->refresh()->target_price_notified)->toBeNull();
+
+    $product->shops()->first()?->update(['current_in_stock' => true]);
+    $product->recomputeCheapestShop();
+    app(DetectTargetPrice::class)($product->refresh());
+
+    Notification::assertSentToTimes($product->user, TargetPriceNotification::class);
+});
+
+test('the same price is news again once the resend window has passed', function (): void {
+    $product = targetPriceProduct('18.00');
+
+    app(DetectTargetPrice::class)($product);
+
+    $product->shops()->first()?->update(['current_price' => '21.00']);
+    $product->recomputeCheapestShop();
+    app(DetectTargetPrice::class)($product->refresh());
+
+    $this->travel(8)->days();
+
+    $product->shops()->first()?->update(['current_price' => '17.05']);
+    $product->recomputeCheapestShop();
+    app(DetectTargetPrice::class)($product->refresh());
+
+    Notification::assertSentToTimes($product->user, TargetPriceNotification::class, 2);
+});

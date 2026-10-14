@@ -242,6 +242,22 @@ final readonly class DetectDrop
                 return;
             }
 
+            // The latch let go on a failed read or a short rise, and this is
+            // news the shopper already had. Re-armed, not sent: the earlier
+            // event is the row behind the latch, and its time is when the
+            // dashboard says the drop happened.
+            $sent = PriceDropEvent::alreadySent($locked, $newPrice, $unit);
+
+            if ($sent !== null) {
+                $locked->forceFill([
+                    'last_notified_price' => $newPrice,
+                    'last_notified_at' => $sent->fired_at,
+                    'last_notified_unit' => $unit,
+                ])->save();
+
+                return;
+            }
+
             // Everything that can abandon the send is resolved before the
             // latch is armed, so an armed latch always has an event row behind
             // it. Armed without one, the product would suppress every later

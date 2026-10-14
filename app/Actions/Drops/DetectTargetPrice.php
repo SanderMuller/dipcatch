@@ -96,6 +96,8 @@ final readonly class DetectTargetPrice
             return;
         }
 
+        $alreadySent = TargetPriceEvent::alreadySent($product, (string) $product->target_price, $price);
+
         // Claim the send first: two workers finishing checks together would
         // otherwise both see an unlatched product and both notify.
         $claimed = Product::query()
@@ -109,7 +111,9 @@ final readonly class DetectTargetPrice
                 'target_price_notified_at' => now(),
             ]);
 
-        if ($claimed === 0) {
+        // News the shopper already had, after a failed read or a short rise
+        // let the latch go: the claim re-arms it, and nothing is sent.
+        if ($claimed === 0 || $alreadySent) {
             return;
         }
 

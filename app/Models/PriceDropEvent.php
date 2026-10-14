@@ -8,10 +8,12 @@ use App\Support\UnitWord;
 use Database\Factories\PriceDropEventFactory;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Config;
 
 #[WithoutTimestamps]
 #[Unguarded]
@@ -77,6 +79,26 @@ final class PriceDropEvent extends Model
             'price' => MoneyFormatter::unitPrice((string) $unitPrice, $this->currency)
                 . ' ' . UnitWord::labelFor(is_string($this->comparison_unit) ? $this->comparison_unit : null),
         ]);
+    }
+
+    /**
+     * The latest drop alert that went out for this product at this price or
+     * lower, in the same basis, within `dipcatch.drops.resend_after_days`.
+     *
+     * @param  string  $basisPrice  Pack money without a unit, money per `$unit` with one.
+     */
+    public static function alreadySent(Product $product, string $basisPrice, ?string $unit): ?self
+    {
+        return self::query()
+            ->where('product_id', $product->id)
+            ->where('fired_at', '>=', now()->subDays(Config::integer('dipcatch.drops.resend_after_days')))
+            ->when(
+                $unit === null,
+                fn (Builder $query): Builder => $query->whereNull('comparison_unit')->where('new_price', '<=', $basisPrice),
+                fn (Builder $query): Builder => $query->where('comparison_unit', $unit)->where('new_unit_price', '<=', $basisPrice),
+            )
+            ->latest('fired_at')
+            ->first();
     }
 
     /**

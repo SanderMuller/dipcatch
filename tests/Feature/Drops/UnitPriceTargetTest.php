@@ -175,10 +175,28 @@ test('rising back above the target arms the alert again', function (): void {
 
     expect($product->refresh()->unit_price_notified)->toBeNull();
 
+    // Past the resend window: inside it, the same value is news already sent.
+    $this->travel(8)->days();
+
     $product->shops()->where('host', 'lidl.nl')->update(['current_price' => '1.99']);
     app(DetectUnitPriceTarget::class)($product->refresh());
 
     Notification::assertSentToTimes($product->user, UnitPriceTargetNotification::class, 2);
+});
+
+test('a short rise above the target does not send the same value again', function (): void {
+    $product = targetProduct('5.50');
+    app(DetectUnitPriceTarget::class)($product);
+
+    $product->shops()->where('host', 'lidl.nl')->update(['current_price' => '2.49']);
+    app(DetectUnitPriceTarget::class)($product->refresh());
+
+    $product->shops()->where('host', 'lidl.nl')->update(['current_price' => '1.99']);
+    app(DetectUnitPriceTarget::class)($product->refresh());
+
+    Notification::assertSentToTimes($product->user, UnitPriceTargetNotification::class);
+    expect(TargetPriceEvent::query()->count())->toBe(1)
+        ->and($product->refresh()->unit_price_notified)->toBe('5.3784');
 });
 
 test('a product whose shops state no pack size cannot reach a target', function (): void {

@@ -10,10 +10,12 @@ use Carbon\CarbonImmutable;
 use Database\Factories\TargetPriceEventFactory;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Config;
 
 /**
  * A product reaching the price its owner set, as the daily digest reads it.
@@ -81,6 +83,27 @@ final class TargetPriceEvent extends Model
             'lowest_in_90_days' => PriceVerdicts::isLowestIn90Days($shop),
             'fired_at' => now(),
         ]);
+    }
+
+    /**
+     * Whether this target was already reached at this price or lower within
+     * `dipcatch.drops.resend_after_days`. A unit price, with its unit, asks
+     * about the price-per-unit target; without one, about the pack-price
+     * target. A changed target is a new question, so it matches only its own.
+     */
+    public static function alreadySent(Product $product, string $target, string $price, ?string $unit = null): bool
+    {
+        return self::query()
+            ->where('user_id', $product->user_id)
+            ->where('fired_at', '>=', now()->subDays(Config::integer('dipcatch.drops.resend_after_days')))
+            ->where('product_id', $product->id)
+            ->where('target', $target)
+            ->when(
+                $unit === null,
+                fn (Builder $query): Builder => $query->whereNull('unit_price')->where('price', '<=', $price),
+                fn (Builder $query): Builder => $query->where('comparison_unit', $unit)->where('unit_price', '<=', $price),
+            )
+            ->exists();
     }
 
     public function isPerUnit(): bool

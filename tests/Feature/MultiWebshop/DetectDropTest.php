@@ -301,3 +301,88 @@ test('the fallback accepts a check whose price differs only in trailing zeros', 
     expect(PriceDropEvent::query()->where('product_id', $product->id)->sole()->price_check_id)
         ->toBe((int) $check->id);
 });
+
+/**
+ * A product at 70 against a long-running 100, ready to drop.
+ *
+ * @return array{Product, Shop}
+ */
+function repeatDropProduct(): array
+{
+    $product = Product::factory()->create();
+    $shop = Shop::factory()->for($product)->create(['current_price' => '70.00']);
+    $product->forceFill([
+        'cheapest_shop_id' => $shop->id,
+        'cheapest_price' => '70.00',
+        'drop_threshold_pct' => '10.00',
+        'drop_threshold_abs' => '5.00',
+    ])->save();
+
+    foreach (range(1, 8) as $i) {
+        ProductCheapestHistory::factory()->for($product)->create([
+            'cheapest_shop_id' => $shop->id,
+            'cheapest_price' => '100.00',
+            'started_at' => now()->subDays(20 + $i),
+            'ended_at' => now()->subDays(19 + $i),
+        ]);
+    }
+
+    return [$product, $shop];
+}
+
+test('a drop already sent is not sent again after a failed read lets the latch go', function (): void {
+    [$product, $shop] = repeatDropProduct();
+
+    app(DetectDrop::class)($product, PriceCheck::factory()->for($shop)->create(['price' => '70.00'])->id);
+    app(DetectDrop::class)->clearLatchIfRecovered($product->refresh(), newPrice: null, reference: null);
+
+    app(DetectDrop::class)($product->refresh(), PriceCheck::factory()->for($shop)->create(['price' => '70.00'])->id);
+
+    Notification::assertSentToTimes($product->user, PriceDropNotification::class);
+    expect(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(1)
+        ->and((string) $product->refresh()->last_notified_price)->toBe('70.00')
+        ->and($product->last_notified_at?->equalTo(PriceDropEvent::query()->sole()->fired_at) === true)->toBeTrue();
+});
+
+test('a lower price inside the resend window is news again', function (): void {
+    [$product, $shop] = repeatDropProduct();
+
+    app(DetectDrop::class)($product, PriceCheck::factory()->for($shop)->create(['price' => '70.00'])->id);
+    app(DetectDrop::class)->clearLatchIfRecovered($product->refresh(), newPrice: null, reference: null);
+
+    $shop->update(['current_price' => '65.00']);
+    $product->forceFill(['cheapest_price' => '65.00'])->save();
+    app(DetectDrop::class)($product->refresh(), PriceCheck::factory()->for($shop)->create(['price' => '65.00'])->id);
+
+    Notification::assertSentToTimes($product->user, PriceDropNotification::class, 2);
+});
+
+test('a drop is news again once the resend window has passed', function (): void {
+    [$product, $shop] = repeatDropProduct();
+
+    app(DetectDrop::class)($product, PriceCheck::factory()->for($shop)->create(['price' => '70.00'])->id);
+    app(DetectDrop::class)->clearLatchIfRecovered($product->refresh(), newPrice: null, reference: null);
+
+    $this->travel(8)->days();
+
+    app(DetectDrop::class)($product->refresh(), PriceCheck::factory()->for($shop)->create(['price' => '70.00'])->id);
+
+    Notification::assertSentToTimes($product->user, PriceDropNotification::class, 2);
+});
+
+test('a drop is matched in its own basis, on the price of that basis', function (): void {
+    [$product] = repeatDropProduct();
+
+    PriceDropEvent::factory()->for($product)->create([
+        'user_id' => $product->user_id,
+        'new_price' => '2.00',
+        'new_unit_price' => '5.0000',
+        'comparison_unit' => 'g',
+        'fired_at' => now(),
+    ]);
+
+    expect(PriceDropEvent::alreadySent($product, '5.0000', unit: 'g'))->not->toBeNull()
+        ->and(PriceDropEvent::alreadySent($product, '2.0000', unit: 'g'))->toBeNull()
+        ->and(PriceDropEvent::alreadySent($product, '5.00', unit: null))->toBeNull()
+        ->and(PriceDropEvent::alreadySent($product, '5.0000', unit: 'kg'))->toBeNull();
+});

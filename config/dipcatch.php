@@ -129,6 +129,10 @@ return [
         // for a shop's own cache to settle, short enough that a real promotion
         // still alerts within the hour.
         'confirm_delay_minutes' => (int) env('DIPCATCH_DROPS_CONFIRM_DELAY_MINUTES', 10),
+        // An alert already sent at this price or lower is not sent again for
+        // this many days, even after its latch let go. A failed read or one
+        // bad price releases the latch, and the next good read would repeat it.
+        'resend_after_days' => (int) env('DIPCATCH_DROPS_RESEND_AFTER_DAYS', 7),
     ],
 
     'digest' => [
