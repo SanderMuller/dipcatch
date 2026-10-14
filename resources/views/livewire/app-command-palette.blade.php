@@ -159,9 +159,9 @@
                                         <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-5 rounded-sm" />
                                     </span>
                                     <div class="grid min-w-0 gap-0.5">
-                                        <span class="truncate">{{ $host }}</span>
+                                        <span class="truncate">{{ $name ?? $host }}</span>
                                         <span class="truncate text-sm font-normal text-zinc-600 dark:text-zinc-300">
-                                            {{ $name === null ? __('Your products at this shop') : $name . ' · ' . __('Your products at this shop') }}
+                                            {{ $name === null ? __('Your products at this shop') : $host . ' · ' . __('Your products at this shop') }}
                                         </span>
                                     </div>
                                 </flux:command.item>
@@ -213,7 +213,7 @@
                                     <div class="grid min-w-0 gap-0.5">
                                         <span class="truncate">{{ $product->title }}</span>
                                         <span class="truncate text-sm font-normal text-zinc-600 dark:text-zinc-300">
-                                            {{ $shop === null ? __('No shop sells this now') : $headline->text() . ' · ' . $shop->host }}
+                                            {{ $shop === null ? __('No shop sells this now') : $headline->text() . ' · ' . $shop->displayName() }}
                                         </span>
                                     </div>
                                 </flux:command.item>

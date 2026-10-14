@@ -212,8 +212,8 @@ it('reads skipped shops from the URL', function (): void {
         ->get(route('app.shopping-list', ['skip' => ['lidl.nl']]))
         ->assertOk()
         ->assertSeeText('Only at shops you skip')
-        ->assertSeeText('Sold at lidl.nl')
-        ->assertSeeText('Go to lidl.nl too');
+        ->assertSeeText('Sold at Lidl')
+        ->assertSeeText('Go to Lidl too');
 });
 
 it('brings a skipped shop back from the item that needs it', function (): void {

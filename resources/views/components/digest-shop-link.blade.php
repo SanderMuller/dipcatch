@@ -5,5 +5,5 @@
 @if ($shop === null)
 Shop unknown
 @else
-<a href="{{ $shop->url }}" style="color: #2563eb; text-decoration: underline;">{{ $shop->host }}</a>
+<a href="{{ $shop->url }}" style="color: #2563eb; text-decoration: underline;">{{ $shop->displayName() }}</a>
 @endif

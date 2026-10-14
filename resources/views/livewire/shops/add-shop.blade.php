@@ -99,7 +99,7 @@
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 text-sm text-zinc-500">
                                 <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
-                                {{ $host }}
+                                <span title="{{ $host }}">{{ \App\Support\ShopNames::label($host) }}</span>
                             </div>
                             <flux:heading><x-title-diff :title="(string) $snapshot['title']" :other="$product->title" data-test="preview-page-title" /></flux:heading>
                             <x-open-page-link :href="$pageUrl" :host="$host" class="mt-1" data-test="preview-open-page" />
@@ -165,7 +165,7 @@
                                 <ul class="mt-1 space-y-0.5 text-sm text-zinc-500 dark:text-zinc-400">
                                     @foreach ($product->shops as $trackedShop)
                                         @php($trackedPack = $trackedShop->packSize())
-                                        <li class="truncate">{{ $trackedPack === null ? $trackedShop->host : $trackedShop->host . ' · ' . \App\Support\UnitWord::pack($trackedPack) }}</li>
+                                        <li class="truncate">{{ $trackedPack === null ? $trackedShop->displayName() : $trackedShop->displayName() . ' · ' . \App\Support\UnitWord::pack($trackedPack) }}</li>
                                     @endforeach
                                 </ul>
                             </div>

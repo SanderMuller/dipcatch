@@ -640,8 +640,8 @@ it('leads the card with the best value and notes the lowest pack price', functio
     expect(preg_replace('/\s+/', ' ', strip_tags($html)))
         ->toContain('€0.0275 /piece')
         ->toContain('€21.99 for 800 pieces')
-        ->toContain('Lowest price €12.99 for 400 pieces at ah.nl')
-        ->toMatch('/kruidvat\.nl.*€0\.0275 \/piece.*€21\.99.*ah\.nl.*€0\.0325 \/piece.*bol\.com.*€0\.0337 \/piece/s');
+        ->toContain('Lowest price €12.99 for 400 pieces at Albert Heijn')
+        ->toMatch('/Kruidvat.*€0\.0275 \/piece.*€21\.99.*Albert Heijn.*€0\.0325 \/piece.*bol\.com.*€0\.0337 \/piece/s');
 });
 
 it('lists the shop behind the card price first, even when an out-of-stock shop is lower', function (): void {
@@ -829,7 +829,7 @@ it('never lists a sold-out shop ahead of one that can be bought from', function 
     // Etos is cheapest per tablet but sold out: it follows the live shops, on
     // its pack price, with no figure per tablet.
     expect(preg_replace('/\s+/', ' ', strip_tags(withoutCardDetails(livewire(ProductList::class)->html()))))
-        ->toMatch('/kruidvat\.nl €0\.0275 \/piece.*ah\.nl €0\.0325 \/piece.*etos\.nl[^€]*€9\.99/s')
+        ->toMatch('/Kruidvat €0\.0275 \/piece.*Albert Heijn €0\.0325 \/piece.*Etos[^€]*€9\.99/s')
         ->not->toContain('€0.0125');
 });
 
@@ -879,7 +879,7 @@ it('names the deal of the lowest-price shop in its note', function (): void {
 
     $card = preg_replace('/\s+/', ' ', strip_tags(withoutCardDetails(livewire(ProductList::class)->set('discounted', true)->html())));
 
-    expect($card)->toContain('Lowest price €1.69 for 200 g at ah.nl · Bonus until')
+    expect($card)->toContain('Lowest price €1.69 for 200 g at Albert Heijn · Bonus until')
         ->not->toContain('Deal Bonus');
 });
 
@@ -902,11 +902,11 @@ it('shows the full discount and every shop on hover', function (): void {
 
     expect($details)->toContain('−23% Down per kilo · since')
         ->toContain('€10.95 /kg → €8.45 /kg')
-        ->toContain('Deal jumbo.com · 2 for €4.00 · or €2.85 each')
+        ->toContain('Deal Jumbo · 2 for €4.00 · or €2.85 each')
         // Every shop, the fourth one too, which the card has no room for.
         ->toMatch('/\d shops/')
-        ->toMatch('/ah\.nl Best value In stock.*€8\.45 \/kg €1\.69 for 200 g/')
-        ->toContain('dirk.nl')
+        ->toMatch('/Albert Heijn Best value In stock.*€8\.45 \/kg €1\.69 for 200 g/')
+        ->toContain('Dirk')
         ->toContain('Out of stock');
 });
 
@@ -1023,7 +1023,7 @@ it('lists a shop that can no longer be read in the hover, marked as such', funct
 
     preg_match('#data-test="product-card-details".*?</ui-tooltip>#s', livewire(ProductList::class)->html(), $match);
 
-    expect(preg_replace('/\s+/', ' ', strip_tags($match[0] ?? '')))->toContain('2 shops')->toMatch('/dirk\.nl Not readable/');
+    expect(preg_replace('/\s+/', ' ', strip_tags($match[0] ?? '')))->toContain('2 shops')->toMatch('/Dirk Not readable/');
 });
 
 it('with a shop chosen, shows only the products that shop is the best buy for', function (): void {

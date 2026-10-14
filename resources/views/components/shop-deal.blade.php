@@ -30,7 +30,7 @@
             </div>
             <p class="text-base font-medium text-zinc-900 sm:text-sm dark:text-zinc-100" data-test="upcoming-deal-terms">
                 {{ \App\Support\PromotionLabel::upcomingTerms($shop) }}
-                <span class="font-normal text-zinc-500 dark:text-zinc-400">{{ __('at :host', ['host' => $shop->host]) }}</span>
+                <span class="font-normal text-zinc-500 dark:text-zinc-400">{{ __('at :host', ['host' => $shop->displayName()]) }}</span>
             </p>
             @if ($bundle !== null && $singleItemPrice !== null)
                 {{-- Not struck through: until the deal starts this is what a shopper pays. --}}

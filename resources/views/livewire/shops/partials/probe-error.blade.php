@@ -13,7 +13,7 @@
         @break
     @case('duplicate')
         @php $dupHost = $errorContext['existing_shop_host'] ?? null; @endphp
-        This URL is already tracked for this product{{ $dupHost ? ' (' . $dupHost . ')' : '' }}.
+        This URL is already tracked for this product{{ $dupHost ? ' (' . \App\Support\ShopNames::label($dupHost) . ')' : '' }}.
         @break
     @case('robots_disallowed')
         This shop's robots.txt forbids automated access.

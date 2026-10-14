@@ -1079,7 +1079,7 @@ it('explains the unit price, the pack price and the read time on hover', functio
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
         ->assertSeeText('Price per kilo: the pack price divided by the pack size, so packs of different sizes compare fairly.')
-        ->assertSeeText('Pack price: what ah.nl charges for 660 g.')
+        ->assertSeeText('Pack price: what Albert Heijn charges for 660 g.')
         ->assertSeeText('Price last read 23 Sep 2026, 12:15.');
 });
 

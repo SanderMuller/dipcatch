@@ -11,6 +11,7 @@ use App\Support\MoneyFormatter;
 use App\Support\Numeric;
 use App\Support\PackLine;
 use App\Support\PackSize;
+use App\Support\ShopNames;
 use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -150,12 +151,13 @@ final class Bell extends Component
     {
         /** @var array<string, mixed> $data */
         $data = $notification->data;
+        $host = $this->text($data, 'host');
 
         return [
             'title' => $this->text($data, 'title') ?? 'Notification',
             'body' => $this->text($data, 'body'),
             'url' => $this->text($data, 'view_url'),
-            'host' => $this->text($data, 'host'),
+            'host' => $host === null ? null : ShopNames::label($host),
             'price' => $this->text($data, 'new_price'),
             ...self::unitFigures($data, leadsWithPack: $notification->type === TargetPriceNotification::class),
             'currency' => $this->text($data, 'currency'),
@@ -196,7 +198,7 @@ final class Bell extends Component
         $betterPrice = $text('better_value_unit_price');
         $betterValue = $betterHost === null || $betterPrice === null || $label === null
             ? null
-            : __('Better value: :price at :host', ['price' => MoneyFormatter::unitPrice($betterPrice, $currency) . ' ' . $label, 'host' => $betterHost]);
+            : __('Better value: :price at :host', ['price' => MoneyFormatter::unitPrice($betterPrice, $currency) . ' ' . $label, 'host' => ShopNames::label($betterHost)]);
 
         $percent = Numeric::percent($data['drop_percent'] ?? null);
         $referenceUnit = $text('reference_unit_price');

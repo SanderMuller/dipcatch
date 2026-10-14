@@ -63,7 +63,7 @@ test('bundle price always shows quantity total and single-item price', function 
         ->assertSeeHtmlInOrder(['€1.33 /l', '€1.90 /l', '€2.00 for 1.5 L', '2 for €4.00', 'Compared across'])
         ->assertSeeHtml('or €2.85 each')
         ->assertSeeHtml('title="Regular price"')
-        ->assertSeeHtml('Tracked on DipCatch: best value €1.33 /l at jumbo.com (€2.00 for 1.5 L · 2 for €4.00 · or €2.85 each)');
+        ->assertSeeHtml('Tracked on DipCatch: best value €1.33 /l at Jumbo (€2.00 for 1.5 L · 2 for €4.00 · or €2.85 each)');
 });
 
 test('equal prices use the same stable shop order as the cheapest-price engine', function (): void {
@@ -533,7 +533,7 @@ test('markdown copy: the shared page as markdown, with no private field in it', 
     expect($response->getContent())
         ->toStartWith("# Beans & more\n")
         ->not->toContain('## Best price now')
-        ->toContain("## Best value\n\n€9.00 /kg at [ah.nl](<https://ah.nl/p/beans>)\n\n€9.00 for 1 kg")
+        ->toContain("## Best value\n\n€9.00 /kg at [Albert Heijn](<https://ah.nl/p/beans>)\n\n€9.00 for 1 kg")
         ->toContain('> Lowest price: €6.00 for 500 g at bol.com. That is 33% more per kilo than the best value.')
         ->toContain('Compared across 2 shops tracked.')
         ->toContain('| [bol.com](<https://bol.com/p/beans>) | €12.00 /kg | €6.00 for 500 g |')
@@ -593,7 +593,7 @@ test('a trade-only price wins neither answer on the public page', function (): v
 
     $html = (string) preg_replace('/\s+/', ' ', $this->get('/p/' . str_repeat('a', 32))->assertOk()->content());
 
-    expect($html)->toContain('Tracked on DipCatch: best value €8.45 /kg at ah.nl')
+    expect($html)->toContain('Tracked on DipCatch: best value €8.45 /kg at Albert Heijn')
         ->and(substr_count($html, '>Lowest price<'))->toBe(1)
         ->and($html)->toContain(ConsumerPriceIssue::TradeOnly->label());
 

@@ -51,7 +51,7 @@ it('shows a notification that Filaments own bell would have hidden', function ()
     // applies. Rendering it is the whole point of this component.
     livewire(Bell::class)
         ->assertSee('Coffee beans 1 kg')
-        ->assertSee('jumbo.com');
+        ->assertSee('Jumbo');
 });
 
 it('discloses bundle terms in notification rows', function (): void {
@@ -202,7 +202,7 @@ it('leads a per-unit drop with its unit price and names the pack', function (): 
 
     $this->actingAs($user);
 
-    livewire(Bell::class)->assertSeeInOrder(['€12.11 /kg', 'dirk.nl', '€2.75 for 227 g', '↓ 3.7% per kilo · was €12.58 /kg']);
+    livewire(Bell::class)->assertSeeInOrder(['€12.11 /kg', 'Dirk', '€2.75 for 227 g', '↓ 3.7% per kilo · was €12.58 /kg']);
 });
 
 it('renders a drop written before the pack size was stored from the unit figures it has', function (): void {
@@ -223,7 +223,7 @@ it('renders a row with no unit figures as the pack price it stored', function ()
     $this->actingAs($user);
 
     livewire(Bell::class)
-        ->assertSeeInOrder(['€12.49', 'jumbo.com'])
+        ->assertSeeInOrder(['€12.49', 'Jumbo'])
         ->assertDontSeeHtml('data-test="bell-unit-figure"');
 });
 
@@ -233,7 +233,7 @@ it('renders a unit-target row from the label it stored before the unit code', fu
 
     $this->actingAs($user);
 
-    livewire(Bell::class)->assertSeeInOrder(['€0.4500 /stuk', 'jumbo.com', '€1.80']);
+    livewire(Bell::class)->assertSeeInOrder(['€0.4500 /stuk', 'Jumbo', '€1.80']);
 });
 
 it('leads a target-price row with the pack price and names the better buy', function (): void {
@@ -254,7 +254,7 @@ it('leads a target-price row with the pack price and names the better buy', func
 
     livewire(Bell::class)
         ->assertDontSeeHtml('data-test="bell-unit-figure"')
-        ->assertSeeInOrder(['€1.69 for 200 g', 'ah.nl', '€8.45 /kg', 'Your target: €1.75', 'Better value: €5.38 /kg at lidl.nl']);
+        ->assertSeeInOrder(['€1.69 for 200 g', 'Albert Heijn', '€8.45 /kg', 'Your target: €1.75', 'Better value: €5.38 /kg at Lidl']);
 });
 
 it('names the unit in the reader\'s language from the stored code', function (): void {

@@ -162,7 +162,7 @@ final readonly class ProductMarkdown
 
         if ($lowest !== null) {
             $percent = $headline->lowestCostsMorePercent();
-            $note = __('Lowest price: :line at :host.', ['line' => PackLine::of($lowest, $headline->packs)->text(), 'host' => $lowest->host]);
+            $note = __('Lowest price: :line at :host.', ['line' => PackLine::of($lowest, $headline->packs)->text(), 'host' => $lowest->displayName()]);
 
             if ($percent !== null) {
                 $note .= ' ' . __('That is :percent% more :unit than the best value.', [
@@ -276,7 +276,7 @@ final readonly class ProductMarkdown
      */
     private static function link(Shop $shop): string
     {
-        return '[' . self::inline((string) $shop->host) . '](<' . str_replace(['<', '>'], ['%3C', '%3E'], $shop->url) . '>)';
+        return '[' . self::inline($shop->displayName()) . '](<' . str_replace(['<', '>'], ['%3C', '%3E'], $shop->url) . '>)';
     }
 
     /**

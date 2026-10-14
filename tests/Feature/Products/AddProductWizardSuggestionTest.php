@@ -371,7 +371,7 @@ it('explains each kind of suggestion', function (string $category, string $now, 
         ? $wizard->assertSeeHtml('data-test="use-suggestion"')
         : $wizard->assertDontSeeHtml('data-test="use-suggestion"');
 })->with([
-    'a promotion on now' => ['food.pantry', '3.00', '4.00', null, 'ah.nl has this 25% off now.', true],
+    'a promotion on now' => ['food.pantry', '3.00', '4.00', null, 'Albert Heijn has this 25% off now.', true],
     // Pantry usually goes 35% off: halfway to 50% now is the 40% step.
     'halfway to a deeper offer' => ['food.pantry', '2.00', '4.00', null, 'We suggest a price halfway between that and its usual offers.', true],
     'the alcohol limit' => ['food.alcohol', '0.60', '1.20', null, 'Alcohol can go at most 25% off in the Netherlands.', true],

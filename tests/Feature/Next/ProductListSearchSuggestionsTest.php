@@ -44,6 +44,7 @@ it('offers a shop by its name as people say it', function (): void {
     livewire(ProductList::class)
         ->set('search', 'albert')
         ->assertSeeHtml("filterByShop('ah.nl')")
+        ->assertSeeHtml('aria-label="Filter by shop Albert Heijn"')
         ->assertDontSeeHtml("filterByShop('jumbo.com')");
 });
 

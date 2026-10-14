@@ -319,6 +319,6 @@ test('the alert leads with the unit price, stores its unit code and names the pa
 
         return $payload['unit'] === 'g'
             && $payload['pack_unit'] === 'g'
-            && is_string($body) && str_contains($body, 'is €5.38 /kg (€1.99 for 370 g) at lidl.nl');
+            && is_string($body) && str_contains($body, 'is €5.38 /kg (€1.99 for 370 g) at Lidl');
     });
 });

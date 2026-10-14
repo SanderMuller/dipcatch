@@ -76,7 +76,7 @@
                                     @foreach ($group['trips'] as $trip)
                                         <li class="flex flex-col gap-3 px-4 py-3.5 @3xl:flex-row @3xl:items-center @3xl:gap-5" wire:key="trip-{{ $trip['host'] }}">
                                             <div class="min-w-0 @3xl:w-44 @3xl:shrink-0">
-                                                <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true']) }}" wire:navigate class="inline-flex max-w-full min-w-0 items-center font-semibold underline-offset-4 hover:underline">{!! \App\Support\Favicon::html($trip['host']) !!}</a>
+                                                <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true']) }}" wire:navigate class="inline-flex max-w-full min-w-0 items-center font-semibold underline-offset-4 hover:underline">{!! \App\Support\Favicon::html($trip['host'], \App\Support\ShopNames::label($trip['host'])) !!}</a>
                                                 <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ trans_choice(':count best buy|:count best buys', $trip['count'], ['count' => $trip['count']]) }}</p>
                                             </div>
                                             <div class="flex min-w-0 flex-1 items-center gap-3">
@@ -100,7 +100,7 @@
                                                     {{-- Best buys and discounted: the same products the badge counts, not every deal at the shop. --}}
                                                     <a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true', 'discounted' => 'true']) }}" wire:navigate class="rounded-full bg-savings/10 px-2 py-0.5 text-xs font-semibold text-savings-strong hover:bg-savings/20" data-test="trip-on-offer">{{ trans_choice(':count on offer|:count on offer', $trip['onOffer'], ['count' => $trip['onOffer']]) }}</a>
                                                 @endif
-                                                <a href="{{ route('app.products.index', ['shop' => $trip['host']]) }}" wire:navigate class="inline-flex items-center gap-1 text-sm font-medium text-brand">{{ __('Everything at :shop', ['shop' => $trip['host']]) }} <flux:icon.arrow-right variant="micro" class="size-4" /></a>
+                                                <a href="{{ route('app.products.index', ['shop' => $trip['host']]) }}" wire:navigate class="inline-flex items-center gap-1 text-sm font-medium text-brand">{{ __('Everything at :shop', ['shop' => \App\Support\ShopNames::label($trip['host'])]) }} <flux:icon.arrow-right variant="micro" class="size-4" /></a>
                                             </div>
                                         </li>
                                     @endforeach
@@ -218,8 +218,8 @@
                     <flux:text size="sm" class="mt-0.5 text-zinc-500 dark:text-zinc-400">{{ __('Deals about to stop, and products DipCatch cannot follow well.') }}</flux:text>
 
                     @php($worthALook = [
-                        ...array_map(fn (array $row): array => ['key' => 'ending-' . $row['shop']->id, 'product' => $row['product'], 'icon' => 'clock', 'tone' => 'text-chart-line', 'note' => __('Deal at :shop ends :when', ['shop' => $row['shop']->host, 'when' => $row['endsAt']->diffForHumans()]), 'addShop' => false], $digest->endingSoon),
-                        ...array_map(fn (array $row): array => ['key' => 'failing-' . $row['shop']->id, 'product' => $row['product'], 'icon' => 'exclamation-triangle', 'tone' => 'text-alert', 'note' => __('DipCatch cannot read :shop right now. The page may have moved.', ['shop' => $row['shop']->host]), 'addShop' => false], $digest->failing),
+                        ...array_map(fn (array $row): array => ['key' => 'ending-' . $row['shop']->id, 'product' => $row['product'], 'icon' => 'clock', 'tone' => 'text-chart-line', 'note' => __('Deal at :shop ends :when', ['shop' => $row['shop']->displayName(), 'when' => $row['endsAt']->diffForHumans()]), 'addShop' => false], $digest->endingSoon),
+                        ...array_map(fn (array $row): array => ['key' => 'failing-' . $row['shop']->id, 'product' => $row['product'], 'icon' => 'exclamation-triangle', 'tone' => 'text-alert', 'note' => __('DipCatch cannot read :shop right now. The page may have moved.', ['shop' => $row['shop']->displayName()]), 'addShop' => false], $digest->failing),
                         ...array_map(fn ($product): array => ['key' => 'single-' . $product->id, 'product' => $product, 'icon' => 'scale', 'tone' => 'text-zinc-500 dark:text-zinc-400', 'note' => __('Tracked at one shop only.'), 'addShop' => true], $digest->singleShop),
                     ])
                     <ul role="list" class="mt-4 divide-y divide-ink/5 rounded-2xl bg-paper ring-1 ring-line dark:divide-white/10">

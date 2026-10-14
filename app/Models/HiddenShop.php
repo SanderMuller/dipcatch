@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ShopNames;
 use App\Support\SupermarketChains;
 use App\Support\UrlNormalizer;
 use Carbon\CarbonImmutable;
@@ -105,7 +106,7 @@ final class HiddenShop extends Model
      */
     public static function displayName(string $label): string
     {
-        return trim(preg_replace('/\s*\(via [^)]*\)$/u', '', $label) ?? $label);
+        return ShopNames::label(trim(preg_replace('/\s*\(via [^)]*\)$/u', '', $label) ?? $label));
     }
 
     public static function showAgain(User $user, string $host): void

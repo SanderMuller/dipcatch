@@ -99,7 +99,7 @@ it('shows the open count, the first items and the way to the list in the header'
 
     livewire(HeaderMenu::class)
         ->assertSeeHtml('data-test="shopping-list-badge"')
-        ->assertSeeInOrder(['Coffee', '€2.49', 'ah.nl'])
+        ->assertSeeInOrder(['Coffee', '€2.49', 'Albert Heijn'])
         ->assertSeeHtml('src="' . e(Product::query()->where('title', 'Coffee')->firstOrFail()->safeImageUrl()) . '"')
         ->assertDontSee('Crossed tea')
         ->assertSeeHtml('href="' . route('app.shopping-list') . '"')

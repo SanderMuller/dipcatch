@@ -306,7 +306,7 @@ final class AddShop extends Component
         Notification::make()
             ->success()
             ->title('Kept as a link')
-            ->body('DipCatch cannot read ' . $shop->host . ', so it holds no price and never decides the cheapest or the best value. It is checked again once a week, and starts being tracked by itself if the page becomes readable.')
+            ->body('DipCatch cannot read ' . $shop->displayName() . ', so it holds no price and never decides the cheapest or the best value. It is checked again once a week, and starts being tracked by itself if the page becomes readable.')
             ->send();
 
         $this->dispatch('shop-added', offerId: (string) $shop->id);

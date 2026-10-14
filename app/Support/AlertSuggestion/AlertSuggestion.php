@@ -117,8 +117,8 @@ final readonly class AlertSuggestion
      * its price is a deal none of the shops runs. Two shops have no middle
      * to tell an outlier by.
      *
-     * @param  list<array{shopId: string, host: string, pack: string, perPack: float, price: float|null, unitPrice: float, normalPrice: numeric-string}>  $normals
-     * @return array{0: array{shopId: string, host: string, pack: string, perPack: float, price: float|null, unitPrice: float, normalPrice: numeric-string}|null, 1: list<string>} the shop, and the hosts left out
+     * @param  list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: float|null, unitPrice: float, normalPrice: numeric-string}>  $normals
+     * @return array{0: array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: float|null, unitPrice: float, normalPrice: numeric-string}|null, 1: list<string>} the shop, and the hosts left out
      */
     private static function normalShop(array $normals): array
     {

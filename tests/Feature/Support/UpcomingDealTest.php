@@ -49,7 +49,7 @@ it('shows an announced deal on the card with its terms, its shop and its period'
 
     expect($html)->toContain('Upcoming deal')
         ->toContain('25% korting')
-        ->toContain('at ah.nl')
+        ->toContain('at Albert Heijn')
         ->toContain('28 Sep – 4 Oct');
 });
 

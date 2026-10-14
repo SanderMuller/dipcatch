@@ -44,7 +44,7 @@
 
     <flux:modal :name="$name" class="w-full md:max-w-3xl" data-test="preview-photo-dialog">
         <div x-data="{ index: 0, images: @js($images) }" class="space-y-4">
-            <flux:heading size="lg" level="2">{{ __('Photos on :shop', ['shop' => $host]) }}</flux:heading>
+            <flux:heading size="lg" level="2">{{ __('Photos on :shop', ['shop' => \App\Support\ShopNames::label($host)]) }}</flux:heading>
 
             <div
                 x-data="{{ $zoom }}"
@@ -56,8 +56,8 @@
                 <img
                     x-bind:src="images[index]"
                     src="{{ $first }}"
-                    alt="{{ __('Photo :number of :count on :shop', ['number' => 1, 'count' => count($images), 'shop' => $host]) }}"
-                    x-bind:alt="{{ \Illuminate\Support\Js::from(__('Photo :number of :count on :shop', ['count' => count($images), 'shop' => $host])) }}.replace(':number', index + 1)"
+                    alt="{{ __('Photo :number of :count on :shop', ['number' => 1, 'count' => count($images), 'shop' => \App\Support\ShopNames::label($host)]) }}"
+                    x-bind:alt="{{ \Illuminate\Support\Js::from(__('Photo :number of :count on :shop', ['count' => count($images), 'shop' => \App\Support\ShopNames::label($host)])) }}.replace(':number', index + 1)"
                     referrerpolicy="no-referrer"
                     class="size-full object-contain p-3"
                     x-bind:style="zoomed ? `transform: scale(2.5); transform-origin: ${x}% ${y}%` : ''"

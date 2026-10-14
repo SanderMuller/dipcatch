@@ -469,7 +469,7 @@ final class AddProductWizard extends Component
      * The drop defaults come from the same reference the drop check measures
      * from: for a product added during an offer, that is the offer price.
      *
-     * @return array{suggestion: AlertSuggestion, onOfferNow: bool, asksJev: bool, usesJev: bool, canSwitchOnAi: bool, packChoices: list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>, unitWord: ?string, defaults: array{pct: string, abs: string}|null, otherAlerts: list<string>}
+     * @return array{suggestion: AlertSuggestion, onOfferNow: bool, asksJev: bool, usesJev: bool, canSwitchOnAi: bool, packChoices: list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>, unitWord: ?string, defaults: array{pct: string, abs: string}|null, otherAlerts: list<string>}
      */
     private function alertStep(Product $product): array
     {

@@ -27,6 +27,33 @@ final readonly class ShopNames
     }
 
     /**
+     * The name of the shop at a host, or null when DipCatch knows none. A
+     * subdomain takes its shop's name: webwinkel.poiesz-supermarkten.nl is
+     * Poiesz.
+     */
+    public static function of(string $host): ?string
+    {
+        $names = self::all();
+        $host = mb_strtolower($host);
+
+        while (str_contains($host, '.')) {
+            if (isset($names[$host])) {
+                return $names[$host];
+            }
+
+            $host = substr($host, strpos($host, '.') + 1);
+        }
+
+        return null;
+    }
+
+    /** The shop's name, or its host when DipCatch knows no name. */
+    public static function label(string $host): string
+    {
+        return self::of($host) ?? $host;
+    }
+
+    /**
      * @return list<string>
      */
     public static function hostsMatching(string $term): array

@@ -306,6 +306,6 @@ test('a drop or unit-target alert queued before the unit snapshots existed still
     expect($revived->toWebPush($user)->toArray()['body'])->toContain($expected)
         ->and($revived->toDatabase($user)['pack_quantity'])->toBeNull();
 })->with([
-    'drop' => ['drop', 'Fanta is now €2.00 at jumbo.com'],
-    'unit target' => ['unit target', 'Fanta is €1.33 /stuk (€2.00) at jumbo.com'],
+    'drop' => ['drop', 'Fanta is now €2.00 at Jumbo'],
+    'unit target' => ['unit target', 'Fanta is €1.33 /stuk (€2.00) at Jumbo'],
 ]);

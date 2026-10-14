@@ -124,7 +124,7 @@ test('the product page leads with the best value and notes the lowest price', fu
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
         ->assertDontSeeText('Best price now')
-        ->assertSeeTextInOrder(['Best value', '€5.38 /kg', '€1.99 for 370 g', 'lidl.nl'])
+        ->assertSeeTextInOrder(['Best value', '€5.38 /kg', '€1.99 for 370 g', 'Lidl'])
         // The lowest pack price is a note under it, with the gap per kilo.
         ->assertSeeText('Lowest price: €1.69 for 200 g at')
         ->assertSeeText('That is 57% more per kilo than the best value.')
@@ -153,7 +153,7 @@ test('the products list shows the best value beside the cheapest price', functio
         ->assertSeeText('€8.45 /kg')
         ->assertSeeText('€5.38 /kg')
         // Named, because the best value is usually not the cheapest shop.
-        ->assertSeeText('lidl.nl');
+        ->assertSeeText('Lidl');
 });
 
 test('the list reads every shop once, not once per product row', function (): void {
@@ -241,10 +241,10 @@ test('the dashboard card leads with the best value and links its shop', function
     // the product list and the product page.
     $card = strip_tags(withoutCardDetails(livewire(Dashboard::class)->html()));
 
-    expect($card)->not->toContain('Lowest price')->not->toContain('ah.nl');
+    expect($card)->not->toContain('Lowest price')->not->toContain('Albert Heijn');
 
     livewire(Dashboard::class)
-        ->assertSeeTextInOrder(['€5.38 /kg', '€1.99 for 370 g', 'lidl.nl'])
+        ->assertSeeTextInOrder(['€5.38 /kg', '€1.99 for 370 g', 'Lidl'])
         ->assertSeeHtml('href="https://lidl.nl/p/lay-s/p7"')
         ->assertDontSeeHtml('href="https://ah.nl/producten/product/wi7/x"');
 });
@@ -269,9 +269,9 @@ test('the list says how long a quoted price lasts', function (): void {
 
     livewire(ProductList::class)
         // The cheapest price is a bonus that runs out; the best value is not.
-        ->assertSeeText('ah.nl · until 6 Sep')
-        ->assertSeeText('lidl.nl')
-        ->assertDontSeeText('lidl.nl · until');
+        ->assertSeeText('Albert Heijn · until 6 Sep')
+        ->assertSeeText('Lidl')
+        ->assertDontSeeText('Lidl · until');
 });
 
 test('a shop with no promotion is named without a deadline', function (): void {
@@ -287,8 +287,8 @@ test('a shop with no promotion is named without a deadline', function (): void {
     $this->actingAs($user);
 
     livewire(ProductList::class)
-        ->assertSeeText('jumbo.com')
-        ->assertDontSeeText('jumbo.com ·');
+        ->assertSeeText('Jumbo')
+        ->assertDontSeeText('Jumbo ·');
 });
 
 test('two shops a rounding step apart are ranked on the unrounded figure', function (): void {

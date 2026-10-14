@@ -11,6 +11,7 @@ use App\Support\BundlePriceLabel;
 use App\Support\MoneyFormatter;
 use App\Support\PackLine;
 use App\Support\PackSize;
+use App\Support\ShopNames;
 use App\Support\UnitWord;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -157,7 +158,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
             ? ''
             : ' (' . PackLine::format($this->snapshotPrice, $this->product->currency, $packSize) . $bundle . ')';
 
-        return $this->product->title . ' is ' . $unit . $price . ' at ' . $this->snapshotHost
+        return $this->product->title . ' is ' . $unit . $price . ' at ' . ShopNames::label($this->snapshotHost)
             . ($this->snapshotLowestIn90Days ? ' · lowest in 90 days' : '');
     }
 }

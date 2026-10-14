@@ -15,6 +15,7 @@ use App\Support\MoneyFormatter;
 use App\Support\Numeric;
 use App\Support\PackLine;
 use App\Support\PackSize;
+use App\Support\ShopNames;
 use App\Support\UnitWord;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -127,7 +128,7 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             : MoneyFormatter::format($this->snapshotPrice, $currency) . $bundle;
 
         $body = $this->product->title . ' is now ' . $priceLine
-            . ($this->snapshotHost !== null ? ' at ' . $this->snapshotHost : '')
+            . ($this->snapshotHost !== null ? ' at ' . ShopNames::label($this->snapshotHost) : '')
             . ($this->snapshotLowestIn90Days ? ' · lowest in 90 days' : '');
 
         return new WebPushMessage()

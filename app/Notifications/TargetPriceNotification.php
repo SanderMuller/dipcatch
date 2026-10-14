@@ -12,6 +12,7 @@ use App\Support\HeadlinePrice;
 use App\Support\MoneyFormatter;
 use App\Support\PackLine;
 use App\Support\PackSize;
+use App\Support\ShopNames;
 use App\Support\UnitWord;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -167,7 +168,7 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
         $body = $this->product->title
             . ' is ' . PackLine::format($this->snapshotPrice, $currency, $packSize)
             . BundlePriceLabel::suffix($this->snapshotBundle, $currency)
-            . ' at ' . $this->snapshotHost;
+            . ' at ' . ShopNames::label($this->snapshotHost);
 
         if ($this->targetPrice() !== null) {
             $body .= ' · your target ' . MoneyFormatter::format($this->targetPrice(), $currency);
@@ -179,7 +180,7 @@ final class TargetPriceNotification extends Notification implements ShouldQueue
 
         if ($this->snapshotBetterValueHost !== null && $this->snapshotBetterValueUnitPrice !== null) {
             $body .= ' · better value ' . MoneyFormatter::unitPrice($this->snapshotBetterValueUnitPrice, $currency) . ' ' . $label
-                . ' at ' . $this->snapshotBetterValueHost;
+                . ' at ' . ShopNames::label($this->snapshotBetterValueHost);
         }
 
         if ($this->snapshotLowestIn90Days) {

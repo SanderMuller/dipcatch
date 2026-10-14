@@ -139,7 +139,7 @@
         @if ($compare && ($lowest = $headline->lowestShop))
             @php($lowestDeal = \App\Support\PromotionLabel::runningDeal($lowest))
             <flux:text size="sm" class="mt-1 text-zinc-500 dark:text-zinc-400" data-test="lowest-price-note">
-                {{ __('Lowest price :line at :host', ['line' => \App\Support\PackLine::format($lowest->current_price === null ? null : (string) $lowest->current_price, $lowest->currency, $headline->packLine($lowest)?->size), 'host' => $lowest->host]) }}@if ($lowestDeal) · <span class="text-zinc-600 dark:text-zinc-300">{{ $lowestDeal }}</span>@endif
+                {{ __('Lowest price :line at :host', ['line' => \App\Support\PackLine::format($lowest->current_price === null ? null : (string) $lowest->current_price, $lowest->currency, $headline->packLine($lowest)?->size), 'host' => $lowest->displayName()]) }}@if ($lowestDeal) · <span class="text-zinc-600 dark:text-zinc-300">{{ $lowestDeal }}</span>@endif
             </flux:text>
         @endif
 

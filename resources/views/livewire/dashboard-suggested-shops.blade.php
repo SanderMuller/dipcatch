@@ -37,7 +37,7 @@
                                 <a href="{{ route('app.products.show', $product) }}" wire:navigate class="line-clamp-2 font-medium underline-offset-4 hover:underline">{{ $product->title }}</a>
                                 @if ($cheapest?->current_price !== null)
                                     <p class="truncate text-sm text-zinc-500 tabular-nums dark:text-zinc-400">
-                                        {{ __('Now :price at :shop', ['price' => \App\Support\MoneyFormatter::format($cheapest->current_price, $cheapest->currency ?? $product->currency), 'shop' => $cheapest->host]) }}
+                                        {{ __('Now :price at :shop', ['price' => \App\Support\MoneyFormatter::format($cheapest->current_price, $cheapest->currency ?? $product->currency), 'shop' => $cheapest->displayName()]) }}
                                     </p>
                                 @endif
                             </div>
@@ -147,7 +147,7 @@
                                                         <p class="text-sm font-medium"><x-title-diff :title="$product->title" :other="$row['name']" /></p>
                                                         @foreach ($product->shops as $trackedShop)
                                                             @php($trackedPack = $trackedShop->packSize())
-                                                            <p class="truncate text-sm text-zinc-500 dark:text-zinc-400">{{ $trackedPack === null ? $trackedShop->host : $trackedShop->host . ' · ' . \App\Support\UnitWord::pack($trackedPack) }}</p>
+                                                            <p class="truncate text-sm text-zinc-500 dark:text-zinc-400">{{ $trackedPack === null ? $trackedShop->displayName() : $trackedShop->displayName() . ' · ' . \App\Support\UnitWord::pack($trackedPack) }}</p>
                                                         @endforeach
                                                     </div>
                                                 </div>

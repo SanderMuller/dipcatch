@@ -22,7 +22,7 @@ final readonly class UnitTargetGuide
      * `perPack` is how many comparison units one pack holds: 1.5 for a 1.5 L
      * bottle compared per litre, 8 for a box of 8 compared per piece.
      *
-     * @return list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>
+     * @return list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>
      */
     public function packs(): array
     {
@@ -49,7 +49,7 @@ final readonly class UnitTargetGuide
      * so the easier of the two carries over. Null when there is nothing to
      * restate, or the saving leaves less than the smallest target.
      *
-     * @param  list<array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>|null  $packs  from packs(), when the caller has them
+     * @param  list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>|null  $packs  from packs(), when the caller has them
      * @return array{unit: string, drops: list<string>, percentUnder: int, packPrice: string, pack: string}|null
      */
     public function switchFromDrop(?string $percent, ?string $amount, ?array $packs = null): ?array
@@ -151,7 +151,7 @@ final readonly class UnitTargetGuide
      * One pack as the unit-target component reads it — also for a shop that
      * is not saved yet, on the create form.
      *
-     * @return array{shopId: string, host: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}
+     * @return array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}
      */
     public static function packChoice(string $shopId, string $host, PackSize $size, mixed $price): array
     {
@@ -160,6 +160,7 @@ final readonly class UnitTargetGuide
         return [
             'shopId' => $shopId,
             'host' => $host,
+            'shop' => ShopNames::label($host),
             'pack' => UnitWord::pack($size),
             'perPack' => $size->unit === 'piece' ? $size->quantity : $size->quantity / 1000,
             'price' => $price === null ? null : (float) $price,

@@ -197,7 +197,20 @@ it('lists a matching shop once, by host or by name, leading to the products at t
     $palette->assertSeeHtml('href="' . route('app.products.index', ['shop' => 'supspace.nl']) . '"')
         ->set('search', 'albert')
         ->assertSeeHtml('href="' . route('app.products.index', ['shop' => 'ah.nl']) . '"')
-        ->assertSeeText('Albert Heijn · Your products at this shop');
+        ->assertSeeText('Albert Heijn')
+        ->assertSeeText('ah.nl · Your products at this shop');
+});
+
+it('finds a shop on a subdomain by its name, and names it', function (): void {
+    config()->set('site.shop_names', ['ah.nl' => 'Albert Heijn']);
+    $user = User::factory()->create();
+    Shop::factory()->for(Product::factory()->for($user)->create())->create(['url' => 'https://offers.ah.nl/p/1']);
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)->set('search', 'albert')
+        ->assertSeeHtml('href="' . route('app.products.index', ['shop' => 'offers.ah.nl']) . '"')
+        ->assertSeeText('Albert Heijn')
+        ->assertSeeText('offers.ah.nl · Your products at this shop');
 });
 
 it('lists no shop the account follows nothing at, and no switched-off shop', function (): void {

@@ -9,7 +9,7 @@
     $perUnit = $headline->isPerUnit() && $headlineShop !== null && $headlineShop->is($headline->shop);
     $priceLine = match (true) {
         $headlineShop?->current_price === null => null,
-        $perUnit => $headline->text() . ' at ' . $headlineShop->host . ' (' . $headline->packLine()?->text() . ')',
+        $perUnit => $headline->text() . ' at ' . $headlineShop->displayName() . ' (' . $headline->packLine()?->text() . ')',
         default => MoneyFormatter::format((string) $headlineShop->current_price, $product->currency),
     };
     $headlineBundleLabel = \App\Support\BundlePriceLabel::forShop($headlineShop);
@@ -114,11 +114,11 @@
                             </p>
                             <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                                 {{-- Plain text: this page loads no Flux script to open a tooltip. --}}
-                                Best value: {{ $headline->packLine()?->text() }} at {{ $headlineShop->host }}
+                                Best value: {{ $headline->packLine()?->text() }} at {{ $headlineShop->displayName() }}
                             </p>
                             @if ($headline->lowestShop && $shops->contains($headline->lowestShop))
                                 <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400" data-test="lowest-price-note">
-                                    Lowest price: {{ $headline->packLine($headline->lowestShop)?->text() }} at {{ $headline->lowestShop->host }}.@if ($gap = $headline->lowestCostsMorePercent()) That is {{ $gap }}% more {{ \App\Support\UnitWord::forCode($headline->unit) }}.@endif
+                                    Lowest price: {{ $headline->packLine($headline->lowestShop)?->text() }} at {{ $headline->lowestShop->displayName() }}.@if ($gap = $headline->lowestCostsMorePercent()) That is {{ $gap }}% more {{ \App\Support\UnitWord::forCode($headline->unit) }}.@endif
                                 </p>
                             @endif
                             <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
@@ -220,9 +220,9 @@
                                         class="flex flex-col items-start gap-2 px-4 py-3 hover:bg-canvas sm:flex-row sm:items-center sm:justify-between sm:gap-4"
                                     >
                                         <div class="min-w-0 flex-1">
-                                            <p class="flex items-center gap-1.5 truncate text-sm font-medium">
+                                            <p class="flex items-center gap-1.5 truncate text-sm font-medium" title="{{ $shop->host }}">
                                                 <img src="{{ Favicon::url($shop->host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
-                                                {{ $shop->host }}
+                                                {{ $shop->displayName() }}
                                                 @if ($shop->id === $lowestShopId && $shops->count() > 1)
                                                     <span class="ml-1.5 inline-flex items-center rounded-full bg-savings/10 px-2 py-0.5 text-xs font-medium text-savings-strong">Lowest price</span>
                                                 @endif

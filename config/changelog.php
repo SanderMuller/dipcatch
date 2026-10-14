@@ -29,11 +29,17 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-14',
+            'category' => 'feature',
+            'title' => 'Shops go by their names',
+            'body' => "Your products now show each shop by the name you know, like Jumbo or Albert Heijn, instead of its web address. Hover over a shop to see the address.\n\nA shop DipCatch doesn't know a name for keeps its address.",
+        ],
+        [
             'date' => '2026-10-13',
             'category' => 'feature',
             'title' => 'See if today\'s price is a good one',
             'body' => "Each shop on a product page now shows whether today's price is good, normal or high for that shop, based on its last 90 days. Hover the label for the usual price range. When a shop hits its lowest price in 90 days, the page and your alerts say so.\n\nA shop gets a label once it has about a month of prices.",
-            'image' => ['src' => 'changelog/price-verdict.png', 'alt' => 'The shop comparison on a product page: ah.nl marked Good price and Lowest in 90 days, jumbo.com Normal price, plus.nl High price, and dirk.nl with no label yet.'],
+            'image' => ['src' => 'changelog/price-verdict.png', 'alt' => 'The shop comparison on a product page: Albert Heijn marked Good price and Lowest in 90 days, Jumbo Normal price, plus.nl High price, and Dirk with no label yet.'],
             'link' => ['route' => 'app.products.index', 'label' => 'Open your products'],
         ],
         [

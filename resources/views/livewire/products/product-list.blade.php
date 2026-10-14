@@ -98,7 +98,7 @@
                 <flux:select class="max-w-56 lg:hidden" wire:model.live="shop" :label:sr="__('Shop')" data-test="product-shop-filter">
                     <flux:select.option value="">{{ __('All shops') }}</flux:select.option>
                     @foreach ($shopHosts as $host)
-                        <flux:select.option value="{{ $host }}">{{ $host }}</flux:select.option>
+                        <flux:select.option value="{{ $host }}">{{ \App\Support\ShopNames::label($host) }}</flux:select.option>
                     @endforeach
                 </flux:select>
             @endif
@@ -164,7 +164,7 @@
                             <flux:navlist.item wire:click="$set('shop', {{ \Illuminate\Support\Js::from($host) }})" :current="$shop === $host" :aria-current="$shop === $host ? 'true' : 'false'" wire:key="shop-{{ $host }}">
                                 <span class="flex min-w-0 items-center gap-2.5" title="{{ $host }}">
                                     <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 shrink-0 rounded-sm" />
-                                    <span class="truncate">{{ $host }}</span>
+                                    <span class="truncate">{{ \App\Support\ShopNames::label($host) }}</span>
                                 </span>
                             </flux:navlist.item>
                         @endforeach

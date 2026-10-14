@@ -15,7 +15,7 @@
                         {{-- Through Alpine: @js escapes quotes, which a URL
                              written straight into wire:click would not survive. --}}
                         x-on:click="$wire.useShopImage(@js($url))"
-                        aria-label="{{ __('Use the photo from :host', ['host' => $host]) }}"
+                        aria-label="{{ __('Use the photo from :host', ['host' => \App\Support\ShopNames::label($host)]) }}"
                         x-data="{ get selected() { return $wire.imageUrl === @js($url) } }"
                         x-bind:aria-pressed="selected ? 'true' : 'false'"
                         x-bind:data-selected="selected"
@@ -25,7 +25,7 @@
                             <flux:icon.check variant="micro" class="size-3.5" />
                         </span>
                         <img src="{{ $url }}" alt="" loading="lazy" class="size-16 rounded-lg bg-white object-contain" />
-                        <span class="w-full truncate text-center text-xs text-zinc-500 dark:text-zinc-400">{{ $host }}</span>
+                        <span class="w-full truncate text-center text-xs text-zinc-500 dark:text-zinc-400" title="{{ $host }}">{{ \App\Support\ShopNames::label($host) }}</span>
                     </button>
                 </li>
             @endforeach

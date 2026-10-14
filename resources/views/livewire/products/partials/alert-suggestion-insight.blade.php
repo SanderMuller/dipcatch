@@ -21,7 +21,7 @@
         <flux:icon.light-bulb :variant="($compact ?? false) ? 'micro' : 'mini'" @class(['shrink-0 text-chart-line dark:text-chart', 'mt-0.5' => $compact ?? false, 'mt-1 sm:mt-0.5' => ! ($compact ?? false)]) />
         <span>
             @if ($suggestion->promotionNowHost !== null)
-                {{ __(':shop has this :depth% off now.', ['shop' => $suggestion->promotionNowHost, 'depth' => $suggestion->promotionNowDepth]) }}
+                {{ __(':shop has this :depth% off now.', ['shop' => \App\Support\ShopNames::label($suggestion->promotionNowHost), 'depth' => $suggestion->promotionNowDepth]) }}
             @endif
             {{ $insight }}
         </span>

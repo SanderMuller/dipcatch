@@ -61,6 +61,6 @@ final readonly class AlsoWorthChecking
         }
 
         return 'Also worth checking by hand: '
-            . implode(', ', array_map(static fn (array $shop): string => $shop['host'], $shops));
+            . implode(', ', array_map(static fn (array $shop): string => ShopNames::label($shop['host']), $shops));
     }
 }

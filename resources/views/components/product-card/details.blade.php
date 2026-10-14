@@ -41,7 +41,7 @@
         <div class="min-w-0">
             <p class="line-clamp-2 text-sm font-medium text-balance text-zinc-950 dark:text-white">{{ $product->title }}</p>
             <p class="text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
-                {{ $headline->text() }}@if ($headline->shop) · {{ $headline->shop->host }}@endif
+                {{ $headline->text() }}@if ($headline->shop) · {{ $headline->shop->displayName() }}@endif
             </p>
         </div>
     </div>
@@ -81,7 +81,7 @@
                     <flux:icon.tag variant="micro" class="size-3.5 shrink-0" />{{ __('Deal') }}
                 </span>
                 <p class="min-w-0 text-pretty">
-                    <span class="font-medium text-zinc-950 dark:text-white">{{ $dealShop->host }}</span>
+                    <span class="font-medium text-zinc-950 dark:text-white">{{ $dealShop->displayName() }}</span>
                     <span class="text-zinc-500 dark:text-zinc-400">· {{ $dealText }}</span>
                 </p>
             </div>
@@ -103,7 +103,7 @@
                         <flux:icon.calendar-days variant="micro" class="size-3.5 shrink-0" />{{ __('Soon') }}
                     </span>
                     <p class="min-w-0 text-pretty">
-                        <span class="font-medium text-zinc-950 dark:text-white">{{ $dealShop->host }}</span>
+                        <span class="font-medium text-zinc-950 dark:text-white">{{ $dealShop->displayName() }}</span>
                         <span class="text-zinc-500 dark:text-zinc-400">· {{ $dealText }}</span>
                     </p>
                 </div>
@@ -124,7 +124,7 @@
                             <img src="{{ \App\Support\Favicon::url($shop->host) }}" alt="" loading="lazy" class="mt-0.5 size-4 shrink-0 rounded-sm" />
                             <div class="min-w-0">
                                 <p class="flex items-center gap-1.5">
-                                    <span @class(['truncate', 'font-medium text-zinc-950 dark:text-white' => $isHeadline])>{{ $shop->host }}</span>
+                                    <span title="{{ $shop->host }}" @class(['truncate', 'font-medium text-zinc-950 dark:text-white' => $isHeadline])>{{ $shop->displayName() }}</span>
                                     @if ($isHeadline && $headline->isPerUnit())
                                         <span class="shrink-0 rounded-sm bg-emerald-50 px-1 text-[0.6875rem] font-medium text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">{{ __('Best value') }}</span>
                                     @endif

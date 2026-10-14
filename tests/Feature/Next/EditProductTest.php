@@ -639,10 +639,10 @@ it('shows what the product costs now beside each target field', function (): voi
     livewire(EditProduct::class, ['product' => $product->refresh()])
         // The target price is an outlay figure, so it is anchored to the
         // smallest outlay.
-        ->assertSee('Now €2.19 at ah.nl')
+        ->assertSee('Now €2.19 at Albert Heijn')
         // The per-unit target is anchored to the best value, which here is the
         // other shop.
-        ->assertSee('Now €8.17 /kg at dirk.nl');
+        ->assertSee('Now €8.17 /kg at Dirk');
 });
 
 it('leaves the now-line out when no shop has a usable price', function (): void {
@@ -711,7 +711,7 @@ it('anchors to the shop that is cheapest now, not the one a recompute last named
 
     // Deliberately not recomputed.
     livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertSee('Now €4.00 at dirk.nl');
+        ->assertSee('Now €4.00 at Dirk');
 });
 
 it('shows a free account the current figure, with no upgrade line', function (): void {
@@ -729,7 +729,7 @@ it('shows a free account the current figure, with no upgrade line', function ():
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertSee('Now €4.00 /kg at ah.nl')
+        ->assertSee('Now €4.00 /kg at Albert Heijn')
         ->assertDontSee('Pro alerts on this');
 });
 

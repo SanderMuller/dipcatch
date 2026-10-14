@@ -111,7 +111,7 @@
                                 {{ __('Lowest price: :line at', ['line' => $headline->packLine($headline->lowestShop)?->text()]) }}
                                 {{-- Written inline rather than as x-shop-link, whose trailing
                                      newline would put a space before the period. --}}
-                                <a href="{{ \App\Support\AffiliateLink::for($headline->lowestShop->url) }}" target="_blank" rel="{{ \App\Support\AffiliateLink::rel($headline->lowestShop->url) }}" class="inline-flex items-center align-bottom hover:underline underline-offset-4">{!! \App\Support\Favicon::html($headline->lowestShop->host) !!}</a>.
+                                <a href="{{ \App\Support\AffiliateLink::for($headline->lowestShop->url) }}" target="_blank" rel="{{ \App\Support\AffiliateLink::rel($headline->lowestShop->url) }}" class="inline-flex items-center align-bottom hover:underline underline-offset-4">{!! \App\Support\Favicon::html($headline->lowestShop->host, $headline->lowestShop->displayName()) !!}</a>.
                                 @if ($unitGap !== null)
                                     {{ __('That is :percent% more :unit than the best value.', [
                                         'percent' => $unitGap,
@@ -275,8 +275,8 @@
                                          pack price beneath it is what the shop charges. --}}
                                     @if ($packs->hasComparisonUnit() && ! $shop->isReference())
                                         @php($packPriceHint = $packLine->size === null || $packLine->estimated
-                                            ? __('Pack price: what :shop charges for one pack.', ['shop' => $shop->host])
-                                            : __('Pack price: what :shop charges for :size.', ['shop' => $shop->host, 'size' => \App\Support\UnitWord::pack($packLine->size)]))
+                                            ? __('Pack price: what :shop charges for one pack.', ['shop' => $shop->displayName()])
+                                            : __('Pack price: what :shop charges for :size.', ['shop' => $shop->displayName(), 'size' => \App\Support\UnitWord::pack($packLine->size)]))
                                         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-base font-medium text-zinc-900 sm:text-sm dark:text-zinc-100">
                                             <x-shop-unit-price :shop="$shop" :packs="$packs" :hint="__('Price :unit: the pack price divided by the pack size, so packs of different sizes compare fairly.', ['unit' => \App\Support\UnitWord::forCode($packs->unit())])" />
                                             {{-- The per-unit winner, marked in the row whichever price the
@@ -399,7 +399,7 @@
                         <flux:card class="mt-6">
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div>
-                                    <flux:heading size="lg">{{ $editing->host }}</flux:heading>
+                                    <flux:heading size="lg">{{ $editing->displayName() }}</flux:heading>
                                     <flux:text class="mt-1 text-zinc-500">
                                         {{ __('Fix the link when the shop moves the product, and keep your own notes about buying there.') }}
                                     </flux:text>

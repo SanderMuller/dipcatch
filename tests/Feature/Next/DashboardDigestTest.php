@@ -244,8 +244,8 @@ it('lists what is worth a look, with a way to add a shop to a product at one sho
 
     livewire(Dashboard::class)
         ->assertSeeHtml('data-test="worth-a-look"')
-        ->assertSeeText('Deal at ah.nl ends')
-        ->assertSeeText('DipCatch cannot read jumbo.com right now.')
+        ->assertSeeText('Deal at Albert Heijn ends')
+        ->assertSeeText('DipCatch cannot read Jumbo right now.')
         ->assertSeeText('Tracked at one shop only.')
         ->assertSeeHtml(e(route('app.products.show', [$single, 'add-shop' => 1])));
 });
@@ -263,7 +263,8 @@ it('counts a best buy at its alert price apart from the other offers', function 
     livewire(Dashboard::class)
         ->assertSeeHtml('data-test="trip-at-alert"')
         ->assertSeeText('2 at alert price')
-        ->assertSeeText('1 on offer');
+        ->assertSeeText('1 on offer')
+        ->assertSeeText('Everything at Albert Heijn');
 });
 
 it('leaves out a product at the price it usually has there, so a trip can fall below two', function (): void {

@@ -308,7 +308,7 @@ test('the alert leads with the pack price that fired and names a better buy per 
         $payload = $notification->toDatabase($user);
 
         return $notification->toWebPush($user)->toArray()['body']
-                === 'Crisps is €1.69 for 200 g at ah.nl · your target €1.75 · €8.45 /kg · better value €5.38 /kg at lidl.nl'
+                === 'Crisps is €1.69 for 200 g at Albert Heijn · your target €1.75 · €8.45 /kg · better value €5.38 /kg at Lidl'
             && $payload['unit_price'] === '8.4500'
             && $payload['unit'] === 'g'
             && $payload['better_value_host'] === 'lidl.nl';
@@ -389,6 +389,6 @@ test('the better-buy note keeps its unit when the shop that fired has no size of
 
     $body = new TargetPriceNotification($product->refresh(), $silent, '1.49')->toWebPush($user)->toArray()['body'];
 
-    expect($body)->toContain('better value €5.38 /kg at lidl.nl')
+    expect($body)->toContain('better value €5.38 /kg at Lidl')
         ->not->toContain('· €7.45');
 });

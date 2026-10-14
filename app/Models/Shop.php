@@ -17,6 +17,7 @@ use App\Support\ImageUrl;
 use App\Support\NotAShop;
 use App\Support\PackSize;
 use App\Support\PriceVerdicts;
+use App\Support\ShopNames;
 use App\Support\UrlNormalizer;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -529,6 +530,12 @@ final class Shop extends Model
     public function faviconUrl(): string
     {
         return Favicon::url($this->host);
+    }
+
+    /** What the app calls this shop: its name, or its host when DipCatch knows none. */
+    public function displayName(): string
+    {
+        return ShopNames::label((string) $this->host);
     }
 
     /** The size this shop's own page states, before any comparison with its siblings. */

@@ -113,7 +113,7 @@ it('stores the pack the drop was measured on and leads the alert with the unit p
 
         return $payload['pack_quantity'] === '227'
             && $payload['pack_unit'] === 'g'
-            && is_string($body) && str_contains($body, 'is now €12.11 /kg (€2.75 for 227 g) at dirk.nl');
+            && is_string($body) && str_contains($body, 'is now €12.11 /kg (€2.75 for 227 g) at Dirk');
     });
 });
 

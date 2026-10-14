@@ -149,6 +149,7 @@
                 <ul class="mt-3 divide-y divide-zinc-100 dark:divide-white/5" data-test="web-suggestions">
                     @foreach ($webSuggestions as $finding)
                         @php($webHost = $finding->addHost())
+                        @php($webName = \App\Support\ShopNames::label($webHost))
                         @php($webSize = $finding->page_pack_quantity !== null && $finding->page_pack_unit !== null ? \App\Support\PackSize::of((float) $finding->page_pack_quantity, $finding->page_pack_unit) : null)
                         @php($webCurrency = $finding->page_currency ?? $product->currency)
                         @php($webUnitPrice = $finding->page_price !== null ? $webSize?->unitPriceFor($finding->page_price) : null)
@@ -157,7 +158,7 @@
 
                             <div class="min-w-0 flex-1">
                                 <flux:text class="truncate font-medium">
-                                    {{ $webHost }}
+                                    <span title="{{ $webHost }}">{{ $webName }}</span>
                                     <span class="font-normal text-zinc-500 dark:text-zinc-400">— {{ $finding->page_title ?? $finding->search_title }}</span>
                                 </flux:text>
                                 <flux:text size="sm" class="text-zinc-500 tabular-nums dark:text-zinc-400" data-test="web-suggestion-price">
@@ -185,7 +186,7 @@
 
                             <div class="flex w-full shrink-0 items-center gap-2 pl-8 sm:w-auto sm:pl-0">
                                 <flux:button size="xs" :href="\App\Support\AffiliateLink::for($finding->add_url ?? $finding->url)" target="_blank" :rel="\App\Support\AffiliateLink::rel($finding->add_url ?? $finding->url)">
-                                    Open<span class="sr-only"> {{ $webHost }} {{ __('(opens in a new tab)') }}</span>
+                                    Open<span class="sr-only"> {{ $webName }} {{ __('(opens in a new tab)') }}</span>
                                 </flux:button>
 
                                 <flux:button
@@ -200,19 +201,19 @@
                                 >
                                     <span class="in-data-adding:hidden">Add</span>
                                     <span class="hidden items-center gap-1 in-data-adding:inline-flex"><flux:icon.loading class="size-3" /> Adding…</span>
-                                    <span class="sr-only"> {{ $webHost }}</span>
+                                    <span class="sr-only"> {{ $webName }}</span>
                                 </flux:button>
 
                                 <flux:dropdown position="bottom" align="end">
                                     <flux:button size="xs" variant="ghost" icon:trailing="chevron-down" data-test="web-suggestion-hide-menu">
-                                        {{ __('Hide') }}<span class="sr-only"> {{ $webHost }}</span>
+                                        {{ __('Hide') }}<span class="sr-only"> {{ $webName }}</span>
                                     </flux:button>
                                     <flux:menu>
                                         <flux:menu.item icon="x-mark" wire:click="dismissWeb({{ $finding->id }})" data-test="web-suggestion-hide">
                                             {{ __('Hide for this product') }}
                                         </flux:menu.item>
-                                        <flux:menu.item icon="eye-slash" x-on:click="hideHost = {{ \Illuminate\Support\Js::from($webHost) }}; hideLabel = {{ \Illuminate\Support\Js::from($webHost) }}; $flux.modal({{ \Illuminate\Support\Js::from('hide-shop-' . $this->getId()) }}).show()" data-test="web-suggestion-hide-shop">
-                                            {{ __('Don’t suggest :shop', ['shop' => $webHost]) }}
+                                        <flux:menu.item icon="eye-slash" x-on:click="hideHost = {{ \Illuminate\Support\Js::from($webHost) }}; hideLabel = {{ \Illuminate\Support\Js::from($webName) }}; $flux.modal({{ \Illuminate\Support\Js::from('hide-shop-' . $this->getId()) }}).show()" data-test="web-suggestion-hide-shop">
+                                            {{ __('Don’t suggest :shop', ['shop' => $webName]) }}
                                         </flux:menu.item>
                                     </flux:menu>
                                 </flux:dropdown>

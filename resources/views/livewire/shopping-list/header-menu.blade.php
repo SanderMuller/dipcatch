@@ -47,7 +47,7 @@
                                 @if ($item['shop'] === null)
                                     {{ __('No shop sells this now') }}
                                 @else
-                                    {{ $item['headline']->text() }} · {{ $item['shop']->host }}
+                                    {{ $item['headline']->text() }} · {{ $item['shop']->displayName() }}
                                 @endif
                             </flux:text>
                         </div>

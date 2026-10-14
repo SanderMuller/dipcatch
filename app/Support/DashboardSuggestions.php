@@ -323,7 +323,7 @@ final readonly class DashboardSuggestions
 
         return [
             'product' => $product,
-            'shop' => $host,
+            'shop' => ShopNames::label($host),
             'host' => $host,
             'url' => $finding->add_url ?? $finding->url,
             'name' => $finding->page_title ?? $finding->search_title,

@@ -28,8 +28,8 @@ it('serves the product page as markdown to its owner', function (): void {
     // Raw text, not HTML: the ampersand arrives as it was typed.
     expect($response->getContent())
         ->toStartWith("# Beans & more\n")
-        ->toContain("## Best price now\n\n€12.49 at [jumbo.com](<https://jumbo.com/p/1>)")
-        ->toContain('| [jumbo.com](<https://jumbo.com/p/1>) | €12.49 |')
+        ->toContain("## Best price now\n\n€12.49 at [Jumbo](<https://jumbo.com/p/1>)")
+        ->toContain('| [Jumbo](<https://jumbo.com/p/1>) | €12.49 |')
         ->toContain('| In stock |');
 });
 
@@ -44,10 +44,10 @@ it('names the best value apart from the lowest price, with the warning the page 
 
     expect($markdown)
         ->not->toContain('## Best price now')
-        ->toContain("## Best value\n\n€3.00 /kg at [ah.nl](<https://ah.nl/p/2>)\n\n€3.00 for 1 kg")
-        ->toContain('> Lowest price: €2.00 for 500 g at jumbo.com. That is 33% more per kilo than the best value.')
+        ->toContain("## Best value\n\n€3.00 /kg at [Albert Heijn](<https://ah.nl/p/2>)\n\n€3.00 for 1 kg")
+        ->toContain('> Lowest price: €2.00 for 500 g at Jumbo. That is 33% more per kilo than the best value.')
         ->toContain('| Shop | Price per kilo | Pack price | In stock | Price read |')
-        ->toContain('| [jumbo.com](<https://jumbo.com/p/1>) | €4.00 /kg | €2.00 for 500 g |');
+        ->toContain('| [Jumbo](<https://jumbo.com/p/1>) | €4.00 /kg | €2.00 for 500 g |');
 });
 
 it('lists the alert rules and marks a shop kept as a link', function (): void {
@@ -93,7 +93,7 @@ it('keeps a pipe in a shop URL from breaking the table row', function (): void {
     Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1?variant=a|b', 'current_price' => '1.00']);
 
     $markdown = $this->actingAs($user)->get(route('app.products.markdown', $product))->getContent();
-    $row = collect(explode("\n", (string) $markdown))->first(fn (string $line): bool => str_starts_with($line, '| [jumbo.com]'));
+    $row = collect(explode("\n", (string) $markdown))->first(fn (string $line): bool => str_starts_with($line, '| [Jumbo]'));
 
     expect($row)->toContain('variant=a\|b')
         // Six unescaped pipes: five cells.
@@ -188,5 +188,5 @@ it('states the pack and its price per unit under a pack-price headline', functio
     $product->recomputeCheapestShop();
 
     expect($this->actingAs($user)->get(route('app.products.markdown', $product))->getContent())
-        ->toContain("## Best price now\n\n€3.99 at [ah.nl](<https://ah.nl/p/1>)\n\n400 g · €9.98 /kg");
+        ->toContain("## Best price now\n\n€3.99 at [Albert Heijn](<https://ah.nl/p/1>)\n\n400 g · €9.98 /kg");
 });

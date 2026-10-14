@@ -56,7 +56,7 @@
                         @else
                             <flux:icon.x-mark variant="micro" class="size-4" />
                         @endif
-                        <span class="inline-flex items-center">{!! \App\Support\Favicon::html($shop['host']) !!}</span>
+                        <span class="inline-flex items-center">{!! \App\Support\Favicon::html($shop['host'], \App\Support\ShopNames::label($shop['host'])) !!}</span>
                         @if ($going && $toBuy > 0)
                             <span class="text-xs text-zinc-500 tabular-nums dark:text-zinc-400" title="{{ trans_choice(':count to buy here|:count to buy here', $toBuy, ['count' => $toBuy]) }}">{{ $toBuy }}</span>
                         @endif
@@ -104,7 +104,7 @@
                                 <flux:icon.exclamation-circle variant="micro" class="size-4 text-zinc-400" />
                                 <span>{{ __('No shop sells this now') }}</span>
                             @else
-                                {!! \App\Support\Favicon::html($group['host']) !!}
+                                {!! \App\Support\Favicon::html($group['host'], \App\Support\ShopNames::label($group['host'])) !!}
                             @endif
                         </h2>
                         <span class="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 tabular-nums dark:bg-white/10 dark:text-zinc-300 print:bg-transparent print:p-0 print:text-[9pt] print:text-zinc-600">
@@ -149,13 +149,13 @@
                                     >{{ $product->title }}</a>
                                     @if ($item['skippedBest'] !== null && ! $item['crossedOff'])
                                         <p class="mt-1 flex flex-wrap items-center gap-2 text-xs text-amber-900 dark:text-amber-200 print:text-[9pt]">
-                                            <span>{{ __('Sold at :host', ['host' => $item['skippedBest']->host]) }}</span>
+                                            <span>{{ __('Sold at :host', ['host' => $item['skippedBest']->displayName()]) }}</span>
                                             <button
                                                 type="button"
                                                 wire:click="toggleShop(@js($item['skippedBest']->host))"
                                                 class="rounded-full bg-white px-2 py-0.5 font-medium text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 dark:bg-amber-950 dark:text-amber-100 dark:ring-amber-500/40 print:hidden"
                                                 data-test="shopping-list-unskip"
-                                            >{{ __('Go to :host too', ['host' => $item['skippedBest']->host]) }}</button>
+                                            >{{ __('Go to :host too', ['host' => $item['skippedBest']->displayName()]) }}</button>
                                         </p>
                                     @endif
                                     @if (! $item['crossedOff'] && ($packLine !== null || $unitLine !== null || $deal !== null))

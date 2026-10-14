@@ -140,9 +140,7 @@ final class AppCommandPalette extends Component
             ->values()
             ->all();
 
-        $names = ShopNames::all();
-
-        return array_map(fn (string $host): array => ['host' => $host, 'name' => $names[$host] ?? null], $hosts);
+        return array_map(fn (string $host): array => ['host' => $host, 'name' => ShopNames::of($host)], $hosts);
     }
 
     /**
@@ -198,9 +196,14 @@ final class AppCommandPalette extends Component
     {
         $namedHosts = ShopNames::hostsMatching($term);
 
-        return $shop->where(fn (EloquentQueryBuilder $match): EloquentQueryBuilder => $match
-            ->whereRaw("LOWER(host) LIKE ? ESCAPE '\\'", [self::like($term)])
-            ->when($namedHosts !== [], fn (EloquentQueryBuilder $named): EloquentQueryBuilder => $named->orWhereIn('host', $namedHosts)));
+        return $shop->where(function (EloquentQueryBuilder $match) use ($term, $namedHosts): void {
+            $match->whereRaw("LOWER(host) LIKE ? ESCAPE '\\'", [self::like($term)]);
+
+            // A subdomain carries its shop's name too.
+            foreach ($namedHosts as $host) {
+                $match->orWhere('host', $host)->orWhereRaw("LOWER(host) LIKE ? ESCAPE '\\'", ['%.' . addcslashes($host, '%_\\')]);
+            }
+        });
     }
 
     /**

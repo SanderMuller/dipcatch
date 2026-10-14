@@ -134,7 +134,7 @@
                         class="mt-6 max-w-2xl"
                         model="unitPriceTarget"
                         :description="$currentUnitPrice
-                            ? __('Now :amount at :host.', ['amount' => $currentUnitPrice['amount'], 'host' => $currentUnitPrice['host']])
+                            ? __('Now :amount at :host.', ['amount' => $currentUnitPrice['amount'], 'host' => \App\Support\ShopNames::label($currentUnitPrice['host'])])
                             : ''"
                         :packs="$packChoices"
                         :history="$unitHistory"
@@ -221,7 +221,7 @@
                 </div>
                 <p class="mt-3 max-w-[65ch] text-base/7 text-pretty text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
                     {{ $currentPrice
-                        ? __('We tell you when any shop reaches this price. Now :amount at :host.', ['amount' => $currentPrice['amount'], 'host' => $currentPrice['host']])
+                        ? __('We tell you when any shop reaches this price. Now :amount at :host.', ['amount' => $currentPrice['amount'], 'host' => \App\Support\ShopNames::label($currentPrice['host'])])
                         : __('We tell you when any shop reaches this price.') }}
                     {{ __('Leave a target empty to switch it off. Leave a drop empty to use the default for the price, or, with a target set, to get no drop alert.') }}
                 </p>
