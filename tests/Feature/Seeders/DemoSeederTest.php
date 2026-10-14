@@ -13,6 +13,8 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
+use App\Support\PriceVerdicts;
+use App\Support\ShopPriceVerdict;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\DB;
@@ -187,6 +189,15 @@ it('seeds consistent demo data, once', function (): void {
 
     expect($generated)->not->toBeNull()
         ->and($generated?->image_url)->toContain(rawurlencode((string) $generated?->title));
+
+    // Every price label shows on each demo account's product list.
+    foreach (['demo@dipcatch.test', 'pro@dipcatch.test', 'free@dipcatch.test'] as $email) {
+        $products = User::query()->where('email', $email)->sole()->products()->with('shops')->get();
+        $verdicts = collect(PriceVerdicts::forProducts($products));
+
+        expect($verdicts->map(fn (ShopPriceVerdict $verdict): string => $verdict->verdict->name)->unique()->sort()->values()->all())->toBe(['Good', 'High', 'Normal'], $email)
+            ->and($verdicts->contains(fn (ShopPriceVerdict $verdict): bool => $verdict->lowestIn90Days))->toBeTrue($email);
+    }
 
     $before = User::query()->count();
 

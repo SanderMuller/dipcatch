@@ -24,6 +24,7 @@ use Database\Seeders\Demo\DemoBestValue;
 use Database\Seeders\Demo\DemoOffer;
 use Database\Seeders\Demo\DemoProduct;
 use Database\Seeders\Demo\GeneratedCatalog;
+use Database\Seeders\Demo\PriceTrend;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -507,14 +508,14 @@ final class DemoSeeder extends Seeder
      */
     private function seedCatalog(User $user, array $catalog): void
     {
-        foreach ($catalog as $spec) {
-            $this->seedProduct($user, $spec);
+        foreach ($catalog as $index => $spec) {
+            $this->seedProduct($user, $spec, PriceTrend::of($spec, $index));
         }
     }
 
-    private function seedProduct(User $user, DemoProduct $spec): void
+    private function seedProduct(User $user, DemoProduct $spec, PriceTrend $trend): void
     {
-        $historyDays = $spec->historyDays ?? self::HISTORY_DAYS;
+        $historyDays = $trend->historyDays($spec->historyDays ?? self::HISTORY_DAYS);
         $ageDays = max($spec->ageDays ?? $historyDays + 5, $historyDays + 5);
 
         $product = Product::factory()->create([
@@ -541,7 +542,7 @@ final class DemoSeeder extends Seeder
         $offers = [];
 
         foreach ($spec->offers as $offer) {
-            $offers[] = $this->seedShop($product, $offer, $historyDays, $ageDays);
+            $offers[] = $this->seedShop($product, $offer, $historyDays, $ageDays, $trend);
         }
 
         $this->seedCheapestHistory($product, $offers, $historyDays);
@@ -556,9 +557,9 @@ final class DemoSeeder extends Seeder
     /**
      * @return array{shop: Shop, prices: array<int, float>}
      */
-    private function seedShop(Product $product, DemoOffer $offer, int $historyDays, int $ageDays): array
+    private function seedShop(Product $product, DemoOffer $offer, int $historyDays, int $ageDays, PriceTrend $trend): array
     {
-        $prices = $this->priceWalk($offer->price, $historyDays);
+        $prices = $trend->walk($offer->price, $historyDays);
 
         $createdAt = now()->subDays($ageDays - 1);
 
@@ -631,28 +632,6 @@ final class DemoSeeder extends Seeder
         $this->seedPriceChecks($shop, $prices, $offer->state, $shop->current_in_stock, $historyDays);
 
         return ['shop' => $shop, 'prices' => $prices];
-    }
-
-    /**
-     * A price path ending on the offer's current price: it starts higher, so
-     * the chart has a shape and the 30-day median sits above today.
-     *
-     * @return array<int, float> index 0 = oldest day, last = today
-     */
-    private function priceWalk(float $current, int $historyDays): array
-    {
-        $prices = [];
-
-        for ($day = 0; $day < $historyDays; $day++) {
-            $progress = $day / ($historyDays - 1);
-            $drift = 1.0 + 0.14 * (1 - $progress);
-            $noise = 1.0 + fake()->randomFloat(4, -0.02, 0.02);
-            $prices[] = round($current * $drift * $noise, 2);
-        }
-
-        $prices[$historyDays - 1] = $current;
-
-        return $prices;
     }
 
     /**
