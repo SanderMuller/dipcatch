@@ -76,7 +76,7 @@
                                     @foreach ($group['trips'] as $trip)
                                         <li class="flex flex-col gap-3 px-4 py-3.5 @3xl:flex-row @3xl:items-center @3xl:gap-5" wire:key="trip-{{ $trip['host'] }}">
                                             <div class="min-w-0 @3xl:w-44 @3xl:shrink-0">
-                                                <x-host-tooltip :host="$trip['host']" :name="\App\Support\ShopNames::label($trip['host'])"><a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true']) }}" wire:navigate class="inline-flex max-w-full min-w-0 items-center font-semibold underline-offset-4 hover:underline"><x-shop-name :host="$trip['host']" /></a></x-host-tooltip>
+                                                <x-host-tooltip :host="$trip['host']"><a href="{{ route('app.products.index', ['shop' => $trip['host'], 'bestBuy' => 'true']) }}" wire:navigate class="inline-flex max-w-full min-w-0 items-center font-semibold underline-offset-4 hover:underline"><x-shop-name :host="$trip['host']" /></a></x-host-tooltip>
                                                 <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ trans_choice(':count best buy|:count best buys', $trip['count'], ['count' => $trip['count']]) }}</p>
                                             </div>
                                             <div class="flex min-w-0 flex-1 items-center gap-3">

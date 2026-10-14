@@ -111,7 +111,7 @@
                                 {{ __('Lowest price: :line at', ['line' => $headline->packLine($headline->lowestShop)?->text()]) }}
                                 {{-- Written inline rather than as x-shop-link, whose trailing
                                      newline would put a space before the period. --}}
-                                <a href="{{ \App\Support\AffiliateLink::for($headline->lowestShop->url) }}" target="_blank" rel="{{ \App\Support\AffiliateLink::rel($headline->lowestShop->url) }}" class="inline-flex items-center align-bottom hover:underline underline-offset-4"><x-shop-name :host="$headline->lowestShop->host" :name="$headline->lowestShop->displayName()" /></a>.
+                                <a href="{{ \App\Support\AffiliateLink::for($headline->lowestShop->url) }}" target="_blank" rel="{{ \App\Support\AffiliateLink::rel($headline->lowestShop->url) }}" class="inline-flex items-center align-bottom hover:underline underline-offset-4"><x-shop-name :host="$headline->lowestShop->host" /></a>.
                                 @if ($unitGap !== null)
                                     {{ __('That is :percent% more :unit than the best value.', [
                                         'percent' => $unitGap,

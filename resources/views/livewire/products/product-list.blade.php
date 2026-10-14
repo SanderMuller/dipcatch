@@ -162,7 +162,7 @@
                         </flux:navlist.item>
                         @foreach ($shopHosts as $host)
                             <flux:navlist.item wire:click="$set('shop', {{ \Illuminate\Support\Js::from($host) }})" :current="$shop === $host" :aria-current="$shop === $host ? 'true' : 'false'" wire:key="shop-{{ $host }}">
-                                <x-shop-name :host="$host" class="gap-2.5" />
+                                <x-shop-name :host="$host" />
                             </flux:navlist.item>
                         @endforeach
                     </flux:navlist>

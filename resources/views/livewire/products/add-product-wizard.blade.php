@@ -64,7 +64,7 @@
                 <ul role="list" class="mt-2 flex flex-wrap gap-2">
                     @foreach ($trackingIdea->group()->shops() as $host)
                         <li class="text-base/7 sm:text-sm/6">
-                            <x-host-tooltip :host="$host" :name="\App\Support\ShopNames::label($host)"><a href="https://www.{{ $host }}" target="_blank" rel="noopener noreferrer" class="flex items-center rounded-full bg-paper py-0.5 pr-3 pl-2 font-medium ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"><x-shop-name :host="$host" /></a></x-host-tooltip>
+                            <x-host-tooltip :host="$host"><a href="https://www.{{ $host }}" target="_blank" rel="noopener noreferrer" class="flex items-center rounded-full bg-paper py-0.5 pr-3 pl-2 font-medium ring-1 ring-line hover:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"><x-shop-name :host="$host" /></a></x-host-tooltip>
                         </li>
                     @endforeach
                 </ul>
@@ -261,7 +261,7 @@
                     @foreach ($product->shops->sortBy('created_at') as $shop)
                         <li class="flex items-center justify-between gap-3 px-4 py-2.5">
                             <span class="flex min-w-0 items-center gap-2">
-                                <x-shop-name :host="$shop->host" :name="$shop->displayName()" />
+                                <x-shop-name :host="$shop->host" />
                             </span>
                             @if ($shop->current_price !== null)
                                 <span class="tabular-nums text-zinc-600 dark:text-zinc-300">{{ \App\Support\MoneyFormatter::format((string) $shop->current_price, $product->currency) }}</span>
