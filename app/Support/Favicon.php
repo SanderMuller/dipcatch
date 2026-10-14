@@ -17,10 +17,9 @@ final readonly class Favicon
     /**
      * Favicon + host as an inline HTML fragment for Filament columns and
      * entries. The host is escaped here; callers wrap the result in an
-     * HtmlString. A `$label`, such as the shop's name, replaces the host as
-     * text, and the host stays in the tooltip.
+     * HtmlString.
      */
-    public static function html(string $host, ?string $label = null): string
+    public static function html(string $host): string
     {
         // Inline styles, not Tailwind classes — panel themes purge utility
         // classes that only appear in PHP strings (the admin panel renders
@@ -29,7 +28,7 @@ final readonly class Favicon
         // holds it: a shop can live on a subdomain of any length.
         return '<span style="display:inline-flex;align-items:center;gap:0.375rem;min-width:0;max-width:100%" title="' . e($host) . '">'
             . '<img src="' . e(self::url($host)) . '" alt="" loading="lazy" style="width:1rem;height:1rem;flex:none;border-radius:0.25rem" />'
-            . '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' . e($label ?? $host) . '</span>'
+            . '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' . e($host) . '</span>'
             . '</span>';
     }
 }

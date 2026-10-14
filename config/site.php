@@ -132,6 +132,7 @@ return [
         'dekamarkt.nl' => 'DekaMarkt',
         'poiesz-supermarkten.nl' => 'Poiesz',
         'vomar.nl' => 'Vomar',
+        'plus.nl' => 'PLUS',
         'bol.com' => 'bol.com',
         'amazon.com' => 'Amazon.com',
         'amazon.co.uk' => 'Amazon.co.uk',

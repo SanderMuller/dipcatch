@@ -98,8 +98,7 @@
                         <x-preview-page-image :images="$imageUrls" :href="$pageUrl" :host="$host" :name="'preview-photos-' . $this->getId()" />
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 text-sm text-zinc-500">
-                                <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 rounded-sm" />
-                                <span title="{{ $host }}">{{ \App\Support\ShopNames::label($host) }}</span>
+                                <x-shop-name :host="$host" />
                             </div>
                             <flux:heading><x-title-diff :title="(string) $snapshot['title']" :other="$product->title" data-test="preview-page-title" /></flux:heading>
                             <x-open-page-link :href="$pageUrl" :host="$host" class="mt-1" data-test="preview-open-page" />

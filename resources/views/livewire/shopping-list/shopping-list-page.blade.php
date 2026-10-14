@@ -56,7 +56,7 @@
                         @else
                             <flux:icon.x-mark variant="micro" class="size-4" />
                         @endif
-                        <span class="inline-flex items-center">{!! \App\Support\Favicon::html($shop['host'], \App\Support\ShopNames::label($shop['host'])) !!}</span>
+                        <span class="inline-flex items-center"><x-shop-name :host="$shop['host']" /></span>
                         @if ($going && $toBuy > 0)
                             <span class="text-xs text-zinc-500 tabular-nums dark:text-zinc-400" title="{{ trans_choice(':count to buy here|:count to buy here', $toBuy, ['count' => $toBuy]) }}">{{ $toBuy }}</span>
                         @endif
@@ -104,7 +104,7 @@
                                 <flux:icon.exclamation-circle variant="micro" class="size-4 text-zinc-400" />
                                 <span>{{ __('No shop sells this now') }}</span>
                             @else
-                                {!! \App\Support\Favicon::html($group['host'], \App\Support\ShopNames::label($group['host'])) !!}
+                                <x-shop-name :host="$group['host']" />
                             @endif
                         </h2>
                         <span class="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 tabular-nums dark:bg-white/10 dark:text-zinc-300 print:bg-transparent print:p-0 print:text-[9pt] print:text-zinc-600">

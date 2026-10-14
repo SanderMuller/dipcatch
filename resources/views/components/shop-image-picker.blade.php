@@ -25,7 +25,7 @@
                             <flux:icon.check variant="micro" class="size-3.5" />
                         </span>
                         <img src="{{ $url }}" alt="" loading="lazy" class="size-16 rounded-lg bg-white object-contain" />
-                        <span class="w-full truncate text-center text-xs text-zinc-500 dark:text-zinc-400" title="{{ $host }}">{{ \App\Support\ShopNames::label($host) }}</span>
+                        <x-shop-name :host="$host" :favicon="false" class="w-full justify-center text-xs text-zinc-500 dark:text-zinc-400" />
                     </button>
                 </li>
             @endforeach

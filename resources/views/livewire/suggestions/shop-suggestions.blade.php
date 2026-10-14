@@ -158,7 +158,7 @@
 
                             <div class="min-w-0 flex-1">
                                 <flux:text class="truncate font-medium">
-                                    <span title="{{ $webHost }}">{{ $webName }}</span>
+                                    <x-shop-name :host="$webHost" :name="$webName" :favicon="false" />
                                     <span class="font-normal text-zinc-500 dark:text-zinc-400">— {{ $finding->page_title ?? $finding->search_title }}</span>
                                 </flux:text>
                                 <flux:text size="sm" class="text-zinc-500 tabular-nums dark:text-zinc-400" data-test="web-suggestion-price">

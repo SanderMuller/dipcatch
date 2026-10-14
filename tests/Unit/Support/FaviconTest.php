@@ -19,12 +19,3 @@ test('html escapes the host in both the image url and the text', function (): vo
         ->not->toContain('<script>')
         ->toContain('evil&quot;&gt;&lt;script&gt;.test');
 });
-
-test('html shows a label in place of the host and keeps the host as the tooltip', function (): void {
-    $html = Favicon::html('webwinkel.poiesz-supermarkten.nl', 'Poiesz & Co');
-
-    expect($html)
-        ->toContain('title="webwinkel.poiesz-supermarkten.nl"')
-        ->toContain('>Poiesz &amp; Co</span>')
-        ->not->toContain('>webwinkel.poiesz-supermarkten.nl</span>');
-});

@@ -124,7 +124,7 @@
                             <img src="{{ \App\Support\Favicon::url($shop->host) }}" alt="" loading="lazy" class="mt-0.5 size-4 shrink-0 rounded-sm" />
                             <div class="min-w-0">
                                 <p class="flex items-center gap-1.5">
-                                    <span title="{{ $shop->host }}" @class(['truncate', 'font-medium text-zinc-950 dark:text-white' => $isHeadline])>{{ $shop->displayName() }}</span>
+                                    <span @class(['truncate', 'font-medium text-zinc-950 dark:text-white' => $isHeadline])>{{ $shop->displayName() }}</span>
                                     @if ($isHeadline && $headline->isPerUnit())
                                         <span class="shrink-0 rounded-sm bg-emerald-50 px-1 text-[0.6875rem] font-medium text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">{{ __('Best value') }}</span>
                                     @endif

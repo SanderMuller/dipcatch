@@ -162,10 +162,7 @@
                         </flux:navlist.item>
                         @foreach ($shopHosts as $host)
                             <flux:navlist.item wire:click="$set('shop', {{ \Illuminate\Support\Js::from($host) }})" :current="$shop === $host" :aria-current="$shop === $host ? 'true' : 'false'" wire:key="shop-{{ $host }}">
-                                <span class="flex min-w-0 items-center gap-2.5" title="{{ $host }}">
-                                    <img src="{{ \App\Support\Favicon::url($host) }}" alt="" loading="lazy" class="size-4 shrink-0 rounded-sm" />
-                                    <span class="truncate">{{ \App\Support\ShopNames::label($host) }}</span>
-                                </span>
+                                <x-shop-name :host="$host" class="gap-2.5" />
                             </flux:navlist.item>
                         @endforeach
                     </flux:navlist>
