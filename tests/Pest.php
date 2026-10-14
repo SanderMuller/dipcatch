@@ -859,7 +859,8 @@ function withoutCardDetails(string $html): string
 
 /**
  * Price checks for a shop in one INSERT: a factory call per row is slow for a
- * 90-day history.
+ * 90-day history. It fires no model events, so it does not clear the cached
+ * price verdict: add a later check with the factory.
  *
  * @param  list<array<string, mixed>>  $rows  Each needs `price` and `checked_at`; the rest defaults to a good reading.
  */

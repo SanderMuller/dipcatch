@@ -124,7 +124,8 @@ final class Shop extends Model
             $shop->host = UrlNormalizer::normalizeHost(parse_url($normalized, PHP_URL_HOST) ?: '');
         });
 
-        // A repoint or a new pack size moves the verdict's history.
+        // A repoint moves the verdict's history. The cache stamp already covers
+        // a new pack size, and the next check clears it too: this is a guard.
         self::updated(static fn (self $shop) => PriceVerdicts::forget($shop->id));
     }
 

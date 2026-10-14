@@ -384,8 +384,29 @@ test('a new pack size on the shop clears the cached history', function (): void 
     expect(verdictFor($shop))->toBeNull();
 });
 
+test('a repoint clears the cached history even when the price stays', function (): void {
+    $shop = shopWithDailyPrices([...prices('2.00', 59), '1.80']);
+    expect(verdictFor($shop))->not->toBeNull();
+
+    // Every reading so far priced the old URL.
+    $shop->forceFill(['repointed_at' => now()])->save();
+
+    expect(verdictFor($shop))->toBeNull();
+});
+
 test('a promotion boundary that passes inside the cache hour removes the verdict at once', function (): void {
     $shop = shopWithDailyPrices([...prices('2.00', 59), '1.80'], shopAttributes: ['promotion_starts_at' => now()->subDays(2), 'promotion_ends_at' => now()->addMinutes(10)]);
+    expect(verdictFor($shop))->not->toBeNull();
+
+    $this->travel(20)->minutes();
+
+    expect(verdictFor($shop))->toBeNull();
+});
+
+test('a price that goes stale inside the cache hour loses its verdict at once', function (): void {
+    $shop = shopWithDailyPrices([...prices('2.00', 59), '1.80']);
+    // The newest reading is an hour old: ten minutes short of three days.
+    $this->travel(3 * 1440 - 70)->minutes();
     expect(verdictFor($shop))->not->toBeNull();
 
     $this->travel(20)->minutes();
@@ -436,6 +457,10 @@ test('a rolled-back check leaves the cached history in place', function (): void
 test('a new check clears the cached history on the database cache store too', function (): void {
     config(['cache.default' => 'database']);
     $shop = shopWithDailyPrices([...prices('2.00', 59), '1.80']);
+    expect(verdictFor($shop))->not->toBeNull();
+
+    // A first check caches again; the second must still clear it.
+    PriceCheck::factory()->for($shop)->create(['price' => '1.80', 'checked_at' => now()]);
     expect(verdictFor($shop))->not->toBeNull();
 
     PriceCheck::factory()->for($shop)->create(['price' => '1.80', 'checked_at' => now(), 'seller' => 'New Seller BV']);
