@@ -39,6 +39,7 @@ return [
         'jumbo' => env('CANARY_URL_JUMBO') ?: 'https://www.jumbo.com/producten/hipro-protein-drink-mango-300ml-494984DSL',
         'lidl' => env('CANARY_URL_LIDL') ?: 'https://www.lidl.nl/p/badenia-trendline-koudschuim-matras-bt155-pro/p100153019',
         'lookfantastic' => env('CANARY_URL_LOOKFANTASTIC') ?: 'https://www.cultbeauty.com/p/cerave-moisturising-cream-pot-with-ceramides-for-dry-to-very-dry-skin-454g/11798691/',
+        'luxplus' => env('CANARY_URL_LUXPLUS') ?: 'https://www.luxplus.nl/product/sanex-expert-skin-health-sensitive-shower-gel-600-ml',
         'mediamarkt' => env('CANARY_URL_MEDIAMARKT') ?: 'https://www.mediamarkt.nl/nl/product/_apple-airpods-2nd-generation-oordopjes-wit-108253882.html',
         'medpets' => env('CANARY_URL_MEDPETS') ?: 'https://www.medpets.nl/4lazylegs-hondendraagzak?sku=MP9563',
         'megekko' => env('CANARY_URL_MEGEKKO') ?: 'https://www.megekko.nl/product/5093/293096/SSD-M-2/Samsung-990-PRO-2TB-M-2-SSD',

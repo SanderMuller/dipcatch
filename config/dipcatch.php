@@ -18,6 +18,7 @@ use App\PriceAdapters\Hosts\IntertoysAdapter;
 use App\PriceAdapters\Hosts\JumboAdapter;
 use App\PriceAdapters\Hosts\LidlAdapter;
 use App\PriceAdapters\Hosts\LookfantasticAdapter;
+use App\PriceAdapters\Hosts\LuxplusAdapter;
 use App\PriceAdapters\Hosts\MediaMarktAdapter;
 use App\PriceAdapters\Hosts\MedpetsAdapter;
 use App\PriceAdapters\Hosts\MegekkoAdapter;
@@ -271,6 +272,7 @@ return [
         JumboAdapter::class,
         LidlAdapter::class,
         LookfantasticAdapter::class,
+        LuxplusAdapter::class,
         MedpetsAdapter::class,
         OrdinaryAdapter::class,
         PetsAtHomeAdapter::class,
