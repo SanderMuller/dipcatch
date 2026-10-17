@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-18',
+            'category' => 'fix',
+            'title' => 'Right prices for AH deals and Jumbo packs',
+            'body' => "An AH offer such as 1 + 1 gratis now counts from the day its week starts, even when we saw it announced before. Jumbo products like \"8 Stuks 200 g\" now get the right pack size, so their price per kilo is right too.",
+        ],
+        [
             'date' => '2026-10-17',
             'category' => 'feature',
             'title' => 'Simpler alert step when you add a product',
