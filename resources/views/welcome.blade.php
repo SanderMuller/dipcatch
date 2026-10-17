@@ -214,6 +214,48 @@
                         </div>
                     </section>
 
+                    <section id="video" class="grid grid-cols-1 items-center gap-10 py-20 lg:grid-cols-12 lg:gap-12">
+                        <div class="lg:col-span-4">
+                            <h2 class="max-w-[20ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('See it in action') }}</h2>
+                            <p class="mt-4 max-w-[48ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('Paste a link, let DipCatch check the shops, and hear about it when the price drops. All in under a minute.') }}</p>
+                        </div>
+
+                        {{-- Framed like the tracked-products card above. The native controls
+                             appear once it plays, so the poster is not covered by them first;
+                             without script they stay on. preload="none": the video downloads
+                             only when played. Music, no speech, so there is nothing to caption. --}}
+                        <div
+                            x-data="{ playing: false }"
+                            class="relative rounded-(--frame) bg-paper p-(--gap) shadow-xl shadow-ink/5 ring-1 ring-ink/10 [--frame:var(--radius-3xl)] [--gap:--spacing(2)] lg:col-span-8 dark:shadow-none"
+                        >
+                            <video
+                                x-ref="video"
+                                x-init="$el.controls = false"
+                                controls
+                                playsinline
+                                preload="none"
+                                poster="{{ asset('images/home/promo-poster.webp') }}"
+                                aria-label="{{ __('DipCatch in under a minute: paste a product link, compare the shops and get an alert when the price drops.') }}"
+                                class="aspect-video w-full rounded-[calc(var(--frame)-var(--gap))] bg-canvas"
+                                data-test="promo-video"
+                                @ended="playing = false; $el.controls = false"
+                            >
+                                <source src="{{ asset('promo.mp4') }}" type="video/mp4">
+                            </video>
+                            <button
+                                type="button"
+                                x-show="! playing"
+                                x-cloak
+                                @click="playing = true; $refs.video.controls = true; $refs.video.play()"
+                                class="absolute bottom-6 left-1/2 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-ink py-3 pr-5 pl-4 text-base font-medium text-paper shadow-md hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:bottom-10 sm:text-sm dark:shadow-none"
+                                data-test="promo-video-play"
+                            >
+                                <flux:icon.play variant="micro" class="shrink-0" />
+                                {{ __('Play the video') }}
+                            </button>
+                        </div>
+                    </section>
+
                     <section id="how-it-works" class="py-20">
                         <h2 class="max-w-[35ch] text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{{ __('How a price alert works') }}</h2>
                         <p class="mt-4 max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-400">{{ __('Add a product and say what you want to pay. DipCatch does the checking, so you need nothing extra in your browser.') }}</p>

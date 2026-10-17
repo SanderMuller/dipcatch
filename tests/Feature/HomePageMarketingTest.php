@@ -282,3 +282,16 @@ it('lists a use case by its short label, because the line already says "Price al
     $response->assertSeeHtml('>your weekly groceries</a>')
         ->assertDontSeeHtml('>Price alerts for your weekly groceries</a>');
 });
+
+test('the homepage plays the promo video on demand, with a poster that ships', function (): void {
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('data-test="promo-video"', escape: false)
+        ->assertSee('data-test="promo-video-play"', escape: false)
+        ->assertSee('preload="none"', escape: false)
+        ->assertSee(asset('promo.mp4'), escape: false)
+        ->assertSee(asset('images/home/promo-poster.webp'), escape: false);
+
+    expect(public_path('promo.mp4'))->toBeFile()
+        ->and(public_path('images/home/promo-poster.webp'))->toBeFile();
+});
