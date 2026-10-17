@@ -29,6 +29,19 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-17',
+            'category' => 'feature',
+            'title' => 'Simpler alert step when you add a product',
+            'body' => "The suggested alert is now one of the choices in the price list, as on the edit page. DipCatch only asks which pack you buy when shops sell different sizes.\n\nWhile it picks a category for a new product, the product page says so.",
+            'link' => ['route' => 'app.products.create', 'label' => 'Track a product'],
+        ],
+        [
+            'date' => '2026-10-17',
+            'category' => 'fix',
+            'title' => 'Fixes for Luxplus, search and categories',
+            'body' => "Luxplus now shows the price you pay without a membership, and the right pack size. Search ignores accents, so \"andrelon\" finds Andrélon. Granola, vegetarian cordon bleu and falafel get the right category more often.",
+        ],
+        [
             'date' => '2026-10-14',
             'category' => 'fix',
             'title' => 'No more repeat price alerts',
