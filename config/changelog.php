@@ -30,6 +30,12 @@ return [
     'entries' => [
         [
             'date' => '2026-10-18',
+            'category' => 'feature',
+            'title' => 'Accept a suggested category in one click',
+            'body' => "When DipCatch isn't sure which category a product belongs to, the product page now shows its best guess. Click \"Use it\" to keep it, or \"Not this one\" to drop it.",
+        ],
+        [
+            'date' => '2026-10-18',
             'category' => 'fix',
             'title' => 'Right prices for AH deals and Jumbo packs',
             'body' => "An AH offer such as 1 + 1 gratis now counts from the day its week starts, even when we saw it announced before. Jumbo products like \"8 Stuks 200 g\" now get the right pack size, so their price per kilo is right too.",
