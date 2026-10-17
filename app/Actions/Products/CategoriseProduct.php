@@ -41,12 +41,36 @@ final class CategoriseProduct
 
         $job = new self($product->id);
 
+        // Set before the response, so a page opened while the hook runs
+        // already reads it as pending. The expiry covers a worker that dies
+        // before the hook runs.
+        Cache::put(self::pendingKey($product->id), true, now()->addSeconds(config()->integer('dipcatch.categories.timeout_seconds') + 30));
+
         app()->terminating(static function () use ($job): void {
             $job->handle(app(TypeSafeClient::class));
         });
     }
 
+    public static function isPending(Product $product): bool
+    {
+        return $product->category === null && Cache::has(self::pendingKey($product->id));
+    }
+
     public function handle(TypeSafeClient $client): void
+    {
+        try {
+            $this->categorise($client);
+        } finally {
+            Cache::forget(self::pendingKey($this->productId));
+        }
+    }
+
+    private static function pendingKey(string $productId): string
+    {
+        return "categorising:{$productId}";
+    }
+
+    private function categorise(TypeSafeClient $client): void
     {
         $product = Product::query()->with(['shops', 'user'])->find($this->productId);
 

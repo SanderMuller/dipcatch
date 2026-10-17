@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Products;
 
+use App\Actions\Products\CategoriseProduct;
 use App\Actions\Shops\ProbeBudget;
 use App\Billing\Entitlements;
 use App\Billing\HistoryWindow;
@@ -390,6 +391,7 @@ final class ProductShow extends Component
             // The chart shows a large drop the moment it is read; the alert
             // waits for a second reading. Say so, or the silence reads as a bug.
             'awaitsConfirmation' => app(LargeDropConfirmation::class)->isAwaited($this->product),
+            'categorising' => CategoriseProduct::isPending($this->product),
         ]);
     }
 

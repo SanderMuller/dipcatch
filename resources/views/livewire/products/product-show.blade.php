@@ -59,15 +59,24 @@
                              a <p> closes the paragraph before it. --}}
                         <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-zinc-500 sm:text-sm dark:text-zinc-400" data-test="product-meta">
                             <span>{{ trans_choice(':count shop|:count shops', $shops->count(), ['count' => $shops->count()]) }}</span>
-                            @if ($product->category !== null)
-                                <a href="{{ route('app.products.index', ['category' => $product->category->value]) }}" wire:navigate data-test="product-category-badge">
-                                    <flux:badge size="sm" color="zinc">{{ $product->category->label() }}</flux:badge>
-                                </a>
-                            @else
-                                <a href="{{ route('app.products.index', ['category' => \App\Livewire\Products\ProductList::NO_CATEGORY]) }}" wire:navigate data-test="product-category-none">
-                                    <flux:badge size="sm" color="zinc" icon="question-mark-circle">{{ __('No category') }}</flux:badge>
-                                </a>
-                            @endif
+                            {{-- Always present, so the result of a pending category is announced. --}}
+                            <span aria-live="polite" aria-atomic="true">
+                                @if ($product->category !== null)
+                                    <a href="{{ route('app.products.index', ['category' => $product->category->value]) }}" wire:navigate data-test="product-category-badge">
+                                        <flux:badge size="sm" color="zinc">{{ $product->category->label() }}</flux:badge>
+                                    </a>
+                                @elseif ($categorising)
+                                    {{-- Sorted after the response, in a few seconds: poll
+                                         until the category or its absence is known. --}}
+                                    <span wire:poll.2s data-test="product-category-pending">
+                                        <flux:badge size="sm" color="zinc" icon="arrow-path">{{ __('Finding a category…') }}</flux:badge>
+                                    </span>
+                                @else
+                                    <a href="{{ route('app.products.index', ['category' => \App\Livewire\Products\ProductList::NO_CATEGORY]) }}" wire:navigate data-test="product-category-none">
+                                        <flux:badge size="sm" color="zinc" icon="question-mark-circle">{{ __('No category') }}</flux:badge>
+                                    </a>
+                                @endif
+                            </span>
                         </div>
                     </div>
 

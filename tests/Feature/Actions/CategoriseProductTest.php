@@ -5,6 +5,7 @@ use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Enums\TrackingIdea;
 use App\Livewire\Products\AddProductWizard;
+use App\Livewire\Products\ProductShow;
 use App\Mcp\Servers\DipCatchServer;
 use App\Mcp\Support\DraftToken;
 use App\Mcp\Tools\CreateProductTool;
@@ -88,6 +89,42 @@ it('categorises a product created by hand after the response', function (): void
 
     Http::assertSentCount(1);
     expect(Product::query()->where('user_id', $user->id)->sole()->category)->toBe(ProductCategory::CoffeeTea);
+});
+
+it('reads as pending from creation until the answer is in, and after a failed request too', function (int $status): void {
+    $status === 200 ? fakeConfidentCoffee() : Http::fake([TypeSafeClient::ENDPOINT => Http::response([], $status)]);
+    $user = proUserWantingCategories();
+    $product = Product::factory()->create(['user_id' => $user->id, 'category' => null]);
+
+    CategoriseProduct::afterResponseFor($product);
+
+    expect(CategoriseProduct::isPending($product))->toBeTrue();
+
+    app()->terminate();
+
+    expect(CategoriseProduct::isPending($product->refresh()))->toBeFalse();
+})->with(['answered' => [200], 'failed' => [500]]);
+
+it('shows the product as being sorted until its category is in', function (): void {
+    fakeConfidentCoffee();
+    $user = proUserWantingCategories();
+    $product = Product::factory()->create(['user_id' => $user->id, 'category' => null]);
+    $this->actingAs($user);
+
+    CategoriseProduct::afterResponseFor($product);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeHtml('data-test="product-category-pending"')
+        ->assertSeeHtml('wire:poll.2s')
+        ->assertSee('Finding a category…')
+        ->assertDontSeeHtml('data-test="product-category-none"');
+
+    app()->terminate();
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertDontSeeHtml('data-test="product-category-pending"')
+        ->assertDontSeeHtml('wire:poll.2s')
+        ->assertSeeHtml('data-test="product-category-badge"');
 });
 
 it('categorises a product created over MCP after the response', function (): void {
