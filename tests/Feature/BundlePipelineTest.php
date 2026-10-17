@@ -207,6 +207,42 @@ test('future bundle terms do not enter current price-check snapshot', function (
         ->and($check?->bundle_total_price)->toBeNull();
 });
 
+test('a bundle stored before its window opened becomes the price once it runs, on a read without bundle authority', function (): void {
+    // AH stored "1 + 1 gratis" on the read before its week began, priced at
+    // the shelf price. Every later read came from a source that does not
+    // know bundles, and the shop stayed at the shelf price all week.
+    $shop = storedBundleShop([
+        'promotion_starts_at' => now()->subDay(),
+        'promotion_ends_at' => now()->addDay(),
+        'promotion_label' => '2 voor 4,00',
+    ]);
+    // The read before the window opened tracked the shelf price.
+    $shop->forceFill(['current_price' => '2.85'])->save();
+    reportBundle(new ShopSnapshot('Fanta', imageUrl: null, price: '2.85', currency: 'EUR', inStock: true));
+
+    runBundleCheck($shop);
+
+    $check = $shop->fresh()->priceChecks()->first();
+
+    expect($shop->fresh()->current_price)->toBe('2.00')
+        ->and($check?->price)->toBe('2.00')
+        ->and($check?->bundle_quantity)->toBe(2);
+});
+
+test('a stored bundle whose window has not opened keeps the shelf price', function (): void {
+    $shop = storedBundleShop([
+        'promotion_starts_at' => now()->addDay(),
+        'promotion_ends_at' => now()->addDays(2),
+    ]);
+    $shop->forceFill(['current_price' => '2.85'])->save();
+    reportBundle(new ShopSnapshot('Fanta', imageUrl: null, price: '2.85', currency: 'EUR', inStock: true));
+
+    runBundleCheck($shop);
+
+    expect($shop->fresh()->current_price)->toBe('2.85')
+        ->and($shop->fresh()->priceChecks()->first()?->bundle_quantity)->toBeNull();
+});
+
 function reportBundle(ShopSnapshot $snapshot): void
 {
     $adapter = new readonly class ($snapshot) implements ShopAdapter {

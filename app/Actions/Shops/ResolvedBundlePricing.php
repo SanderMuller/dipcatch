@@ -44,10 +44,19 @@ final readonly class ResolvedBundlePricing
             // the stored columns, so this is the one path that has to read it
             // back rather than make it.
             $trackedPrice = is_string($shop->current_price) ? $shop->current_price : null;
+            $singleItemPrice = $shop->singleItemPrice();
+
+            // An offer stored before its window opened was tracked at the
+            // shelf price. Once the window runs it is the price, even when no
+            // later read knows bundles: AH's 1 + 1 stayed at the shelf price
+            // for its whole week.
+            if ($storedWindow?->isRunning() === true && $singleItemPrice !== null && $storedOffer->appliesTo($singleItemPrice, $storedWindow)) {
+                $trackedPrice = $storedOffer->effectiveUnitPrice();
+            }
 
             return new self(
                 trackedPrice: $trackedPrice,
-                singleItemPrice: $shop->singleItemPrice(),
+                singleItemPrice: $singleItemPrice,
                 offer: $storedOffer,
                 appliedOffer: $storedOffer->isTrackedAt($trackedPrice) ? $storedOffer : null,
                 promotionUpdates: [],
