@@ -40,6 +40,19 @@ it('searches by title', function (): void {
         ->assertDontSee('Dish soap');
 });
 
+it('searches by title whether or not the accents are typed', function (string $search): void {
+    $user = User::factory()->create();
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Andrélon droogshampoo Verrassend Volume / Volume boost 250 ml']);
+    Product::factory()->create(['user_id' => $user->id, 'title' => 'Dish soap']);
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('search', $search)
+        ->assertSee('Andrélon droogshampoo')
+        ->assertDontSee('Dish soap');
+})->with(['without the accent' => ['andrelon'], 'with the accent' => ['ANDRÉLON']]);
+
 it('sorts by name, and ignores a sort key it does not offer', function (): void {
     $user = User::factory()->create();
     Product::factory()->create(['user_id' => $user->id, 'title' => 'Beta', 'created_at' => now()->subDay()]);

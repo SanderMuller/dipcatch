@@ -10,6 +10,7 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Support\FilterSuggestions;
 use App\Support\HeadlinePrice;
+use App\Support\SearchText;
 use App\Support\ShopNames;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
@@ -174,7 +175,7 @@ final class AppCommandPalette extends Component
      */
     private function matching(User $user, string $term): EloquentQueryBuilder
     {
-        $like = self::like($term);
+        $like = self::like(SearchText::fold($term));
         $categories = array_values(array_map(
             fn (ProductCategory $category): string => $category->value,
             array_filter(ProductCategory::cases(), fn (ProductCategory $category): bool => str_contains(mb_strtolower($category->label()), $term)),
@@ -183,7 +184,7 @@ final class AppCommandPalette extends Component
         return Product::query()
             ->where('user_id', $user->id)
             ->where(fn (EloquentQueryBuilder $match): EloquentQueryBuilder => $match
-                ->whereRaw("LOWER(title) LIKE ? ESCAPE '\\'", [$like])
+                ->whereRaw(SearchText::column('title') . " LIKE ? ESCAPE '\\'", [...SearchText::bindings(), $like])
                 ->orWhereHas('shops', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $this->whereHostOrNameMatches($shop, $term))
                 ->when($categories !== [], fn (EloquentQueryBuilder $category): EloquentQueryBuilder => $category->orWhereIn('category', $categories)));
     }

@@ -17,6 +17,7 @@ use App\Services\TypeSafe\TypeSafeClient;
 use App\Support\DashboardDigest;
 use App\Support\FilterSuggestions;
 use App\Support\PriceVerdicts;
+use App\Support\SearchText;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
@@ -309,11 +310,9 @@ final class ProductList extends Component
 
         return Product::query()
             ->where('user_id', auth()->id())
-            // LOWER() on both sides: Postgres LIKE is case-sensitive, so a
-            // plain `like '%arabica%'` never matches "Arabica beans".
             ->when($this->search !== '', fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereRaw(
-                'LOWER(title) LIKE ?',
-                ['%' . mb_strtolower($this->search) . '%'],
+                SearchText::column('title') . ' LIKE ?',
+                [...SearchText::bindings(), '%' . SearchText::fold($this->search) . '%'],
             ))
             ->when(
                 in_array($this->status, ['active', 'paused'], strict: true),

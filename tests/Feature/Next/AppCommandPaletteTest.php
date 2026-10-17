@@ -64,6 +64,21 @@ it('finds products by shop and by category', function (): void {
         ->assertDontSee('Coffee');
 });
 
+it('finds a product whether or not the accents are typed', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->for($user)->create(['title' => 'Andrélon droogshampoo Verrassend Volume / Volume boost 250 ml']);
+    Product::factory()->for($user)->create(['title' => 'Creme brulee']);
+
+    $this->actingAs($user);
+
+    livewire(AppCommandPalette::class)
+        ->set('search', 'andrelon')
+        ->assertSee('Andrélon droogshampoo')
+        ->assertDontSee('Creme brulee')
+        ->set('search', 'crème')
+        ->assertSee('Creme brulee');
+});
+
 it('treats LIKE wildcards in the search as plain text', function (): void {
     $user = User::factory()->create();
     Product::factory()->for($user)->create(['title' => '100% cocoa']);
