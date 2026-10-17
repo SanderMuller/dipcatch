@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\PriceAdapters\Hosts\JumboAdapter;
+use App\Support\PackSize;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 
@@ -235,3 +236,67 @@ test('a blank h1 falls back to the shop name, not to nothing', function (): void
 
     expect($result->snapshot?->title)->toBe('Jumbo product');
 });
+
+/**
+ * A product panel as jumbo.com serves it (observed 2026-10-17): the title,
+ * the size under it, and the price with its price per unit.
+ */
+function jumboShelfPage(string $title, string $subtitle, string $price, string $perUnit): string
+{
+    [$whole, $fractional] = explode(',', $price);
+    $json = json_encode([
+        '@type' => 'Product',
+        'name' => $title,
+        'offers' => ['@type' => 'AggregateOffer', 'highPrice' => (float) str_replace(',', '.', $price), 'lowPrice' => (float) str_replace(',', '.', $price), 'offerCount' => 99, 'priceCurrency' => 'EUR'],
+    ], JSON_THROW_ON_ERROR);
+    $component = str_replace(
+        '</div>' . "\n" . '</div>',
+        "</div>\n  <div class=\"price-per-unit\"><div class=\"screenreader-only\"><!--[-->{$perUnit}<!--]--></div></div>\n</div>",
+        jumboPriceComponent("Prijs: € {$price}", $whole, $fractional),
+    );
+
+    return str_replace(
+        '<body></body>',
+        '<body><div class="product-panel-info">'
+            . "<h1 data-testid=\"product-title\">{$title}</h1>"
+            . "<div class=\"product-description\"><span data-testid=\"product-subtitle\">{$subtitle}</span></div>"
+            . $component
+            . '</div></body>',
+        withJsonLd($json),
+    );
+}
+
+test('reads the size the price per kilo confirms as the whole pack, not one of the counted items', function (): void {
+    // "8 Stuks 200 g" read as eight packs of 200 g: 1.6 kg for € 1,95.
+    $snapshot = $this->adapter
+        ->extract('https://www.jumbo.com/producten/jumbo-double-chocolate-cookies-8-stuks-200-g-523104PAK', jumboShelfPage('Jumbo Double Chocolate Cookies 8 Stuks 200 g', '200 g', '1,95', '€ 9,75 per kilo'))
+        ->snapshot;
+
+    expect($snapshot?->packSize)->toBe('200 g')
+        ->and($snapshot?->packSizeIsWholePack)->toBeTrue()
+        ->and(PackSize::resolve($snapshot?->packSize, $snapshot->packSizeAuthoritative, $snapshot->title, $snapshot->packSizeIsWholePack)?->quantity)->toBe(200.0);
+});
+
+test('takes the size from the title when the page states none under it', function (string $title, string $price, string $perUnit, string $expected): void {
+    $snapshot = $this->adapter
+        ->extract('https://www.jumbo.com/producten/x-1PAK', jumboShelfPage($title, '', $price, $perUnit))
+        ->snapshot;
+
+    expect($snapshot?->packSize)->toBe($expected);
+})->with([
+    // The unit price is rounded to cents: 1,19 at 7,73 per kilo is 153.9 g.
+    'a weight' => ['Oreo Original koekjes 154g', '1,19', '€ 7,73 per kilo', '154 g'],
+    'a multipack of drinks' => ['Heineken Pilsener Bier 12 x 250ml', '13,99', '€ 4,66 per liter', '3000 ml'],
+]);
+
+test('states no size when the unit price is per piece, or agrees with no size on the page', function (string $subtitle, string $perUnit): void {
+    $snapshot = $this->adapter
+        ->extract('https://www.jumbo.com/producten/x-1PAK', jumboShelfPage('Jumbo Cookies 8 Stuks 200 g', $subtitle, '1,95', $perUnit))
+        ->snapshot;
+
+    expect($snapshot?->packSize)->toBeNull()
+        ->and($snapshot?->packSizeIsWholePack)->toBeFalse();
+})->with([
+    'per piece' => ['200 g', '€ 0,24 per stuk'],
+    'a unit price for another size' => ['200 g', '€ 4,88 per kilo'],
+]);

@@ -122,6 +122,12 @@ final readonly class ShopSnapshot
          * it alone.
          */
         public bool $altPackSizesAuthoritative = false,
+        /**
+         * True when the shop's own price per kilo or litre confirms that the
+         * size is the whole pack, so a count in the title cannot multiply it:
+         * Jumbo's "8 Stuks 200 g" is 200 g, at € 9,75 per kilo.
+         */
+        public bool $packSizeIsWholePack = false,
     ) {}
 
     public function trackedPrice(): string
@@ -136,9 +142,9 @@ final readonly class ShopSnapshot
      * such as the name a page gives a variant: the page's own words, but not
      * a size field, so an empty one cannot clear stored pack data.
      */
-    public function withPackSize(string $packSize, bool $authoritative = true): self
+    public function withPackSize(string $packSize, bool $authoritative = true, bool $wholePack = false): self
     {
-        return clone($this, ['packSize' => $packSize, 'packSizeAuthoritative' => $authoritative]);
+        return clone($this, ['packSize' => $packSize, 'packSizeAuthoritative' => $authoritative, 'packSizeIsWholePack' => $wholePack]);
     }
 
     public function withPromotionWindow(?PromotionWindow $promotionWindow): self

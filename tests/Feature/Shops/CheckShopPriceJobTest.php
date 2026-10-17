@@ -352,6 +352,34 @@ test('a scraped check parses the pack size from the JSON-LD title', function ():
         ->and($shop->unitPriceLabel())->toBe('/l');
 });
 
+test('a size the shop confirms as the whole pack is stored as it is, whatever the title counts', function (bool $wholePack, string $expected): void {
+    Http::fake(['https://shop.test/robots.txt' => Http::response('', 404), 'https://shop.test/p/1' => Http::response('<html></html>')]);
+    $snapshot = new ShopSnapshot('Jumbo Double Chocolate Cookies 8 Stuks 200 g', imageUrl: null, price: '1.95', currency: 'EUR', inStock: true, packSize: '200 g', packSizeAuthoritative: true, packSizeIsWholePack: $wholePack);
+    $adapter = new readonly class ($snapshot) implements ShopAdapter {
+        public function __construct(private ShopSnapshot $snapshot) {}
+
+        public function key(): string
+        {
+            return 'test-pack';
+        }
+
+        public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
+        {
+            return ExtractionResult::success($this->snapshot);
+        }
+    };
+    $shop = Shop::factory()->create(['url' => 'https://shop.test/p/1']);
+
+    new CheckShopPrice($shop)->handle(app(ShopFetcher::class), new AdapterResolver([$adapter]), app(CheckjebonSource::class), app(AhApiSource::class));
+
+    expect((string) $shop->fresh()->pack_quantity)->toBe($expected);
+})->with([
+    'confirmed by the unit price' => [true, '200.00'],
+    // Without the confirmation the title's count still multiplies, as it
+    // must for "12st Barebells ... 55g".
+    'not confirmed' => [false, '1600.00'],
+]);
+
 test('a title without a size keeps the stored pack columns', function (): void {
     Http::fake(fakeJsonLdResponse('shop.test', '/p/1', '2.49', name: 'HiPRO Protein Drink Mango'));
 

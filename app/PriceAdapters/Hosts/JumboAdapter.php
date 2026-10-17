@@ -9,6 +9,7 @@ use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
+use App\Support\PackSize;
 use Carbon\CarbonImmutable;
 use Symfony\Component\DomCrawler\Crawler;
 use Throwable;
@@ -61,10 +62,64 @@ final readonly class JumboAdapter extends HostAdapter
         // periods it runs itself. When it names none, the period the JSON-LD
         // offer stated still stands.
         return ExtractionResult::success(
-            $snapshot
+            self::withShelfPackSize($snapshot, $product)
                 ->withPromotionWindow($window ?? $snapshot->promotionWindow)
                 ->withBundleOffer($offer),
         );
+    }
+
+    /**
+     * The pack size the shelf price states, checked against the price per
+     * kilo or litre beside it.
+     *
+     * The JSON-LD states no size, and the title can mislead: "8 Stuks 200 g"
+     * read as eight packs of 200 g, while the page sells 200 g for € 1,95 at
+     * € 9,75 per kilo (verified 2026-10-17). The subtitle under the h1 states
+     * the size on most pages, and the title on the rest; the one the unit
+     * price confirms is the whole pack. A page whose unit price is per piece
+     * or per wash, or that agrees with neither, keeps the snapshot as it is.
+     */
+    private static function withShelfPackSize(ShopSnapshot $snapshot, Crawler $product): ShopSnapshot
+    {
+        $implied = self::sizeFromUnitPrice($product);
+
+        if (! $implied instanceof PackSize) {
+            return $snapshot;
+        }
+
+        $candidates = [PageMarkup::element($product, '[data-testid="product-subtitle"]'), $snapshot->title];
+
+        foreach ($candidates as $candidate) {
+            $stated = PackSize::parse($candidate);
+
+            // The unit price is rounded to cents: 1,19 at 7,73 per kilo is
+            // 153.9 g for a 154 g pack.
+            if ($stated instanceof PackSize && $stated->unit === $implied->unit && abs($stated->quantity - $implied->quantity) <= $implied->quantity * 0.03) {
+                return $snapshot->withPackSize(rtrim(rtrim(number_format($stated->quantity, 2, '.', ''), '0'), '.') . ' ' . $stated->unit, wholePack: true);
+            }
+        }
+
+        return $snapshot;
+    }
+
+    /** "Prijs: € 1,95" over "€ 9,75 per kilo" is 200 g; null for a unit that is not a weight or a volume. */
+    private static function sizeFromUnitPrice(Crawler $product): ?PackSize
+    {
+        $component = $product->filter('[data-testid="product-price"]')->first();
+        $perUnit = trim($component->filter('.price-per-unit .screenreader-only')->first()->text(''));
+
+        if (preg_match('/^(.+?)\s+per\s+(kilo|liter)$/iu', $perUnit, $matches) !== 1) {
+            return null;
+        }
+
+        $price = self::priceFromComponent($product);
+        $rate = PriceNormalizer::fromMixed($matches[1]);
+
+        if ($price === null || $rate === null || (float) $rate <= 0.0) {
+            return null;
+        }
+
+        return PackSize::of((float) $price / (float) $rate * 1000, strtolower($matches[2]) === 'kilo' ? 'g' : 'ml');
     }
 
     public function key(): string

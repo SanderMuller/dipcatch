@@ -147,6 +147,7 @@ final readonly class ShopDraft
             'stock_signal' => $snapshot->stockSignal,
             'pack_size' => $snapshot->packSize,
             'pack_size_authoritative' => $snapshot->packSizeAuthoritative,
+            'pack_size_whole_pack' => $snapshot->packSizeIsWholePack,
             'alt_pack_sizes' => $snapshot->altPackSizes,
             'alt_pack_sizes_authoritative' => $snapshot->altPackSizesAuthoritative,
             'consumer_price_issue' => $snapshot->consumerPriceIssue?->value,
@@ -212,6 +213,7 @@ final readonly class ShopDraft
             self::string($snapshot, 'pack_size'),
             (bool) ($snapshot['pack_size_authoritative'] ?? false),
             self::string($snapshot, 'title'),
+            (bool) ($snapshot['pack_size_whole_pack'] ?? false),
         );
         $altSizes = is_array($snapshot['alt_pack_sizes'] ?? null)
             ? array_values(array_filter($snapshot['alt_pack_sizes'], is_string(...)))

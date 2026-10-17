@@ -191,6 +191,7 @@ final class AddShopTool extends Tool
             is_string($snapshot['pack_size'] ?? null) ? $snapshot['pack_size'] : null,
             (bool) ($snapshot['pack_size_authoritative'] ?? false),
             is_string($snapshot['title'] ?? null) ? $snapshot['title'] : null,
+            (bool) ($snapshot['pack_size_whole_pack'] ?? false),
         );
 
         if (! $drafted instanceof PackSize) {

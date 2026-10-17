@@ -39,11 +39,12 @@ final readonly class StatedPackSize
      * Deliberately narrow. The stated size has to equal the title's item size
      * exactly, and has to be a weight or a volume. Anything else leaves the
      * shop's figure alone, because a shop knows its own packaging better than
-     * a title does.
+     * a title does. A size the shop's unit price `$confirmed` as the whole
+     * pack stands too.
      */
-    public static function wholePack(PackSize $stated, ?string $title): ?PackSize
+    public static function wholePack(PackSize $stated, ?string $title, bool $confirmed = false): ?PackSize
     {
-        if ($title === null || $stated->unit === 'piece' || ! self::restatesTheItem($stated, $title)) {
+        if ($confirmed || $title === null || $stated->unit === 'piece' || ! self::restatesTheItem($stated, $title)) {
             return null;
         }
 

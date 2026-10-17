@@ -244,7 +244,7 @@ final readonly class ProbeReporter
     private static function unitPrice(array $snapshot): array
     {
         $text = static fn (string $key): ?string => is_string($snapshot[$key] ?? null) ? $snapshot[$key] : null;
-        $size = PackSize::resolve($text('pack_size'), (bool) ($snapshot['pack_size_authoritative'] ?? false), $text('title'));
+        $size = PackSize::resolve($text('pack_size'), (bool) ($snapshot['pack_size_authoritative'] ?? false), $text('title'), (bool) ($snapshot['pack_size_whole_pack'] ?? false));
         $price = $snapshot['price'] ?? null;
 
         return [

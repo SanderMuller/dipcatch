@@ -199,14 +199,15 @@ final readonly class PackSize
      *
      * One exception, in {@see StatedPackSize::wholePack()}: a shop that states
      * the size of a single item while its own title counts the items has
-     * described the item, not the pack.
+     * described the item, not the pack. `$wholePack` turns it off, for a size
+     * the shop's own unit price confirms.
      */
-    public static function resolve(?string $packSize, bool $authoritative, ?string $title): ?self
+    public static function resolve(?string $packSize, bool $authoritative, ?string $title, bool $wholePack = false): ?self
     {
         $parsed = self::parse($packSize);
 
         if ($parsed !== null) {
-            return StatedPackSize::wholePack($parsed, $title) ?? $parsed;
+            return StatedPackSize::wholePack($parsed, $title, confirmed: $wholePack) ?? $parsed;
         }
 
         if ($authoritative) {
