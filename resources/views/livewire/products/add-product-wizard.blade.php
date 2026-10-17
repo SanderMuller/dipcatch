@@ -298,77 +298,107 @@
                 {{ __('We track every price either way. Your alert only decides when we notify you.') }}
             </flux:text>
 
-            {{-- First in source order so it leads on a phone; beside the
-                 fields on a wide screen. --}}
-            <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-start lg:gap-10">
-                <div class="lg:col-start-2 lg:row-start-1">
-                    @if ($settingOwn)
-                        <flux:button type="button" size="sm" variant="ghost" wire:click="showSuggestion">{{ __('Show the suggested alert') }}</flux:button>
-                    @else
-                        @include('livewire.products.partials.alert-suggestion')
-                    @endif
-                </div>
-
-                <div id="wizard-alert-fields" tabindex="-1" class="min-w-0 space-y-6 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand lg:col-start-1 lg:row-start-1">
-                    <h3 class="sr-only">{{ __('Your price alert') }}</h3>
-                    @if ($packChoices === [])
-                        <flux:input
-                            wire:model="unitPriceTarget"
-                            :label="$unitWord ? __('Target price per :unit', ['unit' => $unitWord]) : __('Target price per kilo, litre or piece')"
-                            :description="__('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.')"
-                            type="number"
-                            step="any"
-                            min="0.0001"
-                        />
-                    @else
-                        <x-unit-target
-                            model="unitPriceTarget"
-                            :heading="false"
-                            :packs="$packChoices"
-                            :currency="$product->currency"
-                            :unit-word="$unitWord ?? __('unit')"
-                        />
-                    @endif
-
-                    {{-- Few people want these, so they stay folded until one is
-                         set or has an error. wire:ignore.self keeps the fold as
-                         the person left it across round trips. --}}
-                    @php($otherAlertErrors = $errors->hasAny(['dropThresholdPct', 'dropThresholdAbs', 'targetPrice']))
-                    <details
-                        class="group border-t border-zinc-950/5 pt-6 dark:border-white/10"
-                        wire:ignore.self
-                        @if ($otherAlertErrors || $otherAlerts !== []) open @endif
-                        data-test="other-alerts"
+            @php($showsSuggestion = $packChoices !== [] && ($asksJev || $suggestion->unitTarget !== null))
+            <div class="min-w-0 max-w-2xl space-y-6">
+                <h3 class="sr-only">{{ __('Your price alert') }}</h3>
+                @if ($packChoices === [])
+                    <flux:input
+                        wire:model="unitPriceTarget"
+                        :label="$unitWord ? __('Target price per :unit', ['unit' => $unitWord]) : __('Target price per kilo, litre or piece')"
+                        :description="__('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.')"
+                        type="number"
+                        step="any"
+                        min="0.0001"
+                    />
+                @else
+                    <x-unit-target
+                        model="unitPriceTarget"
+                        :heading="false"
+                        :packs="$packChoices"
+                        :currency="$product->currency"
+                        :unit-word="$unitWord ?? __('unit')"
+                        :suggested-unit="$showsSuggestion && ! $asksJev ? $suggestion->unitTarget : null"
                     >
-                        <summary class="flex cursor-pointer list-none items-center gap-2 select-none [&::-webkit-details-marker]:hidden">
-                            <flux:icon.chevron-right variant="micro" class="shrink-0 text-zinc-400 group-open:rotate-90" />
-                            <span class="shrink-0 text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Other alerts') }}</span>
-                            <span class="truncate text-base/7 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-                                · {{ $otherAlerts === [] ? __('a drop in percent or money, or a price for any pack') : implode(', ', $otherAlerts) }}
-                            </span>
-                            @if ($otherAlertErrors)
-                                <span class="shrink-0 text-base/7 font-medium text-red-600 sm:text-sm/6 dark:text-red-400">{{ __('Check these') }}</span>
+                        @if ($showsSuggestion)
+                            @if ($asksJev)
+                                <x-slot:suggestion wire:init="askJev" wire:loading.attr="aria-busy" wire:target="askJev">
+                                    @include('livewire.products.partials.alert-suggestion-row')
+                                </x-slot:suggestion>
+                            @else
+                                <x-slot:suggestion wire:click="useSuggestion">
+                                    @include('livewire.products.partials.alert-suggestion-row')
+                                </x-slot:suggestion>
                             @endif
-                        </summary>
+                        @endif
+                    </x-unit-target>
+                @endif
 
-                        <div class="mt-4 space-y-3">
-                            <div class="grid gap-3 sm:grid-cols-2">
-                                <flux:input wire:model="dropThresholdPct" :label="__('Alert me when it drops by (%)')" type="number" step="0.01" min="0.01" max="99.99"
-                                    :placeholder="$defaults['pct'] ?? ''" :description="($defaults['pct'] ?? '') !== '' ? __('Default: :value%.', ['value' => $defaults['pct']]) : null" class="tabular-nums" />
-                                <flux:input wire:model="dropThresholdAbs" :label="__('Alert me when it drops by (amount)')" type="number" step="0.01" min="0.01"
-                                    :placeholder="$defaults['abs'] ?? ''" :description="($defaults['abs'] ?? '') !== '' ? __('Default: :value.', ['value' => $defaults['abs']]) : null" class="tabular-nums" />
-                            </div>
-                            <flux:input wire:model="targetPrice" :label="__('Price for any pack')" type="number" step="0.01" min="0.01" class="sm:max-w-xs" />
-                            <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400" data-test="alert-defaults-note">
-                                @if ($defaults === null)
-                                    {{ __('The default alert starts once we have read a price.') }}
-                                @else
-                                    {{ __('Leave the drop fields empty and we use the default shown. Once a target is set, the suggested one included, an empty drop field is off.') }}
-                                @endif
-                            </flux:text>
+                @if (! $showsSuggestion)
+                    <p class="max-w-[65ch] text-base/7 text-pretty text-zinc-600 sm:text-sm/6 dark:text-zinc-400" data-test="alert-suggestion-reason">
+                        @if ($suggestion->band === \App\Enums\PromotionDepthBand::Fixed)
+                            {{ __('This product has a fixed price, so we only alert you on a real drop. Keep the default alert below.') }}
+                        @elseif ($suggestion->unit === null)
+                            {{ __('We could not read a pack size, so we suggest the default alert below.') }}
+                        @elseif ($suggestion->normalUnitPrice === null)
+                            {{ __('We could not tell its normal price, so we suggest the default alert below.') }}
+                        @else
+                            {{ __('We have no sign that this product goes on sale, so we suggest the default alert below.') }}
+                        @endif
+                        @if ($onOfferNow)
+                            {{ __('It is on offer now, so for its first weeks the default counts from the offer price.') }}
+                        @endif
+                    </p>
+                @endif
+
+                @if (! $usesJev && $canSwitchOnAi)
+                    <div data-test="switch-on-ai">
+                        <livewire:ai-feature-prompt place="alert" below wire:key="ai-prompt-alert-wizard" />
+                    </div>
+                @elseif (! $usesJev)
+                    <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400" data-test="pro-teaser">
+                        {{ __('Pro also checks how products like this go on sale.') }}
+                        <flux:link :href="route('app.billing')" wire:navigate>{{ __('Compare plans') }}</flux:link>
+                    </flux:text>
+                @endif
+
+                {{-- Few people want these, so they stay folded until one is
+                     set or has an error. wire:ignore.self keeps the fold as
+                     the person left it across round trips. --}}
+                @php($otherAlertErrors = $errors->hasAny(['dropThresholdPct', 'dropThresholdAbs', 'targetPrice']))
+                <details
+                    class="group border-t border-zinc-950/5 pt-6 dark:border-white/10"
+                    wire:ignore.self
+                    @if ($otherAlertErrors || $otherAlerts !== []) open @endif
+                    data-test="other-alerts"
+                >
+                    <summary class="flex cursor-pointer list-none items-center gap-2 select-none [&::-webkit-details-marker]:hidden">
+                        <flux:icon.chevron-right variant="micro" class="shrink-0 text-zinc-400 group-open:rotate-90" />
+                        <span class="shrink-0 text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Other alerts') }}</span>
+                        <span class="truncate text-base/7 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
+                            · {{ $otherAlerts === [] ? __('a drop in percent or money, or a price for any pack') : implode(', ', $otherAlerts) }}
+                        </span>
+                        @if ($otherAlertErrors)
+                            <span class="shrink-0 text-base/7 font-medium text-red-600 sm:text-sm/6 dark:text-red-400">{{ __('Check these') }}</span>
+                        @endif
+                    </summary>
+
+                    <div class="mt-4 space-y-3">
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <flux:input wire:model="dropThresholdPct" :label="__('Alert me when it drops by (%)')" type="number" step="0.01" min="0.01" max="99.99"
+                                :placeholder="$defaults['pct'] ?? ''" :description="($defaults['pct'] ?? '') !== '' ? __('Default: :value%.', ['value' => $defaults['pct']]) : null" class="tabular-nums" />
+                            <flux:input wire:model="dropThresholdAbs" :label="__('Alert me when it drops by (amount)')" type="number" step="0.01" min="0.01"
+                                :placeholder="$defaults['abs'] ?? ''" :description="($defaults['abs'] ?? '') !== '' ? __('Default: :value.', ['value' => $defaults['abs']]) : null" class="tabular-nums" />
                         </div>
-                    </details>
-                </div>
+                        <flux:input wire:model="targetPrice" :label="__('Price for any pack')" type="number" step="0.01" min="0.01" class="sm:max-w-xs" />
+                        <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400" data-test="alert-defaults-note">
+                            @if ($defaults === null)
+                                {{ __('The default alert starts once we have read a price.') }}
+                            @else
+                                {{ __('Leave the drop fields empty and we use the default shown. Once a target is set, the suggested one included, an empty drop field is off.') }}
+                            @endif
+                        </flux:text>
+                    </div>
+                </details>
             </div>
 
             <div class="flex flex-wrap gap-2">

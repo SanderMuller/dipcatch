@@ -19,7 +19,7 @@ trait SuggestsAlert
     #[Locked]
     public ?string $bandFingerprint = null;
 
-    /** The per-unit target "Use this alert" filled in, so saving can tell it was kept. */
+    /** The per-unit target the suggested row filled in, so saving can tell it was kept. */
     #[Locked]
     public ?string $chosenTarget = null;
 
@@ -42,7 +42,7 @@ trait SuggestsAlert
 
         $this->band = $suggest->band($product);
         // From the product as it is after the ask: a shop that changed
-        // meanwhile gets `Unknown` for its new state, not a checking card
+        // meanwhile gets `Unknown` for its new state, not a checking row
         // that never asks again.
         $this->bandFingerprint = $suggest->fingerprint($product->refresh());
         $this->announce(__('Suggested alert updated.'));

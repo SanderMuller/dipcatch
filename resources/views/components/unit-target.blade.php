@@ -168,30 +168,34 @@
         </div>
     @endif
 
-    <div x-show="packs.length > 1">
-        <p class="text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Which pack do you buy?') }}</p>
-        <div class="mt-2 flex flex-wrap gap-2">
-            <template x-for="(option, index) in packs" :key="option.shopId">
-                <button
-                    type="button"
-                    @click="chosen = index"
-                    :aria-pressed="chosen === index"
-                    class="rounded-full px-3 py-1.5 text-base/6 tabular-nums ring-1 sm:text-sm/6"
-                    :class="chosen === index ? 'bg-zinc-900 text-white ring-zinc-900 dark:bg-white dark:text-zinc-900 dark:ring-white' : 'bg-white text-zinc-700 ring-zinc-950/10 hover:ring-zinc-950/20 dark:bg-white/5 dark:text-zinc-200 dark:ring-white/10'"
-                >
-                    <span x-text="option.pack"></span>
-                    <span class="opacity-60" x-text="'· ' + option.shop + (option.price === null ? '' : ' · ' + money(option.price))"></span>
-                </button>
-            </template>
-        </div>
+    {{-- Only when the packs differ in size: with one size, every choice
+         sets the same alert. --}}
+    @if (count(array_unique(array_column($packs, 'perPack'))) > 1)
+        <div>
+            <p class="text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Which pack do you buy?') }}</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+                <template x-for="(option, index) in packs" :key="option.shopId">
+                    <button
+                        type="button"
+                        @click="chosen = index"
+                        :aria-pressed="chosen === index"
+                        class="rounded-full px-3 py-1.5 text-base/6 tabular-nums ring-1 sm:text-sm/6"
+                        :class="chosen === index ? 'bg-zinc-900 text-white ring-zinc-900 dark:bg-white dark:text-zinc-900 dark:ring-white' : 'bg-white text-zinc-700 ring-zinc-950/10 hover:ring-zinc-950/20 dark:bg-white/5 dark:text-zinc-200 dark:ring-white/10'"
+                    >
+                        <span x-text="option.pack"></span>
+                        <span class="opacity-60" x-text="'· ' + option.shop + (option.price === null ? '' : ' · ' + money(option.price))"></span>
+                    </button>
+                </template>
+            </div>
 
-        {{-- The pack a person buys is often not the best rate. Said once,
-             with the way to switch, rather than hidden in the levels. --}}
-        <p x-show="cheaperElsewhere() > 0" class="mt-3 text-base/7 text-amber-800 sm:text-sm/6 dark:text-amber-300" data-test="unit-target-cheaper-pack">
-            <span x-text="@js(__('Your')) + ' ' + pack().pack + ' ' + @js(__('at')) + ' ' + pack().shop + ' ' + @js(__('costs')) + ' ' + money(pack().unitPrice, true) + ' ' + @js(__('per')) + ' ' + unitWord + '. ' + @js(__('The')) + ' ' + best().pack + ' ' + @js(__('at')) + ' ' + best().shop + ' ' + @js(__('is')) + ' ' + cheaperElsewhere() + '% ' + @js(__('cheaper per')) + ' ' + unitWord + '.'"></span>
-            <button type="button" @click="chosen = 0" class="font-medium underline underline-offset-4" x-text="@js(__('Use the')) + ' ' + best().pack"></button>
-        </p>
-    </div>
+            {{-- The pack a person buys is often not the best rate. Said once,
+                 with the way to switch, rather than hidden in the levels. --}}
+            <p x-show="cheaperElsewhere() > 0" class="mt-3 text-base/7 text-amber-800 sm:text-sm/6 dark:text-amber-300" data-test="unit-target-cheaper-pack">
+                <span x-text="@js(__('Your')) + ' ' + pack().pack + ' ' + @js(__('at')) + ' ' + pack().shop + ' ' + @js(__('costs')) + ' ' + money(pack().unitPrice, true) + ' ' + @js(__('per')) + ' ' + unitWord + '. ' + @js(__('The')) + ' ' + best().pack + ' ' + @js(__('at')) + ' ' + best().shop + ' ' + @js(__('is')) + ' ' + cheaperElsewhere() + '% ' + @js(__('cheaper per')) + ' ' + unitWord + '.'"></span>
+                <button type="button" @click="chosen = 0" class="font-medium underline underline-offset-4" x-text="@js(__('Use the')) + ' ' + best().pack"></button>
+            </p>
+        </div>
+    @endif
 
     <div>
         <p class="text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Alert me when it costs') }}</p>

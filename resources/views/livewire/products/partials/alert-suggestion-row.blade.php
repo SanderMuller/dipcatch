@@ -1,7 +1,7 @@
 {{--
-    The suggested alert as a row in the price list on the edit form: the
-    `suggestion` slot of x-unit-target. Needs `$suggestion`, `$product` and
-    `$asksJev`. Inside a button, so phrasing content only.
+    The suggested alert as a row in the price list: the `suggestion` slot of
+    x-unit-target. Needs `$suggestion`, `$product` and `$asksJev`. Inside a
+    button, so phrasing content only.
 --}}
 @php
     $perUnit = fn (string $amount): string => \App\Support\MoneyFormatter::unitPrice($amount, $product->currency) . ' ' . \App\Support\UnitWord::labelFor($suggestion->unit);
@@ -19,7 +19,7 @@
             {{ __(':depth% under normal', ['depth' => $suggestion->depth]) }}
         </span>
     </span>
-    @include('livewire.products.partials.alert-suggestion-insight', ['compact' => true])
+    @include('livewire.products.partials.alert-suggestion-insight')
     {{-- The rest once it is the chosen alert, so the list stays short. --}}
     <span x-show="isSuggested()" class="mt-1 block max-w-[65ch] text-sm/5 text-pretty text-zinc-500 dark:text-zinc-400" data-test="alert-suggestion-detail">
         @if ($suggestion->normalUnitPrice !== null)

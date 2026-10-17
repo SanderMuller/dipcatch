@@ -68,9 +68,10 @@ it('suggests an alert from the category on a free account, with the Pro teaser a
     $this->actingAs($user);
 
     alertStep(suggestionWizardProduct($user))
-        ->assertSeeHtml('data-test="alert-suggestion"')
-        ->assertSee('Pet food often goes about 20% off.')
-        ->assertSeeInOrder(['€3.20', 'for the 1 kg pack', 'Pet food often goes about 20% off.', 'Our suggestion is €3.20 /kg, 20% under the normal €4.00 /kg.'])
+        ->assertSeeHtml('data-test="unit-target-suggestion"')
+        ->assertSeeHtml('suggestedUnit: 3.2,')
+        ->assertSeeHtml('wire:click="useSuggestion"')
+        ->assertSeeInOrder(['Suggested alert', '20% under normal', 'Pet food often goes about 20% off.', 'The normal price is €4.00 /kg.'])
         ->assertSeeHtml('data-test="pro-teaser"')
         ->assertDontSeeHtml('wire:init="askJev"')
         // Called from the browser anyway: the server refuses it too.
@@ -88,19 +89,21 @@ it('asks Jev on Pro with AI help on, and suggests its band', function (): void {
 
     alertStep($product)
         ->assertSeeHtml('wire:init="askJev"')
-        // Until Jev answers, the card shows no numbers that could still change.
-        ->assertSeeHtml('data-test="alert-suggestion-checking"')
-        ->assertDontSee('Use this alert')
+        // Until Jev answers, the row shows no numbers that could still change.
+        ->assertSeeHtml('data-test="unit-target-suggestion-checking"')
+        ->assertSeeHtml('suggestedUnit: null,')
+        ->assertDontSee('under normal')
         ->call('askJev')
-        ->assertDontSeeHtml('data-test="alert-suggestion-checking"')
+        ->assertDontSeeHtml('data-test="unit-target-suggestion-checking"')
+        ->assertSeeHtml('suggestedUnit: 2,')
         ->assertSee('Products like this often go 50% off.')
-        ->assertSee('Our suggestion is €2.00 /kg')
+        ->assertSee('50% under normal')
         ->assertDontSeeHtml('data-test="pro-teaser"');
 
     // A reload reads the answer back instead of asking again.
     alertStep($product)
         ->assertDontSeeHtml('wire:init="askJev"')
-        ->assertSee('Our suggestion is €2.00 /kg');
+        ->assertSee('50% under normal');
 
     Http::assertSentCount(1);
 });
@@ -244,28 +247,20 @@ it('keeps a lower latch a reopened product already has', function (): void {
     expect((string) $product->refresh()->unit_price_notified)->toBe('2.5000');
 });
 
-it('steps the card aside for a person setting their own alert', function (): void {
+it('explains a product with no pack size, and offers no target', function (bool $pro): void {
     fakeJevAnswer();
-    $user = User::factory()->create();
-    $this->actingAs($user);
-
-    alertStep(suggestionWizardProduct($user))
-        ->call('setOwn')
-        ->assertDontSeeHtml('data-test="alert-suggestion"')
-        ->assertSeeHtml('data-test="wizard-alerts"');
-});
-
-it('explains a product with no pack size, and offers no target', function (): void {
-    fakeJevAnswer();
-    $user = User::factory()->create();
+    $user = $pro ? wizardProUser() : User::factory()->create();
     $product = Product::factory()->for($user)->create(['category' => ProductCategory::PetFood]);
     Shop::factory()->for($product)->create(['pack_quantity' => null, 'pack_unit' => null, 'current_price' => '4.00']);
     $this->actingAs($user);
 
     alertStep($product->refresh())
         ->assertSee('We could not read a pack size')
-        ->assertDontSeeHtml('data-test="use-suggestion"');
-});
+        ->assertDontSeeHtml('data-test="unit-target-suggestion"')
+        ->assertDontSeeHtml('wire:init="askJev"');
+
+    Http::assertNothingSent();
+})->with(['free' => [false], 'Pro with AI help, which has nothing to ask' => [true]]);
 
 it('keeps the pre-latch for the suggestion taken, when Jev answers after it', function (): void {
     fakeJevAnswer();
@@ -277,9 +272,9 @@ it('keeps the pre-latch for the suggestion taken, when Jev answers after it', fu
     alertStep($product)
         ->call('useSuggestion')
         ->assertSet('unitPriceTarget', '3.2')
-        // Jev's half-price band moves the card to €2.00; the fields keep €3.20.
+        // Jev's half-price band moves the suggestion to €2.00; the fields keep €3.20.
         ->call('askJev')
-        ->assertSee('Our suggestion is €2.00 /kg')
+        ->assertSee('50% under normal')
         ->call('saveAlerts');
 
     $product->refresh();
@@ -302,37 +297,12 @@ it('asks Jev again once the product changed, and shows no old answer meanwhile',
 
     $wizard->call('goToStep', 2)
         ->call('goToStep', 3)
-        ->assertSeeHtml('data-test="alert-suggestion-checking"')
+        ->assertSeeHtml('data-test="unit-target-suggestion-checking"')
         ->assertDontSee('Products like this often go 50% off.')
         ->call('askJev')
         ->assertSee('Products like this often go 50% off.');
 
     Http::assertSentCount(2);
-});
-
-it('empties the target the card filled in when the person sets their own', function (): void {
-    fakeJevAnswer();
-    $user = User::factory()->create();
-    $this->actingAs($user);
-
-    alertStep(suggestionWizardProduct($user))
-        ->call('useSuggestion')
-        ->call('setOwn')
-        ->assertSet('unitPriceTarget', null)
-        ->call('showSuggestion')
-        ->assertSeeHtml('data-test="alert-suggestion"');
-});
-
-it('keeps an alert the product already had when the person sets their own', function (): void {
-    fakeJevAnswer();
-    $user = User::factory()->create();
-    $product = suggestionWizardProduct($user);
-    $product->forceFill(['unit_price_target' => '2.5000'])->save();
-    $this->actingAs($user);
-
-    alertStep($product)
-        ->call('setOwn')
-        ->assertSet('unitPriceTarget', '2.5');
 });
 
 it('confirms the alert it set, for a screen reader', function (): void {
@@ -368,8 +338,8 @@ it('explains each kind of suggestion', function (string $category, string $now, 
     $wizard = alertStep($product->refresh())->assertSee($sentence);
 
     $offersTarget
-        ? $wizard->assertSeeHtml('data-test="use-suggestion"')
-        : $wizard->assertDontSeeHtml('data-test="use-suggestion"');
+        ? $wizard->assertSeeHtml('data-test="unit-target-suggestion"')
+        : $wizard->assertDontSeeHtml('data-test="unit-target-suggestion"');
 })->with([
     'a promotion on now' => ['food.pantry', '3.00', '4.00', null, 'Albert Heijn has this 25% off now.', true],
     // Pantry usually goes 35% off: halfway to 50% now is the 40% step.
@@ -406,7 +376,7 @@ it('says a fixed-price product gets the default alert', function (): void {
     alertStep(suggestionWizardProduct($user, now: '3.00'))
         ->call('askJev')
         ->assertSee('This product has a fixed price')
-        ->assertDontSeeHtml('data-test="use-suggestion"');
+        ->assertDontSeeHtml('data-test="unit-target-suggestion"');
 });
 
 it('stops using Jev\'s answer once the owner has no AI help any more', function (): void {
@@ -444,3 +414,23 @@ it('folds the other alerts away until one of them is set', function (): void {
     expect($wizard->html())->toMatch('/<details[^>]*\bopen\b[^>]*data-test="other-alerts"/')
         ->and($wizard->html())->toContain('12.5% drop');
 });
+
+it('asks which pack the person buys only when the shops sell different sizes', function (string $secondPack, bool $asks): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $product = suggestionWizardProduct($user);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://medpets.nl/p/1', 'currency' => 'EUR', 'current_in_stock' => true,
+        'pack_quantity' => $secondPack, 'pack_unit' => 'g',
+    ])->forceFill(['current_price' => '4.20'])->save();
+    $product->refresh()->recomputeCheapestShop();
+
+    $wizard = alertStep($product->refresh());
+
+    $wizard->assertSee('Alert me when it costs');
+    $asks ? $wizard->assertSee('Which pack do you buy?') : $wizard->assertDontSee('Which pack do you buy?');
+})->with([
+    'the same size at both shops' => ['1000.00', false],
+    'two sizes' => ['2000.00', true],
+]);

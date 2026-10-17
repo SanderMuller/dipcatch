@@ -93,9 +93,6 @@ final class AddProductWizard extends Component
 
     public ?string $limitMessage = null;
 
-    /** "Set my own": the card steps aside for the fields. */
-    public bool $settingOwn = false;
-
     /** What the last action did, for the page's status region: a screen reader hears it. */
     public string $status = '';
 
@@ -314,29 +311,7 @@ final class AddProductWizard extends Component
         $this->dropThresholdAbs = null;
         $this->targetPrice = null;
         $this->chosenTarget = $target;
-        $this->settingOwn = false;
         $this->status = __('Alert set to :target.', ['target' => $target]);
-    }
-
-    /**
-     * Hides the card, and empties the target the card filled in — but not an
-     * alert the product already had.
-     */
-    public function setOwn(): void
-    {
-        if ($this->chosenTarget !== null && $this->unitPriceTarget === $this->chosenTarget) {
-            $this->unitPriceTarget = null;
-        }
-
-        $this->settingOwn = true;
-        $this->chosenTarget = null;
-        $this->focus('wizard-alert-fields');
-    }
-
-    public function showSuggestion(): void
-    {
-        $this->settingOwn = false;
-        $this->focus('alert-suggestion-heading');
     }
 
     public function saveAlerts(SaveAlert $save): void

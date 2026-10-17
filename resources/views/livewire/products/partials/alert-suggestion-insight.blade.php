@@ -1,7 +1,6 @@
 {{--
-    Why the suggestion is the price it is, in one line with a light bulb, for
-    the suggested-alert card and the suggested row on the edit form. Needs
-    `$suggestion`; `$compact` sets the row's smaller type.
+    Why the suggestion is the price it is, for the suggested row. Needs
+    `$suggestion`.
 --}}
 @php
     $insight = match (true) {
@@ -13,12 +12,8 @@
     };
 @endphp
 @if ($insight !== null || $suggestion->promotionNowHost !== null)
-    <span @class([
-        'flex max-w-[65ch] gap-2 text-pretty text-zinc-900 dark:text-white',
-        'mt-1 text-sm/5' => $compact ?? false,
-        'mt-3 text-base/7 sm:text-sm/6' => ! ($compact ?? false),
-    ]) data-test="alert-suggestion-reason">
-        <flux:icon.light-bulb :variant="($compact ?? false) ? 'micro' : 'mini'" @class(['shrink-0 text-chart-line dark:text-chart', 'mt-0.5' => $compact ?? false, 'mt-1 sm:mt-0.5' => ! ($compact ?? false)]) />
+    <span class="mt-1 flex max-w-[65ch] gap-2 text-sm/5 text-pretty text-zinc-900 dark:text-white" data-test="alert-suggestion-reason">
+        <flux:icon.light-bulb variant="micro" class="mt-0.5 shrink-0 text-chart-line dark:text-chart" />
         <span>
             @if ($suggestion->promotionNowHost !== null)
                 {{ __(':shop has this :depth% off now.', ['shop' => \App\Support\ShopNames::label($suggestion->promotionNowHost), 'depth' => $suggestion->promotionNowDepth]) }}

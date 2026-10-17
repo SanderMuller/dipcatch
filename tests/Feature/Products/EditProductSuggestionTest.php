@@ -45,8 +45,6 @@ it('suggests an alert as a choice in the price list while the product has no pri
         ->assertSeeHtml('suggestedUnit: 3.2,')
         ->assertSeeHtml('wire:click="useSuggestion"')
         ->assertSeeInOrder(['Suggested alert', '20% under normal', 'Pet food often goes about 20% off.', 'The normal price is €4.00 /kg.'])
-        ->assertDontSeeHtml('data-test="alert-suggestion"')
-        ->assertDontSee('Set my own')
         ->assertDontSeeHtml('wire:init="askJev"');
 
     Http::assertNothingSent();
