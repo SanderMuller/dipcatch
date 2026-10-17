@@ -47,9 +47,7 @@
                 @if ($suggestionAvailable && $category === '')
                     <div class="flex flex-wrap items-center gap-3" data-test="category-suggestion">
                         @if ($suggestedCategory !== null)
-                            <flux:text>{{ __('Suggested:') }} <span class="font-medium">{{ $suggestedLabel }}</span></flux:text>
-                            <flux:button size="sm" variant="primary" wire:click="acceptSuggestion">{{ __('Use it') }}</flux:button>
-                            <flux:button size="sm" variant="ghost" wire:click="declineSuggestion">{{ __('Not this one') }}</flux:button>
+                            <x-category-suggestion :label="$suggestedLabel" accept="acceptSuggestion" decline="declineSuggestion" />
                         @elseif ($allowsAutoCategories)
                             <flux:button size="sm" icon="sparkles" wire:click="suggestCategory" wire:loading.attr="disabled" wire:target="suggestCategory">
                                 {{ __('Suggest a category') }}

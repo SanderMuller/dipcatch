@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Enums\CategorySource;
 use App\Enums\PackExclusion;
 use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
@@ -1287,4 +1288,36 @@ it('gives the price per unit its tooltip apart from the estimated badge beside i
     // The hint closes on the price; the badge and its own tooltip follow it.
     expect($html)->toMatch('/data-test="unit-price-hint">\s*€2\.00 \/piece\s*<\/span>/')
         ->and($html)->toContain('estimated');
+});
+
+it('offers the suggested category of an uncategorised product, and sets it in one click', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['category' => null, 'suggested_category' => ProductCategory::Cleaning]);
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSeeHtml('data-test="product-category-suggestion"')
+        ->assertSee(ProductCategory::Cleaning->label())
+        ->call('acceptSuggestedCategory')
+        ->assertDontSeeHtml('data-test="product-category-suggestion"')
+        ->assertSeeHtml('data-test="product-category-badge"');
+
+    expect($product->refresh()->category)->toBe(ProductCategory::Cleaning)
+        ->and($product->category_set_by)->toBe(CategorySource::User)
+        ->and($product->suggested_category)->toBeNull();
+});
+
+it('drops the suggested category for good when the person declines it', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['category' => null, 'suggested_category' => ProductCategory::Cleaning]);
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('declineSuggestedCategory')
+        ->assertDontSeeHtml('data-test="product-category-suggestion"')
+        ->assertSeeHtml('data-test="product-category-none"');
+
+    expect($product->refresh()->category)->toBeNull()
+        ->and($product->suggested_category)->toBeNull()
+        ->and($product->category_set_by)->toBe(CategorySource::User);
 });

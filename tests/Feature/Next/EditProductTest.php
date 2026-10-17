@@ -493,7 +493,7 @@ it('suggests a category to a Pro account, which can use it and save it as its ow
         ->assertSee('Suggest a category')
         ->call('suggestCategory')
         ->assertSet('suggestedCategory', 'food.coffee_tea')
-        ->assertSee('Suggested:')
+        ->assertSee('Suggested category:')
         ->assertSee('Coffee & tea')
         ->assertSee('Use it')
         ->call('acceptSuggestion')

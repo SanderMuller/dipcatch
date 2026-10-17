@@ -9,6 +9,7 @@ use App\Billing\HistoryWindow;
 use App\Billing\Plan;
 use App\Billing\PlanLimits;
 use App\Charts\PriceHistorySeries;
+use App\Enums\CategorySource;
 use App\Enums\ScrapeStatus;
 use App\Jobs\CheckShopPrice;
 use App\Livewire\ShoppingList\HeaderMenu;
@@ -367,6 +368,31 @@ final class ProductShow extends Component
         // The suggestions panel is a child component: without the event it
         // keeps listing the old suggestions and does not poll the new run.
         $this->dispatch('shop-removed');
+    }
+
+    /** Takes the category the AI suggested for a product it could not place with confidence. */
+    public function acceptSuggestedCategory(): void
+    {
+        $this->authorize('update', $this->product);
+
+        if ($this->product->category !== null || $this->product->suggested_category === null) {
+            return;
+        }
+
+        CategoriseProduct::chooseByUser($this->product, $this->product->suggested_category);
+        $this->product->save();
+    }
+
+    /** A decline is a choice, as on the edit form: the product is not asked about again. */
+    public function declineSuggestedCategory(): void
+    {
+        $this->authorize('update', $this->product);
+
+        if ($this->product->category !== null || $this->product->suggested_category === null) {
+            return;
+        }
+
+        $this->product->forceFill(['suggested_category' => null, 'category_set_by' => CategorySource::User])->save();
     }
 
     public function render(): View

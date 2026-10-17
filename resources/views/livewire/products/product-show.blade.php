@@ -78,6 +78,10 @@
                                 @endif
                             </span>
                         </div>
+
+                        @if ($product->category === null && ! $categorising && $product->suggested_category !== null)
+                            <x-category-suggestion class="mt-3" :label="$product->suggested_category->label()" accept="acceptSuggestedCategory" decline="declineSuggestedCategory" data-test="product-category-suggestion" />
+                        @endif
                     </div>
 
                     <x-product-status-pills :product="$product" :share-url="$shareUrl" class="flex-wrap items-center justify-end @max-2xl:hidden" />
