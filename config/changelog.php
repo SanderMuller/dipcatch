@@ -31,6 +31,12 @@ return [
         [
             'date' => '2026-10-18',
             'category' => 'feature',
+            'title' => 'A category for insect and pest control',
+            'body' => "Mosquito plug-ins, insect spray, ant bait and traps now have their own category under Household & cleaning. Before, they ended up with the air fresheners.",
+        ],
+        [
+            'date' => '2026-10-18',
+            'category' => 'feature',
             'title' => 'Give your products a category in one click',
             'body' => "Products without a category now show up on your dashboard. Pick one from the menu, or click \"Use it\" when DipCatch has a guess. With Pro, \"Suggest a category\" asks for one on the spot.\n\nThe product page shows that guess too.",
             'link' => ['route' => 'app.dashboard', 'label' => 'Go to your dashboard'],
