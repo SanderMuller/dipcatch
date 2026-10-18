@@ -54,7 +54,7 @@ enum ProductDepartment: string
             self::Food => 'Groceries: fresh food, meat, dairy, bread, pantry goods, snacks, frozen food, drinks, coffee, alcohol',
             self::Baby => 'For a baby or toddler: nappies, wipes, formula, baby food, feeding and care gear',
             self::Health => 'Personal care and health: skin, hair, teeth, medicines, supplements, shaving, make-up, perfume, feminine care',
-            self::Household => 'Keeping the house clean and running: laundry, cleaning products, paper, bin bags, storage, candles',
+            self::Household => 'Keeping the house clean and running: laundry, cleaning products, paper, bin bags, storage, candles, insect and pest control',
             self::Pets => 'For an animal: pet food, litter, pet care, pet accessories and toys',
             self::Electronics => 'Consumer electronics: phones, computers, audio, TV, cameras, wearables, cables and chargers, smart home',
             self::Home => 'Furnishing and equipping a home: furniture, kitchenware, bedding, lighting, decoration, appliances',

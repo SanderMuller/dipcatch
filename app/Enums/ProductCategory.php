@@ -37,6 +37,7 @@ enum ProductCategory: string
     case PaperDisposables = 'household.paper_disposables';
     case BagsStorage = 'household.bags_storage';
     case AirCandles = 'household.air_candles';
+    case PestControl = 'household.pest_control';
 
     case PetFood = 'pets.pet_food';
     case PetCare = 'pets.pet_care';
@@ -131,6 +132,7 @@ enum ProductCategory: string
             self::PaperDisposables => __('Paper & disposables'),
             self::BagsStorage => __('Bin bags & storage'),
             self::AirCandles => __('Air fresheners & candles'),
+            self::PestControl => __('Insect & pest control'),
             self::PetFood => __('Pet food'),
             self::PetCare => __('Pet care & litter'),
             self::PetAccessories => __('Pet accessories & toys'),
@@ -209,7 +211,8 @@ enum ProductCategory: string
             self::Cleaning => 'All-purpose cleaner, dish soap, dishwasher tablets, bleach, sponges, cloths',
             self::PaperDisposables => 'Toilet paper, kitchen roll, tissues, napkins, disposable plates',
             self::BagsStorage => 'Bin bags, freezer bags, cling film, foil, storage boxes',
-            self::AirCandles => 'Air freshener, scented candles, tea lights, matches, lighters',
+            self::AirCandles => 'Air freshener, scented candles, tea lights, matches, lighters; not insect repellent',
+            self::PestControl => 'Insect spray, mosquito plug-ins and their refills, ant bait, fly traps, moth repellent, mouse traps',
             self::PetFood => 'Dog food, cat food, treats, fish food, bird seed',
             self::PetCare => 'Cat litter, flea treatment, grooming, pet shampoo',
             self::PetAccessories => 'Leads, beds, bowls, toys, aquariums, cages',

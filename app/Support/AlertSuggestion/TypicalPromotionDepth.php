@@ -35,7 +35,7 @@ final class TypicalPromotionDepth
             ProductCategory::Shaving => 40,
             ProductCategory::MakeupFragrance => 30,
             ProductCategory::Laundry, ProductCategory::Cleaning, ProductCategory::PaperDisposables,
-            ProductCategory::BagsStorage, ProductCategory::AirCandles => 50,
+            ProductCategory::BagsStorage, ProductCategory::AirCandles, ProductCategory::PestControl => 50,
             ProductCategory::PetFood, ProductCategory::PetCare, ProductCategory::PetAccessories => 20,
             ProductCategory::PhonesTablets, ProductCategory::Computers, ProductCategory::Cameras,
             ProductCategory::Wearables, ProductCategory::Accessories => 20,
