@@ -31,8 +31,9 @@ return [
         [
             'date' => '2026-10-18',
             'category' => 'feature',
-            'title' => 'Accept a suggested category in one click',
-            'body' => "When DipCatch isn't sure which category a product belongs to, the product page now shows its best guess. Click \"Use it\" to keep it, or \"Not this one\" to drop it.",
+            'title' => 'Give your products a category in one click',
+            'body' => "Products without a category now show up on your dashboard. Pick one from the menu, or click \"Use it\" when DipCatch has a guess. With Pro, \"Suggest a category\" asks for one on the spot.\n\nThe product page shows that guess too.",
+            'link' => ['route' => 'app.dashboard', 'label' => 'Go to your dashboard'],
         ],
         [
             'date' => '2026-10-18',
