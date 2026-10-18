@@ -126,6 +126,40 @@ final class CategoriseProduct
     }
 
     /**
+     * The "Suggest a category" button: asks for a category now and keeps the
+     * winner as the product's suggestion, even below the guard an automatic
+     * category needs. Returns why nothing was suggested, or null once a
+     * suggestion is stored. The caller checks the plan.
+     */
+    public static function suggest(Product $product): ?string
+    {
+        if ($product->user === null || ! app(CategorisationBudget::class)->allows($product->user)) {
+            return __('You have used today\'s suggestions. Try again tomorrow.');
+        }
+
+        try {
+            $verdict = app(TypeSafeClient::class)->categorise($product);
+        } catch (TypeSafeRequestFailed $e) {
+            Log::warning('Category suggestion failed.', ['product_id' => $product->id, 'error' => $e->getMessage(), 'exception' => $e]);
+
+            return __('No suggestion right now. Try again in a moment.');
+        }
+
+        if ($verdict->winner === null) {
+            return __('Nothing fits this product well enough to suggest.');
+        }
+
+        $product->forceFill(['suggested_category' => $verdict->winner])->save();
+
+        // Only onto the title Jev read, as in store().
+        if ($verdict->trackingIdea !== null) {
+            Product::query()->whereKey($product->id)->where('title', $product->title)->update(['tracking_idea' => $verdict->trackingIdea->value]);
+        }
+
+        return null;
+    }
+
+    /**
      * A person's choice, a clear included. Final: automatic categorisation
      * only writes where the source is still null. Clears any pending
      * suggestion, since the edit form offers a stored one whenever the

@@ -16,16 +16,13 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Services\ShopDiscovery\WebShopDiscovery;
-use App\Services\TypeSafe\CategorisationBudget;
 use App\Services\TypeSafe\TypeSafeClient;
-use App\Services\TypeSafe\TypeSafeRequestFailed;
 use App\Support\Iso4217;
 use App\Support\MoneyFormatter;
 use App\Support\UnitTargetGuide;
 use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use SanderMuller\FluentValidation\Contracts\FluentRuleContract;
@@ -197,40 +194,11 @@ final class EditProduct extends Component
             return;
         }
 
-        if ($this->product->suggested_category !== null) {
-            $this->suggestedCategory = $this->product->suggested_category->value;
-
-            return;
+        if ($this->product->suggested_category === null) {
+            $this->suggestionMessage = CategoriseProduct::suggest($this->product);
         }
 
-        if ($this->product->user === null || ! app(CategorisationBudget::class)->allows($this->product->user)) {
-            $this->suggestionMessage = __('You have used today\'s suggestions. Try again tomorrow.');
-
-            return;
-        }
-
-        try {
-            $verdict = app(TypeSafeClient::class)->categorise($this->product);
-        } catch (TypeSafeRequestFailed $e) {
-            Log::warning('Category suggestion failed.', ['product_id' => $this->product->id, 'error' => $e->getMessage(), 'exception' => $e]);
-            $this->suggestionMessage = __('No suggestion right now. Try again in a moment.');
-
-            return;
-        }
-
-        if ($verdict->winner === null) {
-            $this->suggestionMessage = __('Nothing fits this product well enough to suggest.');
-
-            return;
-        }
-
-        $this->suggestedCategory = $verdict->winner->value;
-        $this->product->forceFill(['suggested_category' => $verdict->winner])->save();
-
-        // Only onto the title Jev read, as in CategoriseProduct::store().
-        if ($verdict->trackingIdea !== null) {
-            Product::query()->whereKey($this->product->id)->where('title', $this->product->title)->update(['tracking_idea' => $verdict->trackingIdea->value]);
-        }
+        $this->suggestedCategory = $this->product->suggested_category?->value;
     }
 
     public function acceptSuggestion(): void

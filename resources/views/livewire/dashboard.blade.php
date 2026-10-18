@@ -210,6 +210,7 @@
 
             @if ($hasAnyProduct)
                 <livewire:dashboard-suggested-shops />
+                <livewire:dashboard-category-suggestions />
             @endif
 
             @if ($digest->endingSoon !== [] || $digest->failing !== [] || $digest->singleShop !== [])
