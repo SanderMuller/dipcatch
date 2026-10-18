@@ -25,6 +25,11 @@ function nowMarkerData(array $prices): array
     ];
 }
 
+/** A drop counts as today's on the Amsterdam calendar, so "2 hours ago" must not cross midnight. */
+beforeEach(function (): void {
+    $this->travelTo(now('Europe/Amsterdam')->setTime(15, 0));
+});
+
 it('marks the newest reading as now, and names a fall within the last day', function (): void {
     $chart = PriceHistoryFluxChart::fromData(nowMarkerData([
         now()->subDays(10)->format('Y-m-d H:i:s') => 647.0,
@@ -103,7 +108,6 @@ it('labels where the price line ends on the product page', function (): void {
 });
 
 it('says how much the price fell today on the product page', function (): void {
-    $this->travelTo(now('Europe/Amsterdam')->setTime(15, 0));
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'cheapest_price' => '85.00']);
     ProductCheapestHistory::factory()->for($product)->create(['cheapest_shop_id' => null, 'cheapest_price' => '100.00', 'started_at' => now()->subDays(10), 'ended_at' => now()->subHours(2)]);
