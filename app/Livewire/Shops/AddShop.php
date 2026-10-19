@@ -89,6 +89,11 @@ final class AddShop extends Component
         return $this->product;
     }
 
+    protected function draftCountsItems(): bool
+    {
+        return $this->product->category?->department()->countsItems() === true;
+    }
+
     protected function onPreviewShown(ProbeOutcome $outcome): void
     {
         $this->sameProductChance = app(ShopMatchCheck::class)->draft($this->product, $this->shopDraft(), anyPack: $this->anyPackUrl === $this->url);

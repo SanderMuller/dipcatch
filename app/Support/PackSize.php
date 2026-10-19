@@ -87,6 +87,9 @@ final readonly class PackSize
      */
     private const string NUMBER = '(\d+(?:[.,]\d+)?)(?![%+])';
 
+    /** Lengths, which no size is read in: a count followed by one measures, it does not count. */
+    private const string LENGTH_UNITS = 'mm|cm|dm|m|meter|metre|km|inch|inches|ft';
+
     /**
      * How many decimals a unit price is carried at. Matches the scale of the
      * columns that store one and the bcmath scale the drop engine compares at,
@@ -140,8 +143,9 @@ final readonly class PackSize
         preg_match_all('/' . self::NUMBER . '\s*[x\x{00D7}]\s*' . self::NUMBER . '\s*(' . $sizeUnitAlt . ')\b/iu', $text, $formA, PREG_SET_ORDER);
         preg_match_all('/' . self::NUMBER . '\s*(?:\S+\s+)?\x{00E0}\s*' . self::NUMBER . '\s*(' . $sizeUnitAlt . ')\b/iu', $text, $formB, PREG_SET_ORDER);
         preg_match_all('/' . self::NUMBER . '-pack\b/i', $text, $formC, PREG_SET_ORDER);
+        preg_match_all(self::sizeFirstCrossFormPattern(), $text, $formD, PREG_SET_ORDER);
 
-        $multipackCount = count($formA) + count($formB) + count($formC);
+        $multipackCount = count($formA) + count($formB) + count($formC) + count($formD);
 
         if ($multipackCount > 1) {
             return null;
@@ -154,6 +158,11 @@ final readonly class PackSize
 
             if ($formB !== []) {
                 return self::resolveCountedMultipack(array_values($formB[0]));
+            }
+
+            // `330 ml x 24`: the same pack as `24 x 330 ml`, written size first.
+            if ($formD !== []) {
+                return self::resolveCountedMultipack([$formD[0][0], $formD[0][3], $formD[0][1], $formD[0][2]]);
             }
 
             return self::resolvePackMultipack($formC[0], $text, $massAlt, $volumeAlt);
@@ -202,9 +211,10 @@ final readonly class PackSize
      * One exception, in {@see StatedPackSize::wholePack()}: a shop that states
      * the size of a single item while its own title counts the items has
      * described the item, not the pack. `$wholePack` turns it off, for a size
-     * the shop's own unit price confirms.
+     * the shop's own unit price confirms. `$countsItems` reads a title as
+     * {@see StatedPackSize::fromTitle()} does for a thing rather than its contents.
      */
-    public static function resolve(?string $packSize, bool $authoritative, ?string $title, bool $wholePack = false): ?self
+    public static function resolve(?string $packSize, bool $authoritative, ?string $title, bool $wholePack = false, bool $countsItems = false): ?self
     {
         $parsed = self::parse($packSize);
 
@@ -216,37 +226,7 @@ final readonly class PackSize
             return null;
         }
 
-        return StatedPackSize::fromTitle($title);
-    }
-
-    /**
-     * How many items a title counts, whichever way it writes them: `12 x 55 g`
-     * and a leading piece count (`12st ...`, `12 stuks ...`) both give 12.
-     *
-     * Null when the title counts nothing, or counts more than one thing.
-     */
-    public static function itemCountIn(string $title): ?float
-    {
-        if (preg_match_all(self::crossFormPattern(), $title, $matches, PREG_SET_ORDER) === 1) {
-            return self::toNumber($matches[0][1]);
-        }
-
-        $pieces = array_unique(self::collectValues($title, self::alternation(self::PIECE_WORDS), units: null));
-
-        return count($pieces) === 1 ? reset($pieces) : null;
-    }
-
-    /**
-     * The item size a `<count> x <size>` title states, so a caller can tell it
-     * apart from the size of the whole pack.
-     */
-    public static function crossFormItemIn(string $title): ?self
-    {
-        if (preg_match_all(self::crossFormPattern(), $title, $matches, PREG_SET_ORDER) !== 1) {
-            return null;
-        }
-
-        return self::parse($matches[0][2] . ' ' . $matches[0][3]);
+        return StatedPackSize::fromTitle($title, $countsItems);
     }
 
     /** A number followed by a piece word, for a caller that needs its position. */
@@ -262,14 +242,28 @@ final readonly class PackSize
             . '|' . self::alternation(array_keys(self::VOLUME_UNITS)) . ')\b/iu';
     }
 
-    /** True when the title writes its multipack as `<count> x <size>`. */
+    /** True when the title writes its multipack as `<count> x <size>`, or `<size> x <count>`. */
     public static function hasCrossForm(string $title): bool
     {
-        return preg_match(self::crossFormPattern(), $title) === 1;
+        return preg_match(self::crossFormPattern(), $title) === 1 || preg_match(self::sizeFirstCrossFormPattern(), $title) === 1;
+    }
+
+    /**
+     * `<size><unit> x <count>`, as British and Amazon listings write a
+     * multipack: "330ml x 24", "350 ml x4". The count carries no unit and no
+     * decimal, so "20 cm x 30" (no unit read) and "1 kg x 2,5" stay out, and
+     * no length either: "Bakvorm 2 l x 24 cm" is a 2 litre tin, 24 cm across.
+     * Nor a free one beside it, "50 g x 3 + 1 gratis", which no count reads.
+     */
+    public static function sizeFirstCrossFormPattern(): string
+    {
+        $sizeAlt = self::alternation(array_keys(self::MASS_UNITS)) . '|' . self::alternation(array_keys(self::VOLUME_UNITS));
+
+        return '/' . self::NUMBER . '\s*(' . $sizeAlt . ')\s*[x\x{00D7}]\s*(\d+)(?![\d.,])(?!\s*\+)(?!\s*(?:' . $sizeAlt . '|' . self::alternation(self::PIECE_WORDS) . '|' . self::LENGTH_UNITS . ')\b)(?!\s*["\x{2033}])/iu';
     }
 
     /** `<count> x <size><unit>`, the shape every caller here looks for first. */
-    private static function crossFormPattern(): string
+    public static function crossFormPattern(): string
     {
         $sizeUnitAlt = self::alternation(array_keys(self::MASS_UNITS))
             . '|' . self::alternation(array_keys(self::VOLUME_UNITS))

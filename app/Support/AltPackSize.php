@@ -45,7 +45,7 @@ final readonly class AltPackSize
             return null;
         }
 
-        $count = PackSize::itemCountIn($title) ?? StatedPackSize::setCountIn($title);
+        $count = ItemCount::ofSecondSize($title);
 
         return $count !== null && $count > 1 ? PackSize::of($count, 'piece') : null;
     }

@@ -310,7 +310,18 @@ trait DrivesShopProbe
             titleSelector: $manual ? (trim($this->titleSelector) ?: null) : null,
             imageSelector: $manual ? (trim($this->imageSelector) ?: null) : null,
             variantKey: $this->chosenVariantKey,
+            countsItems: $this->draftCountsItems(),
         );
+    }
+
+    /**
+     * Whether the product the shop joins is a thing rather than its contents,
+     * so a count after the size reads as items, as the price check reads it.
+     * A product still being created has no category yet.
+     */
+    protected function draftCountsItems(): bool
+    {
+        return false;
     }
 
     /**

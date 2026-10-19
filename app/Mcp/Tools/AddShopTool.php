@@ -96,7 +96,7 @@ final class AddShopTool extends Tool
         }
 
         if ($confirming) {
-            $draft = DraftToken::open($this->user($request), $this->str($validated, 'draft'), $this->key($product));
+            $draft = DraftToken::open($this->user($request), $this->str($validated, 'draft'), $this->key($product), countsItems: $product->category?->department()->countsItems() === true);
 
             if ($draft instanceof DraftFailure) {
                 return Response::error($draft->message('add_shop'));
@@ -192,6 +192,7 @@ final class AddShopTool extends Tool
             (bool) ($snapshot['pack_size_authoritative'] ?? false),
             is_string($snapshot['title'] ?? null) ? $snapshot['title'] : null,
             (bool) ($snapshot['pack_size_whole_pack'] ?? false),
+            countsItems: $product->category?->department()->countsItems() === true,
         );
 
         if (! $drafted instanceof PackSize) {

@@ -192,6 +192,7 @@ final readonly class ShopDraft
         ?string $imageSelector = null,
         ?string $variantKey = null,
         ?string $titleOverride = null,
+        bool $countsItems = false,
     ): self {
         $singleItemPrice = self::string($snapshot, 'single_item_price') ?? self::string($snapshot, 'price') ?? '';
         $bundleOffer = BundleOffer::stored(
@@ -214,6 +215,7 @@ final readonly class ShopDraft
             (bool) ($snapshot['pack_size_authoritative'] ?? false),
             self::string($snapshot, 'title'),
             (bool) ($snapshot['pack_size_whole_pack'] ?? false),
+            $countsItems,
         );
         $altSizes = is_array($snapshot['alt_pack_sizes'] ?? null)
             ? array_values(array_filter($snapshot['alt_pack_sizes'], is_string(...)))

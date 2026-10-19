@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Enums\ProductDepartment;
+
 /**
  * Reconciles the pack size a shop states with the one its own title implies.
  *
@@ -29,20 +31,6 @@ final readonly class StatedPackSize
     private const string BARE_COUNT_PATTERN = '/(?<![\d.,])(\d+)\s*[x\x{00D7}](?!\s*\d)/iu';
 
     /**
-     * A count a title names as a set or a pack of so many, in the languages
-     * of the shops DipCatch reads: "set van 4", "pack of 6", "lot de 4",
-     * "4er-Set", "confezione da 6". Unlike a bare piece count, the words say
-     * the size beside it is one item's, wherever the count stands.
-     *
-     * No "4-delig" or "3-teilig": a three-piece pan set holds three
-     * different pans, not three of one size.
-     */
-    private const array SET_COUNT_PATTERNS = [
-        '/\b(?:set|pak|doos|verpakking|pack|box|case|lot|coffret|bo[iî]te|juego|confezione|packung)\s+(?:van|of|de|di|da|mit)\s+(\d+)\b/iu',
-        '/\b(\d+)er[\s-]?(?:set|pack|packung)\b/iu',
-    ];
-
-    /**
      * The whole pack, when the stated size is the size of one item out of a
      * multipack the title counts — null when the stated size stands.
      *
@@ -63,7 +51,7 @@ final readonly class StatedPackSize
             return null;
         }
 
-        $count = PackSize::itemCountIn($title) ?? self::bareCountIn($title) ?? self::setCountIn($title) ?? 0.0;
+        $count = ItemCount::in($title) ?? self::bareCountIn($title) ?? ItemCount::setIn($title) ?? 0.0;
 
         return $count > 1 ? PackSize::of($stated->quantity * $count, $stated->unit) : null;
     }
@@ -76,20 +64,37 @@ final readonly class StatedPackSize
      * many. Foodello states no structured size at all, so this is the path
      * its rows take.
      */
-    public static function fromTitle(?string $title): ?PackSize
+    public static function fromTitle(?string $title, bool $countsItems = false): ?PackSize
     {
         if ($title === null) {
             return null;
         }
 
         $parsed = PackSize::parse($title);
-        $count = self::leadingCountBeforeSize($title) ?? self::setCountIn($title);
+        $count = self::leadingCountBeforeSize($title) ?? ItemCount::setIn($title) ?? ($countsItems ? self::trailingCount($title) : null);
 
         if (! $parsed instanceof PackSize || $count === null || $parsed->unit === 'piece') {
             return $parsed;
         }
 
         return PackSize::of($parsed->quantity * $count, $parsed->unit) ?? $parsed;
+    }
+
+    /**
+     * A piece count after the size, for a product that is a thing rather
+     * than its contents ({@see ProductDepartment::countsItems()}):
+     * "Glasses 350 ml, 4 pcs" is four glasses, where "Koffie 500 g 20 zakjes"
+     * is one 500 g bag of twenty. Null beside a form that counts already.
+     */
+    private static function trailingCount(string $title): ?float
+    {
+        if (PackSize::hasCrossForm($title) || preg_match('/\d-pack\b/i', $title) === 1) {
+            return null;
+        }
+
+        $count = ItemCount::in($title);
+
+        return $count !== null && $count > 1 ? $count : null;
     }
 
     /**
@@ -132,28 +137,6 @@ final readonly class StatedPackSize
         return (float) $matches[0][1];
     }
 
-    /**
-     * How many items a "set of 4" counts. Null unless the title names one
-     * such count, and never beside a cross form, which counts them already.
-     */
-    public static function setCountIn(string $title): ?float
-    {
-        if (PackSize::hasCrossForm($title)) {
-            return null;
-        }
-
-        $counts = [];
-
-        foreach (self::SET_COUNT_PATTERNS as $pattern) {
-            preg_match_all($pattern, $title, $matches);
-            array_push($counts, ...array_map(floatval(...), $matches[1]));
-        }
-
-        $counts = array_unique($counts);
-
-        return count($counts) === 1 && $counts[0] > 1 ? $counts[0] : null;
-    }
-
     /** @return array{value: float, offset: int}|null */
     private static function firstMatch(string $pattern, string $title): ?array
     {
@@ -167,7 +150,7 @@ final readonly class StatedPackSize
     /** True when the size the shop states is the size of one item in the title. */
     private static function restatesTheItem(PackSize $stated, string $title): bool
     {
-        $crossForm = PackSize::crossFormItemIn($title);
+        $crossForm = ItemCount::crossFormItemIn($title);
 
         if ($crossForm instanceof PackSize) {
             return $stated->isSameSizeAs($crossForm);

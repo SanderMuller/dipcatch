@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Support\ItemCount;
 use App\Support\PackSize;
 use App\Support\StatedPackSize;
 
@@ -430,6 +431,63 @@ test('a piece count is read in the languages of the shops beyond the Netherlands
     ['Bougies chauffe-plat 30 pièces', 30.0],
     ['Capsule caffè 10 pezzi', 10.0],
     ['Cápsulas 16 unidades', 16.0],
+]);
+
+test('a multipack written size first counts the items', function (string $title, float $quantity, float $items): void {
+    // British and Amazon listings write "330ml x 24". Read as one can, the
+    // pack looked 24 times dearer per litre than it is.
+    $size = PackSize::resolve(packSize: null, authoritative: false, title: $title);
+
+    expect($size?->quantity)->toBe($quantity)
+        ->and(ItemCount::in($title))->toBe($items);
+})->with([
+    ['Coca-Cola 330ml x 24', 7920.0, 24.0],
+    ['Glazen 350 ml x4', 1400.0, 4.0],
+    ['Pepsi Max 24 x 330 ml', 7920.0, 24.0],
+]);
+
+test('a size-first multiplier needs a bare whole count', function (string $title, ?float $expected): void {
+    expect(PackSize::resolve(packSize: null, authoritative: false, title: $title)?->quantity)->toBe($expected);
+})->with([
+    // A decimal is a second size, not a count.
+    'a decimal after the x' => ['Suiker 1 kg x 2,5', 1000.0],
+    'no unit before the x' => ['Plank 20 cm x 30', null],
+    // A length after the count measures the item; it counts nothing.
+    'a length after the count' => ['Bakvorm 2 l x 24 cm', 2000.0],
+    'a length in inches' => ['Koelbox 24 l x 40 inch', 24000.0],
+    // The free one is not part of a count: no size-first form reads it.
+    'a free one beside it' => ['Sticks 50 g x 3 + 1 gratis', 50.0],
+]);
+
+test('a shop stating the whole of a dash pack keeps it, counted once', function (string $stated, string $title, float $expected): void {
+    expect(PackSize::resolve($stated, authoritative: true, title: $title)?->quantity)->toBe($expected);
+})->with([
+    ['1980 ml', 'Cola 6-pack 330 ml', 1980.0],
+    ['7,92 l', 'Bier 24-pack 7,92 l', 7920.0],
+    ['9 l', 'Pepsi Max 6-pack 9 l', 9000.0],
+]);
+
+test('a stated size beside a length is not multiplied by it', function (): void {
+    expect(PackSize::resolve('2 l', authoritative: true, title: 'Bakvorm 2 l x 24 cm')?->quantity)->toBe(2000.0);
+});
+
+test('a dash pack counts its items as well as sizing the pack', function (): void {
+    expect(PackSize::resolve(packSize: null, authoritative: false, title: 'Mugs 4-pack 350 ml')?->quantity)->toBe(1400.0)
+        ->and(ItemCount::ofSecondSize('Mugs 4-pack 350 ml'))->toBe(4.0);
+});
+
+test('a count after the size is the number of items only for a thing, not its contents', function (string $title, float $contents, float $thing): void {
+    // "500 g 20 zakjes" is one 500 g bag of twenty pads; "350 ml, 4 pcs" is
+    // four glasses. The words cannot tell them apart; the department can.
+    expect(PackSize::resolve(packSize: null, authoritative: false, title: $title)?->quantity)->toBe($contents)
+        ->and(PackSize::resolve(packSize: null, authoritative: false, title: $title, countsItems: true)?->quantity)->toBe($thing);
+})->with([
+    ['Glasses, 350 ml, 4 pcs', 350.0, 1400.0],
+    ['Gläser 350 ml 4 Stück', 350.0, 1400.0],
+    ['Mok 350 ml (4 stuks)', 350.0, 1400.0],
+    // Counted already: the department adds nothing.
+    ['Mugs 4-pack 350 ml', 1400.0, 1400.0],
+    ['Glazen 350 ml x4', 1400.0, 1400.0],
 ]);
 
 // --- Dutch drugstore count abbreviations -------------------------------------

@@ -373,7 +373,13 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 // unparseable one clears the columns, because a stale unit
                 // price is worse than none. A title fallback only ever fills:
                 // a flaky title must not wipe a known size (spec Section 4).
-                $packSize = PackSize::resolve($snapshot->packSize, $snapshot->packSizeAuthoritative, $snapshot->title, $snapshot->packSizeIsWholePack);
+                $packSize = PackSize::resolve(
+                    $snapshot->packSize,
+                    $snapshot->packSizeAuthoritative,
+                    $snapshot->title,
+                    $snapshot->packSizeIsWholePack,
+                    countsItems: $locked->product?->category?->department()->countsItems() === true,
+                );
                 if ($snapshot->packSizeAuthoritative || $packSize !== null) {
                     $updates['pack_quantity'] = $packSize?->quantity;
                     $updates['pack_unit'] = $packSize?->unit;

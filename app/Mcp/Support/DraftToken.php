@@ -63,7 +63,7 @@ final readonly class DraftToken
      * The draft, or the reason it was refused. Each reason has its own
      * recovery, so they never collapse into one message.
      */
-    public static function open(User $owner, string $token, ?string $productId = null): ShopDraft|DraftFailure
+    public static function open(User $owner, string $token, ?string $productId = null, bool $countsItems = false): ShopDraft|DraftFailure
     {
         try {
             $payload = json_decode(Crypt::decryptString($token), true, 512, JSON_THROW_ON_ERROR);
@@ -135,6 +135,7 @@ final readonly class DraftToken
             adapterKey: $adapterKey,
             variantKey: is_string($variantKey) ? $variantKey : null,
             titleOverride: is_string($titleOverride) ? $titleOverride : null,
+            countsItems: $countsItems,
         );
     }
 }
