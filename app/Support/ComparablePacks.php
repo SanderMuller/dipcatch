@@ -48,6 +48,7 @@ final readonly class ComparablePacks
     /**
      * @param  array<string, ComparablePack>  $packs  keyed by shop id
      * @param  array<string, true>  $altsInDoubt  keyed by shop id
+     * @param  array<string, float>  $itemCounts  keyed by shop id, see {@see itemCountFor()}
      */
     private function __construct(
         private ?string $unit,
@@ -55,6 +56,7 @@ final readonly class ComparablePacks
         private ItemSizes $itemSizes,
         private ?PackSize $agreed = null,
         private array $altsInDoubt = [],
+        private array $itemCounts = [],
     ) {}
 
     /**
@@ -113,7 +115,21 @@ final readonly class ComparablePacks
             $packs[(string) $shop->id] = self::resolveOne($shop, $currency, $unit, $agreed, $median, $itemSizes);
         }
 
-        return new self($unit, $packs, $itemSizes, $agreed, $altsInDoubt);
+        return new self($unit, $packs, $itemSizes, $agreed, $altsInDoubt, $itemSizes->wholeItemCounts(array_map(fn (ComparablePack $pack): ?PackSize => $pack->size, $packs)));
+    }
+
+    /**
+     * How many of one shared item this shop's pack holds: 4 for a set of four
+     * 350 ml glasses beside a single one. A price per litre ranks the two
+     * right, but "€5.75 each" is what a person compares glasses on.
+     *
+     * Only while every shop in the comparison holds a whole number of the
+     * same item, and not all the same number: with one pack size everywhere
+     * the pack price already says it.
+     */
+    public function itemCountFor(Shop $shop): ?float
+    {
+        return $this->itemCounts[(string) $shop->id] ?? null;
     }
 
     /**

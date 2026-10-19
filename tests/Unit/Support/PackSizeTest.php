@@ -399,6 +399,39 @@ test('a bare count multiplies the item size the shop stated', function (): void 
         ->and($size?->unit)->toBe('ml');
 });
 
+test('a title that names a set or pack counts its items, in every shop language', function (?string $stated, bool $authoritative, string $title, float $expected): void {
+    // The Xenos case: a set of four 350 ml glasses read as 350 ml, so it
+    // looked four times dearer per litre than the single glass beside it.
+    expect(PackSize::resolve($stated, authoritative: $authoritative, title: $title)?->quantity)->toBe($expected);
+})->with([
+    'the title alone' => [null, false, 'Dubbelwandige glazen - 350 ml - set van 4', 1400.0],
+    'a stated item size' => ['350 ml', true, 'Dubbelwandige glazen - 350 ml - set van 4', 1400.0],
+    'in English' => [null, false, 'Drinking glasses 250 ml, set of 6', 1500.0],
+    'an Amazon pack' => ['330 ml', true, 'Coca-Cola Zero 330 ml (Pack of 24)', 7920.0],
+    'in German' => [null, false, 'Trinkgläser 300 ml, 6er-Set', 1800.0],
+    'in German, spelled out' => [null, false, 'Gläser Set mit 4 Stück 350 ml', 1400.0],
+    'in French' => [null, false, 'Verres 250 ml - lot de 6', 1500.0],
+    'in Italian' => [null, false, 'Bicchieri 300 ml confezione da 6', 1800.0],
+    // A pan set is pans of several sizes, not several of one.
+    'a numbered set of parts' => [null, false, 'Pannenset 3-delig 2,5 l', 2500.0],
+    'two different set counts' => [null, false, 'Set van 2, set of 4, 350 ml', 350.0],
+    'a set of one' => [null, false, 'Glas 350 ml - set van 1', 350.0],
+    // The cross form already counts the items; the set must not count them again.
+    'beside a cross form' => [null, false, 'Set van 2 x 500 ml', 1000.0],
+    'a stated pack total' => ['1400 ml', true, 'Dubbelwandige glazen - 350 ml - set van 4', 1400.0],
+]);
+
+test('a piece count is read in the languages of the shops beyond the Netherlands', function (string $title, float $expected): void {
+    expect(PackSize::parse($title)?->quantity)->toBe($expected)
+        ->and(PackSize::parse($title)?->unit)->toBe('piece');
+})->with([
+    ['Teelichter 50 Stück', 50.0],
+    ['Kaffeepads 36 Stueck', 36.0],
+    ['Bougies chauffe-plat 30 pièces', 30.0],
+    ['Capsule caffè 10 pezzi', 10.0],
+    ['Cápsulas 16 unidades', 16.0],
+]);
+
 // --- Dutch drugstore count abbreviations -------------------------------------
 
 test('a count written as a drugstore abbreviation is read', function (string $title, float $expected): void {

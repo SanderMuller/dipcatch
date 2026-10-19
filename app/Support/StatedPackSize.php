@@ -29,12 +29,27 @@ final readonly class StatedPackSize
     private const string BARE_COUNT_PATTERN = '/(?<![\d.,])(\d+)\s*[x\x{00D7}](?!\s*\d)/iu';
 
     /**
+     * A count a title names as a set or a pack of so many, in the languages
+     * of the shops DipCatch reads: "set van 4", "pack of 6", "lot de 4",
+     * "4er-Set", "confezione da 6". Unlike a bare piece count, the words say
+     * the size beside it is one item's, wherever the count stands.
+     *
+     * No "4-delig" or "3-teilig": a three-piece pan set holds three
+     * different pans, not three of one size.
+     */
+    private const array SET_COUNT_PATTERNS = [
+        '/\b(?:set|pak|doos|verpakking|pack|box|case|lot|coffret|bo[iî]te|juego|confezione|packung)\s+(?:van|of|de|di|da|mit)\s+(\d+)\b/iu',
+        '/\b(\d+)er[\s-]?(?:set|pack|packung)\b/iu',
+    ];
+
+    /**
      * The whole pack, when the stated size is the size of one item out of a
      * multipack the title counts — null when the stated size stands.
      *
-     * Two title shapes count items: `12 x 55 g`, and a leading piece count
+     * Three title shapes count items: `12 x 55 g`, a leading piece count
      * with the size elsewhere in the string (`12st ... 55g`, which is how
-     * Foodello writes every listing). Both mean twelve of them.
+     * Foodello writes every listing), and a named set (`55 g, pack of 12`).
+     * All mean twelve of them.
      *
      * Deliberately narrow. The stated size has to equal the title's item size
      * exactly, and has to be a weight or a volume. Anything else leaves the
@@ -48,7 +63,7 @@ final readonly class StatedPackSize
             return null;
         }
 
-        $count = PackSize::itemCountIn($title) ?? self::bareCountIn($title) ?? 0.0;
+        $count = PackSize::itemCountIn($title) ?? self::bareCountIn($title) ?? self::setCountIn($title) ?? 0.0;
 
         return $count > 1 ? PackSize::of($stated->quantity * $count, $stated->unit) : null;
     }
@@ -68,7 +83,7 @@ final readonly class StatedPackSize
         }
 
         $parsed = PackSize::parse($title);
-        $count = self::leadingCountBeforeSize($title);
+        $count = self::leadingCountBeforeSize($title) ?? self::setCountIn($title);
 
         if (! $parsed instanceof PackSize || $count === null || $parsed->unit === 'piece') {
             return $parsed;
@@ -115,6 +130,28 @@ final readonly class StatedPackSize
         }
 
         return (float) $matches[0][1];
+    }
+
+    /**
+     * How many items a "set of 4" counts. Null unless the title names one
+     * such count, and never beside a cross form, which counts them already.
+     */
+    public static function setCountIn(string $title): ?float
+    {
+        if (PackSize::hasCrossForm($title)) {
+            return null;
+        }
+
+        $counts = [];
+
+        foreach (self::SET_COUNT_PATTERNS as $pattern) {
+            preg_match_all($pattern, $title, $matches);
+            array_push($counts, ...array_map(floatval(...), $matches[1]));
+        }
+
+        $counts = array_unique($counts);
+
+        return count($counts) === 1 && $counts[0] > 1 ? $counts[0] : null;
     }
 
     /** @return array{value: float, offset: int}|null */

@@ -24,6 +24,8 @@ final readonly class PackLine
         public ?string $bundle,
         /** A size the page does not state, which Jev confirmed from it. */
         public bool $checkedByAi = false,
+        /** `€5.75 each`, while the shops sell one item in different counts. See {@see ComparablePacks::itemCountFor()}. */
+        public ?string $each = null,
     ) {}
 
     public static function of(Shop $shop, ?ComparablePacks $packs = null): self
@@ -37,7 +39,23 @@ final readonly class PackLine
             estimated: in_array($pack?->provenance, [PackProvenance::Inferred, PackProvenance::Converted], strict: true),
             bundle: BundlePriceLabel::forShop($shop),
             checkedByAi: $pack?->provenance === PackProvenance::Confirmed,
+            each: self::each($shop, $packs?->itemCountFor($shop)),
         );
+    }
+
+    /**
+     * Not for a single item, whose pack price says it already, and not beside
+     * a bundle, whose own "or €3.50 each" would read as the same figure.
+     */
+    private static function each(Shop $shop, ?float $count): ?string
+    {
+        if ($count === null || $count <= 1 || $shop->current_price === null || BundlePriceLabel::forShop($shop) !== null) {
+            return null;
+        }
+
+        $price = number_format((float) $shop->current_price / $count, MoneyFormatter::decimals($shop->currency), '.', '');
+
+        return __(':price each', ['price' => MoneyFormatter::format($price, $shop->currency)]);
     }
 
     /** `€21.99 for 800 pieces`, `€21.99 for 800 pieces (estimated)`, or `€21.99`. */
@@ -51,6 +69,10 @@ final readonly class PackLine
 
         if ($this->checkedByAi) {
             $text .= ' (' . __('size checked by AI') . ')';
+        }
+
+        if ($this->each !== null) {
+            $text .= ' · ' . $this->each;
         }
 
         return $this->bundle === null ? $text : $text . ' · ' . $this->bundle;

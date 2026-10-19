@@ -98,6 +98,46 @@ final readonly class ItemSizes
         return abs($pieces - round($pieces)) > self::WHOLE_ITEM_SLACK ? null : PackSize::of(round($pieces), $unit);
     }
 
+    /**
+     * How many of the agreed item each size holds, while every size is a
+     * whole number of it and not all the same number; empty otherwise. A
+     * missing size is skipped. Looser than {@see convert()}: one shop stating
+     * both sizes is enough, because a count is only shown beside a price,
+     * and never ranks or converts anything.
+     *
+     * @param  array<string, ?PackSize>  $sizes  keyed by shop id
+     * @return array<string, float>
+     */
+    public function wholeItemCounts(array $sizes): array
+    {
+        $counts = [];
+
+        foreach (array_filter($sizes) as $id => $size) {
+            $count = $this->wholeItemsIn($size);
+
+            if ($count === null) {
+                return [];
+            }
+
+            $counts[$id] = $count;
+        }
+
+        return count(array_unique($counts)) > 1 ? $counts : [];
+    }
+
+    private function wholeItemsIn(PackSize $size): ?float
+    {
+        $factor = $size->unit === 'piece' ? null : $this->between('piece', $size->unit);
+
+        if ($factor === null) {
+            return null;
+        }
+
+        $pieces = $size->quantity / $factor;
+
+        return $pieces < 1 - self::WHOLE_ITEM_SLACK || abs($pieces - round($pieces)) > self::WHOLE_ITEM_SLACK ? null : max(1.0, round($pieces));
+    }
+
     /** How many shops state both a count and a size in `$measure` that holds. */
     private function pairsIn(string $measure): int
     {

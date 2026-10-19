@@ -9,6 +9,9 @@
             <flux:badge size="sm" color="zinc">{{ __('estimated') }}</flux:badge>
         </flux:tooltip>
     @endif
+    @if ($line->each !== null)
+        <span data-test="pack-line-each">· {{ $line->each }}</span>
+    @endif
     @if ($bundle && $line->bundle !== null)
         <span>· {{ $line->bundle }}</span>
     @endif

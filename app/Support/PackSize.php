@@ -63,6 +63,8 @@ final readonly class PackSize
         'kauwtabletten', 'bruistabletten', 'zuigtabletten',
         'tabletten', 'capsules', 'capsule', 'sachets', 'tablets', 'pieces', 'rollen', 'zakjes', 'tablet', 'vellen',
         // English, as Amazon's international stores title a pack ("5 pieces", "60 count").
+        // German, French, Italian and Spanish for the shops in those markets.
+        'stück', 'stueck', 'pièces', 'unités', 'unites', 'pezzi', 'piezas', 'unidades',
         'stuks', 'zakje', 'count', 'tabl', 'sach', 'caps', 'stuk', 'pack', 'cups', 'pads', 'pcs',
         'cps', 'stk', 'rol', 'vel', 'cup', 'pad', 'st', 'tb',
     ];

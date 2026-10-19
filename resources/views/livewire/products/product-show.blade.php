@@ -309,7 +309,7 @@
                                         </div>
                                         <div class="mt-0.5 hidden text-base text-zinc-500 sm:text-sm @2xl:block dark:text-zinc-400">
                                             <flux:tooltip :content="$packPriceHint">
-                                                <span tabindex="0" class="cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" data-test="pack-price-hint">{{ \App\Support\MoneyFormatter::format($packLine->price, $shop->currency) }}</span>
+                                                <span tabindex="0" class="cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" data-test="pack-price-hint">{{ \App\Support\MoneyFormatter::format($packLine->price, $shop->currency) }}@if ($packLine->each !== null) · {{ $packLine->each }}@endif</span>
                                             </flux:tooltip>
                                         </div>
                                     @else
