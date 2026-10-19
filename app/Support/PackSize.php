@@ -219,7 +219,7 @@ final readonly class PackSize
         $parsed = self::parse($packSize);
 
         if ($parsed !== null) {
-            return StatedPackSize::wholePack($parsed, $title, confirmed: $wholePack) ?? $parsed;
+            return StatedPackSize::wholePack($parsed, $title, confirmed: $wholePack, countsItems: $countsItems) ?? $parsed;
         }
 
         if ($authoritative) {

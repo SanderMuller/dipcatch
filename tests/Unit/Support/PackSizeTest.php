@@ -360,6 +360,10 @@ test('a stated size the title does not contradict is left alone', function (stri
     'no multipack in the title' => ['55 g', 'Barebells single bar 55 g', 55.0],
     'a size that is not the item size' => ['500 g', 'Koffie 12 x 55 g', 500.0],
     'a plain single pack' => ['500 g', 'Koffiebonen 500 g', 500.0],
+    // Order is the signal here too: one 500 g bag holding twenty sachets.
+    'a count after the size' => ['500 g', 'Koffie 500 g 20 zakjes', 500.0],
+    'two counts, neither the pack' => ['5 L', '2x doos 200x zakken 5L', 5000.0],
+    'a set beside a count after the size' => ['500 g', 'Koffie 500 g, 20 zakjes, set van 2', 1000.0],
 ]);
 
 test('an authoritative empty size still clears the pack data', function (): void {
@@ -488,6 +492,20 @@ test('a count after the size is the number of items only for a thing, not its co
     // Counted already: the department adds nothing.
     ['Mugs 4-pack 350 ml', 1400.0, 1400.0],
     ['Glazen 350 ml x4', 1400.0, 1400.0],
+]);
+
+test('a stated item size takes a count of what is inside only for a thing', function (string $stated, string $title, float $contents, float $thing): void {
+    // "500 g 20 zakjes" is one bag of twenty sachets; "12 stuks", "12 Pack"
+    // and "200x" count packs, wherever they stand.
+    expect(PackSize::resolve($stated, authoritative: true, title: $title)?->quantity)->toBe($contents)
+        ->and(PackSize::resolve($stated, authoritative: true, title: $title, countsItems: true)?->quantity)->toBe($thing);
+})->with([
+    ['500 g', 'Koffie 500 g 20 zakjes', 500.0, 10000.0],
+    ['55 g', 'Barebells 55 g 12 stuks', 660.0, 660.0],
+    ['5 L', 'Vuilniszakken 5L 200x', 1000000.0, 1000000.0],
+    ['40 g', 'Pringles 40 g (12 Pack)', 480.0, 480.0],
+    ['350 ml', 'Mok 350 ml (4 stuks)', 1400.0, 1400.0],
+    ['5 L', '2x doos 200x zakken 5L', 5000.0, 5000.0],
 ]);
 
 // --- Dutch drugstore count abbreviations -------------------------------------
