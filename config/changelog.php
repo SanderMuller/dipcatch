@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-19',
+            'category' => 'fix',
+            'title' => 'Sets and multipacks get the right size',
+            'body' => "A title like \"350 ml, set of 4\" or \"Pack of 24\" now counts every item in the pack, so a set no longer looks four times dearer than a single one.\n\nWhen shops sell the same item in different counts, the pack price now also shows what one item costs.",
+        ],
+        [
             'date' => '2026-10-18',
             'category' => 'feature',
             'title' => 'A category for insect and pest control',
