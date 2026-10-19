@@ -35,7 +35,17 @@ final readonly class StatedPackSize
      * capsules, pads, tablets, sheets. A subset of the piece words; "stuks",
      * "pcs" and "pack" count packs and are not in it.
      */
-    private const string CONTENTS_COUNT_PATTERN = '/\d+\s*(?:kauwtabletten|bruistabletten|zuigtabletten|tabletten|capsules|capsule|sachets|tablets|zakjes|tablet|vellen|zakje|tabl|sach|caps|cups|pads|cps|cup|pad|vel|tb)\b/iu';
+    private const string CONTENTS_WORDS = 'kauwtabletten|bruistabletten|zuigtabletten|tabletten|capsules|capsule|sachets|tablets|tablet|vellen|tabl|sach|caps|cups|pads|cps|cup|pad|vel|tb';
+
+    /** Bags, which hold what a pack weighs or measures: "Koffie 500 g 20 zakjes". */
+    private const string BAG_WORDS = 'zakjes|zakje';
+
+    /**
+     * A title whose product is empty bags, sized by what one holds:
+     * "Diepvrieszakjes 1 L 50 zakjes" is fifty bags of a litre, where
+     * "Shampoo navulzakjes 10 zakjes, 100 ml" is ten sachets holding 100 ml.
+     */
+    private const string BAG_PRODUCT_PATTERN = '/(?:diepvries|vries|vuilnis|afval|pedaalemmer|boterham|sandwich|opberg|zip|grip)zak(?:jes|je|ken)\b/iu';
 
     /**
      * The whole pack, when the stated size is the size of one item out of a
@@ -45,8 +55,8 @@ final readonly class StatedPackSize
      * with the size elsewhere in the string (`12st ... 55g`, which is how
      * Foodello writes every listing), and a named set (`55 g, pack of 12`).
      * All mean twelve of them, and so does a bare `200x`. A count of what is
-     * inside counts items only where `$countsItems`: "Koffie 500 g 20 zakjes"
-     * is one 500 g bag ({@see countsContents()}).
+     * inside a weight counts items only where `$countsItems`: "Koffie 500 g
+     * 20 zakjes" is one 500 g bag ({@see countsContents()}).
      *
      * Deliberately narrow. The stated size has to equal the title's item size
      * exactly, and has to be a weight or a volume. Anything else leaves the
@@ -60,7 +70,7 @@ final readonly class StatedPackSize
             return null;
         }
 
-        $count = ($countsItems || ! self::countsContents($title) ? ItemCount::in($title) : null)
+        $count = ($countsItems || ! self::countsContents($title, $stated->unit) ? ItemCount::in($title) : null)
             ?? self::bareCountIn($title)
             ?? ItemCount::setIn($title)
             ?? 0.0;
@@ -84,7 +94,7 @@ final readonly class StatedPackSize
         }
 
         $parsed = PackSize::parse($title);
-        $count = self::leadingCountBeforeSize($title, $countsItems) ?? ItemCount::setIn($title) ?? ($countsItems ? self::trailingCount($title) : null);
+        $count = self::leadingCountBeforeSize($title, $countsItems ? null : $parsed?->unit) ?? ItemCount::setIn($title) ?? ($countsItems ? self::trailingCount($title) : null);
 
         if (! $parsed instanceof PackSize || $count === null || $parsed->unit === 'piece') {
             return $parsed;
@@ -115,9 +125,17 @@ final readonly class StatedPackSize
      * stands: "Koffie 500 g 20 zakjes" and "30 capsules 216 g" weigh that
      * much in all, where "Barebells 55 g 12 stuks" is twelve bars.
      */
-    private static function countsContents(string $title): bool
+    private static function countsContents(string $title, string $unit): bool
     {
-        return ! PackSize::hasCrossForm($title) && preg_match(self::CONTENTS_COUNT_PATTERN, $title) === 1;
+        return ! PackSize::hasCrossForm($title) && preg_match(self::contentsCountPattern($unit, $title), $title) === 1;
+    }
+
+    /** A count of what is inside: not the bags of a title that sells bags by their volume. */
+    private static function contentsCountPattern(string $unit, string $title): string
+    {
+        $sellsBags = $unit === 'ml' && preg_match(self::BAG_PRODUCT_PATTERN, $title) === 1;
+
+        return '/\d+\s*(?:' . self::CONTENTS_WORDS . ($sellsBags ? '' : '|' . self::BAG_WORDS) . ')\b/iu';
     }
 
     /**
@@ -127,9 +145,10 @@ final readonly class StatedPackSize
      *
      * The order is the signal. "Glasses 350 ml, 4 pcs" puts the count last,
      * and is four glasses only where the department counts items. So is the
-     * word: "30 capsules 216 g" weighs 216 g in all, unless `$countsItems`.
+     * word: "30 capsules 216 g" weighs 216 g in all. A caller that reads any
+     * word as a count of items passes no `$contentsOf` unit.
      */
-    private static function leadingCountBeforeSize(string $title, bool $countsItems = false): ?float
+    private static function leadingCountBeforeSize(string $title, ?string $contentsOf = null): ?float
     {
         if (PackSize::hasCrossForm($title)) {
             return null;
@@ -143,7 +162,7 @@ final readonly class StatedPackSize
             return null;
         }
 
-        return $countsItems || preg_match(self::CONTENTS_COUNT_PATTERN, substr($title, $count['offset']), $match, PREG_OFFSET_CAPTURE) !== 1 || $match[0][1] !== 0
+        return $contentsOf === null || preg_match(self::contentsCountPattern($contentsOf, $title), substr($title, $count['offset']), $match, PREG_OFFSET_CAPTURE) !== 1 || $match[0][1] !== 0
             ? $count['value']
             : null;
     }

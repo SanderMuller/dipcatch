@@ -338,6 +338,9 @@ test('a title that counts first and sizes last is a pack, with no stated size at
     'size before the count' => ['Koffie 500 g 20 zakjes', 500.0],
     'a count of what is inside, first' => ['Nescafé Dolce Gusto Lungo 30 capsules 216 g', 216.0],
     'a pack count beside a count of what is inside' => ['2 stuks Koffie 500 g 20 zakjes', 1000.0],
+    'bags of a volume' => ['Diepvrieszakjes 50 zakjes 1 L', 50000.0],
+    'sachets of a liquid' => ['Shampoo 10 sachets, netto 100 ml', 100.0],
+    'bags of a liquid' => ['Shampoo 10 zakjes, netto 100 ml', 100.0],
     'a count with no size' => ['Eieren 12 stuks', 12.0],
     'no count at all' => ['Melk 1 L', 1000.0],
 ]);
@@ -505,6 +508,12 @@ test('a stated item size takes a count of what is inside only for a thing', func
     ['500 g', 'Koffie 500 g 20 zakjes', 500.0, 10000.0],
     ['216 g', 'Nescafé Dolce Gusto Lungo 30 capsules 216 g', 216.0, 6480.0],
     ['720 g', 'Vaatwastabletten 40 tabletten 720 g', 720.0, 28800.0],
+    // Bags sold by their volume are the product; sachets of a liquid are not.
+    ['1 L', 'Diepvrieszakjes 1 L 50 zakjes', 50000.0, 50000.0],
+    ['1 L', 'Diepvrieszakjes 50 zakjes 1 L', 50000.0, 50000.0],
+    ['100 ml', 'Shampoo 10 sachets, netto 100 ml', 100.0, 1000.0],
+    ['100 ml', 'Shampoo 10 zakjes, netto 100 ml', 100.0, 1000.0],
+    ['100 ml', 'Shampoo navulzakjes 10 zakjes, netto 100 ml', 100.0, 1000.0],
     ['55 g', 'Barebells 55 g 12 stuks', 660.0, 660.0],
     ['5 L', 'Vuilniszakken 5L 200x', 1000000.0, 1000000.0],
     ['40 g', 'Pringles 40 g (12 Pack)', 480.0, 480.0],
