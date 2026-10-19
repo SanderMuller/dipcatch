@@ -153,10 +153,10 @@ final readonly class HeadlinePrice
     /** A shop's figure in the headline's terms: `€5.75 each` where the price per item leads, else `€16.42 /l`. */
     public function figureFor(Shop $shop, string $unitPrice): string
     {
-        $itemPrice = $this->leadsWithItems() ? $this->packs->items()?->priceFor($shop) : null;
+        $itemPrice = $this->unit === null ? null : $this->packs->leadingItems()?->priceFor($shop);
 
         return $itemPrice !== null
-            ? __(':price each', ['price' => MoneyFormatter::format($itemPrice, $shop->currency)])
+            ? MoneyFormatter::each($itemPrice, $shop->currency)
             : MoneyFormatter::unitPrice($unitPrice, $shop->currency) . ' ' . UnitWord::labelFor($this->unit);
     }
 
@@ -217,10 +217,10 @@ final readonly class HeadlinePrice
     /** `€0.0275 /piece`, `€5.75 each`, or `€21.99` for a pack-price headline, or a dash. */
     public function text(): string
     {
-        $itemPrice = $this->leadsWithItems() && $this->shop !== null ? $this->packs->items()?->priceFor($this->shop) : null;
+        $itemPrice = $this->leadsWithItems() && $this->shop !== null ? $this->packs->leadingItems()?->priceFor($this->shop) : null;
 
         if ($itemPrice !== null) {
-            return __(':price each', ['price' => MoneyFormatter::format($itemPrice, $this->currency())]);
+            return MoneyFormatter::each($itemPrice, $this->currency());
         }
 
         $unitPrice = $this->unitPrice();

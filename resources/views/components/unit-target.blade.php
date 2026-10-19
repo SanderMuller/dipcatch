@@ -7,6 +7,9 @@
     'unitWord' => 'unit',
     'heading' => true,
     'suggestedUnit' => null,
+    // ml or g per item where the price per item leads (App\Support\ItemPricing):
+    // every figure per unit then reads per item. The target stays per unit.
+    'itemSize' => null,
 ])
 
 {{--
@@ -29,6 +32,7 @@
         history: @js($history),
         currency: @js($currency),
         unitWord: @js($unitWord),
+        itemSize: @js($itemSize),
         suggestedUnit: @js(isset($suggestion) && $suggestedUnit !== null ? (float) $suggestedUnit : null),
         chosen: 0,
         packInput: '',
@@ -56,6 +60,10 @@
             }
 
             return new Intl.NumberFormat('en', { style: 'currency', currency: this.currency, minimumFractionDigits: 2, maximumFractionDigits: perUnit && value < 1 ? 4 : 2 }).format(value);
+        },
+        // A figure per unit as it is shown: per item where the product reads so.
+        shown(value) {
+            return value === null || value === undefined || this.itemSize === null ? value : value * this.itemSize / 1000;
         },
         pack() {
             return this.packs[this.chosen];
@@ -191,7 +199,7 @@
             {{-- The pack a person buys is often not the best rate. Said once,
                  with the way to switch, rather than hidden in the levels. --}}
             <p x-show="cheaperElsewhere() > 0" class="mt-3 text-base/7 text-amber-800 sm:text-sm/6 dark:text-amber-300" data-test="unit-target-cheaper-pack">
-                <span x-text="@js(__('Your')) + ' ' + pack().pack + ' ' + @js(__('at')) + ' ' + pack().shop + ' ' + @js(__('costs')) + ' ' + money(pack().unitPrice, true) + ' ' + @js(__('per')) + ' ' + unitWord + '. ' + @js(__('The')) + ' ' + best().pack + ' ' + @js(__('at')) + ' ' + best().shop + ' ' + @js(__('is')) + ' ' + cheaperElsewhere() + '% ' + @js(__('cheaper per')) + ' ' + unitWord + '.'"></span>
+                <span x-text="@js(__('Your')) + ' ' + pack().pack + ' ' + @js(__('at')) + ' ' + pack().shop + ' ' + @js(__('costs')) + ' ' + money(shown(pack().unitPrice), true) + ' ' + @js(__('per')) + ' ' + unitWord + '. ' + @js(__('The')) + ' ' + best().pack + ' ' + @js(__('at')) + ' ' + best().shop + ' ' + @js(__('is')) + ' ' + cheaperElsewhere() + '% ' + @js(__('cheaper per')) + ' ' + unitWord + '.'"></span>
                 <button type="button" @click="chosen = 0" class="font-medium underline underline-offset-4" x-text="@js(__('Use the')) + ' ' + best().pack"></button>
             </p>
         </div>
@@ -201,13 +209,13 @@
         <p class="text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Alert me when it costs') }}</p>
         <p x-show="levels().length > 0" class="text-base/7 text-zinc-500 sm:text-sm/6 dark:text-zinc-400" data-test="unit-target-context">
             {{ __('Today’s best:') }}
-            <span class="rounded-md bg-zinc-950/5 px-1.5 py-0.5 font-medium text-zinc-900 tabular-nums dark:bg-white/10 dark:text-white" x-text="money(bestUnit(), true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
+            <span class="rounded-md bg-zinc-950/5 px-1.5 py-0.5 font-medium text-zinc-900 tabular-nums dark:bg-white/10 dark:text-white" x-text="money(shown(bestUnit()), true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
             {{-- The pack price too, always: the suggested alert and the
                  levels below are pack prices. --}}
             <span x-text="@js(__('at')) + ' ' + best().shop + ', ' + @js(__('which is'))"></span>
             <span class="rounded-md bg-zinc-950/5 px-1.5 py-0.5 font-medium text-zinc-900 tabular-nums dark:bg-white/10 dark:text-white" x-text="money(bestUnit() * pack().perPack)"></span>
             <span x-text="@js(__('for your')) + ' ' + pack().pack + '.'"></span>
-            <span x-show="lowest() !== null" x-text="@js(__('Lowest on the chart:')) + ' ' + money(lowest(), true) + ' ' + @js(__('per')) + ' ' + unitWord + '.'"></span>
+            <span x-show="lowest() !== null" x-text="@js(__('Lowest on the chart:')) + ' ' + money(shown(lowest()), true) + ' ' + @js(__('per')) + ' ' + unitWord + '.'"></span>
         </p>
 
         {{-- One list of choices rather than a grid of cards: the levels and
@@ -236,7 +244,7 @@
                             <span class="min-w-0 flex-1 text-base/6 text-zinc-700 sm:text-sm/6 dark:text-zinc-200" x-text="row.name"></span>
                             <span class="text-end tabular-nums">
                                 <span class="block text-base/6 font-semibold text-zinc-900 sm:text-sm/6 dark:text-white" x-text="money(row.unit * pack().perPack)"></span>
-                                <span class="block text-sm/5 text-zinc-500 sm:text-[0.8125rem]/5 dark:text-zinc-400" x-text="money(row.unit, true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
+                                <span class="block text-sm/5 text-zinc-500 sm:text-[0.8125rem]/5 dark:text-zinc-400" x-text="money(shown(row.unit), true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
                             </span>
                         </button>
                     </template>
@@ -258,7 +266,7 @@
                                 <span class="min-w-0 flex-1">{{ $suggestion }}</span>
                                 <span class="text-end tabular-nums">
                                     <span class="block text-base/6 font-semibold text-zinc-900 sm:text-sm/6 dark:text-white" x-text="money(row.unit * pack().perPack)"></span>
-                                    <span class="block text-sm/5 text-zinc-500 sm:text-[0.8125rem]/5 dark:text-zinc-400" x-text="money(row.unit, true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
+                                    <span class="block text-sm/5 text-zinc-500 sm:text-[0.8125rem]/5 dark:text-zinc-400" x-text="money(shown(row.unit), true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
                                 </span>
                             </button>
                         </template>
@@ -296,7 +304,7 @@
         <span x-show="unit() !== null" x-cloak>
             {{ __('Your alert:') }}
             <strong class="font-semibold text-zinc-900 tabular-nums dark:text-white" x-text="money(packPrice(pack())) + ' ' + @js(__('for')) + ' ' + pack().pack"></strong>
-            <span class="rounded bg-yellow-100 px-1 font-medium text-yellow-900 tabular-nums dark:bg-yellow-400/20 dark:text-yellow-200" x-text="money(unit(), true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
+            <span class="rounded bg-yellow-100 px-1 font-medium text-yellow-900 tabular-nums dark:bg-yellow-400/20 dark:text-yellow-200" x-text="money(shown(unit()), true) + ' ' + @js(__('per')) + ' ' + unitWord"></span>
             {{ __('at any shop, any pack size.') }}
         </span>
         <button

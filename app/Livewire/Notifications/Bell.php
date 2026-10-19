@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Notifications\TargetPriceNotification;
 use App\Support\AlsoWorthChecking;
 use App\Support\BundlePriceLabel;
+use App\Support\ItemPricing;
 use App\Support\MoneyFormatter;
 use App\Support\Numeric;
 use App\Support\PackLine;
@@ -190,7 +191,10 @@ final class Bell extends Component
         $unitCode = $text('comparison_unit') ?? $text('unit');
         $unitPrice = $text('new_unit_price') ?? $text('unit_price');
         $label = $unitCode === null ? $text('unit_price_label') : UnitWord::labelFor($unitCode);
-        $unitFigure = $unitPrice === null || $label === null ? null : MoneyFormatter::unitPrice($unitPrice, $currency) . ' ' . $label;
+        // Per item where the product read so when the alert fired.
+        $itemSize = is_numeric($data['item_size'] ?? null) ? (float) $data['item_size'] : null;
+        $figure = static fn (string $price): string => ItemPricing::figure($price, $currency, (string) $label, $itemSize);
+        $unitFigure = $unitPrice === null || $label === null ? null : $figure($unitPrice);
         $quantity = $text('pack_quantity');
         $packUnit = $text('pack_unit');
         $size = $quantity === null || $packUnit === null ? null : PackSize::of((float) $quantity, $packUnit);
@@ -198,14 +202,14 @@ final class Bell extends Component
         $betterPrice = $text('better_value_unit_price');
         $betterValue = $betterHost === null || $betterPrice === null || $label === null
             ? null
-            : __('Better value: :price at :host', ['price' => MoneyFormatter::unitPrice($betterPrice, $currency) . ' ' . $label, 'host' => ShopNames::label($betterHost)]);
+            : __('Better value: :price at :host', ['price' => $figure($betterPrice), 'host' => ShopNames::label($betterHost)]);
 
         $percent = Numeric::percent($data['drop_percent'] ?? null);
         $referenceUnit = $text('reference_unit_price');
-        $unitWord = UnitWord::forCode($unitCode);
+        $unitWord = UnitWord::forCode($itemSize === null ? $unitCode : ItemPricing::UNIT);
         $change = $percent === null ? null : '↓ ' . $percent
             . ($unitWord === null ? '' : ' ' . $unitWord)
-            . ($referenceUnit === null || $label === null ? '' : ' · ' . __('was') . ' ' . MoneyFormatter::unitPrice($referenceUnit, $currency) . ' ' . $label);
+            . ($referenceUnit === null || $label === null ? '' : ' · ' . __('was') . ' ' . $figure($referenceUnit));
         $target = $leadsWithPack && $text('target_price') !== null
             ? __('Your target: :price', ['price' => MoneyFormatter::format($text('target_price'), $currency)])
             : null;

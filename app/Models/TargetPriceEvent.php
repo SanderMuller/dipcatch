@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\PackProvenance;
 use App\Support\BundlePriceLabel;
+use App\Support\ItemPricing;
 use App\Support\PackSize;
 use App\Support\PriceVerdicts;
 use Carbon\CarbonImmutable;
@@ -42,6 +43,7 @@ final class TargetPriceEvent extends Model
             'price' => 'decimal:2',
             'unit_price' => 'decimal:4',
             'pack_quantity' => 'decimal:2',
+            'item_size' => 'float',
             'lowest_in_90_days' => 'boolean',
             'fired_at' => 'datetime',
         ];
@@ -81,6 +83,7 @@ final class TargetPriceEvent extends Model
             'pack_unit' => $packSize?->unit,
             'deal' => $bundle === null ? null : BundlePriceLabel::condition($bundle, $product->currency),
             'lowest_in_90_days' => PriceVerdicts::isLowestIn90Days($shop),
+            'item_size' => $unitPrice === null ? null : ItemPricing::itemSizeOf($product),
             'fired_at' => now(),
         ]);
     }

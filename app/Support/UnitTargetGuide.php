@@ -27,6 +27,7 @@ final readonly class UnitTargetGuide
     public function packs(): array
     {
         $packs = $this->product->comparablePacks();
+        $items = $packs->leadingItems();
         $choices = [];
 
         // The shops the ranking and the alert use: a dead or sold-out shop's
@@ -35,7 +36,7 @@ final readonly class UnitTargetGuide
             $size = $packs->for($shop)?->size;
 
             if ($size !== null) {
-                $choices[] = self::packChoice((string) $shop->id, (string) $shop->host, $size, $shop->current_price);
+                $choices[] = self::packChoice((string) $shop->id, (string) $shop->host, $size, $shop->current_price, $items?->sizeLabel($shop, $size));
             }
         }
 
@@ -153,7 +154,7 @@ final readonly class UnitTargetGuide
      *
      * @return array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}
      */
-    public static function packChoice(string $shopId, string $host, PackSize $size, mixed $price): array
+    public static function packChoice(string $shopId, string $host, PackSize $size, mixed $price, ?string $label = null): array
     {
         $price = is_numeric($price) ? (string) $price : null;
 
@@ -161,7 +162,7 @@ final readonly class UnitTargetGuide
             'shopId' => $shopId,
             'host' => $host,
             'shop' => ShopNames::label($host),
-            'pack' => UnitWord::pack($size),
+            'pack' => $label ?? UnitWord::pack($size),
             'perPack' => $size->unit === 'piece' ? $size->quantity : $size->quantity / 1000,
             'price' => $price === null ? null : (float) $price,
             'unitPrice' => $price === null ? null : $size->unitPriceValueFor($price),

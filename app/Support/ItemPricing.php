@@ -3,8 +3,8 @@
 namespace App\Support;
 
 use App\Enums\ProductDepartment;
+use App\Models\Product;
 use App\Models\Shop;
-use Illuminate\Support\Collection;
 
 /**
  * The shops of a product that sell one item in different counts: a single
@@ -13,12 +13,18 @@ use Illuminate\Support\Collection;
  *
  * It leads the display, ahead of the price per litre, only where the product
  * is a thing rather than its contents ({@see ProductDepartment::countsItems()}),
- * and only while the cheapest item is also the best value per litre, so the
- * figure shown never contradicts the ranking. Elsewhere the price per item
- * rides along beside the pack price.
+ * and only while every pack is exactly its count of the item, so the figure
+ * shown never contradicts the ranking. Elsewhere the price per item rides
+ * along beside the pack price.
  */
 final readonly class ItemPricing
 {
+    /** The unit a series is in once it reads per item: not a pack unit, so nothing stores it. */
+    public const string UNIT = 'item';
+
+    /** How far a pack may sit from its count of the item, in ml or g, while the price per item leads: the precision sizes are stored at. */
+    private const float EXACT_TOLERANCE = 0.01;
+
     /**
      * @param  array<string, float>  $counts  shop id => items in its pack
      */
@@ -29,10 +35,9 @@ final readonly class ItemPricing
     ) {}
 
     /**
-     * @param  Collection<int, Shop>  $shops
      * @param  array<string, ComparablePack>  $packs  keyed by shop id, in `$unit`
      */
-    public static function of(ItemSizes $itemSizes, string $unit, Collection $shops, array $packs, bool $countsItems): ?self
+    public static function of(ItemSizes $itemSizes, string $unit, array $packs, bool $countsItems): ?self
     {
         $counts = $itemSizes->wholeItemCounts(array_map(fn (ComparablePack $pack): ?PackSize => $pack->size, $packs));
         $itemSize = $unit === 'piece' ? null : $itemSizes->between('piece', $unit);
@@ -41,12 +46,36 @@ final readonly class ItemPricing
             return null;
         }
 
-        return new self($counts, $itemSize, $countsItems && self::cheapestItemIsBestValue($counts, $shops, $packs));
+        return new self($counts, $itemSize, $countsItems && self::isExact($counts, $itemSize, $packs));
     }
 
-    public function leads(): bool
+    /**
+     * How much one item holds, in ml or g, where the product reads per item;
+     * else null. Kept on an alert when it fires, so the alert reads as the
+     * product page did.
+     */
+    public static function itemSizeOf(Product $product): ?float
     {
-        return $this->leads;
+        $packs = $product->comparablePacks();
+
+        return $packs->leadingItems()?->itemSize;
+    }
+
+    /**
+     * A price per unit as an alert states it: `€16.42 /l`, or `€5.75 each`
+     * with the `$itemSize` the alert kept.
+     */
+    public static function figure(string $unitPrice, string $currency, string $label, ?float $itemSize): string
+    {
+        return $itemSize === null
+            ? MoneyFormatter::unitPrice($unitPrice, $currency) . ' ' . $label
+            : MoneyFormatter::each(self::perItem($unitPrice, $itemSize), $currency);
+    }
+
+    /** This, while the price per item leads the display; else null. */
+    public function leading(): ?self
+    {
+        return $this->leads ? $this : null;
     }
 
     public function countFor(Shop $shop): ?float
@@ -65,7 +94,13 @@ final readonly class ItemPricing
     /** A price per litre or kilo as the price of one item: €52.55 /l is €18.39 for a 350 ml glass. */
     public function fromUnitPrice(string $unitPrice): string
     {
-        return number_format((float) $unitPrice * $this->itemSize / 1000, PackSize::VALUE_DECIMALS, '.', '');
+        return self::perItem($unitPrice, $this->itemSize);
+    }
+
+    /** {@see fromUnitPrice()} for an item size kept apart from its shops. */
+    public static function perItem(string $unitPrice, float $itemSize): string
+    {
+        return number_format((float) $unitPrice * $itemSize / 1000, PackSize::VALUE_DECIMALS, '.', '');
     }
 
     /** `4 × 350 ml` for a set, `350 ml` for one, or the size as it is without a count. */
@@ -82,39 +117,20 @@ final readonly class ItemPricing
     }
 
     /**
-     * Whether the shop with the lowest price per item also has the lowest
-     * price per unit. A pack a little off a whole number of items can rank
-     * differently in the two, and the figure shown must agree with the
-     * "Best value" chip.
+     * Whether every pack is exactly its count of the item. Leading with the
+     * price per item converts the alert and the chart by the item size, while
+     * a row divides its pack price by its count; only for exact packs do the
+     * two agree. It also keeps the figure shown in line with "Best value":
+     * for exact packs the price per item ranks the shops as the price per
+     * unit does. A 1380 ml four-pack beside 350 ml glasses would show €5.50
+     * each in its row and €5.58 each on the chart.
      *
      * @param  array<string, float>  $counts
-     * @param  Collection<int, Shop>  $shops
      * @param  array<string, ComparablePack>  $packs
      */
-    private static function cheapestItemIsBestValue(array $counts, Collection $shops, array $packs): bool
+    private static function isExact(array $counts, float $itemSize, array $packs): bool
     {
-        $perItem = [];
-        $perUnit = [];
-
-        foreach ($shops as $shop) {
-            $id = (string) $shop->id;
-            $size = ($packs[$id] ?? null)?->size;
-
-            if (! isset($counts[$id]) || $size === null || $shop->current_price === null) {
-                continue;
-            }
-
-            $perItem[$id] = (float) $shop->current_price / $counts[$id];
-            $perUnit[$id] = (float) $shop->current_price / $size->quantity;
-        }
-
-        if ($perItem === []) {
-            return false;
-        }
-
-        asort($perItem);
-        asort($perUnit);
-
-        return array_key_first($perItem) === array_key_first($perUnit);
+        return array_all($counts, fn (float $count, string $id): bool => ($size = ($packs[$id] ?? null)?->size) !== null
+            && abs($size->quantity - $count * $itemSize) <= self::EXACT_TOLERANCE);
     }
 }

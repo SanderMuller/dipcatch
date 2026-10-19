@@ -33,8 +33,10 @@ $image = $product->safeImageUrl();
 @php
     $perUnit = $hit->isPerUnit();
     $unitLabel = \App\Support\UnitWord::labelFor($hit->comparison_unit);
+    // Per item where the product read so when the alert fired (App\Support\ItemPricing).
+    $itemSize = $perUnit ? $hit->item_size : null;
     $yourPrice = $perUnit
-        ? \App\Support\MoneyFormatter::unitPrice((string) $hit->target, $hit->currency) . ' ' . $unitLabel
+        ? \App\Support\ItemPricing::figure((string) $hit->target, $hit->currency, $unitLabel, $itemSize)
         : \App\Support\MoneyFormatter::format((string) $hit->target, $hit->currency);
 @endphp
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; margin: 0 0 {{ $loop->last && $events->isEmpty() ? '0' : '16px' }}; border-collapse: collapse;">
@@ -46,7 +48,7 @@ $image = $product->safeImageUrl();
 <tr>
 <td style="padding: 0 0 12px; color: #18181b; line-height: 1.2;">
 @if ($perUnit)
-<span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::unitPrice((string) $hit->unit_price, $hit->currency) }} {{ $unitLabel }}</span>
+<span style="font-size: 24px; font-weight: 700;">{{ \App\Support\ItemPricing::figure((string) $hit->unit_price, $hit->currency, $unitLabel, $itemSize) }}</span>
 @else
 <span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::format($hit->price === null ? null : (string) $hit->price, $hit->currency) }}</span>
 @endif
@@ -85,8 +87,9 @@ $image = $product->safeImageUrl();
     // that fell. The pack price follows as what the shop charges. Two
     // different pack sizes have no honest money difference, so the money is
     // shown only when there is one.
-    $unitWord = \App\Support\UnitWord::forCode($event->comparison_unit);
     $perUnit = $event->comparison_unit !== null && $event->new_unit_price !== null;
+    $itemSize = $perUnit ? $event->item_size : null;
+    $unitWord = \App\Support\UnitWord::forCode($itemSize === null ? $event->comparison_unit : \App\Support\ItemPricing::UNIT);
     $unitLabel = \App\Support\UnitWord::labelFor($event->comparison_unit);
     $changeLabel = '↓ ' . \App\Support\Numeric::percent($event->drop_pct)
         . ($unitWord === null ? '' : ' ' . $unitWord);
@@ -96,7 +99,7 @@ $image = $product->safeImageUrl();
     }
 @endphp
 @if ($perUnit)
-<span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::unitPrice((string) $event->new_unit_price, $event->currency) }} {{ $unitLabel }}</span>
+<span style="font-size: 24px; font-weight: 700;">{{ \App\Support\ItemPricing::figure((string) $event->new_unit_price, $event->currency, $unitLabel, $itemSize) }}</span>
 @else
 <span style="font-size: 24px; font-weight: 700;">{{ \App\Support\MoneyFormatter::format($event->new_price, $event->currency) }}</span>
 @if ($bundle !== null && $singleItemPrice !== null)
@@ -108,7 +111,7 @@ $image = $product->safeImageUrl();
 <span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; white-space: nowrap;">Lowest in 90 days</span>
 @endif
 @if ($perUnit)
-<div style="margin-top: 4px; color: #71717a; font-size: 13px;">{{ \App\Support\PackLine::format((string) $event->new_price, $event->currency, $event->packSize()) }}@if ($bundle !== null && $singleItemPrice !== null) <del title="Regular price" style="color: #a1a1aa;">{{ \App\Support\MoneyFormatter::format($singleItemPrice, $event->currency) }}</del>@endif @if ($event->reference_unit_price !== null)· {{ __('was') }} {{ \App\Support\MoneyFormatter::unitPrice((string) $event->reference_unit_price, $event->currency) }} {{ $unitLabel }}@endif</div>
+<div style="margin-top: 4px; color: #71717a; font-size: 13px;">{{ \App\Support\PackLine::format((string) $event->new_price, $event->currency, $event->packSize()) }}@if ($bundle !== null && $singleItemPrice !== null) <del title="Regular price" style="color: #a1a1aa;">{{ \App\Support\MoneyFormatter::format($singleItemPrice, $event->currency) }}</del>@endif @if ($event->reference_unit_price !== null)· {{ __('was') }} {{ \App\Support\ItemPricing::figure((string) $event->reference_unit_price, $event->currency, $unitLabel, $itemSize) }}@endif</div>
 @endif
 </td>
 </tr>

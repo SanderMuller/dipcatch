@@ -138,6 +138,7 @@
                         :history="$unitHistory"
                         :currency="$product->currency ?? 'EUR'"
                         :unit-word="$unitWord ?? __('unit')"
+                        :item-size="$itemSize"
                         :suggested-unit="$showsSuggestion && ! $alertCard['asksJev'] ? $alertCard['suggestion']->unitTarget : null"
                     >
                         @if ($showsSuggestion)
@@ -197,7 +198,10 @@
                             {{ __('Instead of your :drop drop alert, get an alert once any shop sells it at :unit per :word or less — :pack for your :size, :percent% under today’s best.', [
                                 'drop' => implode(' ' . __('or') . ' ', $priceAlertSwitch['drops']),
                                 'percent' => $priceAlertSwitch['percentUnder'],
-                                'unit' => \App\Support\MoneyFormatter::unitPrice($priceAlertSwitch['unit'], (string) $currency),
+                                // Per item where the form reads so; the target saved is still per unit.
+                                'unit' => $itemSize === null
+                                    ? \App\Support\MoneyFormatter::unitPrice($priceAlertSwitch['unit'], (string) $currency)
+                                    : \App\Support\MoneyFormatter::format(\App\Support\ItemPricing::perItem($priceAlertSwitch['unit'], $itemSize), (string) $currency),
                                 'word' => $unitWord ?? __('unit'),
                                 'pack' => \App\Support\MoneyFormatter::format($priceAlertSwitch['packPrice'], (string) $currency),
                                 'size' => $priceAlertSwitch['pack'],

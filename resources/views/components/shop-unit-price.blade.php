@@ -14,9 +14,9 @@
     $pack = $packs?->for($shop);
     $unitPrice = $packs?->unitPriceOf($shop);
     // Where the price per item leads, it is the figure this row shows.
-    $itemPrice = $packs?->leadsWithItems() === true ? $packs->items()?->priceFor($shop) : null;
+    $itemPrice = $packs?->leadingItems()?->priceFor($shop);
     $figure = $itemPrice !== null
-        ? __(':price each', ['price' => \App\Support\MoneyFormatter::format($itemPrice, $shop->currency)])
+        ? \App\Support\MoneyFormatter::each($itemPrice, $shop->currency)
         : ($unitPrice === null ? null : \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) . ' ' . $pack?->size?->label());
 @endphp
 

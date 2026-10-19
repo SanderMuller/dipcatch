@@ -18,6 +18,7 @@ use App\Services\Drops\LargeDropVerdict;
 use App\Services\Drops\NotificationBudget;
 use App\Services\Drops\Reference;
 use App\Services\Drops\ReferenceValue;
+use App\Support\ItemPricing;
 use App\Support\Numeric;
 use App\Support\PriceVerdicts;
 use Illuminate\Support\Facades\Config;
@@ -317,6 +318,7 @@ final readonly class DetectDrop
                 'pack_quantity' => $unit === null ? null : $locked->bestValuePackSize()?->quantity,
                 'pack_unit' => $unit === null ? null : $locked->bestValuePackSize()?->unit,
                 'lowest_in_90_days' => $triggerCheck->shop instanceof Shop && PriceVerdicts::isLowestIn90Days($triggerCheck->shop),
+                'item_size' => $unit === null ? null : ItemPricing::itemSizeOf($locked),
                 'fired_at' => now(),
             ]);
 

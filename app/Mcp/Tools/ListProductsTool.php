@@ -22,7 +22,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('list_products')]
 #[Title('List products')]
-#[Description('Lists every product this user tracks, with the figure the app leads with (`headline_price`: per kilo, litre or piece when `headline_price_basis` is "unit", else the pack price), its current cheapest pack price and how many shops it has. Compare products on the unit price. Filter by a department or category key from list_categories.')]
+#[Description('Lists every product this user tracks, with the figure the app leads with (`headline_price`: per kilo, litre or piece when `headline_price_basis` is "unit", per item when it is "item", else the pack price), its current cheapest pack price and how many shops it has. Compare products on the unit price. Filter by a department or category key from list_categories.')]
 #[IsReadOnly]
 #[IsDestructive(false)]
 #[IsOpenWorld(false)]

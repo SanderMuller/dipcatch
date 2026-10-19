@@ -4,7 +4,12 @@
     button, so phrasing content only.
 --}}
 @php
-    $perUnit = fn (string $amount): string => \App\Support\MoneyFormatter::unitPrice($amount, $product->currency) . ' ' . \App\Support\UnitWord::labelFor($suggestion->unit);
+    // Per item where the product page reads so (App\Support\ItemPricing).
+    $rowPacks = $product->comparablePacks();
+    $items = $rowPacks->leadingItems();
+    $perUnit = fn (string $amount): string => $items !== null && $suggestion->unit === $rowPacks->unit()
+        ? \App\Support\MoneyFormatter::each($items->fromUnitPrice($amount), $product->currency)
+        : \App\Support\MoneyFormatter::unitPrice($amount, $product->currency) . ' ' . \App\Support\UnitWord::labelFor($suggestion->unit);
 @endphp
 
 @if ($asksJev)

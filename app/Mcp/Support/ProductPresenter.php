@@ -32,9 +32,12 @@ final readonly class ProductPresenter
             // person sees: per unit once the shops sell different packs or the
             // person chose it, else the pack price. `best_value_unit_price`
             // below keeps the per-unit figure either way.
-            'headline_price' => $headline->isPerUnit() ? $headline->unitPrice() : $headline->packPrice(),
+            'headline_price' => self::headlinePrice($headline),
             'headline_unit' => $headline->unit,
-            'headline_price_basis' => $headline->isPerUnit() ? 'unit' : 'pack',
+            'headline_price_basis' => self::headlineBasis($headline),
+            // How much one item holds where the app reads this product per
+            // item: a set of four glasses and a single one. Null elsewhere.
+            'item_size' => $packs->leadingItems()?->itemSize,
             // The pack price of the shop with the smallest outlay — what the
             // shopper hands over. `best_value_*` answers the other question:
             // which shop is cheapest per kilo, litre or piece, which is the
@@ -100,9 +103,9 @@ final readonly class ProductPresenter
                     'currency' => $headline->currency(),
                     // No price without a shop that sells it now: the headline
                     // would fall back to a last price nobody can pay.
-                    'headline_price' => ! $buyable ? null : ($headline->isPerUnit() ? $headline->unitPrice() : $headline->packPrice()),
+                    'headline_price' => ! $buyable ? null : self::headlinePrice($headline),
                     'headline_unit' => $buyable ? $headline->unit : null,
-                    'headline_price_basis' => ! $buyable ? null : ($headline->isPerUnit() ? 'unit' : 'pack'),
+                    'headline_price_basis' => ! $buyable ? null : self::headlineBasis($headline),
                     'crossed_off' => $item['crossedOff'],
                 ];
             }
@@ -167,6 +170,9 @@ final readonly class ProductPresenter
                 'comparable_unit' => $pack?->size?->unit,
                 'pack_size_provenance' => $pack?->provenance?->value,
                 'unit_price' => $packs->unitPriceOf($shop),
+                // Set while the shops sell one item in different counts.
+                'item_count' => $packs->itemCountFor($shop),
+                'item_price' => $packs->items()?->priceFor($shop),
                 'excluded_reason' => $pack?->reason(),
                 // Not a pack exclusion: that one keeps a shop competing for
                 // the lowest price. This one bars it from both answers,
@@ -210,6 +216,26 @@ final readonly class ProductPresenter
      * Decimal columns come back as strings or numerics depending on the
      * driver; every price in this codebase travels as a decimal string.
      */
+    /** The figure the app leads with: per item, per unit, or the pack price. */
+    private static function headlinePrice(HeadlinePrice $headline): ?string
+    {
+        if ($headline->leadsWithItems() && $headline->shop !== null) {
+            return $headline->packs->items()?->priceFor($headline->shop);
+        }
+
+        return $headline->isPerUnit() ? $headline->unitPrice() : $headline->packPrice();
+    }
+
+    /** "item", "unit" or "pack", for {@see HeadlinePrice()}. */
+    private static function headlineBasis(HeadlinePrice $headline): string
+    {
+        return match (true) {
+            $headline->leadsWithItems() => 'item',
+            $headline->isPerUnit() => 'unit',
+            default => 'pack',
+        };
+    }
+
     private static function decimal(mixed $value): ?string
     {
         return is_scalar($value) ? (string) $value : null;

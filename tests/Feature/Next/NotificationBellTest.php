@@ -236,6 +236,25 @@ it('renders a unit-target row from the label it stored before the unit code', fu
     livewire(Bell::class)->assertSeeInOrder(['€0.4500 /stuk', 'Jumbo', '€1.80']);
 });
 
+it('renders a row per item when the alert kept the size of one item', function (): void {
+    $user = User::factory()->create();
+    storeNotification($user, [
+        'new_price' => '22.99',
+        'new_unit_price' => '16.4214',
+        'reference_unit_price' => '18.0000',
+        'comparison_unit' => 'ml',
+        'drop_percent' => '8.77',
+        'item_size' => 350,
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(Bell::class)
+        ->assertSee('€5.75 each')
+        ->assertSee('per item · was €6.30 each')
+        ->assertDontSee('€16.4214');
+});
+
 it('leads a target-price row with the pack price and names the better buy', function (): void {
     $user = User::factory()->create();
     storeNotification($user, [

@@ -26,6 +26,14 @@ final class MoneyFormatter
     /** Third worker-local formatter — see {@see preciseFormatter()}. */
     private static ?NumberFormatter $preciseFormatter = null;
 
+    /** `€5.75 each`: the price of one item, beside or instead of a price per unit. */
+    public static function each(string $amount, string $currency): string
+    {
+        $text = __(':price each', ['price' => self::format($amount, $currency)]);
+
+        return is_string($text) ? $text : self::format($amount, $currency);
+    }
+
     public static function format(?string $amount, string $currency): string
     {
         if ($amount === null || ! is_numeric($amount)) {

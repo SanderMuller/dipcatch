@@ -115,7 +115,7 @@ final readonly class ComparablePacks
             $packs[(string) $shop->id] = self::resolveOne($shop, $currency, $unit, $agreed, $median, $itemSizes);
         }
 
-        return new self($unit, $packs, $itemSizes, $agreed, $altsInDoubt, ItemPricing::of($itemSizes, $unit, $shops, $packs, $countsItems));
+        return new self($unit, $packs, $itemSizes, $agreed, $altsInDoubt, ItemPricing::of($itemSizes, $unit, $packs, $countsItems));
     }
 
     /**
@@ -141,7 +141,13 @@ final readonly class ComparablePacks
     /** Whether the price per item leads the display, ahead of the price per unit. */
     public function leadsWithItems(): bool
     {
-        return $this->items?->leads() === true;
+        return $this->leadingItems() !== null;
+    }
+
+    /** {@see items()}, only while the price per item leads. */
+    public function leadingItems(): ?ItemPricing
+    {
+        return $this->items?->leading();
     }
 
     /**

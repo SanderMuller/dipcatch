@@ -11,6 +11,7 @@ use App\PriceAdapters\PriceNormalizer;
 use App\Services\Drops\DropOutcome;
 use App\Support\AlsoWorthChecking;
 use App\Support\BundlePriceLabel;
+use App\Support\ItemPricing;
 use App\Support\MoneyFormatter;
 use App\Support\Numeric;
 use App\Support\PackLine;
@@ -61,6 +62,14 @@ final class PriceDropNotification extends Notification implements ShouldQueue
      */
     public bool $snapshotLowestIn90Days = false;
 
+    /**
+     * How much one item holds where the product read per item when the alert
+     * fired ({@see ItemPricing}), so the alert reads as the page did. Not
+     * readonly, with a default, so a payload queued before it existed still
+     * renders.
+     */
+    public ?float $snapshotItemSize = null;
+
     public function __construct(
         public Product $product,
         public DropOutcome $outcome,
@@ -82,6 +91,7 @@ final class PriceDropNotification extends Notification implements ShouldQueue
         $packSize = $unit === null ? null : $product->bestValuePackSize();
         $this->snapshotPackQuantity = $packSize === null ? null : (string) $packSize->quantity;
         $this->snapshotPackUnit = $packSize?->unit;
+        $this->snapshotItemSize = $unit === null ? null : ItemPricing::itemSizeOf($product);
         $this->snapshotHost = is_string($cheapest?->host) && $cheapest->host !== '' ? $cheapest->host : null;
         $this->snapshotOfferUrl = is_string($cheapest?->url) && $cheapest->url !== '' ? $cheapest->url : null;
         $this->snapshotBundle = $useTriggeringCheck ? $triggeringCheck->bundleOffer() : $cheapest?->liveBundleOffer();
@@ -123,7 +133,7 @@ final class PriceDropNotification extends Notification implements ShouldQueue
         // Per unit first when the drop was measured per unit: that is the
         // figure that fell. The pack price follows as what the shop charges.
         $priceLine = $unitPrice !== null && $unit !== null
-            ? MoneyFormatter::unitPrice($unitPrice, $currency) . ' ' . UnitWord::labelFor($unit)
+            ? ItemPricing::figure($unitPrice, $currency, UnitWord::labelFor($unit), $this->snapshotItemSize)
                 . ' (' . PackLine::format($this->snapshotPrice, $currency, $this->packSize()) . $bundle . ')'
             : MoneyFormatter::format($this->snapshotPrice, $currency) . $bundle;
 
@@ -177,6 +187,7 @@ final class PriceDropNotification extends Notification implements ShouldQueue
             'comparison_unit' => $this->outcome->comparisonUnit,
             'pack_quantity' => $this->snapshotPackQuantity,
             'pack_unit' => $this->snapshotPackUnit,
+            'item_size' => $this->snapshotItemSize,
             'view_url' => route('app.products.show', $this->product),
         ];
     }

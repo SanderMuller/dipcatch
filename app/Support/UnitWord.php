@@ -18,6 +18,7 @@ final class UnitWord
             'g' => __('per kilo'),
             'ml' => __('per litre'),
             'piece' => __('per piece'),
+            ItemPricing::UNIT => __('per item'),
             default => null,
         };
 
@@ -43,6 +44,7 @@ final class UnitWord
             'g' => __('kilo'),
             'ml' => __('litre'),
             'piece' => __('piece'),
+            ItemPricing::UNIT => __('item'),
             default => null,
         };
 

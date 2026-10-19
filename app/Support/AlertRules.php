@@ -39,13 +39,13 @@ final readonly class AlertRules
                 'below' => true,
             ];
             $size = $packs->sharedSize();
-            $items = $packs->leadsWithItems() ? $packs->items() : null;
+            $items = $packs->leadingItems();
 
             // Read as the price of one item, as the product page leads; the
             // target itself stays per litre or kilo, beside it.
             if ($items !== null) {
                 $rule = [
-                    'value' => __(':price each', ['price' => MoneyFormatter::format($items->fromUnitPrice($effective), (string) $product->currency)]),
+                    'value' => MoneyFormatter::each($items->fromUnitPrice($effective), (string) $product->currency),
                     'below' => true,
                     'pack' => $rule['value'],
                 ];

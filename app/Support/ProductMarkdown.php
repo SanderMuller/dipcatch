@@ -231,14 +231,14 @@ final readonly class ProductMarkdown
     {
         $pack = $packs->for($shop);
         $unitPrice = $packs->unitPriceOf($shop);
-        $itemPrice = $packs->leadsWithItems() ? $packs->items()?->priceFor($shop) : null;
+        $itemPrice = $packs->leadingItems()?->priceFor($shop);
 
         return match (true) {
             $shop->isReference() => (string) $shop->linkNote(),
             $shop->notAConsumerPriceReason() !== null => $shop->notAConsumerPriceReason(),
             ! $packs->hasComparisonUnit() => '—',
             $pack !== null && $pack->isExcluded() => (string) $pack->reason(),
-            $itemPrice !== null => __(':price each', ['price' => MoneyFormatter::format($itemPrice, $shop->currency)]),
+            $itemPrice !== null => MoneyFormatter::each($itemPrice, $shop->currency),
             $unitPrice !== null => MoneyFormatter::unitPrice($unitPrice, $shop->currency) . ' ' . $pack?->size?->label()
                 . match ($pack?->provenance) {
                     PackProvenance::Inferred, PackProvenance::Converted => ' (' . __('estimated') . ')',

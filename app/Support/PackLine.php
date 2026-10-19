@@ -73,7 +73,7 @@ final readonly class PackLine
 
         $price = number_format((float) $shop->current_price / $count, MoneyFormatter::decimals($shop->currency), '.', '');
 
-        return __(':price each', ['price' => MoneyFormatter::format($price, $shop->currency)]);
+        return MoneyFormatter::each($price, $shop->currency);
     }
 
     /** `€21.99 for 800 pieces`, `€21.99 for 800 pieces (estimated)`, or `€21.99`. */

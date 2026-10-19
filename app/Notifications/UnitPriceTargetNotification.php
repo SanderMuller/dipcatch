@@ -8,6 +8,7 @@ use App\Models\User;
 use App\PriceAdapters\BundleOffer;
 use App\Support\AlsoWorthChecking;
 use App\Support\BundlePriceLabel;
+use App\Support\ItemPricing;
 use App\Support\MoneyFormatter;
 use App\Support\PackLine;
 use App\Support\PackSize;
@@ -62,6 +63,14 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
      */
     public bool $snapshotLowestIn90Days = false;
 
+    /**
+     * How much one item holds where the product read per item when the alert
+     * fired ({@see ItemPricing}), so the alert reads as the page did. Not
+     * readonly, with a default, so a payload queued before it existed still
+     * renders.
+     */
+    public ?float $snapshotItemSize = null;
+
     public function __construct(
         public Product $product,
         Shop $shop,
@@ -80,6 +89,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
         $this->snapshotUnit = $packSize?->unit;
         $this->snapshotPackQuantity = $packSize === null ? null : (string) $packSize->quantity;
         $this->snapshotPackUnit = $packSize?->unit;
+        $this->snapshotItemSize = ItemPricing::itemSizeOf($product);
         $this->snapshotBundle = $shop->liveBundleOffer();
         $this->snapshotSingleItemPrice = $this->snapshotBundle === null ? null : $shop->singleItemPrice();
 
@@ -133,6 +143,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
             'unit' => $this->snapshotUnit,
             'pack_quantity' => $this->snapshotPackQuantity,
             'pack_unit' => $this->snapshotPackUnit,
+            'item_size' => $this->snapshotItemSize,
             // A payload queued before the snapshot existed reads the product.
             'unit_price_target' => $this->snapshotTarget ?? $this->product->effectiveUnitPriceTarget(),
             'new_price' => $this->snapshotPrice,
@@ -147,8 +158,9 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
     private function body(): string
     {
         $label = $this->snapshotUnit === null ? $this->snapshotUnitLabel : UnitWord::labelFor($this->snapshotUnit);
-        $unit = MoneyFormatter::unitPrice($this->snapshotUnitPrice, $this->product->currency)
-            . ($label === null ? '' : ' ' . $label);
+        $unit = $label === null
+            ? MoneyFormatter::unitPrice($this->snapshotUnitPrice, $this->product->currency)
+            : ItemPricing::figure($this->snapshotUnitPrice, $this->product->currency, $label, $this->snapshotItemSize);
         $packSize = $this->snapshotPackQuantity === null || $this->snapshotPackUnit === null
             ? null
             : PackSize::of((float) $this->snapshotPackQuantity, $this->snapshotPackUnit);

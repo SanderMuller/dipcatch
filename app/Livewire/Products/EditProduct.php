@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Services\TypeSafe\TypeSafeClient;
 use App\Support\Iso4217;
+use App\Support\ItemPricing;
 use App\Support\MoneyFormatter;
 use App\Support\UnitTargetGuide;
 use App\Support\UnitWord;
@@ -282,7 +283,7 @@ final class EditProduct extends Component
                 : null,
             'unitHistory' => $guide->history(),
             'comparisonUnit' => $this->product->comparablePacks()->unit(),
-            ...$this->alertAnchors(),
+            ...$this->alertAnchors(hasPackChoices: $packChoices !== []),
             'alertCard' => $alertCard,
             'otherAlerts' => $this->otherAlertSummaries($this->currency),
             'suspendedUnitTarget' => $this->suspendedUnitTarget($this->product),
@@ -312,25 +313,35 @@ final class EditProduct extends Component
      * set the ranking uses. Asking each question separately let this form name
      * a dead shop as the best value while every other surface named a live one.
      *
-     * @return array{unitWord: ?string, currentPrice: ?array{amount: string, host: string}, currentUnitPrice: ?array{amount: string, host: string}, unitTargetDescription: string}
+     * @return array{unitWord: ?string, itemSize: ?float, currentPrice: ?array{amount: string, host: string}, currentUnitPrice: ?array{amount: string, host: string}, unitTargetDescription: string}
      */
-    private function alertAnchors(): array
+    private function alertAnchors(bool $hasPackChoices): array
     {
         $packs = $this->product->comparablePacks();
-        $unitWord = UnitWord::noun($packs->unit());
+        // Where the product page leads with the price per item, so does the
+        // form. The target is still stored per litre or kilo, so only with the
+        // pack choices that convert what is typed: the plain field without them
+        // takes the target as it is stored.
+        $items = $hasPackChoices ? $packs->leadingItems() : null;
+        $unitWord = UnitWord::noun($items === null ? $packs->unit() : ItemPricing::UNIT);
         $bestValue = $this->product->bestValueShop();
         $unitPrice = $bestValue === null ? null : $packs->unitPriceOf($bestValue);
+        $itemPrice = $bestValue === null ? null : $items?->priceFor($bestValue);
 
         return [
             'unitWord' => $unitWord,
+            'itemSize' => $items?->itemSize,
             'currentPrice' => $this->anchor($this->product->lowestOutlayShop(), fn (Shop $shop): ?string => $shop->current_price === null
                 ? null
                 : (string) $shop->current_price),
-            'currentUnitPrice' => $this->anchor(
+            'currentUnitPrice' => $itemPrice === null ? $this->anchor(
                 $bestValue,
                 fn (): ?string => $unitPrice,
                 UnitWord::labelFor($packs->unit()),
-            ),
+            ) : [
+                'amount' => MoneyFormatter::each($itemPrice, (string) $this->product->currency),
+                'host' => (string) $bestValue?->host,
+            ],
             'unitTargetDescription' => $this->unitTargetDescription($unitWord),
         ];
     }

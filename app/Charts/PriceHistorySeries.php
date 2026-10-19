@@ -9,6 +9,7 @@ use App\Models\PriceDropEvent;
 use App\Models\Product;
 use App\Models\ProductCheapestHistory;
 use App\Support\BundlePriceLabel;
+use App\Support\ItemPricing;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilder;
@@ -53,7 +54,32 @@ final readonly class PriceHistorySeries
      */
     public function fluxChart(): array
     {
-        return PriceHistoryFluxChart::fromData($this->data(), strtoupper($this->product->currency));
+        return PriceHistoryFluxChart::fromData(self::perItem($this->data(), $this->product), strtoupper($this->product->currency));
+    }
+
+    /**
+     * The unit line as the price of one item, where the product page leads
+     * with it ({@see ItemPricing}): €16.42 /l is €5.75 for a
+     * 350 ml glass. Only a line in the unit the product compares in now.
+     *
+     * @param  array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>, shops: list<?string>, unitShops: list<?string>}  $data
+     * @return array{labels: list<string>, price: list<float|null>, unit: array{unit: string, points: list<float|null>}|null, notified: list<float|null>, bundleConditions: list<?string>, shops: list<?string>, unitShops: list<?string>}
+     */
+    private static function perItem(array $data, Product $product): array
+    {
+        $packs = $product->comparablePacks();
+        $items = $packs->leadingItems();
+
+        if ($items === null || $data['unit'] === null || $data['unit']['unit'] !== $packs->unit()) {
+            return $data;
+        }
+
+        $data['unit'] = [
+            'unit' => ItemPricing::UNIT,
+            'points' => array_map(fn (?float $point): ?float => $point === null ? null : $point * $items->itemSize / 1000, $data['unit']['points']),
+        ];
+
+        return $data;
     }
 
     /**
