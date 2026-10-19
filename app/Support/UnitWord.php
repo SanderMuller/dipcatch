@@ -24,6 +24,18 @@ final class UnitWord
         return is_string($word) ? $word : null;
     }
 
+    /** "per litre", or "per item" where the price per item leads ({@see ItemPricing}). */
+    public static function forComparison(ComparablePacks $packs): ?string
+    {
+        if (! $packs->leadsWithItems()) {
+            return self::forCode($packs->unit());
+        }
+
+        $word = __('per item');
+
+        return is_string($word) ? $word : null;
+    }
+
     /** "kilo", "litre", "piece" — the noun on its own, for a label. */
     public static function noun(?string $unit): ?string
     {

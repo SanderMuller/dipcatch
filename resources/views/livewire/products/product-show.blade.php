@@ -128,7 +128,7 @@
                                 @if ($unitGap !== null)
                                     {{ __('That is :percent% more :unit than the best value.', [
                                         'percent' => $unitGap,
-                                        'unit' => \App\Support\UnitWord::forCode($headline->unit) ?? __('per unit'),
+                                        'unit' => $headline->comparisonWord(),
                                     ]) }}
                                 @endif
                             </dd>
@@ -236,6 +236,7 @@
                      the add-shop button, rather than sitting on a line of its own
                      above it. The partial also states the count and the upgrade
                      path rather than merely disabling a button. --}}
+                @php($comparesPer = \App\Support\UnitWord::forComparison($packs))
                 @include('filament.partials.add-shop-header', [
                     'product' => $product,
                     'shopLimit' => $shopLimit,
@@ -245,7 +246,7 @@
                     'suggestFindingId' => $suggestFinding === null ? null : (int) $suggestFinding,
                     'heading' => __('Shop comparison'),
                     'subheading' => $packs->hasComparisonUnit()
-                        ? __('Same product, different pack sizes. Sorted by price :unit.', ['unit' => \App\Support\UnitWord::forCode($packs->unit())])
+                        ? __('Same product, different pack sizes. Sorted by price :unit.', ['unit' => $comparesPer])
                         : __('Sorted by price.'),
                 ])
 
@@ -253,7 +254,7 @@
                     <flux:table.columns>
                         <flux:table.column>{{ __('Shop') }}</flux:table.column>
                         <flux:table.column class="hidden @2xl:table-cell">{{ __('Pack size') }}</flux:table.column>
-                        <flux:table.column>{{ $packs->hasComparisonUnit() ? __('Price :unit', ['unit' => \App\Support\UnitWord::forCode($packs->unit())]) : __('Price') }}</flux:table.column>
+                        <flux:table.column>{{ $packs->hasComparisonUnit() ? __('Price :unit', ['unit' => $comparesPer]) : __('Price') }}</flux:table.column>
                         <flux:table.column class="hidden @4xl:table-cell">{{ __('In stock') }}</flux:table.column>
                         <flux:table.column class="hidden @4xl:table-cell">{{ __('Price read') }}</flux:table.column>
                         {{-- Named for screen readers only on a narrow table: the word
@@ -276,8 +277,8 @@
                                      it marks as estimated. --}}
                                 @php($packLine = \App\Support\PackLine::of($shop, $packs))
                                 <flux:table.cell class="hidden align-top tabular-nums @2xl:table-cell" data-test="shop-pack-size">
-                                    @if ($packLine->size !== null)
-                                        {{ \App\Support\UnitWord::pack($packLine->size) }}
+                                    @if ($packLine->sizeText !== null)
+                                        {{ $packLine->sizeText }}
                                     @else
                                         <span aria-hidden="true" class="text-zinc-400">&ndash;</span>
                                         <span class="sr-only">{{ __('Unknown') }}</span>
@@ -291,7 +292,9 @@
                                             ? __('Pack price: what :shop charges for one pack.', ['shop' => $shop->displayName()])
                                             : __('Pack price: what :shop charges for :size.', ['shop' => $shop->displayName(), 'size' => \App\Support\UnitWord::pack($packLine->size)]))
                                         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-base font-medium text-zinc-900 sm:text-sm dark:text-zinc-100">
-                                            <x-shop-unit-price :shop="$shop" :packs="$packs" :hint="__('Price :unit: the pack price divided by the pack size, so packs of different sizes compare fairly.', ['unit' => \App\Support\UnitWord::forCode($packs->unit())])" />
+                                            <x-shop-unit-price :shop="$shop" :packs="$packs" :hint="$packs->leadsWithItems()
+                                                ? __('Price per item: the pack price divided by the number of items, so a set and a single one compare fairly.')
+                                                : __('Price :unit: the pack price divided by the pack size, so packs of different sizes compare fairly.', ['unit' => $comparesPer])" />
                                             {{-- The per-unit winner, marked in the row whichever price the
                                                  headline leads with: the table is sorted per unit. --}}
                                             @if ($headline->bestValue?->id === $shop->id && $shops->count() > 1)
@@ -309,7 +312,7 @@
                                         </div>
                                         <div class="mt-0.5 hidden text-base text-zinc-500 sm:text-sm @2xl:block dark:text-zinc-400">
                                             <flux:tooltip :content="$packPriceHint">
-                                                <span tabindex="0" class="cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" data-test="pack-price-hint">{{ \App\Support\MoneyFormatter::format($packLine->price, $shop->currency) }}@if ($packLine->each !== null) · {{ $packLine->each }}@endif</span>
+                                                <span tabindex="0" class="cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" data-test="pack-price-hint">{{ \App\Support\MoneyFormatter::format($packLine->price, $shop->currency) }}@if ($packLine->aside !== null) · {{ $packLine->aside }}@endif</span>
                                             </flux:tooltip>
                                         </div>
                                     @else

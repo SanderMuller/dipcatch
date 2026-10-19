@@ -23,6 +23,14 @@ final readonly class ItemSizes
     /** How far a weight may land from a whole number of items, in items, and still count them. */
     private const float WHOLE_ITEM_SLACK = 0.25;
 
+    /**
+     * How far a size may sit from a whole number of the item, as a share,
+     * and still be counted for a price per item: 2%. Tighter than the slack
+     * a conversion gets, so the price per item ranks the shops as the price
+     * per unit does.
+     */
+    private const float SAME_ITEM_SLACK = 0.02;
+
     private const string COUNTED = 'counted';
 
     private const string DOUBT = 'doubt';
@@ -134,8 +142,9 @@ final readonly class ItemSizes
         }
 
         $pieces = $size->quantity / $factor;
+        $whole = round($pieces);
 
-        return $pieces < 1 - self::WHOLE_ITEM_SLACK || abs($pieces - round($pieces)) > self::WHOLE_ITEM_SLACK ? null : max(1.0, round($pieces));
+        return $whole < 1 || abs($pieces - $whole) / $whole > self::SAME_ITEM_SLACK ? null : $whole;
     }
 
     /** How many shops state both a count and a size in `$measure` that holds. */

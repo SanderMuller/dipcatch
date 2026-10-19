@@ -141,10 +141,39 @@ final readonly class HeadlinePrice
         return $this->unit === null || $this->shop === null ? null : $this->packs->unitPriceOf($this->shop);
     }
 
-    /** The unit price without the running bundle, for the struck-through figure beside it. */
+    /**
+     * Whether the headline reads as a price per item, "€5.75 each", ahead of
+     * the price per unit. See {@see ItemPricing}.
+     */
+    public function leadsWithItems(): bool
+    {
+        return $this->unit !== null && $this->packs->leadsWithItems();
+    }
+
+    /** A shop's figure in the headline's terms: `€5.75 each` where the price per item leads, else `€16.42 /l`. */
+    public function figureFor(Shop $shop, string $unitPrice): string
+    {
+        $itemPrice = $this->leadsWithItems() ? $this->packs->items()?->priceFor($shop) : null;
+
+        return $itemPrice !== null
+            ? __(':price each', ['price' => MoneyFormatter::format($itemPrice, $shop->currency)])
+            : MoneyFormatter::unitPrice($unitPrice, $shop->currency) . ' ' . UnitWord::labelFor($this->unit);
+    }
+
+    /** "per litre", or "per item" where the price per item leads: what a percentage beside the headline compares. */
+    public function comparisonWord(): string
+    {
+        return ($this->unit === null ? null : UnitWord::forComparison($this->packs)) ?? __('per unit');
+    }
+
+    /**
+     * The unit price without the running bundle, for the struck-through figure
+     * beside it. None where the price per item leads: a struck price per litre
+     * beside "€5.75 each" compares two different things.
+     */
     public function regularUnitPrice(): ?string
     {
-        if ($this->unit === null || $this->shop?->liveBundleOffer() === null) {
+        if ($this->unit === null || $this->leadsWithItems() || $this->shop?->liveBundleOffer() === null) {
             return null;
         }
 
@@ -185,9 +214,15 @@ final readonly class HeadlinePrice
         return UnitWord::pack($size) . ' · ' . MoneyFormatter::unitPrice($unitPrice, $this->currency()) . ' ' . UnitWord::labelFor($this->packs->unit());
     }
 
-    /** `€0.0275 /piece`, or `€21.99` for a pack-price headline, or a dash. */
+    /** `€0.0275 /piece`, `€5.75 each`, or `€21.99` for a pack-price headline, or a dash. */
     public function text(): string
     {
+        $itemPrice = $this->leadsWithItems() && $this->shop !== null ? $this->packs->items()?->priceFor($this->shop) : null;
+
+        if ($itemPrice !== null) {
+            return __(':price each', ['price' => MoneyFormatter::format($itemPrice, $this->currency())]);
+        }
+
         $unitPrice = $this->unitPrice();
 
         if ($unitPrice !== null) {

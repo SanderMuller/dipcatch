@@ -48,7 +48,6 @@ final readonly class ComparablePacks
     /**
      * @param  array<string, ComparablePack>  $packs  keyed by shop id
      * @param  array<string, true>  $altsInDoubt  keyed by shop id
-     * @param  array<string, float>  $itemCounts  keyed by shop id, see {@see itemCountFor()}
      */
     private function __construct(
         private ?string $unit,
@@ -56,7 +55,7 @@ final readonly class ComparablePacks
         private ItemSizes $itemSizes,
         private ?PackSize $agreed = null,
         private array $altsInDoubt = [],
-        private array $itemCounts = [],
+        private ?ItemPricing $items = null,
     ) {}
 
     /**
@@ -76,12 +75,13 @@ final readonly class ComparablePacks
      * one most voters have a size in — their own, or a second size that holds
      * — so one of them is `Stated` and winnable, but only if that voter is also
      * a shop this resolver answers for. `$currentUnit`, the unit the product
-     * compares in now, breaks a tie.
+     * compares in now, breaks a tie. `$countsItems` says the product is a
+     * thing rather than its contents, so a price per item may lead.
      *
      * @param  Collection<int, Shop>  $shops
      * @param  Collection<int, Shop>|null  $voters  a subset of `$shops`; defaults to all of them
      */
-    public static function of(Collection $shops, string $currency, ?Collection $voters = null, ?string $currentUnit = null): self
+    public static function of(Collection $shops, string $currency, ?Collection $voters = null, ?string $currentUnit = null, bool $countsItems = false): self
     {
         $voters = ($voters ?? $shops)->filter(fn (Shop $shop): bool => $shop->currency === $currency);
 
@@ -115,7 +115,7 @@ final readonly class ComparablePacks
             $packs[(string) $shop->id] = self::resolveOne($shop, $currency, $unit, $agreed, $median, $itemSizes);
         }
 
-        return new self($unit, $packs, $itemSizes, $agreed, $altsInDoubt, $itemSizes->wholeItemCounts(array_map(fn (ComparablePack $pack): ?PackSize => $pack->size, $packs)));
+        return new self($unit, $packs, $itemSizes, $agreed, $altsInDoubt, ItemPricing::of($itemSizes, $unit, $shops, $packs, $countsItems));
     }
 
     /**
@@ -129,7 +129,19 @@ final readonly class ComparablePacks
      */
     public function itemCountFor(Shop $shop): ?float
     {
-        return $this->itemCounts[(string) $shop->id] ?? null;
+        return $this->items?->countFor($shop);
+    }
+
+    /** The shops' counts of one shared item, while there are any. See {@see ItemPricing}. */
+    public function items(): ?ItemPricing
+    {
+        return $this->items;
+    }
+
+    /** Whether the price per item leads the display, ahead of the price per unit. */
+    public function leadsWithItems(): bool
+    {
+        return $this->items?->leads() === true;
     }
 
     /**

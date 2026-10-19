@@ -536,7 +536,7 @@ final class Product extends Model
         // Every shop gets an answer; only the ones still being tracked get a
         // vote on what this product is measured in. See
         // {@see ComparablePacks::of()}.
-        return ComparablePacks::of($this->shops, (string) $this->currency, $this->votingShops(), $this->best_value_pack_unit);
+        return ComparablePacks::of($this->shops, (string) $this->currency, $this->votingShops(), $this->best_value_pack_unit, countsItems: $this->category?->department()->countsItems() === true);
     }
 
     /**

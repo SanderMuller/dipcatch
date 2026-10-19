@@ -31,7 +31,11 @@
                 </del>
             @elseif ($drop->comparison_unit === $headline->unit && $drop->comparison_unit !== null && $drop->reference_unit_price !== null)
                 <span class="text-sm text-zinc-500 dark:text-zinc-400">
-                    {{ __('Was :price', ['price' => \App\Support\MoneyFormatter::unitPrice((string) $drop->reference_unit_price, $drop->currency) . ' ' . \App\Support\UnitWord::labelFor($drop->comparison_unit)]) }}
+                    @if ($headline->leadsWithItems() && ($items = $headline->packs->items()))
+                        {{ __('Was :price', ['price' => __(':price each', ['price' => \App\Support\MoneyFormatter::format($items->fromUnitPrice((string) $drop->reference_unit_price), $drop->currency)])]) }}
+                    @else
+                        {{ __('Was :price', ['price' => \App\Support\MoneyFormatter::unitPrice((string) $drop->reference_unit_price, $drop->currency) . ' ' . \App\Support\UnitWord::labelFor($drop->comparison_unit)]) }}
+                    @endif
                 </span>
             @elseif ($drop->comparison_unit === $headline->unit && $drop->comparison_unit === null)
                 <span class="text-sm text-zinc-500 dark:text-zinc-400">{{ $drop->wasLabel() }}</span>

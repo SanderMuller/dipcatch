@@ -13,6 +13,11 @@
 @php
     $pack = $packs?->for($shop);
     $unitPrice = $packs?->unitPriceOf($shop);
+    // Where the price per item leads, it is the figure this row shows.
+    $itemPrice = $packs?->leadsWithItems() === true ? $packs->items()?->priceFor($shop) : null;
+    $figure = $itemPrice !== null
+        ? __(':price each', ['price' => \App\Support\MoneyFormatter::format($itemPrice, $shop->currency)])
+        : ($unitPrice === null ? null : \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) . ' ' . $pack?->size?->label());
 @endphp
 
 @php
@@ -37,10 +42,10 @@
     <span class="inline-flex flex-wrap items-baseline gap-x-2 tabular-nums">
         @if ($hint !== null)
             <flux:tooltip :content="$hint">
-                <span tabindex="0" class="cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" data-test="unit-price-hint">{{ \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) }} {{ $pack?->size?->label() }}</span>
+                <span tabindex="0" class="cursor-help rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" data-test="unit-price-hint">{{ $figure }}</span>
             </flux:tooltip>
         @else
-            <span>{{ \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) }} {{ $pack?->size?->label() }}</span>
+            <span>{{ $figure }}</span>
         @endif
         @if ($pack?->provenance === \App\Enums\PackProvenance::Inferred)
             <flux:tooltip content="{{ __('No pack size on this page. Taken from the other shops on this product, which all agree.') }}">

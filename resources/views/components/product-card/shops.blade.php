@@ -31,7 +31,7 @@
             <span class="flex min-w-0 items-center gap-x-1 text-zinc-500 dark:text-zinc-400"><a href="{{ \App\Support\AffiliateLink::for($shop->url) }}" target="_blank" rel="{{ \App\Support\AffiliateLink::rel($shop->url) }}" class="relative z-10 inline-flex min-w-0 items-center gap-1.5 hover:underline"><x-shop-name :host="$shop->host" /></a>@if ($window)<span class="truncate"> · {{ $window }}</span>@endif</span>
             <span @class(['flex shrink-0 items-baseline gap-x-1.5 tabular-nums', 'font-semibold text-zinc-900 dark:text-white' => $isBest, 'text-zinc-500 dark:text-zinc-400' => ! $isBest])>
                 @if ($comparable($shop) && ($unitPrice = $packs->unitPriceOf($shop)) !== null)
-                    <span>{{ \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) }} {{ \App\Support\UnitWord::labelFor($headline->unit) }}</span>
+                    <span>{{ $headline->figureFor($shop, $unitPrice) }}</span>
                     {{-- Only where the row has room: a narrow card keeps the figure it compares on. --}}
                     <span class="hidden text-xs font-normal text-zinc-500 @[17rem]:inline dark:text-zinc-400">{{ \App\Support\MoneyFormatter::format((string) $shop->current_price, $shop->currency) }}</span>
                 @else

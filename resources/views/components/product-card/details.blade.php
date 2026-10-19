@@ -31,7 +31,6 @@
             $headline->isComparable($shop) ? 0 : 1,
             ($headline->isComparable($shop) ? $packs->unitPriceValueOf($shop) : null) ?? ($shop->current_price === null ? PHP_FLOAT_MAX : (float) $shop->current_price),
         ]);
-    $unitLabel = \App\Support\UnitWord::labelFor($packs->unit());
 @endphp
 
 <div class="w-84 divide-y divide-zinc-950/5 text-left font-normal text-zinc-700 dark:divide-white/10 dark:text-zinc-300" data-test="product-card-details">
@@ -145,7 +144,7 @@
                                 <p class="text-zinc-500 dark:text-zinc-400">{{ __('Link only') }}</p>
                             @else
                                 @if ($unitPrice !== null)
-                                    <p @class(['font-medium text-zinc-950 dark:text-white' => $isHeadline])>{{ \App\Support\MoneyFormatter::unitPrice($unitPrice, $shop->currency) }} {{ $unitLabel }}</p>
+                                    <p @class(['font-medium text-zinc-950 dark:text-white' => $isHeadline])>{{ $headline->figureFor($shop, $unitPrice) }}</p>
                                 @endif
                                 <p @class(['text-xs text-zinc-500 dark:text-zinc-400' => $unitPrice !== null, 'font-medium text-zinc-950 dark:text-white' => $unitPrice === null && $isHeadline])>{{ \App\Support\PackLine::format($shop->current_price === null ? null : (string) $shop->current_price, $shop->currency, $packs->for($shop)->size ?? $shop->packSize()) }}</p>
                             @endif

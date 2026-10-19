@@ -52,7 +52,7 @@ final readonly class ProductMarkdown
             $lines[] = __('No shops yet. Add one to start following a price.');
         } elseif ($packs->hasComparisonUnit()) {
             $lines = [...$lines, ...self::table(
-                [__('Shop'), __('Price :unit', ['unit' => UnitWord::forCode($packs->unit())]), __('Pack price'), __('In stock'), __('Price read')],
+                [__('Shop'), __('Price :unit', ['unit' => UnitWord::forComparison($packs)]), __('Pack price'), __('In stock'), __('Price read')],
                 $shops->map(fn (Shop $shop): array => [
                     self::link($shop),
                     self::unitPrice($shop, $packs),
@@ -116,7 +116,7 @@ final readonly class ProductMarkdown
         $lines = [...$lines, '', '## ' . __('Shops'), ''];
         $lines = [...$lines, ...($packs->hasComparisonUnit()
             ? self::table(
-                [__('Shop'), __('Price :unit', ['unit' => UnitWord::forCode($packs->unit())]), __('Pack price'), __('Price read')],
+                [__('Shop'), __('Price :unit', ['unit' => UnitWord::forComparison($packs)]), __('Pack price'), __('Price read')],
                 $shops->map(fn (Shop $shop): array => [
                     self::link($shop),
                     self::unitPrice($shop, $packs),
@@ -167,7 +167,7 @@ final readonly class ProductMarkdown
             if ($percent !== null) {
                 $note .= ' ' . __('That is :percent% more :unit than the best value.', [
                     'percent' => $percent,
-                    'unit' => UnitWord::forCode($headline->unit) ?? __('per unit'),
+                    'unit' => $headline->comparisonWord(),
                 ]);
             }
 
@@ -231,12 +231,14 @@ final readonly class ProductMarkdown
     {
         $pack = $packs->for($shop);
         $unitPrice = $packs->unitPriceOf($shop);
+        $itemPrice = $packs->leadsWithItems() ? $packs->items()?->priceFor($shop) : null;
 
         return match (true) {
             $shop->isReference() => (string) $shop->linkNote(),
             $shop->notAConsumerPriceReason() !== null => $shop->notAConsumerPriceReason(),
             ! $packs->hasComparisonUnit() => '—',
             $pack !== null && $pack->isExcluded() => (string) $pack->reason(),
+            $itemPrice !== null => __(':price each', ['price' => MoneyFormatter::format($itemPrice, $shop->currency)]),
             $unitPrice !== null => MoneyFormatter::unitPrice($unitPrice, $shop->currency) . ' ' . $pack?->size?->label()
                 . match ($pack?->provenance) {
                     PackProvenance::Inferred, PackProvenance::Converted => ' (' . __('estimated') . ')',

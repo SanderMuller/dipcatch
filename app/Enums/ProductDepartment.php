@@ -24,6 +24,18 @@ enum ProductDepartment: string
     case CarTravel = 'car_travel';
     case Other = 'other';
 
+    /**
+     * Whether a size in this department says what one item holds rather than
+     * what you buy: a 350 ml glass, a 20 L backpack. A price per item then
+     * reads better than a price per litre. Food, drinks, care, cleaning and
+     * pet supplies are bought for their contents, and so are motor oil and
+     * potting soil, so sports, garden and car stay out.
+     */
+    public function countsItems(): bool
+    {
+        return in_array($this, [self::Home, self::Clothing, self::Toys, self::Electronics, self::MediaOffice], strict: true);
+    }
+
     public function label(): string
     {
         return match ($this) {
