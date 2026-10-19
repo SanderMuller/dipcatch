@@ -336,6 +336,8 @@ test('a title that counts first and sizes last is a pack, with no stated size at
     'spelled out' => ['12 stuks 55 g', 660.0],
     // Order is the signal: this is 500 g holding twenty sachets.
     'size before the count' => ['Koffie 500 g 20 zakjes', 500.0],
+    'a count of what is inside, first' => ['Nescafé Dolce Gusto Lungo 30 capsules 216 g', 216.0],
+    'a pack count beside a count of what is inside' => ['2 stuks Koffie 500 g 20 zakjes', 1000.0],
     'a count with no size' => ['Eieren 12 stuks', 12.0],
     'no count at all' => ['Melk 1 L', 1000.0],
 ]);
@@ -501,6 +503,8 @@ test('a stated item size takes a count of what is inside only for a thing', func
         ->and(PackSize::resolve($stated, authoritative: true, title: $title, countsItems: true)?->quantity)->toBe($thing);
 })->with([
     ['500 g', 'Koffie 500 g 20 zakjes', 500.0, 10000.0],
+    ['216 g', 'Nescafé Dolce Gusto Lungo 30 capsules 216 g', 216.0, 6480.0],
+    ['720 g', 'Vaatwastabletten 40 tabletten 720 g', 720.0, 28800.0],
     ['55 g', 'Barebells 55 g 12 stuks', 660.0, 660.0],
     ['5 L', 'Vuilniszakken 5L 200x', 1000000.0, 1000000.0],
     ['40 g', 'Pringles 40 g (12 Pack)', 480.0, 480.0],

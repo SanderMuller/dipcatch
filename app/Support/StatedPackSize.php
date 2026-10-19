@@ -45,8 +45,8 @@ final readonly class StatedPackSize
      * with the size elsewhere in the string (`12st ... 55g`, which is how
      * Foodello writes every listing), and a named set (`55 g, pack of 12`).
      * All mean twelve of them, and so does a bare `200x`. A count of what is
-     * inside, after the size, counts items only where `$countsItems`:
-     * "Koffie 500 g 20 zakjes" is one 500 g bag ({@see countsContents()}).
+     * inside counts items only where `$countsItems`: "Koffie 500 g 20 zakjes"
+     * is one 500 g bag ({@see countsContents()}).
      *
      * Deliberately narrow. The stated size has to equal the title's item size
      * exactly, and has to be a weight or a volume. Anything else leaves the
@@ -73,8 +73,9 @@ final readonly class StatedPackSize
      *
      * Close to {@see wholePack()}, from the title alone: a title that counts
      * its items and then sizes one of them describes a pack of that many. A
-     * count after the size counts only where `$countsItems`. Foodello states no structured size at all, so this is the path
-     * its rows take.
+     * count after the size, or of what is inside, counts only where
+     * `$countsItems`. Foodello states no structured size at all, so this is
+     * the path its rows take.
      */
     public static function fromTitle(?string $title, bool $countsItems = false): ?PackSize
     {
@@ -83,7 +84,7 @@ final readonly class StatedPackSize
         }
 
         $parsed = PackSize::parse($title);
-        $count = self::leadingCountBeforeSize($title) ?? ItemCount::setIn($title) ?? ($countsItems ? self::trailingCount($title) : null);
+        $count = self::leadingCountBeforeSize($title, $countsItems) ?? ItemCount::setIn($title) ?? ($countsItems ? self::trailingCount($title) : null);
 
         if (! $parsed instanceof PackSize || $count === null || $parsed->unit === 'piece') {
             return $parsed;
@@ -110,20 +111,13 @@ final readonly class StatedPackSize
     }
 
     /**
-     * True when the title's piece count stands after its size and counts what
-     * is inside: "Koffie 500 g 20 zakjes" is one bag of twenty, where
-     * "Barebells 55 g 12 stuks" is twelve bars.
+     * True when the title's piece count counts what is inside, wherever it
+     * stands: "Koffie 500 g 20 zakjes" and "30 capsules 216 g" weigh that
+     * much in all, where "Barebells 55 g 12 stuks" is twelve bars.
      */
     private static function countsContents(string $title): bool
     {
-        if (PackSize::hasCrossForm($title) || self::leadingCountBeforeSize($title) !== null) {
-            return false;
-        }
-
-        $size = self::firstMatch(PackSize::sizePattern(), $title);
-
-        return $size !== null
-            && preg_match(self::CONTENTS_COUNT_PATTERN, $title, $match, PREG_OFFSET_CAPTURE, $size['offset']) === 1;
+        return ! PackSize::hasCrossForm($title) && preg_match(self::CONTENTS_COUNT_PATTERN, $title) === 1;
     }
 
     /**
@@ -131,11 +125,11 @@ final readonly class StatedPackSize
      * last — `12st Barebells ... 55g`. Null unless the count comes before the
      * size.
      *
-     * The order is the whole signal. "Koffie 500 g 20 zakjes" is 500 g holding
-     * twenty sachets, not twenty times 500 g, and it is told apart from the
-     * shape above only by which of the two comes first.
+     * The order is the signal. "Glasses 350 ml, 4 pcs" puts the count last,
+     * and is four glasses only where the department counts items. So is the
+     * word: "30 capsules 216 g" weighs 216 g in all, unless `$countsItems`.
      */
-    private static function leadingCountBeforeSize(string $title): ?float
+    private static function leadingCountBeforeSize(string $title, bool $countsItems = false): ?float
     {
         if (PackSize::hasCrossForm($title)) {
             return null;
@@ -149,7 +143,9 @@ final readonly class StatedPackSize
             return null;
         }
 
-        return $count['value'];
+        return $countsItems || preg_match(self::CONTENTS_COUNT_PATTERN, substr($title, $count['offset']), $match, PREG_OFFSET_CAPTURE) !== 1 || $match[0][1] !== 0
+            ? $count['value']
+            : null;
     }
 
     /**
