@@ -287,7 +287,7 @@ final readonly class DashboardSuggestions
      */
     private static function datasetRow(Product $product, ShopSuggestion $suggestion, array $chances): array
     {
-        $size = PackSize::resolve($suggestion->size, authoritative: false, title: $suggestion->name);
+        $size = PackSize::resolve($suggestion->size, authoritative: false, title: $suggestion->name, countsItems: $product->category?->department()->countsItems() === true);
         $unitPrice = $size?->unitPriceFor($suggestion->price);
 
         return [

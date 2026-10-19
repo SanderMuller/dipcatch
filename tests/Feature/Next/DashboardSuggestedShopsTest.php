@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Suggestions\SuggestionVerdicts;
+use App\Enums\ProductCategory;
 use App\Enums\WebFindingStatus;
 use App\Livewire\Dashboard;
 use App\Livewire\DashboardSuggestedShops;
@@ -325,3 +326,15 @@ it('lists again as soon as a shop is added, a web suggestion dismissed, or a pro
     $cheese->update(['active' => false]);
     expect(suggestedShopRows($user))->toBeEmpty();
 });
+
+it('prices a suggested shop for kitchenware per litre of the whole set', function (?ProductCategory $category, string $expected): void {
+    $user = User::factory()->create(['shop_checks' => false]);
+    $product = dashboardProduct($user, 'Dubbelwandige glazen 350 ml 4 stuks');
+    $product->forceFill(['category' => $category])->save();
+    seedRow('ah', 'Dubbelwandige glazen 350 ml 4 stuks', null, '22.99', link: 'glazen-ah');
+
+    expect(suggestedShopRows($user)[0] ?? '')->toContain($expected);
+})->with([
+    'kitchenware' => [ProductCategory::Kitchen, '€16.42'],
+    'no category' => [null, '€65.69'],
+]);

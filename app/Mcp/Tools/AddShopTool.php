@@ -131,7 +131,7 @@ final class AddShopTool extends Tool
         $variantKey = $outcome->pickedVariantKey ?? $variantKey;
         $snapshot = ShopDraft::flatten($outcome);
 
-        $preview = ['found' => $this->reporter->preview($snapshot, $outcome)];
+        $preview = ['found' => $this->reporter->preview($snapshot, $outcome, countsItems: $product->category?->department()->countsItems() === true)];
 
         if ($outcome->pickedVariantKey !== null) {
             $preview['variant_note'] = 'The page names no variant, so the one matching the pack size already on this product was picked. To track another, call add_shop again with its variant_key.';

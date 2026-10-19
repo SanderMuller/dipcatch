@@ -55,12 +55,13 @@ final readonly class ProbeReporter
     }
 
     /**
-     * What the page said, in the shape a person can be read back.
+     * What the page said, in the shape a person can be read back. A product
+     * that `$countsItems` reads its pack as the price check stores it.
      *
      * @param  array<string, mixed>  $snapshot
      * @return array<string, mixed>
      */
-    public function preview(array $snapshot, ProbeOutcome $outcome): array
+    public function preview(array $snapshot, ProbeOutcome $outcome, bool $countsItems = false): array
     {
         return [
             'title' => $snapshot['title'] ?? null,
@@ -81,7 +82,7 @@ final readonly class ProbeReporter
             'pack_size' => $snapshot['pack_size'] ?? null,
             // The price per kilo, litre or piece the page works out to, when it
             // states a pack size — the figure shops are compared on.
-            ...self::unitPrice($snapshot),
+            ...self::unitPrice($snapshot, $countsItems),
             // How many variants the page sells, and how this one was picked.
             // Null means this reader cannot see variants at all — not that
             // the page has one. A bare price from a page whose title looks
@@ -241,10 +242,10 @@ final readonly class ProbeReporter
      * @param  array<string, mixed>  $snapshot
      * @return array{unit_price: ?string, comparison_unit: ?string}
      */
-    private static function unitPrice(array $snapshot): array
+    private static function unitPrice(array $snapshot, bool $countsItems): array
     {
         $text = static fn (string $key): ?string => is_string($snapshot[$key] ?? null) ? $snapshot[$key] : null;
-        $size = PackSize::resolve($text('pack_size'), (bool) ($snapshot['pack_size_authoritative'] ?? false), $text('title'), (bool) ($snapshot['pack_size_whole_pack'] ?? false));
+        $size = PackSize::resolve($text('pack_size'), (bool) ($snapshot['pack_size_authoritative'] ?? false), $text('title'), (bool) ($snapshot['pack_size_whole_pack'] ?? false), $countsItems);
         $price = $snapshot['price'] ?? null;
 
         return [

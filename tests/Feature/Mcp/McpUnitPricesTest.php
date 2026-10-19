@@ -79,3 +79,16 @@ it('states the unit price a probed page works out to', function (): void {
 
     expect($unsized)->toMatchArray(['unit_price' => null, 'comparison_unit' => null]);
 });
+
+it('works out the unit price of a probed page as the price check will store it', function (bool $countsItems, string $expected): void {
+    $preview = new ProbeReporter()->preview(
+        ['title' => 'Glasses, 350 ml, 4 pcs', 'price' => '22.99', 'currency' => 'EUR'],
+        ProbeOutcome::failed(ProbeFailure::cases()[0]),
+        countsItems: $countsItems,
+    );
+
+    expect($preview['unit_price'])->toBe($expected);
+})->with([
+    'kitchenware' => [true, '16.4214'],
+    'anything else' => [false, '65.6857'],
+]);
