@@ -17,4 +17,16 @@ enum NameSearchVerdict: string
     {
         return $this === self::Specific;
     }
+
+    /** Why the web search stays off for this text, or null when it may run. */
+    public function hint(): ?string
+    {
+        if ($this === self::Specific) {
+            return null;
+        }
+
+        return $this === self::TooVague
+            ? __('Add the brand or the size, and search again.')
+            : __('These results match every word. Pick one, or change the text to search the web.');
+    }
 }

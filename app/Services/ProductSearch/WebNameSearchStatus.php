@@ -23,4 +23,18 @@ enum WebNameSearchStatus: string
 
     /** The provider failed, the app-wide cap is spent, or the save failed. */
     case Failed = 'failed';
+
+    /** What the wizard says about a search that listed nothing new, or null when the results or the gate say it. */
+    public function note(): ?string
+    {
+        if (! in_array($this, [self::Failed, self::Busy, self::TooShort], strict: true)) {
+            return null;
+        }
+
+        return match ($this) {
+            self::Failed => __('The web search failed. Try again, or paste a link.'),
+            self::Busy => __('A search for this text is already running. Try again in a moment.'),
+            default => __('Type at least 3 characters of the product name, or paste a link.'),
+        };
+    }
 }
