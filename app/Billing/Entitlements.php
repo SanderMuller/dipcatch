@@ -97,6 +97,12 @@ final readonly class Entitlements
         return $this->value('sharing') === true;
     }
 
+    /** New web searches by product name a day; a stored search does not count. */
+    public function webSearchesPerDay(): int
+    {
+        return $this->limit('web_searches_per_day') ?? 0;
+    }
+
     private function number(string $key, string $fallbackKey): int
     {
         $value = $this->value($key);
