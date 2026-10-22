@@ -232,7 +232,7 @@ describe('the web search', function (): void {
             ->set('query', 'demo hagelslag 400 g')
             ->call('searchTheWeb')
             ->assertSet('webStatus', null)
-            ->assertSee('Look up the new text first, then search the web for it.');
+            ->assertSeeHtml('wire:click="searchTheWeb" disabled="disabled"');
 
         Http::assertNothingSent();
     });
