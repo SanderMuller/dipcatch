@@ -71,7 +71,7 @@ function webSearchKey(User $user): string
     return "name-search:web:{$user->id}:" . now($user->timezone)->toDateString();
 }
 
-function webSearchesUsed(User $user): int
+function webSearchesUsed(User $user): mixed
 {
     return RateLimiter::attempts(webSearchKey($user));
 }
