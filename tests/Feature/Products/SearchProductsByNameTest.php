@@ -131,14 +131,18 @@ test('three-character words and digits are needles', function (): void {
     expect(resultTitles(searchByName('7up')))->toBe(['7up Original fles']);
 });
 
-test('text without a word of three characters finds no catalogue rows', function (string $text): void {
+test('text without a word of three characters finds no catalogue rows, and still asks bol.com', function (string $text): void {
+    configureBol();
+    fakeBolApi([BolCatalogClient::BASE_URL . '/products/search*' => Http::response(['results' => []])]);
     seedRow('ah', 'AH 1 ei', null);
     seedRow('ah', '100% sinaasappelsap', null);
 
     $results = searchByName($text);
 
     expect($results->items)->toBe([])
-        ->and($results->fullMatch)->toBeFalse();
+        ->and($results->fullMatch)->toBeFalse()
+        ->and($results->bolFailed)->toBeFalse()
+        ->and(bolSearchCalls())->toBe(1);
 })->with([
     'short words' => ['ah 1'],
     // Unescaped, these would match every name.
