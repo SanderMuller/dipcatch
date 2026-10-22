@@ -438,7 +438,7 @@ function seedChains(?DateTimeInterface $refreshedAt = null): void
     }
 }
 
-function seedRow(string $chain, string $name, ?string $size, string $price = '1.00', ?DateTimeInterface $refreshedAt = null, ?string $link = null): CheckjebonPrice
+function seedRow(string $chain, string $name, ?string $size, string $price = '1.00', ?DateTimeInterface $refreshedAt = null, ?string $link = null, ?string $ean = null): CheckjebonPrice
 {
     return CheckjebonPrice::query()->create([
         'supermarket' => $chain,
@@ -447,8 +447,29 @@ function seedRow(string $chain, string $name, ?string $size, string $price = '1.
         'size' => $size,
         'price' => $price,
         'link' => $link ?? ($chain . '-' . md5($name)),
+        'ean' => $ean,
         'refreshed_at' => $refreshedAt ?? now(),
     ]);
+}
+
+/** A bol.com Catalog API answer for one product with its best offer.
+ * @return array<string, string|array<string, float|string>> */
+function bolProductJson(string $ean, string $title, string $id, float $price): array
+{
+    $slug = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $title));
+
+    return [
+        'ean' => $ean,
+        'bolProductId' => $id,
+        'title' => $title,
+        'url' => "https://www.bol.com/nl/nl/p/{$slug}/{$id}/",
+        'offer' => ['price' => $price, 'deliveryDescription' => 'Morgen in huis'],
+    ];
+}
+
+function fakeBolApi(array $routes): void
+{
+    Http::fake(['login.bol.com/*' => Http::response(['access_token' => 'token', 'token_type' => 'Bearer', 'expires_in' => 299])] + $routes);
 }
 
 /**

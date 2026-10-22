@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Actions\Products\SearchProductsByName;
 use App\Actions\Suggestions\SuggestShops;
 use App\Billing\StripeTax;
 use App\Health\AdapterCanaryCheck;
@@ -49,6 +50,9 @@ final class AppServiceProvider extends ServiceProvider
         // the suggestions component twice, and the catalogue scan is the
         // expensive part.
         $this->app->scoped(SuggestShops::class);
+
+        // Fresh chains and the pg_trgm check, read once per request.
+        $this->app->scoped(SearchProductsByName::class);
 
         $this->app->singleton(function (): AdapterResolver {
             /** @var list<class-string<ShopAdapter>> $classes */

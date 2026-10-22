@@ -75,6 +75,40 @@ final readonly class QueryTokens
     }
 
     /**
+     * Text a user typed to find a product. A size in it ("melk 1 l") is read
+     * as a pack size and leaves only its canonical tokens, as a catalogue
+     * row's size does, so the search covers a 1-litre row whose size sits in
+     * its own column.
+     */
+    public static function ofSearchText(string $text): self
+    {
+        $size = PackSize::resolve(null, authoritative: false, title: $text);
+
+        if (! $size instanceof PackSize) {
+            return self::of($text);
+        }
+
+        $words = $text;
+
+        foreach ([PackSize::crossFormPattern(), PackSize::sizeFirstCrossFormPattern(), PackSize::sizePattern(), PackSize::pieceCountPattern()] as $pattern) {
+            $words = preg_replace($pattern, ' ', $words) ?? $words;
+        }
+
+        return self::of($words, $size);
+    }
+
+    /**
+     * Whether every token of this text is a whole token of the row, short
+     * words and the pack size included: "room" does not cover "Roomijs",
+     * and "melk 1 l" is not covered by a 2-litre row. Empty text covers
+     * nothing.
+     */
+    public function coveredBy(self $row): bool
+    {
+        return $this->tokens !== [] && array_diff_key($this->tokens, $row->tokens) === [];
+    }
+
+    /**
      * Whether both sides name a pack size in the same unit, and the sizes
      * differ: a 300 g bar against a 100 g one. A size in another unit, or a
      * side without one, says nothing either way.
