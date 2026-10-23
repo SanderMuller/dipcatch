@@ -298,3 +298,22 @@ test('a bonus without dates yields no period rather than a guessed one', functio
     expect($result->snapshot?->price)->toBe('1.69')
         ->and($result->snapshot?->promotionWindow)->toBeNull();
 });
+
+test('an authoritative empty size reads the size from the shop\'s own title', function (): void {
+    Http::fake(ahApiDownFakes());
+    CheckjebonPrice::query()->create([
+        'supermarket' => 'ah',
+        'external_id' => 'wi257',
+        'name' => 'AH Kruiden roomkaas 500 g',
+        'price' => '1.15',
+        'size' => '',
+        'refreshed_at' => now(),
+    ]);
+
+    $shop = checkjebonShop(attributes: ['pack_quantity' => '125.00', 'pack_unit' => 'g']);
+    runCheck($shop);
+
+    $shop->refresh();
+    expect((string) $shop->pack_quantity)->toBe('500.00')
+        ->and($shop->pack_unit)->toBe('g');
+});

@@ -371,11 +371,13 @@ test('a stated size the title does not contradict is left alone', function (stri
     'a set beside a count after the size' => ['500 g', 'Koffie 500 g, 20 zakjes, set van 2', 1000.0],
 ]);
 
-test('an authoritative empty size still clears the pack data', function (): void {
-    // Unchanged by the rule above: a shop that stops stating a size must be
-    // able to clear a stale one (spec Section 4).
-    expect(PackSize::resolve(packSize: null, authoritative: true, title: 'Barebells 12 x 55 g'))->toBeNull()
-        ->and(PackSize::resolve(packSize: null, authoritative: false, title: 'Barebells 12 x 55 g')?->quantity)->toBe(660.0);
+test('an authoritative empty size reads the shop\'s own title, and clears only when that states none', function (): void {
+    // The title is the shop's own word: it gives the product a price per
+    // unit. With no size there either, null lets the caller clear a stale
+    // one (spec Section 4).
+    expect(PackSize::resolve(packSize: null, authoritative: true, title: 'Barebells 12 x 55 g')?->quantity)->toBe(660.0)
+        ->and(PackSize::resolve(packSize: null, authoritative: false, title: 'Barebells 12 x 55 g')?->quantity)->toBe(660.0)
+        ->and(PackSize::resolve(packSize: null, authoritative: true, title: 'Barebells Creamy Crisp'))->toBeNull();
 });
 
 // --- a count written as a bare multiplier ------------------------------------

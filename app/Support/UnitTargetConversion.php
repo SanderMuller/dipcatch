@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\Product;
+
 /**
  * Expresses a per-unit figure the owner set in one unit in the unit the
  * product compares in today.
@@ -11,9 +13,20 @@ namespace App\Support;
  * size. The owner's own number is never rewritten: this class derives the
  * figure every comparison reads, and answers null when the two units do not
  * convert, so a target set per piece is never read as a price per kilo.
+ *
+ * One exception: a target set per pack ({@see self::PACK}) is rewritten once,
+ * to the product's unit, when the shop it is pinned to states its own size
+ * ({@see Product::recomputeCheapestShop()}). A figure derived on
+ * every read would move each time that shop changed its pack.
  */
 final readonly class UnitTargetConversion
 {
+    /**
+     * The pseudo-unit of a target set as a price for one shop's pack. Never a
+     * size unit: `PackSize::of()` refuses it, so it never reaches size math.
+     */
+    public const string PACK = 'pack';
+
     /** The storage range of a per-unit figure: `decimal(12,4)`, and the floor the forms accept. */
     private const string MIN = '0.0001';
 
@@ -30,6 +43,12 @@ final readonly class UnitTargetConversion
     {
         if ($target === null || ! is_numeric($target)) {
             return null;
+        }
+
+        // A price for one shop's pack is compared as it is, with that shop's
+        // price. It is never converted through an item size.
+        if ($targetUnit === self::PACK) {
+            return self::stored((float) $target);
         }
 
         $unit = $packs->unit();

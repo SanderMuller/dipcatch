@@ -1084,15 +1084,18 @@ it('explains the unit price, the pack price and the read time on hover', functio
         ->assertSeeText('Price last read 23 Sep 2026, 12:15.');
 });
 
-it('shows every alert rule the product has', function (): void {
+it('shows the target as the only alert rule, with no drop beside it', function (): void {
     $user = User::factory()->create();
     $product = smallPackCheapest($user, '6.60');
-    $product->forceFill(['target_price' => null, 'drop_threshold_pct' => '10.00', 'drop_threshold_abs' => null, 'unit_price_target' => '0.2000'])->save();
+    // A drop threshold stored on the product no longer alerts, so it is not listed either.
+    $product->forceFill(['drop_threshold_pct' => '10.00', 'drop_threshold_abs' => null, 'unit_price_target' => '0.2000', 'unit_price_target_unit' => 'piece'])->save();
 
     $this->actingAs($user);
 
     $component = livewire(ProductShow::class, ['product' => $product->refresh()]);
-    $component->assertSeeInOrder(['€0.2000 /piece', 'when a price reaches it', 'or 10% drop'])
+    $component->assertSeeInOrder(['€0.2000 /piece', 'when a price reaches it'])
+        ->assertDontSee('10% drop')
+        ->assertDontSee('drop (default)')
         ->assertDontSee('Any drop');
     $html = $component->html();
 
@@ -1121,17 +1124,17 @@ it('says what a unit-price target comes to for the pack every shop sells', funct
     'grams' => ['400.00', 'g', '10.0000', 'when a price reaches it (€4.00 for 400 g)'],
 ]);
 
-it('gives the pack price beside a unit-price target listed under a price target', function (): void {
+it('shows a pack target as a price for the pack of the shop it is pinned to', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user);
-    Shop::factory()->for($product)->create(['url' => 'https://amazon.nl/dp/B0BK923TZY', 'currency' => 'EUR', 'current_price' => '15.90', 'pack_quantity' => '5.00', 'pack_unit' => 'piece']);
-    $product->forceFill(['target_price' => '14.00', 'unit_price_target' => '2.5400', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+    $amazon = Shop::factory()->for($product)->create(['url' => 'https://amazon.nl/dp/B0BK923TZY', 'currency' => 'EUR', 'current_price' => '15.90']);
+    $product->forceFill(['unit_price_target' => '14.00', 'unit_price_target_unit' => 'pack', 'unit_price_target_shop_id' => $amazon->id])->save();
 
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
-        ->assertSeeInOrder(['€14.00', 'when a price reaches it', 'or €2.54 /piece or less', '(€12.70 for 5 pieces)'])
-        ->assertDontSee('when a price reaches it (');
+        ->assertSeeInOrder(['€14.00 /pack', 'when a price reaches it (the pack at Amazon.nl)'])
+        ->assertDontSee('drop (default)');
 });
 
 it('gives no pack price for a unit-price target when the shops sell different packs', function (): void {
@@ -1156,15 +1159,23 @@ it('says any drop when the product has no alert rule and no price yet', function
     livewire(ProductShow::class, ['product' => $product->refresh()])->assertSee('Any drop');
 });
 
-it('says below for a second price target too', function (): void {
+it('lists no rule for a stored price for any pack', function (): void {
     $user = User::factory()->create();
     $product = smallPackCheapest($user, '6.60');
-    $product->forceFill(['target_price' => '2.00', 'unit_price_target' => '0.2000', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+    $product->forceFill(['target_price' => '2.00', 'unit_price_target' => '0.2000', 'unit_price_target_unit' => 'piece', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
 
     $this->actingAs($user);
 
-    livewire(ProductShow::class, ['product' => $product->refresh()])
-        ->assertSeeInOrder(['€2.00', 'when a price reaches it', 'or €0.2000 /piece or less']);
+    $html = livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeInOrder(['€0.2000 /piece', 'when a price reaches it'])
+        ->html();
+
+    // From the rules down to the next card, the price chart.
+    preg_match('/data-test="alert-rules".*?data-test="price-history"/s', is_string($html) ? $html : '', $rules);
+
+    expect($rules[0] ?? '')->toContain('€0.2000 /piece')
+        ->not->toContain('€2.00')
+        ->not->toContain('or less');
 });
 
 it('names the default drop thresholds when the product has none of its own', function (): void {

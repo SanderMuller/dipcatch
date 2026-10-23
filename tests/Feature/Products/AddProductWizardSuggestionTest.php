@@ -160,25 +160,22 @@ it('shows the free view to an account that lost Pro before step 3', function ():
         ->assertDontSeeHtml('wire:init="askJev"');
 });
 
-it('saves the suggestion as a per-unit target with nothing else beside it', function (): void {
+it('saves the suggestion as a per-unit target', function (): void {
     fakeJevAnswer();
     $user = User::factory()->create();
     $product = suggestionWizardProduct($user);
-    $product->forceFill(['drop_threshold_pct' => '10.00', 'target_price' => '3.00'])->save();
     $this->actingAs($user);
 
     alertStep($product)
         ->call('useSuggestion')
         ->assertSet('unitPriceTarget', '3.2')
-        ->assertSet('dropThresholdPct', null)
         ->call('saveAlerts')
         ->assertHasNoErrors();
 
     $product->refresh();
 
     expect((string) $product->unit_price_target)->toBe('3.2000')
-        ->and($product->drop_threshold_pct)->toBeNull()
-        ->and($product->target_price)->toBeNull()
+        ->and($product->unit_price_target_unit)->toBe('g')
         // Not met at €4.00, so nothing is latched.
         ->and($product->unit_price_notified)->toBeNull();
 });
@@ -347,7 +344,7 @@ it('explains each kind of suggestion', function (string $category, string $now, 
     'the alcohol limit' => ['food.alcohol', '0.60', '1.20', null, 'Alcohol can go at most 25% off in the Netherlands.', true],
     'no normal price' => ['home.small_appliances', '70.00', '100.00', null, 'We could not tell its normal price', false],
     'no sign of sales' => ['', '4.00', null, null, 'We have no sign that this product goes on sale', false],
-    'on offer with no normal price' => ['home.small_appliances', '70.00', '100.00', null, 'It is on offer now, so for its first weeks the default counts from the offer price.', false],
+    'on offer with no normal price' => ['home.small_appliances', '70.00', '100.00', null, 'It is on offer now, so for its first weeks that counts from the offer price.', false],
 ]);
 
 it('names a shop it leaves out of the normal price for being far cheaper', function (): void {
@@ -397,25 +394,7 @@ it('stops using Jev\'s answer once the owner has no AI help any more', function 
         ->assertDontSee('Products like this often go 50% off.');
 });
 
-it('folds the other alerts away until one of them is set', function (): void {
-    $user = User::factory()->create();
-    $this->actingAs($user);
-
-    // As a product the wizard just created: no drop of its own yet.
-    $product = suggestionWizardProduct($user);
-    $product->forceFill(['drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
-
-    $wizard = alertStep($product);
-
-    expect($wizard->html())->toMatch('/<details(?![^>]*\bopen\b)[^>]*data-test="other-alerts"/');
-
-    $wizard->set('dropThresholdPct', '12.5');
-
-    expect($wizard->html())->toMatch('/<details[^>]*\bopen\b[^>]*data-test="other-alerts"/')
-        ->and($wizard->html())->toContain('12.5% drop');
-});
-
-it('asks which pack the person buys only when the shops sell different sizes', function (string $secondPack, bool $asks): void {
+it('asks which pack the person buys, also when the shops sell one size', function (string $secondPack): void {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -429,8 +408,8 @@ it('asks which pack the person buys only when the shops sell different sizes', f
     $wizard = alertStep($product->refresh());
 
     $wizard->assertSee('Alert me when it costs');
-    $asks ? $wizard->assertSee('Which pack do you buy?') : $wizard->assertDontSee('Which pack do you buy?');
+    $wizard->assertSee('Which pack do you buy?');
 })->with([
-    'the same size at both shops' => ['1000.00', false],
-    'two sizes' => ['2000.00', true],
+    'the same size at both shops' => ['1000.00'],
+    'two sizes' => ['2000.00'],
 ]);

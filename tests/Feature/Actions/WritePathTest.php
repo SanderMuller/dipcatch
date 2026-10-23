@@ -166,14 +166,14 @@ it('creates a product and its first shop together', function (): void {
 
     $product = app(CreateProductWithShop::class)(
         $user,
-        new ProductDraft(title: 'Coffee', dropThresholdPct: '10.00', dropThresholdAbs: '0.50'),
+        new ProductDraft(title: 'Coffee'),
         draft(),
     );
 
     expect($product->user_id)->toBe($user->id)
         ->and($product->title)->toBe('Coffee')
-        ->and((string) $product->drop_threshold_pct)->toBe('10.00')
-        ->and((string) $product->drop_threshold_abs)->toBe('0.50')
+        ->and($product->drop_threshold_pct)->toBeNull()
+        ->and($product->unit_price_target)->toBeNull()
         ->and($product->shops()->count())->toBe(1);
 });
 

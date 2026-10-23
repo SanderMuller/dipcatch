@@ -52,10 +52,8 @@ final class ZooplusFeliwaySeeder extends Seeder
                 [
                     'image_url' => 'https://media.zooplus.com/bilder/8/400/67609_mhi_ceva_feliway_classic_hs_07_8.jpg',
                     'currency' => self::CURRENCY,
-                    'drop_threshold_pct' => 5.00,
                     'category' => ProductCategory::PetCare,
                     'category_set_by' => CategorySource::User,
-                    'drop_threshold_abs' => 1.00,
                     'active' => true,
                 ],
             );

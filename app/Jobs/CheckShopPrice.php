@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Actions\Drops\DetectTargetPrice;
 use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Actions\Shops\CheckOutcome;
 use App\Actions\Shops\RegularPriceClaim;
@@ -28,6 +27,7 @@ use App\Support\ImageUrl;
 use App\Support\Iso4217;
 use App\Support\MovedShopUrl;
 use App\Support\PackSize;
+use App\Support\PromotedPackSize;
 use App\Support\RecheckJitter;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -380,12 +380,15 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                     $snapshot->packSizeIsWholePack,
                     countsItems: $locked->product?->category?->department()->countsItems() === true,
                 );
+                $promoted = PromotedPackSize::for($locked, $packSize, $snapshot);
+                $packSize ??= $promoted;
+
                 if ($snapshot->packSizeAuthoritative || $packSize !== null) {
                     $updates['pack_quantity'] = $packSize?->quantity;
                     $updates['pack_unit'] = $packSize?->unit;
                 }
 
-                $updates += AltPackSize::updates($locked, $packSize, $snapshot);
+                $updates += AltPackSize::updates($locked, $packSize, $snapshot, promoted: $promoted !== null);
 
                 $updates += $pricing->promotionUpdates;
             } else {
@@ -426,7 +429,6 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 $product->refresh();
 
                 app(DetectUnitPriceTarget::class)($product);
-                app(DetectTargetPrice::class)($product);
             }
         });
 

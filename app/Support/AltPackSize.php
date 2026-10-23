@@ -70,14 +70,16 @@ final readonly class AltPackSize
      *
      * `$packSize` is the primary size this read resolved; the shop keeps its
      * stored one when the read states none and has no authority over it.
+     * `$promoted` says it is the read's second size ({@see PromotedPackSize}), so
+     * there is no second size left.
      *
      * @return array<string, mixed>
      */
-    public static function updates(Shop $shop, ?PackSize $packSize, ShopSnapshot $snapshot): array
+    public static function updates(Shop $shop, ?PackSize $packSize, ShopSnapshot $snapshot, bool $promoted = false): array
     {
         $primary = $snapshot->packSizeAuthoritative || $packSize !== null ? $packSize : $shop->packSize();
         $stored = $shop->altPackSize();
-        $alt = $primary === null ? null : self::resolve($shop, $primary, $snapshot, $stored);
+        $alt = $primary === null || $promoted ? null : self::resolve($shop, $primary, $snapshot, $stored);
 
         if ($alt !== null && $alt->unit === $primary?->unit) {
             $alt = null;

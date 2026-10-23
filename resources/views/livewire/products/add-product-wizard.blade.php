@@ -301,22 +301,18 @@
             @php($showsSuggestion = $packChoices !== [] && ($asksJev || $suggestion->unitTarget !== null))
             <div class="min-w-0 max-w-2xl space-y-6">
                 <h3 class="sr-only">{{ __('Your price alert') }}</h3>
-                @if ($packChoices === [])
-                    <flux:input
-                        wire:model="unitPriceTarget"
-                        :label="$unitWord ? __('Target price per :unit', ['unit' => $unitWord]) : __('Target price per kilo, litre or piece')"
-                        :description="__('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.')"
-                        type="number"
-                        step="any"
-                        min="0.0001"
-                    />
-                @else
+                @if ($packChoices === [] && $pinnablePacks !== [])
+                    {{-- No shop can be compared per unit yet: the price of the
+                         pack the person buys, at the shop they pick. --}}
+                    <x-pack-target :packs="$pinnablePacks" :currency="$product->currency" />
+                @elseif ($packChoices !== [])
                     <x-unit-target
                         model="unitPriceTarget"
                         :heading="false"
                         :packs="$packChoices"
                         :currency="$product->currency"
                         :unit-word="$unitWord ?? __('unit')"
+                        :stranded="$strandedOwnerSizes"
                         :suggested-unit="$showsSuggestion && ! $asksJev ? $suggestion->unitTarget : null"
                     >
                         @if ($showsSuggestion)
@@ -336,16 +332,16 @@
                 @if (! $showsSuggestion)
                     <p class="max-w-[65ch] text-base/7 text-pretty text-zinc-600 sm:text-sm/6 dark:text-zinc-400" data-test="alert-suggestion-reason">
                         @if ($suggestion->band === \App\Enums\PromotionDepthBand::Fixed)
-                            {{ __('This product has a fixed price, so we only alert you on a real drop. Keep the default alert below.') }}
+                            {{ __('This product has a fixed price, so we suggest no target: we tell you when the price drops well under its usual price.') }}
                         @elseif ($suggestion->unit === null)
-                            {{ __('We could not read a pack size, so we suggest the default alert below.') }}
+                            {{ __('We could not read a pack size, so we suggest no target: we tell you when the price drops well under its usual price.') }}
                         @elseif ($suggestion->normalUnitPrice === null)
-                            {{ __('We could not tell its normal price, so we suggest the default alert below.') }}
+                            {{ __('We could not tell its normal price, so we suggest no target: we tell you when the price drops well under its usual price.') }}
                         @else
-                            {{ __('We have no sign that this product goes on sale, so we suggest the default alert below.') }}
+                            {{ __('We have no sign that this product goes on sale, so we suggest no target: we tell you when the price drops well under its usual price.') }}
                         @endif
                         @if ($onOfferNow)
-                            {{ __('It is on offer now, so for its first weeks the default counts from the offer price.') }}
+                            {{ __('It is on offer now, so for its first weeks that counts from the offer price.') }}
                         @endif
                     </p>
                 @endif
@@ -360,45 +356,6 @@
                         <flux:link :href="route('app.billing')" wire:navigate>{{ __('Compare plans') }}</flux:link>
                     </flux:text>
                 @endif
-
-                {{-- Few people want these, so they stay folded until one is
-                     set or has an error. wire:ignore.self keeps the fold as
-                     the person left it across round trips. --}}
-                @php($otherAlertErrors = $errors->hasAny(['dropThresholdPct', 'dropThresholdAbs', 'targetPrice']))
-                <details
-                    class="group border-t border-zinc-950/5 pt-6 dark:border-white/10"
-                    wire:ignore.self
-                    @if ($otherAlertErrors || $otherAlerts !== []) open @endif
-                    data-test="other-alerts"
-                >
-                    <summary class="flex cursor-pointer list-none items-center gap-2 select-none [&::-webkit-details-marker]:hidden">
-                        <flux:icon.chevron-right variant="micro" class="shrink-0 text-zinc-400 group-open:rotate-90" />
-                        <span class="shrink-0 text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Other alerts') }}</span>
-                        <span class="truncate text-base/7 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-                            · {{ $otherAlerts === [] ? __('a drop in percent or money, or a price for any pack') : implode(', ', $otherAlerts) }}
-                        </span>
-                        @if ($otherAlertErrors)
-                            <span class="shrink-0 text-base/7 font-medium text-red-600 sm:text-sm/6 dark:text-red-400">{{ __('Check these') }}</span>
-                        @endif
-                    </summary>
-
-                    <div class="mt-4 space-y-3">
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <flux:input wire:model="dropThresholdPct" :label="__('Alert me when it drops by (%)')" type="number" step="0.01" min="0.01" max="99.99"
-                                :placeholder="$defaults['pct'] ?? ''" :description="($defaults['pct'] ?? '') !== '' ? __('Default: :value%.', ['value' => $defaults['pct']]) : null" class="tabular-nums" />
-                            <flux:input wire:model="dropThresholdAbs" :label="__('Alert me when it drops by (amount)')" type="number" step="0.01" min="0.01"
-                                :placeholder="$defaults['abs'] ?? ''" :description="($defaults['abs'] ?? '') !== '' ? __('Default: :value.', ['value' => $defaults['abs']]) : null" class="tabular-nums" />
-                        </div>
-                        <flux:input wire:model="targetPrice" :label="__('Price for any pack')" type="number" step="0.01" min="0.01" class="sm:max-w-xs" />
-                        <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400" data-test="alert-defaults-note">
-                            @if ($defaults === null)
-                                {{ __('The default alert starts once we have read a price.') }}
-                            @else
-                                {{ __('Leave the drop fields empty and we use the default shown. Once a target is set, the suggested one included, an empty drop field is off.') }}
-                            @endif
-                        </flux:text>
-                    </div>
-                </details>
             </div>
 
             <div class="flex flex-wrap gap-2">

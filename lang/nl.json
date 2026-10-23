@@ -1,5 +1,6 @@
 {
     " (sign in first).": " (log eerst in).",
+    "/pack": "/verpakking",
     "/piece": "/stuk",
     ":days days": ":days dagen",
     ":days days free": ":days dagen gratis",
@@ -519,8 +520,10 @@
     "or :price a year": "of :price per jaar",
     "or :price each": "of :price per stuk",
     "our AI provider, only if you switch on an AI feature in your settings (automatic categories, or the check on a new shop, which also suggests an alert for a new product). It receives the product name, its shops and their web addresses, the pack size, barcode and price, any offer a shop shows, and the category of the product. Nothing that identifies you or your account.": "onze AI-leverancier, alleen als je in je instellingen een AI-functie aanzet (automatische categorieën, of de controle bij een nieuwe winkel, die ook een melding voorstelt voor een nieuw product). Die krijgt de productnaam, de winkels en hun webadressen, de verpakkingsgrootte, de barcode en de prijs, een aanbieding die een winkel toont, en de categorie van het product. Niets waaraan jij of je account te herkennen is.",
+    "pack": "verpakking",
     "per kilo": "per kilo",
     "per litre": "per liter",
+    "per pack": "per verpakking",
     "per piece": "per stuk",
     "pet food": "dierenvoer",
     "piece": "stuk",

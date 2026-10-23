@@ -23,6 +23,7 @@ function targetProduct(?string $target, string $lidlPrice = '1.99'): Product
     $product = Product::factory()->for($user)->create([
         'currency' => 'EUR',
         'unit_price_target' => $target,
+        'unit_price_target_unit' => $target === null ? null : 'g',
     ]);
 
     Shop::factory()->for($product)->create([
@@ -244,7 +245,7 @@ test('a price check on any shop can fire the target, not only the cheapest', fun
 
     $user = User::factory()->create(['notify_via_filament' => true]);
     subscribeUser($user);
-    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'unit_price_target' => '5.50']);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'unit_price_target' => '5.50', 'unit_price_target_unit' => 'g']);
 
     // The cheapest shop, which this check does not touch.
     $cheapest = Shop::factory()->for($product)->create([

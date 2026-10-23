@@ -8,8 +8,10 @@ use App\Mcp\Concerns\InteractsWithOwner;
 use App\Mcp\Support\ProductPresenter;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Support\ComparablePacks;
 use App\Support\Numeric;
 use App\Support\UnitTargetConversion;
+use App\Support\UnitTargetMath;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +28,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('set_threshold')]
 #[Title('Set threshold')]
-#[Description('Sets when this product alerts: how far the price must fall (a percentage, an absolute amount, or both), a price to reach, and/or a unit price to reach. Omit a value to leave it as it is.')]
+#[Description('Sets the price this product alerts at. A product has one target: a price per kg, litre or piece that holds every shop and pack size to one rate, or the price of one shop\'s pack, compared with that shop only until its size is known. Give exactly one of unit_price_target, percent_under_best or pack_price. Without a target the product alerts on a large drop under its usual price.')]
 #[IsReadOnly(false)]
 #[IsDestructive]
 #[IsOpenWorld(false)]
@@ -40,12 +42,22 @@ final class SetThresholdTool extends Tool
     {
         $validated = $request->validate([
             'product_id' => ['required', 'uuid'],
-            'percent' => ['nullable', 'numeric', 'min:0.01', 'max:99.99'],
-            'amount' => ['nullable', 'numeric', 'min:0.01'],
-            'target_price' => ['nullable', 'numeric', 'min:0.01'],
             // Four decimals, as the column and the web forms keep: a price per
             // piece is often below a cent.
             'unit_price_target' => ['nullable', 'numeric', 'min:0.0001', 'max:99999999.9999'],
+            'percent_under_best' => ['nullable', 'numeric', 'min:0.01', 'max:99.99'],
+            'pack_price' => ['nullable', 'numeric', 'min:0.01'],
+            'shop_id' => ['nullable', 'uuid'],
+            // Gone: a drop or a price for any pack is no longer an alert. An
+            // unknown key is otherwise ignored, so an old caller would think
+            // it had set one.
+            'percent' => ['prohibited'],
+            'amount' => ['prohibited'],
+            'target_price' => ['prohibited'],
+        ], [
+            'percent.prohibited' => 'percent is no longer supported. Use percent_under_best: a target that percentage under today\'s best price per unit.',
+            'amount.prohibited' => 'amount is no longer supported. Use pack_price: the price for the pack you buy, with shop_id.',
+            'target_price.prohibited' => 'target_price is no longer supported. Use pack_price: the price for the pack you buy, with shop_id.',
         ]);
 
         $product = $this->ownedProduct($request, $this->str($validated, 'product_id'));
@@ -54,67 +66,168 @@ final class SetThresholdTool extends Tool
             return Response::error('No such product.');
         }
 
-        $percent = $validated['percent'] ?? null;
-        $amount = $validated['amount'] ?? null;
-        $targetPrice = $validated['target_price'] ?? null;
-        $unitPriceTarget = $validated['unit_price_target'] ?? null;
+        $given = array_filter(
+            ['unit_price_target', 'percent_under_best', 'pack_price'],
+            fn (string $key): bool => ($validated[$key] ?? null) !== null,
+        );
 
-        if ($percent === null && $amount === null && $targetPrice === null && $unitPriceTarget === null) {
-            return Response::error('Give a percent, an amount, a target_price, a unit_price_target, or several of them.');
+        if (count($given) !== 1) {
+            return Response::error('Give exactly one of unit_price_target, percent_under_best or pack_price.');
         }
 
-        // Under the lock a price check takes: the unit a per-unit target is
-        // stored in is read here, and a check moving the product to another
-        // unit in between would store the number in a unit nobody chose.
-        $product = DB::transaction(function () use ($product, $percent, $amount, $targetPrice, $unitPriceTarget): Product {
+        $shopId = is_string($validated['shop_id'] ?? null) ? $validated['shop_id'] : null;
+
+        if ($shopId !== null && ! $product->shops()->whereKey($shopId)->exists()) {
+            return Response::error('No such shop on this product.');
+        }
+
+        // Under the lock a price check takes: the unit a target is stored in
+        // is read here, and a check moving the product to another unit in
+        // between would store the number in a unit nobody chose.
+        $result = DB::transaction(function () use ($product, $validated, $shopId): Product|string {
             $locked = Product::query()->with('shops')->lockForUpdate()->findOrFail($product->id);
+            $target = self::target($locked, $validated, $shopId);
 
-            if (is_numeric($percent)) {
-                $locked->drop_threshold_pct = round((float) $percent, 2);
+            if (is_string($target)) {
+                return $target;
             }
 
-            if (is_numeric($amount)) {
-                $locked->drop_threshold_abs = round((float) $amount, 2);
-            }
-
-            if (is_numeric($targetPrice)) {
-                $locked->target_price = round((float) $targetPrice, 2);
-            }
-
-            if (is_numeric($unitPriceTarget)) {
-                $packs = $locked->comparablePacks();
-                // The cut decimal string, as the decimal:4 cast stores it, in
-                // the unit `comparison_unit` names right now.
-                $target = self::fourDecimalsDown($unitPriceTarget);
-                $locked->forceFill([
-                    'unit_price_target' => $target,
-                    'unit_price_target_unit' => $packs->unit(),
-                    'unit_price_target_effective' => UnitTargetConversion::effective($target, $packs->unit(), $packs),
-                ]);
-            }
-
-            $locked->save();
+            $locked->forceFill([
+                'unit_price_target' => $target['target'],
+                'unit_price_target_unit' => $target['unit'],
+                'unit_price_target_shop_id' => $target['shop'],
+                'unit_price_target_effective' => UnitTargetConversion::effective($target['target'], $target['unit'], $locked->comparablePacks()),
+            ])->save();
 
             return $locked;
         });
 
-        $summary = $this->presenter->summary($product);
-
-        $notes = [];
-
-        if ($unitPriceTarget !== null) {
-            $excluded = self::shopsOutsideTheUnitGroup($product);
-
-            if ($excluded !== '') {
-                $notes[] = $excluded;
-            }
+        if (is_string($result)) {
+            return Response::error($result);
         }
 
-        if ($notes !== []) {
-            $summary['note'] = implode(' ', $notes);
+        $summary = $this->presenter->summary($result);
+        $note = $result->unit_price_target_unit === UnitTargetConversion::PACK
+            ? self::packNote($result)
+            : self::shopsOutsideTheUnitGroup($result);
+
+        if ($note !== '') {
+            $summary['note'] = $note;
         }
 
         return Response::structured($summary);
+    }
+
+    /**
+     * The target to store, or the reason it cannot be set.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array{target: string, unit: string, shop: ?string}|string
+     */
+    private static function target(Product $product, array $validated, ?string $shopId): array|string
+    {
+        $packs = $product->comparablePacks();
+        $unitTarget = $validated['unit_price_target'] ?? null;
+        $percent = $validated['percent_under_best'] ?? null;
+        $packPrice = $validated['pack_price'] ?? null;
+
+        if (is_numeric($unitTarget)) {
+            return self::unitTarget($packs, $unitTarget);
+        }
+
+        // Only a shop a shopper can buy from: a target pinned to any other
+        // would be paused the moment it is set.
+        $shop = $shopId === null ? $product->bestValueShop() : $product->eligibleShops()->first(fn (Shop $candidate): bool => $candidate->id === $shopId);
+
+        if ($shopId !== null && $shop === null) {
+            return 'That shop is sold out, no longer tracked, or not a price a shopper pays. Pick another shop_id from get_product.';
+        }
+
+        if (is_numeric($percent)) {
+            return self::percentTarget($product, $packs, $shop, (string) $percent);
+        }
+
+        return is_numeric($packPrice)
+            ? self::packPriceTarget($packs, $shop, (string) $packPrice)
+            : 'Give exactly one of unit_price_target, percent_under_best or pack_price.';
+    }
+
+    /**
+     * @param  int|float|numeric-string  $value
+     * @return array{target: string, unit: string, shop: ?string}|string
+     */
+    private static function unitTarget(ComparablePacks $packs, int|float|string $value): array|string
+    {
+        $unit = $packs->unit();
+
+        if ($unit === null) {
+            return 'No shop on this product has a pack size yet, so it has no price per unit. Use pack_price with shop_id: the price for the pack you buy at that shop.';
+        }
+
+        return ['target' => self::fourDecimalsDown($value), 'unit' => $unit, 'shop' => null];
+    }
+
+    /**
+     * Under today's best per unit, off the winner's pack price; while nobody
+     * wins, off the price of `$shop`'s pack.
+     *
+     * @return array{target: string, unit: string, shop: ?string}|string
+     */
+    private static function percentTarget(Product $product, ComparablePacks $packs, ?Shop $shop, string $percent): array|string
+    {
+        $winner = $product->bestValueShop();
+        $winnerSize = $winner === null ? null : $packs->for($winner)?->size;
+        $unit = $packs->unit();
+
+        if ($winner?->current_price !== null && $winnerSize !== null && $unit !== null) {
+            return self::stored(UnitTargetMath::percentUnderPack((string) $winner->current_price, $percent, UnitTargetMath::perPack($winnerSize)), $unit, null, 'That percentage leaves no target.');
+        }
+
+        if ($shop?->current_price === null) {
+            return 'No shop can be compared per unit yet. Give shop_id: the shop whose pack price the percentage comes off.';
+        }
+
+        return self::stored(UnitTargetMath::percentUnderPack((string) $shop->current_price, $percent, '1'), UnitTargetConversion::PACK, (string) $shop->id, 'That percentage leaves no target.');
+    }
+
+    /**
+     * A pack whose size the shop or the owner states sets a price per
+     * unit. A size borrowed from the other shops can be another pack, so any
+     * other pack is compared with its own shop's price only.
+     *
+     * @return array{target: string, unit: string, shop: ?string}|string
+     */
+    private static function packPriceTarget(ComparablePacks $packs, ?Shop $shop, string $packPrice): array|string
+    {
+        if ($shop === null) {
+            return 'No shop can be compared per unit yet. Give shop_id: the shop whose pack this price is for.';
+        }
+
+        $unit = $packs->unit();
+        $pack = $packs->for($shop);
+
+        if ($unit !== null && $pack?->size !== null && $pack->isOwnSize()) {
+            return self::stored(UnitTargetMath::fromPackPrice($packPrice, UnitTargetMath::perPack($pack->size)), $unit, null, 'That price leaves no target.');
+        }
+
+        return self::stored(UnitTargetMath::fromPackPrice($packPrice, '1'), UnitTargetConversion::PACK, (string) $shop->id, 'That price leaves no target.');
+    }
+
+    /**
+     * @return array{target: string, unit: string, shop: ?string}|string
+     */
+    private static function stored(?string $target, string $unit, ?string $shopId, string $refusal): array|string
+    {
+        return $target === null ? $refusal : ['target' => $target, 'unit' => $unit, 'shop' => $shopId];
+    }
+
+    private static function packNote(Product $product): string
+    {
+        $shop = $product->shops->first(fn (Shop $shop): bool => $shop->id === $product->unit_price_target_shop_id);
+
+        return $shop === null
+            ? ''
+            : sprintf('Compared with the price at %s only, until it says how much is in its pack. Then it becomes a price per kilo, litre or piece.', $shop->host);
     }
 
     /**
@@ -136,10 +249,10 @@ final class SetThresholdTool extends Tool
         $unit = $packs->unit();
 
         if ($unit === null) {
-            return 'No shop on this product has read a pack size yet, so there is nothing to compare per unit until one does.';
+            return '';
         }
 
-        $withPack = $product->shops->filter(fn (Shop $shop): bool => $shop->packSize() !== null);
+        $withPack = $product->shops->filter(fn (Shop $shop): bool => $shop->ownOrOwnerPackSize() !== null);
 
         // A shop given an estimated size from its count is in the list as an
         // estimate, but it reports pieces and can never reach a per-unit target.
@@ -161,7 +274,7 @@ final class SetThresholdTool extends Tool
             self::unitPhrase($unit),
             $outside->map(fn (Shop $shop): string => (string) $shop->host)->values()->implode(', '),
             $outside->count() === 1 ? 'reports' : 'report',
-            self::unitNoun((string) $outside->first()->pack_unit),
+            self::unitNoun((string) $outside->first()->ownOrOwnerPackSize()?->unit),
             $outside->count() === 1 ? 'it' : 'them',
         );
     }
@@ -190,6 +303,7 @@ final class SetThresholdTool extends Tool
         return match ($unit) {
             'g' => 'per kilo',
             'ml' => 'per litre',
+            UnitTargetConversion::PACK => 'per pack',
             default => 'per piece',
         };
     }
@@ -199,6 +313,7 @@ final class SetThresholdTool extends Tool
         return match ($unit) {
             'g' => 'grams',
             'ml' => 'millilitres',
+            UnitTargetConversion::PACK => 'packs',
             default => 'pieces',
         };
     }
@@ -210,10 +325,10 @@ final class SetThresholdTool extends Tool
     {
         return [
             'product_id' => $schema->string()->format('uuid')->description('From list_products.')->required(),
-            'percent' => $schema->number()->description('Alert when the price falls this many percent, e.g. 10.'),
-            'amount' => $schema->number()->description('Alert when the price falls by at least this much money.'),
-            'target_price' => $schema->number()->description('Alert when the lowest price per item reaches this amount. If that price requires a multi-buy, the result says how many items to buy. Use it for a price per pack; for a price per kg, litre or piece, use unit_price_target.'),
-            'unit_price_target' => $schema->number()->description('Alert when the best value reaches this price per kg, litre or piece, up to four decimals (e.g. 0.0125 per piece). It holds every shop and pack size to one rate.'),
+            'unit_price_target' => $schema->number()->description('Alert when the best value reaches this price per kg, litre or piece (comparison_unit), up to four decimals (e.g. 0.0125 per piece). It holds every shop and pack size to one rate.'),
+            'percent_under_best' => $schema->number()->description('Set the target this many percent under today\'s best price per unit, e.g. 10. With no price per unit yet, it comes off the price of shop_id\'s pack.'),
+            'pack_price' => $schema->number()->description('The price for the pack you buy at shop_id (default: the best value). With a known pack size it becomes a price per unit; without one, only that shop\'s price is compared.'),
+            'shop_id' => $schema->string()->format('uuid')->description('With pack_price or percent_under_best: the shop whose pack is meant, from get_product. Needed while no shop can be compared per unit.'),
         ];
     }
 }

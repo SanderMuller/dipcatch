@@ -93,15 +93,16 @@ it('returns bundle conditions beside tracked MCP prices', function (): void {
         ->assertSee('"cheapest_bundle_total_price":"4.00"');
 });
 
-it('sets a threshold and refuses an empty one', function (): void {
+it('sets a target and refuses an empty one', function (): void {
     $me = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $me->id]);
+    Shop::factory()->for($product)->create(['pack_quantity' => '500.00', 'pack_unit' => 'g']);
 
     DipCatchServer::actingAs($me)
-        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'percent' => 12.5])
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 12.5])
         ->assertOk();
 
-    expect((float) $product->fresh()?->drop_threshold_pct)->toBe(12.5);
+    expect((float) $product->fresh()?->unit_price_target)->toBe(12.5);
 
     DipCatchServer::actingAs($me)
         ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id])
@@ -109,13 +110,14 @@ it('sets a threshold and refuses an empty one', function (): void {
 });
 
 it('will not set a threshold on another users product', function (): void {
-    $theirs = Product::factory()->create(['drop_threshold_pct' => null]);
+    $theirs = Product::factory()->create();
+    Shop::factory()->for($theirs)->create(['pack_quantity' => '500.00', 'pack_unit' => 'g']);
 
     DipCatchServer::actingAs(User::factory()->create())
-        ->tool(SetThresholdTool::class, ['product_id' => (string) $theirs->id, 'percent' => 50])
-        ->assertHasErrors();
+        ->tool(SetThresholdTool::class, ['product_id' => (string) $theirs->id, 'unit_price_target' => 5])
+        ->assertHasErrors(['No such product.']);
 
-    expect($theirs->fresh()?->drop_threshold_pct)->toBeNull();
+    expect($theirs->fresh()?->unit_price_target)->toBeNull();
 });
 
 it('removes a shop and recomputes the cheapest', function (): void {
@@ -292,6 +294,7 @@ it('will not let one account spend a draft issued to another', function (): void
 it('sets the unit price target on a free account, with no Pro caveat', function (): void {
     $me = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+    Shop::factory()->for($product)->create(['pack_quantity' => '500.00', 'pack_unit' => 'g']);
 
     DipCatchServer::actingAs($me)
         ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 6.5])
@@ -305,6 +308,7 @@ it('sets the unit price target on a free account, with no Pro caveat', function 
 it('keeps a unit price target to four decimals, cut rather than rounded up', function (): void {
     $me = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+    Shop::factory()->for($product)->create(['pack_quantity' => '500.00', 'pack_unit' => 'g']);
 
     // A nappy at a cent and a quarter: two decimals would have stored 0.01.
     DipCatchServer::actingAs($me)
@@ -317,6 +321,7 @@ it('keeps a unit price target to four decimals, cut rather than rounded up', fun
 it('cuts a unit price target without rounding it up first', function (): void {
     $me = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+    Shop::factory()->for($product)->create(['pack_quantity' => '500.00', 'pack_unit' => 'g']);
 
     DipCatchServer::actingAs($me)
         ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 0.012599999999])
@@ -328,6 +333,7 @@ it('cuts a unit price target without rounding it up first', function (): void {
 it('refuses a unit price target below the smallest one the column keeps', function (): void {
     $me = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+    Shop::factory()->for($product)->create(['pack_quantity' => '500.00', 'pack_unit' => 'g']);
 
     DipCatchServer::actingAs($me)
         ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 0.00005])
@@ -340,6 +346,7 @@ it('sets the unit price target without a caveat for a Pro account', function ():
     $me = User::factory()->create();
     subscribeUser($me);
     $product = Product::factory()->create(['user_id' => $me->id, 'unit_price_target' => null]);
+    Shop::factory()->for($product)->create(['pack_quantity' => '500.00', 'pack_unit' => 'g']);
 
     DipCatchServer::actingAs($me)
         ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 6.5])
@@ -358,6 +365,7 @@ it('set_threshold changing the unit price target clears a stale latch', function
         'unit_price_notified' => '5.38',
         'unit_price_notified_at' => now(),
     ]);
+    Shop::factory()->for($product)->create(['pack_quantity' => '500.00', 'pack_unit' => 'g']);
 
     DipCatchServer::actingAs($me)
         ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 6.0])
@@ -370,13 +378,14 @@ it('set_threshold changing the unit price target clears a stale latch', function
         ->and($fresh?->unit_price_notified_at)->toBeNull();
 });
 
-it('leaves the drop thresholds alone when only a unit price target is given', function (): void {
+it('leaves the old drop columns alone, as a way back until they are dropped', function (): void {
     $me = User::factory()->create();
     $product = Product::factory()->create([
         'user_id' => $me->id,
         'drop_threshold_pct' => '10.00',
         'drop_threshold_abs' => null,
     ]);
+    Shop::factory()->for($product)->create(['pack_quantity' => '500.00', 'pack_unit' => 'g']);
 
     DipCatchServer::actingAs($me)
         ->tool(SetThresholdTool::class, ['product_id' => (string) $product->id, 'unit_price_target' => 4.25])

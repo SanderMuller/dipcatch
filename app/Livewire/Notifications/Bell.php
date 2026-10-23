@@ -13,6 +13,7 @@ use App\Support\Numeric;
 use App\Support\PackLine;
 use App\Support\PackSize;
 use App\Support\ShopNames;
+use App\Support\UnitTargetConversion;
 use App\Support\UnitWord;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -219,7 +220,8 @@ final class Bell extends Component
             'target' => is_string($target) ? $target : null,
             'unitFigure' => $unitFigure,
             'leadsWithUnit' => $unitFigure !== null && ! $leadsWithPack,
-            'pack' => $text('new_price') === null ? null : PackLine::format($text('new_price'), $currency, $size),
+            // A target per pack already leads with the pack's price.
+            'pack' => $text('new_price') === null || $unitCode === UnitTargetConversion::PACK ? null : PackLine::format($text('new_price'), $currency, $size),
             'betterValue' => is_string($betterValue) ? $betterValue : null,
         ];
     }

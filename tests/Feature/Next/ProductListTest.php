@@ -167,9 +167,9 @@ it('puts the products at their alert price first, then the ones on discount, the
     productWithCheapestShop($user, 'Plain product', []);
     // A deal at a shop, with no drop alert of its own.
     productWithCheapestShop($user, 'Deal only', ['promotion_ends_at' => now()->addDays(3)]);
-    productWithCheapestShop($user, 'Under the alert', [], ['target_price' => '2.50']);
+    productWithPackTarget($user, 'Under the alert', '2.50');
     // A target it has not reached: no different from a plain product.
-    productWithCheapestShop($user, 'Above the alert', [], ['target_price' => '1.50']);
+    productWithPackTarget($user, 'Above the alert', '1.50');
 
     $this->actingAs($user);
 
@@ -185,7 +185,7 @@ it('puts the products at their alert price first, then the ones on discount, the
 it('draws no discount line when nothing is on discount', function (): void {
     $user = User::factory()->create();
     productWithCheapestShop($user, 'Plain product', []);
-    productWithCheapestShop($user, 'Under the alert', [], ['target_price' => '2.50']);
+    productWithPackTarget($user, 'Under the alert', '2.50');
 
     $this->actingAs($user);
 
@@ -208,7 +208,7 @@ it('counts a deal at the best-value shop as a discount', function (): void {
 
 it('groups only when sorted by drop', function (): void {
     $user = User::factory()->create();
-    productWithCheapestShop($user, 'Zest', [], ['target_price' => '2.50']);
+    productWithPackTarget($user, 'Zest', '2.50');
     productWithCheapestShop($user, 'Apple', []);
 
     $this->actingAs($user);
@@ -224,7 +224,7 @@ it('counts a per-kilo alert, and leaves a paused product out of the alert group'
     productWithCheapestShop($user, 'Plain product', []);
     // €2.00 for 500 g is €4.00 a kilo, under a €4.50 target.
     productWithCheapestShop($user, 'Under the kilo alert', [], ['unit_price_target' => '4.50', 'best_value_price' => '2.00', 'best_value_pack_quantity' => '500.00', 'best_value_pack_unit' => 'g']);
-    productWithCheapestShop($user, 'Paused under the alert', [], ['target_price' => '2.50', 'active' => false]);
+    productWithPackTarget($user, 'Paused under the alert', '2.50', ['active' => false]);
 
     $this->actingAs($user);
 
@@ -248,7 +248,7 @@ it('counts a deal at the chosen shop as a discount, also when another shop is ch
 
 it('draws no line above a single group of products at their alert price', function (): void {
     $user = User::factory()->create();
-    productWithCheapestShop($user, 'Under the alert', [], ['target_price' => '2.50']);
+    productWithPackTarget($user, 'Under the alert', '2.50');
 
     $this->actingAs($user);
 
@@ -802,6 +802,24 @@ function productWithCheapestShop(User $user, string $title, array $shop, array $
     return $made;
 }
 
+/**
+ * A product whose cheapest shop sells it at €2.00, with a price for that
+ * shop's pack as its alert.
+ *
+ * @param  array<string, mixed>  $product
+ */
+function productWithPackTarget(User $user, string $title, string $target, array $product = []): Product
+{
+    $made = productWithCheapestShop($user, $title, [], $product);
+    $made->forceFill([
+        'unit_price_target' => $target,
+        'unit_price_target_unit' => 'pack',
+        'unit_price_target_shop_id' => $made->cheapest_shop_id,
+    ])->save();
+
+    return $made;
+}
+
 it('shows no drop for a product whose price is back at the alert reference', function (): void {
     $user = User::factory()->create();
     // Alerted from 11.95, and the price is back at 11.95: still latched, but 0% down.
@@ -1140,10 +1158,8 @@ it('offers the on-list filter only to an account with something on its list', fu
 
 it('marks a product whose price is at or under its target, and only that one', function (): void {
     $user = User::factory()->create();
-    $reached = Product::factory()->create(['user_id' => $user->id, 'title' => 'Reached', 'target_price' => '2.00']);
-    Shop::factory()->for($reached)->create(['current_price' => '1.99']);
-    $above = Product::factory()->create(['user_id' => $user->id, 'title' => 'Above', 'target_price' => '0.95']);
-    Shop::factory()->for($above)->create(['current_price' => '1.92']);
+    $reached = Product::factory()->withPackTarget('2.00', ['current_price' => '1.99'])->create(['user_id' => $user->id, 'title' => 'Reached']);
+    $above = Product::factory()->withPackTarget('0.95', ['current_price' => '1.92'])->create(['user_id' => $user->id, 'title' => 'Above']);
     $perKilo = Product::factory()->create(['user_id' => $user->id, 'title' => 'Per kilo', 'unit_price_target' => '8.0000']);
     Shop::factory()->for($perKilo)->create(['current_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
 
@@ -1177,12 +1193,10 @@ it('calls the line between the drops and the rest "No discount right now"', func
 
 it('marks a price exactly at the target, but not a price above a per-unit target, nor a paused product', function (): void {
     $user = User::factory()->create();
-    $exact = Product::factory()->create(['user_id' => $user->id, 'title' => 'Exact', 'target_price' => '1.99']);
-    Shop::factory()->for($exact)->create(['current_price' => '1.99']);
-    $above = Product::factory()->create(['user_id' => $user->id, 'title' => 'Above per kilo', 'unit_price_target' => '7.0000']);
+    $exact = Product::factory()->withPackTarget('1.99', ['current_price' => '1.99'])->create(['user_id' => $user->id, 'title' => 'Exact']);
+    $above = Product::factory()->create(['user_id' => $user->id, 'title' => 'Above per kilo', 'unit_price_target' => '7.0000', 'unit_price_target_unit' => 'g']);
     Shop::factory()->for($above)->create(['current_price' => '4.99', 'pack_quantity' => '660.00', 'pack_unit' => 'g']);
-    $paused = Product::factory()->create(['user_id' => $user->id, 'title' => 'Paused', 'target_price' => '2.00', 'active' => false]);
-    Shop::factory()->for($paused)->create(['current_price' => '1.50']);
+    $paused = Product::factory()->withPackTarget('2.00', ['current_price' => '1.50'])->create(['user_id' => $user->id, 'title' => 'Paused', 'active' => false]);
 
     foreach ([$exact, $above, $paused] as $product) {
         $product->refresh()->recomputeCheapestShop();

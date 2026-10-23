@@ -17,26 +17,41 @@ use Illuminate\Support\Facades\RateLimiter;
 
 use function Pest\Livewire\livewire;
 
+/**
+ * A product with one 1 kg shop at €10.00, so it compares per kilo and the
+ * form takes a target per kilo.
+ *
+ * @param  array<model-property<Product>, mixed>  $attributes
+ */
+function editFormSizedProduct(User $user, array $attributes = []): Product
+{
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', ...$attributes]);
+    Shop::factory()->for($product)->create([
+        'currency' => 'EUR', 'current_price' => '10.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g',
+    ]);
+
+    return $product->refresh();
+}
+
 it('loads the product into the form', function (): void {
     $user = User::factory()->create();
-    $product = Product::factory()->create([
-        'user_id' => $user->id,
+    $product = editFormSizedProduct($user, [
         'title' => 'Coffee beans 1 kg',
-        'drop_threshold_pct' => '12.50',
-        'target_price' => '15.00',
+        'unit_price_target' => '12.50',
+        'unit_price_target_unit' => 'g',
     ]);
 
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product])
         ->assertSet('title', 'Coffee beans 1 kg')
-        ->assertSet('dropThresholdPct', '12.50')
-        ->assertSet('targetPrice', '15.00');
+        ->assertSet('unitPriceTarget', '12.5')
+        ->assertSet('unitPriceTargetUnit', 'g');
 });
 
 it('saves every field the old Filament form carried', function (): void {
     $user = User::factory()->create();
-    $product = Product::factory()->create(['user_id' => $user->id, 'active' => true]);
+    $product = editFormSizedProduct($user, ['active' => true]);
 
     $this->actingAs($user);
 
@@ -44,9 +59,6 @@ it('saves every field the old Filament form carried', function (): void {
         ->set('title', '  Beemster 48+ 150 g  ')
         ->set('imageUrl', 'https://example.test/pack.jpg')
         ->set('currency', 'EUR')
-        ->set('dropThresholdPct', '15')
-        ->set('dropThresholdAbs', '0.75')
-        ->set('targetPrice', '2.49')
         ->set('unitPriceTarget', '11.0000')
         ->set('active', false)
         ->call('save')
@@ -56,56 +68,48 @@ it('saves every field the old Filament form carried', function (): void {
 
     expect($fresh?->title)->toBe('Beemster 48+ 150 g')
         ->and($fresh?->image_url)->toBe('https://example.test/pack.jpg')
-        ->and((string) $fresh?->drop_threshold_pct)->toBe('15.00')
-        ->and((string) $fresh?->target_price)->toBe('2.49')
         ->and((string) $fresh?->unit_price_target)->toBe('11.0000')
+        ->and($fresh?->unit_price_target_unit)->toBe('g')
         ->and($fresh?->active)->toBeFalse();
 });
 
 it('reads an empty field as no alert of that kind', function (): void {
     $user = User::factory()->create();
-    $product = Product::factory()->create([
-        'user_id' => $user->id,
-        'target_price' => '9.99',
-        'unit_price_target' => '4.00',
-    ]);
+    $product = editFormSizedProduct($user, ['unit_price_target' => '4.00', 'unit_price_target_unit' => 'g']);
 
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product])
-        ->set('targetPrice', '')
+        ->assertSet('unitPriceTarget', '4')
         ->set('unitPriceTarget', '   ')
-        ->call('save');
+        ->call('save')
+        ->assertHasNoErrors();
 
     $fresh = $product->fresh();
 
-    expect($fresh?->target_price)->toBeNull()
-        ->and($fresh?->unit_price_target)->toBeNull();
+    expect($fresh?->unit_price_target)->toBeNull()
+        ->and($fresh?->unit_price_target_unit)->toBeNull();
 });
 
 it('clears a stale target latch when the target changes through the edit form', function (): void {
     $user = User::factory()->create();
-    $product = Product::factory()->create([
-        'user_id' => $user->id,
-        'target_price' => '18.00',
-        'target_price_notified' => '17.05',
-        'target_price_notified_at' => now(),
+    $product = editFormSizedProduct($user, [
         'unit_price_target' => '5.50',
+        'unit_price_target_unit' => 'g',
         'unit_price_notified' => '5.38',
+        'unit_price_notified_unit' => 'g',
         'unit_price_notified_at' => now(),
     ]);
 
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product])
-        ->set('targetPrice', '30.00')
         ->set('unitPriceTarget', '6.00')
         ->call('save');
 
     $fresh = $product->fresh();
 
-    expect($fresh?->target_price_notified)->toBeNull()
-        ->and($fresh?->target_price_notified_at)->toBeNull()
+    expect((string) $fresh?->unit_price_target)->toBe('6.0000')
         ->and($fresh?->unit_price_notified)->toBeNull()
         ->and($fresh?->unit_price_notified_at)->toBeNull();
 });
@@ -114,9 +118,11 @@ it('leaves an armed latch alone when the edit form does not change the target', 
     $user = User::factory()->create();
     $product = Product::factory()->create([
         'user_id' => $user->id,
-        'target_price' => '18.00',
-        'target_price_notified' => '17.05',
-        'target_price_notified_at' => now(),
+        'unit_price_target' => '5.50',
+        'unit_price_target_unit' => 'g',
+        'unit_price_notified' => '5.38',
+        'unit_price_notified_unit' => 'g',
+        'unit_price_notified_at' => now(),
     ]);
 
     $this->actingAs($user);
@@ -127,22 +133,22 @@ it('leaves an armed latch alone when the edit form does not change the target', 
 
     $fresh = $product->fresh();
 
-    expect($fresh?->target_price_notified)->toBe('17.05')
-        ->and($fresh?->target_price_notified_at)->not->toBeNull();
+    expect((string) $fresh?->unit_price_notified)->toBe('5.3800')
+        ->and($fresh?->unit_price_notified_at)->not->toBeNull();
 });
 
-it('refuses a threshold of zero rather than alerting on a price that did not move', function (): void {
+it('refuses a target of zero rather than alerting on every price', function (): void {
     $user = User::factory()->create();
-    $product = Product::factory()->create(['user_id' => $user->id, 'drop_threshold_pct' => '10.00']);
+    $product = editFormSizedProduct($user, ['unit_price_target' => '8.00', 'unit_price_target_unit' => 'g']);
 
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product])
-        ->set('dropThresholdPct', '0')
+        ->set('unitPriceTarget', '0')
         ->call('save')
-        ->assertHasErrors('dropThresholdPct');
+        ->assertHasErrors('unitPriceTarget');
 
-    expect((string) $product->fresh()?->drop_threshold_pct)->toBe('10.00');
+    expect((string) $product->fresh()?->unit_price_target)->toBe('8.0000');
 });
 
 it('refuses a title that is not there', function (): void {
@@ -175,7 +181,7 @@ it('refuses an image url whose scheme is not http(s)', function (): void {
 
 it('saves a unit price target on a free account', function (): void {
     $user = User::factory()->create();
-    $product = Product::factory()->create(['user_id' => $user->id]);
+    $product = editFormSizedProduct($user);
 
     $this->actingAs($user);
 
@@ -433,15 +439,18 @@ it('names the unit the comparison actually uses when the shops disagree', functi
         ->assertDontSee('same price per piece');
 });
 
-it('keeps the three-way wording while no shop has read a pack size', function (): void {
+it('asks for the price of one shop\'s pack while no shop has read a pack size', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create();
-    Shop::factory()->for($product)->create(['pack_quantity' => null, 'pack_unit' => null]);
+    Shop::factory()->for($product)->create(['current_price' => '3.00', 'pack_quantity' => null, 'pack_unit' => null]);
 
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product])
-        ->assertSee('Target price per kilo, litre or piece');
+        ->assertSet('unitPriceTargetUnit', 'pack')
+        ->assertSeeHtml('data-test="pack-target"')
+        ->assertSee('Price for this pack')
+        ->assertDontSeeHtml('data-test="unit-target"');
 
     expect($product->comparablePacks()->unit())->toBeNull();
 });
@@ -608,7 +617,7 @@ it('tells a Pro account when the daily suggestion budget is spent, and sends not
     Http::assertNothingSent();
 });
 
-it('shows what the product costs now beside each target field', function (): void {
+it('shows what the best value costs now beside the target', function (): void {
     // Setting a target means picking a number relative to today's price. Asking
     // the reader to remember it, or to open the product page in another tab,
     // is the difference between a considered figure and a guess.
@@ -637,26 +646,23 @@ it('shows what the product costs now beside each target field', function (): voi
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product->refresh()])
-        // The target price is an outlay figure, so it is anchored to the
+        // The per-unit target is anchored to the best value, not to the
         // smallest outlay.
-        ->assertSee('Now €2.19 at Albert Heijn')
-        // The per-unit target is anchored to the best value, which here is the
-        // other shop.
-        ->assertSee('Now €8.17 /kg at Dirk');
+        ->assertSee('Now €8.17 /kg at Dirk')
+        ->assertDontSee('Now €2.19 at Albert Heijn');
 });
 
-it('leaves the now-line out when no shop has a usable price', function (): void {
+it('offers no target field when no shop has a price to buy at', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
+    Shop::factory()->for($product)->create(['current_price' => null]);
 
     $this->actingAs($user);
 
-    // The whole sentence, not a fragment: "Now " on its own would pass for the
-    // wrong reason the moment any other copy on this page starts with it, and
-    // it proves nothing about which description rendered.
-    livewire(EditProduct::class, ['product' => $product])
-        ->assertSee('We tell you when any shop reaches this price.')
-        ->assertDontSee('We tell you when any shop reaches this price. Now');
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->assertSeeHtml('data-test="no-pack-to-target"')
+        ->assertDontSeeHtml('data-test="pack-target"')
+        ->assertDontSeeHtml('data-test="unit-target"');
 });
 
 it('anchors to a shop a shopper can actually buy from', function (): void {
@@ -684,7 +690,6 @@ it('anchors to a shop a shopper can actually buy from', function (): void {
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertSee('Now €10.00 at live.nl')
         ->assertSee('Now €20.00 /kg at live.nl')
         ->assertDontSee('dead.nl');
 
@@ -700,18 +705,18 @@ it('anchors to the shop that is cheapest now, not the one a recompute last named
     $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
 
     $first = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1']);
-    $first->forceFill(['currency' => 'EUR', 'current_price' => '5.00', 'current_in_stock' => true])->save();
+    $first->forceFill(['currency' => 'EUR', 'current_price' => '5.00', 'current_in_stock' => true, 'pack_quantity' => '500.00', 'pack_unit' => 'g'])->save();
 
     $product->refresh()->recomputeCheapestShop();
 
     $second = Shop::factory()->for($product)->create(['url' => 'https://dirk.nl/p/1']);
-    $second->forceFill(['currency' => 'EUR', 'current_price' => '4.00', 'current_in_stock' => true])->save();
+    $second->forceFill(['currency' => 'EUR', 'current_price' => '4.00', 'current_in_stock' => true, 'pack_quantity' => '500.00', 'pack_unit' => 'g'])->save();
 
     $this->actingAs($user);
 
     // Deliberately not recomputed.
     livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertSee('Now €4.00 at Dirk');
+        ->assertSee('Now €8.00 /kg at Dirk');
 });
 
 it('shows a free account the current figure, with no upgrade line', function (): void {
@@ -735,134 +740,12 @@ it('shows a free account the current figure, with no upgrade line', function ():
 
 it('shows the unit target without the zeros its column pads it with', function (): void {
     $user = User::factory()->create();
-    $product = Product::factory()->create(['user_id' => $user->id]);
-    $product->forceFill(['unit_price_target' => '7.0000'])->save();
+    $product = editFormSizedProduct($user);
+    $product->forceFill(['unit_price_target' => '7.0000', 'unit_price_target_unit' => 'g'])->save();
 
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product->refresh()])->assertSet('unitPriceTarget', '7');
-});
-
-it('opens the other alerts when one of them is set, and folds them away when none is', function (): void {
-    $user = User::factory()->create();
-    $set = Product::factory()->create(['user_id' => $user->id, 'drop_threshold_pct' => '25.00', 'drop_threshold_abs' => null, 'target_price' => null]);
-    $empty = Product::factory()->create(['user_id' => $user->id, 'drop_threshold_pct' => null, 'drop_threshold_abs' => null, 'target_price' => null]);
-
-    $this->actingAs($user);
-
-    $open = fn (Product $product): bool => (bool) preg_match('/<details[^>]*\bopen\b[^>]*data-test="other-alerts"/s', livewire(EditProduct::class, ['product' => $product])->html());
-
-    expect($open($set))->toBeTrue()
-        ->and($open($empty))->toBeFalse();
-});
-
-it('switches a drop alert to a price alert at the same saving', function (): void {
-    $user = User::factory()->create();
-    subscribeUser($user);
-    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '25.00', 'drop_threshold_abs' => '1.00', 'unit_price_target' => null]);
-    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
-        ->forceFill(['currency' => 'EUR', 'current_price' => '6.15', 'current_in_stock' => true, 'pack_quantity' => '840.00', 'pack_unit' => 'g'])->save();
-    $product->refresh()->recomputeCheapestShop();
-
-    $this->actingAs($user);
-
-    // €6.15 for 840 g is €7.3214 a kilo. 25% off is €5.4910; €1.00 off the
-    // pack is €6.1309. The drop check alerts on whichever is met first, so
-    // the easier one, €6.1309, carries over, and both are named.
-    livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertSeeHtml('data-test="price-alert-switch"')
-        ->assertSee('Instead of your 25% or €1.00 drop alert')
-        ->call('switchToPriceAlert')
-        ->assertSet('unitPriceTarget', '6.1309')
-        ->assertSet('dropThresholdPct', null)
-        ->assertSet('dropThresholdAbs', null)
-        ->assertDontSeeHtml('data-test="price-alert-switch"')
-        ->call('save')
-        ->assertHasNoErrors();
-
-    $saved = $product->fresh();
-    expect((string) $saved?->unit_price_target)->toBe('6.1309')
-        ->and($saved?->drop_threshold_pct)->toBeNull()
-        ->and($saved?->drop_threshold_abs)->toBeNull();
-});
-
-it('offers no switch once the product has a price alert', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '25.00', 'unit_price_target' => '5.00']);
-    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
-        ->forceFill(['currency' => 'EUR', 'current_price' => '6.15', 'current_in_stock' => true, 'pack_quantity' => '840.00', 'pack_unit' => 'g'])->save();
-    $product->refresh()->recomputeCheapestShop();
-
-    $this->actingAs($user);
-
-    livewire(EditProduct::class, ['product' => $product->refresh()])->assertDontSeeHtml('data-test="price-alert-switch"');
-});
-
-it('offers a free account the switch to a price alert', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '25.00', 'unit_price_target' => null]);
-    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
-        ->forceFill(['currency' => 'EUR', 'current_price' => '6.15', 'current_in_stock' => true, 'pack_quantity' => '840.00', 'pack_unit' => 'g'])->save();
-    $product->refresh()->recomputeCheapestShop();
-
-    $this->actingAs($user);
-
-    livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertSeeHtml('data-test="price-alert-switch"')
-        ->call('switchToPriceAlert')
-        ->assertSet('dropThresholdPct', null)
-        // €6.15 for 840 g is €7.3214/kg; 25% under that, cut to four decimals.
-        ->assertSet('unitPriceTarget', '5.491');
-});
-
-it('offers no switch when the same saving leaves less than the smallest target', function (): void {
-    $user = User::factory()->create();
-    subscribeUser($user);
-    // €1 for 100 pieces is a cent a piece; 99.5% off that is below 0.0001.
-    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '99.50', 'unit_price_target' => null]);
-    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
-        ->forceFill(['currency' => 'EUR', 'current_price' => '1.00', 'current_in_stock' => true, 'pack_quantity' => '100.00', 'pack_unit' => 'piece'])->save();
-    $product->refresh()->recomputeCheapestShop();
-
-    $this->actingAs($user);
-
-    livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertDontSeeHtml('data-test="price-alert-switch"')
-        ->call('switchToPriceAlert')
-        ->assertSet('dropThresholdPct', '99.50');
-});
-
-it('restates a percentage drop without a float cutting 4.2 to 4.1999', function (): void {
-    $user = User::factory()->create();
-    subscribeUser($user);
-    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => '30.00', 'drop_threshold_abs' => null, 'unit_price_target' => null]);
-    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
-        ->forceFill(['currency' => 'EUR', 'current_price' => '6.00', 'current_in_stock' => true, 'pack_quantity' => '1000.00', 'pack_unit' => 'g'])->save();
-    $product->refresh()->recomputeCheapestShop();
-
-    $this->actingAs($user);
-
-    livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertSee('€4.20 per kilo')
-        ->call('switchToPriceAlert')
-        ->assertSet('unitPriceTarget', '4.2');
-});
-
-it('restates a money drop off the best pack', function (): void {
-    $user = User::factory()->create();
-    subscribeUser($user);
-    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR', 'drop_threshold_pct' => null, 'drop_threshold_abs' => '1.00', 'unit_price_target' => null]);
-    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1'])
-        ->forceFill(['currency' => 'EUR', 'current_price' => '5.00', 'current_in_stock' => true, 'pack_quantity' => '500.00', 'pack_unit' => 'g'])->save();
-    $product->refresh()->recomputeCheapestShop();
-
-    $this->actingAs($user);
-
-    // €5.00 for 500 g, €1.00 off: €4.00 for the pack, €8 a kilo.
-    livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertSee('Instead of your €1.00 drop alert')
-        ->call('switchToPriceAlert')
-        ->assertSet('unitPriceTarget', '8');
 });
 
 it('forgets the checklist item Jev picked once the product is renamed, and keeps it otherwise', function (): void {
@@ -870,7 +753,7 @@ it('forgets the checklist item Jev picked once the product is renamed, and keeps
     $product = Product::factory()->create(['user_id' => $user->id, 'title' => 'Douwe Egberts Aroma Rood', 'tracking_idea' => TrackingIdea::CoffeeTea]);
     $this->actingAs($user);
 
-    livewire(EditProduct::class, ['product' => $product])->set('targetPrice', '4.00')->call('save');
+    livewire(EditProduct::class, ['product' => $product])->set('active', false)->call('save')->assertHasNoErrors();
 
     expect($product->fresh()?->tracking_idea)->toBe(TrackingIdea::CoffeeTea);
 

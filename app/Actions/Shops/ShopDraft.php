@@ -10,6 +10,7 @@ use App\Support\AltPackSize;
 use App\Support\ImageUrl;
 use App\Support\PackSize;
 use App\Support\ProductTitle;
+use App\Support\PromotedPackSize;
 use Carbon\CarbonImmutable;
 use Throwable;
 
@@ -217,9 +218,11 @@ final readonly class ShopDraft
             (bool) ($snapshot['pack_size_whole_pack'] ?? false),
             $countsItems,
         );
-        $altSizes = is_array($snapshot['alt_pack_sizes'] ?? null)
-            ? array_values(array_filter($snapshot['alt_pack_sizes'], is_string(...)))
-            : [];
+        $altSizes = PromotedPackSize::statedIn($snapshot);
+        // A page that states its size only second leads with it, as the
+        // price check stores it.
+        $promoted = $packSize === null ? PromotedPackSize::first($altSizes) : null;
+        $packSize ??= $promoted;
 
         return new self(
             url: $url,
@@ -244,7 +247,7 @@ final readonly class ShopDraft
             claimedRegularPrice: self::string($snapshot, 'claimed_regular_price'),
             claimRead: ($snapshot['claim_read'] ?? false) === true,
             seller: self::string($snapshot, 'seller'),
-            altPackSize: $packSize === null ? null : AltPackSize::first(
+            altPackSize: $packSize === null || $promoted !== null ? null : AltPackSize::first(
                 $altSizes,
                 (bool) ($snapshot['alt_pack_sizes_authoritative'] ?? false),
                 $packSize,

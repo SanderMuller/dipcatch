@@ -1,7 +1,6 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Drops\DetectDrop;
-use App\Actions\Drops\DetectTargetPrice;
 use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
@@ -54,31 +53,6 @@ function budgetUnitPriceProduct(): Product
         'pack_quantity' => '370.00',
         'pack_unit' => 'g',
     ]);
-
-    return $product->refresh();
-}
-
-/**
- * A free-plan product whose cheapest price of 17.05 is under an 18.00 target,
- * so the pack-price alert is due.
- */
-function budgetTargetPriceProduct(): Product
-{
-    $user = User::factory()->create(['notify_via_filament' => true]);
-
-    $product = Product::factory()->for($user)->create([
-        'currency' => 'EUR',
-        'target_price' => '18.00',
-    ]);
-
-    Shop::factory()->for($product)->create([
-        'url' => 'https://shop.test/p/1',
-        'currency' => 'EUR',
-        'current_price' => '17.05',
-        'current_in_stock' => true,
-    ]);
-
-    $product->recomputeCheapestShop();
 
     return $product->refresh();
 }
@@ -149,7 +123,7 @@ test('a unit-price transaction that rolls back spends no slot', function (): voi
     $user = $product->user()->sole();
 
     // `CheckShopPrice::persist()` runs this action inside its own
-    // transaction, with `DetectTargetPrice` after it. A throw there rolls the
+    // transaction, after the drop alert. A throw there rolls the
     // claim back, but the cache-backed limiter does not roll back with it.
     try {
         DB::transaction(function () use ($product): void {
@@ -184,38 +158,6 @@ test('a denied unit-price budget keeps the claim and drops that alert', function
     expect($product->refresh()->unit_price_notified)->toBe('5.3784');
 });
 
-test('a target-price claim lost to another worker spends no slot', function (): void {
-    $product = budgetTargetPriceProduct();
-    $user = $product->user()->sole();
-
-    Product::query()->whereKey($product->getKey())->update(['target_price_notified' => '17.05']);
-
-    app(DetectTargetPrice::class)($product);
-
-    Notification::assertNothingSent();
-    expect(RateLimiter::attempts(NotificationBudget::key($user)))->toBe(0);
-});
-
-test('a target-price transaction that rolls back spends no slot', function (): void {
-    $product = budgetTargetPriceProduct();
-    $user = $product->user()->sole();
-
-    try {
-        DB::transaction(function () use ($product): void {
-            app(DetectTargetPrice::class)($product);
-
-            throw new RuntimeException('the caller failed after the claim landed');
-        });
-    } catch (RuntimeException) {
-        // Expected — the rollback is the point of the test.
-    }
-
-    expect($product->refresh()->target_price_notified)->toBeNull()
-        ->and(RateLimiter::attempts(NotificationBudget::key($user)))->toBe(0);
-
-    Notification::assertNothingSent();
-});
-
 test('a suppressed unit-price alert says so in the log', function (): void {
     config()->set('plans.pro.notifications_hourly_limit', 1);
 
@@ -232,28 +174,6 @@ test('a suppressed unit-price alert says so in the log', function (): void {
         ->once()
         ->withArgs(fn (string $message, array $context): bool => $message === 'Notification suppressed by hourly rate limit'
             && $context['alert'] === 'unit_price_target'
-            && $context['user_id'] === $user->id
-            && $context['product_id'] === $product->id);
-
-    Notification::assertNothingSent();
-});
-
-test('a suppressed target-price alert says so in the log', function (): void {
-    config()->set('plans.free.notifications_hourly_limit', 1);
-
-    $product = budgetTargetPriceProduct();
-    $user = $product->user()->sole();
-
-    RateLimiter::hit(NotificationBudget::key($user), 3600);
-
-    Log::spy();
-
-    app(DetectTargetPrice::class)($product);
-
-    Log::shouldHaveReceived('warning')
-        ->once()
-        ->withArgs(fn (string $message, array $context): bool => $message === 'Notification suppressed by hourly rate limit'
-            && $context['alert'] === 'target_price'
             && $context['user_id'] === $user->id
             && $context['product_id'] === $product->id);
 

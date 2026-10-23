@@ -50,20 +50,20 @@ function readingOn(Shop $shop, string $price): PriceCheck
     ]);
 }
 
-function droppingProduct(string $pct = '3.00'): Product
+/** A product with no target, so it alerts on the default drops. */
+function droppingProduct(): Product
 {
     $user = User::factory()->create();
 
     return Product::factory()->for($user)->create([
         'currency' => 'EUR',
-        'drop_threshold_pct' => $pct,
-        'drop_threshold_abs' => '1000.00',
     ]);
 }
 
 it('measures a fall per unit rather than across two pack sizes', function (): void {
-    // The Twix shape. jumbo 333 g at 4.19 is 12.58/kg; dirk 227 g at 2.75 is
-    // 12.11/kg. On pack money that reads as 34.4% off. It is 3.7%.
+    // The Twix shape. jumbo 333 g at 4.19 is 12.58/kg; dirk 227 g at 2.40 is
+    // 10.57/kg. On pack money that reads as 42.7% off. It is 16.0%, just past
+    // the default 15% for a price under €25.
     $product = droppingProduct();
 
     $jumbo = sizedShop($product, 'jumbo.com', '4.19', ['pack_quantity' => '333.00', 'pack_unit' => 'g']);
@@ -77,16 +77,16 @@ it('measures a fall per unit rather than across two pack sizes', function (): vo
     $product->refresh()->recomputeCheapestShop($joined->id);
 
     // Then its own price falls, and it takes the lead per kilo.
-    $trigger = readingOn($dirk, '2.75');
+    $trigger = readingOn($dirk, '2.40');
     $product->refresh()->recomputeCheapestShop($trigger->id);
 
     $event = PriceDropEvent::query()->where('product_id', $product->id)->first();
 
     expect($event)->not->toBeNull()
-        ->and(round((float) $event->drop_pct, 1))->toBe(3.7)
+        ->and(round((float) $event->drop_pct, 1))->toBe(16.0)
         ->and($event->comparison_unit)->toBe('g')
         ->and((string) $event->reference_unit_price)->toBe('12.5826')
-        ->and((string) $event->new_unit_price)->toBe('12.1145');
+        ->and((string) $event->new_unit_price)->toBe('10.5727');
 });
 
 it('stores the pack the drop was measured on and leads the alert with the unit price', function (): void {
@@ -97,7 +97,7 @@ it('stores the pack the drop was measured on and leads the alert with the unit p
     $product->recomputeCheapestShop();
     $dirk = sizedShop($product, 'dirk.nl', '5.00', ['pack_quantity' => '227.00', 'pack_unit' => 'g']);
     $product->refresh()->recomputeCheapestShop(readingOn($dirk, '5.00')->id);
-    $product->refresh()->recomputeCheapestShop(readingOn($dirk, '2.75')->id);
+    $product->refresh()->recomputeCheapestShop(readingOn($dirk, '2.40')->id);
 
     $event = PriceDropEvent::query()->where('product_id', $product->id)->sole();
 
@@ -113,7 +113,7 @@ it('stores the pack the drop was measured on and leads the alert with the unit p
 
         return $payload['pack_quantity'] === '227'
             && $payload['pack_unit'] === 'g'
-            && is_string($body) && str_contains($body, 'is now €12.11 /kg (€2.75 for 227 g) at Dirk');
+            && is_string($body) && str_contains($body, 'is now €10.57 /kg (€2.40 for 227 g) at Dirk');
     });
 });
 
@@ -134,7 +134,7 @@ it('stores no pack size on a drop measured on pack prices', function (): void {
 
 it('measures a fall on a product priced by the piece', function (): void {
     // The Roter vitamin C shape. 400 tablets at 12.99 is 0.032475 each; the
-    // same pack at 11.50 is 0.028750 — about an 11.5% fall. Both used to be
+    // same pack at 11.00 is 0.027500 — about a 15.3% fall. Both used to be
     // stored as 0.03, so the reference could not fall far enough to clear any
     // threshold at all and no per-piece product could ever alert. Four
     // decimals put the resolution at a tenth of a percent here, which is
@@ -145,7 +145,7 @@ it('measures a fall on a product priced by the piece', function (): void {
     readingOn($ah, '12.99');
     $product->recomputeCheapestShop();
 
-    $trigger = readingOn($ah, '11.50');
+    $trigger = readingOn($ah, '11.00');
     $product->refresh()->recomputeCheapestShop($trigger->id);
 
     $event = PriceDropEvent::query()->where('product_id', $product->id)->first();
@@ -153,8 +153,8 @@ it('measures a fall on a product priced by the piece', function (): void {
     expect($event)->not->toBeNull()
         ->and($event->comparison_unit)->toBe('piece')
         ->and((string) $event->reference_unit_price)->toBe('0.0325')
-        ->and((string) $event->new_unit_price)->toBe('0.0288')
-        ->and(round((float) $event->drop_pct, 1))->toBe(11.4);
+        ->and((string) $event->new_unit_price)->toBe('0.0275')
+        ->and(round((float) $event->drop_pct, 1))->toBe(15.4);
 });
 
 it('detects a drop when the pack price rises and the unit price falls', function (): void {
@@ -226,24 +226,26 @@ it('does not fire when only the pack size was corrected', function (): void {
 });
 
 it('keeps an absolute threshold meaning money off a pack', function (): void {
-    // Five euro off is five euro off a pack, not off a kilo. Same 500 g pack
-    // either side, so the money figure is honest and the percentage — 20% — sits
-    // under this product's 50% percentage threshold.
-    $product = droppingProduct('50.00');
-    $product->forceFill(['drop_threshold_abs' => '1.00'])->save();
+    // Sixty euro off is sixty euro off the pack, not off a bottle. A case of
+    // six at 1500.00 is 250.00 a bottle: the default percentage, banded on the
+    // bottle, is 8%, and the default money amount, banded on the pack, is
+    // €50. Same case either side, so the money figure is honest; at 4% only
+    // the money amount can fire.
+    $product = droppingProduct();
 
-    $shop = sizedShop($product, 'ah.nl', '5.00', ['pack_quantity' => '500.00', 'pack_unit' => 'g']);
-    readingOn($shop, '5.00');
+    $shop = sizedShop($product, 'wijnhuis.nl', '1500.00', ['pack_quantity' => '6.00', 'pack_unit' => 'piece']);
+    readingOn($shop, '1500.00');
     $product->recomputeCheapestShop();
 
-    $trigger = readingOn($shop, '4.00');
+    $trigger = readingOn($shop, '1440.00');
     $product->refresh()->recomputeCheapestShop($trigger->id);
 
     $event = PriceDropEvent::query()->where('product_id', $product->id)->first();
 
     expect($event)->not->toBeNull()
-        ->and((string) $event->drop_abs)->toBe('1.00')
-        ->and((string) $event->new_price)->toBe('4.00');
+        ->and((string) $event->drop_abs)->toBe('60.00')
+        ->and(round((float) $event->drop_pct, 1))->toBe(4.0)
+        ->and((string) $event->new_price)->toBe('1440.00');
 });
 
 it('clears a latch armed in the other basis instead of suppressing on it', function (): void {

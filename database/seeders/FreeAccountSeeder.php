@@ -87,7 +87,6 @@ final class FreeAccountSeeder extends Seeder
             ['user_id' => $user->id, 'title' => $title],
             [
                 'currency' => 'EUR',
-                'drop_threshold_pct' => 10.00,
                 'active' => true,
                 'image_url' => null,
                 'category' => $category,

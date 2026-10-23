@@ -257,3 +257,15 @@ test('a preview whose source states no second size attaches none, whatever the t
 
     expect($draft->altPackSize)->toBeNull();
 });
+
+test('a shop with no size that states one second leads with it, and keeps no second size', function (): void {
+    fakeAh(null, [[560.0, 'g']]);
+
+    $shop = checkAh(ahShop());
+
+    expect($shop)
+        ->pack_quantity->toBe('560.00')
+        ->pack_unit->toBe('g')
+        ->alt_pack_quantity->toBeNull()
+        ->alt_pack_unit->toBeNull();
+});

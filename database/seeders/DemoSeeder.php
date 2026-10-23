@@ -528,8 +528,6 @@ final class DemoSeeder extends Seeder
             // resolves.
             'image_url' => $spec->image(),
             'currency' => 'EUR',
-            'drop_threshold_pct' => 5.00,
-            'drop_threshold_abs' => 0.50,
             'unit_price_target' => $spec->unitPriceTarget,
             'share_slug' => $spec->shareSlug,
             'active' => $spec->active,

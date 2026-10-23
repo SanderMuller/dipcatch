@@ -90,7 +90,7 @@ final class EditProduct extends Component
         $this->title = $product->title;
         $this->imageUrl = $product->image_url;
         $this->currency = $product->currency;
-        $this->loadAlertFields($product);
+        $this->loadUnitPriceTarget($product);
         $this->active = $product->active;
         $this->priceDisplay = $product->price_display->value ?? '';
         $this->category = $product->category->value ?? '';
@@ -115,32 +115,12 @@ final class EditProduct extends Component
         ];
     }
 
-    /**
-     * Replaces the product's own drop alert with a price alert at the same
-     * saving. The drop fields empty, and with a target set an empty drop field
-     * is off, so the price alert is the only alert left. Nothing is written
-     * until the form is saved.
-     */
-    public function switchToPriceAlert(): void
-    {
-        // The suggestion is in today's unit, so the field has to be too.
-        $this->rebaseUnitPriceTarget($this->product);
-        $suggestion = new UnitTargetGuide($this->product)->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs);
-
-        if ($suggestion === null || self::blankToNull($this->unitPriceTarget) !== null) {
-            return;
-        }
-
-        $this->unitPriceTarget = $suggestion['unit'];
-        $this->dropThresholdPct = null;
-        $this->dropThresholdAbs = null;
-    }
-
     public function save(SaveAlert $saveAlert): void
     {
         $this->authorize('update', $this->product);
 
         $this->validate();
+        $this->prepareAlert($this->product);
 
         // An untouched field is not a choice.
         if ($this->category !== $this->loadedCategory) {
@@ -236,6 +216,8 @@ final class EditProduct extends Component
 
         $this->unitPriceTarget = $target;
         $this->chosenTarget = $target;
+        $this->alertHelper = 'price';
+        $this->alertHelperValue = null;
         $this->announce(__('Alert set to :target. Save changes to keep it.', ['target' => $target]));
     }
 
@@ -278,19 +260,22 @@ final class EditProduct extends Component
             'suggestedLabel' => ProductCategory::tryFrom((string) $this->suggestedCategory)?->label(),
             'shopImages' => UpdateProductDetails::shopImages($this->product),
             'packChoices' => $packChoices,
-            'priceAlertSwitch' => self::blankToNull($this->unitPriceTarget) === null
-                ? $guide->switchFromDrop($this->dropThresholdPct, $this->dropThresholdAbs, $packChoices)
-                : null,
+            'pinnablePacks' => $packChoices === [] ? $guide->pinnablePacks() : [],
+            'strandedOwnerSizes' => $packChoices === [] ? [] : $guide->strandedOwnerSizes(),
             'unitHistory' => $guide->history(),
             'comparisonUnit' => $this->product->comparablePacks()->unit(),
             ...$this->alertAnchors(hasPackChoices: $packChoices !== []),
             'alertCard' => $alertCard,
-            'otherAlerts' => $this->otherAlertSummaries($this->currency),
             'suspendedUnitTarget' => $this->suspendedUnitTarget($this->product),
         ]);
     }
 
     protected function suggestedProduct(): Product
+    {
+        return $this->product;
+    }
+
+    protected function alertProduct(): Product
     {
         return $this->product;
     }
@@ -306,14 +291,14 @@ final class EditProduct extends Component
     }
 
     /**
-     * The two figures a reader sets an alert against, and the sentence under
-     * the per-unit field.
+     * The unit the form speaks in, and today's best price per unit, which a
+     * reader sets an alert against.
      *
      * Resolved together, from one read of the resolver and the same eligible
      * set the ranking uses. Asking each question separately let this form name
      * a dead shop as the best value while every other surface named a live one.
      *
-     * @return array{unitWord: ?string, itemSize: ?float, currentPrice: ?array{amount: string, host: string}, currentUnitPrice: ?array{amount: string, host: string}, unitTargetDescription: string}
+     * @return array{unitWord: ?string, itemSize: ?float, currentUnitPrice: ?array{amount: string, host: string}}
      */
     private function alertAnchors(bool $hasPackChoices): array
     {
@@ -331,9 +316,6 @@ final class EditProduct extends Component
         return [
             'unitWord' => $unitWord,
             'itemSize' => $items?->itemSize,
-            'currentPrice' => $this->anchor($this->product->lowestOutlayShop(), fn (Shop $shop): ?string => $shop->current_price === null
-                ? null
-                : (string) $shop->current_price),
             'currentUnitPrice' => $itemPrice === null ? $this->anchor(
                 $bestValue,
                 fn (): ?string => $unitPrice,
@@ -342,7 +324,6 @@ final class EditProduct extends Component
                 'amount' => MoneyFormatter::each($itemPrice, (string) $this->product->currency),
                 'host' => (string) $bestValue?->host,
             ],
-            'unitTargetDescription' => $this->unitTargetDescription($unitWord),
         ];
     }
 
@@ -371,13 +352,5 @@ final class EditProduct extends Component
                 : MoneyFormatter::unitPrice($amount, $currency) . ' ' . $suffix),
             'host' => (string) $shop->host,
         ];
-    }
-
-    /** The sentence under the per-unit target field. */
-    private function unitTargetDescription(?string $unitWord): string
-    {
-        return $unitWord === null
-            ? __('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.')
-            : __('We tell you when the best value reaches this price per :unit.', ['unit' => $unitWord]);
     }
 }

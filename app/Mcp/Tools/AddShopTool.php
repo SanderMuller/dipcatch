@@ -21,6 +21,7 @@ use App\Services\ShopFetcher\HostFetchMemory;
 use App\Services\TypeSafe\ShopMatchCheck;
 use App\Support\AltPackSize;
 use App\Support\PackSize;
+use App\Support\PromotedPackSize;
 use App\Support\UrlNormalizer;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -193,7 +194,7 @@ final class AddShopTool extends Tool
             is_string($snapshot['title'] ?? null) ? $snapshot['title'] : null,
             (bool) ($snapshot['pack_size_whole_pack'] ?? false),
             countsItems: $product->category?->department()->countsItems() === true,
-        );
+        ) ?? PromotedPackSize::first(PromotedPackSize::statedIn($snapshot));
 
         if (! $drafted instanceof PackSize) {
             return null;

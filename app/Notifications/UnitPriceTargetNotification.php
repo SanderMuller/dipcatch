@@ -13,6 +13,7 @@ use App\Support\MoneyFormatter;
 use App\Support\PackLine;
 use App\Support\PackSize;
 use App\Support\ShopNames;
+use App\Support\UnitTargetConversion;
 use App\Support\UnitWord;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,7 +23,8 @@ use NotificationChannels\WebPush\WebPushMessage;
 
 /**
  * "Lay's Naturel is €5.38 /kg at lidl.nl" — the product reached the price
- * per unit the shopper asked about.
+ * per unit the shopper asked about, or the pinned shop the price for its
+ * pack.
  *
  * Says the unit price first, because that is what was asked for, and the
  * pack price second, because that is what gets paid.
@@ -77,19 +79,22 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
         public readonly string $snapshotUnitPrice,
         ?string $target = null,
         bool $lowestIn90Days = false,
+        ?string $unit = null,
     ) {
         $this->snapshotLowestIn90Days = $lowestIn90Days;
         $this->snapshotTarget = $target ?? $product->effectiveUnitPriceTarget();
         $this->snapshotHost = $shop->host;
         $this->snapshotPrice = $shop->current_price === null ? null : (string) $shop->current_price;
+        $perPack = $unit === UnitTargetConversion::PACK;
         // The size the resolver compared the shop by: it can be the second
-        // size the shop states, 560 g beside its 20 pieces.
-        $packSize = $product->comparablePacks()->for($shop)->size ?? $shop->comparableSize();
-        $this->snapshotUnitLabel = $packSize?->label();
-        $this->snapshotUnit = $packSize?->unit;
+        // size the shop states, 560 g beside its 20 pieces. A target on one
+        // shop's pack compared that shop's price, whatever its size.
+        $packSize = ($perPack ? null : $product->comparablePacks()->for($shop)?->size) ?? $shop->comparableSize();
+        $this->snapshotUnitLabel = $perPack ? UnitWord::labelFor($unit) : $packSize?->label();
+        $this->snapshotUnit = $perPack ? $unit : $packSize?->unit;
         $this->snapshotPackQuantity = $packSize === null ? null : (string) $packSize->quantity;
         $this->snapshotPackUnit = $packSize?->unit;
-        $this->snapshotItemSize = ItemPricing::itemSizeOf($product);
+        $this->snapshotItemSize = $perPack ? null : ItemPricing::itemSizeOf($product);
         $this->snapshotBundle = $shop->liveBundleOffer();
         $this->snapshotSingleItemPrice = $this->snapshotBundle === null ? null : $shop->singleItemPrice();
 
@@ -117,7 +122,7 @@ final class UnitPriceTargetNotification extends Notification implements ShouldQu
     public function toWebPush(User $notifiable): WebPushMessage
     {
         return new WebPushMessage()
-            ->title('Target price per kilo, litre or piece: ' . $this->product->title)
+            ->title('Target price ' . (UnitWord::forCode($this->snapshotUnit) ?? 'per unit') . ': ' . $this->product->title)
             ->body($this->body())
             ->icon($this->product->safeImageUrl() ?? '/favicon.svg')
             ->data(['url' => route('app.products.show', $this->product)]);

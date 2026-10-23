@@ -243,6 +243,7 @@ final readonly class ProductMarkdown
                 . match ($pack?->provenance) {
                     PackProvenance::Inferred, PackProvenance::Converted => ' (' . __('estimated') . ')',
                     PackProvenance::Confirmed => ' (' . __('size checked by AI') . ')',
+                    PackProvenance::Owner => ' (' . __('your size') . ')',
                     default => '',
                 },
             default => '—',

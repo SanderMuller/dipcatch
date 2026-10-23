@@ -28,6 +28,21 @@ function digestProduct(User $user, string $title, string $cheapHost, string $dea
     return $product->refresh();
 }
 
+/** Pin a price for one shop's pack: the alert a product with no size has. */
+function digestPackTarget(Product $product, string $host, string $target): Product
+{
+    $shop = $product->shops->firstWhere('host', $host);
+    assert($shop instanceof Shop);
+
+    $product->forceFill([
+        'unit_price_target' => $target,
+        'unit_price_target_unit' => 'pack',
+        'unit_price_target_shop_id' => $shop->id,
+    ])->save();
+
+    return $product;
+}
+
 it('groups each product under the shop where it is the best buy, biggest trip first', function (): void {
     $user = User::factory()->create();
     digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
@@ -252,8 +267,8 @@ it('lists what is worth a look, with a way to add a shop to a product at one sho
 
 it('counts a best buy at its alert price apart from the other offers', function (): void {
     $user = User::factory()->create();
-    digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true)->update(['target_price' => '1.50']);
-    digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com', onOffer: true)->update(['target_price' => '1.00']);
+    digestPackTarget(digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true), 'ah.nl', '1.50');
+    digestPackTarget(digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com', onOffer: true), 'ah.nl', '1.00');
     digestProduct($user, 'Rice', 'ah.nl', 'jumbo.com', onOffer: true);
     digestProduct($user, 'Milk', 'ah.nl', 'jumbo.com');
     $this->actingAs($user);
@@ -288,7 +303,7 @@ it('leaves out a product with too little history to say its price is good', func
 it('counts a product at its alert price when another shop sells it too, even at its usual price', function (): void {
     $user = User::factory()->create();
     digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
-    digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com', usualPrice: '1.00')->update(['target_price' => '1.50']);
+    digestPackTarget(digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com', usualPrice: '1.00'), 'ah.nl', '1.50');
 
     expect(DashboardDigest::forUser($user)->trips[0] ?? null)->toMatchArray(['host' => 'ah.nl', 'count' => 2, 'atAlert' => 1]);
 });
@@ -296,8 +311,9 @@ it('counts a product at its alert price when another shop sells it too, even at 
 it('counts a product sold at one shop only when it is on offer there', function (bool $onOffer): void {
     $user = User::factory()->create();
     digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
-    $only = Product::factory()->for($user)->create(['title' => 'Only at ah', 'currency' => 'EUR', 'target_price' => '1.50']);
+    $only = Product::factory()->for($user)->create(['title' => 'Only at ah', 'currency' => 'EUR']);
     $shop = Shop::factory()->for($only)->create(['url' => 'https://ah.nl/p/only', 'current_price' => '1.00', 'currency' => 'EUR', 'promotion_ends_at' => $onOffer ? now()->addDays(2) : null]);
+    $only->forceFill(['unit_price_target' => '1.50', 'unit_price_target_unit' => 'pack', 'unit_price_target_shop_id' => $shop->id])->save();
     // A good price and at the alert price: neither is enough on its own here.
     priceHistory($shop, '1.30');
     $only->refresh()->recomputeCheapestShop();
@@ -319,7 +335,7 @@ it('counts a product only on offer when its other shop is switched off or only a
 
 it('lists a product at its alert price under best buys here, even at its usual price', function (): void {
     $user = User::factory()->create();
-    digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com', usualPrice: '1.00')->update(['target_price' => '1.50']);
+    digestPackTarget(digestProduct($user, 'Tea', 'ah.nl', 'jumbo.com', usualPrice: '1.00'), 'ah.nl', '1.50');
 
     expect(DashboardDigest::bestBuyIds($user, 'ah.nl'))->toHaveCount(1);
 });
@@ -327,14 +343,18 @@ it('lists a product at its alert price under best buys here, even at its usual p
 it('does not count the alert price of another shop than the one the product leads with', function (): void {
     $user = User::factory()->create();
     digestProduct($user, 'Coffee', 'ah.nl', 'jumbo.com', onOffer: true);
-    // The cheapest pack at jumbo.com meets the €1.50 target; ah.nl leads per kilo at €5.00.
-    $rice = Product::factory()->for($user)->create(['title' => 'Rice', 'currency' => 'EUR', 'target_price' => '1.50']);
-    Shop::factory()->for($rice)->create(['url' => 'https://jumbo.com/p/rice', 'current_price' => '1.00', 'pack_quantity' => '100.00', 'pack_unit' => 'g']);
+    // The €1.50 target is for jumbo.com's pack, which states no size, and
+    // jumbo.com's €1.00 meets it; ah.nl leads per kilo at €5.00.
+    $rice = Product::factory()->for($user)->create(['title' => 'Rice', 'currency' => 'EUR']);
+    $jumbo = Shop::factory()->for($rice)->create(['url' => 'https://jumbo.com/p/rice', 'current_price' => '1.00']);
+    $rice->forceFill(['unit_price_target' => '1.50', 'unit_price_target_unit' => 'pack', 'unit_price_target_shop_id' => $jumbo->id])->save();
     $ah = Shop::factory()->for($rice)->create(['url' => 'https://ah.nl/p/rice', 'current_price' => '5.00', 'pack_quantity' => '1000.00', 'pack_unit' => 'g']);
     priceHistory($ah, '5.00');
     $rice->refresh()->recomputeCheapestShop();
 
     expect(HeadlinePrice::of($rice->refresh())->buyableShop()?->host)->toBe('ah.nl')
+        ->and($rice->unit_price_target_unit)->toBe('pack')
+        ->and($rice->isAtTarget())->toBeTrue()
         ->and(DashboardDigest::forUser($user)->trips)->toBeEmpty()
         ->and(DashboardDigest::bestBuyIds($user, 'ah.nl'))->toHaveCount(1);
 });

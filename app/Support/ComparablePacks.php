@@ -73,7 +73,7 @@ final readonly class ComparablePacks
      * `$voters` must be a subset of `$shops`. The guarantee that a resolved
      * unit always has a shop that can win in it rests on it: the unit is the
      * one most voters have a size in — their own, or a second size that holds
-     * — so one of them is `Stated` and winnable, but only if that voter is also
+     * — so one of them is `Stated` or `Owner` and winnable, but only if that voter is also
      * a shop this resolver answers for. `$currentUnit`, the unit the product
      * compares in now, breaks a tie. `$countsItems` says the product is a
      * thing rather than its contents, so a price per item may lead.
@@ -85,14 +85,18 @@ final readonly class ComparablePacks
     {
         $voters = ($voters ?? $shops)->filter(fn (Shop $shop): bool => $shop->currency === $currency);
 
-        $primaries = $voters->map(fn (Shop $shop): ?PackSize => self::statedSize($shop))->filter();
+        // A size the owner stated votes on the unit, as the shop's own would.
+        // It never sets the median, the size a silent shop inherits or a
+        // check Jev runs: it says what one shop's pack holds, nothing more.
+        $primaries = $voters->map(fn (Shop $shop): ?PackSize => $shop->ownOrOwnerPackSize())->filter();
+        $ownerSized = $voters->filter(fn (Shop $shop): bool => $shop->isOwnerSized());
         $alts = $voters->map(fn (Shop $shop): ?PackSize => self::usableAlt($shop))->filter();
 
         $vote = UnitVote::tally(
             $voters,
             $primaries,
             $alts,
-            fn (Collection $inUnit): ?float => self::medianUnitPrice($voters, $inUnit),
+            fn (Collection $inUnit): ?float => self::medianUnitPrice($voters, $inUnit->diffKeys($ownerSized)),
             self::altHolds(...),
         );
         $medians = $vote->medians;
@@ -112,7 +116,8 @@ final readonly class ComparablePacks
         $packs = [];
 
         foreach ($shops as $shop) {
-            $packs[(string) $shop->id] = self::resolveOne($shop, $currency, $unit, $agreed, $median, $itemSizes);
+            $packs[(string) $shop->id] = ComparablePack::forOwnerSize($shop, $currency, $unit)
+                ?? self::resolveOne($shop, $currency, $unit, $agreed, $median, $itemSizes);
         }
 
         return new self($unit, $packs, $itemSizes, $agreed, $altsInDoubt, ItemPricing::of($itemSizes, $unit, $packs, $countsItems));
@@ -239,8 +244,8 @@ final readonly class ComparablePacks
     }
 
     /**
-     * The shops that may win the per-unit ranking — a stated or a confirmed
-     * size, in the comparison unit.
+     * The shops that may win the per-unit ranking — a stated, an owner's or a
+     * confirmed size, in the comparison unit.
      *
      * @param  Collection<int, Shop>  $shops
      * @return Collection<int, Shop>

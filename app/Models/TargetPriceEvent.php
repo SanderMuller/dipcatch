@@ -7,6 +7,7 @@ use App\Support\BundlePriceLabel;
 use App\Support\ItemPricing;
 use App\Support\PackSize;
 use App\Support\PriceVerdicts;
+use App\Support\UnitTargetConversion;
 use Carbon\CarbonImmutable;
 use Database\Factories\TargetPriceEventFactory;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
@@ -52,7 +53,8 @@ final class TargetPriceEvent extends Model
     /**
      * Writes the row for a target just reached, with the shop's pack and any
      * multi-buy it takes as they stand now: the digest reads them hours later.
-     * A unit price marks the price-per-unit target; without one it is the
+     * A unit price marks the price-per-unit target, in `$comparisonUnit`
+     * (`pack` for a target on one shop's pack); without one it is the old
      * pack-price target.
      */
     public static function record(
@@ -61,6 +63,7 @@ final class TargetPriceEvent extends Model
         string $target,
         ?string $price,
         ?string $unitPrice = null,
+        ?string $comparisonUnit = null,
     ): self {
         // The size the shop was compared by when the target was reached,
         // which can be the second size it states, 560 g beside 20 pieces.
@@ -78,12 +81,12 @@ final class TargetPriceEvent extends Model
             'target' => $target,
             'price' => $price,
             'unit_price' => $unitPrice,
-            'comparison_unit' => $unitPrice === null ? null : $packSize?->unit,
+            'comparison_unit' => $unitPrice === null ? null : $comparisonUnit ?? $packSize?->unit,
             'pack_quantity' => $packSize?->quantity,
             'pack_unit' => $packSize?->unit,
             'deal' => $bundle === null ? null : BundlePriceLabel::condition($bundle, $product->currency),
             'lowest_in_90_days' => PriceVerdicts::isLowestIn90Days($shop),
-            'item_size' => $unitPrice === null ? null : ItemPricing::itemSizeOf($product),
+            'item_size' => $unitPrice === null || $comparisonUnit === UnitTargetConversion::PACK ? null : ItemPricing::itemSizeOf($product),
             'fired_at' => now(),
         ]);
     }
@@ -92,9 +95,10 @@ final class TargetPriceEvent extends Model
      * Whether this target was already reached at this price or lower within
      * `dipcatch.drops.resend_after_days`. A unit price, with its unit, asks
      * about the price-per-unit target; without one, about the pack-price
-     * target. A changed target is a new question, so it matches only its own.
+     * target. A changed target is a new question, so it matches only its own,
+     * and a `pack` target moved to another shop is a changed target.
      */
-    public static function alreadySent(Product $product, string $target, string $price, ?string $unit = null): bool
+    public static function alreadySent(Product $product, string $target, string $price, ?string $unit = null, ?string $shopId = null): bool
     {
         return self::query()
             ->where('user_id', $product->user_id)
@@ -106,6 +110,7 @@ final class TargetPriceEvent extends Model
                 fn (Builder $query): Builder => $query->whereNull('unit_price')->where('price', '<=', $price),
                 fn (Builder $query): Builder => $query->where('comparison_unit', $unit)->where('unit_price', '<=', $price),
             )
+            ->when($unit === UnitTargetConversion::PACK, fn (Builder $query): Builder => $query->where('shop_id', $shopId))
             ->exists();
     }
 

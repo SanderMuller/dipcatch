@@ -4,10 +4,11 @@ namespace App\Support;
 
 use App\Charts\PriceHistorySeries;
 use App\Models\Product;
+use App\Models\Shop;
 
 /**
- * What a person needs to set a per-unit target in the terms they think in:
- * the packs the shops sell, and the per-unit prices they have seen.
+ * What a person needs to set a target in the terms they think in: the packs
+ * the shops sell, and the prices they have seen.
  */
 final readonly class UnitTargetGuide
 {
@@ -22,7 +23,11 @@ final readonly class UnitTargetGuide
      * `perPack` is how many comparison units one pack holds: 1.5 for a 1.5 L
      * bottle compared per litre, 8 for a box of 8 compared per piece.
      *
-     * @return list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>
+     * `ownerSize` is the size the owner stated for the shop, which the form
+     * lets them change or remove; `shopSays` is the shop's own size when it
+     * now states one that overrides it.
+     *
+     * @return list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, shopSays: ?string}>
      */
     public function packs(): array
     {
@@ -36,7 +41,10 @@ final readonly class UnitTargetGuide
             $size = $packs->for($shop)?->size;
 
             if ($size !== null) {
-                $choices[] = self::packChoice((string) $shop->id, (string) $shop->host, $size, $shop->current_price, $items?->sizeLabel($shop, $size));
+                $choices[] = [
+                    ...self::packChoice((string) $shop->id, (string) $shop->host, $size, $shop->current_price, $items?->sizeLabel($shop, $size)),
+                    ...self::ownerSizeOf($shop),
+                ];
             }
         }
 
@@ -44,61 +52,71 @@ final readonly class UnitTargetGuide
     }
 
     /**
-     * A drop alert restated as a price per unit, off today's best per-unit
-     * price: a percentage off the unit price, a money amount off the best
-     * pack. With both set the drop check alerts on whichever is met first,
-     * so the easier of the two carries over. Null when there is nothing to
-     * restate, or the saving leaves less than the smallest target.
+     * The packs a target can be set on while no shop can win per unit: one
+     * per shop a shopper can buy from, the shop the product was added with
+     * first. A price for one of them is compared with that shop's price only,
+     * so a single bar elsewhere never meets a price meant for a 12-pack.
      *
-     * @param  list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>|null  $packs  from packs(), when the caller has them
-     * @return array{unit: string, drops: list<string>, percentUnder: int, packPrice: string, pack: string}|null
+     * The shape of {@see packs()}, one pack being the unit: `perPack` is 1.
+     *
+     * @return list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, shopSays: ?string}>
      */
-    public function switchFromDrop(?string $percent, ?string $amount, ?array $packs = null): ?array
+    public function pinnablePacks(): array
     {
-        $best = ($packs ?? $this->packs())[0] ?? null;
+        return $this->product->eligibleShops()
+            ->sort(fn (Shop $a, Shop $b): int => [$a->created_at, (string) $a->id] <=> [$b->created_at, (string) $b->id])
+            ->map(function (Shop $shop): array {
+                $size = $shop->packSize();
+                $price = is_numeric($shop->current_price) ? (float) $shop->current_price : null;
 
-        if ($best === null || $best['unitPrice'] === null) {
-            return null;
-        }
+                return [
+                    'shopId' => (string) $shop->id,
+                    'host' => (string) $shop->host,
+                    'shop' => ShopNames::label((string) $shop->host),
+                    'pack' => $size === null ? (string) __('pack') : UnitWord::pack($size),
+                    'perPack' => 1.0,
+                    'price' => $price,
+                    'unitPrice' => $price,
+                    ...self::ownerSizeOf($shop),
+                ];
+            })
+            ->values()
+            ->all();
+    }
 
-        // Decimal strings throughout: a float cut to four decimals turns 4.2
-        // into 4.1999.
-        $bestUnit = self::decimal($best['unitPrice']);
-        $perPack = self::decimal($best['perPack']);
-        $candidates = [];
+    /**
+     * Sizes the owner stated that are no pack choice: in another unit than
+     * the product compares in, so the shop is left out of {@see packs()}.
+     * The form still offers to remove them.
+     *
+     * @return list<array{shopId: string, shop: string, size: string}>
+     */
+    public function strandedOwnerSizes(): array
+    {
+        $chips = array_column($this->packs(), 'shopId');
 
-        if (is_numeric($percent) && (float) $percent > 0 && (float) $percent < 100) {
-            $candidates[] = [
-                'unit' => bcmul($bestUnit, bcsub('1', bcdiv(Numeric::str($percent), '100', 10), 10), 10),
-                'drop' => Numeric::trimmed($percent) . '%',
-            ];
-        }
+        return $this->product->shops
+            ->filter(fn (Shop $shop): bool => $shop->isOwnerSized() && ! in_array((string) $shop->id, $chips, strict: true))
+            ->map(fn (Shop $shop): array => [
+                'shopId' => (string) $shop->id,
+                'shop' => ShopNames::label((string) $shop->host),
+                'size' => UnitWord::pack($shop->ownerPackSize() ?? throw new \LogicException('An owner-sized shop has an owner size.')),
+            ])
+            ->values()
+            ->all();
+    }
 
-        if (is_numeric($amount) && $best['price'] !== null && (float) $amount > 0 && (float) $amount < $best['price']) {
-            $candidates[] = [
-                'unit' => bcdiv(bcsub(self::decimal($best['price']), Numeric::str($amount), 10), $perPack, 10),
-                'drop' => MoneyFormatter::format($amount, (string) $this->product->currency),
-            ];
-        }
-
-        if ($candidates === []) {
-            return null;
-        }
-
-        $drops = array_column($candidates, 'drop');
-        usort($candidates, fn (array $a, array $b): int => bccomp($b['unit'], $a['unit'], 10));
-        $target = self::storable($candidates[0]['unit'], $perPack);
-
-        if ($target === null) {
-            return null;
-        }
+    /**
+     * @return array{ownerSize: ?string, shopSays: ?string}
+     */
+    private static function ownerSizeOf(Shop $shop): array
+    {
+        $owner = $shop->ownerPackSize();
+        $own = $owner === null ? null : $shop->packSize();
 
         return [
-            'unit' => $target['unit'],
-            'drops' => $drops,
-            'percentUnder' => (int) round((1 - (float) $target['unit'] / (float) $bestUnit) * 100),
-            'packPrice' => $target['packPrice'],
-            'pack' => $best['pack'],
+            'ownerSize' => $owner === null ? null : UnitWord::pack($owner),
+            'shopSays' => $own === null ? null : UnitWord::pack($own),
         ];
     }
 

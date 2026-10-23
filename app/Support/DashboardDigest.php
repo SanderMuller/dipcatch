@@ -261,12 +261,14 @@ final readonly class DashboardDigest
      */
     private static function atAlertAt(Product $product, Shop $shop, HeadlinePrice $headline): bool
     {
-        if ($product->target_price !== null && is_numeric($shop->current_price)
-            && bccomp(Numeric::str((string) $shop->current_price), Numeric::str((string) $product->target_price), 4) <= 0) {
-            return true;
+        $target = $product->effectiveUnitPriceTarget();
+
+        if ($product->unit_price_target_unit === UnitTargetConversion::PACK) {
+            return $target !== null && is_numeric($shop->current_price)
+                && $product->pinnedTargetShop()?->is($shop) === true
+                && DetectUnitPriceTarget::meets((float) $shop->current_price, $target);
         }
 
-        $target = $product->effectiveUnitPriceTarget();
         $unitValue = $headline->packs->unitPriceValueOf($shop);
 
         return $target !== null && $unitValue !== null && DetectUnitPriceTarget::meets($unitValue, $target);

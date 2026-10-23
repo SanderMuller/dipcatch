@@ -7,9 +7,9 @@ use App\Models\ProductCheapestHistory;
 use App\Models\Shop;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
-use App\Notifications\TargetPriceNotification;
 use App\Notifications\UnitPriceTargetNotification;
 use App\Services\Drops\NotificationBudget;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -18,8 +18,8 @@ use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * `CheckShopPrice::persist()` wraps the price_check insert, the recompute and
- * both target detectors in one transaction, and the recompute opens another
- * for the row lock. Every alert now asks the hourly budget and sends from a
+ * the target detector in one transaction, and the recompute opens another for
+ * the row lock. Every alert asks the hourly budget and sends from a
  * `DB::afterCommit` callback three levels down. The hand-rolled transactions
  * in NotificationBudgetSpendTest only go two deep, so this drives the real
  * job.
@@ -34,22 +34,40 @@ beforeEach(function (): void {
 });
 
 /**
- * A product at 25.00 whose next check reads 17.05. That is a drop against a
- * stable 25.00 window, under the 18.00 pack-price target, and — at 370 g —
- * under the 50.00/kg unit-price target. One check, all three alerts.
+ * Two products of one owner, each with one 370 g shop at 25.00 whose next
+ * check reads 17.05. One check fires one alert at most: a product with a
+ * live target alerts on its target and on no drop. So:
  *
- * All three matter: `DetectDrop` stages its callback deepest and runs first,
- * so a cascade test that omitted the unit-price alert would never prove that
- * the `foreach` resumes after the throw, only that it reaches the last entry.
+ * - `drop` has no target. 25.00 → 17.05 is 31.8% and €7.95 off a stable
+ *   25.00 window, past the default 10% / €7 and under the 40% confirmation.
+ * - `target` has a 50.00/kg target. 17.05 for 370 g is 46.08/kg.
  *
- * Returns the shop the check runs against; its product and owner hang off
- * it, so no test has to carry variables it does not assert on.
+ * Each shop has its own host, so the second check never waits on the first
+ * one's per-host limit.
+ *
+ * @return array{drop: Shop, target: Shop}
  */
-function jobTransactionShop(): Shop
+function jobTransactionShops(): array
+{
+    $user = User::factory()->create(['notify_via_filament' => true]);
+
+    return [
+        'drop' => jobTransactionShop($user, 'shop-a.test', []),
+        'target' => jobTransactionShop($user, 'shop-b.test', [
+            'unit_price_target' => '50.00',
+            'unit_price_target_unit' => 'g',
+        ]),
+    ];
+}
+
+/**
+ * @param  array<model-property<Product>, mixed>  $productAttributes
+ */
+function jobTransactionShop(User $user, string $host, array $productAttributes): Shop
 {
     Http::fake([
-        'https://shop.test/robots.txt' => Http::response('', 404),
-        'https://shop.test/p/1' => Http::response(withJsonLd(json_encode([
+        "https://{$host}/robots.txt" => Http::response('', 404),
+        "https://{$host}/p/1" => Http::response(withJsonLd(json_encode([
             '@type' => 'Product',
             'name' => 'Olive oil',
             'offers' => [
@@ -61,18 +79,13 @@ function jobTransactionShop(): Shop
         ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']),
     ]);
 
-    $user = User::factory()->create(['notify_via_filament' => true]);
-
     $product = Product::factory()->for($user)->create([
         'currency' => 'EUR',
-        'target_price' => '18.00',
-        'unit_price_target' => '50.00',
-        'drop_threshold_pct' => '10.00',
-        'drop_threshold_abs' => '5.00',
+        ...$productAttributes,
     ]);
 
     $shop = Shop::factory()->for($product)->create([
-        'url' => 'https://shop.test/p/1',
+        'url' => "https://{$host}/p/1",
         'currency' => 'EUR',
         'current_price' => '25.00',
         'current_in_stock' => true,
@@ -100,9 +113,31 @@ function jobTransactionShop(): Shop
 }
 
 /**
+ * Run both checks inside one transaction, as any caller that holds one open
+ * would. Both jobs' alert callbacks then wait for the one outer commit and
+ * run there in the order they were staged: the drop's first, the target's
+ * second. Run apart, each job's own commit runs its own callbacks, and a
+ * throw in the first job has nothing in the second to take down.
+ *
+ * @param  array{drop: Shop, target: Shop}  $shops
+ */
+function checkBothInOneTransaction(array $shops): void
+{
+    DB::transaction(function () use ($shops): void {
+        dispatch_sync(new CheckShopPrice($shops['drop']));
+
+        // Proof the first job's alert waits for the outer commit, and so
+        // shares one run of the callbacks with the second job's alert.
+        Notification::assertNothingSent();
+
+        dispatch_sync(new CheckShopPrice($shops['target']));
+    });
+}
+
+/**
  * Bind a stand-in for `NotificationBudget` that throws on its first call. That
- * first call is always `DetectDrop`'s, because its callback is staged deepest
- * and therefore runs first.
+ * first call is always the `drop` product's `DetectDrop`, because its check
+ * runs first.
  *
  * `NotificationBudget` is `final`, so it can be neither subclassed nor
  * doubled. It does not need to be: every call site resolves it untyped as
@@ -127,42 +162,38 @@ function bindBudgetThatFailsOnce(): void
     });
 }
 
-test('all three alerts arrive through the job transaction', function (): void {
-    $shop = jobTransactionShop();
-    $product = $shop->product;
-    $user = $product->user()->sole();
+test('both alerts arrive through the job transaction', function (): void {
+    $shops = jobTransactionShops();
+    $user = $shops['drop']->product->user()->sole();
 
-    dispatch_sync(new CheckShopPrice($shop));
+    checkBothInOneTransaction($shops);
 
-    expect((string) $product->refresh()->cheapest_price)->toBe('17.05')
-        ->and(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(1);
+    expect((string) $shops['drop']->product->refresh()->cheapest_price)->toBe('17.05')
+        ->and(PriceDropEvent::query()->where('product_id', $shops['drop']->product_id)->count())->toBe(1);
 
     Notification::assertSentTo($user, PriceDropNotification::class);
-    Notification::assertSentTo($user, TargetPriceNotification::class);
     Notification::assertSentTo($user, UnitPriceTargetNotification::class);
 
-    // Three alerts sent, three slots spent — never more.
-    expect(RateLimiter::attempts(NotificationBudget::key($user)))->toBe(3);
+    expect(RateLimiter::attempts(NotificationBudget::key($user)))->toBe(2);
 });
 
-test('a failing drop alert does not take the other two with it', function (): void {
-    $shop = jobTransactionShop();
-    $user = $shop->product->user()->sole();
+test('a failing drop alert does not take the target alert with it', function (): void {
+    $shops = jobTransactionShops();
+    $user = $shops['drop']->product->user()->sole();
     bindBudgetThatFailsOnce();
 
-    dispatch_sync(new CheckShopPrice($shop));
+    checkBothInOneTransaction($shops);
 
     // The drop alert is lost — that is the accepted cost of sending after the
-    // commit. The other two have no business dying with it: their claims
-    // committed and their latches are armed. The unit-price alert is the one
-    // that proves the loop resumes rather than merely reaching its last entry.
+    // commit. The target alert has no business dying with it: its claim
+    // committed and its latch is armed. It runs after the throw, so it proves
+    // the callbacks resume rather than stop.
     Notification::assertNotSentTo($user, PriceDropNotification::class);
-    Notification::assertSentTo($user, TargetPriceNotification::class);
     Notification::assertSentTo($user, UnitPriceTargetNotification::class);
 });
 
 test('a failing alert does not fail the job', function (): void {
-    $shop = jobTransactionShop();
+    $shop = jobTransactionShops()['drop'];
     bindBudgetThatFailsOnce();
 
     // `handle()` calls `persist()` outside every one of its try blocks and
@@ -175,7 +206,7 @@ test('a failing alert is reported and logged, not swallowed', function (): void 
     Exceptions::fake();
     Log::spy();
 
-    $shop = jobTransactionShop();
+    $shop = jobTransactionShops()['drop'];
     $product = $shop->product;
     $user = $product->user()->sole();
     bindBudgetThatFailsOnce();
@@ -199,21 +230,22 @@ test('a failing alert is reported and logged, not swallowed', function (): void 
 });
 
 test('a failing alert leaves the committed data alone', function (): void {
-    $shop = jobTransactionShop();
-    $product = $shop->product;
+    $shops = jobTransactionShops();
     bindBudgetThatFailsOnce();
 
-    dispatch_sync(new CheckShopPrice($shop));
+    checkBothInOneTransaction($shops);
+
+    $dropped = $shops['drop']->product->refresh();
+    $targeted = $shops['target']->product->refresh();
 
     // The catch must not change the transaction semantics: the price, the
     // event row and every latch are committed before any callback runs.
-    expect((string) $product->refresh()->cheapest_price)->toBe('17.05')
-        ->and(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(1)
+    expect((string) $dropped->cheapest_price)->toBe('17.05')
+        ->and(PriceDropEvent::query()->where('product_id', $dropped->id)->count())->toBe(1)
         // The drop latch holds money in the basis the drop was measured in —
-        // per kilo here, with `last_notified_unit` saying so — while the target
-        // latch stays pack money, because a target is about the till.
-        ->and((string) $product->last_notified_price)->toBe('46.08')
-        ->and($product->last_notified_unit)->toBe('g')
-        ->and((string) $product->target_price_notified)->toBe('17.05')
-        ->and((string) $product->unit_price_notified)->toBe('46.0811');
+        // per kilo here, with `last_notified_unit` saying so.
+        ->and((string) $dropped->last_notified_price)->toBe('46.08')
+        ->and($dropped->last_notified_unit)->toBe('g')
+        ->and((string) $targeted->cheapest_price)->toBe('17.05')
+        ->and((string) $targeted->unit_price_notified)->toBe('46.0811');
 });

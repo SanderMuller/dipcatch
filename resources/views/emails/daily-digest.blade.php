@@ -56,7 +56,7 @@ $image = $product->safeImageUrl();
 @if ($hit->lowest_in_90_days)
 <span style="display: inline-block; margin-left: 8px; padding: 4px 8px; border-radius: 999px; background: #dcfce7; color: #166534; font-size: 12px; font-weight: 700; white-space: nowrap;">Lowest in 90 days</span>
 @endif
-<div style="margin-top: 4px; color: #71717a; font-size: 13px;">@if ($perUnit && $hit->price !== null){{ \App\Support\PackLine::format((string) $hit->price, $hit->currency, $hit->packSize()) }} · @endif your price {{ $yourPrice }}</div>
+<div style="margin-top: 4px; color: #71717a; font-size: 13px;">@if ($perUnit && $hit->price !== null && $hit->comparison_unit !== \App\Support\UnitTargetConversion::PACK){{ \App\Support\PackLine::format((string) $hit->price, $hit->currency, $hit->packSize()) }} · @endif your price {{ $yourPrice }}</div>
 </td>
 </tr>
 @if ($hit->deal !== null)
