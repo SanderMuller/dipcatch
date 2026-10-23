@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-24',
+            'category' => 'feature',
+            'title' => 'Price alerts follow the pack you buy',
+            'body' => "Your price alert is now one price per kilo, litre or piece, so a single bar can't trigger an alert meant for a 12-pack. On a product's edit page, pick the pack you buy and set a price, a percentage off today's best, or an amount off.\n\nNo pack size known? Set a price for one shop's pack, or enter how much is in it.",
+        ],
+        [
             'date' => '2026-10-19',
             'category' => 'fix',
             'title' => 'Sets and multipacks get the right size',
