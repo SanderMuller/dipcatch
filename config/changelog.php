@@ -29,6 +29,13 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-23',
+            'category' => 'feature',
+            'title' => 'Track a product from your dashboard',
+            'body' => "The Track a product button is now on your dashboard too, in the same spot as on your product list. Ideas for what else to track sit next to it.\n\nThe product and savings counts at the top are gone. Your savings by month are still on the Stats page.",
+            'link' => ['route' => 'app.dashboard', 'label' => 'Go to your dashboard'],
+        ],
+        [
             'date' => '2026-10-19',
             'category' => 'fix',
             'title' => 'Sets and multipacks get the right size',
