@@ -76,7 +76,7 @@ test('a typed shop name picks the shop, not words of the title', function (strin
     expect($first->title)->toStartWith('Knorr')
         ->and($first->host)->toContain($chain === 'ah' ? 'ah.nl' : "{$chain}.")
         // The same product at another shop still beats the shop's own row that is not it.
-        ->and(array_search(ucfirst($chain) . ' Nasi Vega', resultTitles($results), true))->toBe(3)
+        ->and(array_search(ucfirst($chain) . ' Nasi Vega', resultTitles($results), strict: true))->toBe(3)
         ->and($results->fullMatch)->toBeTrue();
 })->with([
     'its key' => ['Knorr nasi jumbo', 'jumbo'],

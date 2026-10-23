@@ -59,13 +59,7 @@ final readonly class FindCataloguePhoto
             return false;
         }
 
-        foreach (CheckjebonChain::freshByKey() as $chain) {
-            if (SupermarketChains::isTrackable($chain->chain) && in_array($host, SupermarketChains::hosts($chain->chain, $chain->base_url), strict: true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(CheckjebonChain::freshByKey(), fn (CheckjebonChain $chain): bool => SupermarketChains::isTrackable($chain->chain) && in_array($host, SupermarketChains::hosts($chain->chain, $chain->base_url), strict: true));
     }
 
     public function __invoke(string $url): ?string

@@ -35,6 +35,7 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
+use Illuminate\Routing\Middleware\ValidateSignature;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
@@ -246,7 +247,7 @@ Route::prefix('app')
         Route::livewire('stats', StatsPage::class)->name('stats');
         Route::livewire('shopping-list', ShoppingListPage::class)->name('shopping-list');
         Route::get('name-search/photo', NameSearchPhotoController::class)
-            ->middleware(['signed', 'throttle:name-search-photo'])
+            ->middleware([ValidateSignature::class, 'throttle:name-search-photo'])
             ->name('name-search.photo');
     });
 
