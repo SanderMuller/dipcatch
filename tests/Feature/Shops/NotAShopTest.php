@@ -43,6 +43,7 @@ test('a pasted comparison-site link is refused with a message and no keep-as-lin
     'bcc.nl' => 'https://www.bcc.nl/product/siemens-cm776gmb1f',
     'maxict.nl' => 'https://maxict.nl/product/canon-selphy-cp1500-wit',
     'tweakers.net' => 'https://tweakers.net/pricewatch/1234/some-product.html',
+    'ingredientenlijst.nl' => 'https://ingredientenlijst.nl/product/100006034',
 ]);
 
 test('an assistant pasting a comparison-site link gets the same answer', function (): void {
@@ -60,6 +61,7 @@ test('web discovery skips the same hosts from the shared list', function (): voi
     expect(WebResultFilter::isNotAShop('www.bcc.nl'))->toBeTrue()
         ->and(WebResultFilter::isNotAShop('maxict.nl'))->toBeTrue()
         ->and(WebResultFilter::isNotAShop('makro.nl'))->toBeTrue()
+        ->and(WebResultFilter::isNotAShop('www.ingredientenlijst.nl'))->toBeTrue()
         ->and(WebResultFilter::isNotAShop('expert.nl'))->toBeFalse();
 });
 

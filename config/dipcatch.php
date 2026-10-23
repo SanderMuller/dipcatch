@@ -247,7 +247,7 @@ return [
     'not_a_shop' => [
         'wikipedia.org', 'youtube.com', 'facebook.com', 'instagram.com', 'pinterest.com', 'reddit.com', 'tiktok.com', 'x.com', 'twitter.com',
         'tweakers.net', 'beslist.nl', 'kieskeurig.nl', 'vergelijk.nl', 'idealo.nl', 'idealo.de', 'google.com', 'google.nl', 'trustpilot.com',
-        'kassa.bnnvara.nl', 'consumentenbond.nl', 'folders.nl', 'reclamefolder.nl', 'myshopi.com', 'openfoodfacts.org', 'voedingscentrum.nl',
+        'kassa.bnnvara.nl', 'consumentenbond.nl', 'folders.nl', 'reclamefolder.nl', 'myshopi.com', 'openfoodfacts.org', 'ingredientenlijst.nl', 'voedingscentrum.nl',
         'supermarktscanner.nl', 'fatsecret.nl', 'beeradvocate.com', 'techradar.com',
         'kisteman-events.nl', 'partyverhuren.nl', 'bidfood.nl', 'makro.nl',
         'bcc.nl', 'maxict.nl',
