@@ -342,3 +342,29 @@ it('still offers to remove a size the owner stated in another unit than the prod
 
     expect($odd->refresh()->owner_pack_quantity)->toBeNull();
 });
+
+it('does not call a size in the comparison unit stranded when its shop is only sold out', function (): void {
+    [$user, $product] = alertFormProduct();
+    Shop::factory()->for($product)->create(['url' => 'https://spar.nl/p/1', 'currency' => 'EUR', 'current_price' => '3.00', 'current_in_stock' => false, 'owner_pack_quantity' => '100.00', 'owner_pack_unit' => 'g']);
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->assertDontSeeHtml('data-test="owner-pack-size-stranded"');
+});
+
+it('saves a helper target after a stranded size is removed', function (): void {
+    [$user, $product] = alertFormProduct();
+    $odd = Shop::factory()->for($product)->create(['url' => 'https://spar.nl/p/1', 'currency' => 'EUR', 'current_price' => '3.00', 'owner_pack_quantity' => '100.00', 'owner_pack_unit' => 'ml']);
+    $product->refresh()->recomputeCheapestShop();
+    $this->actingAs($user);
+
+    livewire(EditProduct::class, ['product' => $product->refresh()])
+        ->call('removeOwnerPackSize', $odd->id)
+        ->assertSet('chosenPackShopId', null)
+        ->set('alertHelper', 'percent')
+        ->set('alertHelperValue', '10')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($product->refresh()->unit_price_target)->toBe('28.6363');
+});

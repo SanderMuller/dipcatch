@@ -110,7 +110,7 @@ final class TargetPriceEvent extends Model
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('unit_price')->where('price', '<=', $price),
                 fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('comparison_unit', $unit)->where('unit_price', '<=', $price),
             )
-            ->when($unit === UnitTargetConversion::PACK, fn (Builder $query): Builder => $query->where('shop_id', $shopId))
+            ->when($unit === UnitTargetConversion::PACK, fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('shop_id', $shopId))
             ->exists();
     }
 

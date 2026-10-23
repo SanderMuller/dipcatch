@@ -166,7 +166,7 @@ trait EditsAlertFields
 
         $this->packSizeInput = null;
         $this->loadUnitPriceTarget($product->refresh());
-        $this->chosenPackShopId ??= $shopId;
+        $this->keepChosenPack($product, $shopId);
         $this->announce(__('Size saved.'));
         $this->dispatch('alert-size-saved');
     }
@@ -181,7 +181,7 @@ trait EditsAlertFields
 
         $this->packSizeInput = null;
         $this->loadUnitPriceTarget($product->refresh());
-        $this->chosenPackShopId ??= $shopId;
+        $this->keepChosenPack($product, $shopId);
         $this->announce(__('Your size removed.'));
         $this->dispatch('alert-size-saved');
     }
@@ -200,6 +200,17 @@ trait EditsAlertFields
             'alertHelper' => FluentRule::string('Helper')->required()->in(['price', 'percent', 'amount']),
             'alertHelperValue' => FluentRule::numeric('My own price')->nullable()->min(0.01),
         ];
+    }
+
+    /** The pack the size was saved for stays chosen, while it is still one of the packs. */
+    private function keepChosenPack(Product $product, string $shopId): void
+    {
+        $guide = new UnitTargetGuide($product);
+        $choices = $this->unitPriceTargetUnit === UnitTargetConversion::PACK ? $guide->pinnablePacks() : $guide->packs();
+
+        if ($this->chosenPackShopId === null && in_array($shopId, array_column($choices, 'shopId'), strict: true)) {
+            $this->chosenPackShopId = $shopId;
+        }
     }
 
     /**

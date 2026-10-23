@@ -85,18 +85,18 @@ final readonly class UnitTargetGuide
     }
 
     /**
-     * Sizes the owner stated that are no pack choice: in another unit than
-     * the product compares in, so the shop is left out of {@see packs()}.
-     * The form still offers to remove them.
+     * Sizes the owner stated in another unit than the product compares in,
+     * which keeps their shop out of {@see packs()}. The form still offers to
+     * remove them.
      *
      * @return list<array{shopId: string, shop: string, size: string}>
      */
     public function strandedOwnerSizes(): array
     {
-        $chips = array_column($this->packs(), 'shopId');
+        $unit = $this->product->comparablePacks()->unit();
 
         return $this->product->shops
-            ->filter(fn (Shop $shop): bool => $shop->isOwnerSized() && ! in_array((string) $shop->id, $chips, strict: true))
+            ->filter(fn (Shop $shop): bool => $shop->isOwnerSized() && $shop->ownerPackSize()?->unit !== $unit)
             ->map(fn (Shop $shop): array => [
                 'shopId' => (string) $shop->id,
                 'shop' => ShopNames::label((string) $shop->host),
