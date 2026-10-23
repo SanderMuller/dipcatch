@@ -129,6 +129,8 @@ trait SearchesByName
         $this->announce($outcome->status === WebNameSearchStatus::Found
             ? trans_choice('{0} The web search found no shops for this name.|{1} The web search found one result.|[2,*] The web search found :count results.', count($outcome->items))
             : (string) ($this->webStatus->note() ?? $this->webSearchBlock()));
+        // The keyed results block is drawn again, so the clicked button is gone.
+        $this->focus($outcome->status === WebNameSearchStatus::Found ? 'web-results-heading' : 'name-results-heading');
     }
 
     /** Sends the picked result's link through the probe. The input keeps the typed name. */
@@ -142,6 +144,18 @@ trait SearchesByName
 
         $this->url = $picked['url'];
         $this->probe($probe);
+
+        // The list and the clicked row are gone after the probe, so focus moves on.
+        if ($this->state === 'error') {
+            $this->announce(__('We could not open that page.'));
+            $this->focus('wizard-probe-error');
+
+            return;
+        }
+
+        if ($this->state !== 'idle') {
+            $this->focus('wizard-step-heading');
+        }
     }
 
     /**

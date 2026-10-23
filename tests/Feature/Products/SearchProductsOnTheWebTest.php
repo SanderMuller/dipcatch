@@ -194,6 +194,45 @@ test('a slot is reserved before the search, so a second text at once cannot take
         ->and(serperRequests())->toBe(1);
 });
 
+test('a text that passed the gate while another took the last slot is refunded and gets the cap', function (): void {
+    $user = nameSearchProUser();
+
+    foreach (range(1, 9) as $search) {
+        RateLimiter::hit(webSearchKey($user), 86_400);
+    }
+
+    $during = null;
+
+    // Jev answers before the outer search counts its slot, so the other
+    // text takes the last one in between.
+    fakeNameSearchApis(jev: function () use ($user, &$during): mixed {
+        $during = searchTheWeb($user, 'douwe egberts koffiebonen', knownVerdict: NameSearchVerdict::Specific);
+
+        return jevSays(0.1)();
+    });
+
+    $outer = searchTheWeb($user);
+
+    expect($during?->status)->toBe(WebNameSearchStatus::Found)
+        ->and($outer->status)->toBe(WebNameSearchStatus::CapSpent)
+        ->and($outer->verdict)->toBe(NameSearchVerdict::Specific)
+        ->and(webSearchesUsed($user))->toBe(10)
+        ->and(jevRequests())->toBe(1)
+        ->and(serperRequests())->toBe(1);
+});
+
+test('with discovery switched off a new search fails without asking Jev, and a stored one still shows', function (): void {
+    config()->set('dipcatch.web_discovery.enabled', false);
+    $user = nameSearchProUser();
+    fakeNameSearchApis(jev: jevSays(0.1));
+    storeWebSearch('melk halfvol', [['title' => 'Melk', 'link' => 'https://www.shop.test/melk', 'snippet' => '', 'position' => 1]]);
+
+    expect(searchTheWeb($user)->status)->toBe(WebNameSearchStatus::Failed)
+        ->and(searchTheWeb($user, 'melk halfvol')->status)->toBe(WebNameSearchStatus::Found)
+        ->and(webSearchesUsed($user))->toBe(0);
+    Http::assertNothingSent();
+});
+
 test('a second request for the same text while one runs returns at once', function (): void {
     $user = nameSearchProUser();
     $during = null;

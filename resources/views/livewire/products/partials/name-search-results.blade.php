@@ -28,7 +28,7 @@
     @endif
 
     @if ($webFound)
-        <flux:heading level="3" class="pt-2">{{ __('From the web') }}</flux:heading>
+        <flux:heading level="3" id="web-results-heading" tabindex="-1" class="pt-2 focus:outline-none">{{ __('From the web') }}</flux:heading>
         @if ($webResults === [])
             <flux:text class="text-zinc-500 dark:text-zinc-400" data-test="web-results-empty">{{ __('The web search found no shops for this name.') }}</flux:text>
         @else

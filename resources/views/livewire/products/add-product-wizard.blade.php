@@ -101,7 +101,7 @@
             </div>
 
             @if ($state === 'error')
-                <flux:callout variant="danger" icon="exclamation-triangle">
+                <flux:callout variant="danger" icon="exclamation-triangle" id="wizard-probe-error" tabindex="-1" class="focus:outline-none">
                     <flux:callout.heading>We could not open that page</flux:callout.heading>
                     <flux:callout.text>
                         @include('livewire.shops.partials.probe-error')

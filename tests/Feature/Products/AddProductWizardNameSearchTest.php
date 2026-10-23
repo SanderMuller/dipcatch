@@ -219,6 +219,53 @@ describe('a name', function (): void {
         Livewire::test(AddProductWizard::class)
             ->set('nameResults', ['items' => [], 'bolFailed' => false, 'fullMatch' => false, 'throttled' => false]);
     })->throws(CannotUpdateLockedPropertyException::class);
+
+    test('keeps the web search state locked', function (string $property, mixed $value): void {
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AddProductWizard::class)
+            ->set($property, $value);
+    })->throws(CannotUpdateLockedPropertyException::class)->with([
+        'gate verdict' => ['webVerdict', 'specific'],
+        'searched text' => ['searchedQuery', 'demo pindakaas'],
+        'stored search' => ['webStored', true],
+        'spent cap' => ['webCapSpent', true],
+        'web status' => ['webStatus', 'found'],
+        'web results' => ['webResults', [['source' => 'web', 'title' => 'Demo', 'shopLabel' => 'shop.example.com', 'host' => 'shop.example.com', 'url' => 'https://shop.example.com/p/1', 'ean' => null, 'price' => null, 'packSize' => null, 'photoUrl' => null, 'snippet' => null]]],
+    ]);
+
+    test('with a slash and a dot in it is searched as a name, not probed as a link', function (): void {
+        Http::fake();
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AddProductWizard::class)
+            ->set('query', '1.5/2 liter melk')
+            ->call('lookUp')
+            ->assertHasNoErrors()
+            ->assertSet('searchedQuery', '1.5/2 liter melk')
+            ->assertNotSet('nameResults', null)
+            ->assertSet('state', 'idle')
+            ->assertSet('url', '');
+
+        Http::assertNothingSent();
+    });
+
+    test('shows the bol.com note when bol.com fails, with the catalogue results', function (): void {
+        config()->set('services.bol.api.client_id', 'client-id');
+        config()->set('services.bol.api.client_secret', 'client-secret');
+        CheckjebonChain::query()->create(['chain' => 'bol', 'label' => 'bol.com', 'base_url' => 'https://www.bol.com/nl/nl/p/', 'refreshed_at' => now()]);
+        fakeBolApi([BolCatalogClient::BASE_URL . '/products/search*' => Http::response(['message' => 'Too many requests'], 429)]);
+        seedRow('ah', 'Demo pindakaas', '650 g');
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AddProductWizard::class)
+            ->set('query', 'demo pindakaas')
+            ->call('lookUp')
+            ->assertSet('nameResults.bolFailed', true)
+            ->assertSet('nameResults.items.0.title', 'Demo pindakaas')
+            ->assertSeeHtml('data-test="name-results-bol-failed"')
+            ->assertSee('bol.com did not answer. Try again in a moment.');
+    });
 });
 
 describe('the web search', function (): void {
@@ -319,6 +366,42 @@ describe('the web search', function (): void {
 
         Http::assertNothingSent();
     });
+
+    test('is off with the budget text for a plan with no web searches a day', function (): void {
+        Http::fake();
+        config()->set('plans.free.web_searches_per_day', 0);
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AddProductWizard::class)
+            ->set('query', 'demo pindakaas 650 g')
+            ->call('lookUp')
+            ->assertSet('webCapSpent', true)
+            ->assertSee('You have used today’s web searches. Paste a link, or try again tomorrow.')
+            ->assertSeeHtml('wire:click="searchTheWeb" disabled="disabled"');
+
+        Http::assertNothingSent();
+    });
+
+    test('moves focus to the web results when found, and back to the results heading when blocked', function (string $typed, WebNameSearchStatus $status, string $focused, string $notFocused): void {
+        Http::fake();
+        $this->actingAs(User::factory()->create());
+        storedNameSearch('demo pindakaas 650 g');
+
+        $wizard = Livewire::test(AddProductWizard::class)
+            ->set('query', $typed)
+            ->call('lookUp')
+            ->call('searchTheWeb')
+            ->assertSet('webStatus', $status)
+            ->assertJs('document.getElementById(' . json_encode($focused) . ')?.focus()');
+
+        $scripts = $wizard->effects['xjs'] ?? [];
+
+        expect($scripts)->toBeArray()
+            ->and(array_column(is_array($scripts) ? $scripts : [], 'expression'))->not->toContain('document.getElementById(' . json_encode($notFocused) . ')?.focus()');
+    })->with([
+        'found' => ['demo pindakaas 650 g', WebNameSearchStatus::Found, 'web-results-heading', 'name-results-heading'],
+        'too vague' => ['melk', WebNameSearchStatus::TooVague, 'name-results-heading', 'web-results-heading'],
+    ]);
 });
 
 describe('a pick', function (): void {
@@ -355,6 +438,60 @@ describe('a pick', function (): void {
             ->assertSee('We could not open that page')
             ->assertSeeHtml('data-test="name-result"');
     });
+
+    test('of a web row below catalogue rows probes the web link', function (): void {
+        Http::fake(nameSearchShopPage());
+        seedRow('ah', 'Demo pindakaas', '650 g');
+        storedNameSearch('demo pindakaas 650 g');
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AddProductWizard::class)
+            ->set('query', 'demo pindakaas 650 g')
+            ->call('lookUp')
+            ->assertCount('nameResults.items', 1)
+            ->call('searchTheWeb')
+            ->assertSet('webStatus', WebNameSearchStatus::Found)
+            ->call('pickResult', 1)
+            ->assertSet('url', 'https://shop.example.com/p/1')
+            ->assertSet('state', 'preview')
+            ->assertSet('title', 'Demo Pindakaas 650 g');
+    });
+
+    test('after the input was edited without a new search probes the listed link', function (): void {
+        Http::fake(nameSearchShopPage());
+        storedNameSearch('demo pindakaas 650 g');
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AddProductWizard::class)
+            ->set('query', 'demo pindakaas 650 g')
+            ->call('lookUp')
+            ->call('searchTheWeb')
+            ->set('query', 'https://other.example.com/p/9')
+            ->call('pickResult', 0)
+            ->assertSet('url', 'https://shop.example.com/p/1')
+            ->assertSet('state', 'preview');
+    });
+
+    test('moves focus to the probe error and says so when the page fails, and to the step heading when it opens', function (int $pageStatus, string $state, string $focused): void {
+        Http::fake(nameSearchShopPage(status: $pageStatus));
+        storedNameSearch('demo pindakaas 650 g');
+        $this->actingAs(User::factory()->create());
+
+        $wizard = Livewire::test(AddProductWizard::class)
+            ->set('query', 'demo pindakaas 650 g')
+            ->call('lookUp')
+            ->call('searchTheWeb')
+            ->call('pickResult', 0)
+            ->assertSet('state', $state)
+            ->assertJs('document.getElementById(' . json_encode($focused) . ')?.focus()');
+
+        if ($state === 'error') {
+            $wizard->assertSet('status', 'We could not open that page.');
+        }
+    })->with([
+        'page fails' => [500, 'error', 'wizard-probe-error'],
+        'page opens' => [200, 'preview', 'wizard-step-heading'],
+    ]);
 
     test('with an index outside the list does nothing', function (): void {
         Http::fake();

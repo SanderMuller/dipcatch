@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Products\SearchProductsByName;
+use App\Models\CatalogueLink;
 use App\Models\CheckjebonChain;
 use App\Models\User;
 use App\Services\BolApi\BolCatalogClient;
@@ -95,11 +96,12 @@ test('the database returns 50 rows at most, ordered by similarity when pg_trgm i
 ]);
 
 test('a typed accent matches names with and without it', function (): void {
-    seedRow('ah', 'Café Noir koffiebonen', null);
-    seedRow('jumbo', 'Cafe Noir koffiebonen', null);
+    seedRow('ah', 'Café koffiebonen', null);
+    seedRow('jumbo', 'Cafe koffiebonen', null);
 
-    expect(resultTitles(searchByName('café noir')))
-        ->toEqualCanonicalizing(['Café Noir koffiebonen', 'Cafe Noir koffiebonen']);
+    // The accented word alone, so only its ASCII form can match "Cafe".
+    expect(resultTitles(searchByName('café')))
+        ->toEqualCanonicalizing(['Café koffiebonen', 'Cafe koffiebonen']);
 });
 
 test('a size in the text must match the row size to count as every word', function (string $size, bool $fullMatch): void {
@@ -145,9 +147,41 @@ test('text without a word of three characters finds no catalogue rows, and still
         ->and(bolSearchCalls())->toBe(1);
 })->with([
     'short words' => ['ah 1'],
-    // Unescaped, these would match every name.
+    // The word split drops % and _, so no LIKE pattern is built from them.
     'like wildcards' => ['%% __'],
 ]);
+
+test('only the first ten words of the text are needles', function (): void {
+    seedRow('ah', 'Pindakaas naturel', null);
+
+    $tenWords = 'alfa bravo charlie delta echo foxtrot golf hotel india juliett';
+
+    expect(resultTitles(searchByName("pindakaas {$tenWords}")))->toBe(['Pindakaas naturel'])
+        ->and(resultTitles(searchByName("{$tenWords} pindakaas")))->toBe([]);
+});
+
+test('a page a recent check found gone is not listed, and a live page lists its own URL', function (): void {
+    $gone = seedRow('ah', 'Pindakaas naturel', null);
+    $goneLongAgo = seedRow('ah', 'Pindakaas stukjes', null);
+    $moved = seedRow('jumbo', 'Pindakaas extra crunchy', null);
+    CatalogueLink::record('ah', $gone->external_id, alive: false);
+    CatalogueLink::query()->create([
+        'chain' => 'ah',
+        'external_id' => $goneLongAgo->external_id,
+        'alive' => false,
+        'url' => null,
+        'checked_at' => now()->subDays(CatalogueLink::VALID_DAYS + 1),
+    ]);
+    CatalogueLink::record('jumbo', $moved->external_id, alive: true, url: 'https://www.jumbo.com/producten/pindakaas-extra-crunchy-123');
+
+    $results = searchByName('pindakaas');
+
+    expect(array_column(array_map(static fn (NameSearchResult $result): array => $result->toArray(), $results->items), 'url', 'title'))
+        ->toEqualCanonicalizing([
+            'Pindakaas stukjes' => 'https://www.ah.nl/producten/product/' . $goneLongAgo->link,
+            'Pindakaas extra crunchy' => 'https://www.jumbo.com/producten/pindakaas-extra-crunchy-123',
+        ]);
+});
 
 test('only fresh chains that can be tracked and linked are searched', function (): void {
     seedRow('ah', 'Pindakaas naturel', null, link: 'wi123/pindakaas-naturel');

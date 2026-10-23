@@ -99,7 +99,10 @@ final readonly class SearchProductsOnTheWeb
 
     public function capSpent(User $user): bool
     {
-        return RateLimiter::tooManyAttempts(self::capKey($user), Entitlements::for($user)->webSearchesPerDay());
+        $cap = Entitlements::for($user)->webSearchesPerDay();
+
+        // The limiter reads a cap of 0 as unspent until its first hit.
+        return $cap <= 0 || RateLimiter::tooManyAttempts(self::capKey($user), $cap);
     }
 
     private function searchNow(User $user, string $searchText, NameSearchResults $local, ?NameSearchVerdict $knownVerdict): WebNameSearch
@@ -107,9 +110,13 @@ final readonly class SearchProductsOnTheWeb
         $capKey = self::capKey($user);
         $cap = Entitlements::for($user)->webSearchesPerDay();
 
-        // Before the gate, so a spent cap never asks Jev.
-        if (RateLimiter::tooManyAttempts($capKey, $cap)) {
+        // Before the gate, so a spent cap or a switched-off search never asks Jev.
+        if ($this->capSpent($user)) {
             return new WebNameSearch(WebNameSearchStatus::CapSpent);
+        }
+
+        if (! $this->searches->enabled()) {
+            return new WebNameSearch(WebNameSearchStatus::Failed);
         }
 
         $verdict = $knownVerdict ?? $this->gate->verdict($user, $searchText, $local);

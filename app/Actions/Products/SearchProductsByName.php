@@ -45,6 +45,9 @@ final class SearchProductsByName
     /** A word shorter than this makes a useless `LIKE`. */
     private const int MIN_NEEDLE_LENGTH = 3;
 
+    /** Words past this add `LIKE` terms, not a better match. */
+    private const int MAX_NEEDLES = 10;
+
     private const int SEARCHES_PER_MINUTE = 20;
 
     /**
@@ -199,6 +202,10 @@ final class SearchProductsByName
                 continue;
             }
 
+            if (count($needles) === self::MAX_NEEDLES) {
+                break;
+            }
+
             $forms = array_unique([$word, mb_strtolower(Str::ascii($word))]);
 
             $needles[] = array_values(array_map(
@@ -227,7 +234,7 @@ final class SearchProductsByName
             host: SupermarketChains::hosts($chain->chain, $chain->base_url)[0] ?? '',
             url: is_string($liveUrl) ? $liveUrl : $chain->productUrl((string) $row->link),
             ean: $row->ean,
-            price: number_format((float) $row->price, 2, '.', ''),
+            price: $row->price,
             packSize: $row->size !== null && $row->size !== '' ? $row->size : null,
         );
     }
