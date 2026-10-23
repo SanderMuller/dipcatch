@@ -189,13 +189,19 @@ return RectorConfig::configure()
      */
     ->withSkip([
         AddOverrideAttributeToOverriddenPropertiesRector::class,
-        // A queued job's declared default is what a job serialised before the
-        // property existed reads; a promoted property has none.
+        // A queued job's or notification's declared default is what a payload
+        // serialised before the property existed reads; a promoted property has none.
         ClassPropertyAssignToConstructorPromotionRector::class => [
             __DIR__ . '/app/Jobs/PrewarmShopSearches.php',
+            __DIR__ . '/app/Notifications/PriceDropNotification.php',
+            __DIR__ . '/app/Notifications/TargetPriceNotification.php',
+            __DIR__ . '/app/Notifications/UnitPriceTargetNotification.php',
         ],
         RemoveDefaultValueFromAssignedPropertyRector::class => [
             __DIR__ . '/app/Jobs/PrewarmShopSearches.php',
+            __DIR__ . '/app/Notifications/PriceDropNotification.php',
+            __DIR__ . '/app/Notifications/TargetPriceNotification.php',
+            __DIR__ . '/app/Notifications/UnitPriceTargetNotification.php',
         ],
         // Larastan can't introspect models that declare their table via
         // #[Table] attribute — it still reads `protected $table`. Keep the

@@ -435,14 +435,11 @@ test('a rolled-back check leaves the cached history in place', function (): void
     $shop = shopWithDailyPrices([...prices('2.00', 59), '1.80']);
     $before = verdictFor($shop);
 
-    try {
-        DB::transaction(function () use ($shop): void {
-            PriceCheck::factory()->for($shop)->create(['price' => '1.80', 'checked_at' => now(), 'seller' => 'New Seller BV']);
+    expect(fn () => DB::transaction(function () use ($shop): void {
+        PriceCheck::factory()->for($shop)->create(['price' => '1.80', 'checked_at' => now(), 'seller' => 'New Seller BV']);
 
-            throw new RuntimeException('Rolled back.');
-        });
-    } catch (RuntimeException) {
-    }
+        throw new RuntimeException('Rolled back.');
+    }))->toThrow(RuntimeException::class);
 
     DB::flushQueryLog();
     DB::enableQueryLog();
@@ -455,7 +452,7 @@ test('a rolled-back check leaves the cached history in place', function (): void
 });
 
 test('a new check clears the cached history on the database cache store too', function (): void {
-    config(['cache.default' => 'database']);
+    config()->set('cache.default', 'database');
     $shop = shopWithDailyPrices([...prices('2.00', 59), '1.80']);
     expect(verdictFor($shop))->not->toBeNull();
 

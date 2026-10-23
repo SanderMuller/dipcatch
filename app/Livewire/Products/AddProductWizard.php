@@ -14,6 +14,7 @@ use App\Enums\TrackingIdea;
 use App\Jobs\PrewarmShopSearches;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Livewire\Concerns\EditsAlertFields;
+use App\Livewire\Concerns\SearchesByName;
 use App\Livewire\Concerns\SuggestsAlert;
 use App\Models\Product;
 use App\Models\Shop;
@@ -42,8 +43,8 @@ use SanderMuller\FluentValidation\FluentRule;
 use SanderMuller\FluentValidation\HasFluentValidation;
 
 /**
- * Adding a product, in three steps: the product (from a shop link, or by
- * hand), more shops, then the alert.
+ * Adding a product, in three steps: the product (from a shop link, a name
+ * search, or by hand), more shops, then the alert.
  *
  * Leaving step 1 saves the product: the shop suggestions and the add-shop
  * form both need one. A product left behind after that is tracked like any
@@ -54,6 +55,7 @@ final class AddProductWizard extends Component
     use DrivesShopProbe;
     use EditsAlertFields;
     use HasFluentValidation;
+    use SearchesByName;
     use SuggestsAlert;
 
     /**
@@ -283,6 +285,11 @@ final class AddProductWizard extends Component
     {
         if ($this->productId === '') {
             $this->mode = self::modeFrom($mode);
+
+            if ($this->mode === 'manual') {
+                $this->manualTitle = $this->handFormTitle($this->manualTitle);
+            }
+
             $this->limitMessage = null;
             $this->focus($this->mode === 'manual' ? 'wizard-manual-title' : 'create-product-url');
         }

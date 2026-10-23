@@ -39,8 +39,11 @@ final readonly class WebSearches
         return $this->lookUp($query, $country)->search;
     }
 
-    /** As {@see forQuery()}, with the reason when there is no search. */
-    public function lookUp(string $query, string $country): WebSearchOutcome
+    /**
+     * As {@see forQuery()}, with the reason when there is no search. A
+     * thrown error from the save is not caught here.
+     */
+    public function lookUp(string $query, string $country, WebSearchBudget $budget = WebSearchBudget::Discovery): WebSearchOutcome
     {
         if (! $this->enabled()) {
             return WebSearchOutcome::failed();
@@ -57,7 +60,7 @@ final readonly class WebSearches
             // Under a lock on the query, and checked again inside it: two
             // products with the same title that miss together spend one search.
             $outcome = Cache::lock("web-discovery:search:{$hash}", self::LOCK_SECONDS)
-                ->block(self::LOCK_WAIT_SECONDS, fn (): WebSearchOutcome => ($fresh = $this->fresh($hash)) instanceof WebSearch ? WebSearchOutcome::found($fresh) : $this->search($query, $country, $hash));
+                ->block(self::LOCK_WAIT_SECONDS, fn (): WebSearchOutcome => ($fresh = $this->fresh($hash)) instanceof WebSearch ? WebSearchOutcome::found($fresh) : $this->search($query, $country, $hash, $budget));
         } catch (LockTimeoutException) {
             Log::info('Web shop discovery skipped a search: another worker held it too long; the next run tries again.', ['query_hash' => $hash]);
 
@@ -72,6 +75,12 @@ final readonly class WebSearches
         return $search->searched_at->greaterThan(now()->subDays(Config::integer('dipcatch.web_discovery.search_max_age_days')));
     }
 
+    /** The stored search for a query and country, when it is fresh; never searches. */
+    public function stored(string $query, string $country): ?WebSearch
+    {
+        return $this->fresh(WebSearch::hashOf($query, $country));
+    }
+
     /** The stored search for a query hash, when it is fresh. */
     public function fresh(string $hash): ?WebSearch
     {
@@ -80,9 +89,9 @@ final readonly class WebSearches
         return $search instanceof WebSearch && self::isFresh($search) ? $search : null;
     }
 
-    private function search(string $query, string $country, string $hash): WebSearchOutcome
+    private function search(string $query, string $country, string $hash, WebSearchBudget $budget): WebSearchOutcome
     {
-        if (! self::reserveSearch()) {
+        if (! self::reserveSearch($budget)) {
             Log::info('Web shop discovery skipped a search: the daily limit is spent.');
             ApiUsageDay::refused(ApiService::Serper, SerperProvider::PURPOSE);
 
@@ -99,7 +108,7 @@ final readonly class WebSearches
             return WebSearchOutcome::failed();
         }
 
-        return WebSearchOutcome::found(WebSearch::query()->updateOrCreate(
+        return WebSearchOutcome::searchedNow(WebSearch::query()->updateOrCreate(
             ['query_hash' => $hash],
             ['query' => mb_substr(WebSearch::normalise($query), 0, 255), 'results' => $results, 'searched_at' => now()],
         ));
@@ -110,15 +119,15 @@ final readonly class WebSearches
      * workers can never both take the last search of the day.
      * `RateLimiter::attempt()` checks before it counts, which lets them.
      */
-    private static function reserveSearch(): bool
+    private static function reserveSearch(WebSearchBudget $budget): bool
     {
-        $limit = Config::integer('dipcatch.web_discovery.daily_search_limit');
+        $limit = $budget->dailyLimit();
 
         if ($limit <= 0) {
             return true;
         }
 
-        $key = 'web-discovery:searches:' . now()->toDateString();
+        $key = $budget->counterKey(now()->toDateString());
         Cache::add($key, 0, now()->endOfDay());
 
         return (int) Cache::increment($key) <= $limit;

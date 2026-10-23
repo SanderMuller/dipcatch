@@ -5,6 +5,7 @@ use App\Http\Controllers\AutoDetectTimezoneController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LlmsTxtController;
+use App\Http\Controllers\NameSearchPhotoController;
 use App\Http\Controllers\OpenaiAppsChallengeController;
 use App\Http\Controllers\ProductMarkdownController;
 use App\Http\Controllers\PublicProductController;
@@ -34,6 +35,7 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
+use Illuminate\Routing\Middleware\ValidateSignature;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
@@ -244,6 +246,9 @@ Route::prefix('app')
         Route::livewire('changelog', ChangelogPage::class)->name('changelog');
         Route::livewire('stats', StatsPage::class)->name('stats');
         Route::livewire('shopping-list', ShoppingListPage::class)->name('shopping-list');
+        Route::get('name-search/photo', NameSearchPhotoController::class)
+            ->middleware([ValidateSignature::class, 'throttle:name-search-photo'])
+            ->name('name-search.photo');
     });
 
 require __DIR__ . '/settings.php';

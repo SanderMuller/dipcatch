@@ -19,26 +19,6 @@ beforeEach(function (): void {
     Http::preventStrayRequests();
 });
 
-/** A bol.com Catalog API answer for one product with its best offer.
- * @return array<string, string|array<string, float|string>> */
-function bolProductJson(string $ean, string $title, string $id, float $price): array
-{
-    $slug = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $title));
-
-    return [
-        'ean' => $ean,
-        'bolProductId' => $id,
-        'title' => $title,
-        'url' => "https://www.bol.com/nl/nl/p/{$slug}/{$id}/",
-        'offer' => ['price' => $price, 'deliveryDescription' => 'Morgen in huis'],
-    ];
-}
-
-function fakeBolApi(array $routes): void
-{
-    Http::fake(['login.bol.com/*' => Http::response(['access_token' => 'token', 'token_type' => 'Bearer', 'expires_in' => 299])] + $routes);
-}
-
 function runBolLookup(Product $product): LookUpBolOffers
 {
     $job = new LookUpBolOffers($product->id)->withFakeQueueInteractions();

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Actions\Products\SearchProductsByName;
 use App\Actions\Suggestions\SuggestShops;
 use App\Billing\StripeTax;
 use App\Health\AdapterCanaryCheck;
@@ -49,6 +50,9 @@ final class AppServiceProvider extends ServiceProvider
         // the suggestions component twice, and the catalogue scan is the
         // expensive part.
         $this->app->scoped(SuggestShops::class);
+
+        // Fresh chains and the pg_trgm check, read once per request.
+        $this->app->scoped(SearchProductsByName::class);
 
         $this->app->singleton(function (): AdapterResolver {
             /** @var list<class-string<ShopAdapter>> $classes */
@@ -144,6 +148,10 @@ final class AppServiceProvider extends ServiceProvider
         // Per token owner. The limiter sits behind `auth:api`, so an
         // unauthenticated request never reaches it and needs no IP fallback.
         RateLimiter::for('mcp', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($request->user()?->getAuthIdentifier() ?? $request->ip()));
+
+        // The photos of one name search's rows load at once, eight at most.
+        RateLimiter::for('name-search-photo', fn (Request $request): Limit => Limit::perMinute(60)
             ->by($request->user()?->getAuthIdentifier() ?? $request->ip()));
 
         // The screen a user sees when an assistant asks for access to their
