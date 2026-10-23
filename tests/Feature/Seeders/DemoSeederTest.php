@@ -212,7 +212,7 @@ it('renders the seeded admin dashboard, app dashboard and product page', functio
     $this->actingAs($demo)
         ->get('/app')
         ->assertOk()
-        ->assertSee('Tracked products');
+        ->assertSee('Track a product');
 
     livewire(Dashboard::class)
         ->assertSee('Douwe Egberts Aroma Rood koffiebonen 1 kg');

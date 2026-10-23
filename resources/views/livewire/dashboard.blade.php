@@ -13,35 +13,14 @@
         </a>
     </div>
 
-    {{-- The add action sits where the product list has it. The counts are
-         context, not the point of the page, so they sit on one quiet line
-         beside it rather than a card of their own. --}}
-    <div class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
-        <div class="shrink-0">
+    {{-- The add action sits where the product list has it, in the same
+         left column, and the ideas sit beside it. --}}
+    <div class="mt-6 grid gap-3 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-center lg:gap-x-8">
+        <div>
             <x-track-product-button :can-add="$canAddProduct" />
         </div>
 
-        <div class="min-w-0 flex-1">
-            <dl class="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm sm:min-h-10 sm:content-center">
-                <div class="flex items-baseline gap-1.5">
-                    <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Tracked products') }}</dt>
-                    <dd class="font-semibold tabular-nums">{{ $trackedProducts }}</dd>
-                </div>
-                <div class="flex items-baseline gap-1.5">
-                    <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Active drops') }}</dt>
-                    <dd @class(['font-semibold tabular-nums', 'text-savings-strong' => $activeDropCount > 0])>{{ $activeDropCount }}</dd>
-                </div>
-                <div class="flex items-baseline gap-1.5">
-                    <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Potential savings so far') }}</dt>
-                    <dd class="font-semibold tabular-nums">{{ $lifetimeSavings }}</dd>
-                    <dd>
-                        <flux:link :href="route('app.stats')" variant="subtle" class="text-sm" wire:navigate data-test="savings-by-month-link">
-                            {{ __('See it by month') }}
-                        </flux:link>
-                    </dd>
-                </div>
-            </dl>
-
+        <div class="min-w-0">
             <livewire:dashboard.tracking-ideas />
         </div>
     </div>

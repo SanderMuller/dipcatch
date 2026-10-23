@@ -12,17 +12,6 @@ use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
-it('counts only the signed-in users active products', function (): void {
-    $user = User::factory()->create();
-    Product::factory()->count(2)->create(['user_id' => $user->id, 'active' => true]);
-    Product::factory()->create(['user_id' => $user->id, 'active' => false]);
-    Product::factory()->create(['active' => true]);
-
-    $this->actingAs($user);
-
-    livewire(Dashboard::class)->assertSee('Tracked products')->assertSee('2');
-});
-
 it('invites a new account to track its first product', function (): void {
     $this->actingAs(User::factory()->create());
 
@@ -97,30 +86,6 @@ it('lists active drops and nobody elses', function (): void {
     livewire(Dashboard::class)
         ->assertSee('My dropped product')
         ->assertDontSee('Someone elses drop');
-});
-
-it('sums lifetime savings in the currency most alerts used', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR']);
-
-    foreach (['2.50', '1.25'] as $amount) {
-        PriceDropEvent::factory()->create([
-            'product_id' => $product->id,
-            'user_id' => $user->id,
-            'currency' => 'EUR',
-            'drop_abs' => $amount,
-        ]);
-    }
-
-    $this->actingAs($user);
-
-    livewire(Dashboard::class)->assertSee('€3.75');
-});
-
-it('shows zero savings rather than nothing for a new account', function (): void {
-    $this->actingAs(User::factory()->create());
-
-    livewire(Dashboard::class)->assertSee('€0.00');
 });
 
 it('discloses bundle terms beside dashboard effective prices', function (): void {
