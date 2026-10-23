@@ -22,6 +22,15 @@ final readonly class ApiPriceSources
         private AxfoodApiSource $axfoodApi = new AxfoodApiSource(),
     ) {}
 
+    /** Whether an API reads this host, whatever it answers for one page. */
+    public function supports(string $host): bool
+    {
+        return $this->bolApi->supports($host)
+            || $this->ahApi->supports($host)
+            || $this->dmApi->supports($host)
+            || $this->axfoodApi->supports($host);
+    }
+
     /**
      * @return array{0: ShopSnapshot, 1: string}|null  the reading and the reader's adapter key
      */

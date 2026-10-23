@@ -150,6 +150,10 @@ final class AppServiceProvider extends ServiceProvider
         RateLimiter::for('mcp', fn (Request $request): Limit => Limit::perMinute(60)
             ->by($request->user()?->getAuthIdentifier() ?? $request->ip()));
 
+        // The photos of one name search's rows load at once, eight at most.
+        RateLimiter::for('name-search-photo', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by($request->user()?->getAuthIdentifier() ?? $request->ip()));
+
         // The screen a user sees when an assistant asks for access to their
         // DipCatch account.
         Passport::authorizationView(

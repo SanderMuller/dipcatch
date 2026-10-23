@@ -28,7 +28,7 @@ final class ImageUrl
     }
 
     /**
-     * A small version of a shop's product image, for a thumbnail of 64 px at
+     * A small version of a shop's product image, for a thumbnail of 80 px at
      * most. Some image servers resize on request, and a Shopify shop can
      * otherwise send a 1.5 MB image for a 40 px tile. Each rule asks for a
      * size that server accepts: AH, Jumbo and Zooplus refuse sizes they do

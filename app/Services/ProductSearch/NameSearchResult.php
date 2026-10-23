@@ -27,6 +27,11 @@ final readonly class NameSearchResult
         public ?string $snippet = null,
     ) {}
 
+    public function withPhoto(string $photoUrl): self
+    {
+        return clone ($this, ['photoUrl' => $photoUrl]);
+    }
+
     /**
      * @return NameSearchResultArray
      */

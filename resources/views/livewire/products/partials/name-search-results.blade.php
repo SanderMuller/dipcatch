@@ -6,6 +6,7 @@
     $webBlock = $this->webSearchBlock();
     $webNote = $webStatus?->note();
     $webFound = $webStatus === \App\Services\ProductSearch\WebNameSearchStatus::Found;
+    $offersWeb = $this->offersWebSearch();
 @endphp
 {{-- Keyed on what the block shows, so a new search or web answer replaces
      it whole and Alpine reads the new searched text, rather than a morph
@@ -17,7 +18,7 @@
 
     @if ($localCount === 0)
         <flux:text class="text-zinc-500 dark:text-zinc-400" data-test="name-results-empty">
-            {{ __('Nothing found in the supermarkets or at bol.com. Search the web, or add it by hand.') }}
+            {{ $offersWeb ? __('Nothing found in the supermarkets or at bol.com. Search the web, or paste the product’s link.') : __('Nothing found in the supermarkets or at bol.com. Paste the product’s link instead.') }}
         </flux:text>
     @else
         @include('livewire.products.partials.name-search-rows', ['rows' => $nameResults['items'], 'offset' => 0])
@@ -34,7 +35,7 @@
         @else
             @include('livewire.products.partials.name-search-rows', ['rows' => $webResults, 'offset' => $localCount])
         @endif
-    @else
+    @elseif ($offersWeb)
         {{-- Off while the input holds other text than was searched, so the
              web search never runs for words the results do not describe. --}}
         <div class="flex flex-wrap items-center gap-3" x-data>
@@ -58,7 +59,9 @@
         </flux:text>
     @endif
 
-    <flux:button type="button" variant="ghost" size="sm" wire:click="switchMode('manual')" data-test="name-results-manual">
-        {{ __('Not listed? Add it by hand') }}
-    </flux:button>
+    {{-- A link gets the name, photo and price read from the page; the hand
+         form gets none of that, so the link is the way forward. --}}
+    <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400" data-test="name-results-paste-link">
+        {{ __('Not listed? Open the product at the shop you buy it from, copy the link from the address bar, and paste it in the field above.') }}
+    </flux:text>
 </section>

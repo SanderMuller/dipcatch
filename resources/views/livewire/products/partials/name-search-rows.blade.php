@@ -9,11 +9,21 @@
                 wire:click="pickResult({{ $offset + $loop->index }})"
                 wire:loading.attr="disabled"
                 wire:target="pickResult"
-                class="flex w-full items-start gap-3 p-3 text-left first:rounded-t-xl last:rounded-b-xl hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand disabled:opacity-60 dark:hover:bg-white/5"
+                class="flex w-full items-center gap-4 p-3 text-left first:rounded-t-xl last:rounded-b-xl hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand disabled:opacity-60 dark:hover:bg-white/5"
                 data-test="name-result"
             >
+                {{-- Every row keeps the slot, so the titles line up. Without a photo
+                     it shows the shop's icon; a supermarket row asks for its page's
+                     photo over it, and keeps the icon when there is none. --}}
                 @if ($photo !== null)
-                    <img src="{{ $photo }}" alt="" loading="lazy" referrerpolicy="no-referrer" class="size-12 flex-none rounded-lg bg-white object-contain ring-1 ring-zinc-200 dark:ring-white/10" />
+                    <img src="{{ \App\Support\ImageUrl::thumbnail($photo) }}" alt="" loading="lazy" referrerpolicy="no-referrer" class="size-16 flex-none rounded-lg bg-white object-contain p-1 ring-1 ring-zinc-200 sm:size-20 dark:ring-white/10" data-test="name-result-photo" />
+                @else
+                    <span class="relative flex size-16 flex-none items-center justify-center overflow-hidden rounded-lg bg-zinc-50 ring-1 ring-zinc-200 sm:size-20 dark:bg-white/5 dark:ring-white/10" aria-hidden="true">
+                        <img src="{{ \App\Support\Favicon::url($row['host']) }}" alt="" loading="lazy" class="size-7 rounded opacity-80" />
+                        @if ($row['source'] === \App\Services\ProductSearch\NameSearchSource::Catalogue->value)
+                            <img src="{{ \Illuminate\Support\Facades\URL::signedRoute('app.name-search.photo', ['url' => $row['url']]) }}" alt="" loading="lazy" referrerpolicy="no-referrer" class="absolute inset-0 size-full bg-white object-contain p-1 opacity-0 transition-opacity" x-data x-init="$el.complete && ($el.naturalWidth > 1 ? $el.classList.remove('opacity-0') : $el.remove())" x-on:load="$el.naturalWidth > 1 ? $el.classList.remove('opacity-0') : $el.remove()" x-on:error="$el.remove()" data-test="name-result-fetched-photo" />
+                        @endif
+                    </span>
                 @endif
                 <span class="min-w-0 flex-1">
                     <span class="block font-medium text-zinc-900 dark:text-white">{{ $row['title'] }}</span>

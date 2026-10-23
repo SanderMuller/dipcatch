@@ -18,6 +18,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
@@ -177,10 +178,29 @@ describe('a name', function (): void {
             ->assertSet('status', 'Nothing found for this name.')
             ->assertSeeHtml('data-test="name-results-empty"')
             ->assertSeeHtml('data-test="search-the-web"')
+            ->assertSee('copy the link from the address bar, and paste it in the field above.')
+            ->assertDontSee('Not listed? Add it by hand')
             ->assertDontSeeHtml('data-test="assistant-hint"')
             ->call('switchMode', 'manual')
             ->assertSet('mode', 'manual')
             ->assertSet('manualTitle', 'Demo Pindakaas 650 g');
+    });
+
+    test('asks for the page photo only for a supermarket row without a known one', function (): void {
+        Http::fake();
+        seedRow('ah', 'Demo pindakaas', '650 g', link: 'wi1/demo-pindakaas');
+        seedRow('jumbo', 'Demo pindakaas crunchy', '650 g', link: 'demo-pindakaas-crunchy-1ZK');
+        Shop::factory()->create(['url' => 'https://www.jumbo.com/producten/demo-pindakaas-crunchy-1ZK', 'image_url' => 'https://static.jumbo.test/crunchy.png']);
+        $this->actingAs(User::factory()->create());
+
+        $html = Livewire::test(AddProductWizard::class)
+            ->set('query', 'demo pindakaas')
+            ->call('lookUp')
+            ->html();
+
+        expect(substr_count($html, 'data-test="name-result-fetched-photo"'))->toBe(1)
+            ->and($html)->toContain(e(URL::signedRoute('app.name-search.photo', ['url' => 'https://www.ah.nl/producten/product/wi1/demo-pindakaas'])))
+            ->and($html)->toContain('https://static.jumbo.test/crunchy.png');
     });
 
     test('keeps the hand form empty when nothing was searched', function (): void {
@@ -332,7 +352,7 @@ describe('the web search', function (): void {
         $this->actingAs($user);
 
         for ($i = 0; $i < Entitlements::for($user)->webSearchesPerDay(); $i++) {
-            RateLimiter::hit("name-search:web:{$user->id}:" . now($user->timezone)->toDateString(), 86_400);
+            RateLimiter::hit("name-search:web:{$user->id}:" . now('UTC')->toDateString(), 86_400);
         }
 
         Livewire::test(AddProductWizard::class)
@@ -350,7 +370,7 @@ describe('the web search', function (): void {
         storedNameSearch('demo pindakaas 650 g');
 
         for ($i = 0; $i < Entitlements::for($user)->webSearchesPerDay(); $i++) {
-            RateLimiter::hit("name-search:web:{$user->id}:" . now($user->timezone)->toDateString(), 86_400);
+            RateLimiter::hit("name-search:web:{$user->id}:" . now('UTC')->toDateString(), 86_400);
         }
 
         Livewire::test(AddProductWizard::class)
@@ -363,6 +383,39 @@ describe('the web search', function (): void {
             ->assertSet('webResults.0.url', 'https://shop.example.com/p/1')
             ->assertSee('From the web')
             ->assertDontSeeHtml('data-test="search-the-web"');
+
+        Http::assertNothingSent();
+    });
+
+    test('is not offered while web search is switched off', function (): void {
+        Http::fake();
+        config()->set('dipcatch.web_discovery.enabled', false);
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(AddProductWizard::class)
+            ->set('query', 'demo pindakaas 650 g')
+            ->call('lookUp')
+            ->assertSet('webSearchOff', true)
+            ->assertDontSeeHtml('data-test="search-the-web"')
+            ->assertSee('Nothing found in the supermarkets or at bol.com. Paste the product’s link instead.')
+            ->assertDontSee('Search the web, or paste the product’s link.');
+
+        Http::assertNothingSent();
+    });
+
+    test('still lists a text searched before while web search is switched off', function (): void {
+        Http::fake();
+        config()->set('dipcatch.web_discovery.enabled', false);
+        $this->actingAs(User::factory()->create());
+        storedNameSearch('demo pindakaas 650 g');
+
+        Livewire::test(AddProductWizard::class)
+            ->set('query', 'demo pindakaas 650 g')
+            ->call('lookUp')
+            ->assertSeeHtml('data-test="search-the-web"')
+            ->call('searchTheWeb')
+            ->assertSet('webStatus', WebNameSearchStatus::Found)
+            ->assertSet('webResults.0.url', 'https://shop.example.com/p/1');
 
         Http::assertNothingSent();
     });

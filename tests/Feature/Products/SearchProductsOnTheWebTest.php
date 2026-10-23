@@ -68,7 +68,7 @@ function jevRequests(): int
 
 function webSearchKey(User $user): string
 {
-    return "name-search:web:{$user->id}:" . now($user->timezone)->toDateString();
+    return "name-search:web:{$user->id}:" . now('UTC')->toDateString();
 }
 
 function webSearchesUsed(User $user): mixed
@@ -158,10 +158,10 @@ test('a free account gets 3 new searches a day and a Pro account 10', function (
     'pro' => [true, 10],
 ]);
 
-test('the cap is counted per day in the account timezone', function (): void {
+test('the cap is counted per UTC day, so a timezone change gives no new searches', function (): void {
     fakeNameSearchApis();
     $this->travelTo('2026-10-22 14:30:00');
-    $user = User::factory()->create(['timezone' => 'Asia/Tokyo']);
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
 
     foreach (range(1, 3) as $i) {
         searchTheWeb($user, "calvé pindakaas {$i}");
@@ -169,8 +169,13 @@ test('the cap is counted per day in the account timezone', function (): void {
 
     expect(searchTheWeb($user, 'calvé pindakaas 4')->status)->toBe(WebNameSearchStatus::CapSpent);
 
-    // 01:30 the next day in Tokyo, still the same day in UTC.
+    // Already the next day in Tokyo, still the same day in UTC.
+    $user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
     $this->travelTo('2026-10-22 16:30:00');
+
+    expect(searchTheWeb($user, 'calvé pindakaas 4')->status)->toBe(WebNameSearchStatus::CapSpent);
+
+    $this->travelTo('2026-10-23 00:00:01');
 
     expect(searchTheWeb($user, 'calvé pindakaas 4')->status)->toBe(WebNameSearchStatus::Found);
 });

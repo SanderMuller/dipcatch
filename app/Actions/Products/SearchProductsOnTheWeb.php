@@ -97,6 +97,12 @@ final readonly class SearchProductsOnTheWeb
         return $this->searches->stored(self::searchTextOf($typed), self::COUNTRY) instanceof WebSearch;
     }
 
+    /** Whether a new web search can run. Off, a stored search still shows. */
+    public function enabled(): bool
+    {
+        return $this->searches->enabled();
+    }
+
     public function capSpent(User $user): bool
     {
         $cap = Entitlements::for($user)->webSearchesPerDay();
@@ -130,8 +136,8 @@ final readonly class SearchProductsOnTheWeb
 
         // Counted first and compared after, so two texts searched at once
         // cannot both take the last slot.
-        if (RateLimiter::hit($capKey, self::secondsLeftToday($user)) > $cap) {
-            self::refund($capKey, $user);
+        if (RateLimiter::hit($capKey, self::secondsLeftToday()) > $cap) {
+            self::refund($capKey);
 
             return new WebNameSearch(WebNameSearchStatus::CapSpent, verdict: $verdict);
         }
@@ -139,7 +145,7 @@ final readonly class SearchProductsOnTheWeb
         try {
             $outcome = $this->searches->lookUp($searchText, self::COUNTRY, WebSearchBudget::NameSearch);
         } catch (QueryException $e) {
-            self::refund($capKey, $user);
+            self::refund($capKey);
             report($e);
 
             return new WebNameSearch(WebNameSearchStatus::Failed, verdict: $verdict);
@@ -147,7 +153,7 @@ final readonly class SearchProductsOnTheWeb
 
         // A stored search a waiter got inside the lock, or no search at all.
         if (! $outcome->searchedNow) {
-            self::refund($capKey, $user);
+            self::refund($capKey);
         }
 
         if (! $outcome->search instanceof WebSearch) {
@@ -192,24 +198,27 @@ final readonly class SearchProductsOnTheWeb
         return $shown;
     }
 
-    /** Dated in the account's timezone, so the cap resets at its midnight. */
+    /**
+     * Dated in UTC, not the account's timezone: a timezone change would give
+     * the account a new key, and so a new day of searches.
+     */
     private static function capKey(User $user): string
     {
-        return "name-search:web:{$user->id}:" . now($user->timezone)->toDateString();
+        return "name-search:web:{$user->id}:" . now('UTC')->toDateString();
     }
 
-    private static function secondsLeftToday(User $user): int
+    private static function secondsLeftToday(): int
     {
-        $now = now($user->timezone);
+        $now = now('UTC');
 
         return max(1, (int) ceil($now->diffInSeconds($now->copy()->endOfDay())));
     }
 
     /** Never below zero: a counter that expired in between is not given a credit. */
-    private static function refund(string $capKey, User $user): void
+    private static function refund(string $capKey): void
     {
         if (RateLimiter::attempts($capKey) > 0) {
-            RateLimiter::decrement($capKey, self::secondsLeftToday($user));
+            RateLimiter::decrement($capKey, self::secondsLeftToday());
         }
     }
 }

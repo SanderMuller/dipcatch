@@ -5,6 +5,7 @@ namespace App\Actions\Products;
 use App\Models\CatalogueLink;
 use App\Models\CheckjebonChain;
 use App\Models\CheckjebonPrice;
+use App\Models\Shop;
 use App\Models\User;
 use App\Services\BolApi\BolApiFailed;
 use App\Services\BolApi\BolCatalogClient;
@@ -14,6 +15,7 @@ use App\Services\ProductSearch\NameSearchResults;
 use App\Services\ProductSearch\NameSearchSource;
 use App\Services\Suggestions\QueryTokens;
 use App\Support\SupermarketChains;
+use App\Support\UrlNormalizer;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -22,6 +24,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 /**
  * Products for a name the user typed in the add-product wizard, from the
@@ -64,6 +67,16 @@ final class SearchProductsByName
     /** Covers a bol login and a search, each with a 10-second timeout. */
     private const int BOL_LOCK_SECONDS = 30;
 
+    /**
+     * Words that name a supermarket chain beyond its own key, which always
+     * counts. A typed shop name picks the shop, not words of the title.
+     *
+     * @var array<string, list<string>>
+     */
+    private const array SHOP_NAMES = [
+        'ah' => ['albert heijn'],
+    ];
+
     /** @var array<string, CheckjebonChain>|null */
     private ?array $chains = null;
 
@@ -97,7 +110,7 @@ final class SearchProductsByName
         ));
 
         return new NameSearchResults(
-            items: [...array_slice($catalogue, 0, self::CATALOGUE_SHOWN), ...$bolResults],
+            items: [...self::withKnownPhotos(array_slice($catalogue, 0, self::CATALOGUE_SHOWN)), ...$bolResults],
             bolFailed: $bolFailed,
             fullMatch: $fullMatch,
         );
@@ -111,30 +124,120 @@ final class SearchProductsByName
      */
     private function catalogueResults(string $text): array
     {
-        $needles = self::needles($text);
         $chains = array_filter(
             $this->chains ??= CheckjebonChain::freshByKey(),
             static fn (CheckjebonChain $chain): bool => SupermarketChains::isTrackable($chain->chain),
         );
+        [$rest, $shops] = self::withoutShopNames($text, array_keys($chains));
+        $needles = self::needles($rest);
 
         if ($needles === [] || $chains === []) {
             return [[], false];
         }
 
         $search = QueryTokens::ofSearchText($text);
+        $searchWithoutShop = QueryTokens::ofSearchText($rest);
         $ranked = [];
 
-        foreach ($this->candidates($text, $needles, $chains) as $position => $row) {
+        foreach ($this->candidates($rest, $needles, $chains, $shops) as $position => $row) {
             $tokens = QueryTokens::ofCatalogueRow($row->name, $row->size);
-            $ranked[] = [$search->coveredBy($tokens), $search->overlapWith($tokens), $position, $row];
+            $titleHoldsAll = $search->coveredBy($tokens);
+            $holdsTheRest = $searchWithoutShop->coveredBy($tokens);
+            $atShop = in_array($row->supermarket, $shops, strict: true);
+
+            $ranked[] = [
+                // A row at the named shop holds the shop's name too.
+                $titleHoldsAll || ($holdsTheRest && $atShop),
+                // "AH melk" puts AH's own milk before a plain "Melk" at AH.
+                $titleHoldsAll,
+                // A product at another shop before a shop's row that is not the product.
+                $holdsTheRest,
+                $atShop,
+                $search->overlapWith($tokens),
+                $position,
+                $row,
+            ];
         }
 
-        usort($ranked, static fn (array $a, array $b): int => [$b[0], $b[1], $a[2]] <=> [$a[0], $a[1], $b[2]]);
+        usort($ranked, static fn (array $a, array $b): int => [$b[0], $b[1], $b[2], $b[3], $b[4], $a[5]] <=> [$a[0], $a[1], $a[2], $a[3], $a[4], $b[5]]);
 
         return [
-            array_map(fn (array $entry): NameSearchResult => $this->catalogueResult($entry[3], $chains[$entry[3]->supermarket]), $ranked),
+            array_map(fn (array $entry): NameSearchResult => $this->catalogueResult($entry[6], $chains[$entry[6]->supermarket]), $ranked),
             array_any($ranked, static fn (array $entry): bool => $entry[0]),
         ];
+    }
+
+    /**
+     * The catalogue has no photos. A row whose page a shop already tracks
+     * gets the photo that shop stored. Only the photo is read, never the
+     * product or the account it belongs to.
+     *
+     * @param  list<NameSearchResult>  $results
+     * @return list<NameSearchResult>
+     */
+    private static function withKnownPhotos(array $results): array
+    {
+        $hashes = [];
+
+        foreach ($results as $index => $result) {
+            try {
+                $hashes[$index] = UrlNormalizer::hash(UrlNormalizer::normalize($result->url));
+            } catch (InvalidArgumentException) {
+                continue;
+            }
+        }
+
+        if ($hashes === []) {
+            return $results;
+        }
+
+        $photos = Shop::query()
+            ->whereIn('url_hash', array_values(array_unique($hashes)))
+            ->whereNotNull('image_url')
+            ->where('image_url', '!=', '')
+            // The newest last, so `pluck` keeps it per page.
+            ->oldest('updated_at')
+            ->pluck('image_url', 'url_hash')
+            ->all();
+
+        return array_map(static function (NameSearchResult $result, int $index) use ($hashes, $photos): NameSearchResult {
+            $photo = $photos[$hashes[$index] ?? ''] ?? null;
+
+            return is_string($photo) ? $result->withPhoto($photo) : $result;
+        }, $results, array_keys($results));
+    }
+
+    /**
+     * The text without the names of the given chains, and the chains it
+     * named. A text that is only a shop name keeps it, so "jumbo" still
+     * finds Jumbo's own products.
+     *
+     * @param  list<string>  $chains
+     * @return array{0: string, 1: list<string>}
+     */
+    private static function withoutShopNames(string $text, array $chains): array
+    {
+        $rest = $text;
+        $named = [];
+
+        foreach ($chains as $chain) {
+            foreach ([$chain, ...self::SHOP_NAMES[$chain] ?? []] as $name) {
+                $pattern = '/(?<![\p{L}\p{N}])' . preg_quote($name, '/') . '(?![\p{L}\p{N}])/iu';
+
+                if (preg_match($pattern, $rest) === 1) {
+                    $rest = (string) preg_replace($pattern, ' ', $rest);
+                    $named[] = $chain;
+                }
+            }
+        }
+
+        $rest = trim((string) preg_replace('/\s+/u', ' ', $rest));
+
+        if ($named === [] || self::needles($rest) === []) {
+            return [$text, []];
+        }
+
+        return [$rest, array_values(array_unique($named))];
     }
 
     /**
@@ -145,9 +248,10 @@ final class SearchProductsByName
      *
      * @param  non-empty-list<non-empty-list<string>>  $needles
      * @param  array<string, CheckjebonChain>  $chains
+     * @param  list<string>  $shops  Chains the text named: their rows come first among rows that hold as many words.
      * @return Collection<int, CheckjebonPrice>
      */
-    private function candidates(string $text, array $needles, array $chains): Collection
+    private function candidates(string $text, array $needles, array $chains, array $shops): Collection
     {
         $patterns = array_merge(...$needles);
         $anyWord = implode(' or ', array_fill(0, count($patterns), 'lower(name) like ?'));
@@ -176,6 +280,7 @@ final class SearchProductsByName
                     ->where('checked_at', '>=', CatalogueLink::validFrom());
             })
             ->orderByRaw("({$wordsHeld}) desc", $patterns)
+            ->when($shops !== [], static fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->orderByRaw('case when supermarket in (' . implode(', ', array_fill(0, count($shops), '?')) . ') then 0 else 1 end', $shops))
             ->when($this->hasTrigrams(), static fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->orderByRaw('similarity(lower(name), ?) desc', [mb_strtolower($text)]))
             ->orderBy('checkjebon_prices.id')
             ->limit(self::CANDIDATES)

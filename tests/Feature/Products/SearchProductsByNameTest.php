@@ -3,6 +3,8 @@
 use App\Actions\Products\SearchProductsByName;
 use App\Models\CatalogueLink;
 use App\Models\CheckjebonChain;
+use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use App\Services\BolApi\BolCatalogClient;
 use App\Services\ProductSearch\NameSearchResult;
@@ -60,6 +62,61 @@ test('a row that holds every word comes first, even when other rows overlap more
     expect($results->items)->toHaveCount(8)
         ->and($results->items[0]->title)->toBe('AH Halfvolle melk biologisch weidemelk pak')
         ->and($results->fullMatch)->toBeTrue();
+});
+
+test('a typed shop name picks the shop, not words of the title', function (string $typed, string $chain): void {
+    seedRow('ah', 'Knorr Maaltijdmix nasi', '44 g');
+    seedRow('dirk', 'Knorr Kruidenmix nasi goreng', '44 g');
+    seedRow('jumbo', 'Knorr Maaltijdmix Nasi 44 g', null);
+    seedRow($chain, ucfirst($chain) . ' Nasi Vega', '260 g');
+
+    $results = searchByName($typed);
+    $first = $results->items[0];
+
+    expect($first->title)->toStartWith('Knorr')
+        ->and($first->host)->toContain($chain === 'ah' ? 'ah.nl' : "{$chain}.")
+        // The same product at another shop still beats the shop's own row that is not it.
+        ->and(array_search(ucfirst($chain) . ' Nasi Vega', resultTitles($results), true))->toBe(3)
+        ->and($results->fullMatch)->toBeTrue();
+})->with([
+    'its key' => ['Knorr nasi jumbo', 'jumbo'],
+    'at the start' => ['dirk knorr nasi', 'dirk'],
+    'a longer name' => ['knorr nasi Albert Heijn', 'ah'],
+]);
+
+test('a shop name that is also the brand puts the shop’s own product first', function (): void {
+    seedRow('jumbo', 'Knorr Maaltijdmix Nasi 44 g', null);
+    seedRow('jumbo', 'Jumbo Nasi Goreng', '260 g');
+    seedRow('ah', 'Nasi goreng', '400 g');
+
+    expect(resultTitles(searchByName('jumbo nasi')))->toBe(['Jumbo Nasi Goreng', 'Knorr Maaltijdmix Nasi 44 g', 'Nasi goreng']);
+});
+
+test('a text that is only a shop name, or holds one inside a word, searches it as a word', function (): void {
+    seedRow('jumbo', 'Jumbo Prei', null);
+    seedRow('ah', 'Jumbopak luiers', null);
+    seedRow('dirk', 'Prei', null);
+
+    expect(searchByName('jumbo')->items[0]->title)->toBe('Jumbo Prei')
+        ->and(searchByName('jumbopak luiers')->items[0]->title)->toBe('Jumbopak luiers');
+});
+
+test('a row whose page a shop already tracks gets that shop’s photo, and only that row', function (): void {
+    seedRow('jumbo', 'Knorr Maaltijdmix Nasi 44 g', null, link: 'knorr-maaltijdmix-nasi-44-g-439493ZK');
+    seedRow('ah', 'Knorr Maaltijdmix nasi', '44 g', link: 'wi37951/knorr-maaltijdmix-nasi');
+    $product = Product::factory()->create();
+    // Another account's shop, at the same page written with www and a slash.
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/producten/knorr-maaltijdmix-nasi-44-g-439493ZK/', 'image_url' => 'https://static.jumbo.test/knorr-nasi.png']);
+    Shop::factory()->for($product)->create(['url' => 'https://www.ah.nl/producten/product/wi37951/knorr-maaltijdmix-nasi', 'image_url' => null]);
+
+    $photos = array_column(array_map(static fn (NameSearchResult $result): array => $result->toArray(), searchByName('knorr nasi')->items), 'photoUrl', 'title');
+
+    ksort($photos);
+
+    expect($photos)->toBe([
+        'Knorr Maaltijdmix Nasi 44 g' => 'https://static.jumbo.test/knorr-nasi.png',
+        'Knorr Maaltijdmix nasi' => null,
+    ]);
 });
 
 test('a row with every word is kept when more than 50 rows hold one of them', function (): void {

@@ -60,6 +60,10 @@ trait SearchesByName
     #[Locked]
     public bool $webCapSpent = false;
 
+    /** Web search is switched off app-wide, so only a stored search can still show. */
+    #[Locked]
+    public bool $webSearchOff = false;
+
     abstract protected function announce(string $message): void;
 
     abstract private function currentUser(): User;
@@ -110,6 +114,7 @@ trait SearchesByName
         $this->nameResults = $results->toArray();
         $this->webStored = $web->isStored($this->query);
         $this->webCapSpent = $web->capSpent($user);
+        $this->webSearchOff = ! $web->enabled();
 
         $this->announce(trans_choice('{0} Nothing found for this name.|{1} One product found.|[2,*] :count products found.', count($results->items)));
         $this->focus('name-results-heading');
@@ -177,6 +182,12 @@ trait SearchesByName
         return trim($this->query) === $this->searchedQuery;
     }
 
+    /** Whether the wizard offers the web search at all: a stored search still shows with the search switched off. */
+    public function offersWebSearch(): bool
+    {
+        return ! $this->webSearchOff || $this->webStored;
+    }
+
     /** Why the web search button is off, or null when it is on. */
     public function webSearchBlock(): ?string
     {
@@ -197,6 +208,6 @@ trait SearchesByName
 
     private function clearNameSearch(): void
     {
-        $this->reset(['searchedQuery', 'nameResults', 'webResults', 'webStatus', 'webVerdict', 'webStored', 'webCapSpent']);
+        $this->reset(['searchedQuery', 'nameResults', 'webResults', 'webStatus', 'webVerdict', 'webStored', 'webCapSpent', 'webSearchOff']);
     }
 }
