@@ -31,6 +31,13 @@ return [
         [
             'date' => '2026-10-23',
             'category' => 'feature',
+            'title' => 'Find a product by its name',
+            'body' => "Track a product now takes a name as well as a link. Type what you buy and pick it from the matching supermarket and bol.com products, each with its photo and price.\n\nNot in the list? Search the web for it, or paste the product's link.",
+            'link' => ['route' => 'app.products.create', 'label' => 'Track a product'],
+        ],
+        [
+            'date' => '2026-10-23',
+            'category' => 'feature',
             'title' => 'Track a product from your dashboard',
             'body' => "The Track a product button is now on your dashboard too, in the same spot as on your product list. Ideas for what else to track sit next to it.\n\nThe product and savings counts at the top are gone. Your savings by month are still on the Stats page.",
             'link' => ['route' => 'app.dashboard', 'label' => 'Go to your dashboard'],
