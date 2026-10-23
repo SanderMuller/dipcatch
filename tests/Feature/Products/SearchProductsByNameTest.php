@@ -141,7 +141,7 @@ test('text without a word of three characters finds no catalogue rows, and still
 
     $results = searchByName($text);
 
-    expect($results->items)->toBe([])
+    expect($results->items)->toBeEmpty()
         ->and($results->fullMatch)->toBeFalse()
         ->and($results->bolFailed)->toBeFalse()
         ->and(bolSearchCalls())->toBe(1);
@@ -157,7 +157,7 @@ test('only the first ten words of the text are needles', function (): void {
     $tenWords = 'alfa bravo charlie delta echo foxtrot golf hotel india juliett';
 
     expect(resultTitles(searchByName("pindakaas {$tenWords}")))->toBe(['Pindakaas naturel'])
-        ->and(resultTitles(searchByName("{$tenWords} pindakaas")))->toBe([]);
+        ->and(resultTitles(searchByName("{$tenWords} pindakaas")))->toBeEmpty();
 });
 
 test('a page a recent check found gone is not listed, and a live page lists its own URL', function (): void {
@@ -293,7 +293,7 @@ test('a user gets 20 searches a minute', function (): void {
     $throttled = searchByName('pindakaas 21', $user);
 
     expect($throttled->throttled)->toBeTrue()
-        ->and($throttled->items)->toBe([])
+        ->and($throttled->items)->toBeEmpty()
         ->and(bolSearchCalls())->toBe(20)
         ->and(searchByName('pindakaas 21')->throttled)->toBeFalse();
 });

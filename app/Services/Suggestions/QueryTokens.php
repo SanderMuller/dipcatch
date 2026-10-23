@@ -82,7 +82,7 @@ final readonly class QueryTokens
      */
     public static function ofSearchText(string $text): self
     {
-        $size = PackSize::resolve(null, authoritative: false, title: $text);
+        $size = PackSize::resolve(packSize: null, authoritative: false, title: $text);
 
         if (! $size instanceof PackSize) {
             return self::of($text);

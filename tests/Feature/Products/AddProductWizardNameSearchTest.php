@@ -203,7 +203,7 @@ describe('a name', function (): void {
             ->call('lookUp');
 
         for ($i = 0; $i < 20; $i++) {
-            RateLimiter::hit("name-search:local:{$user->id}", 60);
+            RateLimiter::hit("name-search:local:{$user->id}");
         }
 
         $wizard->set('query', 'demo hagelslag')
@@ -322,8 +322,8 @@ describe('the web search', function (): void {
             ->call('searchTheWeb')
             ->assertSet('webStatus', WebNameSearchStatus::Failed);
 
-        expect(count(Http::recorded(static fn (Request $request): bool => $request->url() === TypeSafeClient::ENDPOINT)))->toBe(1)
-            ->and(count(Http::recorded(static fn (Request $request): bool => $request->url() === SerperProvider::ENDPOINT)))->toBe(2);
+        expect(Http::recorded(static fn (Request $request): bool => $request->url() === TypeSafeClient::ENDPOINT))->toHaveCount(1)
+            ->and(Http::recorded(static fn (Request $request): bool => $request->url() === SerperProvider::ENDPOINT))->toHaveCount(2);
     });
 
     test('is off with the budget text once today’s searches are used', function (): void {

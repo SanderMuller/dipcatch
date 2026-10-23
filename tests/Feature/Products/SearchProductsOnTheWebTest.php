@@ -268,7 +268,7 @@ test('an empty answer that was stored is charged', function (): void {
     $result = searchTheWeb($user);
 
     expect($result->status)->toBe(WebNameSearchStatus::Found)
-        ->and($result->items)->toBe([])
+        ->and($result->items)->toBeEmpty()
         ->and(webSearchesUsed($user))->toBe(1);
 });
 

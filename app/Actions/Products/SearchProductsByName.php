@@ -83,7 +83,7 @@ final class SearchProductsByName
             return NameSearchResults::throttled();
         }
 
-        RateLimiter::hit($limiterKey, 60);
+        RateLimiter::hit($limiterKey);
 
         [$bolResults, $bolFailed] = $this->bolResults($text);
         [$catalogue, $fullMatch] = $this->catalogueResults($text);

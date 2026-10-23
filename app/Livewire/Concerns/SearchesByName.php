@@ -81,7 +81,9 @@ trait SearchesByName
         }
 
         $this->validate([
-            'query' => FluentRule::string(__('Product name'))->required()->min(self::NAME_MIN_LENGTH)->max(self::NAME_MAX_LENGTH),
+            'query' => FluentRule::string(__('Product name'))
+                ->required()
+                ->between(self::NAME_MIN_LENGTH, self::NAME_MAX_LENGTH),
         ]);
 
         // One string for the catalogue, bol.com, the gate and Serper.
