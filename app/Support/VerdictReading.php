@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Enums\ScrapeStatus;
 use App\Models\PriceCheck;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -164,7 +165,7 @@ final readonly class VerdictReading
 
     private static function timestamp(mixed $value): int
     {
-        return is_string($value) ? (int) strtotime($value) : 0;
+        return is_string($value) ? (int) Carbon::parse($value)->getTimestamp() : 0;
     }
 
     /** @return numeric-string|null */

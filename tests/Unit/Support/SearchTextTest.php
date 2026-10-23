@@ -13,7 +13,7 @@ test('maps every accented letter, capitals included, to one plain letter', funct
 
     $capital = mb_strpos($from, 'É');
 
-    expect(mb_strlen($from))->toBe(mb_strlen($to))
+    expect($from)->toHaveLength(mb_strlen($to))
         ->and($capital)->toBeInt()
         ->and(mb_substr($to, (int) $capital, 1))->toBe('e');
 });

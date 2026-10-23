@@ -58,7 +58,7 @@ function packLines(Product $product): array
 {
     $packs = $product->comparablePacks();
 
-    return $product->shops->sortBy('current_price')->map(fn ($shop): string => PackLine::of($shop, $packs)->text())->values()->all();
+    return $product->shops->sortBy('current_price')->map(fn (Shop $shop): string => PackLine::of($shop, $packs)->text())->values()->all();
 }
 
 test('a set title gives the pack its count of items', function (): void {

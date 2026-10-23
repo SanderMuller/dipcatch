@@ -75,17 +75,15 @@ it('seeds consistent demo data, once', function (): void {
     expect($admin->isComped())->toBeTrue()
         ->and($admin->comped_until?->toDateString())->toBe('2099-12-31')
         ->and($admin->comped_reason)->toBe('Developer account')
-        ->and($admin->auto_categories)->toBeTrue();
-
-    expect(DB::table('invitations')->whereNull('redeemed_at')->where('expires_at', '>', now())->count())->toBeGreaterThan(0)
+        ->and($admin->auto_categories)->toBeTrue()
+        ->and(DB::table('invitations')->whereNull('redeemed_at')->where('expires_at', '>', now())->count())->toBeGreaterThan(0)
         ->and(DB::table('invitations')->whereNotNull('redeemed_at')->count())->toBeGreaterThan(0)
         ->and(DB::table('invitations')->where('expires_at', '<', now())->count())->toBeGreaterThan(0)
         ->and(DB::table('subscriptions')->where('stripe_status', 'active')->count())->toBeGreaterThan(0)
         ->and(DB::table('subscriptions')->where('stripe_status', 'trialing')->count())->toBeGreaterThan(0)
         ->and(DB::table('stripe_payments')->count())->toBeGreaterThan(0)
-        ->and(DB::table('stripe_disputes')->count())->toBeGreaterThan(0);
-
-    expect($demo->products()->count())->toBeGreaterThanOrEqual(8)
+        ->and(DB::table('stripe_disputes')->count())->toBeGreaterThan(0)
+        ->and($demo->products()->count())->toBeGreaterThanOrEqual(8)
         ->and(Shop::query()->whereIn('product_id', $demo->products()->pluck('id'))->count())->toBeGreaterThanOrEqual(15)
         ->and(PriceCheck::query()->count())->toBeGreaterThan(500);
 

@@ -6,6 +6,7 @@ use App\Enums\PriceVerdict;
 use App\Models\Product;
 use App\Models\Shop;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -106,7 +107,7 @@ final class PriceVerdicts
      */
     public static function forget(string $shopId): void
     {
-        DB::afterCommit(static fn (): bool => Cache::put(self::generationKey($shopId), Str::random(16), now()->addDays(self::GENERATION_DAYS)));
+        DB::afterCommit(static fn (): bool => Cache::put(self::generationKey($shopId), Str::random(), now()->addDays(self::GENERATION_DAYS)));
     }
 
     private static function entryKey(string $shopId): string
@@ -245,12 +246,11 @@ final class PriceVerdicts
             return false;
         }
 
-        foreach ([$shop->promotion_starts_at, $shop->promotion_ends_at] as $boundary) {
-            if ($boundary !== null && $boundary->lessThanOrEqualTo($now) && $newest['lastAt'] <= $boundary->getTimestamp()) {
-                return false;
-            }
-        }
-
-        return true;
+        return array_all(
+            [$shop->promotion_starts_at, $shop->promotion_ends_at],
+            static fn (?CarbonInterface $boundary): bool => $boundary === null
+                || $boundary->greaterThan($now)
+                || $newest['lastAt'] > $boundary->getTimestamp(),
+        );
     }
 }
