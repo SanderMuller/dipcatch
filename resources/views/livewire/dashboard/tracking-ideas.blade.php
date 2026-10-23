@@ -1,6 +1,6 @@
 <div>
     @if ($checklist->open !== [] && ! $hidden)
-        <div class="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl bg-soft-yellow/60 px-4 py-3 ring-1 ring-chart/30 dark:bg-white/5 dark:ring-white/10" data-test="tracking-ideas">
+        <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl bg-soft-yellow/60 px-4 py-3 ring-1 ring-chart/30 dark:bg-white/5 dark:ring-white/10" data-test="tracking-ideas">
             <div class="flex min-w-0 items-center gap-3">
                 <flux:icon.sparkles variant="mini" class="size-5 shrink-0 text-chart-line" />
                 <p class="text-sm font-medium">{{ __('What else do you buy again and again?') }}</p>

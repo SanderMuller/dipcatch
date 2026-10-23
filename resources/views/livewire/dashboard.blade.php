@@ -13,41 +13,45 @@
         </a>
     </div>
 
-    {{-- The counts are context, not the point of the page, so they sit on
-         one quiet line rather than a card of their own. --}}
-    <dl class="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
-        <div class="flex items-baseline gap-1.5">
-            <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Tracked products') }}</dt>
-            <dd class="font-semibold tabular-nums">{{ $trackedProducts }}</dd>
+    {{-- The add action sits where the product list has it. The counts are
+         context, not the point of the page, so they sit on one quiet line
+         beside it rather than a card of their own. --}}
+    <div class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+        <div class="shrink-0">
+            <x-track-product-button :can-add="$canAddProduct" />
         </div>
-        <div class="flex items-baseline gap-1.5">
-            <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Active drops') }}</dt>
-            <dd @class(['font-semibold tabular-nums', 'text-savings-strong' => $activeDropCount > 0])>{{ $activeDropCount }}</dd>
+
+        <div class="min-w-0 flex-1">
+            <dl class="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm sm:min-h-10 sm:content-center">
+                <div class="flex items-baseline gap-1.5">
+                    <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Tracked products') }}</dt>
+                    <dd class="font-semibold tabular-nums">{{ $trackedProducts }}</dd>
+                </div>
+                <div class="flex items-baseline gap-1.5">
+                    <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Active drops') }}</dt>
+                    <dd @class(['font-semibold tabular-nums', 'text-savings-strong' => $activeDropCount > 0])>{{ $activeDropCount }}</dd>
+                </div>
+                <div class="flex items-baseline gap-1.5">
+                    <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Potential savings so far') }}</dt>
+                    <dd class="font-semibold tabular-nums">{{ $lifetimeSavings }}</dd>
+                    <dd>
+                        <flux:link :href="route('app.stats')" variant="subtle" class="text-sm" wire:navigate data-test="savings-by-month-link">
+                            {{ __('See it by month') }}
+                        </flux:link>
+                    </dd>
+                </div>
+            </dl>
+
+            <livewire:dashboard.tracking-ideas />
         </div>
-        <div class="flex items-baseline gap-1.5">
-            <dt class="text-zinc-500 dark:text-zinc-400">{{ __('Potential savings so far') }}</dt>
-            <dd class="font-semibold tabular-nums">{{ $lifetimeSavings }}</dd>
-            <dd>
-                <flux:link :href="route('app.stats')" variant="subtle" class="text-sm" wire:navigate data-test="savings-by-month-link">
-                    {{ __('See it by month') }}
-                </flux:link>
-            </dd>
-        </div>
-    </dl>
+    </div>
 
     @unless ($hasAnyProduct)
         <flux:callout class="mt-6" icon="sparkles">
             <flux:callout.heading>{{ __('Track your first product') }}</flux:callout.heading>
             <flux:callout.text>{{ __('Paste a product link and DipCatch watches it at every shop that sells it.') }}</flux:callout.text>
-            @if ($canAddProduct)
-                <flux:button class="mt-3 rounded-full!" :href="route('app.products.create')" variant="primary" wire:navigate>
-                    {{ __('Track a product') }}
-                </flux:button>
-            @endif
         </flux:callout>
     @endunless
-
-    <livewire:dashboard.tracking-ideas />
 
     <div class="mt-8 grid items-start gap-x-8 gap-y-10 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div class="min-w-0 space-y-10">

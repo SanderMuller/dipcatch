@@ -38,6 +38,25 @@ it('drops the invitation once something is tracked', function (): void {
     livewire(Dashboard::class)->assertDontSee('Track your first product');
 });
 
+it('offers the create action below the plan limit', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    livewire(Dashboard::class)
+        ->assertSeeHtml('data-test="track-product"')
+        ->assertSeeHtml('href="' . route('app.products.create') . '"');
+});
+
+it('states the limit instead of offering creation when the plan is full', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->count(20)->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertSee('You are following as many products as the free plan allows.')
+        ->assertDontSeeHtml('href="' . route('app.products.create') . '"');
+});
+
 it('shows recently added products, paused ones included, and nobody elses', function (): void {
     $user = User::factory()->create();
     // Paused: the strip answers "what am I watching", which a paused product
