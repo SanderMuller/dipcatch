@@ -346,6 +346,7 @@ function lidlPage(
     ?string $validFrom = '-3 days',
     ?string $validUntil = '+3 days',
     ?string $secondWindowUntil = null,
+    ?string $secondWindowFrom = null,
 ): string {
     $jsonLd = json_encode([
         '@context' => 'http://schema.org',
@@ -379,7 +380,7 @@ function lidlPage(
         $base = count($records);
         $records[] = ['badges' => $base + 1, 'validFrom' => $base + 2, 'validUntil' => $base + 3];
         $records[] = [];
-        $records[] = now()->modify($validFrom ?? '-3 days')->getTimestamp();
+        $records[] = now()->modify($secondWindowFrom ?? $validFrom ?? '-3 days')->getTimestamp();
         $records[] = now()->modify($secondWindowUntil)->getTimestamp();
     }
 
@@ -653,7 +654,7 @@ function dekaMarktPageWithWindow(string $start, string $end): string
  * name, GTIN and an HTML-escaped brand, plus the offer subtitle that holds
  * the pack size the JSON-LD omits (observed 2026-09-02).
  */
-function sparPage(string $price = '2.45', ?string $packSize = '200 Gram'): string
+function sparPage(string $price = '2.45', ?string $packSize = '200 Gram', ?string $priceValidUntil = null): string
 {
     $jsonLd = json_encode([
         '@context' => 'http://www.schema.org/',
@@ -661,7 +662,7 @@ function sparPage(string $price = '2.45', ?string $packSize = '200 Gram'): strin
         'name' => 'Lay&#39;s chips naturel',
         'gtin13' => '8710398526014',
         'image' => 'https://www.spar.nl/media/lays.png',
-        'offers' => ['@type' => 'Offer', 'price' => $price, 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock'],
+        'offers' => array_filter(['@type' => 'Offer', 'price' => $price, 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock', 'priceValidUntil' => $priceValidUntil], fn (?string $value): bool => $value !== null),
     ], JSON_THROW_ON_ERROR);
 
     $subtitle = $packSize === null ? '' : '<h2 class="c-offer__subtitle">' . $packSize . '</h2>';

@@ -23,7 +23,7 @@ function offerValidUntil(?string $until, ?string $from = null): array
 }
 
 test('a weekly end date is a promotion period', function (): void {
-    // spar.nl states a bare date; it means the close of that day here.
+    // A bare date means the close of that day here.
     $window = OfferValidity::windowFrom(offerValidUntil('2026-09-03'), CarbonImmutable::parse('2026-09-02'));
 
     expect($window?->endsAt->setTimezone('Europe/Amsterdam')->format('Y-m-d H:i:s'))->toBe('2026-09-03 23:59:59');

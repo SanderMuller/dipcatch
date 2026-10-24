@@ -18,6 +18,10 @@ use Symfony\Component\DomCrawler\Crawler;
  *
  * The size sits in the offer block's subtitle (`200 Gram`), never in the
  * JSON-LD (verified 2026-09-02).
+ *
+ * The JSON-LD `priceValidUntil` is no promotion: every product states the
+ * same date, on offer or not, and a folder offer never shows on the product
+ * page (verified 2026-10-24).
  */
 final readonly class SparAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
@@ -46,13 +50,10 @@ final readonly class SparAdapter implements HostSpecificAdapter, OwnsHosts, Shop
         $snapshot = $result->snapshot;
         assert($snapshot instanceof ShopSnapshot);
 
+        $snapshot = $snapshot->withPromotionWindow(promotionWindow: null);
         $packSize = self::packSize($html);
 
-        if ($packSize === null) {
-            return $result;
-        }
-
-        return ExtractionResult::success($snapshot->withPackSize($packSize));
+        return ExtractionResult::success($packSize === null ? $snapshot : $snapshot->withPackSize($packSize));
     }
 
     /**

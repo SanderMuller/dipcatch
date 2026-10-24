@@ -189,9 +189,9 @@ final readonly class LidlAdapter implements HostSpecificAdapter, OwnsHosts, Shop
     /**
      * The offer period, from the stock-availability badge that states it.
      *
-     * A page can carry more than one badge; they agree in every page
-     * sampled, and when they do not there is no basis to pick one, so no
-     * period is reported.
+     * A page can carry more than one badge. Beside a later period the one
+     * running now is the price's own; with no single running period there
+     * is no basis to pick one, so none is reported.
      *
      * @param  list<mixed>  $data
      */
@@ -208,20 +208,22 @@ final readonly class LidlAdapter implements HostSpecificAdapter, OwnsHosts, Shop
             $until = is_int($element['validUntil']) ? ($data[$element['validUntil']] ?? null) : null;
 
             if (is_int($from) && is_int($until)) {
-                $windows[$from . '-' . $until] = [$from, $until];
+                $windows[$from . '-' . $until] = PromotionWindow::make(
+                    endsAt: CarbonImmutable::createFromTimestampUTC($until),
+                    startsAt: CarbonImmutable::createFromTimestampUTC($from),
+                );
             }
         }
 
-        if (count($windows) !== 1) {
-            return null;
+        $windows = array_values(array_filter($windows));
+
+        if (count($windows) === 1) {
+            return $windows[0];
         }
 
-        [$from, $until] = array_first($windows);
+        $running = array_values(array_filter($windows, fn (PromotionWindow $window): bool => $window->isRunning()));
 
-        return PromotionWindow::make(
-            endsAt: CarbonImmutable::createFromTimestampUTC($until),
-            startsAt: CarbonImmutable::createFromTimestampUTC($from),
-        );
+        return count($running) === 1 ? $running[0] : null;
     }
 
     /**

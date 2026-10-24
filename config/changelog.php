@@ -30,6 +30,12 @@ return [
     'entries' => [
         [
             'date' => '2026-10-24',
+            'category' => 'fix',
+            'title' => 'Right deal dates at Spar and Lidl',
+            'body' => "Spar products no longer show a deal that isn't there. At Lidl, an offer that runs this week keeps its end date, even when the shop already lists a later offer for the same product.",
+        ],
+        [
+            'date' => '2026-10-24',
             'category' => 'feature',
             'title' => 'Price alerts follow the pack you buy',
             'body' => "Your price alert is now one price per kilo, litre or piece, so a single bar can't trigger an alert meant for a 12-pack. On a product's edit page, pick the pack you buy and set a price, a percentage off today's best, or an amount off.\n\nNo pack size known? Set a price for one shop's pack, or enter how much is in it.",

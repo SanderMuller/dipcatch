@@ -71,6 +71,17 @@ test('badges that disagree on the period yield none', function (): void {
         ->and($result->snapshot?->promotionWindow)->toBeNull();
 });
 
+test('a running offer keeps its period beside a later one', function (): void {
+    // Fritessaus, 2026-10-24: one badge for this week, one for a week in December.
+    $result = app(LidlAdapter::class)->extract(
+        'https://www.lidl.nl/p/lay-s/p10033095',
+        lidlPage(secondWindowFrom: '+46 days', secondWindowUntil: '+50 days'),
+    );
+
+    expect($result->snapshot?->promotionWindow?->isRunning())->toBeTrue()
+        ->and($result->snapshot?->promotionWindow?->endsAt->getTimestamp())->toBe(now()->modify('+3 days')->getTimestamp());
+});
+
 test('a packaging record for another product is not this product\'s pack size', function (): void {
     // The payload describes article 999999 while the URL names 10033095.
     $html = lidlPage(productId: 999999);
