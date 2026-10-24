@@ -183,3 +183,19 @@ it('asks in a dialog before it stops suggesting a shop, on the product page and 
             ->assertDontSeeHtml('wire:click="hideShop(');
     }
 });
+
+it('stops showing a web suggestion already found on a host later listed as not a shop', function (): void {
+    $product = hidingProduct(shopChecks: true);
+    WebShopFinding::query()->forceCreate([
+        'product_id' => $product->id,
+        'url' => 'https://ingredientenlijst.nl/product/100006034',
+        'url_hash' => hash('sha256', 'ingredientenlijst'),
+        'host' => 'ingredientenlijst.nl',
+        'search_title' => 'Beemster',
+        'second_chance' => 0.9,
+        'status' => WebFindingStatus::Proposed,
+        'fingerprint' => WebShopFinding::fingerprintFor($product),
+    ]);
+
+    expect(WebShopFinding::shownFor($product))->toBeEmpty();
+});
