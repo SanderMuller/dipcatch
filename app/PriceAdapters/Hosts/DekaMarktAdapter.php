@@ -10,6 +10,7 @@ use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
+use App\Services\Offers\DekaMarktUpcomingOffers;
 use App\Support\NuxtData;
 use Carbon\CarbonImmutable;
 use Throwable;
@@ -32,6 +33,8 @@ use Throwable;
  */
 final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
+    public function __construct(private ?DekaMarktUpcomingOffers $announced = null) {}
+
     private const string IMAGE_BASE = 'https://web-fileserver.dekamarkt.nl/';
 
     public function key(): string
@@ -105,8 +108,9 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
         $title = NuxtData::value($data, $product, 'headerText');
         $packaging = NuxtData::value($data, $product, 'packaging');
         $window = self::agreedWindow($windows);
+        $offerRuns = array_any($priceRecords, fn (array $record): bool => self::offerApplies($data, $record));
 
-        return ExtractionResult::success(new ShopSnapshot(
+        $snapshot = new ShopSnapshot(
             title: is_string($title) && $title !== '' ? $title : 'Unknown',
             imageUrl: self::imageUrl($data, $product),
             price: $price,
@@ -121,7 +125,18 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
             promotionWindowAuthoritative: true,
             claimedRegularPrice: $claim,
             claimAuthoritative: true,
-        ));
+        );
+
+        return ExtractionResult::success($this->withAnnouncedOffer($snapshot, $offerRuns, $productId));
+    }
+
+    private function withAnnouncedOffer(ShopSnapshot $snapshot, bool $offerRuns, string $productId): ShopSnapshot
+    {
+        if ($offerRuns || $this->announced === null) {
+            return $snapshot;
+        }
+
+        return $this->announced->applyTo($snapshot, $productId);
     }
 
     /**

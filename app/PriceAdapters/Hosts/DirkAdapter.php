@@ -11,6 +11,7 @@ use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
+use App\Services\Offers\DirkUpcomingOffers;
 use App\Support\DutchDate;
 use App\Support\Numeric;
 use App\Support\NuxtData;
@@ -25,6 +26,8 @@ use App\Support\NuxtData;
  */
 final readonly class DirkAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
+    public function __construct(private ?DirkUpcomingOffers $announced = null) {}
+
     public function key(): string
     {
         return 'dirk';
@@ -69,12 +72,16 @@ final readonly class DirkAdapter implements HostSpecificAdapter, OwnsHosts, Shop
 
         $offer = self::offerRecord($data, $productId, $snapshot->price);
 
-        // The payload is the only promotion source this adapter reads, so one
-        // that states no period for this product ends the promotion.
+        // No payload record prices today's price, so the offers pages'
+        // announcement, or none, is the period.
+        if ($offer === null) {
+            return ExtractionResult::success($this->announced?->applyTo($snapshot, $productId) ?? $snapshot->withPromotionWindow(promotionWindow: null));
+        }
+
         return ExtractionResult::success(
             $snapshot
-                ->withPromotionWindow($offer === null ? null : self::promotionWindow($data, $offer))
-                ->withClaimedRegularPrice($offer === null ? $snapshot->claimedRegularPrice : self::normalPrice($data, $offer, $snapshot->price)),
+                ->withPromotionWindow(self::promotionWindow($data, $offer))
+                ->withClaimedRegularPrice(self::normalPrice($data, $offer, $snapshot->price)),
         );
     }
 

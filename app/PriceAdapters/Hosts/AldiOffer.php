@@ -4,12 +4,13 @@ namespace App\PriceAdapters\Hosts;
 
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\PromotionWindow;
+use App\Support\UpcomingDeal;
 use Carbon\CarbonImmutable;
 
 /**
  * Aldi prices its whole assortment in campaign periods, and the payload
  * keeps a period's price after it closes. This decides which price is
- * current and states the period behind it.
+ * current, whether it is an offer, and which lower price is announced.
  */
 final readonly class AldiOffer
 {
@@ -76,9 +77,9 @@ final readonly class AldiOffer
     }
 
     /**
-     * The campaign period the current price belongs to. Only ever asked
-     * after {@see price()} accepted it, so the window it returns is the one
-     * that price passed.
+     * The current price's offer period. Null without a "was" price above
+     * it: every Aldi price has a period, a regular one too. Only asked after
+     * {@see price()} accepted the price.
      *
      * @param  array<mixed, mixed>  $product
      */
@@ -86,7 +87,7 @@ final readonly class AldiOffer
     {
         $current = $product['currentPrice'] ?? null;
 
-        if (! is_array($current)) {
+        if (! is_array($current) || ! self::hasStrikePrice($current)) {
             return null;
         }
 
@@ -97,5 +98,52 @@ final readonly class AldiOffer
             endsAt: $until instanceof CarbonImmutable ? $until : null,
             startsAt: $from instanceof CarbonImmutable ? $from : null,
         );
+    }
+
+    /**
+     * The window of the earliest announced price below today's, from
+     * `promotionPrices` (observed 2026-10-24). Most entries there repeat
+     * today's price.
+     *
+     * @param  array<mixed, mixed>  $product
+     */
+    public static function upcoming(array $product, string $todayPrice): ?PromotionWindow
+    {
+        $entries = is_array($product['promotionPrices'] ?? null) ? $product['promotionPrices'] : [];
+        $windows = [];
+
+        foreach ($entries as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $from = self::bound($entry, 'validFrom');
+            $until = self::bound($entry, 'validUntil');
+            $price = PriceNormalizer::fromMixed($entry['priceValue'] ?? null);
+            $text = data_get($entry, 'priceTagLabels.promoText1');
+
+            if (! $from instanceof CarbonImmutable || ! $until instanceof CarbonImmutable || $price === null) {
+                continue;
+            }
+
+            $window = UpcomingDeal::window($from, $until, $price, is_string($text) ? $text : null, $todayPrice, priceDecides: true);
+
+            if ($window !== null) {
+                $windows[] = $window;
+            }
+        }
+
+        usort($windows, fn (PromotionWindow $a, PromotionWindow $b): int => $a->startsAt <=> $b->startsAt);
+
+        return $windows[0] ?? null;
+    }
+
+    /** @param  array<mixed, mixed>  $price */
+    private static function hasStrikePrice(array $price): bool
+    {
+        $strike = PriceNormalizer::fromMixed(data_get($price, 'strikePrice.strikePriceValue'));
+        $current = PriceNormalizer::fromMixed($price['priceValue'] ?? null);
+
+        return $strike !== null && $current !== null && bccomp($strike, $current, 2) > 0;
     }
 }

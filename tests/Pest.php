@@ -334,6 +334,61 @@ function dirkPage(
 }
 
 /**
+ * Trimmed replica of a dirk.nl or dekamarkt.nl offers page: Nuxt offer
+ * records with their disclaimer days, as instants at midnight UTC, and the
+ * products each covers with their own offer price (observed 2026-10-24).
+ *
+ * @param  list<array{id: int, text?: ?string, listed?: string, headline?: string, start: string, end: string, products: list<array{0: int|string, 1: string, 2?: ?string, 3?: ?string}>}>  $offers  a product's optional own start and end, as DekaMarkt states them
+ */
+function nuxtOffersPage(array $offers): string
+{
+    $records = [['upcomingOffers' => 1], []];
+
+    foreach ($offers as $offer) {
+        $base = count($records);
+        $records[1][] = $base;
+        $productIndexes = [];
+        // `startDate` is the day the offer is listed from; a weekend offer is
+        // listed from Wednesday but runs from its disclaimer start, Friday.
+        $records[] = [
+            'offerId' => $base + 1,
+            'textPriceSign' => $base + 2,
+            'disclaimerStartDate' => $base + 3,
+            'disclaimerEndDate' => $base + 4,
+            'products' => $base + 5,
+            'startDate' => $base + 6,
+            'offerPrice' => $base + 7,
+        ];
+        $records[] = $offer['id'];
+        $records[] = $offer['text'] ?? 'ACTIE_';
+        $records[] = $offer['start'] . 'T00:00:00.000Z';
+        $records[] = $offer['end'] . 'T00:00:00.000Z';
+        $records[] = [];
+        $records[] = ($offer['listed'] ?? $offer['start']) . 'T00:00:00.000Z';
+        $records[] = isset($offer['headline']) ? (float) $offer['headline'] : null;
+
+        foreach ($offer['products'] as $product) {
+            $index = count($records);
+            $productIndexes[] = $index;
+            $records[] = array_filter([
+                'productId' => $index + 1,
+                'offerPrice' => $index + 2,
+                'startDate' => isset($product[2]) ? $index + 3 : null,
+                'endDate' => isset($product[3]) ? $index + 4 : null,
+            ], fn (?int $value): bool => $value !== null);
+            $records[] = $product[0];
+            $records[] = (float) $product[1];
+            $records[] = $product[2] ?? null;
+            $records[] = $product[3] ?? null;
+        }
+
+        $records[$base + 5] = $productIndexes;
+    }
+
+    return '<html><body><script type="application/json" id="__NUXT_DATA__">' . json_encode($records, JSON_THROW_ON_ERROR) . '</script></body></html>';
+}
+
+/**
  * Trimmed replica of lidl.nl's product page: standard JSON-LD plus the Nuxt
  * `__NUXT_DATA__` flat-array payload where the product record's `price`
  * points at a price record whose `packaging.text` holds the pack size
@@ -686,8 +741,14 @@ function aldiPage(
     ?string $validUntil = '+6 days',
     bool $available = true,
     ?array $products = null,
+    ?string $strikePrice = null,
+    array $promotionPrices = [],
 ): string {
     $currentPrice = ['priceValue' => (float) $price];
+
+    if ($strikePrice !== null) {
+        $currentPrice['strikePrice'] = ['strikePriceValue' => (float) $strikePrice];
+    }
 
     if ($validFrom !== null && $validUntil !== null) {
         $currentPrice['validFrom'] = now()->modify($validFrom)->getTimestamp();
@@ -706,6 +767,7 @@ function aldiPage(
         'salesUnit' => '500 g',
         'isAvailable' => $available,
         'currentPrice' => $currentPrice,
+        'promotionPrices' => $promotionPrices,
     ]];
 
     $apiData = json_encode([
@@ -719,6 +781,23 @@ function aldiPage(
     ], JSON_THROW_ON_ERROR);
 
     return '<html><body><script id="__NEXT_DATA__" type="application/json">' . $nextData . '</script></body></html>';
+}
+
+/**
+ * One entry of an aldi.nl `promotionPrices` list: next campaign's price,
+ * listed before it starts (observed 2026-10-24).
+ *
+ * @return array<string, mixed>
+ */
+function aldiPromotionPrice(string $price, string $from = '+2 days', string $until = '+8 days', ?string $strikePrice = null, ?string $promoText = null): array
+{
+    return array_filter([
+        'validFrom' => now()->modify($from)->getTimestamp(),
+        'validUntil' => now()->modify($until)->getTimestamp(),
+        'priceValue' => (float) $price,
+        'strikePrice' => $strikePrice === null ? null : ['strikePriceValue' => (float) $strikePrice],
+        'priceTagLabels' => $promoText === null ? null : ['promoText1' => $promoText],
+    ], fn (mixed $value): bool => $value !== null);
 }
 
 /**

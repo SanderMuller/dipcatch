@@ -13,6 +13,9 @@ use App\Health\SessionDriverCheck;
 use App\Health\StripeWebhookSecretCheck;
 use App\PriceAdapters\AdapterResolver;
 use App\PriceAdapters\ShopAdapter;
+use App\Services\Offers\DekaMarktUpcomingOffers;
+use App\Services\Offers\DirkUpcomingOffers;
+use App\Services\Offers\JumboUpcomingPromotion;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -53,6 +56,12 @@ final class AppServiceProvider extends ServiceProvider
 
         // Fresh chains and the pg_trgm check, read once per request.
         $this->app->scoped(SearchProductsByName::class);
+
+        // Bound so the container injects them: the adapters take them as
+        // optional, and an unbound optional class gets its default of null.
+        $this->app->singleton(DirkUpcomingOffers::class);
+        $this->app->singleton(DekaMarktUpcomingOffers::class);
+        $this->app->singleton(JumboUpcomingPromotion::class);
 
         $this->app->singleton(function (): AdapterResolver {
             /** @var list<class-string<ShopAdapter>> $classes */

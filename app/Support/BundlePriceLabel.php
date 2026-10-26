@@ -78,7 +78,7 @@ final readonly class BundlePriceLabel
         ?PromotionWindow $window = null,
     ): string {
         return implode(' · ', array_filter([
-            $window === null ? null : PromotionLabel::forWindow($window),
+            $window === null ? null : PromotionLabel::forWindow($window, $currency),
             self::condition($offer, $currency),
             __('or :price each', ['price' => MoneyFormatter::format($singleItemPrice, $currency)]),
         ]));

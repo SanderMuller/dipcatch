@@ -113,6 +113,13 @@ return [
         'retry_every_days' => (int) env('DIPCATCH_REFERENCE_RETRY_EVERY_DAYS', 7),
     ],
 
+    // Offers a shop announces before they start (Dirk, DekaMarkt and Jumbo
+    // read them from pages or an API beside the product page). Off in tests
+    // unless a test turns it on, so no check there reaches those shops.
+    'upcoming_offers' => [
+        'enabled' => (bool) env('DIPCATCH_UPCOMING_OFFERS', true),
+    ],
+
     'recheck' => [
         'interval_hours' => (int) env('DIPCATCH_RECHECK_INTERVAL_HOURS', 24),
         // Spread each batch of rechecks over this window. Capped at the SQS
