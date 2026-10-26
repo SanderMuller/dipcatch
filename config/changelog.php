@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-10-26',
+            'category' => 'feature',
+            'title' => 'Upcoming deals at Aldi, Dirk, DekaMarkt and Jumbo',
+            'body' => "Next week's offers at Aldi, Dirk, DekaMarkt and Jumbo now show on a product before they start, like AH bonus deals already did. You see the deal and the days it runs. Your price alerts keep using today's price until the offer starts.\n\nAldi products no longer show their regular price as a deal.",
+        ],
+        [
             'date' => '2026-10-24',
             'category' => 'fix',
             'title' => 'Right deal dates at Spar and Lidl',
