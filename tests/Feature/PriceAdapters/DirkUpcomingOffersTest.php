@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 
-const DIRK_URL = 'https://www.dirk.nl/boodschappen/aardappelen-groente-fruit/fruit/mango/55252';
+function dirkMangoUrl(): string
+{
+    return 'https://www.dirk.nl/boodschappen/aardappelen-groente-fruit/fruit/mango/55252';
+}
 
 beforeEach(function (): void {
     Cache::flush();
@@ -19,7 +22,10 @@ beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-24 12:00', 'Europe/Amsterdam'));
 });
 
-/** @param  list<array<string, mixed>>  $nextWeek */
+/**
+ * @param  list<array{id: int, text?: ?string, listed?: string, headline?: string, start: string, end: string, products: list<array{0: int|string, 1: string, 2?: ?string, 3?: ?string}>}>  $nextWeek
+ * @param  list<array{id: int, text?: ?string, listed?: string, headline?: string, start: string, end: string, products: list<array{0: int|string, 1: string, 2?: ?string, 3?: ?string}>}>  $current
+ */
 function fakeDirkOffers(array $nextWeek, array $current = []): void
 {
     Http::fake([
@@ -28,6 +34,7 @@ function fakeDirkOffers(array $nextWeek, array $current = []): void
     ]);
 }
 
+/** @return array{id: int, text?: ?string, listed?: string, headline?: string, start: string, end: string, products: list<array{0: int|string, 1: string, 2?: ?string, 3?: ?string}>} */
 function mangoNextWeek(string $price = '0.99', string $start = '2026-10-28', string $end = '2026-11-03', ?string $text = 'ACTIE_'): array
 {
     return ['id' => 140106, 'text' => $text, 'start' => $start, 'end' => $end, 'products' => [[55252, $price]]];
@@ -35,7 +42,7 @@ function mangoNextWeek(string $price = '0.99', string $start = '2026-10-28', str
 
 function dirkExtract(string $todayPrice = '1.79'): ShopSnapshot
 {
-    $snapshot = app(DirkAdapter::class)->extract(DIRK_URL, dirkPage(price: $todayPrice, productId: '55252', offerPrice: null))->snapshot;
+    $snapshot = app(DirkAdapter::class)->extract(dirkMangoUrl(), dirkPage(price: $todayPrice, productId: '55252', offerPrice: null))->snapshot;
     assert($snapshot !== null);
 
     return $snapshot;
@@ -62,7 +69,11 @@ test('reads the offer\'s days as Amsterdam retail days, not UTC instants', funct
         ->and($window?->endsAt->setTimezone('Europe/Amsterdam')->format('Y-m-d H:i:s'))->toBe('2026-11-03 23:59:59');
 });
 
-/** Fruitsalade, offer 140188: listed from Wednesday, runs Friday to Sunday. */
+/**
+ * Fruitsalade, offer 140188: listed from Wednesday, runs Friday to Sunday.
+ *
+ * @return array{id: int, text?: ?string, listed?: string, headline?: string, start: string, end: string, products: list<array{0: int|string, 1: string, 2?: ?string, 3?: ?string}>}
+ */
 function dirkWeekendOffer(): array
 {
     return ['id' => 140188, 'text' => 'VR, ZA & ZO_actie', 'listed' => '2026-10-28', 'start' => '2026-10-30', 'end' => '2026-11-01', 'products' => [[55252, '0.99']]];
@@ -133,7 +144,7 @@ test('an offer with no products is skipped', function (): void {
 test('a running offer on the product page wins without reading the offers pages', function (): void {
     Http::fake();
 
-    $snapshot = app(DirkAdapter::class)->extract(DIRK_URL, dirkPage(price: '0.99', productId: '55252', offerPrice: '0.99', offerStart: '2026-10-21', offerEnd: '2026-10-27'))->snapshot;
+    $snapshot = app(DirkAdapter::class)->extract(dirkMangoUrl(), dirkPage(price: '0.99', productId: '55252', offerPrice: '0.99', offerStart: '2026-10-21', offerEnd: '2026-10-27'))->snapshot;
 
     expect($snapshot?->promotionWindow?->isRunning())->toBeTrue();
     Http::assertNothingSent();
@@ -211,12 +222,12 @@ test('offers pages that failed are read again after five minutes', function (): 
 test('a clean read without the offer ends a stored announcement through a check', function (): void {
     Http::fake([
         'https://www.dirk.nl/robots.txt' => Http::response('', 404),
-        DIRK_URL => Http::response(dirkPage(price: '1.79', productId: '55252', offerPrice: null)),
+        dirkMangoUrl() => Http::response(dirkPage(price: '1.79', productId: '55252', offerPrice: null)),
         DirkUpcomingOffers::NEXT_WEEK_URL => Http::response(nuxtOffersPage([])),
         DirkUpcomingOffers::CURRENT_URL => Http::response(nuxtOffersPage([])),
     ]);
     $shop = Shop::factory()->for(Product::factory()->create(['currency' => 'EUR']))->create([
-        'url' => DIRK_URL,
+        'url' => dirkMangoUrl(),
         'currency' => 'EUR',
         'current_price' => '1.79',
         'promotion_starts_at' => '2026-10-27 23:00:00',
@@ -255,11 +266,11 @@ test('a check waiting on another\'s read sends no request of its own', function 
 test('a failed read keeps the stored upcoming window through a check', function (): void {
     Http::fake([
         'https://www.dirk.nl/robots.txt' => Http::response('', 404),
-        DIRK_URL => Http::response(dirkPage(price: '1.69', productId: '55252', offerPrice: null)),
+        dirkMangoUrl() => Http::response(dirkPage(price: '1.69', productId: '55252', offerPrice: null)),
         DirkUpcomingOffers::NEXT_WEEK_URL => Http::response('', 500),
     ]);
     $shop = Shop::factory()->for(Product::factory()->create(['currency' => 'EUR']))->create([
-        'url' => DIRK_URL,
+        'url' => dirkMangoUrl(),
         'currency' => 'EUR',
         'current_price' => '1.79',
         'promotion_starts_at' => '2026-10-27 23:00:00',

@@ -15,7 +15,11 @@ enum AiFeature: string
     case Categories = 'categories';
     case ShopChecks = 'shop_checks';
 
-    /** The `users` column that holds the opt-in. */
+    /**
+     * The `users` column that holds the opt-in.
+     *
+     * @return 'auto_categories'|'shop_checks'
+     */
     public function column(): string
     {
         return match ($this) {

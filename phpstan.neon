@@ -39,9 +39,11 @@ parameters:
         complexity: false
         configurable: false
         static: false
+        modern: false
         symfony: false
         symfonyConfig: false
         doctrine: false
+        collections: false
         phpunit: false
 
     # Lets hihaho/phpstan-rules' RouteBindingReturnTypeExtension infer $this->route('x')

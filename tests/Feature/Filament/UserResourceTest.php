@@ -25,6 +25,12 @@ class RecordedStripeCalls
     public static array $calls = [];
 
     public static bool $userExistedAtDelete = false;
+
+    public static function reset(): void
+    {
+        self::$calls = [];
+        self::$userExistedAtDelete = false;
+    }
 }
 
 beforeEach(function (): void {
@@ -339,8 +345,7 @@ test('deleting an account expires its open checkout and removes the Stripe custo
         }
     });
 
-    RecordedStripeCalls::$calls = [];
-    RecordedStripeCalls::$userExistedAtDelete = false;
+    RecordedStripeCalls::reset();
 
     livewire(ListUsers::class)
         ->callAction(TestAction::make('delete')->table($target))

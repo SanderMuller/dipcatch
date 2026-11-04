@@ -449,7 +449,7 @@ test('a lookup whose search fails counts against its lead until it gives up', fu
         ['host' => 'medpets.nl', 'title' => 'Hill’s 10 kg', 'pack_quantity' => 10000.0, 'pack_unit' => 'g', 'state' => 'pending', 'attempts' => 0],
     ])]);
 
-    foreach (range(1, 3) as $attempt) {
+    for ($i = 1; $i <= 3; $i++) {
         app(KlarnaDiscovery::class)->lookUp($product, 0, 'medpets.nl');
     }
 
@@ -708,12 +708,11 @@ test('a lead finding checked against an old pack size starts over and keeps its 
 });
 
 test('a Klarna step that gives up keeps the suggestions it made; a product found not to be on Klarna drops them', function (): void {
-    $klarna = new stdClass();
-    $klarna->search = 'happy';
+    $klarna = collect(['answer' => 'happy']);
     $searches = happyKlarnaSearches();
     // Decided per request, so the test can change Klarna's answer.
     $searches['site:klarna.com'] = static function () use ($klarna) {
-        return match ($klarna->search) {
+        return match ($klarna->get('answer')) {
             'happy' => Http::response(['organic' => happyKlarnaSearches()['site:klarna.com']]),
             'down' => Http::response([], 500),
             default => Http::response(['organic' => []]),
@@ -729,9 +728,9 @@ test('a Klarna step that gives up keeps the suggestions it made; a product found
 
     WebSearch::query()->where('query', 'like', 'site:klarna.com%')->delete();
     $generation = KlarnaSource::restart($product);
-    $klarna->search = 'down';
+    $klarna->put('answer', 'down');
 
-    foreach (range(1, 3) as $attempt) {
+    for ($i = 1; $i <= 3; $i++) {
         app(KlarnaDiscovery::class)->findPage($product, $generation);
     }
 
@@ -741,7 +740,7 @@ test('a Klarna step that gives up keeps the suggestions it made; a product found
         ->and(WebShopFinding::query()->whereNotNull('lead_url')->where('status', WebFindingStatus::Proposed)->count())->toBe(2);
 
     $generation = KlarnaSource::restart($product);
-    $klarna->search = 'empty';
+    $klarna->put('answer', 'empty');
     app(KlarnaDiscovery::class)->findPage($product, $generation);
 
     expect(WebDiscovery::query()->findOrFail($product->id)->klarna_url)->toBeNull()
@@ -854,7 +853,7 @@ test('a Klarna page that cannot be fetched counts an attempt each time and finis
     WebDiscovery::query()->whereKey($product->id)->update(['klarna_url' => klarnaSourceUrl()]);
     $seen = [];
 
-    foreach (range(1, 3) as $attempt) {
+    for ($i = 1; $i <= 3; $i++) {
         app(KlarnaDiscovery::class)->readLeads($product, 0);
         $discovery = WebDiscovery::query()->findOrFail($product->id);
         $seen[] = [$discovery->klarna_attempts, $discovery->klarna_leads, $discovery->klarna_checked_at !== null];
@@ -952,7 +951,7 @@ test('a lookup job that crashes counts against its lead until the lead fails', f
     ])]);
     $seen = [];
 
-    foreach (range(1, 3) as $attempt) {
+    for ($i = 1; $i <= 3; $i++) {
         new LookUpKlarnaLead((string) $product->id, 0, 'medpets.nl')->failed();
         $discovery = WebDiscovery::query()->findOrFail($product->id);
         $seen[] = [$discovery->klarna_leads[0]['attempts'] ?? null, $discovery->klarna_leads[0]['state'] ?? null, $discovery->klarna_checked_at !== null];

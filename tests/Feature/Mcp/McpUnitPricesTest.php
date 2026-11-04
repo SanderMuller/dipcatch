@@ -51,7 +51,7 @@ it('lists products without a query per product', function (): void {
     $queriesFor = function (int $count): int {
         $user = User::factory()->create();
 
-        foreach (range(1, $count) as $index) {
+        for ($i = 1; $i <= $count; $i++) {
             mcpTablets($user);
         }
 

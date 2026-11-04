@@ -36,7 +36,7 @@ it('lifts a cap set to zero', function (): void {
     $user = User::factory()->create();
     $budget = new CategorisationBudget();
 
-    foreach (range(1, 5) as $ignored) {
+    for ($i = 1; $i <= 5; $i++) {
         expect($budget->allows($user))->toBeTrue();
     }
 });

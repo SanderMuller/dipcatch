@@ -136,7 +136,7 @@ test('triggering scalar check cannot inherit bundle terms from a later cheapest 
         'current_price' => '2.75',
     ]);
     $check = PriceCheck::factory()->for($triggerShop)->create(['price' => '2.75']);
-    $cheapest = Shop::factory()->for($product)->create([
+    Shop::factory()->for($product)->create([
         'url' => 'https://jumbo.com/p/fanta',
         'current_price' => '2.00',
         'single_item_price' => '2.85',

@@ -39,8 +39,8 @@ it('asks bol.com about the products it was not asked about lately, a few a secon
     Queue::assertPushed(LookUpBolOffers::class, 3);
     Queue::assertNotPushed(LookUpBolOffers::class, fn (LookUpBolOffers $job): bool => $job->productId === (string) $fresh->id);
     // Two a second: the third waits a second.
-    expect(Queue::pushed(LookUpBolOffers::class)->map(fn (LookUpBolOffers $job): mixed => $job->delay)->sort()->values()->all())->toBe([0, 0, 1])
-        ->and(Queue::pushed(LookUpBolOffers::class)->map(fn (LookUpBolOffers $job): string => $job->productId)->sort()->values()->all())
+    expect(Queue::pushed(LookUpBolOffers::class)->ensure(LookUpBolOffers::class)->map(fn (LookUpBolOffers $job): mixed => $job->delay)->sort()->values()->all())->toBe([0, 0, 1])
+        ->and(Queue::pushed(LookUpBolOffers::class)->ensure(LookUpBolOffers::class)->map(fn (LookUpBolOffers $job): string => $job->productId)->sort()->values()->all())
         ->toBe(collect([$stale->id, $another->id, $third->id])->map(strval(...))->sort()->values()->all());
 });
 

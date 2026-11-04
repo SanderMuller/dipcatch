@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 test('profile page is displayed', function (): void {
-    $this->actingAs($user = User::factory()->create());
+    $this->actingAs(User::factory()->create());
 
     $this->get('/settings/profile')->assertOk();
 });

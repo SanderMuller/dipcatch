@@ -72,7 +72,7 @@ function readPrices(Shop $shop, ?string ...$prices): void
 
     // Handled in place: the queue is faked so the confirmation dispatch stays
     // queued, and a faked queue would swallow `dispatch_sync` too.
-    foreach (array_keys($prices) as $ignored) {
+    for ($i = 0; $i < count($prices); $i++) {
         app()->call(new CheckShopPrice($shop->refresh(), manual: true)->handle(...));
     }
 }

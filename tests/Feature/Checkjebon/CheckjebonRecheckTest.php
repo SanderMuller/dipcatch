@@ -23,7 +23,7 @@ function runCheck(Shop $shop): void
 }
 
 /**
- * @param  array<string, mixed>  $attributes  Extra Shop attributes applied after create.
+ * @param  array<model-property<Shop>, mixed>  $attributes  Extra Shop attributes applied after create.
  */
 function checkjebonShop(string $url = 'https://ah.nl/producten/product/wi257/roomkaas', array $attributes = []): Shop
 {

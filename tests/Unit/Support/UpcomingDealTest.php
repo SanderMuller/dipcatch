@@ -25,8 +25,8 @@ test('the label is the shop\'s deal wording, or the offer price', function (?str
 })->with('labels');
 
 test('a price-only text without a stated price keeps the text', function (): void {
-    expect(UpcomingDeal::label('per stuk 1,99', null))->toBe('per stuk 1,99')
-        ->and(UpcomingDeal::label('OP=OP', null))->toBeNull();
+    expect(UpcomingDeal::label('per stuk 1,99', offerPrice: null))->toBe('per stuk 1,99')
+        ->and(UpcomingDeal::label('OP=OP', offerPrice: null))->toBeNull();
 });
 
 function upcomingWindow(?string $offerPrice, ?string $text, string $today = '2.59', string $startsIn = '+3 days', bool $priceDecides = false): ?PromotionWindow

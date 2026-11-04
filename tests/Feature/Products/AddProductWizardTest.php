@@ -325,7 +325,7 @@ test('a blocking shop names Cloudflare on the first refusal', function (): void 
 
 test('a persistently blocking shop counts the refusals instead', function (): void {
     // PERSISTENT_AFTER is 3, and this probe adds the fourth.
-    foreach (range(1, 3) as $ignored) {
+    for ($i = 1; $i <= 3; $i++) {
         app(HostFetchMemory::class)->record('shop.example.com', HostFetchMemory::KIND_BLOCKED);
     }
 
@@ -344,7 +344,7 @@ test('a persistently blocking shop counts the refusals instead', function (): vo
 });
 
 test('a shop that has gone quiet for a while counts the silences', function (): void {
-    foreach (range(1, 3) as $ignored) {
+    for ($i = 1; $i <= 3; $i++) {
         app(HostFetchMemory::class)->record('shop.example.com', HostFetchMemory::KIND_SILENT);
     }
 
@@ -381,7 +381,7 @@ test('a 429 from the shop states the wait it asked for', function (): void {
 test('our own per-host throttle says so rather than blaming the shop', function (): void {
     // Spend the host bucket, so the fetch never leaves the building.
     $limit = config()->integer('dipcatch.fetcher.rate_limit_per_minute');
-    foreach (range(1, $limit) as $ignored) {
+    for ($i = 1; $i <= $limit; $i++) {
         RateLimiter::hit(ShopFetcher::throttleKey('shop.example.com'));
     }
 
@@ -423,13 +423,12 @@ test('too many probes in a minute states the wait', function (): void {
 function connectAssistantFor(User $user, bool $revoked = false): void
 {
     $client = new Client();
-    $client->forceFill([
-        'id' => (string) Str::uuid(),
-        'name' => 'Claude',
-        'redirect_uris' => ['https://example.test/callback'],
-        'grant_types' => ['authorization_code'],
-        'revoked' => false,
-    ])->save();
+    $client->id = (string) Str::uuid();
+    $client->name = 'Claude';
+    $client->redirect_uris = ['https://example.test/callback'];
+    $client->grant_types = ['authorization_code'];
+    $client->revoked = false;
+    $client->save();
 
     Token::query()->forceCreate([
         'id' => (string) Str::uuid(),

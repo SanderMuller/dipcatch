@@ -36,7 +36,7 @@ final class ZooplusFeliwaySeeder extends Seeder
         $owner = User::query()->orderBy('created_at')->first();
 
         if (! $owner instanceof User) {
-            $this->command->warn(
+            $this->command?->warn(
                 'ZooplusFeliwaySeeder skipped: no User found. Run AdminUserSeeder first (set ADMIN_EMAIL + ADMIN_PASSWORD).',
             );
 
@@ -101,6 +101,6 @@ final class ZooplusFeliwaySeeder extends Seeder
             $product->recomputeCheapestShop((int) $check->id);
         });
 
-        $this->command->info('ZooplusFeliwaySeeder: Feliway Classic Verdamper 3-pack seeded with ZooplusAdapter shop.');
+        $this->command?->info('ZooplusFeliwaySeeder: Feliway Classic Verdamper 3-pack seeded with ZooplusAdapter shop.');
     }
 }

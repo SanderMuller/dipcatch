@@ -81,12 +81,8 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
 
             if ($candidate !== null) {
                 $prices[$candidate] = true;
-                // Only the offer branch has a window: the shelf price is not
-                // a promotion, and last week's dates would label it as one.
-                $windows[] = self::offerApplies($data, $record) ? self::window($data, $record) : null;
-                // While an offer runs, the normal price is the price the shop
-                // says it charged before it.
-                $claim ??= self::offerApplies($data, $record) ? PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'normalPrice')) : null;
+                $windows[] = self::runningWindow($data, $record);
+                $claim ??= self::runningClaim($data, $record);
             }
         }
 
@@ -185,6 +181,30 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
         }
 
         return CarbonImmutable::now()->between($start, $end);
+    }
+
+    /**
+     * Only the offer branch has a window: the shelf price is not a promotion,
+     * and last week's dates would label it as one.
+     *
+     * @param  list<mixed>  $data
+     * @param  array<string, mixed>  $record
+     */
+    private static function runningWindow(array $data, array $record): ?PromotionWindow
+    {
+        return self::offerApplies($data, $record) ? self::window($data, $record) : null;
+    }
+
+    /**
+     * While an offer runs, the normal price is the price the shop says it
+     * charged before it.
+     *
+     * @param  list<mixed>  $data
+     * @param  array<string, mixed>  $record
+     */
+    private static function runningClaim(array $data, array $record): ?string
+    {
+        return self::offerApplies($data, $record) ? PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'normalPrice')) : null;
     }
 
     /**

@@ -127,7 +127,7 @@ test('a stored search shows at once, ungated and free, even at the cap', functio
     $user = User::factory()->create();
     storeWebSearch('melk', [['title' => 'Melk', 'link' => 'https://www.shop.test/melk', 'snippet' => '', 'position' => 1]]);
 
-    foreach (range(1, 3) as $search) {
+    for ($i = 1; $i <= 3; $i++) {
         RateLimiter::hit(webSearchKey($user), 86_400);
     }
 
@@ -202,7 +202,7 @@ test('a slot is reserved before the search, so a second text at once cannot take
 test('a text that passed the gate while another took the last slot is refunded and gets the cap', function (): void {
     $user = nameSearchProUser();
 
-    foreach (range(1, 9) as $search) {
+    for ($i = 1; $i <= 9; $i++) {
         RateLimiter::hit(webSearchKey($user), 86_400);
     }
 
@@ -423,7 +423,7 @@ test('a spent cap does not ask Jev', function (): void {
     $user = nameSearchProUser();
     fakeNameSearchApis(jev: jevSays(0.1));
 
-    foreach (range(1, 10) as $search) {
+    for ($i = 1; $i <= 10; $i++) {
         RateLimiter::hit(webSearchKey($user), 86_400);
     }
 

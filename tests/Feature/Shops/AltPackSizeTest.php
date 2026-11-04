@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Http;
 /**
  * An AH shop, read through the AH API, with any stored sizes given.
  *
- * @param  array<string, mixed>  $attributes
+ * @param  array<model-property<Shop>, mixed>  $attributes
  */
 function ahShop(array $attributes = []): Shop
 {

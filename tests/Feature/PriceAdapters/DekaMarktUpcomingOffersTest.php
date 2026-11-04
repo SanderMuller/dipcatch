@@ -8,7 +8,10 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 
-const DEKA_URL = 'https://www.dekamarkt.nl/producten/x/x/x/126549';
+function dekaProductUrl(): string
+{
+    return 'https://www.dekamarkt.nl/producten/x/x/x/126549';
+}
 
 beforeEach(function (): void {
     Cache::flush();
@@ -16,12 +19,13 @@ beforeEach(function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-10-24 12:00', 'Europe/Amsterdam'));
 });
 
-/** @param  list<array<string, mixed>>  $offers */
+/** @param  list<array{id: int, text?: ?string, listed?: string, headline?: string, start: string, end: string, products: list<array{0: int|string, 1: string, 2?: ?string, 3?: ?string}>}>  $offers */
 function fakeDekaOffers(array $offers): void
 {
     Http::fake([DekaMarktUpcomingOffers::URL => Http::response(nuxtOffersPage($offers))]);
 }
 
+/** @return array{id: int, text?: ?string, listed?: string, headline?: string, start: string, end: string, products: list<array{0: int|string, 1: string, 2?: ?string, 3?: ?string}>} */
 function dekaNextWeek(string $price = '1.49', ?string $text = 'per stuk 1,49'): array
 {
     // Disclaimer days as the folder states them: Tuesday to Monday.
@@ -31,7 +35,7 @@ function dekaNextWeek(string $price = '1.49', ?string $text = 'per stuk 1,49'): 
 /** A shelf price record whose days cover today with offer price 0, as on captured products 99405 and 3111. */
 function dekaShelfExtract(string $normalPrice = '1.95'): ShopSnapshot
 {
-    $snapshot = app(DekaMarktAdapter::class)->extract(DEKA_URL, dekaMarktPage(normalPrice: $normalPrice, offerPrice: '0'))->snapshot;
+    $snapshot = app(DekaMarktAdapter::class)->extract(dekaProductUrl(), dekaMarktPage(normalPrice: $normalPrice, offerPrice: '0'))->snapshot;
     assert($snapshot !== null);
 
     return $snapshot;
@@ -104,7 +108,7 @@ test('two offers for one product with different days give none', function (): vo
 test('a running offer on the product page wins without reading the offers page', function (): void {
     Http::fake();
 
-    $snapshot = app(DekaMarktAdapter::class)->extract(DEKA_URL, dekaMarktPage())->snapshot;
+    $snapshot = app(DekaMarktAdapter::class)->extract(dekaProductUrl(), dekaMarktPage())->snapshot;
 
     expect($snapshot?->promotionWindow?->isRunning())->toBeTrue();
     Http::assertNothingSent();

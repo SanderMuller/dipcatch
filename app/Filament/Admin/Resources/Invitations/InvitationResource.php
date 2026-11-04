@@ -34,7 +34,9 @@ final class InvitationResource extends Resource
             TextInput::make('email')
                 ->email()
                 ->required()
-                ->rule(fn (): Closure => self::rejectTakenAddress(...)),
+                ->rule(fn (): Closure => static function (string $attribute, mixed $value, Closure $fail): void {
+                    self::rejectTakenAddress($value, $fail);
+                }),
         ]);
     }
 
@@ -46,7 +48,7 @@ final class InvitationResource extends Resource
      *
      * @param  Closure(string): PotentiallyTranslatedString  $fail
      */
-    private static function rejectTakenAddress(string $attribute, mixed $value, Closure $fail): void
+    private static function rejectTakenAddress(mixed $value, Closure $fail): void
     {
         if (! is_string($value)) {
             return;

@@ -624,7 +624,7 @@ test('reached targets of one product list the cheapest price first, not the earl
 
     new SendDailyDigest($user, '2026-01-15')->handle();
 
-    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => $mail->grouped->get($product->id)['reached']->pluck('shop_id')->all() === [$cheap->id, $dear->id]);
+    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => ($mail->grouped->get($product->id)['reached'] ?? collect())->pluck('shop_id')->all() === [$cheap->id, $dear->id]);
 });
 
 test('the shop name in the digest links to the product page, not the shop homepage', function (): void {

@@ -77,7 +77,7 @@ it('reads one product with its shops', function (): void {
 it('returns bundle conditions beside tracked MCP prices', function (): void {
     $me = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $me->id]);
-    $shop = Shop::factory()->for($product)->create([
+    Shop::factory()->for($product)->create([
         'current_price' => '2.00',
         'single_item_price' => '2.85',
         'bundle_quantity' => 2,

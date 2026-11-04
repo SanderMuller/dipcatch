@@ -19,7 +19,7 @@ use function Pest\Livewire\livewire;
  * Shops named by host. `Shop::booted()` derives the host from the URL, so
  * the URL is what decides which shop a test is naming.
  *
- * @param  array<string, array<string, mixed>>  $shops  host => attributes
+ * @param  array<string, array<model-property<Shop>, mixed>>  $shops  host => attributes
  */
 function productWithShops(array $shops): Product
 {

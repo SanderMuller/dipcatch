@@ -91,13 +91,13 @@ final class DemoSeeder extends Seeder
         DatasetCatalog::forget();
 
         if (app()->environment('production')) {
-            $this->command->warn('DemoSeeder skipped: demo data is never seeded in production.');
+            $this->command?->warn('DemoSeeder skipped: demo data is never seeded in production.');
 
             return;
         }
 
         if (User::query()->where('email', self::DEMO_EMAIL)->exists()) {
-            $this->command->info('DemoSeeder skipped: ' . self::DEMO_EMAIL . ' already exists. Run migrate:fresh --seed for a clean set.');
+            $this->command?->info('DemoSeeder skipped: ' . self::DEMO_EMAIL . ' already exists. Run migrate:fresh --seed for a clean set.');
 
             return;
         }
@@ -137,9 +137,9 @@ final class DemoSeeder extends Seeder
         $this->seedCrowd($admin);
         $this->seedInvitations($admin);
 
-        $this->command->info('DemoSeeder: demo data seeded — ' . Product::query()->count() . ' products across ' . User::query()->count() . ' accounts.');
-        $this->command->info('  App    https://dipcatch.test  — ' . self::DEMO_EMAIL . ' / ' . self::PASSWORD);
-        $this->command->info('  Admin  https://dipcatch.test/admin — ' . $admin->email . ' / ' . self::PASSWORD . ' (unless ADMIN_PASSWORD is set)');
+        $this->command?->info('DemoSeeder: demo data seeded — ' . Product::query()->count() . ' products across ' . User::query()->count() . ' accounts.');
+        $this->command?->info('  App    https://dipcatch.test  — ' . self::DEMO_EMAIL . ' / ' . self::PASSWORD);
+        $this->command?->info('  Admin  https://dipcatch.test/admin — ' . $admin->email . ' / ' . self::PASSWORD . ' (unless ADMIN_PASSWORD is set)');
     }
 
     /**

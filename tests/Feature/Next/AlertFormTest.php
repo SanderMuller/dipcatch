@@ -329,7 +329,7 @@ it('refuses a percentage of a hundred or more', function (): void {
 });
 
 it('still offers to remove a size the owner stated in another unit than the product compares in', function (): void {
-    [$user, $product, $big, $bar] = alertFormProduct();
+    [$user, $product] = alertFormProduct();
     $odd = Shop::factory()->for($product)->create(['url' => 'https://spar.nl/p/1', 'currency' => 'EUR', 'current_price' => '3.00', 'owner_pack_quantity' => '100.00', 'owner_pack_unit' => 'ml']);
     $product->refresh()->recomputeCheapestShop();
     $this->actingAs($user);

@@ -33,7 +33,7 @@ use function Pest\Livewire\livewire;
 /**
  * A shop with a primary size and, optionally, the same pack in a second unit.
  *
- * @param  array<string, mixed>  $extra
+ * @param  array<model-property<Shop>, mixed>  $extra
  */
 function pairedShop(Product $product, string $host, string $price, string $quantity, string $unit, ?string $altQuantity = null, ?string $altUnit = null, array $extra = []): Shop
 {
@@ -539,7 +539,7 @@ it('sends no drop alert when a second size the guard kept out is admitted once i
     };
 
     // €1.00 for 500 g is far off €20 a kilo: kept out, read after read.
-    foreach ([1, 2, 3] as $hours) {
+    for ($i = 1; $i <= 3; $i++) {
         $this->travel(1)->hours();
         $read('1.00');
     }

@@ -92,7 +92,7 @@ test('a shop that fails for a moment is asked again, and its failure is not kept
 test('a host with less than half its fetches left this minute is not fetched for a photo', function (): void {
     Http::fake(fakeJsonLdOffer(photoTestPage()));
 
-    foreach (range(1, intdiv(Config::integer('dipcatch.fetcher.rate_limit_per_minute'), 2)) as $fetch) {
+    for ($i = 1; $i <= intdiv(Config::integer('dipcatch.fetcher.rate_limit_per_minute'), 2); $i++) {
         RateLimiter::hit(ShopFetcher::throttleKey('spar.nl'));
     }
 

@@ -23,7 +23,7 @@ beforeEach(function (): void {
 });
 
 /**
- * @param  array<string, mixed>  $attributes
+ * @param  array<model-property<Shop>, mixed>  $attributes
  */
 function sizedShop(Product $product, string $host, string $price, array $attributes = []): Shop
 {

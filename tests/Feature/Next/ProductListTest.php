@@ -789,8 +789,8 @@ it('names the filter, not only the category, when more than one filter finds not
 /**
  * A product whose cheapest shop carries the given columns.
  *
- * @param  array<string, mixed>  $shop
- * @param  array<string, mixed>  $product
+ * @param  array<model-property<Shop>, mixed>  $shop
+ * @param  array<model-property<Product>, mixed>  $product
  */
 function productWithCheapestShop(User $user, string $title, array $shop, array $product = []): Product
 {
@@ -806,7 +806,7 @@ function productWithCheapestShop(User $user, string $title, array $shop, array $
  * A product whose cheapest shop sells it at €2.00, with a price for that
  * shop's pack as its alert.
  *
- * @param  array<string, mixed>  $product
+ * @param  array<model-property<Product>, mixed>  $product
  */
 function productWithPackTarget(User $user, string $title, string $target, array $product = []): Product
 {

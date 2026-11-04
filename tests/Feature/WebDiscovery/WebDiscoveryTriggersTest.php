@@ -117,7 +117,7 @@ it('queues unfinished runs, then stale findings, then never-searched products, a
 
     $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
 
-    $queued = Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all();
+    $queued = Queue::pushed(DiscoverWebShops::class)->ensure(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all();
 
     // One search a day: the oldest never-searched product goes before an
     // older product whose search is only stale.
@@ -136,7 +136,7 @@ it('counts a barcode without a fresh search against the search limit', function 
 
     $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
 
-    expect(Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $withBarcode->id]);
+    expect(Queue::pushed(DiscoverWebShops::class)->ensure(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $withBarcode->id]);
 });
 
 it('still queues the title search when the barcode search does not fit', function (): void {
@@ -162,7 +162,7 @@ it('queues a finished product whose barcode has no fresh search', function (): v
 
     $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
 
-    expect(Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $product->id]);
+    expect(Queue::pushed(DiscoverWebShops::class)->ensure(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $product->id]);
 });
 
 it('searches again when the owner changed the country the last search was for', function (): void {
@@ -174,7 +174,7 @@ it('searches again when the owner changed the country the last search was for', 
 
     $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
 
-    expect(Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $product->id]);
+    expect(Queue::pushed(DiscoverWebShops::class)->ensure(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $product->id]);
 });
 
 it('queues every product that needs a search when the limit is zero', function (): void {
@@ -198,7 +198,7 @@ it('spends the search limit on gated products only', function (): void {
 
     $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
 
-    expect(Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $gated->id]);
+    expect(Queue::pushed(DiscoverWebShops::class)->ensure(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $gated->id]);
 });
 
 it('skips a product made by hand until it has a shop', function (): void {
@@ -240,7 +240,7 @@ it('searches the newest products never searched at once when shop checks go on, 
 
     app(SwitchOnAiFeature::class)($user, AiFeature::ShopChecks);
 
-    $queued = Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId);
+    $queued = Queue::pushed(DiscoverWebShops::class)->ensure(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId);
     expect($user->refresh()->shop_checks)->toBeTrue()
         ->and($queued)->toHaveCount(SwitchOnAiFeature::DISCOVERIES_AT_SWITCH_ON)
         ->and($queued->all())->not->toContain((string) $searched->id, (string) $withoutShop->id, (string) $products->last()->id, (string) $someoneElses->id)
@@ -280,7 +280,7 @@ it('searches for an owner abroad in the currency of their country, and not in eu
 
     $this->artisan('dipcatch:discover-web-shops')->assertSuccessful();
 
-    expect(Queue::pushed(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $kronor->id]);
+    expect(Queue::pushed(DiscoverWebShops::class)->ensure(DiscoverWebShops::class)->map(fn (DiscoverWebShops $job): string => $job->productId)->all())->toBe([(string) $kronor->id]);
 
     app(CreateProductWithShop::class)($owner, new ProductDraft(title: 'Kaffe'), shopDraftFor('SEK'));
     app(CreateProductWithShop::class)($owner, new ProductDraft(title: 'Coffee'), shopDraftFor('EUR'));

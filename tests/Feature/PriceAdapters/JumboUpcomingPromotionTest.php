@@ -9,12 +9,16 @@ use App\PriceAdapters\ShopSnapshot;
 use App\Services\Offers\JumboUpcomingPromotion;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 
-const JUMBO_URL = 'https://www.jumbo.com/producten/pitloze-witte-druiven-500-g-306009BAK';
+function jumboGrapesUrl(): string
+{
+    return 'https://www.jumbo.com/producten/pitloze-witte-druiven-500-g-306009BAK';
+}
 
 beforeEach(function (): void {
     Cache::flush();
@@ -40,7 +44,7 @@ function jumboGraphQl(array $promotions = [['2026-10-28T00:01:00+01:00', '2026-1
 function jumboExtract(): ShopSnapshot
 {
     // The no-offer fixture: a product panel at 1.99 with no promotion block.
-    $snapshot = app(JumboAdapter::class)->extract(JUMBO_URL, File::get(base_path('tests/Fixtures/bundle-prices/jumbo-no-offer.html')))->snapshot;
+    $snapshot = app(JumboAdapter::class)->extract(jumboGrapesUrl(), File::get(base_path('tests/Fixtures/bundle-prices/jumbo-no-offer.html')))->snapshot;
     assert($snapshot !== null);
 
     return $snapshot;
@@ -63,7 +67,7 @@ test('asks for Wednesday noon of the next offer week, in the formats each field 
     jumboExtract();
 
     Http::assertSent(function (Request $request): bool {
-        $variables = json_decode((string) ($request->data()['variables'] ?? ''), true);
+        $variables = json_decode(Arr::string($request->data(), 'variables', ''), true);
 
         return $request->hasHeader('apollographql-client-name', 'JUMBO_WEB')
             && $request->hasHeader('apollo-require-preflight', 'true')
@@ -196,7 +200,7 @@ test('a failed lookup does not write an ended page window over a stored announce
     $ended = PromotionWindow::make(endsAt: CarbonImmutable::now()->subDay(), startsAt: CarbonImmutable::now()->subDays(7));
     $page = new ShopSnapshot(title: 'Druiven', imageUrl: null, price: '1.99', currency: 'EUR', inStock: true, raw: [], promotionWindow: $ended, promotionWindowAuthoritative: true);
 
-    $snapshot = app(JumboUpcomingPromotion::class)->applyTo($page, JUMBO_URL);
+    $snapshot = app(JumboUpcomingPromotion::class)->applyTo($page, jumboGrapesUrl());
 
     expect($snapshot->promotionWindow)->toBeNull()
         ->and($snapshot->promotionWindowAuthoritative)->toBeFalse();

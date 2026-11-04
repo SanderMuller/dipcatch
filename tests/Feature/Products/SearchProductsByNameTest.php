@@ -327,7 +327,7 @@ test('over the app-wide bol.com limit the bol part is skipped as failed', functi
     configureBol();
     fakeBolApi([BolCatalogClient::BASE_URL . '/products/search*' => Http::response(['results' => []])]);
 
-    foreach (range(1, 5) as $call) {
+    for ($i = 1; $i <= 5; $i++) {
         RateLimiter::hit('name-search:bol', 1);
     }
 
