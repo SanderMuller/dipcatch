@@ -237,6 +237,8 @@ it('shows the owner each subscriber, their revenue and their disputes', function
 });
 
 it('keeps a failed payment out of MRR and reports trial conversion', function (): void {
+    configureStripe();
+
     $admin = User::factory()->create(['is_admin' => true]);
 
     // Two paying, one past due (entitled to Pro, but collecting nothing).
