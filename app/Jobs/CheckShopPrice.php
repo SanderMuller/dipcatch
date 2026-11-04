@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Drops\DetectUnitPriceTarget;
+use App\Actions\Products\LatchIfMet;
 use App\Actions\Shops\CheckOutcome;
 use App\Actions\Shops\RegularPriceClaim;
 use App\Actions\Shops\ResolvedBundlePricing;
@@ -412,7 +413,11 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
               + $pricing->promotionCheckAttributes($locked, $succeeded)
               + self::packSizeAfter($locked, $updates));
 
+            $sizeBefore = $locked->packSize();
+
             $locked->forceFill($updates)->save();
+
+            $onlySizeMoved = self::onlySizeMoved($locked, $sizeBefore);
 
             $pairKey = AltPackSize::afterWrite($locked, $now);
 
@@ -427,6 +432,10 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
 
             if ($product !== null) {
                 $product->refresh();
+
+                if ($onlySizeMoved) {
+                    app(LatchIfMet::class)($product);
+                }
 
                 app(DetectUnitPriceTarget::class)($product);
             }
@@ -473,6 +482,19 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
         }
 
         return ScrapeStatus::CurrencyMismatch;
+    }
+
+    /**
+     * The same money for another amount: the unit price moves by whatever the
+     * correction was, which is not a shop cutting its price. A first size is
+     * not one, because there was no unit price to move.
+     */
+    private static function onlySizeMoved(Shop $saved, ?PackSize $sizeBefore): bool
+    {
+        return $sizeBefore instanceof PackSize
+            && $saved->packSize() instanceof PackSize
+            && ! $sizeBefore->isSameSizeAs($saved->packSize())
+            && ! $saved->wasChanged('current_price');
     }
 
     /**

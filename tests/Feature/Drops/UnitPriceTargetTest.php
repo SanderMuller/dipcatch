@@ -268,6 +268,93 @@ test('a price check on any shop can fire the target, not only the cheapest', fun
     Notification::assertSentTo($user, UnitPriceTargetNotification::class);
 });
 
+/**
+ * A 370 g bag at €1.99 (€5.38/kg) under a €3.00/kg target, on a page that can
+ * state another name and price from one check to the next.
+ *
+ * @return array{Product, Shop}
+ */
+function shopReadByCheck(string &$name, string &$price): array
+{
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/1' => function () use (&$name, &$price) {
+            return Http::response(withJsonLd(json_encode([
+                '@type' => 'Product',
+                'name' => $name,
+                'offers' => ['@type' => 'Offer', 'price' => $price, 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock'],
+            ], JSON_THROW_ON_ERROR)), 200, ['Content-Type' => 'text/html']);
+        },
+    ]);
+
+    $user = User::factory()->create(['notify_via_filament' => true]);
+    subscribeUser($user);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'unit_price_target' => '3.00', 'unit_price_target_unit' => 'g']);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.test/p/1', 'currency' => 'EUR', 'current_price' => '1.99',
+        'pack_quantity' => '370.00', 'pack_unit' => 'g',
+    ]);
+
+    return [$product, $shop];
+}
+
+test('a new pack size at the same price does not fire the target, now or on the next check', function (): void {
+    $name = 'Chips 740 g';
+    $price = '1.99';
+    [$product, $shop] = shopReadByCheck($name, $price);
+
+    dispatch_sync(new CheckShopPrice($shop));
+
+    // The money did not move: €2.69/kg is a different reading of the same bag.
+    expect((float) $shop->refresh()->pack_quantity)->toBe(740.0);
+    Notification::assertNothingSent();
+    expect(TargetPriceEvent::query()->count())->toBe(0);
+
+    dispatch_sync(new CheckShopPrice($shop->refresh()));
+
+    Notification::assertNothingSent();
+
+    // A real cut after the correction is still news.
+    $price = '1.50';
+    dispatch_sync(new CheckShopPrice($shop->refresh()));
+
+    Notification::assertSentTo($product->user, UnitPriceTargetNotification::class);
+});
+
+test('a new pack size that lifts the value above the target lets the alert go', function (): void {
+    $name = 'Chips 185 g';
+    $price = '1.99';
+    [$product, $shop] = shopReadByCheck($name, $price);
+    $product->forceFill(['unit_price_target' => '6.00', 'unit_price_target_unit' => 'g'])->save();
+    $product->forceFill(['unit_price_notified' => '5.3784', 'unit_price_notified_unit' => 'g', 'unit_price_notified_at' => now()])->save();
+
+    dispatch_sync(new CheckShopPrice($shop));
+
+    Notification::assertNothingSent();
+    expect($product->refresh()->unit_price_notified)->toBeNull();
+});
+
+test('a new pack size and a new price together still fire the target', function (): void {
+    $name = 'Chips 740 g';
+    $price = '1.89';
+    [$product, $shop] = shopReadByCheck($name, $price);
+
+    dispatch_sync(new CheckShopPrice($shop));
+
+    Notification::assertSentTo($product->user, UnitPriceTargetNotification::class);
+});
+
+test('a first pack size at the same price still fires the target', function (): void {
+    $name = 'Chips 740 g';
+    $price = '1.99';
+    [$product, $shop] = shopReadByCheck($name, $price);
+    $shop->forceFill(['pack_quantity' => null, 'pack_unit' => null])->save();
+
+    dispatch_sync(new CheckShopPrice($shop->refresh()));
+
+    Notification::assertSentTo($product->user, UnitPriceTargetNotification::class);
+});
+
 test('the unit-price alert obeys the same hourly ceiling as a drop alert', function (): void {
     // The owner is on Pro, so it is the Pro ceiling that must bind.
     config()->set('plans.pro.notifications_hourly_limit', 1);
