@@ -27,6 +27,13 @@ final readonly class SaveOwnerPackSize
     private const string PACK_WORDS = '/\b(packs?|pak|pakken|pakje|doos|dozen|box|boxes|verpakking|verpakkingen|bag|zak)\b/iu';
 
     /**
+     * An owner counts in the singular, "1 piece". `PackSize::parse()` knows the
+     * plural only: in a shop's title the singular is a dose or a set of
+     * different things ("3 piece pan set 2 l"), so it stays out of the parser.
+     */
+    private const string SINGULAR_PIECE = '/(?<!\p{L})piece\b/iu';
+
+    /**
      * @throws ValidationException on `$field` when the shop is not this product's, or the size cannot be read
      */
     public function __invoke(Product $product, string $shopId, ?string $input, string $field = 'packSize'): void
@@ -39,7 +46,7 @@ final readonly class SaveOwnerPackSize
         }
 
         $input = trim((string) $input);
-        $size = $input === '' ? null : PackSize::parse($input);
+        $size = $input === '' ? null : PackSize::parse(preg_replace(self::SINGULAR_PIECE, 'pieces', $input) ?? $input);
 
         // The column keeps decimal(10,2): a size it cannot hold is refused, not cut.
         $fits = $size !== null && $size->quantity >= 0.01 && $size->quantity <= 99999999.99;

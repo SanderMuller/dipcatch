@@ -143,7 +143,9 @@ final readonly class AdapterResolver
             return $result;
         }
 
-        return $result->withSnapshot($snapshot->withPackSize($size->quantity . ' ' . $size->unit, authoritative: false));
+        $unitWord = $size->unit === 'piece' ? 'pieces' : $size->unit;
+
+        return $result->withSnapshot($snapshot->withPackSize($size->quantity . ' ' . $unitWord, authoritative: false));
     }
 
     /**

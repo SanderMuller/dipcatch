@@ -61,7 +61,7 @@ final readonly class PackSize
         // Plurals only: a singular is a dose ("1 kauwtablet per dag"), and a
         // second count makes the title ambiguous.
         'kauwtabletten', 'bruistabletten', 'zuigtabletten',
-        'tabletten', 'capsules', 'capsule', 'sachets', 'tablets', 'pieces', 'piece', 'rollen', 'zakjes', 'tablet', 'vellen',
+        'tabletten', 'capsules', 'capsule', 'sachets', 'tablets', 'pieces', 'rollen', 'zakjes', 'tablet', 'vellen',
         // English, as Amazon's international stores title a pack ("5 pieces", "60 count").
         // German, French, Italian and Spanish for the shops in those markets.
         'stück', 'stueck', 'pièces', 'unités', 'unites', 'pezzi', 'piezas', 'unidades',

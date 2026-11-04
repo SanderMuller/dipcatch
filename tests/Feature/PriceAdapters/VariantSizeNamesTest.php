@@ -119,6 +119,25 @@ test('a scheduled check of a shop saved for one variant stores its size', functi
     'agradi by key' => [agradiCavalorUrl(), '44768356', '1000.00'],
 ]);
 
+test('a scheduled check of a variant named by its count stores that count', function (): void {
+    $html = str_replace('Cavalor Muscle Motion - 1kg', 'Cavalor Muscle Motion - 12 stuks', variantFixture('agradi_shopify_variants'));
+    Http::fake([
+        'https://www.agradi.nl/robots.txt' => Http::response('', 404),
+        'https://www.agradi.nl/*' => Http::response($html, 200, ['Content-Type' => 'text/html']),
+    ]);
+    $shop = Shop::factory()->for(Product::factory()->create(['currency' => 'EUR']))->create([
+        'url' => agradiCavalorUrl(),
+        'variant_key' => '44768356',
+        'pack_quantity' => null,
+        'pack_unit' => null,
+    ]);
+
+    runVariantCheck($shop);
+
+    expect($shop->fresh()->pack_quantity)->toBe('12.00')
+        ->and($shop->fresh()->pack_unit)->toBe('piece');
+});
+
 test('variants keep their titles when the page names them nowhere else', function (): void {
     $variants = [
         new VariantCandidate('a', 'Cola — a', '1.00', 'EUR'),

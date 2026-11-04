@@ -77,10 +77,20 @@ test('parses the English piece words Amazon titles a pack with', function (strin
         ->and($size?->unit)->toBe('piece');
 })->with([
     'pieces' => ['PETKIT Filters for cats, 5 pieces for EverSWEET 2, 3 and CYBERTIAL PUREDRINK fountains', 5.0],
-    'piece' => ['Replacement filter, 1 piece', 1.0],
     'count' => ['Vitamin D3 2000 IU, 60 Count', 60.0],
     'tablets' => ['Dishwasher tablets, 40 tablets', 40.0],
     'pcs' => ['Coffee pods 10 pcs', 10.0],
+]);
+
+test('does not read a singular piece in a title as a count', function (string $title, ?float $quantity, ?string $unit): void {
+    $size = PackSize::resolve(packSize: null, authoritative: false, title: $title);
+
+    expect($size?->quantity)->toBe($quantity)
+        ->and($size?->unit)->toBe($unit);
+})->with([
+    'a set of different things' => ['3 piece pan set 2 l', 2000.0, 'ml'],
+    'a dose beside the pack count' => ['60 tablets, take 1 piece daily', 60.0, 'piece'],
+    'a set of clothes' => ['T-shirt 2 piece XL', null, null],
 ]);
 
 test('parses rollen', function (): void {
