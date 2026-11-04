@@ -77,6 +77,7 @@ test('parses the English piece words Amazon titles a pack with', function (strin
         ->and($size?->unit)->toBe('piece');
 })->with([
     'pieces' => ['PETKIT Filters for cats, 5 pieces for EverSWEET 2, 3 and CYBERTIAL PUREDRINK fountains', 5.0],
+    'piece' => ['Replacement filter, 1 piece', 1.0],
     'count' => ['Vitamin D3 2000 IU, 60 Count', 60.0],
     'tablets' => ['Dishwasher tablets, 40 tablets', 40.0],
     'pcs' => ['Coffee pods 10 pcs', 10.0],

@@ -48,6 +48,15 @@ it('gives the product a unit and that shop a size that can win, and passes it to
         ->and($packs->for($bar)?->exclusion)->toBe(PackExclusion::SizeUnknown);
 });
 
+it('accepts a single piece as the size', function (): void {
+    [$product, $pack] = sizelessForOwner();
+
+    app(SaveOwnerPackSize::class)($product, $pack->id, '1 piece');
+
+    expect($pack->refresh()->owner_pack_unit)->toBe('piece')
+        ->and((float) $pack->owner_pack_quantity)->toBe(1.0);
+});
+
 it('lets the shop\'s own size win once it states one, and keeps the owner\'s', function (): void {
     [$product, $pack] = sizelessForOwner();
     app(SaveOwnerPackSize::class)($product, $pack->id, '660 g');
