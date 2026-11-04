@@ -613,6 +613,20 @@ test('drops and reached targets share one mail, grouped per product, counted tog
     });
 });
 
+test('reached targets of one product list the cheapest price first, not the earliest', function (): void {
+    $user = User::factory()->create(['notify_via_email' => true, 'digest_processed_until' => null]);
+    $product = Product::factory()->for($user)->create();
+    $dear = Shop::factory()->for($product)->create();
+    $cheap = Shop::factory()->for($product)->create();
+
+    TargetPriceEvent::factory()->for($user)->for($product)->create(['shop_id' => $dear->id, 'price' => '19.99', 'fired_at' => now()->subHours(6)]);
+    TargetPriceEvent::factory()->for($user)->for($product)->create(['shop_id' => $cheap->id, 'price' => '14.99', 'fired_at' => now()->subHours(2)]);
+
+    new SendDailyDigest($user, '2026-01-15')->handle();
+
+    Mail::assertSent(DailyDigestMail::class, fn (DailyDigestMail $mail): bool => $mail->grouped->get($product->id)['reached']->pluck('shop_id')->all() === [$cheap->id, $dear->id]);
+});
+
 test('the shop name in the digest links to the product page, not the shop homepage', function (): void {
     Mail::swap(app('mail.manager'));
 

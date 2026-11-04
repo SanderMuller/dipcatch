@@ -16,7 +16,8 @@ use Illuminate\Support\Collection;
 
 /**
  * Daily digest for a single user — every PriceDropEvent and TargetPriceEvent
- * fired since their previous digest, grouped by product.
+ * fired since their previous digest, grouped by product. Within a product
+ * the cheapest price comes first.
  *
  * Takes flat collections of events (caller filters + orders); groups
  * internally and exposes `$grouped` to the Blade view.
@@ -59,8 +60,12 @@ final class DailyDigestMail extends Mailable
             ->merge($reachedByProduct->keys())
             ->unique()
             ->mapWithKeys(function (int|string $productId) use ($dropsByProduct, $reachedByProduct): array {
-                $drops = collect(array_values($dropsByProduct->get($productId)?->all() ?? []));
-                $targets = collect(array_values($reachedByProduct->get($productId)?->all() ?? []));
+                $drops = collect($dropsByProduct->get($productId)?->all() ?? [])
+                    ->sortBy(fn (PriceDropEvent $event): float => (float) ($event->new_unit_price ?? $event->new_price))
+                    ->values();
+                $targets = collect($reachedByProduct->get($productId)?->all() ?? [])
+                    ->sortBy(fn (TargetPriceEvent $hit): float => (float) ($hit->unit_price ?? $hit->price ?? 0))
+                    ->values();
                 $first = $targets->first() ?? $drops->first();
                 assert($first instanceof PriceDropEvent || $first instanceof TargetPriceEvent);
 

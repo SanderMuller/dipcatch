@@ -39,7 +39,7 @@ $image = $product->safeImageUrl();
         ? \App\Support\ItemPricing::figure((string) $hit->target, $hit->currency, $unitLabel, $itemSize)
         : \App\Support\MoneyFormatter::format((string) $hit->target, $hit->currency);
 @endphp
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; margin: 0 0 {{ $loop->last && $events->isEmpty() ? '0' : '16px' }}; border-collapse: collapse;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; margin: 0 0 {{ $loop->last && $events->isEmpty() ? '0' : '16px' }}; {{ $loop->first ? '' : 'padding-top: 16px; border-top: 1px solid #e4e4e7; ' }}border-collapse: collapse;">
 <tr>
 <td style="padding: 0 0 8px; color: #71717a; font-size: 13px; line-height: 1.4;">
 <x-digest-shop-link :shop="$hit->shop" /> · {{ $hit->fired_at->setTimezone($user->timezone)->format('H:i') }}
