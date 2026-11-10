@@ -44,6 +44,7 @@ test('a pasted comparison-site link is refused with a message and no keep-as-lin
     'maxict.nl' => 'https://maxict.nl/product/canon-selphy-cp1500-wit',
     'tweakers.net' => 'https://tweakers.net/pricewatch/1234/some-product.html',
     'ingredientenlijst.nl' => 'https://ingredientenlijst.nl/product/100006034',
+    'zogoedkoop.nl' => 'https://www.zogoedkoop.nl/product/powerful-people-protein-bar-pinda-55-g-1203568',
 ]);
 
 test('an assistant pasting a comparison-site link gets the same answer', function (): void {
