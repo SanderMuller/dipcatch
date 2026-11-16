@@ -312,6 +312,40 @@ test('per-host rate limit releases instead of writing a failed check or ticking 
         ->and($shop->fresh()->consecutive_failures)->toBe(0);
 });
 
+test('our own per-host throttle never counts against the shop, even on the last attempt', function (): void {
+    // Security audit lead 16: probes and scheduled checks share one bucket
+    // per host. One account filling it with probes would otherwise walk
+    // another account's shop to dead, which stops its price alerts.
+    $perMinute = config()->integer('dipcatch.fetcher.rate_limit_per_minute', 12);
+    for ($i = 0; $i < $perMinute; $i++) {
+        RateLimiter::hit(ShopFetcher::throttleKey('shop.test'));
+    }
+    Cache::put('dipcatch:robots:shop.test', [], 60);
+    Http::fake();
+
+    $shop = Shop::factory()->create([
+        'url' => 'https://shop.test/p/1',
+        'consecutive_failures' => config()->integer('dipcatch.shop.dead_after') - 1,
+        'health' => ShopHealth::Failing,
+    ]);
+
+    $job = new CheckShopPrice($shop)->withFakeQueueInteractions();
+    $job->job->attempts = 5;
+
+    $job->handle(
+        app(ShopFetcher::class),
+        app(AdapterResolver::class),
+        app(CheckjebonSource::class),
+        app(AhApiSource::class),
+    );
+
+    $shop->refresh();
+    expect($shop->consecutive_failures)->toBe(config()->integer('dipcatch.shop.dead_after') - 1)
+        ->and($shop->health)->toBe(ShopHealth::Failing)
+        ->and($shop->active)->toBeTrue()
+        ->and($shop->last_status)->toBe(ScrapeStatus::RateLimited);
+});
+
 test('successful check resets both counters and clears failing health', function (): void {
     Http::fake(fakeJsonLdResponse('shop.test', '/p/1'));
 
@@ -793,10 +827,9 @@ test('a host saturated across the whole release budget records a rate-limited ch
     expect($check->status)->toBe(ScrapeStatus::RateLimited)
         ->and(DB::table('jobs')->count())->toBe(0)
         ->and(DB::table('failed_jobs')->count())->toBe(0)
-        // Accepted trade-off: recording the check ticks the shared failure
-        // counter, against failing_after = 3. The alternative is a cycle that
-        // leaves no trace at all.
-        ->and($shop->fresh()->consecutive_failures)->toBe(1);
+        // The check is recorded, but our own throttle is not the shop's
+        // failure, so the counter that leads to dead does not tick.
+        ->and($shop->fresh()->consecutive_failures)->toBe(0);
 });
 
 test('a released job completes normally once the host budget refills', function (): void {

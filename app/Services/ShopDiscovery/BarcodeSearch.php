@@ -46,7 +46,7 @@ final readonly class BarcodeSearch
     {
         $barcode = self::barcodeOf($product);
 
-        return $barcode !== null && $this->searches->forQuery($barcode, ShoppersCountry::forProduct($product)) instanceof WebSearch;
+        return $barcode !== null && $this->searches->forQuery($barcode, ShoppersCountry::forProduct($product), $product->user) instanceof WebSearch;
     }
 
     /** Whether a run for the product would spend a search on its barcode. */

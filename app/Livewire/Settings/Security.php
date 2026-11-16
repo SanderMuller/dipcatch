@@ -7,6 +7,7 @@ use App\Models\User;
 use Exception;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Actions\ConfirmTwoFactorAuthentication;
 use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
@@ -167,6 +168,10 @@ final class Security extends Component
 
     public function deletePasskey(DeletePasskey $deletePasskey): void
     {
+        if ($this->needsFreshPasswordConfirmation(Features::passkeys())) {
+            return;
+        }
+
         if ($this->deletingPasskeyId === null) {
             return;
         }
@@ -194,6 +199,10 @@ final class Security extends Component
      */
     public function enable(EnableTwoFactorAuthentication $enableTwoFactorAuthentication): void
     {
+        if ($this->needsFreshPasswordConfirmation(Features::twoFactorAuthentication())) {
+            return;
+        }
+
         $user = Auth::user();
         assert($user instanceof User);
 
@@ -249,6 +258,10 @@ final class Security extends Component
      */
     public function confirmTwoFactor(ConfirmTwoFactorAuthentication $confirmTwoFactorAuthentication): void
     {
+        if ($this->needsFreshPasswordConfirmation(Features::twoFactorAuthentication())) {
+            return;
+        }
+
         $this->validate();
 
         $user = Auth::user();
@@ -274,10 +287,41 @@ final class Security extends Component
      */
     public function disable(DisableTwoFactorAuthentication $disableTwoFactorAuthentication): void
     {
+        if ($this->needsFreshPasswordConfirmation(Features::twoFactorAuthentication())) {
+            return;
+        }
+
         $user = Auth::user();
         assert($user instanceof User);
 
         $disableTwoFactorAuthentication($user);
+    }
+
+    /**
+     * Sends the user to confirm their password again when the confirmation
+     * the page asked for has expired.
+     *
+     * The route's `password.confirm` runs on the page request only. Livewire
+     * update requests skip it, so a session that never confirmed, or an open
+     * page left past the timeout, could still change these credentials.
+     */
+    private function needsFreshPasswordConfirmation(string $feature): bool
+    {
+        if (! Features::optionEnabled($feature, 'confirmPassword')) {
+            return false;
+        }
+
+        $confirmedAt = session('auth.password_confirmed_at');
+        $confirmedAt = is_numeric($confirmedAt) ? (int) $confirmedAt : 0;
+
+        if (Date::now()->unix() - $confirmedAt <= config()->integer('auth.password_timeout', 10800)) {
+            return false;
+        }
+
+        redirect()->setIntendedUrl(route('security.edit'));
+        $this->redirectRoute('password.confirm');
+
+        return true;
     }
 
     /**

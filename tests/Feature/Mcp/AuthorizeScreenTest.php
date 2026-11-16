@@ -101,3 +101,30 @@ test('a guest reaching the consent route is left to Passport, not sent to verify
     $this->get(route('passport.authorizations.authorize', ['client_id' => (string) Str::uuid(), 'response_type' => 'code']))
         ->assertUnauthorized();
 });
+
+test('the consent screen names the host the code goes to, not the first one the client registered', function (): void {
+    // Security audit lead 4: anyone can register a client with a trusted name,
+    // a trusted first redirect URI and a second one of their own. The code
+    // goes to whichever registered URI the request names.
+    $clientId = $this->postJson('oauth/register', [
+        'client_name' => 'Trusted',
+        'redirect_uris' => ['https://trusted.example.test/cb', 'https://other.example.test/cb'],
+    ])->assertSuccessful()->json('client_id');
+
+    $verifier = Str::random(64);
+    $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('passport.authorizations.authorize', [
+            'client_id' => $clientId,
+            'response_type' => 'code',
+            'redirect_uri' => 'https://other.example.test/cb',
+            'scope' => 'mcp:use',
+            'code_challenge' => $challenge,
+            'code_challenge_method' => 'S256',
+            'state' => 'the-client-state',
+        ]))
+        ->assertOk()
+        ->assertSee('It will send you back to other.example.test.')
+        ->assertDontSee('trusted.example.test');
+});

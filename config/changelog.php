@@ -31,6 +31,13 @@ return [
         [
             'date' => '2026-11-16',
             'category' => 'feature',
+            'title' => 'Changing your email asks for your password',
+            'body' => "To change your email address in your profile, you now enter your current password.\n\nOn the Security page, changes to two-factor sign-in and passkeys ask for your password again if you last confirmed it a while ago.",
+            'link' => ['route' => 'profile.edit', 'label' => 'Open your profile'],
+        ],
+        [
+            'date' => '2026-11-16',
+            'category' => 'feature',
             'title' => 'Review suggested shops from your dashboard',
             'body' => "Click the plus next to a suggested shop on your dashboard to check it right there. You see your product and the shop's page side by side, with photo, size and price, so you can tell if it's the same product.\n\nAdd the shop, mark it as a different product, or skip it. The next suggestion opens straight away, so you can go through them all in one go.",
             'link' => ['route' => 'app.dashboard', 'label' => 'Go to your dashboard'],

@@ -3,8 +3,10 @@
 use App\Http\Controllers\McpOauthDiscoveryController;
 use App\Mcp\Servers\DipCatchServer;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
+use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Support\Facades\Route;
 use Laravel\Mcp\Facades\Mcp;
+use Laravel\Mcp\Server\Http\Controllers\OAuthRegisterController;
 
 // Loaded by laravel/mcp itself (McpServiceProvider resolves this path), so it
 // is deliberately absent from bootstrap/app.php.
@@ -17,7 +19,14 @@ Route::get('.well-known/oauth-protected-resource', [McpOauthDiscoveryController:
 Route::get('.well-known/oauth-authorization-server', [McpOauthDiscoveryController::class, 'authorizationServer'])
     ->name('mcp.oauth.authorization-server');
 
-Mcp::oauthRoutes();
+// Registration comes off so it can sit behind a limit. The package adds no
+// middleware, and every request creates a client row. The route keeps the
+// package's name, which discovery uses for `registration_endpoint`.
+Mcp::oauthRoutes(registration: false);
+
+Route::post('oauth/register', OAuthRegisterController::class)
+    ->middleware(ThrottleRequestsWithRedis::using('mcp-registration'))
+    ->name('mcp.oauth.register');
 
 Mcp::web('/mcp', DipCatchServer::class)
     // `auth:api` proves who the token belongs to; it does not prove the token

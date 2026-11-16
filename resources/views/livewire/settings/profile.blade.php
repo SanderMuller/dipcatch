@@ -24,6 +24,23 @@
                 @endif
             </div>
 
+            {{-- No `required`: the browser refuses to submit a hidden required field. The server asks for it. --}}
+            <div
+                x-data="{ savedEmail: @js(Str::lower(auth()->user()->email)) }"
+                x-show="$wire.email.toLowerCase() !== savedEmail"
+                x-cloak
+            >
+                <flux:input
+                    id="current_password"
+                    wire:model="current_password"
+                    :label="__('Current password')"
+                    :description="__('Needed to change your email address.')"
+                    type="password"
+                    autocomplete="current-password"
+                    viewable
+                />
+            </div>
+
             <div class="flex items-center gap-4">
                 <flux:button variant="primary" type="submit">{{ __('Save') }}</flux:button>
             </div>

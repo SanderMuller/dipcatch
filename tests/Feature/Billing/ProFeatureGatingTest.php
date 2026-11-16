@@ -200,3 +200,39 @@ it('sends a customer with no stripe account back from the portal', function (): 
         ->get('/billing/portal')
         ->assertRedirect('/app/billing');
 });
+
+it('does not touch checkout when another site sends the browser to it', function (): void {
+    // Security audit lead 7: checkout is a GET link, so any site can navigate
+    // a signed-in browser to it. The browser marks that request cross-site.
+    configureStripe();
+    config()->set('plans.stripe.pro_yearly_price_id', 'price_year');
+
+    $user = User::factory()->create(['stripe_checkout_session_id' => 'cs_monthly']);
+    Cache::put('billing:checkout-interval:' . $user->id, 'monthly');
+
+    $sessions = new class extends CheckoutSessions {
+        /** @var list<string> */
+        public array $expired = [];
+
+        public function find(string $sessionId): CheckoutSession
+        {
+            return new CheckoutSession('open', url: 'https://checkout.stripe.test/cs_monthly');
+        }
+
+        public function expire(string $sessionId): void
+        {
+            $this->expired[] = $sessionId;
+
+            throw new RuntimeException('stop');
+        }
+    };
+    app()->instance(CheckoutSessions::class, $sessions);
+
+    $this->actingAs($user)
+        ->withHeader('Sec-Fetch-Site', 'cross-site')
+        ->get('/billing/checkout/yearly')
+        ->assertRedirect('/app/billing');
+
+    expect($sessions->expired)->toBe([])
+        ->and($user->fresh()?->stripe_checkout_session_id)->toBe('cs_monthly');
+});

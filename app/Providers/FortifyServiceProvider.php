@@ -100,6 +100,21 @@ final class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(20)->by($request->ip() ?? 'unknown');
         });
 
+        // Sending the verification link again, and following it. Fortify's
+        // default is 6 a minute with no longer window, so an account that
+        // names someone else's address could mail them without end. The
+        // two limits need distinct keys: a shared key would count each
+        // request twice.
+        RateLimiter::for('verification', function (Request $request) {
+            $user = $request->user();
+            $key = $user instanceof User ? 'user:' . $user->id : 'ip:' . $request->ip();
+
+            return [
+                Limit::perMinute(6)->by('minute:' . $key),
+                Limit::perHour(6)->by('hour:' . $key),
+            ];
+        });
+
         RateLimiter::for('invitation', function (Request $request) {
             return Limit::perMinute(30)->by($request->ip() ?? 'unknown');
         });

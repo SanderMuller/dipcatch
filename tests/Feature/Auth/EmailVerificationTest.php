@@ -2,7 +2,9 @@
 
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Laravel\Fortify\Features;
 
@@ -69,4 +71,26 @@ test('already verified user visiting verification link is redirected without fir
 
     expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
     Event::assertNotDispatched(Verified::class);
+});
+
+test('the verification link can be sent again only so often an hour', function (): void {
+    // The account names the address, which can be anyone's. Fortify's own
+    // limit is per minute only, so its route would send mail without end.
+    Notification::fake();
+
+    $user = User::factory()->unverified()->create();
+    $this->actingAs($user);
+
+    for ($attempt = 1; $attempt <= 6; $attempt++) {
+        $this->post(route('verification.send'))->assertRedirect();
+        $this->travel(2)->minutes();
+    }
+
+    $this->post(route('verification.send'))->assertTooManyRequests();
+
+    Notification::assertSentToTimes($user, VerifyEmail::class, 6);
+
+    $this->travel(1)->hours();
+
+    $this->post(route('verification.send'))->assertRedirect();
 });

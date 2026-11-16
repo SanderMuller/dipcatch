@@ -4,11 +4,13 @@ namespace App\Services\ShopDiscovery;
 
 use App\Enums\ApiService;
 use App\Models\ApiUsageDay;
+use App\Models\User;
 use App\Models\WebSearch;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * One stored search per query and country, shared by every product that
@@ -34,16 +36,20 @@ final readonly class WebSearches
      * limit spent, the provider failed, or another worker held the lock too
      * long.
      */
-    public function forQuery(string $query, string $country): ?WebSearch
+    public function forQuery(string $query, string $country, ?User $account = null): ?WebSearch
     {
-        return $this->lookUp($query, $country)->search;
+        return $this->lookUp($query, $country, account: $account)->search;
     }
 
     /**
      * As {@see forQuery()}, with the reason when there is no search. A
      * thrown error from the save is not caught here.
+     *
+     * With an account, a new search also counts against that account's own
+     * daily share, so one account cannot spend the searches every account
+     * shares. A stored search costs nothing and is never refused.
      */
-    public function lookUp(string $query, string $country, WebSearchBudget $budget = WebSearchBudget::Discovery): WebSearchOutcome
+    public function lookUp(string $query, string $country, WebSearchBudget $budget = WebSearchBudget::Discovery, ?User $account = null): WebSearchOutcome
     {
         if (! $this->enabled()) {
             return WebSearchOutcome::failed();
@@ -60,7 +66,7 @@ final readonly class WebSearches
             // Under a lock on the query, and checked again inside it: two
             // products with the same title that miss together spend one search.
             $outcome = Cache::lock("web-discovery:search:{$hash}", self::LOCK_SECONDS)
-                ->block(self::LOCK_WAIT_SECONDS, fn (): WebSearchOutcome => ($fresh = $this->fresh($hash)) instanceof WebSearch ? WebSearchOutcome::found($fresh) : $this->search($query, $country, $hash, $budget));
+                ->block(self::LOCK_WAIT_SECONDS, fn (): WebSearchOutcome => ($fresh = $this->fresh($hash)) instanceof WebSearch ? WebSearchOutcome::found($fresh) : $this->search($query, $country, $hash, $budget, $account));
         } catch (LockTimeoutException) {
             Log::info('Web shop discovery skipped a search: another worker held it too long; the next run tries again.', ['query_hash' => $hash]);
 
@@ -89,13 +95,27 @@ final readonly class WebSearches
         return $search instanceof WebSearch && self::isFresh($search) ? $search : null;
     }
 
-    private function search(string $query, string $country, string $hash, WebSearchBudget $budget): WebSearchOutcome
+    private function search(string $query, string $country, string $hash, WebSearchBudget $budget, ?User $account): WebSearchOutcome
     {
+        // Zero or less lifts the account's cap, as it does the app-wide one.
+        $accountLimit = Config::integer('dipcatch.web_discovery.account_daily_search_limit');
+        $accountKey = $account === null || $accountLimit <= 0 ? null : 'web-discovery:searches:user:' . $account->id;
+
+        if ($accountKey !== null && RateLimiter::tooManyAttempts($accountKey, $accountLimit)) {
+            Log::info('Web shop discovery skipped a search: the account used its daily share.', ['user_id' => $account?->id]);
+
+            return WebSearchOutcome::quotaSpent();
+        }
+
         if (! self::reserveSearch($budget)) {
             Log::info('Web shop discovery skipped a search: the daily limit is spent.');
             ApiUsageDay::refused(ApiService::Serper, SerperProvider::PURPOSE);
 
             return WebSearchOutcome::quotaSpent();
+        }
+
+        if ($accountKey !== null) {
+            RateLimiter::hit($accountKey, decaySeconds: 86_400);
         }
 
         try {

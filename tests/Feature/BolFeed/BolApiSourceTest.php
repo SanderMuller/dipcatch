@@ -1,15 +1,19 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\ProbeBudget;
 use App\Actions\Shops\ProbeShopUrl;
+use App\Enums\ProbeFailure;
 use App\Jobs\CheckShopPrice;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\User;
 use App\PriceAdapters\AdapterResolver;
 use App\Services\AhApi\AhApiSource;
 use App\Services\BolApi\BolApiSource;
 use App\Services\Checkjebon\CheckjebonResult;
 use App\Services\Checkjebon\CheckjebonSource;
 use App\Services\ShopFetcher\ShopFetcher;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
 function bolPage(): string
@@ -93,4 +97,23 @@ it('checks a tracked bol.com shop through the API', function (): void {
 
     expect($shop->refresh()->adapter_key)->toBe('bol-api')
         ->and((string) $shop->current_price)->toBe('8.81');
+});
+
+it('spends from the probe budget when it reads a page through the API', function (): void {
+    // Security audit lead 14: every API read is a live call on the operator's
+    // credential, so it must be paced like a page fetch.
+    fakeBolProductApi();
+    $user = User::factory()->create();
+
+    for ($probe = 1; $probe <= ProbeBudget::PER_MINUTE; $probe++) {
+        expect(app(ProbeShopUrl::class)(null, bolPage(), $user)->isSuccess())->toBeTrue();
+    }
+
+    $catalogCalls = fn (): int => Http::recorded(fn (Request $request): bool => str_contains($request->url(), 'api.bol.com'))->count();
+    $before = $catalogCalls();
+
+    $blocked = app(ProbeShopUrl::class)(null, bolPage(), $user);
+
+    expect($blocked->errorCode)->toBe(ProbeFailure::ProbeRateLimited)
+        ->and($catalogCalls())->toBe($before);
 });

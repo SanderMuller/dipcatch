@@ -4,6 +4,7 @@ namespace App\Actions\Shops;
 
 use App\Enums\ScrapeStatus;
 use App\PriceAdapters\ShopSnapshot;
+use App\Services\ShopFetcher\Exceptions\RateLimitedByHost;
 
 /**
  * What one price check read, in the shape `CheckShopPrice::persist()` needs.
@@ -26,6 +27,8 @@ final readonly class CheckOutcome
         public ?string $movedTo = null,
         /** The URL that was fetched, so a move is not stored over a URL changed since. */
         public ?string $movedFrom = null,
+        /** False when the failure is DipCatch's own, so the shop's failure count stays. */
+        public bool $countsAgainstShop = true,
     ) {}
 
     /**
@@ -41,5 +44,23 @@ final readonly class CheckOutcome
     public static function failure(ScrapeStatus $status, ?string $error): self
     {
         return new self($status, snapshot: null, adapterKey: null, imageUrl: null, error: $error);
+    }
+
+    /**
+     * A host that stayed throttled through every attempt. When the throttle
+     * is DipCatch's own, the check is recorded but says nothing about the
+     * shop: probes from any account draw on the same throttle, so counting
+     * it would let one account walk another account's shop to dead.
+     */
+    public static function rateLimited(RateLimitedByHost $e): self
+    {
+        return new self(
+            $e->status(),
+            snapshot: null,
+            adapterKey: null,
+            imageUrl: null,
+            error: $e->getMessage(),
+            countsAgainstShop: $e->source !== RateLimitedByHost::SOURCE_LOCAL,
+        );
     }
 }

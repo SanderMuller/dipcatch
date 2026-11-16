@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Actions\Products\LatchIfMet;
 use App\Actions\Shops\CheckOutcome;
+use App\Actions\Shops\FailedCheckUpdates;
 use App\Actions\Shops\RegularPriceClaim;
 use App\Actions\Shops\ResolvedBundlePricing;
 use App\Actions\Shops\SuccessfulCheckUpdates;
@@ -35,7 +36,6 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -170,8 +170,9 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             }
 
             // The host stayed saturated across the whole budget. Record the
-            // throttling rather than losing the cycle silently.
-            $outcome = CheckOutcome::failure($e->status(), $e->getMessage());
+            // throttling rather than losing the cycle silently. When the
+            // throttle is our own, the shop's failure count stays.
+            $outcome = CheckOutcome::rateLimited($e);
         }
 
         $this->persist($shop, $outcome);
@@ -325,7 +326,7 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
                 $updates['last_error'] = $outcome->error;
                 $updates += ResolvedBundlePricing::expiredFailureUpdates($locked);
 
-                $updates += self::failureUpdatesFor($locked, $status);
+                $updates += FailedCheckUpdates::for($locked, $status, $outcome->countsAgainstShop);
             }
 
             $check = PriceCheck::create($pricing->priceCheckAttributes(
@@ -439,50 +440,5 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             'pack_quantity' => array_key_exists('pack_quantity', $updates) ? $updates['pack_quantity'] : $shop->pack_quantity,
             'pack_unit' => array_key_exists('pack_unit', $updates) ? $updates['pack_unit'] : $shop->pack_unit,
         ];
-    }
-
-    /**
-     * @return array{consecutive_failures?: int, consecutive_5xx_failures?: int, health?: string, active?: bool}
-     */
-    private static function failureUpdatesFor(Shop $shop, ScrapeStatus $status): array
-    {
-        // Permanent: both counters are kept, the offer dies now.
-        if ($status === ScrapeStatus::RobotsDisallowed) {
-            return ['health' => ShopHealth::Dead->value, 'active' => false];
-        }
-
-        if ($status === ScrapeStatus::TransientServerError) {
-            $failures = $shop->consecutive_5xx_failures + 1;
-
-            return ['consecutive_5xx_failures' => $failures] + self::healthAt(
-                $failures,
-                Config::integer('dipcatch.shop.failing_5xx_after'),
-                Config::integer('dipcatch.shop.dead_5xx_after'),
-            );
-        }
-
-        $failures = $shop->consecutive_failures + 1;
-
-        return ['consecutive_failures' => $failures] + self::healthAt(
-            $failures,
-            Config::integer('dipcatch.shop.failing_after'),
-            Config::integer('dipcatch.shop.dead_after'),
-        );
-    }
-
-    /**
-     * @return array{health?: string, active?: bool}
-     */
-    private static function healthAt(int $failures, int $failingAfter, int $deadAfter): array
-    {
-        if ($failures >= $deadAfter) {
-            return ['health' => ShopHealth::Dead->value, 'active' => false];
-        }
-
-        if ($failures >= $failingAfter) {
-            return ['health' => ShopHealth::Failing->value];
-        }
-
-        return [];
     }
 }

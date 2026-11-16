@@ -1072,3 +1072,25 @@ it('starts stale findings over from the stored search when no new search can be 
         ->and($finding->status)->toBe(WebFindingStatus::Proposed)
         ->and(serperCalls())->toBe(1);
 });
+
+it('gives each account its own share of the day\'s searches', function (): void {
+    // Security audit lead 15: renaming a product starts a new paid search,
+    // and every account spends from one app-wide daily limit.
+    config()->set('dipcatch.web_discovery.account_daily_search_limit', 2);
+
+    $product = discoveryProduct();
+    fakeDiscovery([['title' => 'Coffee beans', 'link' => 'https://a.test/p']], ['https://a.test/p' => htmlPage(discoveryPage('Coffee beans'))]);
+    Queue::fake();
+
+    foreach (['Coffee beans 1 kg', 'Coffee beans 2 kg', 'Coffee beans 3 kg'] as $title) {
+        $product->forceFill(['title' => $title])->save();
+        discover($product);
+    }
+
+    expect(serperCalls())->toBe(2);
+
+    // Another account still gets its search.
+    discover(discoveryProduct('Tea leaves 500 g'));
+
+    expect(serperCalls())->toBe(3);
+});

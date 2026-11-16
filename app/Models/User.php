@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Concerns\Subscribes;
 use App\Enums\AiPromptPlace;
+use App\Rules\PushServiceEndpoint;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -26,6 +27,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Passport\Contracts\OAuthenticatable;
 use Laravel\Passport\HasApiTokens;
 use NotificationChannels\WebPush\HasPushSubscriptions;
+use NotificationChannels\WebPush\PushSubscription;
 
 /**
  * @property int $id
@@ -165,6 +167,20 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
     public function wantsShopChecks(): bool
     {
         return $this->shop_checks && $this->entitlements()->allowsShopChecks();
+    }
+
+    /**
+     * The subscriptions a push goes to: only those at a browser push service.
+     * A row stored before the subscribe check existed could name any address,
+     * and the queue worker would POST to it.
+     *
+     * @return EloquentCollection<array-key, PushSubscription>
+     */
+    public function routeNotificationForWebPush(): EloquentCollection
+    {
+        return $this->pushSubscriptions
+            ->filter(static fn (PushSubscription $subscription): bool => PushServiceEndpoint::allows($subscription->endpoint))
+            ->values();
     }
 
     public function canAccessPanel(Panel $panel): bool

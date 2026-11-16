@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\TestNotification;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -20,6 +21,8 @@ use Livewire\Component;
 #[Title('Notification settings')]
 final class NotificationPreferences extends Component
 {
+    public const int TESTS_PER_HOUR = 5;
+
     public bool $notify_via_email = false;
 
     public bool $notify_via_filament = false;
@@ -51,7 +54,21 @@ final class NotificationPreferences extends Component
      */
     public function sendTest(): void
     {
-        $this->user()->notify(new TestNotification());
+        $user = $this->user();
+
+        // Each test sends an email and a push to every subscription.
+        $sent = RateLimiter::attempt(
+            'notification-test:' . $user->id,
+            self::TESTS_PER_HOUR,
+            static fn () => $user->notify(new TestNotification()),
+            3600,
+        );
+
+        if ($sent === false) {
+            Flux::toast(variant: 'danger', text: __('You sent several tests recently. Please wait before you send another.'));
+
+            return;
+        }
 
         Flux::toast(variant: 'success', text: __('Test notification sent.'));
     }

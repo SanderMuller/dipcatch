@@ -36,8 +36,14 @@
 
                 {{-- Anyone may register a client under any name, so the name
                      alone is not identity. The host it sends you back to is
-                     the part a reader can actually check. --}}
-                @php($redirectHost = parse_url($client->redirect_uris[0] ?? '', PHP_URL_HOST))
+                     the part a reader can actually check. That is the
+                     `redirect_uri` of this request, which Passport has already
+                     matched against the client's list: a client may register
+                     several, and the code goes to the one the request names,
+                     not to the first. Without one, Passport allows only a
+                     client with a single registered URI. --}}
+                @php($redirectUri = $request->query('redirect_uri', $client->redirect_uris[0] ?? ''))
+                @php($redirectHost = is_string($redirectUri) ? parse_url($redirectUri, PHP_URL_HOST) : null)
 
                 @if (is_string($redirectHost))
                     <p class="mt-4 text-sm text-zinc-600 dark:text-zinc-300">

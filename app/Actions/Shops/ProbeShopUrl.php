@@ -45,6 +45,7 @@ final readonly class ProbeShopUrl
         private HostFetchMemory $memory,
         private ProbeBudget $budget,
         private AddressRefusal $refusal,
+        private BudgetedApiRead $apiRead,
     ) {}
 
     /**
@@ -86,6 +87,7 @@ final readonly class ProbeShopUrl
 
         // Dataset-served hosts resolve locally: no network fetch, and no
         // per-user probe budget consumed (bulk-adding must not throttle).
+        // An API-served host pays first: see BudgetedApiRead.
         $host = UrlNormalizer::normalizeHost((string) parse_url($normalizedUrl, PHP_URL_HOST));
 
         $refused = $this->refusal->for($normalizedUrl, $host, fn (): ?ProbeOutcome => $this->overBudget($actor, $spendBudget));
@@ -93,14 +95,14 @@ final readonly class ProbeShopUrl
             return $refused;
         }
 
-        $local = $this->resolveFromLocalSources($product, $normalizedUrl, $host);
+        $local = $this->resolveFromLocalSources($product, $normalizedUrl, $host, $actor, $spendBudget);
         if ($local instanceof ProbeOutcome) {
             return $local;
         }
 
-        $overBudget = $this->overBudget($actor, $spendBudget);
-
-        if ($overBudget instanceof ProbeOutcome) {
+        // An API-served host already paid in resolveFromLocalSources(), so
+        // its fallback to the page does not pay twice.
+        if (! $this->apiSources->supports($host) && ($overBudget = $this->overBudget($actor, $spendBudget)) instanceof ProbeOutcome) {
             return $overBudget;
         }
 
@@ -281,9 +283,15 @@ final readonly class ProbeShopUrl
      * unofficial API misbehaves, and boodschaapje.nl/Lidl is dataset-only.
      * Returns null otherwise, so the network probe runs.
      */
-    private function resolveFromLocalSources(?Product $product, string $normalizedUrl, string $host): ?ProbeOutcome
+    private function resolveFromLocalSources(?Product $product, string $normalizedUrl, string $host, User $actor, bool $spendBudget): ?ProbeOutcome
     {
-        $reading = $this->apiSources->read($host, $normalizedUrl);
+        $reading = $this->apiSources->supports($host)
+            ? ($this->apiRead)($host, $normalizedUrl, $actor, $spendBudget)
+            : null;
+
+        if ($reading instanceof ProbeOutcome) {
+            return $reading;
+        }
 
         if ($reading !== null) {
             return $this->successFromSnapshot($product, $reading[0], $normalizedUrl, $host, adapterKey: $reading[1]);

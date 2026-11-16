@@ -196,6 +196,7 @@ test('two-factor setup does not offer the secret as a password', function (): vo
         ->andReturn('otpauth://totp/Dipcatch:test@example.com?secret=CMN5TSOG355MJ55R');
 
     $this->actingAs($user);
+    session()->put('auth.password_confirmed_at', now()->getTimestamp());
 
     $enabled = Livewire::test(Security::class)->call('enable');
     $setupHtml = $enabled->html();

@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\ParallelTesting;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Cashier\Cashier;
@@ -159,6 +160,12 @@ final class AppServiceProvider extends ServiceProvider
         RateLimiter::for('mcp', fn (Request $request): Limit => Limit::perMinute(60)
             ->by($request->user()?->getAuthIdentifier() ?? $request->ip()));
 
+        // Open client registration, per IP. An assistant such as Claude
+        // registers from its own servers for each user who connects, so the
+        // limit is wide; it stops a flood of client rows, not normal use.
+        RateLimiter::for('mcp-registration', fn (Request $request): Limit => Limit::perMinute(30)
+            ->by($request->ip() ?? 'unknown'));
+
         // The photos of one name search's rows load at once, eight at most.
         RateLimiter::for('name-search-photo', fn (Request $request): Limit => Limit::perMinute(60)
             ->by($request->user()?->getAuthIdentifier() ?? $request->ip()));
@@ -179,6 +186,14 @@ final class AppServiceProvider extends ServiceProvider
     protected function configureDefaults(): void
     {
         Date::use(CarbonImmutable::class);
+
+        // Every URL the app builds uses `APP_URL`, not the request host. On
+        // Laravel Cloud the framework trusts all proxies, so a forged
+        // `X-Forwarded-Host` would otherwise put another host into a password
+        // reset mail, or into a sitemap the edge then caches for everyone.
+        $appUrl = config()->string('app.url');
+        URL::useOrigin($appUrl);
+        URL::forceScheme(parse_url($appUrl, PHP_URL_SCHEME) ?: 'https');
 
         DB::prohibitDestructiveCommands(
             app()->isProduction(),

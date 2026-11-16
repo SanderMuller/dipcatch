@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Actions\Shops\ProbeBudget;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Enums\ProbeFailure;
 use App\Livewire\Products\AddProductWizard;
@@ -9,7 +10,6 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
 
 function seedAhRow(string $externalId = 'wi257', string $name = 'AH Kruiden roomkaas', string $price = '1.25'): void
@@ -54,17 +54,19 @@ test('probe falls back to the dataset when the AH API is down', function (): voi
         ->and($outcome->host)->toBe('ah.nl');
 });
 
-test('dataset probes do not consume the per-user probe rate limit', function (): void {
+test('bulk adding from the dataset is not throttled by the per-user probe budget', function (): void {
+    // The live AH API spends from the budget, but past it the probe reads the
+    // dataset instead, which costs nothing.
     Http::fake(ahApiDownFakes());
     seedAhRow();
     $user = User::factory()->create();
 
-    for ($i = 0; $i < 10; $i++) {
+    for ($probe = 1; $probe <= ProbeBudget::PER_MINUTE + 5; $probe++) {
         $outcome = app(ProbeShopUrl::class)(null, 'https://www.ah.nl/producten/product/wi257/x', $user);
         expect($outcome->isSuccess())->toBeTrue();
     }
 
-    expect(RateLimiter::attempts("dipcatch:probe:user:{$user->id}"))->toBe(0);
+    Http::assertSentCount(ProbeBudget::PER_MINUTE);
 });
 
 test('AH product missing from the dataset fails with not_in_dataset', function (): void {

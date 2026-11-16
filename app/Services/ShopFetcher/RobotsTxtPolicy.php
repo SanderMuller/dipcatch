@@ -204,6 +204,13 @@ final readonly class RobotsTxtPolicy
      * underscore — for all crawlers, and we read it as the literal prefix
      * `/*_*`, which matches nothing, so we would have fetched what they had
      * forbidden. Most shops write their rules this way.
+     *
+     * Matched without a regex. The shop writes the pattern, and as a regex
+     * each `*` became `.*`: a rule with many of them against a long address
+     * ran into the backtrack limit, and the failed match read as "no match",
+     * so a forbidden page was fetched. With `*` the only wildcard, taking
+     * each literal piece at its first place after the one before is enough,
+     * and that costs one string search per piece.
      */
     private function patternMatches(string $pattern, string $path): bool
     {
@@ -213,10 +220,39 @@ final readonly class RobotsTxtPolicy
             $pattern = substr($pattern, 0, -1);
         }
 
-        // Escape everything, then put the one metacharacter back.
-        $regex = str_replace('\*', '.*', preg_quote($pattern, '#'));
+        $pieces = explode('*', $pattern);
+        $first = array_shift($pieces);
 
-        return preg_match('#^' . $regex . ($anchored ? '$' : '') . '#s', $path) === 1;
+        if (! str_starts_with($path, $first)) {
+            return false;
+        }
+
+        if ($pieces === []) {
+            return ! $anchored || $path === $first;
+        }
+
+        $last = array_pop($pieces);
+        $position = strlen($first);
+
+        foreach ($pieces as $piece) {
+            if ($piece === '') {
+                continue;
+            }
+
+            $found = strpos($path, $piece, $position);
+
+            if ($found === false) {
+                return false;
+            }
+
+            $position = $found + strlen($piece);
+        }
+
+        if ($anchored) {
+            return strlen($path) - strlen($last) >= $position && str_ends_with($path, $last);
+        }
+
+        return $last === '' || strpos($path, $last, $position) !== false;
     }
 
     private static function nameFromUa(string $ua): string

@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Http\Controllers\PushSubscriptionController;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -28,7 +29,7 @@ function pushOutcome(): DropOutcome
 /**
  * @return array<string, string|array<string, string>>
  */
-function subscriptionPayload(string $endpoint = 'https://push.example.com/endpoint/abc'): array
+function subscriptionPayload(string $endpoint = 'https://fcm.googleapis.com/fcm/send/endpoint/abc'): array
 {
     return [
         'endpoint' => $endpoint,
@@ -49,7 +50,7 @@ test('POST /push/subscribe creates a push_subscriptions row for the authed user'
 
     expect($user->pushSubscriptions()->count())->toBe(1);
     $sub = $user->pushSubscriptions()->firstOrFail();
-    expect($sub->endpoint)->toBe('https://push.example.com/endpoint/abc')
+    expect($sub->endpoint)->toBe('https://fcm.googleapis.com/fcm/send/endpoint/abc')
         ->and($sub->public_key)->toBe('BJ_p256dh_public_key_base64url')
         ->and($sub->auth_token)->toBe('auth_secret_base64url')
         ->and($sub->content_encoding)->toBe(ContentEncoding::aes128gcm);
@@ -63,7 +64,7 @@ test('subscribe rejects missing keys', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user)
-        ->postJson(route('push.subscribe'), ['endpoint' => 'https://push.example.com/x'])
+        ->postJson(route('push.subscribe'), ['endpoint' => 'https://fcm.googleapis.com/fcm/send/x'])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['keys.p256dh', 'keys.auth']);
 });
@@ -71,7 +72,7 @@ test('subscribe rejects missing keys', function (): void {
 test('subscribe rejects non-URL endpoints and endpoints longer than the column', function (): void {
     $user = User::factory()->create();
 
-    $tooLong = 'https://push.example.com/' . str_repeat('a', 600);
+    $tooLong = 'https://fcm.googleapis.com/fcm/send/' . str_repeat('a', 600);
 
     $this->actingAs($user)
         ->postJson(route('push.subscribe'), [
@@ -95,19 +96,19 @@ test('subscribe rejects non-URL endpoints and endpoints longer than the column',
 test('DELETE /push/subscribe removes only the matching endpoint', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user)->postJson(route('push.subscribe'), subscriptionPayload('https://push.example.com/a'));
-    $this->actingAs($user)->postJson(route('push.subscribe'), subscriptionPayload('https://push.example.com/b'));
+    $this->actingAs($user)->postJson(route('push.subscribe'), subscriptionPayload('https://fcm.googleapis.com/fcm/send/a'));
+    $this->actingAs($user)->postJson(route('push.subscribe'), subscriptionPayload('https://fcm.googleapis.com/fcm/send/b'));
 
     expect($user->pushSubscriptions()->count())->toBe(2);
 
     $this->actingAs($user)
-        ->deleteJson(route('push.unsubscribe'), ['endpoint' => 'https://push.example.com/a'])
+        ->deleteJson(route('push.unsubscribe'), ['endpoint' => 'https://fcm.googleapis.com/fcm/send/a'])
         ->assertOk()
         ->assertJson(['ok' => true]);
 
     $user->refresh();
     expect($user->pushSubscriptions()->count())->toBe(1)
-        ->and($user->pushSubscriptions()->first()?->endpoint)->toBe('https://push.example.com/b');
+        ->and($user->pushSubscriptions()->first()?->endpoint)->toBe('https://fcm.googleapis.com/fcm/send/b');
 });
 
 test('via() includes the WebPush channel only when toggle is on AND user has at least one subscription', function (): void {
@@ -124,8 +125,8 @@ test('via() includes the WebPush channel only when toggle is on AND user has at 
         'notify_via_email' => false, 'notify_via_filament' => false, 'notify_via_push' => true,
     ]);
 
-    $togglesOffWithSub->updatePushSubscription('https://push.example.com/x', 'k', 'a');
-    $togglesOnWithSub->updatePushSubscription('https://push.example.com/y', 'k', 'a');
+    $togglesOffWithSub->updatePushSubscription('https://fcm.googleapis.com/fcm/send/x', 'k', 'a');
+    $togglesOnWithSub->updatePushSubscription('https://fcm.googleapis.com/fcm/send/y', 'k', 'a');
 
     $notification = new PriceDropNotification($product, $outcome, 'fake-id');
 
@@ -309,3 +310,85 @@ test('a drop or unit-target alert queued before the unit snapshots existed still
     'drop' => ['drop', 'Fanta is now €2.00 at Jumbo'],
     'unit target' => ['unit target', 'Fanta is €1.33 /stuk (€2.00) at Jumbo'],
 ]);
+
+test('subscribe accepts the endpoints the browser push services hand out', function (string $endpoint): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->postJson(route('push.subscribe'), subscriptionPayload($endpoint))
+        ->assertCreated();
+
+    expect($user->pushSubscriptions()->value('endpoint'))->toBe($endpoint);
+})->with([
+    'Chrome' => 'https://fcm.googleapis.com/fcm/send/abc:def',
+    'Firefox' => 'https://updates.push.services.mozilla.com/wpush/v2/abc',
+    'Safari' => 'https://web.push.apple.com/QABC',
+    'Edge' => 'https://wns2-par02p.notify.windows.com/w/?token=abc',
+]);
+
+test('subscribe refuses an endpoint that is not a browser push service', function (string $endpoint): void {
+    // Security audit lead 5: the queue worker POSTs to the stored endpoint,
+    // so any other address turns a subscription into a request from inside
+    // the app's network.
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->postJson(route('push.subscribe'), subscriptionPayload($endpoint))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['endpoint']);
+
+    expect($user->pushSubscriptions()->exists())->toBeFalse();
+})->with([
+    'cloud metadata' => 'http://169.254.169.254/latest/meta-data',
+    'private address' => 'https://10.0.0.5:8080/path',
+    'push service over http' => 'http://fcm.googleapis.com/fcm/send/abc',
+    'push service on another port' => 'https://fcm.googleapis.com:8443/fcm/send/abc',
+    'look-alike host' => 'https://fcm.googleapis.com.attacker.example.test/abc',
+    'credentials in the URL' => 'https://user:pass@fcm.googleapis.com/fcm/send/abc',
+    'unknown host' => 'https://attacker.example.test/push',
+]);
+
+test('a stored endpoint that is not a browser push service is never sent to', function (): void {
+    // Rows saved before the subscribe check existed stay in the table.
+    $user = User::factory()->create();
+    $user->updatePushSubscription('http://169.254.169.254/latest/meta-data', 'k', 'a');
+    $user->updatePushSubscription('https://fcm.googleapis.com/fcm/send/abc', 'k', 'a');
+
+    $routed = $user->routeNotificationFor('WebPush');
+
+    expect($routed->pluck('endpoint')->all())->toBe(['https://fcm.googleapis.com/fcm/send/abc']);
+});
+
+test('an account keeps only its newest push subscriptions', function (): void {
+    // Security audit lead 12: every push goes to each subscription in turn,
+    // inside one queued job.
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $limit = PushSubscriptionController::SUBSCRIPTIONS_PER_USER;
+
+    foreach (range(0, $limit) as $number) {
+        $this->postJson(route('push.subscribe'), subscriptionPayload("https://fcm.googleapis.com/fcm/send/device-{$number}"))
+            ->assertCreated();
+    }
+
+    $endpoints = $user->pushSubscriptions()->pluck('endpoint');
+
+    expect($endpoints)->toHaveCount($limit)
+        ->and($endpoints)->not->toContain('https://fcm.googleapis.com/fcm/send/device-0')
+        ->and($endpoints)->toContain("https://fcm.googleapis.com/fcm/send/device-{$limit}");
+});
+
+test('the limit counts per account, not across accounts', function (): void {
+    $other = User::factory()->create();
+    $other->updatePushSubscription('https://fcm.googleapis.com/fcm/send/other', 'k', 'a');
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    foreach (range(0, PushSubscriptionController::SUBSCRIPTIONS_PER_USER) as $number) {
+        $this->postJson(route('push.subscribe'), subscriptionPayload("https://fcm.googleapis.com/fcm/send/device-{$number}"));
+    }
+
+    expect($other->pushSubscriptions()->count())->toBe(1);
+});

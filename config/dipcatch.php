@@ -229,6 +229,10 @@ return [
         'search_max_age_days' => (int) env('DIPCATCH_WEB_DISCOVERY_SEARCH_MAX_AGE_DAYS', 90),
         // Paid searches app-wide per day. Zero or less lifts the cap.
         'daily_search_limit' => (int) env('DIPCATCH_WEB_DISCOVERY_DAILY_SEARCH_LIMIT', 300),
+        // New title and barcode searches one account may start per day, out
+        // of the limit above. Renaming a product starts one, so without this
+        // one account could spend the searches every account shares.
+        'account_daily_search_limit' => (int) env('DIPCATCH_WEB_DISCOVERY_ACCOUNT_DAILY_SEARCH_LIMIT', 30),
         // Paid searches app-wide per day for product names typed in the
         // add-product wizard, on a counter apart from the one above.
         'name_search_daily_limit' => (int) env('DIPCATCH_WEB_DISCOVERY_NAME_SEARCH_DAILY_LIMIT', 100),

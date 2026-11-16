@@ -24,6 +24,9 @@ beforeEach(function (): void {
     Features::passkeys([
         'confirmPassword' => true,
     ]);
+
+    // The page asks for the password first, and its actions check it again.
+    session()->put('auth.password_confirmed_at', Carbon::now()->getTimestamp());
 });
 
 test('security settings page can be rendered', function (): void {
@@ -41,6 +44,7 @@ test('security settings page can be rendered', function (): void {
 
 test('security settings page requires password confirmation when enabled', function (): void {
     $user = User::factory()->create();
+    session()->forget('auth.password_confirmed_at');
 
     $response = $this->actingAs($user)
         ->get(route('security.edit'));

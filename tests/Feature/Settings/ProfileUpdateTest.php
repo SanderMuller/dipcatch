@@ -3,7 +3,9 @@
 use App\Billing\StripeCustomers;
 use App\Livewire\Settings\Profile;
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
 test('profile information can be updated', function (): void {
@@ -14,6 +16,7 @@ test('profile information can be updated', function (): void {
     $response = Livewire::test(Profile::class)
         ->set('name', 'Test User')
         ->set('email', 'test@example.com')
+        ->set('current_password', 'password')
         ->call('updateProfileInformation');
 
     $response->assertHasNoErrors();
@@ -24,6 +27,27 @@ test('profile information can be updated', function (): void {
         ->and($user->email)->toEqual('test@example.com')
         ->and($user->email_verified_at)->toBeNull();
 });
+
+test('a new address is refused without the current password', function (?string $password): void {
+    $user = User::factory()->create(['email' => 'eigen@example.test']);
+
+    $this->actingAs($user);
+
+    Livewire::test(Profile::class)
+        ->set('email', 'nieuw@example.test')
+        ->set('current_password', $password ?? '')
+        ->call('updateProfileInformation')
+        ->assertHasErrors(['current_password'])
+        ->assertSet('current_password', '');
+
+    $user->refresh();
+
+    expect($user->email)->toBe('eigen@example.test')
+        ->and($user->email_verified_at)->not->toBeNull();
+})->with([
+    'no password' => [null],
+    'wrong password' => ['wrong-password'],
+]);
 
 test('email verification status is unchanged when email address is unchanged', function (): void {
     $user = User::factory()->create();
@@ -170,4 +194,21 @@ test('a Stripe failure leaves your account in place and signed in', function ():
 
     expect($user->fresh())->not->toBeNull()
         ->and(auth()->check())->toBeTrue();
+});
+
+test('the verification link can be sent again only so often', function (): void {
+    // Security audit lead 10: the account names the address, which can be
+    // anyone's, so the button must not send mail without end.
+    Notification::fake();
+
+    $user = User::factory()->unverified()->create();
+    $this->actingAs($user);
+
+    $component = Livewire::test(Profile::class);
+
+    for ($attempt = 1; $attempt <= Profile::VERIFICATION_RESENDS_PER_HOUR + 1; $attempt++) {
+        $component->call('resendVerificationNotification');
+    }
+
+    Notification::assertSentToTimes($user, VerifyEmail::class, Profile::VERIFICATION_RESENDS_PER_HOUR);
 });

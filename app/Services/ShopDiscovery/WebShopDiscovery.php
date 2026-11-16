@@ -120,7 +120,7 @@ final readonly class WebShopDiscovery
         WebDiscovery::mark($product, WebDiscoveryState::Running);
         // Without a new search (the day's searches spent, or the provider
         // down) the stored one still lets stale findings start over.
-        $search = $this->searches->forQuery($product->title, ShoppersCountry::forProduct($product))
+        $search = $this->searches->forQuery($product->title, ShoppersCountry::forProduct($product), $product->user)
             ?? WebDiscovery::query()->find($product->id)?->search;
 
         // The findings stored before still go on.

@@ -11,6 +11,7 @@ use App\Billing\StripeTax;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Cashier\Checkout;
 use Throwable;
@@ -52,8 +53,16 @@ final class BillingController extends Controller
         return redirect()->route('billing.checkout', $interval === BillingInterval::Yearly->value ? ['interval' => $interval] : []);
     }
 
-    public function checkout(string $interval = 'monthly'): Checkout|RedirectResponse
+    public function checkout(Request $request, string $interval = 'monthly'): Checkout|RedirectResponse
     {
+        // A GET link, so another site can send a signed-in browser here, and
+        // this action creates, ends and redirects to Stripe sessions. The
+        // browser marks such a request, and a redirect keeps the mark. The
+        // billing page offers the same choice behind one more click.
+        if ($request->headers->get('Sec-Fetch-Site') === 'cross-site') {
+            return redirect('/app/billing');
+        }
+
         if (! BillingGate::isOpen()) {
             return $this->failed('Pro is not on sale yet.');
         }

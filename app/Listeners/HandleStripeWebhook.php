@@ -185,7 +185,10 @@ final readonly class HandleStripeWebhook
         if ($record->user_id === null) {
             // Nothing else will revisit this: Stripe promises no further
             // event after a close, and this event id is already claimed.
-            dispatch(new RelinkStripeDispute($record->id));
+            // After the commit: this runs inside the webhook transaction, and
+            // a worker that starts first reads the row before the close, or
+            // no row at all, and never applies the block.
+            dispatch(new RelinkStripeDispute($record->id))->afterCommit();
         }
 
         $this->alertOwners(BillingIncidentNotification::disputeClosed($record));
