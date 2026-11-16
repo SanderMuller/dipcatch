@@ -51,5 +51,13 @@ jobs:
       - name: Ensure Rector cache directories exist
         run: mkdir -p .cache/rector .cache/phpstan
 
+      # Rector exits 0 on a clean dry run even when it prints a warning, for example
+      # about a skipped rule that no set registers. The grep fails the job on a warning.
       - name: Run Rector (dry-run)
-        run: vendor/bin/rector process --dry-run
+        run: |
+          set -o pipefail
+          vendor/bin/rector process --dry-run 2>&1 | tee "$RUNNER_TEMP/rector.txt"
+          if grep -q '\[WARNING\]' "$RUNNER_TEMP/rector.txt"; then
+            echo "::error::Rector printed a warning. See the output above."
+            exit 1
+          fi

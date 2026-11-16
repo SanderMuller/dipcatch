@@ -10,12 +10,9 @@ use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Pest\Rector\Rules\SimplifyToLiteralBooleanRector;
 use Pest\Rector\Rules\UseToStartWithRector;
-use Rector\CodeQuality\Rector\Class_\CompleteDynamicPropertiesRector;
 use Rector\CodeQuality\Rector\ClassMethod\LocallyCalledStaticMethodToNonStaticRector;
 use Rector\CodeQuality\Rector\FuncCall\InlineIsAInstanceOfRector;
-use Rector\CodeQuality\Rector\Identical\FlipTypeControlToUseExclusiveTypeRector;
 use Rector\CodeQuality\Rector\If_\SimplifyIfReturnBoolRector;
-use Rector\CodingStyle\Rector\PostInc\PostIncDecToPreIncDecRector;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
 use Rector\DeadCode\Rector\Property\RemoveDefaultValueFromAssignedPropertyRector;
 use Rector\DeadCode\Rector\PropertyProperty\RemoveNullPropertyInitializationRector;
@@ -26,7 +23,6 @@ use Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector;
 use Rector\Php81\Rector\MethodCall\SpatieEnumMethodCallToEnumConstRector;
 use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
 use Rector\Renaming\Rector\Name\RenameClassRector;
-use Rector\TypeDeclaration\Rector\StmtsAwareInterface\DeclareStrictTypesRector;
 use RectorLaravel\Rector\ArrayDimFetch\EnvVariableToEnvHelperRector;
 use RectorLaravel\Rector\ArrayDimFetch\RequestVariablesToRequestFacadeRector;
 use RectorLaravel\Rector\ArrayDimFetch\ServerVariableToRequestFacadeRector;
@@ -142,18 +138,13 @@ return Preset::app(typeDeclarationDocblocks: true)
         TablePropertyToTableAttributeRector::class,
         AppToResolveRector::class,
         CarbonToDateFacadeRector::class,
-        CompleteDynamicPropertiesRector::class,
-        DeclareStrictTypesRector::class, // Performed by Pint
         EnvVariableToEnvHelperRector::class,
         ArrayToFirstClassCallableRector::class => [
             __DIR__ . '/routes',
             __DIR__ . '/config',
         ],
-        FlipTypeControlToUseExclusiveTypeRector::class,
-        FlipTypeControlToUseExclusiveTypeRector::class,
         InlineIsAInstanceOfRector::class,
         LocallyCalledStaticMethodToNonStaticRector::class,
-        PostIncDecToPreIncDecRector::class,
         RedirectRouteToToRouteHelperRector::class,
         // `assert($x instanceof Foo)` after a container `make()` is what narrows
         // `mixed` to the concrete type for PHPStan. Rector reads those asserts as
