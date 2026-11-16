@@ -124,7 +124,7 @@ final readonly class VerdictReading
         return new self(
             firstAt: self::timestamp($row->first_at ?? null),
             lastAt: self::timestamp($row->last_at ?? null),
-            price: self::price($row->price ?? null),
+            price: self::numeric($row->price ?? null),
             isEvidence: true,
             seller: self::text($row->seller ?? null),
             size: self::sizeKey($row->pack_quantity ?? null, $row->pack_unit ?? null),
@@ -136,7 +136,7 @@ final readonly class VerdictReading
     private static function fromNewestRow(object $row): self
     {
         $at = self::timestamp($row->checked_at ?? null);
-        $price = self::price($row->price ?? null);
+        $price = self::numeric($row->price ?? null);
 
         return new self(
             firstAt: $at,
@@ -160,7 +160,9 @@ final readonly class VerdictReading
             return null;
         }
 
-        return (is_numeric($quantity) ? bcadd((string) $quantity, '0', 2) : '') . ' ' . (is_string($unit) ? $unit : '');
+        $quantity = self::numeric($quantity);
+
+        return ($quantity !== null ? bcadd($quantity, '0', 2) : '') . ' ' . (is_string($unit) ? $unit : '');
     }
 
     private static function timestamp(mixed $value): int
@@ -168,9 +170,17 @@ final readonly class VerdictReading
         return is_string($value) ? (int) Carbon::parse($value)->getTimestamp() : 0;
     }
 
-    /** @return numeric-string|null */
-    private static function price(mixed $value): ?string
+    /**
+     * is_numeric() accepts INF and NAN, but they cast to "INF" and "NAN", which bcmath rejects.
+     *
+     * @return numeric-string|null
+     */
+    private static function numeric(mixed $value): ?string
     {
+        if (is_float($value) && ! is_finite($value)) {
+            return null;
+        }
+
         return is_numeric($value) ? (string) $value : null;
     }
 
