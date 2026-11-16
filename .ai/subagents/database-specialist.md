@@ -76,7 +76,6 @@ An index is not free — it is paid for on every insert, update and delete, fore
 - **Append columns**; never position one mid-table.
 - When modifying a column, restate every previously defined attribute or Laravel drops the ones you left out.
 - Rector does not scan `database/`, so these are enforced by review — yours.
-- `MIGRATION_DB_*` in `.env.example` configures a one-off engine-migration target, not a place to run schema changes. Do not prescribe it as a workaround.
 
 ## Database safety
 

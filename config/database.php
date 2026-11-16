@@ -104,25 +104,6 @@ return [
             'timezone' => env('APP_TIMEZONE', 'UTC'),
         ],
 
-        // Second PostgreSQL connection for the one-off engine migration
-        // (`dipcatch:copy-database --to=pgsql_migration`): lets the new
-        // database sit next to the live one until the switch.
-        'pgsql_migration' => [
-            'driver' => 'pgsql',
-            'url' => env('MIGRATION_DB_URL'),
-            'host' => env('MIGRATION_DB_HOST', '127.0.0.1'),
-            'port' => env('MIGRATION_DB_PORT', '5432'),
-            'database' => env('MIGRATION_DB_DATABASE', 'dipcatch'),
-            'username' => env('MIGRATION_DB_USERNAME', 'postgres'),
-            'password' => env('MIGRATION_DB_PASSWORD', ''),
-            'charset' => 'utf8',
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'search_path' => 'public',
-            'sslmode' => env('MIGRATION_DB_SSLMODE', 'require'),
-            'timezone' => env('APP_TIMEZONE', 'UTC'),
-        ],
-
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

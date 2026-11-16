@@ -71,10 +71,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
-          # pdo_sqlite stays for CopyDatabaseCommandTest, which uses two
-          # throwaway SQLite files to stand in for a source and a target
-          # engine. Nothing else in the suite touches SQLite.
-          extensions: bcmath, redis, pdo_sqlite, sqlite3, pdo_pgsql, pgsql, intl
+          extensions: bcmath, redis, pdo_pgsql, pgsql, intl
           tools: composer:v2
           coverage: xdebug
 
