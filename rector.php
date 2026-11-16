@@ -6,85 +6,38 @@ use Hihaho\RectorRules\Rector\CodeQuality\NativeFunctionFlagArgumentToNamedRecto
 use Hihaho\RectorRules\Rector\CodeQuality\RemoveDefaultValuedArgumentRector;
 use Hihaho\RectorRules\Rector\Routing\MiddlewareStringToClassRector;
 use Hihaho\RectorRules\Rector\Testing\TestFieldStringToConstantRector;
-use Hihaho\RectorRules\Set\HihahoSetList;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Pest\Rector\Rules\SimplifyToLiteralBooleanRector;
 use Pest\Rector\Rules\UseToStartWithRector;
-use Pest\Rector\Set\PestSetList;
-use Rector\Arguments\Rector\ClassMethod\ArgumentAdderRector;
-use Rector\Caching\ValueObject\Storage\FileCacheStorage;
 use Rector\CodeQuality\Rector\Class_\CompleteDynamicPropertiesRector;
 use Rector\CodeQuality\Rector\ClassMethod\LocallyCalledStaticMethodToNonStaticRector;
 use Rector\CodeQuality\Rector\FuncCall\InlineIsAInstanceOfRector;
 use Rector\CodeQuality\Rector\Identical\FlipTypeControlToUseExclusiveTypeRector;
 use Rector\CodeQuality\Rector\If_\SimplifyIfReturnBoolRector;
 use Rector\CodingStyle\Rector\PostInc\PostIncDecToPreIncDecRector;
-use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPublicMethodParameterRector;
 use Rector\DeadCode\Rector\Property\RemoveDefaultValueFromAssignedPropertyRector;
 use Rector\DeadCode\Rector\PropertyProperty\RemoveNullPropertyInitializationRector;
 use Rector\DeadCode\Rector\Stmt\RemoveUnreachableStatementRector;
 use Rector\DeadCode\Rector\StmtsAwareInterface\RemoveDeadInstanceOfAssertRector;
-use Rector\Php74\Rector\Closure\ClosureToArrowFunctionRector;
-use Rector\Php74\Rector\Property\RestoreDefaultNullToNullableTypePropertyRector;
 use Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector;
 use Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector;
 use Rector\Php81\Rector\MethodCall\SpatieEnumMethodCallToEnumConstRector;
 use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
-use Rector\PHPUnit\CodeQuality\Rector\Class_\PreferPHPUnitSelfCallRector;
-use Rector\PHPUnit\CodeQuality\Rector\Class_\PreferPHPUnitThisCallRector;
-use Rector\Privatization\Rector\Property\PrivatizeFinalClassPropertyRector;
 use Rector\Renaming\Rector\Name\RenameClassRector;
 use Rector\TypeDeclaration\Rector\StmtsAwareInterface\DeclareStrictTypesRector;
 use RectorLaravel\Rector\ArrayDimFetch\EnvVariableToEnvHelperRector;
 use RectorLaravel\Rector\ArrayDimFetch\RequestVariablesToRequestFacadeRector;
 use RectorLaravel\Rector\ArrayDimFetch\ServerVariableToRequestFacadeRector;
 use RectorLaravel\Rector\Class_\TablePropertyToTableAttributeRector;
-use RectorLaravel\Rector\Coalesce\ApplyDefaultInsteadOfNullCoalesceRector;
 use RectorLaravel\Rector\FuncCall\AppToResolveRector;
 use RectorLaravel\Rector\MethodCall\RedirectRouteToToRouteHelperRector;
-use RectorLaravel\Rector\MethodCall\ReplaceServiceContainerCallArgRector;
 use RectorLaravel\Rector\StaticCall\CarbonToDateFacadeRector;
-use RectorLaravel\Set\LaravelSetList;
 use SanderMuller\FluentValidationRector\Rector\SimplifyRuleWrappersRector;
 use SanderMuller\FluentValidationRector\Rector\UpdateRulesReturnTypeDocblockRector;
 use SanderMuller\FluentValidationRector\Set\FluentValidationSetList;
-
-// Match worker count to the host's cores. A fixed count oversubscribes a 2-4 vCPU
-// CI runner several times over (each worker bootstraps the full container), which is
-// slower than matching cores. Detected inline to keep this config self-contained.
-// Clamp between 2 and 15: the floor keeps some parallelism, the -1 reserves a core,
-// and the ceiling caps the worst case at the previous fixed value, so a host that
-// reports its full core count (e.g. a CPU-quota limited container that sees host
-// cores rather than its vCPU share) can never spawn more workers than before.
-// Resolves to ~13 on a 14-core dev machine and 2-3 on CI.
-$detectCpuCores = static function (): int {
-    // Linux and CI runners: count processor entries directly, which also works when
-    // shell_exec is disabled. Anchored per line so the first entry is not missed.
-    if (is_readable('/proc/cpuinfo')) {
-        $processors = preg_match_all('/^processor\s*:/m', (string) file_get_contents('/proc/cpuinfo'));
-
-        if ($processors > 0) {
-            return $processors;
-        }
-    }
-
-    // macOS (sysctl), with an nproc fallback for other Unixes. Guarded so a disabled
-    // shell_exec (disable_functions) falls through to the default instead of erroring;
-    // the command is a fixed literal, so there is no injection surface.
-    if (function_exists('shell_exec')) {
-        $cores = trim((string) shell_exec('sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null'));
-
-        if (is_numeric($cores)) {
-            return (int) $cores;
-        }
-    }
-
-    return 4;
-};
-
-$maxParallelProcesses = max(2, min(15, $detectCpuCores() - 1));
+use SanderMuller\RectorPreset\Preset;
 
 // Mirror RouteServiceProvider's recursive File::allFiles(base_path('routes')) scan so
 // TestFieldStringToConstantRector classifies endpoints declared in nested route files too.
@@ -103,23 +56,12 @@ foreach (
 sort($routeFiles);
 
 /**
- * @see https://github.com/rectorphp/rector/blob/main/docs/rector_rules_overview.md
- * @see https://github.com/driftingly/rector-laravel/blob/main/docs/rector_rules_overview.md
+ * The preset sets up the cache, the parallel workers, the paths, the prepared sets, the
+ * extension sets and the shared skips. This file keeps only what is specific to this app.
+ *
+ * @see https://github.com/SanderMuller/rector-preset
  */
-return RectorConfig::configure()
-    ->withCache(
-        cacheDirectory: './.cache/rector',
-        cacheClass: FileCacheStorage::class,
-        containerCacheDirectory: './.cache/rectorContainer',
-    )
-    ->withPaths([
-        __DIR__ . '/app',
-        __DIR__ . '/config',
-        __DIR__ . '/database/factories',
-        __DIR__ . '/routes',
-        __DIR__ . '/tests',
-        __DIR__ . '/bootstrap',
-    ])
+return Preset::app(typeDeclarationDocblocks: true)
     ->withConfiguredRule(SimplifyRuleWrappersRector::class, [
         SimplifyRuleWrappersRector::ALLOW_CHAIN_TAIL_ON_ALLOWLISTED => true,
     ])
@@ -178,15 +120,6 @@ return RectorConfig::configure()
         TestFieldStringToConstantRector::INTERNAL_MIDDLEWARE => [Authenticate::class],
         TestFieldStringToConstantRector::FIRST_PARTY_PREFIX => 'App\\',
     ])
-    ->withRules([
-        PrivatizeFinalClassPropertyRector::class,
-        PreferPHPUnitSelfCallRector::class,
-    ])
-    /**
-     * Prevent syntax like `$request->validated(null, null)`
-     * @see https://getrector.org/documentation/ignoring-rules-or-paths
-     * @see vendor/driftingly/rector-laravel/config/sets/laravel90.php:61
-     */
     ->withSkip([
         AddOverrideAttributeToOverriddenPropertiesRector::class,
         // A queued job's or notification's declared default is what a payload
@@ -208,10 +141,7 @@ return RectorConfig::configure()
         // property form until the larastan upgrade resolves.
         TablePropertyToTableAttributeRector::class,
         AppToResolveRector::class,
-        ApplyDefaultInsteadOfNullCoalesceRector::class,
-        ArgumentAdderRector::class,
         CarbonToDateFacadeRector::class,
-        ClosureToArrowFunctionRector::class,
         CompleteDynamicPropertiesRector::class,
         DeclareStrictTypesRector::class, // Performed by Pint
         EnvVariableToEnvHelperRector::class,
@@ -224,7 +154,6 @@ return RectorConfig::configure()
         InlineIsAInstanceOfRector::class,
         LocallyCalledStaticMethodToNonStaticRector::class,
         PostIncDecToPreIncDecRector::class,
-        PreferPHPUnitThisCallRector::class,
         RedirectRouteToToRouteHelperRector::class,
         // `assert($x instanceof Foo)` after a container `make()` is what narrows
         // `mixed` to the concrete type for PHPStan. Rector reads those asserts as
@@ -242,8 +171,6 @@ return RectorConfig::configure()
             __DIR__ . '/app/Http/Controllers/*',
             __DIR__ . '/app/Policies/*',
         ],
-        ReplaceServiceContainerCallArgRector::class,
-        RestoreDefaultNullToNullableTypePropertyRector::class,
         RequestVariablesToRequestFacadeRector::class => [
             __DIR__ . '/tests/*',
         ],
@@ -269,43 +196,11 @@ return RectorConfig::configure()
             __DIR__ . '/tests/Feature/CrawlPolicyTest.php',
             __DIR__ . '/tests/Feature/StructuredDataTest.php',
         ],
-        __DIR__ . '/bootstrap/cache',
-        __DIR__ . '/.cache',
     ])
+    // The preset detects ALL, POLISH and SIMPLIFY.
     ->withSets([
-        FluentValidationSetList::ALL,
-        FluentValidationSetList::POLISH,
         FluentValidationSetList::SCHEMA,
-        FluentValidationSetList::SIMPLIFY,
-        HihahoSetList::ALL,
-        LaravelSetList::LARAVEL_CODE_QUALITY,
-        LaravelSetList::LARAVEL_ARRAYACCESS_TO_METHOD_CALL,
-        LaravelSetList::LARAVEL_COLLECTION,
-        LaravelSetList::LARAVEL_CONTAINER_STRING_TO_FULLY_QUALIFIED_NAME,
-        LaravelSetList::LARAVEL_FACADE_ALIASES_TO_FULL_NAMES,
-        PestSetList::CODING_STYLE,
     ])
-    ->withComposerBased(
-        phpunit: true,
-        laravel: true,
-    )
-    // If needed, we can update the parallel settings to make sure Rector doesn't start generating errors on large codebases
-    ->withParallel(300, $maxParallelProcesses, 15)
-    // here we can define, what prepared sets of rules will be applied
-    ->withPreparedSets(
-        deadCode: true,
-        codeQuality: true,
-        codingStyle: false,
-        typeDeclarations: true,
-        typeDeclarationDocblocks: true,
-        privatization: false,
-        instanceOf: false,
-        earlyReturn: true,
-        carbon: true,
-        rectorPreset: true,
-        phpunitCodeQuality: true,
-    )
-    ->withAttributesSets()
-    ->withImportNames()
-    ->withMemoryLimit('3G')
+    // The preset turns this set off on a Pest project. The tests still extend PHPUnit's TestCase.
+    ->withComposerBased(phpunit: true)
     ->withPhpSets(php85: true);

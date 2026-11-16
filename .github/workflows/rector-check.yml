@@ -44,12 +44,12 @@ jobs:
         with:
           path: |
             .cache/rector/
-            .cache/rectorContainer/
+            .cache/phpstan/
           key: rector-cache-${{ hashFiles('rector.php') }}
           restore-keys: rector-cache-
 
       - name: Ensure Rector cache directories exist
-        run: mkdir -p .cache/rector .cache/rectorContainer
+        run: mkdir -p .cache/rector .cache/phpstan
 
       - name: Run Rector (dry-run)
         run: vendor/bin/rector process --dry-run
