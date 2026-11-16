@@ -15,7 +15,7 @@
         "@laravel/passkeys": "^0.2.0",
         "@tailwindcss/vite": "^4.3.0",
         "chart.js": "^4.5.1",
-        "concurrently": "^10.0.5",
+        "concurrently": "^10.0.7",
         "laravel-vite-plugin": "^3.0.0",
         "tailwindcss": "^4.3.0",
         "vite": "^8.2.4"
