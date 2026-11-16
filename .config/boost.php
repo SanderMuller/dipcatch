@@ -3,6 +3,7 @@
 use SanderMuller\BoostCore\Config\BoostConfig;
 use SanderMuller\BoostCore\Enums\Agent;
 use SanderMuller\BoostCore\Enums\Tag;
+use SanderMuller\BoostCore\Skills\Remote\RemoteSkillSource;
 use SanderMuller\ProjectBoostLaravel\Rendering\BladeRenderer;
 
 /**
@@ -116,7 +117,11 @@ return BoostConfig::configure()
         'laravel/boost:sail-core',
         'laravel/boost:wayfinder-core',
     ])
-
+    ->withRemoteSkills([
+        RemoteSkillSource::githubPath('cloudflare/security-audit-skill', 'c1c8a8c1471069fb0e188eeaff69b8e8db6564a8', [
+            'security-audit' => 'skills/security-audit',
+        ]),
+    ])
     // Without a renderer, the `.blade.php` vendor skills of laravel/mcp,
     // laravel/passport and laravel/socialite are skipped silently.
     ->withSkillRenderers([new BladeRenderer()]);
