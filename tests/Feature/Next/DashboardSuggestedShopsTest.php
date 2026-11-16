@@ -5,6 +5,7 @@ use App\Enums\ProductCategory;
 use App\Enums\WebFindingStatus;
 use App\Livewire\Dashboard;
 use App\Livewire\DashboardSuggestedShops;
+use App\Livewire\Suggestions\ReviewSuggestedShops;
 use App\Models\HiddenShop;
 use App\Models\Product;
 use App\Models\Shop;
@@ -149,17 +150,18 @@ it('lists any dataset suggestion for an account without the AI check, closest na
         ->and(implode(' ', $rows))->not->toContain('koffie.test')->not->toContain('match');
 });
 
-it('links each shop to its page, and Add to the product with this shop\'s comparison open', function (): void {
+it('links each shop to its page, and opens the review dialog on this shop from Add', function (): void {
     $user = User::factory()->create();
     $product = dashboardProduct($user, 'Beemster Extra belegen 48+ plakken');
     seedRow('ah', 'Beemster Extra belegen 48+ plakken', '150 g', '3.49', link: 'beemster-ah');
     $this->actingAs($user);
 
     Livewire::withoutLazyLoading()->test(DashboardSuggestedShops::class)
-        ->assertSeeHtml(e(route('app.products.show', [$product, 'add-shop' => 1, 'suggest' => 'https://www.ah.nl/producten/product/beemster-ah'])))
-        ->assertSeeHtml('aria-label="Add AH to Beemster Extra belegen 48+ plakken"')
+        ->assertSeeHtml("'review-suggested-shop', { productId: '{$product->id}', host: 'ah.nl' }")
+        ->assertSeeHtml('aria-label="Review AH for Beemster Extra belegen 48+ plakken"')
         ->assertSeeHtml('aria-label="Open AH in a new tab to check the product"')
-        ->assertSeeHtml('beemster-ah');
+        ->assertSeeHtml('beemster-ah')
+        ->assertSeeLivewire(ReviewSuggestedShops::class);
 });
 
 it('says so when there is nothing to suggest', function (): void {
@@ -259,18 +261,6 @@ it('compares a suggested shop with the product side by side, marking the words t
     expect($html)->toContain('data-test="suggested-shop-compare"')
         ->and($panel)->toContain('https://koffie.test/p/1')->toContain('tracked.test · 150 g')
         ->and($marked[1])->toBe(['at', 'koffie.test']);
-});
-
-it('names the web suggestion in the Add link, so the form checks the variant its read picked', function (): void {
-    $user = User::factory()->create(['shop_checks' => true]);
-    subscribeUser($user);
-    $product = dashboardProduct($user, 'Beemster Extra belegen 48+ plakken');
-    dashboardWebFinding($product, 'kaas.example', 0.9);
-    $findingId = WebShopFinding::query()->where('product_id', $product->id)->value('id');
-    $this->actingAs($user);
-
-    Livewire::withoutLazyLoading()->test(DashboardSuggestedShops::class)
-        ->assertSeeHtml(e(route('app.products.show', [$product, 'add-shop' => 1, 'suggest' => 'https://kaas.example/p/1', 'finding' => $findingId])));
 });
 
 it('keeps the list for a few minutes, and lists again as soon as a shop is hidden', function (): void {

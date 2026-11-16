@@ -7,6 +7,7 @@ use App\Actions\Shops\KeepShopAsLink;
 use App\Actions\Shops\ProbeOutcome;
 use App\Actions\Shops\ProbeShopUrl;
 use App\Actions\Shops\TrackedElsewhere;
+use App\Actions\Suggestions\SuggestShops;
 use App\Billing\PlanLimitReached;
 use App\Enums\ProbeFailure;
 use App\Livewire\Concerns\DrivesShopProbe;
@@ -51,12 +52,66 @@ final class AddShop extends Component
     #[Locked]
     public ?string $anyPackUrl = null;
 
-    public function mount(Product $product): void
+    /**
+     * The dashboard suggestion this form reviews in the review dialog, or
+     * null on the product page. The dialog reads the shop's page as soon as
+     * it shows, and offers to decline or skip the suggestion.
+     *
+     * @var array{url: string, shop: string, findingId: ?int, chain: ?string, externalId: ?string}|null
+     */
+    #[Locked]
+    public ?array $review = null;
+
+    /**
+     * @param  array{url: string, shop: string, findingId: ?int, chain: ?string, externalId: ?string}|null  $review
+     */
+    public function mount(Product $product, ?array $review = null): void
     {
         Gate::authorize('view', $product);
 
         $this->product = $product;
         $this->manualCurrency = $product->currency !== '' ? $product->currency : 'EUR';
+        $this->review = $review;
+    }
+
+    /** Reads the reviewed suggestion's page, once the dialog has drawn its loading state. */
+    public function startReview(ProbeShopUrl $probe): void
+    {
+        if ($this->review === null || $this->state !== 'idle') {
+            return;
+        }
+
+        $this->useSuggestion($this->review['url'], $probe, $this->review['findingId']);
+    }
+
+    /**
+     * Not the same product: the suggestion is hidden for this product, as
+     * "Hide for this product" does, and the dialog moves on.
+     */
+    public function decline(SuggestShops $suggest): void
+    {
+        Gate::authorize('view', $this->product);
+
+        if ($this->review === null) {
+            return;
+        }
+
+        if ($this->review['findingId'] !== null) {
+            WebShopFinding::query()
+                ->where('product_id', $this->product->id)
+                ->whereKey($this->review['findingId'])
+                ->update(['dismissed_at' => now()]);
+        } elseif ($this->review['chain'] !== null && $this->review['externalId'] !== null) {
+            $suggest->dismiss($this->product, $this->review['chain'], $this->review['externalId']);
+        }
+
+        $this->dispatch('suggestion-reviewed', outcome: 'declined');
+    }
+
+    /** Leaves the suggestion for later and moves on. */
+    public function skip(): void
+    {
+        $this->dispatch('suggestion-reviewed', outcome: 'skipped');
     }
 
     /**
@@ -327,6 +382,6 @@ final class AddShop extends Component
 
     public function render(): View
     {
-        return view('livewire.shops.add-shop');
+        return view($this->review === null ? 'livewire.shops.add-shop' : 'livewire.shops.review-shop');
     }
 }
