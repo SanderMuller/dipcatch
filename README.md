@@ -2,6 +2,8 @@
 
 Track product prices across the web. Get notified when a price drops more than your threshold.
 
+Try it at [dipcatch.eu](https://dipcatch.eu/).
+
 ## What it does
 
 - Public homepage at `/` pitches the product and collects wait-list emails (table: `waitlist_signups`, IP-rate-limited 5/hr).
