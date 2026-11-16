@@ -19,13 +19,17 @@ permissions:
 
 jobs:
   ci:
-    name: tests (pgsql)
+    name: tests (pgsql, shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     environment: Testing
     strategy:
       fail-fast: false
       matrix:
         php-version: ['8.5']
+        # Pest splits the classes into four parts of about equal run time, from
+        # the timings in tests/.pest/shards.json. Refresh that file with
+        # `vendor/bin/pest --parallel --update-shards` when the suite changes a lot.
+        shard: [1, 2, 3, 4]
 
     # The invitation and public-product routes throttle through
     # ThrottleRequestsWithRedis, which drives a DurationLimiter straight on the
@@ -73,7 +77,8 @@ jobs:
           php-version: ${{ matrix.php-version }}
           extensions: bcmath, redis, pdo_pgsql, pgsql, intl
           tools: composer:v2
-          coverage: xdebug
+          # No job collects coverage, and a loaded Xdebug slows every test.
+          coverage: none
 
       - name: Setup Node
         uses: actions/setup-node@v7
@@ -130,4 +135,4 @@ jobs:
         # Connection details come from phpunit.xml.dist, which points at the
         # Postgres service above. Each worker gets its own database (Laravel
         # appends the token) and its own Redis prefix (AppServiceProvider).
-        run: ./vendor/bin/pest --parallel
+        run: ./vendor/bin/pest --parallel --shard=${{ matrix.shard }}/4
