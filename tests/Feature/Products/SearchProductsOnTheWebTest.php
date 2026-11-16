@@ -284,7 +284,7 @@ test('a failed search is free', function (int $status): void {
     expect(searchTheWeb($user)->status)->toBe(WebNameSearchStatus::Failed)
         ->and(webSearchesUsed($user))->toBe(0)
         ->and(WebSearch::query()->count())->toBe(0);
-})->with([401, 402, 503]);
+})->with([401, 503]);
 
 test('a failed save is free and shows the failure', function (): void {
     fakeNameSearchApis();

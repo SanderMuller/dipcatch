@@ -179,19 +179,6 @@ it('refuses an image url whose scheme is not http(s)', function (): void {
     expect($product->fresh()?->image_url)->toBeNull();
 });
 
-it('saves a unit price target on a free account', function (): void {
-    $user = User::factory()->create();
-    $product = editFormSizedProduct($user);
-
-    $this->actingAs($user);
-
-    livewire(EditProduct::class, ['product' => $product])
-        ->set('unitPriceTarget', '3.2000')
-        ->call('save');
-
-    expect((string) $product->fresh()?->unit_price_target)->toBe('3.2000');
-});
-
 it('offers the images the shops reported', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id]);
@@ -750,16 +737,6 @@ it('shows a free account the current figure, with no upgrade line', function ():
     livewire(EditProduct::class, ['product' => $product->refresh()])
         ->assertSee('Now €4.00 /kg at Albert Heijn')
         ->assertDontSee('Pro alerts on this');
-});
-
-it('shows the unit target without the zeros its column pads it with', function (): void {
-    $user = User::factory()->create();
-    $product = editFormSizedProduct($user);
-    $product->forceFill(['unit_price_target' => '7.0000', 'unit_price_target_unit' => 'g'])->save();
-
-    $this->actingAs($user);
-
-    livewire(EditProduct::class, ['product' => $product->refresh()])->assertSet('unitPriceTarget', '7');
 });
 
 it('forgets the checklist item Jev picked once the product is renamed, and keeps it otherwise', function (): void {

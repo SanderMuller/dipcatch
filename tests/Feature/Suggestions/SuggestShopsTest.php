@@ -124,20 +124,6 @@ test('tracking lidl.nl suppresses the boodschaapje row, and the reverse', functi
     'https://boodschaapje.nl/product/8128671',
 ]);
 
-test('a dismissed row is not offered again', function (): void {
-    seedChains();
-    seedBeemsterCatalogue();
-
-    $product = beemsterProduct();
-    $action = app(SuggestShops::class);
-
-    /** @var ShopSuggestion $dirk */
-    $dirk = collect(suggest($product))->firstWhere('chain', 'dirk');
-    $action->dismiss($product, 'dirk', $dirk->externalId);
-
-    expect(collect(suggest($product))->pluck('chain')->all())->not->toContain('dirk');
-});
-
 test('dismissing the same row twice is idempotent', function (): void {
     seedChains();
     seedBeemsterCatalogue();

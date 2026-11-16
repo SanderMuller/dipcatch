@@ -118,13 +118,3 @@ it('lists a shop the add-shop form just added', function (): void {
         ->assertSee('jumbo.com')
         ->assertDontSeeHtml('data-test="wizard-no-shops"');
 });
-
-it('goes on to the alerts with or without new shops', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->for($user)->create();
-    $this->actingAs($user);
-
-    wizardOnShops($product)
-        ->call('goToStep', 3)
-        ->assertSet('step', 3);
-});

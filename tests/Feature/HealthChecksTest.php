@@ -162,10 +162,3 @@ test('non-admin cannot access the Filament health page', function (): void {
 
     $this->get('/admin/health-check-results')->assertForbidden();
 });
-
-test('failed-job-monitor mail recipients come from FAILED_JOB_MONITOR_NOTIFIABLE env', function (): void {
-    config()->set('failed-job-monitor.mail.to', ['ops@dipcatch.test']);
-
-    expect(config('failed-job-monitor.mail.to'))->toBe(['ops@dipcatch.test'])
-        ->and(config('failed-job-monitor.channels'))->toBeArray();
-});

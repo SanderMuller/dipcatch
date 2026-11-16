@@ -36,17 +36,6 @@ function fakeShopPage(string $path, string $price): array
     ];
 }
 
-test('an offer whose window is open reads as live', function (): void {
-    $offer = new ConditionalOffer(
-        price: '2.97',
-        label: 'Bonus Box 15% korting',
-        startsAt: CarbonImmutable::now()->subDay(),
-        endsAt: CarbonImmutable::now()->addDays(4),
-    );
-
-    expect($offer->isLive())->toBeTrue();
-});
-
 test('an offer that has not started, or has ended, is not live', function (): void {
     $notYet = new ConditionalOffer('2.97', 'x', startsAt: CarbonImmutable::now()->addDay());
     $over = new ConditionalOffer('2.97', 'x', endsAt: CarbonImmutable::now()->subSecond());

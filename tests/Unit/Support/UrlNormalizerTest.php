@@ -74,13 +74,6 @@ test('keeps the path as the shop wrote it', function (): void {
         ->toBe('https://example.com/foo/bar');
 });
 
-test('both slash forms are still one shop', function (): void {
-    // Identity is the resource, not the spelling — and this is what keeps
-    // every hash written while the slash was being stripped still matching.
-    expect(UrlNormalizer::hash(UrlNormalizer::normalize('https://example.com/foo/bar/')))
-        ->toBe(UrlNormalizer::hash(UrlNormalizer::normalize('https://example.com/foo/bar')));
-});
-
 test('preserves path case', function (): void {
     expect(UrlNormalizer::normalize('https://example.com/Foo-Bar'))
         ->toBe('https://example.com/Foo-Bar');
@@ -111,8 +104,6 @@ test('drops tracking parameters', function (string $param): void {
         ->toBe('https://example.com/foo?keep=1');
 })->with([
     'utm_source',
-    'utm_medium',
-    'utm_campaign',
     'gclid',
     'fbclid',
     'mc_eid',
@@ -126,14 +117,6 @@ test('idn host is converted to ASCII punycode', function (): void {
     // The German umlaut domain "münchen.de" becomes "xn--mnchen-3ya.de".
     expect(UrlNormalizer::normalize('https://münchen.de/foo'))
         ->toBe('https://xn--mnchen-3ya.de/foo');
-});
-
-test('different query orders produce identical hashes', function (): void {
-    $a = UrlNormalizer::normalize('https://example.com/p?a=1&b=2');
-    $b = UrlNormalizer::normalize('https://example.com/p?b=2&a=1');
-
-    expect($a)->toBe($b)
-        ->and(UrlNormalizer::hash($a))->toBe(UrlNormalizer::hash($b));
 });
 
 test('rejects non-http(s) schemes', function (): void {

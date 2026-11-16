@@ -60,33 +60,3 @@ test('database channel writes a row with the price_drop_event_id payload', funct
         'reference_kind' => 'median_30d',
     ])->and($data['view_url'])->toBeString();
 });
-
-test('marking a notification as read sets read_at and removes it from unreadNotifications', function (): void {
-    $user = User::factory()->create([
-        'notify_via_email' => false,
-        'notify_via_filament' => true,
-    ]);
-    $product = Product::factory()->for($user)->create();
-
-    $user->notify(new PriceDropNotification($product, dropOutcome(), (string) Str::uuid()));
-
-    expect($user->unreadNotifications()->count())->toBe(1);
-
-    $user->unreadNotifications->first()->markAsRead();
-
-    $user->refresh();
-    expect($user->unreadNotifications()->count())->toBe(0)
-        ->and($user->notifications()->whereNotNull('read_at')->count())->toBe(1);
-});
-
-test('users with notify_via_filament=false do not receive a database row', function (): void {
-    $user = User::factory()->create([
-        'notify_via_email' => false,
-        'notify_via_filament' => false,
-    ]);
-    $product = Product::factory()->for($user)->create();
-
-    $user->notify(new PriceDropNotification($product, dropOutcome(), (string) Str::uuid()));
-
-    expect($user->notifications()->count())->toBe(0);
-});

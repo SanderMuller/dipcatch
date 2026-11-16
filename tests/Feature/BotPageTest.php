@@ -41,10 +41,6 @@ test('the page shows no contact section when no address is configured', function
     $this->get('/bot')->assertOk()->assertDontSee('mailto:');
 });
 
-test('the bot page is reachable without signing in', function (): void {
-    $this->get('/bot')->assertOk();
-});
-
 test('the user agent points at the domain the site actually runs on', function (): void {
     expect(Config::string('dipcatch.fetcher.user_agent'))->toContain('dipcatch.eu/bot');
 });

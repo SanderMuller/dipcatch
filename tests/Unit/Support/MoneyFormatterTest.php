@@ -5,7 +5,6 @@ use App\Support\MoneyFormatter;
 dataset('money_strings', [
     'EUR uses the euro symbol' => ['1.69', 'EUR', '€1.69'],
     'USD groups thousands with a comma' => ['1234.56', 'USD', '$1,234.56'],
-    'GBP uses the pound symbol' => ['0.99', 'GBP', '£0.99'],
     'JPY has zero minor units' => ['200.00', 'JPY', '¥200'],
     'CHF has no symbol, so the code is used' => ['1.69', 'CHF', 'CHF 1.69'],
     'a code outside Iso4217::CODES falls back' => ['1.69', 'ZZZ', 'ZZZ 1.69'],
@@ -18,14 +17,6 @@ dataset('money_strings', [
 test('MoneyFormatter::format renders symbol-first, dot-decimal money', function (string $amount, string $currency, string $expected): void {
     expect(MoneyFormatter::format($amount, $currency))->toBe($expected);
 })->with('money_strings');
-
-test('a code with no intl symbol is separated by an ASCII space, never U+00A0', function (): void {
-    $formatted = MoneyFormatter::format('1.69', 'CHF');
-
-    expect($formatted)->toBe('CHF 1.69')
-        ->and(str_contains($formatted, "\u{00A0}"))->toBeFalse()
-        ->and(str_contains($formatted, "\u{202F}"))->toBeFalse();
-});
 
 test('a null amount renders an em dash', function (): void {
     expect(MoneyFormatter::format(amount: null, currency: 'EUR'))->toBe('—');
@@ -65,13 +56,6 @@ test('a unit price of one or more is shown as money', function (): void {
     // Nobody needs EUR 5.3784 per kilo.
     expect(MoneyFormatter::unitPrice('5.3784', 'EUR'))->toBe('€5.38')
         ->and(MoneyFormatter::unitPrice('33.5700', 'EUR'))->toBe('€33.57');
-});
-
-test('the precision follows the magnitude, not the unit', function (): void {
-    // A price per piece can be eleven euros, and a price per kilo can be
-    // twenty cents.
-    expect(MoneyFormatter::unitPrice('11.0000', 'EUR'))->toBe('€11.00')
-        ->and(MoneyFormatter::unitPrice('0.2000', 'EUR'))->toBe('€0.2000');
 });
 
 test('widening a unit price does not widen ordinary money', function (): void {

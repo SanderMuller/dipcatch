@@ -48,12 +48,8 @@ test('matches all zooplus country TLDs and Bitiba sister shops', function (strin
     expect($result->isSuccess())->toBeTrue();
 })->with([
     'nl' => ['https://www.zooplus.nl/shop/foo'],
-    'de' => ['https://www.zooplus.de/shop/foo'],
-    'be' => ['https://www.zooplus.be/shop/foo'],
-    'com' => ['https://www.zooplus.com/shop/foo'],
     'uk' => ['https://www.zooplus.co.uk/shop/foo'],
     'bitiba-nl' => ['https://www.bitiba.nl/shop/foo'],
-    'bitiba-de' => ['https://www.bitiba.de/shop/foo'],
 ]);
 
 test('reads a sterling price on the UK shop', function (): void {

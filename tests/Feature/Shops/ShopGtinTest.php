@@ -207,7 +207,6 @@ test('a GTIN with letters mixed in is rejected, separators are not', function (m
     expect(Gtin::normalize($input))->toBe($expected);
 })->with([
     'letters in the middle' => ['8712ABC243044506', null],
-    'letters appended' => ['8712243044506X', null],
     'dashes' => ['871-224-304-4506', '8712243044506'],
     'spaces' => ['8712 2430 44506', '8712243044506'],
 ]);

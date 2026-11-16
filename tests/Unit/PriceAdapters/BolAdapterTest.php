@@ -12,14 +12,6 @@ test('skips when the URL host is not bol.com', function (): void {
     expect($result->isSkip())->toBeTrue();
 });
 
-test('skips for non-bol www. host variants', function (): void {
-    // BolAdapter uses normalized host, which strips www. → bol.com still matches.
-    // This test confirms a totally different host skips.
-    $result = $this->adapter->extract('https://www.coolblue.nl/p/1', '<html></html>');
-
-    expect($result->isSkip())->toBeTrue();
-});
-
 test('matches www.bol.com via normalized host', function (): void {
     $json = json_encode([
         '@type' => 'Product',

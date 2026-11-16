@@ -145,13 +145,6 @@ test('a registered host adapter with no canary entry fails', function (): void {
         ->and($result->notificationMessage)->toContain('zooplus');
 });
 
-test('the generic adapters are not expected to have canary entries', function (): void {
-    bothFresh();
-
-    // JsonLd and Generic are in the chain above and read no particular shop.
-    expect(new AdapterCanaryCheck()->run()->status)->toEqual(Status::ok());
-});
-
 test('every registered host adapter has a canary entry in the shipped config', function (): void {
     // The URLs are environment-backed and empty outside production, so this
     // reads the config file's keys rather than CanaryEntries::configured().

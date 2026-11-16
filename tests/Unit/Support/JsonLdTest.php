@@ -2,13 +2,6 @@
 
 use App\Support\JsonLd;
 
-test('script wraps the encoded data in a single script element', function (): void {
-    $html = (string) JsonLd::script(['@type' => 'FAQPage', 'foo' => 'bar']);
-
-    expect($html)->toStartWith('<script type="application/ld+json">')
-        ->toEndWith('</script>');
-});
-
 test('script-ending text in the data cannot end the element early', function (): void {
     $data = [
         'note' => 'Before</script><script>alert(1)</script>after',

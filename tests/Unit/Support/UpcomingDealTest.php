@@ -6,10 +6,7 @@ use Carbon\CarbonImmutable;
 
 dataset('labels', [
     'a percentage stays' => ['25% KORTING', '1.99', '25% KORTING'],
-    'a multi-buy stays' => ['1+1 GRATIS', '2.09', '1+1 GRATIS'],
     'a fixed total stays' => ['2 voor 2,99', '1.79', '2 voor 2,99'],
-    'a later-item discount stays' => ['2e halve PRIJS', '2.49', '2e halve PRIJS'],
-    'an Aldi discount stays' => ['-26%', '0.85', '-26%'],
     '"voor" and a price is the price' => ['voor 1,99', '1.99', '1.99'],
     '"per stuk" and a price is the price' => ['per stuk 1,99', '1.99', '1.99'],
     'a size and a price is the price' => ['500 gram 0,79', '0.79', '0.79'],

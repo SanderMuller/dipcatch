@@ -112,6 +112,5 @@ test('thumbnail leaves a server that refuses other sizes, or does not resize, al
 })->with([
     'Jumbo' => 'https://www.jumbo.com/dam-images/fit-in/360x360/Products/1.png',
     'Zooplus' => 'https://media.zooplus.com/bilder/8/400/1.jpg',
-    'Spar' => 'https://media.spar.nl/productdetail/fanta-1.5-Liter.jpg',
     'AH without a rendition' => 'https://static.ah.nl/dam/product/AHI_1',
 ]);

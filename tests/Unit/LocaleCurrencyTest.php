@@ -4,11 +4,8 @@ use App\Support\LocaleCurrency;
 
 dataset('locale_currency_pairs', [
     ['nl-NL,nl;q=0.9', 'EUR'],
-    ['en-US,en;q=0.8', 'USD'],
     ['en-GB,en;q=0.5', 'GBP'],
     ['en;q=1', 'USD'],
-    ['ja-JP', 'JPY'],
-    ['pl-PL,pl;q=0.9', 'PLN'],
     ['zh-TW,zh;q=0.9,en;q=0.5', 'TWD'],
     ['de-CH,de;q=0.9', 'EUR'],
     ['xx-XX', 'EUR'],

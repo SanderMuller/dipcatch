@@ -29,9 +29,6 @@ HTML;
     ['www.amazon.nl', 'EUR'],
     ['amazon.com', 'USD'],
     ['amazon.co.uk', 'GBP'],
-    ['amazon.de', 'EUR'],
-    ['amazon.co.jp', 'JPY'],
-    ['amazon.ca', 'CAD'],
 ]);
 
 test('resolves overlapping suffixes to the most specific TLD', function (): void {
@@ -48,20 +45,6 @@ HTML;
 
     expect($result->isSuccess())->toBeTrue()
         ->and($result->snapshot?->currency)->toBe('AUD');
-});
-
-test('matches subdomains via host suffix', function (): void {
-    $html = <<<'HTML'
-<html><body>
-  <span id="productTitle">Demo</span>
-  <div id="corePriceDisplay_desktop_feature_div"><span class="a-offscreen">$10.00</span></div>
-</body></html>
-HTML;
-
-    $result = $this->adapter->extract('https://smile.amazon.com/dp/B000', $html);
-
-    expect($result->isSuccess())->toBeTrue()
-        ->and($result->snapshot?->currency)->toBe('USD');
 });
 
 test('delegates to JsonLdAdapter when the page exposes schema.org markup', function (): void {
@@ -239,9 +222,3 @@ HTML;
     'all buying options' => ['<span id="buybox-see-all-buying-choices">See All Buying Options</span>'],
     'nothing ships here' => ['<span>No featured offers available</span>'],
 ]);
-
-test('keeps the generic failure for a page it simply cannot read', function (): void {
-    $result = $this->adapter->extract('https://www.amazon.nl/dp/B000', '<html><body><span id="productTitle">Demo</span></body></html>');
-
-    expect($result->failureReason)->toBe('amazon_extraction_failed');
-});

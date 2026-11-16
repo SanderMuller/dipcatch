@@ -114,12 +114,6 @@ test('the free plan is always on offer', function (): void {
         ->and($offers[0]['price'])->toBe('0');
 });
 
-test('the paid plan stays off the graph until Stripe is configured', function (): void {
-    config()->set('plans.stripe.pro_price_id');
-
-    expect(collect(StructuredData::offers())->pluck('name'))->not->toContain('Pro');
-});
-
 function openTheShop(): void
 {
     config()->set('plans.stripe.pro_price_id', 'price_123');

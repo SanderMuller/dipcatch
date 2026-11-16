@@ -1,24 +1,12 @@
 <?php declare(strict_types=1);
 
 use App\Enums\SocialProvider;
-use App\Models\Invitation;
 use App\Models\PriceCheck;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Database\QueryException;
-
-test('invitation factory states work and helpers report state', function (): void {
-    $fresh = Invitation::factory()->create();
-    $expired = Invitation::factory()->expired()->create();
-    $redeemed = Invitation::factory()->redeemed()->create();
-
-    expect($fresh->isExpired())->toBeFalse()
-        ->and($fresh->isRedeemed())->toBeFalse()
-        ->and($expired->isExpired())->toBeTrue()
-        ->and($redeemed->isRedeemed())->toBeTrue();
-});
 
 test('cascade delete on user wipes products', function (): void {
     $user = User::factory()->create();

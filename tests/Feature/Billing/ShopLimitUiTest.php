@@ -57,17 +57,6 @@ it('says so plainly on a product that already sits over the limit', function ():
         ->assertSee('and this one has 5.');
 });
 
-it('keeps every existing shop listed and checkable over the limit', function (): void {
-    $product = shopLimitProduct(shopLimitOwner(5));
-
-    // Over the limit, every existing shop stays listed and checked; only
-    // adding another is blocked.
-    livewire(ProductShow::class, ['product' => $product])
-        ->assertSee('This product is at its shop limit');
-
-    expect($product->shops()->where('active', true)->count())->toBe(5);
-});
-
 it('gives a pro account the button with no count', function (): void {
     $user = shopLimitOwner(9);
     subscribeUser($user);

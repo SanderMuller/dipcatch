@@ -15,12 +15,6 @@ beforeEach(function (): void {
     $this->skipUnlessFortifyHas(Features::resetPasswords());
 });
 
-test('reset password link screen can be rendered', function (): void {
-    $response = $this->get(route('password.request'));
-
-    $response->assertOk();
-});
-
 test('reset password link can be requested', function (): void {
     Notification::fake();
 

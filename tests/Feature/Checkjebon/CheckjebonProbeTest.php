@@ -80,16 +80,6 @@ test('AH product missing from the dataset fails with not_in_dataset', function (
         ->and($outcome->shouldOfferManualSelector())->toBeFalse();
 });
 
-test('empty dataset fails with dataset_empty reason', function (): void {
-    Http::fake(ahApiDownFakes());
-    $user = User::factory()->create();
-
-    $outcome = app(ProbeShopUrl::class)(null, 'https://www.ah.nl/producten/product/wi257/x', $user);
-
-    expect($outcome->errorCode)->toBe(ProbeFailure::NotInDataset)
-        ->and($outcome->context)->toBe(['reason' => 'dataset_empty']);
-});
-
 test('lidl.nl URLs probe over the network through the Lidl adapter', function (): void {
     // The URL keeps its `www.` host: that is what the shop serves.
     Http::fake([

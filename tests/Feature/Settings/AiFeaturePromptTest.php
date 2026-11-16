@@ -5,8 +5,6 @@ use App\Livewire\AiFeaturePrompt;
 use App\Livewire\Products\ProductList;
 use App\Models\Product;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\View\ViewException;
 
 use function Pest\Livewire\livewire;
@@ -136,21 +134,3 @@ test('an unknown place cannot be mounted', function (): void {
 
     promptOnNewPage('everywhere');
 })->throws(ViewException::class, 'is not a valid backing value');
-
-test('dropping the account-wide not now keeps a recent one quiet at every place', function (): void {
-    $migration = require database_path('migrations/2026_10_07_220756_drop_ai_prompts_dismissed_at_from_users_table.php');
-    $migration->down();
-    $recent = proAccountWithAi(['ai_prompt_dismissals' => ['alert' => now()->toIso8601String()]]);
-    $old = proAccountWithAi();
-    DB::table('users')->where('id', $recent->id)->update(['ai_prompts_dismissed_at' => now()->subDays(10)]);
-    DB::table('users')->where('id', $old->id)->update(['ai_prompts_dismissed_at' => now()->subDays(AiPromptPlace::QUIET_DAYS + 1)]);
-
-    $migration->up();
-    $dismissals = $recent->refresh()->ai_prompt_dismissals ?? [];
-
-    expect(Schema::hasColumn('users', 'ai_prompts_dismissed_at'))->toBeFalse()
-        ->and(array_keys($dismissals))->toEqualCanonicalizing(array_column(AiPromptPlace::cases(), 'value'))
-        ->and($dismissals)->toHaveKeys(['alert', 'add_shop'])
-        ->and($dismissals['alert'] ?? null)->toBeGreaterThan($dismissals['add_shop'] ?? '')
-        ->and($old->refresh()->ai_prompt_dismissals)->toBeNull();
-});

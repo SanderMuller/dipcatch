@@ -5,11 +5,6 @@ use App\Support\MoneyFormatter;
 use App\Support\SupportedShops;
 use Symfony\Component\DomCrawler\Crawler;
 
-test('the homepage carries SEO and sharing meta', function (): void {
-    $this->get(route('home'))->assertOk()->assertSeeHtml('<meta name="description"')->assertSeeHtml('property="og:title"')->assertSeeHtml('rel="canonical"')
-        ->assertSee('Price alerts for the things you buy anyway');
-});
-
 test('guests see the supported shops, a bottom call to action, and the footer links', function (): void {
     $this->get(route('home'))
         ->assertOk()

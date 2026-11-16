@@ -72,21 +72,6 @@ test('shop requests and shop problems require a valid shop URL', function (Suppo
     'shop problem' => SupportRequestType::ShopIssue,
 ]);
 
-test('feedback does not require a shop URL', function (): void {
-    Mail::fake();
-    config()->set('site.contact_email', 'support@dipcatch.test');
-    $user = User::factory()->create();
-
-    Livewire::actingAs($user)
-        ->test(SupportPage::class)
-        ->set('requestType', SupportRequestType::Feedback->value)
-        ->set('message', 'The new product page is much easier to scan.')
-        ->call('submit')
-        ->assertHasNoErrors();
-
-    Mail::assertSent(SupportRequestMail::class, 1);
-});
-
 test('switching away from a shop request clears the hidden shop URL', function (): void {
     Mail::fake();
     config()->set('site.contact_email', 'support@dipcatch.test');

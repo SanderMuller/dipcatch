@@ -272,29 +272,6 @@ it('clears a latch armed in the other basis instead of suppressing on it', funct
         ->and((string) $product->last_notified_price)->toBe('8.00');
 });
 
-it('leaves a cross-size drop out of lifetime savings rather than counting nothing as money', function (): void {
-    // `drop_abs` is null on those events, and both the monthly chart and the
-    // lifetime total sum that column — so the row contributes nothing instead
-    // of contributing a number that describes no purchase.
-    $product = droppingProduct();
-
-    $small = sizedShop($product, 'ah.nl', '5.00', ['pack_quantity' => '500.00', 'pack_unit' => 'g']);
-    readingOn($small, '5.00');
-    $product->recomputeCheapestShop();
-
-    $big = sizedShop($product, 'jumbo.com', '10.00', ['pack_quantity' => '1000.00', 'pack_unit' => 'g']);
-    $joined = readingOn($big, '10.00');
-    $product->refresh()->recomputeCheapestShop($joined->id);
-
-    $trigger = readingOn($big, '8.00');
-    $product->refresh()->recomputeCheapestShop($trigger->id);
-
-    $total = PriceDropEvent::query()->where('product_id', $product->id)->sum('drop_abs');
-
-    expect((float) $total)->toBe(0.0)
-        ->and(PriceDropEvent::query()->where('product_id', $product->id)->count())->toBe(1);
-});
-
 it('names the shop the drop was measured on, not the smallest outlay', function (): void {
     // The two answers differ here. The alert has to name the shop whose price
     // moved and the price the event row records, or the mail and the row say

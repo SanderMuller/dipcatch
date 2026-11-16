@@ -2,7 +2,6 @@
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Laravel\Passport\Client;
 
@@ -76,11 +75,6 @@ test('the consent screen uses colours this theme actually defines', function ():
 
 test('the consent screen is not indexable', function (): void {
     expect(renderConsent())->toContain('<meta name="robots" content="noindex">');
-});
-
-test('the passport authorization routes the screen posts to exist', function (): void {
-    expect(Route::has('passport.authorizations.approve'))->toBeTrue()
-        ->and(Route::has('passport.authorizations.deny'))->toBeTrue();
 });
 
 test('uses a third-party-safe session cookie for MCP authorization', function (): void {

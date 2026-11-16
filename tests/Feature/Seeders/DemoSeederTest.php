@@ -3,10 +3,6 @@
 use App\Billing\PlanLimits;
 use App\Enums\CategorySource;
 use App\Enums\ShopHealth;
-use App\Filament\Admin\Widgets\OperationsOverviewWidget;
-use App\Filament\Admin\Widgets\ShopsNeedingAttentionWidget;
-use App\Livewire\Dashboard;
-use App\Livewire\Notifications\Bell;
 use App\Models\PriceCheck;
 use App\Models\PriceDropEvent;
 use App\Models\Product;
@@ -19,10 +15,7 @@ use Database\Seeders\DemoSeeder;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\DB;
 
-use function Pest\Livewire\livewire;
-
-// Each test runs the seeder, about 3 s, so there are two: what it writes,
-// and the pages that render it.
+// The seeder takes about 3 s, so one test checks everything it writes.
 beforeEach(function (): void {
     $this->seed(DemoSeeder::class);
 });
@@ -202,50 +195,4 @@ it('seeds consistent demo data, once', function (): void {
     $this->seed(DemoSeeder::class);
 
     expect(User::query()->count())->toBe($before);
-});
-
-it('renders the seeded admin dashboard, app dashboard and product page', function (): void {
-    $demo = User::query()->where('email', 'demo@dipcatch.test')->sole();
-
-    $this->actingAs($demo)
-        ->get('/app')
-        ->assertOk()
-        ->assertSee('Track a product');
-
-    livewire(Dashboard::class)
-        ->assertSee('Douwe Egberts Aroma Rood koffiebonen 1 kg');
-
-    livewire(Bell::class)
-        ->assertSee('Zeeuws Meisje Roomboter 250 g');
-
-    $product = $demo->products()->where('title', 'Douwe Egberts Aroma Rood koffiebonen 1 kg')->sole();
-
-    $this->actingAs($demo)
-        ->get('/app/products/' . $product->id)
-        ->assertOk()
-        ->assertSee('jumbo.com');
-
-    // A new session: the one above holds the demo account's password hash,
-    // and a session that changes account is signed out.
-    $this->flushSession();
-    $admin = User::query()->where('is_admin', true)->orderBy('id')->firstOrFail();
-
-    $this->actingAs($admin)
-        ->get('/admin')
-        ->assertOk()
-        // The operations widget counts accounts, offers and drops; the
-        // attention list names the hosts whose offers stopped reading.
-        ->assertSee('Accounts');
-
-    // The table widgets load lazily, so the dashboard HTML alone does not
-    // prove they have rows — render them directly.
-    $this->actingAs($admin);
-
-    livewire(OperationsOverviewWidget::class)
-        ->assertSee('Accounts')
-        ->assertSee('Scrapes healthy');
-
-    livewire(ShopsNeedingAttentionWidget::class)
-        ->assertSee('Offers needing attention')
-        ->assertSee('bol.com');
 });

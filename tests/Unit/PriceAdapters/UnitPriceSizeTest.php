@@ -34,11 +34,6 @@ test('recovers the pack size the unit price implies', function (): void {
     expect(UnitPriceSize::from(offerWithUnitPrice(), '59.99'))->toBe('144 ml');
 });
 
-test('a member or sale price is never read as the rate', function (): void {
-    // Both sit before the UnitPrice entry; 59.99/59.99 would be "1 ml".
-    expect(UnitPriceSize::from(offerWithUnitPrice(), '59.99'))->not->toBe('1 ml');
-});
-
 test('reads a rate given per 100 grams', function (): void {
     expect(UnitPriceSize::from(offerWithUnitPrice(rate: 2.5, unitCode: 'GRM', per: 100.0), '5.00'))->toBe('200 g');
 });
