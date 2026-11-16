@@ -18,7 +18,8 @@ function dirkMangoUrl(): string
 
 beforeEach(function (): void {
     Cache::flush();
-    config(['dipcatch.upcoming_offers.enabled' => true]);
+    config()
+        ->set('dipcatch.upcoming_offers.enabled', true);
     $this->travelTo(CarbonImmutable::parse('2026-10-24 12:00', 'Europe/Amsterdam'));
 });
 
@@ -286,7 +287,8 @@ test('a failed read keeps the stored upcoming window through a check', function 
 });
 
 test('nothing is read while the switch is off', function (): void {
-    config(['dipcatch.upcoming_offers.enabled' => false]);
+    config()
+        ->set('dipcatch.upcoming_offers.enabled', false);
     Http::fake();
 
     $snapshot = dirkExtract();

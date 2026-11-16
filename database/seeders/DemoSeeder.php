@@ -227,8 +227,6 @@ final class DemoSeeder extends Seeder
         return [
             new DemoProduct(
                 title: 'Roter Vitamine C 70 mg citroen kauwtabletten',
-                category: ProductCategory::MedicinesSupplements,
-                unitPriceTarget: 0.0280,
                 offers: [
                     new DemoOffer(
                         host: 'ah.nl', path: '', price: 12.99, packQuantity: 400, packUnit: 'piece',
@@ -241,10 +239,11 @@ final class DemoSeeder extends Seeder
                         imageUrl: 'https://www.benushop.nl/images/productimages/big/8713304941826_1.jpg',
                     ),
                 ],
+                unitPriceTarget: 0.0280,
+                category: ProductCategory::MedicinesSupplements,
             ),
             new DemoProduct(
                 title: 'Creapure Creatine 500 g',
-                category: ProductCategory::MedicinesSupplements,
                 offers: [
                     new DemoOffer(
                         host: 'bodyandfit.com', path: '', price: 29.99, packQuantity: 500, packUnit: 'g',
@@ -252,10 +251,10 @@ final class DemoSeeder extends Seeder
                         imageUrl: 'https://www.bodyandfit.com/cdn/shop/files/01668_Image_01_79c5e785-834b-4215-a613-222613b78856.png?v=1783689694&width=1920',
                     ),
                 ],
+                category: ProductCategory::MedicinesSupplements,
             ),
             new DemoProduct(
                 title: 'AURMOO Vuilniszakken 5 L (200 stuks)',
-                category: ProductCategory::PaperDisposables,
                 offers: [
                     new DemoOffer(
                         host: 'amazon.nl', path: '', price: 15.99, packQuantity: 1000000, packUnit: 'ml',
@@ -263,10 +262,10 @@ final class DemoSeeder extends Seeder
                         imageUrl: 'https://m.media-amazon.com/images/I/51np1PVT2+L.jpg',
                     ),
                 ],
+                category: ProductCategory::PaperDisposables,
             ),
             new DemoProduct(
                 title: 'Fanta Cassis 1,5 L',
-                category: ProductCategory::SoftDrinks,
                 offers: [
                     new DemoOffer(
                         host: 'spar.nl', path: '', price: 3.19, packQuantity: 1500, packUnit: 'ml',
@@ -274,10 +273,10 @@ final class DemoSeeder extends Seeder
                         imageUrl: 'https://media.spar.nl/productdetail/fanta-fanta-cassis-pet-1.5l-1.5-Liter-9256413-168619.jpg',
                     ),
                 ],
+                category: ProductCategory::SoftDrinks,
             ),
             new DemoProduct(
                 title: 'Feliway Classic Startpakket verdamper',
-                category: ProductCategory::PetCare,
                 offers: [
                     new DemoOffer(
                         host: 'zooplus.nl', path: '', price: 27.99, packQuantity: 1, packUnit: 'piece',
@@ -285,10 +284,10 @@ final class DemoSeeder extends Seeder
                         imageUrl: 'https://media.zooplus.com/bilder/9/400/67609_pla_ceva_feliway_classic_hs_01_9.jpg',
                     ),
                 ],
+                category: ProductCategory::PetCare,
             ),
             new DemoProduct(
                 title: 'Vet-Concept Cat Sana Paard 3 kg',
-                category: ProductCategory::PetFood,
                 offers: [
                     new DemoOffer(
                         host: 'dierapotheker.nl', path: '', price: 30.55, packQuantity: 3000, packUnit: 'g',
@@ -296,10 +295,10 @@ final class DemoSeeder extends Seeder
                         imageUrl: 'https://www.dierapotheker.nl/media/c1/2d/15/1725524946/Vet-Concept-Sana-Paard-Kattenvoer-10-kg.jpg',
                     ),
                 ],
+                category: ProductCategory::PetFood,
             ),
             new DemoProduct(
                 title: 'Dr. Oetker Big Americans Pizza Texas 435 g',
-                category: ProductCategory::Frozen,
                 offers: [
                     // Dirk's offer price, 23 to 29 September 2026. The normal price is 4.65.
                     new DemoOffer(
@@ -313,10 +312,10 @@ final class DemoSeeder extends Seeder
                         imageUrl: 'https://www.jumbo.com/dam-images/fit-in/360x360/Products/17042025_1744858686454_1744858693343_184179_DS_04001724023906_C1N1_s02.png',
                     ),
                 ],
+                category: ProductCategory::Frozen,
             ),
             new DemoProduct(
                 title: 'Sensodyne Rapid Relief Mint tandpasta 75 ml',
-                category: ProductCategory::Oral,
                 offers: [
                     new DemoOffer(
                         host: 'jumbo.com', path: '', price: 7.29, packQuantity: 75, packUnit: 'ml',
@@ -329,6 +328,7 @@ final class DemoSeeder extends Seeder
                         imageUrl: 'https://img.deonlinedrogist.nl/wjGOPaliQKXMLdrbhUuqk_GUxeaiBiLhhaXcxesUGI4/dpr:1/bg:FFFFFF/fn:sensodyne-rapid-relief-tandpasta-75ml/plain/s3://dod-storage/media/40/18/81f3945ad31198780d5398bd6c395755.png',
                     ),
                 ],
+                category: ProductCategory::Oral,
             ),
         ];
     }
@@ -341,7 +341,6 @@ final class DemoSeeder extends Seeder
         return [
             new DemoProduct(
                 title: 'Douwe Egberts Aroma Rood koffiebonen 1 kg',
-                category: ProductCategory::CoffeeTea,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi123456/douwe-egberts-aroma-rood-bonen', 13.99, 1000, 'g'),
                     new DemoOffer('jumbo.com', 'producten/douwe-egberts-aroma-rood-koffiebonen-1kg', 12.49, 1000, 'g'),
@@ -350,76 +349,77 @@ final class DemoSeeder extends Seeder
                 unitPriceTarget: 12.50,
                 shareSlug: 'aroma-rood-1kg',
                 drop: 'recent',
+                category: ProductCategory::CoffeeTea,
             ),
             new DemoProduct(
                 title: 'Zeeuws Meisje Roomboter 250 g',
-                categorySource: CategorySource::Auto,
-                category: ProductCategory::DairyEggs,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi222333/zeeuws-meisje-roomboter', 3.29, 250, 'g'),
                     new DemoOffer('jumbo.com', 'producten/zeeuws-meisje-roomboter-250g', 3.09, 250, 'g'),
                     new DemoOffer('dirk.nl', 'boodschappen/zuivel/boter/zeeuws-meisje-roomboter/1234', 2.89, 250, 'g'),
                 ],
                 drop: 'today',
+                category: ProductCategory::DairyEggs,
+                categorySource: CategorySource::Auto,
             ),
             new DemoProduct(
                 title: 'Coca-Cola Zero Sugar 6 x 1,5 L',
-                category: ProductCategory::SoftDrinks,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi334455/coca-cola-zero-6-pack', 11.94, 9000, 'ml'),
                     new DemoOffer('jumbo.com', 'producten/coca-cola-zero-sugar-6x1-5l', 10.99, 9000, 'ml', promotion: 'live'),
                 ],
+                category: ProductCategory::SoftDrinks,
             ),
             new DemoProduct(
                 title: 'Pampers Baby-Dry maat 4 (174 stuks)',
-                category: ProductCategory::NappiesWipes,
                 offers: [
                     new DemoOffer('bol.com', 'nl/nl/p/pampers-baby-dry-maat-4-174-luiers/9200000098765432', 44.99, 174, 'piece'),
                     new DemoOffer('amazon.nl', 'dp/B08PAMPERS4', 41.95, 174, 'piece'),
                 ],
                 drop: 'week',
+                category: ProductCategory::NappiesWipes,
             ),
             new DemoProduct(
                 title: 'Whiskas Adult kattenvoer 100 zakjes',
-                category: ProductCategory::PetFood,
                 offers: [
                     new DemoOffer('zooplus.nl', 'shop/katten/kattenvoer_nat/whiskas/100-zakjes/123456', 39.99, 100, 'piece'),
                     new DemoOffer('bol.com', 'nl/nl/p/whiskas-adult-100-zakjes/9200000011112222', 43.50, 100, 'piece', state: 'out_of_stock'),
                 ],
+                category: ProductCategory::PetFood,
             ),
             new DemoProduct(
                 title: 'Philips Hue White and Color Ambiance E27 (2-pack)',
-                category: ProductCategory::SmartHome,
                 offers: [
                     new DemoOffer('coolblue.nl', 'product/912345/philips-hue-white-and-color-e27-duopack.html', 89.00, 2, 'piece'),
                     new DemoOffer('bol.com', 'nl/nl/p/philips-hue-white-and-color-e27-2-pack/9200000033334444', 94.99, 2, 'piece', state: 'unknown_stock'),
                 ],
                 drop: 'week',
+                category: ProductCategory::SmartHome,
             ),
             new DemoProduct(
                 title: 'Nespresso Vertuo Barista Creations (30 capsules)',
-                category: ProductCategory::CoffeeTea,
                 offers: [
                     new DemoOffer('bol.com', 'nl/nl/p/nespresso-vertuo-barista-30-capsules/9200000055556666', 21.45, 30, 'piece', state: 'failing'),
                     new DemoOffer('amazon.nl', 'dp/B08VERTUO30', 19.99, 30, 'piece'),
                 ],
+                category: ProductCategory::CoffeeTea,
             ),
             new DemoProduct(
                 title: 'Grolsch Premium Pilsner 24 x 30 cl',
-                categorySource: CategorySource::Auto,
-                category: ProductCategory::Alcohol,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi556677/grolsch-premium-pilsner-24-pack', 18.99, 7200, 'ml', conditional: true),
                     new DemoOffer('jumbo.com', 'producten/grolsch-premium-pilsner-24x30cl', 17.49, 7200, 'ml', promotion: 'expired'),
                 ],
+                category: ProductCategory::Alcohol,
+                categorySource: CategorySource::Auto,
             ),
             new DemoProduct(
                 title: 'Garmin Forerunner 265',
-                category: ProductCategory::Wearables,
                 offers: [
                     new DemoOffer('coolblue.nl', 'product/934567/garmin-forerunner-265-zwart.html', 399.00, 1, 'piece'),
                     new DemoOffer('bol.com', 'nl/nl/p/garmin-forerunner-265/9200000077778888', 429.00, 1, 'piece', state: 'dead'),
                 ],
+                category: ProductCategory::Wearables,
             ),
             new DemoProduct(
                 title: 'LEGO Icons Orchidee 10311',
@@ -439,31 +439,31 @@ final class DemoSeeder extends Seeder
         return [
             new DemoProduct(
                 title: 'Sony WH-1000XM5 koptelefoon',
-                category: ProductCategory::Audio,
                 offers: [
                     new DemoOffer('coolblue.nl', 'product/901234/sony-wh-1000xm5-zwart.html', 299.00, 1, 'piece'),
                     new DemoOffer('bol.com', 'nl/nl/p/sony-wh-1000xm5/9200000044445555', 319.00, 1, 'piece'),
                     new DemoOffer('amazon.nl', 'dp/B09XM5SONY', 289.99, 1, 'piece'),
                 ],
                 drop: 'recent',
+                category: ProductCategory::Audio,
             ),
             new DemoProduct(
                 title: 'Lay\'s Oven Baked Paprika 150 g',
-                categorySource: CategorySource::Auto,
-                category: ProductCategory::SnacksSweets,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi667788/lays-oven-baked-paprika', 2.19, 150, 'g'),
                     new DemoOffer('dirk.nl', 'boodschappen/snacks/chips/lays-oven-baked/5678', 1.99, 150, 'g'),
                 ],
+                category: ProductCategory::SnacksSweets,
+                categorySource: CategorySource::Auto,
             ),
             new DemoProduct(
                 title: 'Royal Canin Medium Adult 15 kg',
-                category: ProductCategory::PetFood,
                 offers: [
                     new DemoOffer('zooplus.nl', 'shop/honden/droogvoer/royal_canin/medium/223344', 74.99, 15000, 'g'),
                     new DemoOffer('bol.com', 'nl/nl/p/royal-canin-medium-adult-15kg/9200000066667777', 79.95, 15000, 'g', state: 'failing'),
                 ],
                 drop: 'week',
+                category: ProductCategory::PetFood,
             ),
         ];
     }
@@ -478,23 +478,23 @@ final class DemoSeeder extends Seeder
                 // One offer only, so the "add a second shop" NextStepsWidget
                 // has something to point at.
                 title: 'Robijn Wasmiddel Color 40 wasbeurten',
-                category: ProductCategory::Laundry,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi889900/robijn-color-wasmiddel', 9.99, 40, 'piece'),
                 ],
+                category: ProductCategory::Laundry,
             ),
             new DemoProduct(
                 // Offers up to `plans.free.max_shops_per_product`, so the
                 // shop-limit panel and the upgrade path it offers render on
                 // an account that has genuinely reached the ceiling.
                 title: 'Tony\'s Chocolonely Melk 180 g',
-                category: ProductCategory::SnacksSweets,
                 offers: [
                     new DemoOffer('ah.nl', 'producten/product/wi990011/tonys-chocolonely-melk', 3.49, 180, 'g'),
                     new DemoOffer('jumbo.com', 'producten/tonys-chocolonely-melk-180g', 3.19, 180, 'g'),
                     new DemoOffer('dirk.nl', 'boodschappen/snoep/chocolade/tonys-chocolonely-melk/9012', 2.99, 180, 'g'),
                     new DemoOffer('bol.com', 'nl/nl/p/tonys-chocolonely-melk-180-g/9200000022223333', 3.75, 180, 'g'),
                 ],
+                category: ProductCategory::SnacksSweets,
             ),
         ];
     }
@@ -787,7 +787,7 @@ final class DemoSeeder extends Seeder
 
         $priceCheckId = PriceCheck::query()
             ->where('shop_id', $product->cheapest_shop_id)
-            ->orderByDesc('checked_at')
+            ->latest('checked_at')
             ->value('id');
 
         $notificationId = (string) Str::uuid();

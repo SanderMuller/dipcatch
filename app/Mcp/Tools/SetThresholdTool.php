@@ -180,7 +180,7 @@ final class SetThresholdTool extends Tool
         $unit = $packs->unit();
 
         if ($winner?->current_price !== null && $winnerSize !== null && $unit !== null) {
-            return self::stored(UnitTargetMath::percentUnderPack((string) $winner->current_price, $percent, UnitTargetMath::perPack($winnerSize)), $unit, null, 'That percentage leaves no target.');
+            return self::stored(UnitTargetMath::percentUnderPack((string) $winner->current_price, $percent, UnitTargetMath::perPack($winnerSize)), $unit, shopId: null, refusal: 'That percentage leaves no target.');
         }
 
         if ($shop?->current_price === null) {
@@ -207,7 +207,7 @@ final class SetThresholdTool extends Tool
         $pack = $packs->for($shop);
 
         if ($unit !== null && $pack?->size !== null && $pack->isOwnSize()) {
-            return self::stored(UnitTargetMath::fromPackPrice($packPrice, UnitTargetMath::perPack($pack->size)), $unit, null, 'That price leaves no target.');
+            return self::stored(UnitTargetMath::fromPackPrice($packPrice, UnitTargetMath::perPack($pack->size)), $unit, shopId: null, refusal: 'That price leaves no target.');
         }
 
         return self::stored(UnitTargetMath::fromPackPrice($packPrice, '1'), UnitTargetConversion::PACK, (string) $shop->id, 'That price leaves no target.');

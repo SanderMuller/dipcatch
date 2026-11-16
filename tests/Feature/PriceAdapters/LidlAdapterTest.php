@@ -75,7 +75,7 @@ test('a running offer keeps its period beside a later one', function (): void {
     // Fritessaus, 2026-10-24: one badge for this week, one for a week in December.
     $result = app(LidlAdapter::class)->extract(
         'https://www.lidl.nl/p/lay-s/p10033095',
-        lidlPage(secondWindowFrom: '+46 days', secondWindowUntil: '+50 days'),
+        lidlPage(secondWindowUntil: '+50 days', secondWindowFrom: '+46 days'),
     );
 
     expect($result->snapshot?->promotionWindow?->isRunning())->toBeTrue()

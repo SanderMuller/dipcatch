@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Spatie\Health\ResultStores\EloquentHealthResultStore;
 
 /**
@@ -47,8 +48,8 @@ beforeEach(function (): void {
 afterEach(function (): void {
     DB::purge('copy_source');
     DB::purge('copy_target');
-    @unlink($this->sourcePath);
-    @unlink($this->targetPath);
+    File::delete($this->sourcePath);
+    File::delete($this->targetPath);
 });
 
 /**

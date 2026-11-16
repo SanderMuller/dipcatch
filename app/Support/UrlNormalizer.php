@@ -47,14 +47,14 @@ final class UrlNormalizer
      * direct request to the same page always succeeded: nine failures against
      * five successes, measured on production 2026-09-22.
      *
-     * Identity is unaffected. {@see hash()} strips the trailing slash before
+     * Identity is unaffected. {@see Hash()} strips the trailing slash before
      * hashing, so `/p/1` and `/p/1/` remain one shop and every hash stored
      * before this still matches.
      *
      * The `www.` prefix is deliberately KEPT here: not every shop serves its
      * apex domain (vomar.nl answers 404 while www.vomar.nl serves the page),
      * and this string is what the fetcher requests. Dedupe is unaffected —
-     * {@see hash()} drops the prefix before hashing, so the two forms still
+     * {@see Hash()} drops the prefix before hashing, so the two forms still
      * collapse to one shop.
      *
      * @throws InvalidArgumentException when the input is not a parseable http/https URL.

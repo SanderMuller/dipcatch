@@ -9,7 +9,7 @@ test('sizeKey gives the same key for every spelling of a pack size', function ()
 });
 
 test('sizeKey treats a quantity that is not finite as no quantity', function (float $quantity): void {
-    expect(VerdictReading::sizeKey($quantity, 'g'))->toBe(VerdictReading::sizeKey(null, 'g'));
+    expect(VerdictReading::sizeKey($quantity, 'g'))->toBe(VerdictReading::sizeKey(quantity: null, unit: 'g'));
 })->with([
     'INF' => [INF],
     '-INF' => [-INF],

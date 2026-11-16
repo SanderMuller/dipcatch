@@ -157,7 +157,7 @@ final class DatasetCatalog
      */
     private static function resolveBatch(array $pairs): array
     {
-        $urls = array_map(static fn (array $pair): string => self::ahUrl($pair), $pairs);
+        $urls = array_map(self::ahUrl(...), $pairs);
         $answers = app(AhApiSource::class)->resolveMany($urls);
         $entries = [];
 

@@ -167,7 +167,7 @@ final readonly class VerdictReading
 
     private static function timestamp(mixed $value): int
     {
-        return is_string($value) ? (int) Carbon::parse($value)->getTimestamp() : 0;
+        return is_string($value) ? Carbon::parse($value)->getTimestamp() : 0;
     }
 
     /**
