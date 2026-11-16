@@ -4,6 +4,7 @@ namespace App\Livewire\Products;
 
 use App\Actions\Products\CategoriseProduct;
 use App\Actions\Shops\ProbeBudget;
+use App\Actions\Shops\SaveOwnerPackSize;
 use App\Billing\Entitlements;
 use App\Billing\HistoryWindow;
 use App\Billing\Plan;
@@ -19,6 +20,7 @@ use App\Models\User;
 use App\Services\Drops\LargeDropConfirmation;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Support\AlertRules;
+use App\Support\Numeric;
 use App\Support\PriceBeforeDiscount;
 use App\Support\PriceVerdicts;
 use App\Support\UrlNormalizer;
@@ -78,6 +80,9 @@ final class ProductShow extends Component
 
     public string $editingNotes = '';
 
+    /** "How much is in this pack?" for a shop whose page states no size: the owner's size, or empty. */
+    public string $editingPackSize = '';
+
     public ?string $shareMessage = null;
 
     public function mount(Product $product): void
@@ -114,7 +119,18 @@ final class ProductShow extends Component
         $this->editingShopId = $shop->id;
         $this->editingUrl = $shop->url;
         $this->editingNotes = $shop->notes ?? '';
+        // As stored, not as shown: UnitWord::pack() rounds 1234 g to 1.23 kg, and saving that back moves the size.
+        $this->editingPackSize = $shop->owner_pack_quantity === null || $shop->owner_pack_unit === null
+            ? ''
+            : Numeric::trimmed($shop->owner_pack_quantity) . ' ' . ($shop->owner_pack_unit === 'piece' ? 'pieces' : $shop->owner_pack_unit);
         $this->shopMessage = null;
+        $this->resetErrorBag('editingPackSize');
+    }
+
+    public function askPackSize(string $shopId): void
+    {
+        $this->editShop($shopId);
+        $this->dispatch('ask-pack-size');
     }
 
     public function saveEditedUrl(): void
@@ -129,6 +145,22 @@ final class ProductShow extends Component
         if ($this->editingShopId !== null) {
             $this->saveShopNotes($this->editingShopId, $this->editingNotes);
         }
+    }
+
+    public function saveEditedPackSize(SaveOwnerPackSize $save): void
+    {
+        if ($this->editingShopId === null) {
+            return;
+        }
+
+        $shop = $this->shop($this->editingShopId);
+        $this->authorize('update', $shop);
+        $this->resetErrorBag('editingPackSize');
+
+        $save($this->product, $shop->id, $this->editingPackSize, 'editingPackSize');
+
+        $this->product->refresh();
+        $this->shopMessage = trim($this->editingPackSize) === '' ? __('Your size removed.') : __('Size saved.');
     }
 
     /**
@@ -306,6 +338,11 @@ final class ProductShow extends Component
         }
 
         $shop->updateUrl($normalized);
+
+        // The new page drops the owner's size; the open panel must not save it back.
+        if ($shop->id === $this->editingShopId) {
+            $this->editingPackSize = '';
+        }
 
         dispatch_sync(new CheckShopPrice($shop->refresh(), manual: true));
 

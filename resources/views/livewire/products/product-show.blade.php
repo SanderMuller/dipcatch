@@ -223,9 +223,12 @@
         </div>
     </flux:modal>
 
-    @if ($shopMessage)
-        <flux:callout class="mt-6" icon="information-circle">{{ $shopMessage }}</flux:callout>
-    @endif
+    {{-- Always in the DOM: a live region inserted with its text is not announced. --}}
+    <div role="status" aria-live="polite">
+        @if ($shopMessage)
+            <flux:callout class="mt-6" icon="information-circle">{{ $shopMessage }}</flux:callout>
+        @endif
+    </div>
 
     <div class="mt-6 grid gap-6 min-[112.5rem]:grid-cols-[3fr_2fr] min-[112.5rem]:items-start">
         <section class="min-w-0 space-y-6">
@@ -295,6 +298,10 @@
                                             <x-shop-unit-price :shop="$shop" :packs="$packs" :hint="$packs->leadsWithItems()
                                                 ? __('Price per item: the pack price divided by the number of items, so a set and a single one compare fairly.')
                                                 : __('Price :unit: the pack price divided by the pack size, so packs of different sizes compare fairly.', ['unit' => $comparesPer])" />
+                                            {{-- A stated size that cannot be read is unknown too, but an owner's size never counts there. --}}
+                                            @if ($packs->for($shop)?->exclusion === \App\Enums\PackExclusion::SizeUnknown && $shop->packSize() === null && $shop->notAConsumerPriceReason() === null)
+                                                <button type="button" wire:click="askPackSize('{{ $shop->id }}')" class="text-base font-medium text-zinc-900 underline underline-offset-4 sm:text-sm dark:text-white" data-test="ask-pack-size">{{ __('Add the size') }}<span class="sr-only"> {{ __('for :shop', ['shop' => $shop->displayName()]) }}</span></button>
+                                            @endif
                                             {{-- The per-unit winner, marked in the row whichever price the
                                                  headline leads with: the table is sorted per unit. --}}
                                             @if ($headline->bestValue?->id === $shop->id && $shops->count() > 1)
@@ -323,6 +330,12 @@
                                             {{-- A link's note, or a price nobody here pays. --}}
                                             <p class="mt-0.5 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
                                                 <x-shop-unit-price :shop="$shop" :packs="$packs" />
+                                            </p>
+                                        @elseif ($shop->packSize() === null && $shop->ownerPackSize() === null)
+                                            {{-- No live shop has a size, so nothing compares per unit yet. --}}
+                                            <p class="mt-0.5 text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
+                                                {{ __('Pack size unknown') }}
+                                                <button type="button" wire:click="askPackSize('{{ $shop->id }}')" class="ms-1 font-medium text-zinc-900 underline underline-offset-4 dark:text-white" data-test="ask-pack-size">{{ __('Add the size') }}<span class="sr-only"> {{ __('for :shop', ['shop' => $shop->displayName()]) }}</span></button>
                                             </p>
                                         @endif
                                     @endif
@@ -417,7 +430,7 @@
                                 <div>
                                     <flux:heading size="lg">{{ $editing->displayName() }}</flux:heading>
                                     <flux:text class="mt-1 text-zinc-500">
-                                        {{ __('Fix the link when the shop moves the product, and keep your own notes about buying there.') }}
+                                        {{ __('Fix the link when the shop moves the product, say how much is in the pack when the page does not, and keep your own notes about buying there.') }}
                                     </flux:text>
                                 </div>
 
@@ -431,6 +444,22 @@
                                     <flux:input wire:model="editingUrl" :label="__('Product link')" type="url" />
                                     <flux:button size="sm" wire:click="saveEditedUrl">{{ __('Save the link and check again') }}</flux:button>
                                 </div>
+
+                                @if (! $editing->isReference() && $editing->packSize() === null)
+                                    <div class="space-y-2" data-test="edit-pack-size">
+                                        <flux:input
+                                            wire:model="editingPackSize"
+                                            wire:keydown.enter="saveEditedPackSize"
+                                            x-on:ask-pack-size.window="$nextTick(() => { $el.scrollIntoView({ block: 'center' }); $el.focus() })"
+                                            :label="__('How much is in this pack?')"
+                                            :description="__('For example 660 g, 1 l or 4 pieces. It counts for this shop only, until the shop states a size itself. Leave it empty to remove your size.')"
+                                            placeholder="660 g"
+                                            autocomplete="off"
+                                            class="max-w-48"
+                                        />
+                                        <flux:button size="sm" wire:click="saveEditedPackSize" data-test="edit-pack-size-save">{{ __('Save size') }}</flux:button>
+                                    </div>
+                                @endif
 
                                 <div class="space-y-2">
                                     <flux:textarea

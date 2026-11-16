@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Enums\CategorySource;
+use App\Enums\ConsumerPriceIssue;
 use App\Enums\PackExclusion;
 use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
@@ -454,6 +455,156 @@ it('removes a shop and recomputes the cheapest offer', function (): void {
     // pointing at a row that no longer exists.
     expect(Shop::query()->find($cheap->id))->toBeNull()
         ->and($product->fresh()?->cheapest_shop_id)->not->toBe($cheap->id);
+});
+
+/**
+ * Two shops that disagree on the size, so the third one, whose page states
+ * none, borrows nothing and reads "Pack size unknown".
+ *
+ * @return array{0: User, 1: Product, 2: Shop}
+ */
+function productWithUnsizedShop(): array
+{
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://a.test/p', 'current_price' => '2.00', 'pack_quantity' => '100.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://b.test/p', 'current_price' => '3.00', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    $unsized = Shop::factory()->for($product)->create(['url' => 'https://c.test/p', 'current_price' => '2.50']);
+    $product->refresh()->recomputeCheapestShop();
+
+    return [$user, $product->refresh(), $unsized];
+}
+
+it('asks how much is in the pack at a shop whose size is unknown, and compares it per unit once told', function (): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee('Pack size unknown')
+        ->assertSeeHtml('data-test="ask-pack-size"')
+        ->call('askPackSize', $unsized->id)
+        ->assertDispatched('ask-pack-size')
+        ->assertSee('How much is in this pack?')
+        ->set('editingPackSize', '150 g')
+        ->call('saveEditedPackSize')
+        ->assertHasNoErrors()
+        ->assertSet('shopMessage', 'Size saved.')
+        ->assertDontSee('Pack size unknown')
+        ->assertDontSeeHtml('data-test="ask-pack-size"');
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBe('150.00')
+        ->and($unsized->owner_pack_unit)->toBe('g');
+});
+
+it('asks for the size on a product where no shop states one', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://a.test/p', 'current_price' => '2.00']);
+    $product->refresh()->recomputeCheapestShop();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeHtml('data-test="ask-pack-size"')
+        ->call('askPackSize', $shop->id)
+        ->set('editingPackSize', '500 g')
+        ->call('saveEditedPackSize')
+        ->assertHasNoErrors()
+        ->assertDontSeeHtml('data-test="ask-pack-size"');
+
+    expect($shop->refresh()->owner_pack_quantity)->toBe('500.00');
+});
+
+it('does not ask for a size on a shop whose price nobody here pays', function (): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $unsized->forceFill(['consumer_price_issue' => ConsumerPriceIssue::ExcludesVat, 'consumer_price_note' => 'excl. btw'])->save();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertDontSeeHtml('data-test="ask-pack-size"');
+});
+
+it('refuses a pack size it cannot read', function (): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('askPackSize', $unsized->id)
+        ->set('editingPackSize', 'a box')
+        ->call('saveEditedPackSize')
+        ->assertHasErrors('editingPackSize');
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBeNull();
+});
+
+it('loads the size the owner stated into the panel, and removes it when the field is emptied', function (): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $unsized->forceFill(['owner_pack_quantity' => '150.00', 'owner_pack_unit' => 'g'])->save();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('editShop', $unsized->id)
+        ->assertSet('editingPackSize', '150 g')
+        ->set('editingPackSize', '')
+        ->call('saveEditedPackSize')
+        ->assertSet('shopMessage', 'Your size removed.');
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBeNull();
+});
+
+it('keeps the owner size exact when the panel is saved unchanged', function (string $quantity, string $unit, string $field): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $unsized->forceFill(['owner_pack_quantity' => $quantity, 'owner_pack_unit' => $unit])->save();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('editShop', $unsized->id)
+        ->assertSet('editingPackSize', $field)
+        ->call('saveEditedPackSize')
+        ->assertHasNoErrors();
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBe($quantity)
+        ->and($unsized->owner_pack_unit)->toBe($unit);
+})->with([
+    'grams over a kilo' => ['1234.00', 'g', '1234 g'],
+    'millilitres over a litre' => ['1500.50', 'ml', '1500.5 ml'],
+    'pieces' => ['4.00', 'piece', '4 pieces'],
+]);
+
+it('empties the size field when a new link drops the owner size', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '5.00',
+        'owner_pack_quantity' => '150.00',
+        'owner_pack_unit' => 'g',
+    ]);
+
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/2' => Http::response(jsonLdPage('9.00'), 200, ['Content-Type' => 'text/html']),
+    ]);
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('editShop', $shop->id)
+        ->assertSet('editingPackSize', '150 g')
+        ->set('editingUrl', 'https://shop.example.com/p/2')
+        ->call('saveEditedUrl')
+        ->assertSet('editingPackSize', '');
+
+    expect($shop->refresh()->owner_pack_quantity)->toBeNull();
+});
+
+it('does not ask for a size the shop page states itself', function (): void {
+    [$user, $product] = productWithUnsizedShop();
+    $sized = $product->shops()->where('url', 'https://a.test/p')->sole();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('editShop', $sized->id)
+        ->assertDontSeeHtml('data-test="edit-pack-size"');
 });
 
 it('refuses to remove a shop belonging to someone else', function (): void {

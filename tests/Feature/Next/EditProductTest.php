@@ -278,7 +278,14 @@ it('refuses to open a shop on somebody elses product', function (): void {
         ->call('saveShopUrl', $stranger->id, 'https://shop.example.com/p/9')
         ->assertForbidden();
 
-    expect($stranger->fresh()?->url)->toBe($stranger->url);
+    livewire(ProductShow::class, ['product' => $mine])
+        ->set('editingShopId', $stranger->id)
+        ->set('editingPackSize', '500 g')
+        ->call('saveEditedPackSize')
+        ->assertForbidden();
+
+    expect($stranger->fresh()?->url)->toBe($stranger->url)
+        ->and($stranger->fresh()?->owner_pack_quantity)->toBeNull();
 });
 
 it('refuses a shop of my own that belongs to another product', function (): void {
@@ -311,10 +318,17 @@ it('refuses a shop of my own that belongs to another product', function (): void
         ->call('removeShop', $shop->id)
         ->assertNotFound();
 
+    livewire(ProductShow::class, ['product' => $shown])
+        ->set('editingShopId', $shop->id)
+        ->set('editingPackSize', '500 g')
+        ->call('saveEditedPackSize')
+        ->assertNotFound();
+
     $untouched = $shop->fresh();
 
     expect($untouched?->notes)->toBe('untouched')
-        ->and((string) $untouched?->current_price)->toBe('10.00');
+        ->and((string) $untouched?->current_price)->toBe('10.00')
+        ->and($untouched?->owner_pack_quantity)->toBeNull();
 });
 
 it('saves a category chosen by hand and marks it as the users choice', function (): void {
