@@ -24,10 +24,11 @@ final readonly class UnitTargetGuide
      * bottle compared per litre, 8 for a box of 8 compared per piece.
      *
      * `ownerSize` is the size the owner stated for the shop, which the form
-     * lets them change or remove; `shopSays` is the shop's own size when it
-     * now states one that overrides it.
+     * lets them change or remove, and `ownerAmount` and `ownerUnit` are that
+     * size as the form's fields take it; `shopSays` is the shop's own size
+     * when it now states one that overrides it.
      *
-     * @return list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, shopSays: ?string}>
+     * @return list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, ownerAmount: ?string, ownerUnit: ?string, shopSays: ?string}>
      */
     public function packs(): array
     {
@@ -59,7 +60,7 @@ final readonly class UnitTargetGuide
      *
      * The shape of {@see packs()}, one pack being the unit: `perPack` is 1.
      *
-     * @return list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, shopSays: ?string}>
+     * @return list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, ownerAmount: ?string, ownerUnit: ?string, shopSays: ?string}>
      */
     public function pinnablePacks(): array
     {
@@ -107,15 +108,19 @@ final readonly class UnitTargetGuide
     }
 
     /**
-     * @return array{ownerSize: ?string, shopSays: ?string}
+     * @return array{ownerSize: ?string, ownerAmount: ?string, ownerUnit: ?string, shopSays: ?string}
      */
     private static function ownerSizeOf(Shop $shop): array
     {
         $owner = $shop->ownerPackSize();
         $own = $owner === null ? null : $shop->packSize();
 
+        $field = OwnerPackSizeField::of($shop);
+
         return [
             'ownerSize' => $owner === null ? null : UnitWord::pack($owner),
+            'ownerAmount' => $field['amount'] ?? null,
+            'ownerUnit' => $field['unit'] ?? null,
             'shopSays' => $own === null ? null : UnitWord::pack($own),
         ];
     }

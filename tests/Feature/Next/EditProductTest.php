@@ -280,7 +280,7 @@ it('refuses to open a shop on somebody elses product', function (): void {
 
     livewire(ProductShow::class, ['product' => $mine])
         ->set('editingShopId', $stranger->id)
-        ->set('editingPackSize', '500 g')
+        ->set('editingPackAmount', '500')->set('editingPackUnit', 'g')
         ->call('saveEditedPackSize')
         ->assertForbidden();
 
@@ -320,7 +320,7 @@ it('refuses a shop of my own that belongs to another product', function (): void
 
     livewire(ProductShow::class, ['product' => $shown])
         ->set('editingShopId', $shop->id)
-        ->set('editingPackSize', '500 g')
+        ->set('editingPackAmount', '500')->set('editingPackUnit', 'g')
         ->call('saveEditedPackSize')
         ->assertNotFound();
 

@@ -447,16 +447,27 @@
 
                                 @if (! $editing->isReference() && $editing->packSize() === null)
                                     <div class="space-y-2" data-test="edit-pack-size">
-                                        <flux:input
-                                            wire:model="editingPackSize"
-                                            wire:keydown.enter="saveEditedPackSize"
-                                            x-on:ask-pack-size.window="$nextTick(() => { $el.scrollIntoView({ block: 'center' }); $el.focus() })"
+                                        <flux:input.group
                                             :label="__('How much is in this pack?')"
-                                            :description="__('For example 660 g, 1 l or 4 pieces. It counts for this shop only, until the shop states a size itself. Leave it empty to remove your size.')"
-                                            placeholder="660 g"
-                                            autocomplete="off"
-                                            class="max-w-48"
-                                        />
+                                            :description="__('Enter the number and pick the unit. It counts for this shop only, until the shop states a size itself. Leave it empty to remove your size.')"
+                                            error:name="editingPackAmount"
+                                            class="max-w-64"
+                                        >
+                                            <flux:input
+                                                wire:model="editingPackAmount"
+                                                wire:keydown.enter="saveEditedPackSize"
+                                                x-on:ask-pack-size.window="$nextTick(() => { $el.scrollIntoView({ block: 'center' }); $el.focus() })"
+                                                inputmode="decimal"
+                                                placeholder="660"
+                                                autocomplete="off"
+                                                data-test="edit-pack-size-amount"
+                                            />
+                                            <flux:select wire:model="editingPackUnit" :aria-label="__('Unit')" class="max-w-fit" data-test="edit-pack-size-unit">
+                                                @foreach (\App\Support\OwnerPackSizeField::UNITS as $value => $label)
+                                                    <flux:select.option :value="$value">{{ __($label) }}</flux:select.option>
+                                                @endforeach
+                                            </flux:select>
+                                        </flux:input.group>
                                         <flux:button size="sm" wire:click="saveEditedPackSize" data-test="edit-pack-size-save">{{ __('Save size') }}</flux:button>
                                     </div>
                                 @endif

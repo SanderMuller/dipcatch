@@ -440,7 +440,7 @@ final class AddProductWizard extends Component
     }
 
     /**
-     * @return array{suggestion: AlertSuggestion, onOfferNow: bool, asksJev: bool, usesJev: bool, canSwitchOnAi: bool, packChoices: list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, shopSays: ?string}>, pinnablePacks: list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, shopSays: ?string}>, strandedOwnerSizes: list<array{shopId: string, shop: string, size: string}>, unitWord: ?string}
+     * @return array{suggestion: AlertSuggestion, onOfferNow: bool, asksJev: bool, usesJev: bool, canSwitchOnAi: bool, packChoices: list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, ownerAmount: ?string, ownerUnit: ?string, shopSays: ?string}>, pinnablePacks: list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, ownerAmount: ?string, ownerUnit: ?string, shopSays: ?string}>, strandedOwnerSizes: list<array{shopId: string, shop: string, size: string}>, unitWord: ?string}
      */
     private function alertStep(Product $product): array
     {

@@ -485,7 +485,7 @@ it('asks how much is in the pack at a shop whose size is unknown, and compares i
         ->call('askPackSize', $unsized->id)
         ->assertDispatched('ask-pack-size')
         ->assertSee('How much is in this pack?')
-        ->set('editingPackSize', '150 g')
+        ->set('editingPackAmount', '150')->set('editingPackUnit', 'g')
         ->call('saveEditedPackSize')
         ->assertHasNoErrors()
         ->assertSet('shopMessage', 'Size saved.')
@@ -506,7 +506,7 @@ it('asks for the size on a product where no shop states one', function (): void 
     livewire(ProductShow::class, ['product' => $product->refresh()])
         ->assertSeeHtml('data-test="ask-pack-size"')
         ->call('askPackSize', $shop->id)
-        ->set('editingPackSize', '500 g')
+        ->set('editingPackAmount', '500')->set('editingPackUnit', 'g')
         ->call('saveEditedPackSize')
         ->assertHasNoErrors()
         ->assertDontSeeHtml('data-test="ask-pack-size"');
@@ -523,15 +523,50 @@ it('does not ask for a size on a shop whose price nobody here pays', function ()
         ->assertDontSeeHtml('data-test="ask-pack-size"');
 });
 
-it('refuses a pack size it cannot read', function (): void {
+it('saves a count picked from the unit list, with the unit the product compares in already chosen', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://a.test/p', 'current_price' => '22.77', 'pack_quantity' => '100.00', 'pack_unit' => 'piece']);
+    Shop::factory()->for($product)->create(['url' => 'https://b.test/p', 'current_price' => '9.00', 'pack_quantity' => '40.00', 'pack_unit' => 'piece']);
+    $unsized = Shop::factory()->for($product)->create(['url' => 'https://c.test/p', 'current_price' => '10.26']);
+    $product->refresh()->recomputeCheapestShop();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->call('askPackSize', $unsized->id)
+        ->assertSet('editingPackUnit', 'pieces')
+        ->set('editingPackAmount', '36')
+        ->call('saveEditedPackSize')
+        ->assertHasNoErrors();
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBe('36.00')
+        ->and($unsized->owner_pack_unit)->toBe('piece');
+});
+
+it('reads a decimal comma and a larger unit', function (): void {
     [$user, $product, $unsized] = productWithUnsizedShop();
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product])
         ->call('askPackSize', $unsized->id)
-        ->set('editingPackSize', 'a box')
+        ->set('editingPackAmount', '1,5')
+        ->set('editingPackUnit', 'kg')
         ->call('saveEditedPackSize')
-        ->assertHasErrors('editingPackSize');
+        ->assertHasNoErrors();
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBe('1500.00')
+        ->and($unsized->owner_pack_unit)->toBe('g');
+});
+
+it('refuses an amount that is not a number', function (): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('askPackSize', $unsized->id)
+        ->set('editingPackAmount', 'a box')
+        ->call('saveEditedPackSize')
+        ->assertHasErrors('editingPackAmount');
 
     expect($unsized->refresh()->owner_pack_quantity)->toBeNull();
 });
@@ -543,31 +578,32 @@ it('loads the size the owner stated into the panel, and removes it when the fiel
 
     livewire(ProductShow::class, ['product' => $product])
         ->call('editShop', $unsized->id)
-        ->assertSet('editingPackSize', '150 g')
-        ->set('editingPackSize', '')
+        ->assertSet('editingPackAmount', '150')->assertSet('editingPackUnit', 'g')
+        ->set('editingPackAmount', '')
         ->call('saveEditedPackSize')
         ->assertSet('shopMessage', 'Your size removed.');
 
     expect($unsized->refresh()->owner_pack_quantity)->toBeNull();
 });
 
-it('keeps the owner size exact when the panel is saved unchanged', function (string $quantity, string $unit, string $field): void {
+it('keeps the owner size exact when the panel is saved unchanged', function (string $quantity, string $unit, string $amount, string $field): void {
     [$user, $product, $unsized] = productWithUnsizedShop();
     $unsized->forceFill(['owner_pack_quantity' => $quantity, 'owner_pack_unit' => $unit])->save();
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product])
         ->call('editShop', $unsized->id)
-        ->assertSet('editingPackSize', $field)
+        ->assertSet('editingPackAmount', $amount)
+        ->assertSet('editingPackUnit', $field)
         ->call('saveEditedPackSize')
         ->assertHasNoErrors();
 
     expect($unsized->refresh()->owner_pack_quantity)->toBe($quantity)
         ->and($unsized->owner_pack_unit)->toBe($unit);
 })->with([
-    'grams over a kilo' => ['1234.00', 'g', '1234 g'],
-    'millilitres over a litre' => ['1500.50', 'ml', '1500.5 ml'],
-    'pieces' => ['4.00', 'piece', '4 pieces'],
+    'grams over a kilo' => ['1234.00', 'g', '1234', 'g'],
+    'millilitres over a litre' => ['1500.50', 'ml', '1500.5', 'ml'],
+    'pieces' => ['4.00', 'piece', '4', 'pieces'],
 ]);
 
 it('empties the size field when a new link drops the owner size', function (): void {
@@ -589,10 +625,10 @@ it('empties the size field when a new link drops the owner size', function (): v
 
     livewire(ProductShow::class, ['product' => $product])
         ->call('editShop', $shop->id)
-        ->assertSet('editingPackSize', '150 g')
+        ->assertSet('editingPackAmount', '150')->assertSet('editingPackUnit', 'g')
         ->set('editingUrl', 'https://shop.example.com/p/2')
         ->call('saveEditedUrl')
-        ->assertSet('editingPackSize', '');
+        ->assertSet('editingPackAmount', '');
 
     expect($shop->refresh()->owner_pack_quantity)->toBeNull();
 });

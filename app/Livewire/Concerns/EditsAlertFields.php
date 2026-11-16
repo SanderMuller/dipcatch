@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Shop;
 use App\Support\MoneyFormatter;
 use App\Support\Numeric;
+use App\Support\OwnerPackSizeField;
 use App\Support\ShopNames;
 use App\Support\UnitTargetConversion;
 use App\Support\UnitTargetGuide;
@@ -22,7 +23,7 @@ use SanderMuller\FluentValidation\FluentRule;
  * kilo, litre or piece while a shop can win per unit, or the price of one
  * shop's pack while none can.
  *
- * @phpstan-type PackChoice array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, shopSays: ?string}
+ * @phpstan-type PackChoice array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, ownerAmount: ?string, ownerUnit: ?string, shopSays: ?string}
  */
 trait EditsAlertFields
 {
@@ -56,8 +57,11 @@ trait EditsAlertFields
 
     public ?string $alertHelperValue = null;
 
-    /** "How much is in this pack?" — the size the owner states for the chosen shop. */
-    public ?string $packSizeInput = null;
+    /** "How much is in this pack?" — the amount the owner states for the chosen shop. */
+    public ?string $packSizeAmount = null;
+
+    /** The unit of that amount: a key of {@see OwnerPackSizeField::UNITS}. */
+    public string $packSizeUnit = 'g';
 
     /**
      * The target in the unit the form works in: today's comparison unit, the
@@ -80,6 +84,7 @@ trait EditsAlertFields
         $this->removeUnitPriceTarget = false;
         $this->alertHelper = 'price';
         $this->alertHelperValue = null;
+        $this->packSizeUnit = OwnerPackSizeField::defaultUnit($product->comparablePacks()->unit());
     }
 
     private static function formUnit(Product $product): ?string
@@ -160,11 +165,11 @@ trait EditsAlertFields
     {
         $product = $this->alertProduct();
         $this->authorize('update', $product);
-        $this->resetErrorBag('packSizeInput');
+        $this->resetErrorBag('packSizeAmount');
 
-        $save($product, $shopId, $this->packSizeInput, 'packSizeInput');
+        $save($product, $shopId, OwnerPackSizeField::text($this->packSizeAmount, $this->packSizeUnit, 'packSizeAmount'), 'packSizeAmount');
 
-        $this->packSizeInput = null;
+        $this->packSizeAmount = null;
         $this->loadUnitPriceTarget($product->refresh());
         $this->keepChosenPack($product, $shopId);
         $this->announce(__('Size saved.'));
@@ -175,11 +180,11 @@ trait EditsAlertFields
     {
         $product = $this->alertProduct();
         $this->authorize('update', $product);
-        $this->resetErrorBag('packSizeInput');
+        $this->resetErrorBag('packSizeAmount');
 
-        $save($product, $shopId, null, 'packSizeInput');
+        $save($product, $shopId, null, 'packSizeAmount');
 
-        $this->packSizeInput = null;
+        $this->packSizeAmount = null;
         $this->loadUnitPriceTarget($product->refresh());
         $this->keepChosenPack($product, $shopId);
         $this->announce(__('Your size removed.'));

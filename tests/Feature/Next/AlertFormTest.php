@@ -198,7 +198,7 @@ it('gives the product a price per kilo when the owner states the size of the pac
 
     livewire(EditProduct::class, ['product' => $product])
         ->assertSee('How much is in this pack?')
-        ->set('packSizeInput', '660 g')
+        ->set('packSizeAmount', '660')->set('packSizeUnit', 'g')
         ->call('saveOwnerPackSize', $big->id)
         ->assertHasNoErrors()
         ->assertSet('unitPriceTargetUnit', 'g')
@@ -211,24 +211,24 @@ it('gives the product a price per kilo when the owner states the size of the pac
         ->and($product->refresh()->best_value_shop_id)->toBe($big->id);
 });
 
-it('refuses a word for the pack instead of what is in it', function (string $input): void {
+it('refuses an amount that is not a number', function (string $input): void {
     [$user, $product, $big] = alertFormProduct(sized: false);
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product])
-        ->set('packSizeInput', $input)
+        ->set('packSizeAmount', $input)
         ->call('saveOwnerPackSize', $big->id)
-        ->assertHasErrors('packSizeInput');
+        ->assertHasErrors('packSizeAmount');
 
     expect($big->refresh()->owner_pack_quantity)->toBeNull();
-})->with(['a box', '1 pack']);
+})->with(['a box', '1 pack', '0']);
 
 it('removes the size the owner stated and goes back to a price for the pack', function (): void {
     [$user, $product, $big] = alertFormProduct(sized: false);
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product])
-        ->set('packSizeInput', '660 g')
+        ->set('packSizeAmount', '660')->set('packSizeUnit', 'g')
         ->call('saveOwnerPackSize', $big->id)
         ->call('removeOwnerPackSize', $big->id)
         ->assertSet('unitPriceTargetUnit', 'pack')
@@ -253,10 +253,10 @@ it('drops the size error once a size saves', function (): void {
     $this->actingAs($user);
 
     livewire(EditProduct::class, ['product' => $product])
-        ->set('packSizeInput', 'a box')
+        ->set('packSizeAmount', 'a box')
         ->call('saveOwnerPackSize', $big->id)
-        ->assertHasErrors('packSizeInput')
-        ->set('packSizeInput', '660 g')
+        ->assertHasErrors('packSizeAmount')
+        ->set('packSizeAmount', '660')->set('packSizeUnit', 'g')
         ->call('saveOwnerPackSize', $big->id)
         ->assertHasNoErrors();
 });
@@ -271,7 +271,7 @@ it('loads the target again when a size turns a pack target into a price per kilo
 
     livewire(EditProduct::class, ['product' => $product->refresh()])
         ->assertSet('unitPriceTarget', null)
-        ->set('packSizeInput', '660 g')
+        ->set('packSizeAmount', '660')->set('packSizeUnit', 'g')
         ->call('saveOwnerPackSize', $big->id)
         // €22.80 for 660 g.
         ->assertSet('unitPriceTarget', '34.5454')

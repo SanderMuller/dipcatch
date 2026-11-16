@@ -32,7 +32,7 @@ return [
             'date' => '2026-11-16',
             'category' => 'feature',
             'title' => 'Add a pack size on the product page',
-            'body' => "When a shop doesn't say how much is in its pack, the product page now shows Add the size next to that shop. Enter it, for example 660 g or 4 pieces, and that shop gets a price per kilo, litre or piece, so it can count as the best value.",
+            'body' => "When a shop doesn't say how much is in its pack, the product page now shows Add the size next to that shop. Type the number and pick the unit, for example 36 and pieces, and that shop gets a price per kilo, litre or piece, so it can count as the best value.",
         ],
         [
             'date' => '2026-10-26',
