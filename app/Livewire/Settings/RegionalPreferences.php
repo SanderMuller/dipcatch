@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\ShopDiscovery\ShoppersCountry;
 use App\Support\IanaTimezones;
 use App\Support\Iso4217;
+use App\Support\ListboxOptions;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -73,8 +74,8 @@ final class RegionalPreferences extends Component
     public function render(): View
     {
         return view('livewire.settings.regional-preferences', [
-            'timezones' => IanaTimezones::options(),
-            'countries' => ShoppersCountry::options(),
+            'timezones' => ListboxOptions::html(IanaTimezones::options()),
+            'countries' => ListboxOptions::html(ShoppersCountry::options()),
         ]);
     }
 

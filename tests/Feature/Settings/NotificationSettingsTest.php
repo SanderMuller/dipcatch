@@ -4,6 +4,8 @@ use App\Livewire\Settings\NotificationPreferences;
 use App\Livewire\Settings\RegionalPreferences;
 use App\Models\User;
 use App\Notifications\TestNotification;
+use App\Services\ShopDiscovery\ShoppersCountry;
+use App\Support\IanaTimezones;
 use Illuminate\Support\Facades\Notification;
 
 use function Pest\Livewire\livewire;
@@ -124,4 +126,21 @@ test('regional settings show the country from the timezone, and keep a country t
 
     livewire(RegionalPreferences::class)->set('country', 'xx')->call('save')->assertHasErrors('country');
     expect($user->refresh()->country)->toBe('be');
+});
+
+test('regional settings list every timezone and country as a searchable option, also after a save', function (): void {
+    $this->actingAs(User::factory()->create(['timezone' => 'Europe/Amsterdam']));
+    $optionCount = count(IanaTimezones::options()) + count(ShoppersCountry::options());
+
+    $component = livewire(RegionalPreferences::class);
+
+    expect(preg_match_all('/<ui-option\s/', $component->html()))->toBe($optionCount);
+
+    $component->call('save')->assertHasNoErrors()
+        ->assertSeeHtml('<ui-option')
+        ->assertSeeHtml('value="Europe/London"')
+        ->assertSeeHtml('value="be"')
+        ->assertSee('Belgium');
+
+    expect(preg_match_all('/<ui-option\s/', $component->html()))->toBe($optionCount);
 });
