@@ -98,7 +98,7 @@ test('a wrong password signs out nothing', function (): void {
     Livewire::test(SignOutEverywhereForm::class)
         ->set('password', 'not-my-password')
         ->call('signOutEverywhere')
-        ->assertHasErrors(['password' => 'current_password'])
+        ->assertHasErrors(['password' => __('validation.current_password')])
         ->assertSet('password', '');
 
     expect(DB::table('oauth_access_tokens')->where('user_id', $user->id)->exists())->toBeTrue();

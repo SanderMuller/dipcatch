@@ -2,6 +2,7 @@
 
 namespace App\Concerns;
 
+use App\Rules\CurrentPassword;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rules\Password;
 
@@ -24,6 +25,6 @@ trait PasswordValidationRules
      */
     protected function currentPasswordRules(): array
     {
-        return ['required', 'string', 'current_password'];
+        return ['required', 'string', new CurrentPassword()];
     }
 }

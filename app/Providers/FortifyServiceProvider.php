@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
+use App\Actions\Fortify\PasswordGuesses;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -12,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Fortify;
 
 final class FortifyServiceProvider extends ServiceProvider
@@ -64,6 +66,18 @@ final class FortifyServiceProvider extends ServiceProvider
             ]);
         });
         Fortify::confirmPasswordView(fn (): Factory|View => view('livewire.auth.confirm-password'));
+
+        // The confirm page counts wrong guesses with the settings forms.
+        Fortify::confirmPasswordsUsing(static function (User $user, ?string $password): bool {
+            $guesses = app(PasswordGuesses::class);
+            $lockedFor = $guesses->lockedFor($user);
+
+            if ($lockedFor !== null) {
+                throw ValidationException::withMessages(['password' => PasswordGuesses::lockedMessage($lockedFor)]);
+            }
+
+            return $guesses->check($user, (string) $password);
+        });
         Fortify::registerView(fn (): Factory|View => view('livewire.auth.register'));
         Fortify::resetPasswordView(fn (): Factory|View => view('livewire.auth.reset-password'));
         Fortify::requestPasswordResetLinkView(fn (): Factory|View => view('livewire.auth.forgot-password'));
