@@ -78,6 +78,15 @@ substitution runs the whole suite.
 
 ---
 
+## Product Scope — Any Shop, Not Just Supermarkets
+
+DipCatch tracks prices at any webshop, in the Netherlands and abroad. When you describe it — in user copy, the changelog, outreach, a spec or a PR — never present it as a supermarket or grocery tool, and do not narrow a general feature such as "where to shop this week" to supermarkets.
+
+- Supermarket support is deeper than elsewhere (weekly offers, upcoming deals, unit prices). Name it as a strength, not as the scope.
+- Dutch shops have the best and widest support. Say so, but do not call DipCatch a Dutch price tracker.
+
+---
+
 ## Public Repository — Everything You Push Is Published
 
 `SanderMuller/dipcatch` is a public GitHub repository. A later commit, a force-push or a rename does not unpublish what a push already published. Treat every commit, branch name and PR body as permanent and world-readable, and remember that `.gitignore` names files, not classes of file — it is not a safety net.
@@ -264,42 +273,40 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - If you're creating a generic PHP class, use `php artisan make:class`.
 - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
 
-@scoped(['app/Models/**'])
+
 ### Model Creation
 
 - When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
-@endscoped
 
-@scoped(['app/Http/**', 'routes/**'])
+
+
 ## APIs & Eloquent Resources
 
 - For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
-@endscoped
+
 
 ## URL Generation
 - When generating links to other pages, prefer named routes and the `route()` function.
 
-@scoped(['tests/**'])
+
 ## Testing
 
 - When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
 - Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
 - When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
-@endscoped
 
 ---
 
-@scoped(['app/Livewire/**', 'resources/views/**'])
+
 # Livewire
 
 - Livewire allows you to build dynamic, reactive interfaces in PHP without writing JavaScript.
 - You can use Alpine.js for client-side interactions instead of JavaScript frameworks.
 - Keep state server-side so the UI reflects it. Validate and authorize in actions as you would in HTTP requests.
-@endscoped
 
 ---
 
-@scoped(['tests/**'])
+
 # Pest
 
 - This project uses Pest. Create tests with `php artisan make:test --pest {name}`.
@@ -312,8 +319,6 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
 - Rerun a test after each change to it.
 - Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
-- After the feature tests pass, ask the user to run the complete suite with `php artisan test --compact`.
-@endscoped
 
 ---
 
@@ -505,7 +510,7 @@ $table->string('description');
 
 A migration runner records a migration only after its whole `up()` returns, and it wraps the run in a transaction only for engines it treats as supporting transactional DDL. Laravel does that for PostgreSQL and SQL Server, and not for MySQL, MariaDB or SQLite. Without that transaction, a run that dies halfway leaves the applied statements in place with nothing recorded, and the retry fails on the first statement it already applied, blocking every later migration. Check which side your engine and runner fall on before assuming a failed migration rolled back.
 
-Make each statement in a multi-statement migration skippable when it is already applied, using the runner's own column and index checks.
+Make each statement in a multi-statement migration skippable when it is already applied, using the runner's own column and index checks. On PostgreSQL this also applies to a migration that opts out of the transaction, for example to build an index with `CREATE INDEX CONCURRENTLY`, which PostgreSQL rejects inside a transaction (in Laravel, `public $withinTransaction = false;`). A failed concurrent build leaves an invalid index that `Schema::hasIndex()` still reports, so check `pg_index.indisvalid` too, and drop the invalid index before the retry.
 
 ```php
 // ❌ WRONG — a retry after a half-applied run dies on "Duplicate column name"
@@ -524,7 +529,7 @@ if (! Schema::hasIndex('orders', 'orders_reference_index')) {
 }
 ```
 
-Keep slow work out of the migration on a large table: build an index, backfill a column, or add a foreign key as a separate job or an out-of-band task, not inside the deploy step. On MySQL, where the session has the `database-specialist` subagent, dispatch it before any DDL on a large table: it names the algorithm and lock each statement takes.
+Keep slow work out of the migration on a large table: build an index, backfill a column, or add a foreign key as a separate job or an out-of-band task, not inside the deploy step. Where the session has the `database-specialist` subagent, dispatch it before any DDL on a large table: it names the algorithm or lock level each statement takes, on MySQL and PostgreSQL.
 
 ---
 
@@ -551,7 +556,7 @@ Write a test when the PHPStan error indicates a fault that would surface at runt
 
 ### Annotate Rather Than Suppress
 
-Some errors are PHPStan reading a signature that says less than the code does — a return type a parameter decides, a bool helper that proves a type. The `backend-quality` skill carries the two annotations that state the missing fact, and the rules for when each one lies.
+Some errors are PHPStan reading a signature that says less than the code does. When a parameter decides the return type, add a conditional `@return ($param is Type ? A : B)`. When a bool method is a pure type check, add `@phpstan-assert-if-true`. Add either one only where it holds for every call; a wrong one makes the analysis worse. The `backend-quality` skill, where the project ships it, has the full rules and examples.
 
 ### When to Skip the Test
 
@@ -684,7 +689,8 @@ This guideline governs **how a sentence is built**, and how much you write. It n
 
 **Write in ASD-STE100 Simplified Technical English.** Say the same thing in fewer, simpler words.
 
-- One idea per sentence. Keep procedural sentences to 20 words or less, descriptive sentences to 25 or less.
+- One idea per sentence. Keep procedural sentences to 20 words or less, descriptive sentences to 25 or less. These limits are a ceiling, not a target.
+- Vary sentence length. A run of short sentences of the same size reads as machine output, as a run of long ones does. Join two clauses that carry one idea with "because", "so", or "although" instead of splitting them into two short sentences.
 - Use the active voice. Name the actor. Use the passive only when the actor is unknown.
 - Use simple tenses only — simple present, simple past, simple future, infinitive, imperative. No complex constructions built from auxiliary verbs.
 - Use one word for one meaning. Use the same word for the same thing every time — do not vary it for style.
