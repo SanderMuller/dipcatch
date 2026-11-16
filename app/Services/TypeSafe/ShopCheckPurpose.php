@@ -25,4 +25,7 @@ enum ShopCheckPurpose: string
 
     /** Whether a page that states no pack size sells the size the other shops state. */
     case PackSize = 'pack-size';
+
+    /** Whether a typed product name is specific enough for a paid web search. */
+    case NameSearch = 'name-search';
 }

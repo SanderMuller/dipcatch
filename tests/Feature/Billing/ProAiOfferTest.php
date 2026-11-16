@@ -153,7 +153,7 @@ test('the billing page stops waiting and says Pro is on its way when Stripe is s
 
     $page = livewire(BillingPage::class, ['checkout' => 'done']);
 
-    foreach (range(1, BillingPage::MAX_CHECKOUT_POLLS) as $wait) {
+    for ($i = 1; $i <= BillingPage::MAX_CHECKOUT_POLLS; $i++) {
         $page->call('waitForPro');
     }
 

@@ -59,6 +59,9 @@ return [
         // Data older than this is still stored — see the retention rule in
         // PruneOldChecksCommand — it simply cannot be read on this plan.
         'history_days' => (int) env('PLAN_FREE_HISTORY_DAYS', 90),
+        // New web searches by product name per day, counted per UTC day.
+        // A search someone made before is free.
+        'web_searches_per_day' => (int) env('PLAN_FREE_WEB_SEARCHES_PER_DAY', 3),
     ],
 
     'pro' => [
@@ -73,6 +76,7 @@ return [
         'price_changes' => true,
         'sharing' => true,
         'history_days' => null,
+        'web_searches_per_day' => (int) env('PLAN_PRO_WEB_SEARCHES_PER_DAY', 10),
     ],
 
     /*

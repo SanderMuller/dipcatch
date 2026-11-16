@@ -33,16 +33,7 @@
          filters above the products they narrow. --}}
     <div class="mt-6 grid gap-3 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-x-8 lg:gap-y-6">
         <div>
-            @if ($canAddProduct)
-                <flux:button class="rounded-full!" :href="route('app.products.create')" icon="plus" variant="primary" wire:navigate>
-                    {{ __('Track a product') }}
-                </flux:button>
-            @else
-                {{-- The limit is stated, not hidden: the guard also refuses the write. --}}
-                <flux:tooltip content="{{ auth()->user()?->isPro() === true ? __('You are following as many products as Pro allows.') : __('You are following as many products as the free plan allows.') }}">
-                    <flux:button class="rounded-full!" icon="plus" variant="primary" disabled>{{ __('Track a product') }}</flux:button>
-                </flux:tooltip>
-            @endif
+            <x-track-product-button :can-add="$canAddProduct" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3">

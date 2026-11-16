@@ -52,15 +52,36 @@ beforeEach(function (): void {
     Notification::fake();
 });
 
-it('stamps the first unit a product gets on a target saved without one, and keeps its latch', function (): void {
+it('reads a target saved before the product had a unit as a price for the first shop\'s pack, never as a price per kilo', function (): void {
     $product = weighedProduct(['unit_price_target' => '5.50', 'unit_price_notified' => '5.3784']);
+    $product->shops()->where('url', 'https://lidl.nl/p/1')->update(['created_at' => now()->addMinute()]);
 
-    $product->recomputeCheapestShop();
+    $product->refresh()->recomputeCheapestShop();
 
+    // €5.50 for the first shop's 200 g is €27.50 a kilo. Stamped with the
+    // unit that just appeared it would read as €5.50 a kilo.
     expect($product->unit_price_target_unit)->toBe('g')
-        ->and($product->unit_price_target_effective)->toBe('5.5000')
-        ->and($product->unit_price_notified)->toBe('5.3784')
+        ->and($product->unit_price_target)->toBe('27.5000')
+        ->and($product->unit_price_target_shop_id)->toBeNull()
+        // The latch was read as the first shop's pack price too: €5.3784 for
+        // 200 g. Lidl's €5.3784 a kilo is under it, so it is still news.
+        ->and($product->unit_price_notified)->toBe('26.8920')
         ->and($product->unit_price_notified_unit)->toBe('g');
+});
+
+it('keeps a target saved before the product had a unit on the first shop\'s pack while that shop has no size', function (): void {
+    $product = weighedProduct(['unit_price_target' => '1.80']);
+    $first = $product->shops()->where('url', 'https://ah.nl/p/1')->sole();
+    $first->forceFill(['pack_quantity' => null, 'pack_unit' => null])->save();
+    $product->shops()->where('url', 'https://lidl.nl/p/1')->update(['created_at' => now()->addMinute()]);
+
+    $product->refresh()->recomputeCheapestShop();
+
+    // The other shop's 370 g can be another pack: it is never the divisor.
+    expect($product->unit_price_target_unit)->toBe('pack')
+        ->and($product->unit_price_target_shop_id)->toBe($first->id)
+        ->and($product->unit_price_target)->toBe('1.8000')
+        ->and($product->isAtTarget())->toBeTrue();
 });
 
 it('suspends a target whose unit the product no longer compares in, and wakes it when the unit returns', function (): void {
@@ -322,20 +343,4 @@ it('reloads the wizard\'s target field when shops added in it move the product t
     $component->call('$refresh')
         ->assertSet('unitPriceTargetUnit', 'piece')
         ->assertSet('unitPriceTarget', null);
-});
-
-it('switches to a price alert in the unit the product compares in when it moved while the form was open', function (): void {
-    $product = weighedProduct(['drop_threshold_pct' => '15.00']);
-    $product->recomputeCheapestShop();
-    $this->actingAs($product->user()->firstOrFail());
-
-    $component = livewire(EditProduct::class, ['product' => $product])->assertSet('unitPriceTargetUnit', 'g');
-
-    countInPieces($product)->recomputeCheapestShop();
-
-    $component->call('switchToPriceAlert')->assertSet('unitPriceTargetUnit', 'piece');
-
-    // Whatever the switch filled in, the next render keeps it.
-    $target = $component->get('unitPriceTarget');
-    $component->call('$refresh')->assertSet('unitPriceTarget', $target);
 });

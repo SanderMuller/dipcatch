@@ -129,7 +129,7 @@ final class DashboardCategorySuggestions extends Component
             ->whereNull('category')
             ->whereNull('category_set_by')
             ->orderByRaw('suggested_category IS NULL')
-            ->latest('created_at')
+            ->latest()
             ->limit(self::SHOWN + 3)
             ->get();
     }

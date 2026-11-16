@@ -12,17 +12,6 @@ use Illuminate\Support\Facades\DB;
 
 use function Pest\Livewire\livewire;
 
-it('counts only the signed-in users active products', function (): void {
-    $user = User::factory()->create();
-    Product::factory()->count(2)->create(['user_id' => $user->id, 'active' => true]);
-    Product::factory()->create(['user_id' => $user->id, 'active' => false]);
-    Product::factory()->create(['active' => true]);
-
-    $this->actingAs($user);
-
-    livewire(Dashboard::class)->assertSee('Tracked products')->assertSee('2');
-});
-
 it('invites a new account to track its first product', function (): void {
     $this->actingAs(User::factory()->create());
 
@@ -36,6 +25,25 @@ it('drops the invitation once something is tracked', function (): void {
     $this->actingAs($user);
 
     livewire(Dashboard::class)->assertDontSee('Track your first product');
+});
+
+it('offers the create action below the plan limit', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    livewire(Dashboard::class)
+        ->assertSeeHtml('data-test="track-product"')
+        ->assertSeeHtml('href="' . route('app.products.create') . '"');
+});
+
+it('states the limit instead of offering creation when the plan is full', function (): void {
+    $user = User::factory()->create();
+    Product::factory()->count(20)->create(['user_id' => $user->id]);
+
+    $this->actingAs($user);
+
+    livewire(Dashboard::class)
+        ->assertSee('You are following as many products as the free plan allows.')
+        ->assertDontSeeHtml('href="' . route('app.products.create') . '"');
 });
 
 it('shows recently added products, paused ones included, and nobody elses', function (): void {
@@ -78,30 +86,6 @@ it('lists active drops and nobody elses', function (): void {
     livewire(Dashboard::class)
         ->assertSee('My dropped product')
         ->assertDontSee('Someone elses drop');
-});
-
-it('sums lifetime savings in the currency most alerts used', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->create(['user_id' => $user->id, 'currency' => 'EUR']);
-
-    foreach (['2.50', '1.25'] as $amount) {
-        PriceDropEvent::factory()->create([
-            'product_id' => $product->id,
-            'user_id' => $user->id,
-            'currency' => 'EUR',
-            'drop_abs' => $amount,
-        ]);
-    }
-
-    $this->actingAs($user);
-
-    livewire(Dashboard::class)->assertSee('€3.75');
-});
-
-it('shows zero savings rather than nothing for a new account', function (): void {
-    $this->actingAs(User::factory()->create());
-
-    livewire(Dashboard::class)->assertSee('€0.00');
 });
 
 it('discloses bundle terms beside dashboard effective prices', function (): void {
@@ -204,12 +188,16 @@ it('counts a drop only while the card shows one', function (): void {
 
 it('shows the products at their alert price above the drops, and only there', function (): void {
     $user = User::factory()->create();
-    $atAlert = Product::factory()->for($user)->create(['title' => 'Under my alert', 'cheapest_price' => '7.99', 'target_price' => '8.00', 'last_notified_price' => '7.99', 'last_notified_at' => now()]);
+    $atAlert = Product::factory()->for($user)->withPackTarget('8.00', ['current_price' => '7.99', 'initial_price' => '7.99'])
+        ->create(['title' => 'Under my alert', 'cheapest_price' => '7.99', 'last_notified_price' => '7.99', 'last_notified_at' => now()]);
     // Also in a drop: it shows under its alert, not twice.
     PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $atAlert->id, 'reference_price' => '9.99', 'new_price' => '7.99', 'drop_pct' => 20.0, 'currency' => 'EUR']);
-    Product::factory()->for($user)->create(['title' => 'Above my alert', 'cheapest_price' => '8.50', 'target_price' => '8.00']);
-    Product::factory()->for($user)->create(['title' => 'Paused under alert', 'cheapest_price' => '7.00', 'target_price' => '8.00', 'active' => false]);
-    Product::factory()->create(['title' => 'Someone elses alert', 'cheapest_price' => '1.00', 'target_price' => '2.00']);
+    Product::factory()->for($user)->withPackTarget('8.00', ['current_price' => '8.50', 'initial_price' => '8.50'])
+        ->create(['title' => 'Above my alert', 'cheapest_price' => '8.50']);
+    Product::factory()->for($user)->withPackTarget('8.00', ['current_price' => '7.00', 'initial_price' => '7.00'])
+        ->create(['title' => 'Paused under alert', 'cheapest_price' => '7.00', 'active' => false]);
+    Product::factory()->withPackTarget('2.00', ['current_price' => '1.00', 'initial_price' => '1.00'])
+        ->create(['title' => 'Someone elses alert', 'cheapest_price' => '1.00']);
 
     $this->actingAs($user);
 
@@ -222,7 +210,8 @@ it('shows the products at their alert price above the drops, and only there', fu
 
 it('leaves the alert section out when nothing is at its alert price', function (): void {
     $user = User::factory()->create();
-    Product::factory()->for($user)->create(['cheapest_price' => '8.50', 'target_price' => '8.00']);
+    Product::factory()->for($user)->withPackTarget('8.00', ['current_price' => '8.50', 'initial_price' => '8.50'])
+        ->create(['cheapest_price' => '8.50']);
 
     $this->actingAs($user);
 
@@ -233,7 +222,8 @@ it('leaves the alert section out when nothing is at its alert price', function (
 
 it('still shows the other drops beside the products at their alert price', function (): void {
     $user = User::factory()->create();
-    $atAlert = Product::factory()->for($user)->create(['title' => 'Under my alert', 'cheapest_price' => '7.99', 'target_price' => '8.00', 'last_notified_price' => '7.99', 'last_notified_at' => now()]);
+    $atAlert = Product::factory()->for($user)->withPackTarget('8.00', ['current_price' => '7.99', 'initial_price' => '7.99'])
+        ->create(['title' => 'Under my alert', 'cheapest_price' => '7.99', 'last_notified_price' => '7.99', 'last_notified_at' => now()]);
     PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $atAlert->id, 'reference_price' => '9.99', 'new_price' => '7.99', 'drop_pct' => 20.0, 'currency' => 'EUR']);
     $dropped = Product::factory()->for($user)->create(['title' => 'Only dropped', 'cheapest_price' => '4.00', 'last_notified_price' => '4.00', 'last_notified_at' => now()]);
     PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $dropped->id, 'reference_price' => '5.00', 'new_price' => '4.00', 'drop_pct' => 20.0, 'currency' => 'EUR']);
@@ -259,7 +249,13 @@ it('says how many shops a recently added product has, and that it is paused', fu
 it('fills the drop cards from beyond the products at their alert price', function (): void {
     $user = User::factory()->create();
     $drop = function (string $title, string $price, ?string $target) use ($user): void {
-        $product = Product::factory()->for($user)->create(['title' => $title, 'cheapest_price' => $price, 'target_price' => $target, 'last_notified_price' => $price, 'last_notified_at' => now()]);
+        $factory = Product::factory()->for($user);
+
+        if ($target !== null) {
+            $factory = $factory->withPackTarget($target, ['current_price' => $price, 'initial_price' => $price]);
+        }
+
+        $product = $factory->create(['title' => $title, 'cheapest_price' => $price, 'last_notified_price' => $price, 'last_notified_at' => now()]);
         PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $product->id, 'reference_price' => '10.00', 'new_price' => $price, 'drop_pct' => 50.0, 'currency' => 'EUR']);
     };
 

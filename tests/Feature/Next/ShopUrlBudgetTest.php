@@ -20,7 +20,7 @@ it('refuses a new shop URL once the account has used its fetch budget, and fetch
     $product = Product::factory()->for($user)->create();
     $shop = Shop::factory()->for($product)->create(['url' => 'https://shop.example.com/p/1', 'current_price' => '5.00']);
 
-    foreach (range(1, ProbeBudget::PER_MINUTE) as $ignored) {
+    for ($i = 1; $i <= ProbeBudget::PER_MINUTE; $i++) {
         RateLimiter::hit('dipcatch:probe:user:' . $user->id);
     }
 

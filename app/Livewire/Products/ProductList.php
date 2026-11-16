@@ -86,9 +86,9 @@ final class ProductList extends Component
      * {@see Product::AT_TARGET_SQL} reads it; 1: in a drop, or with a deal as the "Only
      * discounts" switch reads one; 2: the rest. With a shop chosen, the alert
      * price and the drop count only where that shop has the price they are
-     * read at (`price_here`), as the switch has it.
+     * read at (`alert_here`, `price_here`), as the switch has it.
      */
-    private const string LIST_GROUP = 'CASE WHEN (' . Product::AT_TARGET_SQL . ') AND price_here > 0 THEN 0'
+    private const string LIST_GROUP = 'CASE WHEN (' . Product::AT_TARGET_SQL . ') AND alert_here > 0 THEN 0'
         . ' WHEN (biggest_drop >= 0.5 AND price_here > 0) OR deals_now > 0 THEN 1'
         . ' ELSE 2 END';
 
@@ -375,15 +375,17 @@ final class ProductList extends Component
         ]);
 
         if ($this->shop === '') {
-            $inner->selectRaw('1 AS price_here');
+            $inner->selectRaw('1 AS price_here, 1 AS alert_here');
         } else {
             // The lowest price or the best value is at the chosen shop.
             $inner->addSelect(['price_here' => Shop::query()->selectRaw('COUNT(*)')
                 ->whereColumn('shops.product_id', 'products.id')
                 ->where('host', $this->shop)
-                ->where(fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => $shop
-                    ->whereColumn('shops.id', 'products.cheapest_shop_id')
-                    ->orWhereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id'))]);
+                ->where(self::isHeadlineShop(...))]);
+            $inner->addSelect(['alert_here' => Shop::query()->selectRaw('COUNT(*)')
+                ->whereColumn('shops.product_id', 'products.id')
+                ->where('host', $this->shop)
+                ->where(self::isTargetShop(...))]);
         }
 
         return Product::query()->fromSub($inner, 'products')->select('*')->selectRaw(self::LIST_GROUP . ' AS list_group');
@@ -449,11 +451,44 @@ final class ProductList extends Component
                 ->select(DB::raw(1))
                 ->whereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id')
                 ->where('host', $host));
+        $alertThere = Shop::query()
+            ->select(DB::raw(1))
+            ->whereColumn('shops.product_id', 'products.id')
+            ->where('host', $host)
+            ->where(self::isTargetShop(...));
 
         return $query
             ->whereHas('shops', fn (EloquentQueryBuilder $shop): EloquentQueryBuilder => self::dealRunningNow($shop->where('host', $host)->where('active', true)))
             ->orWhere(fn (EloquentQueryBuilder $drop): EloquentQueryBuilder => $drop->inVisibleDrop()->where($priceThere))
-            ->orWhere(fn (EloquentQueryBuilder $alert): EloquentQueryBuilder => $alert->atTarget()->where($priceThere));
+            ->orWhere(fn (EloquentQueryBuilder $alert): EloquentQueryBuilder => $alert->atTarget()->whereExists($alertThere));
+    }
+
+    /**
+     * @param  EloquentQueryBuilder<Shop>  $shop
+     * @return EloquentQueryBuilder<Shop>
+     */
+    private static function isHeadlineShop(EloquentQueryBuilder $shop): EloquentQueryBuilder
+    {
+        return $shop->whereColumn('shops.id', 'products.cheapest_shop_id')
+            ->orWhereRaw('CAST(shops.id AS TEXT) = products.best_value_shop_id');
+    }
+
+    /**
+     * The shop a target is met at: the one a `pack` target is pinned to,
+     * never a cheaper pack elsewhere; else the lowest price or best value.
+     *
+     * @param  EloquentQueryBuilder<Shop>  $shop
+     * @return EloquentQueryBuilder<Shop>
+     */
+    private static function isTargetShop(EloquentQueryBuilder $shop): EloquentQueryBuilder
+    {
+        return $shop
+            ->where(fn (EloquentQueryBuilder $pinned): EloquentQueryBuilder => $pinned
+                ->whereRaw("products.unit_price_target_unit = 'pack'")
+                ->whereColumn('shops.id', 'products.unit_price_target_shop_id'))
+            ->orWhere(fn (EloquentQueryBuilder $headline): EloquentQueryBuilder => $headline
+                ->whereRaw("(products.unit_price_target_unit IS NULL OR products.unit_price_target_unit <> 'pack')")
+                ->where(self::isHeadlineShop(...)));
     }
 
     /**

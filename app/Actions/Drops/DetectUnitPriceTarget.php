@@ -17,7 +17,8 @@ use Throwable;
 
 /**
  * Fires when a product's best value reaches the price per unit the shopper
- * asked to be told about — "let me know when this is 6.00 per kilo or less".
+ * asked to be told about — "let me know when this is 6.00 per kilo or less" —
+ * or, for a target per pack, when the pinned shop reaches that pack price.
  *
  * Deliberately not the drop engine. That one measures a fall against the
  * product's own 30-day median and answers "is this unusually cheap"; a
@@ -36,30 +37,23 @@ final readonly class DetectUnitPriceTarget
 
     public function __invoke(Product $product): void
     {
-        $target = $product->effectiveUnitPriceTarget();
-
-        if ($target === null) {
+        // A target in a unit the product no longer compares in keeps its
+        // latch for when the unit comes back. A `pack` target goes on to
+        // clear it while its shop cannot be bought from, as a target per
+        // unit does while nobody can win.
+        if ($product->effectiveUnitPriceTarget() === null && $product->unit_price_target_unit !== UnitTargetConversion::PACK) {
             return;
         }
 
-        $packs = $product->comparablePacks();
-        $shop = $product->bestValueShop();
-        // The resolver's size, not the shop's own pack columns: a shop can win
-        // on the second size it states, 560 g beside its 20 pieces.
-        $unitPrice = $shop === null ? null : $packs->unitPriceOf($shop);
-        // Two figures on purpose: the unrounded one decides, the rounded one is
-        // what the latch stores and the notification prints. Deciding on the
-        // rounded one fired the alert on a shop whose true price per tablet was
-        // above the target and merely rounded down onto it.
-        $unitValue = $shop === null ? null : $packs->unitPriceValueOf($shop);
+        $basis = $product->targetBasis();
 
-        if ($shop === null || $unitPrice === null || $unitValue === null) {
+        if ($basis === null) {
             $this->clearLatch($product);
 
             return;
         }
 
-        if (! self::meets($unitValue, $target)) {
+        if (! self::meets($basis->value, $basis->target)) {
             // Above the target: nothing to say, and the next time it drops
             // below is worth saying again.
             $this->clearLatch($product);
@@ -67,13 +61,11 @@ final readonly class DetectUnitPriceTarget
             return;
         }
 
-        $unit = $packs->unit();
-
-        if ($unit === null || self::alreadyNotified($product, $unitPrice, $unit, $packs)) {
+        if (self::alreadyNotified($product, $basis->price, $basis->unit, $product->comparablePacks())) {
             return;
         }
 
-        $this->notify($product, $shop, $unitPrice, $unit, $target);
+        $this->notify($product, $basis->shop, $basis->price, $basis->unit, $basis->target);
     }
 
     /**
@@ -156,7 +148,7 @@ final readonly class DetectUnitPriceTarget
             return;
         }
 
-        $alreadySent = TargetPriceEvent::alreadySent($product, $target, $unitPrice, $unit);
+        $alreadySent = TargetPriceEvent::alreadySent($product, $target, $unitPrice, $unit, $shop->id);
 
         // Claim the send first: two workers finishing checks together would
         // otherwise both see an unlatched product and both notify.
@@ -188,12 +180,13 @@ final readonly class DetectUnitPriceTarget
             $target,
             price: $shop->current_price === null ? null : (string) $shop->current_price,
             unitPrice: $unitPrice,
+            comparisonUnit: $unit,
         );
 
         // Asked here and nowhere earlier: asking spends a slot of the hourly
         // ceiling, the limiter is cache-backed and does not roll back, and
         // `CheckShopPrice` runs this action inside a transaction.
-        DB::afterCommit(function () use ($product, $shop, $unitPrice, $user, $target, $event): void {
+        DB::afterCommit(function () use ($product, $shop, $unitPrice, $unit, $user, $target, $event): void {
             try {
                 if (! app(NotificationBudget::class)->allows($user)) {
                     Log::warning('Notification suppressed by hourly rate limit', [
@@ -205,15 +198,15 @@ final readonly class DetectUnitPriceTarget
                     return;
                 }
 
-                $user->notify(new UnitPriceTargetNotification($product, $shop, $unitPrice, $target, $event->lowest_in_90_days === true));
+                $user->notify(new UnitPriceTargetNotification($product, $shop, $unitPrice, $target, $event->lowest_in_90_days === true, $unit));
             } catch (Throwable $e) {
                 // This alert is already lost. The claim is committed and the
                 // latch is armed, and `CheckShopPrice` sets
                 // `maxExceptions = 1`, so rethrowing fails the job on the
                 // first throw rather than retrying it — and a replayed check
                 // would find the latch already armed anyway. Rethrowing also
-                // skips every callback staged after this one, costing the
-                // other alerts on the same check. `report()` keeps the trace;
+                // skips every callback staged after this one in the same
+                // transaction. `report()` keeps the trace;
                 // the catch only stops the failure steering control flow.
                 report($e);
 

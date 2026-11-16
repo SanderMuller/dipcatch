@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Enums\PackExclusion;
 use App\Enums\PackProvenance;
+use App\Models\Shop;
 
 /**
  * One shop's answer to "how much is in this pack, in the unit this product
@@ -38,6 +39,24 @@ final readonly class ComparablePack
         return new self($size, PackProvenance::Inferred, exclusion: null);
     }
 
+    /**
+     * The answer for a shop the owner stated a size for, compared in `$unit`;
+     * null for a shop whose page states its own size, that has no owner size,
+     * or that prices in another currency.
+     */
+    public static function forOwnerSize(Shop $shop, string $currency, string $unit): ?self
+    {
+        $size = $shop->isOwnerSized() && $shop->currency === $currency ? $shop->ownerPackSize() : null;
+
+        if (! $size instanceof PackSize) {
+            return null;
+        }
+
+        return $size->unit === $unit
+            ? new self($size, PackProvenance::Owner, exclusion: null)
+            : self::excluded(PackExclusion::outsideTheUnit($size->unit));
+    }
+
     /** The shop's own size in the other unit, through the item size the shops agree on. */
     public static function converted(PackSize $size): self
     {
@@ -56,11 +75,18 @@ final readonly class ComparablePack
 
     /**
      * Whether this size may win the per-unit ranking and be the basis of an
-     * alert: a stated size, or one Jev confirmed from the page.
+     * alert: a stated size, one the owner stated, or one Jev confirmed from
+     * the page.
      */
     public function canWin(): bool
     {
-        return $this->provenance === PackProvenance::Stated || $this->provenance === PackProvenance::Confirmed;
+        return in_array($this->provenance, [PackProvenance::Stated, PackProvenance::Owner, PackProvenance::Confirmed], strict: true);
+    }
+
+    /** Whether the size is this shop's own, stated by the shop or by the owner: not borrowed from or estimated through the other shops. */
+    public function isOwnSize(): bool
+    {
+        return $this->provenance === PackProvenance::Stated || $this->provenance === PackProvenance::Owner;
     }
 
     /**

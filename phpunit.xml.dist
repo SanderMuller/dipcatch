@@ -55,6 +55,7 @@
              .env.example and a developer has their own: the suite read 2 hours
              on one and 6 on the other, and only CI noticed. -->
         <env name="DIPCATCH_RECHECK_INTERVAL_HOURS" value="24"/>
+        <env name="DIPCATCH_UPCOMING_OFFERS" value="false"/>
         <env name="PLAN_PRO_RECHECK_INTERVAL_HOURS" value="6"/>
         <env name="PLAN_FREE_RECHECK_INTERVAL_HOURS" value=""/>
         <env name="TELESCOPE_ENABLED" value="false"/>

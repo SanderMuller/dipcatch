@@ -7,7 +7,7 @@ use App\Support\HeadlinePrice;
 use App\Support\PackLine;
 
 /**
- * @param  array<string, mixed>  $columns
+ * @param  array<model-property<Shop>, mixed>  $columns
  */
 function headlineShop(Product $product, string $host, string $price, ?string $quantity, ?string $unit, array $columns = []): Shop
 {

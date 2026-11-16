@@ -99,9 +99,15 @@
                             <flux:text size="sm">{{ __('Your target of :target will be removed when you save.', ['target' => $suspendedUnitTarget['target']]) }}</flux:text>
                         @else
                             <flux:text size="sm" class="text-amber-700 dark:text-amber-500">
-                                {{ $suspendedUnitTarget['comparesIn'] === null
-                                    ? __('Your target of :target is paused: this product no longer compares per unit.', ['target' => $suspendedUnitTarget['target']])
-                                    : __('Your target of :target is paused: this product now compares :unit. Set a new target below, or remove it.', ['target' => $suspendedUnitTarget['target'], 'unit' => $suspendedUnitTarget['comparesIn']]) }}
+                                @if ($suspendedUnitTarget['waitsForSize'])
+                                    {{ __('Your target of :target stays until that shop says how much is in its pack. Then it becomes a price per :unit. Set a price below to replace it, or remove it.', ['target' => $suspendedUnitTarget['target'], 'unit' => $unitWord ?? __('unit')]) }}
+                                @elseif ($suspendedUnitTarget['pack'])
+                                    {{ __('Your target of :target is paused: that shop is sold out or no longer tracked. Pick the pack you buy below, or remove it.', ['target' => $suspendedUnitTarget['target']]) }}
+                                @elseif ($packChoices === [])
+                                    {{ __('Your target of :target is paused: no shop can be compared per unit right now. Set a price for the pack you buy below, or remove it.', ['target' => $suspendedUnitTarget['target']]) }}
+                                @else
+                                    {{ __('Your target of :target is paused: this product now compares :unit. Set a new target below, or remove it.', ['target' => $suspendedUnitTarget['target'], 'unit' => $suspendedUnitTarget['comparesIn']]) }}
+                                @endif
                             </flux:text>
                         @endif
                         <flux:button size="sm" variant="ghost" class="mt-2" wire:click="{{ $removeUnitPriceTarget ? 'keepUnitTarget' : 'removeUnitTarget' }}" data-test="remove-unit-target">
@@ -111,19 +117,19 @@
                 @endif
 
                 @if ($packChoices === [])
-                    {{-- No shop has said how much is in its pack yet, so there is
-                         nothing to translate a pack price with. --}}
-                    <flux:input
-                        class="mt-4"
-                        wire:model="unitPriceTarget"
-                        :label="$unitWord ? __('Target price per :unit', ['unit' => $unitWord]) : __('Target price per kilo, litre or piece')"
-                        :description="$unitTargetDescription"
-                        {{-- The column keeps four decimals; a step of 0.01 made the
-                             browser refuse to submit a saved 0.0125. --}}
-                        type="number"
-                        step="any"
-                        min="0.0001"
-                    />
+                    {{-- No shop can be compared per unit yet: the price of the
+                         pack the person buys, at the shop they pick. --}}
+                    @if ($pinnablePacks !== [])
+                        <x-pack-target
+                            class="mt-6 max-w-2xl"
+                            :packs="$pinnablePacks"
+                            :currency="$product->currency ?? 'EUR'"
+                        />
+                    @else
+                        <flux:text class="mt-4 max-w-2xl" data-test="no-pack-to-target">
+                            {{ __('No shop has a price you can buy at right now. We tell you when the price drops well under its usual price.') }}
+                        </flux:text>
+                    @endif
                 @else
                     {{-- The per-unit target leads: it is the alert that holds every
                          shop and pack size to one rate. The suggested alert is one
@@ -139,6 +145,7 @@
                         :currency="$product->currency ?? 'EUR'"
                         :unit-word="$unitWord ?? __('unit')"
                         :item-size="$itemSize"
+                        :stranded="$strandedOwnerSizes"
                         :suggested-unit="$showsSuggestion && ! $alertCard['asksJev'] ? $alertCard['suggestion']->unitTarget : null"
                     >
                         @if ($showsSuggestion)
@@ -166,68 +173,6 @@
                     @endif
                 @endif
             </div>
-
-            {{-- Folded away while empty, so the price alert leads; open when
-                 one of them is set or has an error, so nothing active hides. --}}
-            @php($otherAlertErrors = $errors->hasAny(['dropThresholdPct', 'dropThresholdAbs', 'targetPrice']))
-            {{-- wire:ignore.self keeps the section open or shut across round
-                 trips; the summary line, which does morph, names an error. --}}
-            <details
-                class="group mt-8 border-t border-zinc-950/5 pt-6 dark:border-white/10"
-                wire:ignore.self
-                @if ($otherAlertErrors || $otherAlerts !== []) open @endif
-                data-test="other-alerts"
-            >
-                <summary class="flex cursor-pointer list-none items-center gap-2 select-none [&::-webkit-details-marker]:hidden">
-                    <flux:icon.chevron-right variant="micro" class="shrink-0 text-zinc-400 group-open:rotate-90" />
-                    <span class="shrink-0 text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Other alerts') }}</span>
-                    <span class="truncate text-base/7 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-                        · {{ $otherAlerts === [] ? __('a drop in percent or money, or a price for any pack') : implode(', ', $otherAlerts) }}
-                    </span>
-                    @if ($otherAlertErrors)
-                        <span class="shrink-0 text-base/7 font-medium text-red-600 sm:text-sm/6 dark:text-red-400">{{ __('Check these') }}</span>
-                    @endif
-                </summary>
-                {{-- Beside the drop it replaces, so it reads as a swap rather
-                     than as one more alert. The drop fields update on blur, so
-                     the figures here follow what was typed. --}}
-                @if ($priceAlertSwitch)
-                    <flux:callout class="mt-4" color="blue" icon="arrows-right-left" data-test="price-alert-switch">
-                        <flux:callout.heading>{{ __('Switch this drop alert to a price alert') }}</flux:callout.heading>
-                        <flux:callout.text>
-                            {{ __('Instead of your :drop drop alert, get an alert once any shop sells it at :unit per :word or less — :pack for your :size, :percent% under today’s best.', [
-                                'drop' => implode(' ' . __('or') . ' ', $priceAlertSwitch['drops']),
-                                'percent' => $priceAlertSwitch['percentUnder'],
-                                // Per item where the form reads so; the target saved is still per unit.
-                                'unit' => $itemSize === null
-                                    ? \App\Support\MoneyFormatter::unitPrice($priceAlertSwitch['unit'], (string) $currency)
-                                    : \App\Support\MoneyFormatter::format(\App\Support\ItemPricing::perItem($priceAlertSwitch['unit'], $itemSize), (string) $currency),
-                                'word' => $unitWord ?? __('unit'),
-                                'pack' => \App\Support\MoneyFormatter::format($priceAlertSwitch['packPrice'], (string) $currency),
-                                'size' => $priceAlertSwitch['pack'],
-                            ]) }}
-                            {{ __('Your drop settings are cleared, so the price alert is the only alert left.') }}
-                        </flux:callout.text>
-                        <x-slot name="actions">
-                            <flux:button size="sm" wire:click="switchToPriceAlert">{{ __('Switch to a price alert') }}</flux:button>
-                        </x-slot>
-                    </flux:callout>
-                @endif
-
-                <div class="mt-4 grid gap-4 sm:grid-cols-3">
-                    <flux:input wire:model.blur="dropThresholdPct" :label="__('Alert me when it drops by (%)')" type="number" step="0.01" min="0.01" max="99.99" />
-
-                    <flux:input wire:model.blur="dropThresholdAbs" :label="__('Alert me when it drops by (amount)')" type="number" step="0.01" min="0.01" />
-
-                    <flux:input wire:model="targetPrice" :label="__('Price for any pack')" type="number" step="0.01" min="0.01" />
-                </div>
-                <p class="mt-3 max-w-[65ch] text-base/7 text-pretty text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-                    {{ $currentPrice
-                        ? __('We tell you when any shop reaches this price. Now :amount at :host.', ['amount' => $currentPrice['amount'], 'host' => \App\Support\ShopNames::label($currentPrice['host'])])
-                        : __('We tell you when any shop reaches this price.') }}
-                    {{ __('Leave a target empty to switch it off. Leave a drop empty to use the default for the price, or, with a target set, to get no drop alert.') }}
-                </p>
-            </details>
 
             {{-- Currency sits with the settings every alert shares, not with one
                  kind of alert. --}}

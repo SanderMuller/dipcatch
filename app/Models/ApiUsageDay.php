@@ -63,7 +63,7 @@ final class ApiUsageDay extends Model
      * Counting never stands in the way of the call it counts: a failed write
      * is logged and dropped.
      *
-     * @param  array<string, int>  $amounts
+     * @param  array<'calls'|'failures'|'refusals'|'input_tokens'|'output_tokens', int>  $amounts
      */
     private static function add(ApiService $service, string $purpose, array $amounts): void
     {

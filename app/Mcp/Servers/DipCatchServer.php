@@ -15,6 +15,7 @@ use App\Mcp\Tools\RemoveFromShoppingListTool;
 use App\Mcp\Tools\RemoveShopTool;
 use App\Mcp\Tools\SetCategoryTool;
 use App\Mcp\Tools\SetImageTool;
+use App\Mcp\Tools\SetPackSizeTool;
 use App\Mcp\Tools\SetThresholdTool;
 use App\Mcp\Tools\SetTitleTool;
 use App\Mcp\Tools\ShoppingListTool;
@@ -35,7 +36,7 @@ use Laravel\Mcp\Server\Tool;
  * gets that its cached copy is stale. Two tools were added without moving it,
  * and a live session kept seeing the nine that came before them.
  */
-#[Version('1.12.0')]
+#[Version('1.14.0')]
 #[Instructions(<<<'TEXT'
 DipCatch tracks the price of things this user buys more than once, across Dutch
 supermarkets and webshops, and tells them when one drops.
@@ -97,6 +98,7 @@ final class DipCatchServer extends Server
         RecheckTool::class,
         RemoveShopTool::class,
         SetThresholdTool::class,
+        SetPackSizeTool::class,
         SetTitleTool::class,
         SetCategoryTool::class,
         SetImageTool::class,

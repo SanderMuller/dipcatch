@@ -14,13 +14,12 @@ use Laravel\Passport\Client;
 function renderConsent(?string $state = 'the-client-state'): string
 {
     $client = new Client();
-    $client->forceFill([
-        'id' => (string) Str::uuid(),
-        'name' => 'Claude',
-        'redirect_uris' => ['https://claude.ai/api/mcp/auth_callback'],
-        'grant_types' => ['authorization_code'],
-        'revoked' => false,
-    ])->save();
+    $client->id = (string) Str::uuid();
+    $client->name = 'Claude';
+    $client->redirect_uris = ['https://claude.ai/api/mcp/auth_callback'];
+    $client->grant_types = ['authorization_code'];
+    $client->revoked = false;
+    $client->save();
 
     return view('mcp.authorize', [
         'client' => $client,

@@ -8,10 +8,10 @@ use Carbon\CarbonImmutable;
 /**
  * The promotion period a schema.org offer states.
  *
- * `priceValidUntil` is used two ways in the wild. spar.nl states
- * `2026-09-03` and zooplus `2026-09-09`, both real weekly promotions; but
- * pharmacy4pets states `2027-12-31`, a placeholder meaning "no promotion",
- * which would otherwise render as a discount running for another year.
+ * `priceValidUntil` is used two ways in the wild. zooplus states
+ * `2026-09-09`, a real weekly promotion; but pharmacy4pets states
+ * `2027-12-31`, a placeholder meaning "no promotion", which would otherwise
+ * render as a discount running for another year.
  *
  * Nothing in the markup separates the two, so a date beyond
  * {@see MAX_DAYS_AHEAD} is treated as the placeholder it almost certainly

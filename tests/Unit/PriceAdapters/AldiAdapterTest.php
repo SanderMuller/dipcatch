@@ -139,11 +139,64 @@ test('a validity bound this adapter cannot read refuses the price', function ():
     expect($this->adapter->extract($this->url, $html)->failureReason)->toBe('aldi_no_current_price');
 });
 
-test('reports the campaign period the price belongs to', function (): void {
-    $result = $this->adapter->extract($this->url, aldiPage());
+test('reports the period of an offer Aldi states a "was" price for', function (): void {
+    $result = $this->adapter->extract($this->url, aldiPage(price: '1.49', strikePrice: '2.69'));
 
     expect($result->snapshot?->promotionWindow?->isRunning())->toBeTrue()
         ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});
+
+test('a regular campaign price is no offer, whatever its period', function (): void {
+    // Bananen, 2026-10-24: 1.15 valid 15/10 - 25/10, no "was" price.
+    $result = $this->adapter->extract($this->url, aldiPage(price: '1.15'));
+
+    expect($result->snapshot?->price)->toBe('1.15')
+        ->and($result->snapshot?->promotionWindow)->toBeNull()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});
+
+test('announces next campaign\'s lower price and keeps tracking today\'s', function (): void {
+    $html = aldiPage(price: '1.15', promotionPrices: [aldiPromotionPrice('0.85', strikePrice: '1.15', promoText: '-26%')]);
+
+    $snapshot = $this->adapter->extract($this->url, $html)->snapshot;
+
+    expect($snapshot?->price)->toBe('1.15')
+        ->and($snapshot?->claimedRegularPrice)->toBeNull()
+        ->and($snapshot?->promotionWindow?->hasNotStarted())->toBeTrue()
+        ->and($snapshot?->promotionWindow?->label)->toBe('-26%');
+});
+
+test('an announced price that only repeats "OP=OP" is labelled with its price', function (): void {
+    // Hollandse Jonagold: 1.95 now, 1.69 next week, no "was" price.
+    $html = aldiPage(price: '1.95', promotionPrices: [aldiPromotionPrice('1.69', promoText: 'OP=OP')]);
+
+    expect($this->adapter->extract($this->url, $html)->snapshot?->promotionWindow?->label)->toBe('1.69');
+});
+
+test('next campaign at today\'s price or higher is no upcoming deal, whatever its text', function (string $price): void {
+    $html = aldiPage(price: '1.79', promotionPrices: [aldiPromotionPrice($price, promoText: '-26%')]);
+
+    expect($this->adapter->extract($this->url, $html)->snapshot?->promotionWindow)->toBeNull();
+})->with(['same price' => '1.79', 'higher price' => '1.99']);
+
+test('a running offer wins over an announced one', function (): void {
+    $html = aldiPage(price: '1.49', strikePrice: '2.69', promotionPrices: [
+        aldiPromotionPrice('1.49', from: '-1 day', until: '+6 days', strikePrice: '2.69', promoText: '-44%'),
+        aldiPromotionPrice('0.99', from: '+7 days', until: '+13 days', strikePrice: '2.69'),
+    ]);
+
+    $window = $this->adapter->extract($this->url, $html)->snapshot?->promotionWindow;
+
+    expect($window?->isRunning())->toBeTrue();
+});
+
+test('of two announced offers the earliest is shown', function (): void {
+    $html = aldiPage(price: '1.79', promotionPrices: [
+        aldiPromotionPrice('1.29', from: '+9 days', until: '+15 days'),
+        aldiPromotionPrice('1.49', from: '+2 days', until: '+8 days'),
+    ]);
+
+    expect($this->adapter->extract($this->url, $html)->snapshot?->promotionWindow?->label)->toBe('1.49');
 });
 
 test('a price with no stated window reports none', function (): void {

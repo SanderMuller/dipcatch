@@ -97,9 +97,11 @@ it('groups by the alert price only where the chosen shop has the price', functio
     $user = User::factory()->create();
 
     foreach (['At the alert here' => ['jumbo.com', 'musclehouse.nl'], 'At the alert elsewhere' => ['musclehouse.nl', 'jumbo.com']] as $title => [$cheapHost, $dearHost]) {
-        $product = Product::factory()->for($user)->create(['title' => $title, 'currency' => 'EUR', 'target_price' => '1.50']);
-        Shop::factory()->for($product)->create(['url' => "https://{$cheapHost}/p/1", 'current_price' => '1.00', 'currency' => 'EUR']);
+        $product = Product::factory()->for($user)->create(['title' => $title, 'currency' => 'EUR']);
+        $cheap = Shop::factory()->for($product)->create(['url' => "https://{$cheapHost}/p/1", 'current_price' => '1.00', 'currency' => 'EUR']);
         Shop::factory()->for($product)->create(['url' => "https://{$dearHost}/p/1", 'current_price' => '2.00', 'currency' => 'EUR']);
+        // A price for the cheap shop's pack, met there only.
+        $product->forceFill(['unit_price_target' => '1.50', 'unit_price_target_unit' => 'pack', 'unit_price_target_shop_id' => $cheap->id])->save();
         $product->refresh()->recomputeCheapestShop();
     }
 
@@ -110,4 +112,59 @@ it('groups by the alert price only where the chosen shop has the price', functio
         ->assertDontSeeHtml('data-test="drop-divider"')
         ->set('shop', 'jumbo.com')
         ->assertSeeHtmlInOrder(['data-test="at-alert-divider"', 'At the alert here', 'data-test="drop-divider"', 'At the alert elsewhere']);
+});
+
+it('counts a pack target at the shop it is pinned to, not at a cheaper pack elsewhere', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['title' => 'Barebells 12-pack', 'currency' => 'EUR']);
+    // One bar at Jumbo is the lowest price; the 12-pack at MuscleHouse is the pack the target is for.
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '1.00', 'currency' => 'EUR']);
+    $pack = Shop::factory()->for($product)->create(['url' => 'https://musclehouse.nl/p/1', 'current_price' => '10.00', 'currency' => 'EUR']);
+    $product->forceFill(['unit_price_target' => '11.00', 'unit_price_target_unit' => 'pack', 'unit_price_target_shop_id' => $pack->id])->save();
+    $other = Product::factory()->for($user)->create(['title' => 'Something else', 'currency' => 'EUR']);
+    Shop::factory()->for($other)->create(['url' => 'https://jumbo.com/p/2', 'current_price' => '3.00', 'currency' => 'EUR']);
+    Shop::factory()->for($other)->create(['url' => 'https://musclehouse.nl/p/2', 'current_price' => '3.00', 'currency' => 'EUR']);
+    $product->refresh()->recomputeCheapestShop();
+    $other->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    livewire(ProductList::class)
+        ->set('shop', 'musclehouse.nl')
+        ->assertSeeHtmlInOrder(['data-test="at-alert-divider"', 'Barebells 12-pack']);
+
+    livewire(ProductList::class)
+        ->set('shop', 'jumbo.com')
+        ->assertDontSeeHtml('data-test="at-alert-divider"')
+        ->set('discounted', true)
+        ->assertDontSee('Barebells 12-pack');
+
+    livewire(ProductList::class)
+        ->set('shop', 'musclehouse.nl')
+        ->set('discounted', true)
+        ->assertSee('Barebells 12-pack');
+});
+
+it('groups a target per kilo under the shop with the best value only', function (): void {
+    $user = User::factory()->create();
+    $product = Product::factory()->for($user)->create(['title' => 'Per kilo', 'currency' => 'EUR', 'unit_price_target' => '6.00', 'unit_price_target_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://lidl.nl/p/1', 'current_price' => '1.99', 'currency' => 'EUR', 'pack_quantity' => '370.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '2.49', 'currency' => 'EUR', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    $product->refresh()->recomputeCheapestShop();
+    // A product at no alert at either shop, so the groups get a line.
+    $other = Product::factory()->for($user)->create(['title' => 'No alert', 'currency' => 'EUR']);
+    Shop::factory()->for($other)->create(['url' => 'https://lidl.nl/p/2', 'current_price' => '3.00', 'currency' => 'EUR']);
+    Shop::factory()->for($other)->create(['url' => 'https://ah.nl/p/2', 'current_price' => '3.00', 'currency' => 'EUR']);
+    $other->refresh()->recomputeCheapestShop();
+
+    $this->actingAs($user);
+
+    // €1.99 for 370 g is €5.38 a kilo at Lidl, the best value.
+    livewire(ProductList::class)
+        ->set('shop', 'lidl.nl')
+        ->assertSeeHtmlInOrder(['data-test="at-alert-divider"', 'Per kilo']);
+
+    livewire(ProductList::class)
+        ->set('shop', 'ah.nl')
+        ->assertDontSeeHtml('data-test="at-alert-divider"');
 });

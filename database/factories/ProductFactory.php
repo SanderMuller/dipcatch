@@ -5,7 +5,9 @@ namespace Database\Factories;
 use App\Enums\CategorySource;
 use App\Enums\ProductCategory;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
+use App\Support\UnitTargetConversion;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -26,8 +28,6 @@ class ProductFactory extends Factory
             // broken frame.
             'image_url' => 'https://placehold.co/600x600/e4e4e7/52525b.png?text=' . rawurlencode(fake()->word()),
             'currency' => 'EUR',
-            'drop_threshold_pct' => 10.00,
-            'drop_threshold_abs' => 5.00,
             'last_notified_price' => null,
             'last_notified_at' => null,
             'cheapest_shop_id' => null,
@@ -45,6 +45,25 @@ class ProductFactory extends Factory
             'category' => $category,
             'category_set_by' => $source,
         ]);
+    }
+
+    /**
+     * A target per pack, pinned to a shop made for it: the alert a product
+     * with no size gets.
+     *
+     * @param  array<string, mixed>  $shop
+     */
+    public function withPackTarget(string $price, array $shop = []): static
+    {
+        return $this->afterCreating(function (Product $product) use ($price, $shop): void {
+            $pinned = Shop::factory()->for($product)->create($shop);
+
+            $product->forceFill([
+                'unit_price_target' => $price,
+                'unit_price_target_unit' => UnitTargetConversion::PACK,
+                'unit_price_target_shop_id' => $pinned->id,
+            ])->save();
+        });
     }
 
     public function inactive(): static

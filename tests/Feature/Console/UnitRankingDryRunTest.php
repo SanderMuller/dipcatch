@@ -9,7 +9,7 @@ use App\Models\User;
  * what unit ranking makes of the real data — including the rows it would let
  * win on a size nobody stated.
  *
- * @param  array<string, array<string, mixed>>  $shops  host => attributes
+ * @param  array<string, array<model-property<Shop>, mixed>>  $shops  host => attributes
  */
 function dryRunProduct(string $title, array $shops): Product
 {

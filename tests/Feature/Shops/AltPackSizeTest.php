@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Http;
 /**
  * An AH shop, read through the AH API, with any stored sizes given.
  *
- * @param  array<string, mixed>  $attributes
+ * @param  array<model-property<Shop>, mixed>  $attributes
  */
 function ahShop(array $attributes = []): Shop
 {
@@ -256,4 +256,16 @@ test('a preview whose source states no second size attaches none, whatever the t
     ], 'https://ah.nl/producten/product/wi191096/iglo-vissticks', 'checkjebon');
 
     expect($draft->altPackSize)->toBeNull();
+});
+
+test('a shop with no size that states one second leads with it, and keeps no second size', function (): void {
+    fakeAh(null, [[560.0, 'g']]);
+
+    $shop = checkAh(ahShop());
+
+    expect($shop)
+        ->pack_quantity->toBe('560.00')
+        ->pack_unit->toBe('g')
+        ->alt_pack_quantity->toBeNull()
+        ->alt_pack_unit->toBeNull();
 });

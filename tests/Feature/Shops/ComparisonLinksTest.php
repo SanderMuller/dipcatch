@@ -82,7 +82,7 @@ test('a check queued before its shop became a link reads nothing', function (): 
 
 test('the recheck command makes Klarna shops links on paused products too', function (): void {
     Queue::fake();
-    [$product, $klarna] = productWithKlarnaCheapest(['active' => false]);
+    [, $klarna] = productWithKlarnaCheapest(['active' => false]);
     $other = Shop::factory()->for(Product::factory()->create())->create(['url' => 'https://www.expert.nl/p/1']);
 
     $this->artisan(RecheckActiveShopsCommand::class)->assertSuccessful();

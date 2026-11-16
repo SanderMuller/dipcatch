@@ -19,6 +19,7 @@ final class UnitWord
             'ml' => __('per litre'),
             'piece' => __('per piece'),
             ItemPricing::UNIT => __('per item'),
+            UnitTargetConversion::PACK => __('per pack'),
             default => null,
         };
 
@@ -45,15 +46,20 @@ final class UnitWord
             'ml' => __('litre'),
             'piece' => __('piece'),
             ItemPricing::UNIT => __('item'),
+            UnitTargetConversion::PACK => __('pack'),
             default => null,
         };
 
         return is_string($word) ? $word : null;
     }
 
-    /** "/kg", "/l", "/piece" — for a figure. */
+    /** "/kg", "/l", "/piece", "/pack" — for a figure. */
     public static function labelFor(?string $unit): string
     {
+        if ($unit === UnitTargetConversion::PACK) {
+            return (string) __('/pack');
+        }
+
         return PackSize::of(1.0, $unit ?? '')?->label() ?? '';
     }
 

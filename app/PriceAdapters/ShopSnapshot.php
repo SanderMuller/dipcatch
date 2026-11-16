@@ -37,8 +37,8 @@ final readonly class ShopSnapshot
         public ?string $packSize = null,
         /**
          * True when a structured source supplied the size field at all, even
-         * empty — an authoritative empty size clears stored pack data, while
-         * a non-authoritative snapshot allows the title fallback.
+         * empty. An authoritative empty size with no size in the title clears
+         * stored pack data; a non-authoritative one keeps it.
          */
         public bool $packSizeAuthoritative = false,
         /** Normalized GTIN (EAN/UPC) when the source published one. */

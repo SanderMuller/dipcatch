@@ -12,7 +12,8 @@
     $window = $shop->promotionWindow();
     $isUpcoming = $window?->hasNotStarted() ?? false;
     $bundle = $isUpcoming ? $shop->bundleOffer() : $liveBundle;
-    $sourceOffer = $window?->label;
+    // A bare amount is a reader's own label (see UpcomingDeal), not the shop page's words.
+    $sourceOffer = is_numeric($window?->label) ? null : $window?->label;
     $deadline = $window === null ? null : \App\Support\PromotionLabel::short($shop);
     $surfaceClasses = $isUpcoming
         ? 'bg-blue-50/70 ring-blue-900/10 dark:bg-blue-950/25 dark:ring-blue-200/10'

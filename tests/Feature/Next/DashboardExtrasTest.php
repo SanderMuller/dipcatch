@@ -106,7 +106,7 @@ it('plots savings as one Flux field per currency', function (): void {
         ->and($last['USD'])->toBe(10.0);
 });
 
-it('keeps the savings chart off the dashboard and links to it instead', function (): void {
+it('keeps the savings chart off the dashboard', function (): void {
     $user = User::factory()->create();
     $product = Product::factory()->create(['user_id' => $user->id]);
     PriceDropEvent::factory()->create([
@@ -121,8 +121,7 @@ it('keeps the savings chart off the dashboard and links to it instead', function
 
     livewire(Dashboard::class)
         ->assertDontSee('Savings by month')
-        ->assertDontSeeHtml('<ui-chart')
-        ->assertSeeHtml(route('app.stats'));
+        ->assertDontSeeHtml('<ui-chart');
 });
 
 it('keeps the alert history off the dashboard', function (): void {
@@ -214,7 +213,7 @@ it('filters the product list by tracking state', function (): void {
         ->assertSee('On hold');
 });
 
-it('leaves a drop with no honest money figure out of the savings total', function (): void {
+it('leaves a drop with no honest money figure out of the monthly savings', function (): void {
     // A cross-size drop has a real percentage and no saving: the winning pack
     // is a different amount from the one it is measured against. Counting it as
     // zero is right; counting the pack difference would be a number nobody saved.
@@ -243,8 +242,4 @@ it('leaves a drop with no honest money figure out of the savings total', functio
     $euro = collect($data['datasets'])->keyBy('currency')->get('EUR', ['data' => []])['data'];
 
     expect(end($euro))->toBe(2.5);
-
-    $this->actingAs($user);
-
-    livewire(Dashboard::class)->assertSee('€2.50');
 });

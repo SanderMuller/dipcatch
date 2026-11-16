@@ -325,7 +325,7 @@ test('a blocking shop names Cloudflare on the first refusal', function (): void 
 
 test('a persistently blocking shop counts the refusals instead', function (): void {
     // PERSISTENT_AFTER is 3, and this probe adds the fourth.
-    foreach (range(1, 3) as $ignored) {
+    for ($i = 1; $i <= 3; $i++) {
         app(HostFetchMemory::class)->record('shop.example.com', HostFetchMemory::KIND_BLOCKED);
     }
 
@@ -344,7 +344,7 @@ test('a persistently blocking shop counts the refusals instead', function (): vo
 });
 
 test('a shop that has gone quiet for a while counts the silences', function (): void {
-    foreach (range(1, 3) as $ignored) {
+    for ($i = 1; $i <= 3; $i++) {
         app(HostFetchMemory::class)->record('shop.example.com', HostFetchMemory::KIND_SILENT);
     }
 
@@ -381,7 +381,7 @@ test('a 429 from the shop states the wait it asked for', function (): void {
 test('our own per-host throttle says so rather than blaming the shop', function (): void {
     // Spend the host bucket, so the fetch never leaves the building.
     $limit = config()->integer('dipcatch.fetcher.rate_limit_per_minute');
-    foreach (range(1, $limit) as $ignored) {
+    for ($i = 1; $i <= $limit; $i++) {
         RateLimiter::hit(ShopFetcher::throttleKey('shop.example.com'));
     }
 
@@ -423,13 +423,12 @@ test('too many probes in a minute states the wait', function (): void {
 function connectAssistantFor(User $user, bool $revoked = false): void
 {
     $client = new Client();
-    $client->forceFill([
-        'id' => (string) Str::uuid(),
-        'name' => 'Claude',
-        'redirect_uris' => ['https://example.test/callback'],
-        'grant_types' => ['authorization_code'],
-        'revoked' => false,
-    ])->save();
+    $client->id = (string) Str::uuid();
+    $client->name = 'Claude';
+    $client->redirect_uris = ['https://example.test/callback'];
+    $client->grant_types = ['authorization_code'];
+    $client->revoked = false;
+    $client->save();
 
     Token::query()->forceCreate([
         'id' => (string) Str::uuid(),
@@ -765,45 +764,36 @@ describe('step 3, the alert', function (): void {
             ->assertDontSee('Any shop, any pack size');
     });
 
-    it('suggests the default thresholds from the reference the drop check uses', function (): void {
-        $this->actingAs(User::factory()->create());
-
-        // 50.00 sits in the 25–100 tier: 10% or 7.00.
-        wizardAtAlerts()
-            ->assertSeeHtml('placeholder="10.00"')
-            ->assertSeeHtml('placeholder="7.00"');
-    });
-
     it('stores the alert a person sets', function (): void {
         $user = User::factory()->create();
         $this->actingAs($user);
 
         wizardAtAlerts()
-            ->set('dropThresholdPct', '12.5')
-            ->set('targetPrice', '40')
+            ->set('unitPriceTarget', '40')
             ->call('saveAlerts')
             ->assertHasNoErrors()
             ->assertRedirect();
 
         $product = Product::query()->where('user_id', $user->id)->sole();
 
-        expect((string) $product->drop_threshold_pct)->toBe('12.50')
-            ->and($product->drop_threshold_abs)->toBeNull()
-            ->and((string) $product->target_price)->toBe('40.00');
+        // No shop states a size, so the price is for the pack at the one shop.
+        expect((string) $product->unit_price_target)->toBe('40.0000')
+            ->and($product->unit_price_target_unit)->toBe('pack')
+            ->and($product->unit_price_target_shop_id)->toBe($product->shops()->sole()->id);
     });
 
-    it('refuses a threshold of zero, as the edit page does', function (string $field): void {
+    it('refuses a target of zero, as the edit page does', function (): void {
         $user = User::factory()->create();
         $this->actingAs($user);
 
         wizardAtAlerts()
-            ->set($field, '0')
+            ->set('unitPriceTarget', '0')
             ->call('saveAlerts')
-            ->assertHasErrors($field)
+            ->assertHasErrors('unitPriceTarget')
             ->assertNoRedirect();
 
-        expect(Product::query()->where('user_id', $user->id)->sole()->{$field === 'dropThresholdPct' ? 'drop_threshold_pct' : 'drop_threshold_abs'})->toBeNull();
-    })->with(['dropThresholdPct', 'dropThresholdAbs']);
+        expect(Product::query()->where('user_id', $user->id)->sole()->unit_price_target)->toBeNull();
+    });
 
     it('offers a price per unit when a shop states a pack size, and stores it', function (): void {
         $user = User::factory()->create();
@@ -819,12 +809,14 @@ describe('step 3, the alert', function (): void {
         expect((string) Product::query()->where('user_id', $user->id)->sole()->unit_price_target)->toBe('6.0000');
     });
 
-    it('asks for a price per unit without the pack picker when no shop states a size', function (): void {
+    it('asks for the price of one shop\'s pack when no shop states a size', function (): void {
         $this->actingAs(User::factory()->create());
 
         wizardAtAlerts()
+            ->assertSet('unitPriceTargetUnit', 'pack')
             ->assertDontSeeHtml('data-test="unit-target"')
-            ->assertSee('Target price per kilo, litre or piece');
+            ->assertSeeHtml('data-test="pack-target"')
+            ->assertSee('Price for this pack');
     });
 
     it('finishes through Start tracking only, which saves what was set', function (): void {
@@ -838,18 +830,20 @@ describe('step 3, the alert', function (): void {
         // The old way out, which skipped saving, is no longer reachable.
         expect(fn () => $wizard->call('finish'))->toThrow(MethodNotFoundException::class);
 
-        $wizard->set('dropThresholdPct', '30')
+        $wizard->set('unitPriceTarget', '30')
             ->call('saveAlerts')
             ->assertRedirect();
 
-        expect(Product::query()->where('user_id', $user->id)->sole()->drop_threshold_pct)->toEqual('30.00');
+        expect((string) Product::query()->where('user_id', $user->id)->sole()->unit_price_target)->toBe('30.0000');
     });
 
     it('keeps the alert a reopened product already has', function (): void {
         $user = User::factory()->create();
         $product = Product::factory()->for($user)->create([
-            'drop_threshold_pct' => '20.00', 'drop_threshold_abs' => '1.50',
-            'target_price' => '3.00', 'unit_price_target' => '0.5000',
+            'currency' => 'EUR', 'unit_price_target' => '0.5000', 'unit_price_target_unit' => 'g',
+        ]);
+        Shop::factory()->for($product)->create([
+            'currency' => 'EUR', 'current_price' => '3.00', 'pack_quantity' => '500.00', 'pack_unit' => 'g',
         ]);
         $this->actingAs($user);
 
@@ -861,20 +855,19 @@ describe('step 3, the alert', function (): void {
 
         $product->refresh();
 
-        expect((string) $product->drop_threshold_pct)->toBe('20.00')
-            ->and((string) $product->drop_threshold_abs)->toBe('1.50')
-            ->and((string) $product->target_price)->toBe('3.00')
-            ->and((string) $product->unit_price_target)->toBe('0.5000');
+        expect((string) $product->unit_price_target)->toBe('0.5000')
+            ->and($product->unit_price_target_unit)->toBe('g');
     });
 
-    it('says the default starts later for a product with no price yet', function (): void {
+    it('finishes a product with no price yet without a target field', function (): void {
         $user = User::factory()->create();
         $product = Product::factory()->for($user)->create();
         $this->actingAs($user);
 
         Livewire::withQueryParams(['product' => (string) $product->id, 'step' => 3])
             ->test(AddProductWizard::class)
-            ->assertSee('The default alert starts once we have read a price.')
+            ->assertDontSeeHtml('data-test="pack-target"')
+            ->assertDontSeeHtml('data-test="unit-target"')
             ->call('saveAlerts')
             ->assertHasNoErrors()
             ->assertRedirect(route('app.products.show', $product));

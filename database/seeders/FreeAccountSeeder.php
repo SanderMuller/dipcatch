@@ -36,7 +36,7 @@ final class FreeAccountSeeder extends Seeder
     public function run(): void
     {
         if (app()->environment('production')) {
-            $this->command->warn('FreeAccountSeeder skipped: never seeded in production.');
+            $this->command?->warn('FreeAccountSeeder skipped: never seeded in production.');
 
             return;
         }
@@ -45,7 +45,7 @@ final class FreeAccountSeeder extends Seeder
         $password = config('dipcatch.demo.password');
 
         if (! is_string($email) || $email === '' || ! is_string($password) || $password === '') {
-            $this->command->warn('FreeAccountSeeder skipped: set DEMO_FREE_EMAIL and DEMO_PASSWORD.');
+            $this->command?->warn('FreeAccountSeeder skipped: set DEMO_FREE_EMAIL and DEMO_PASSWORD.');
 
             return;
         }
@@ -73,8 +73,8 @@ final class FreeAccountSeeder extends Seeder
         $this->seedProduct($user, 'Coffee beans 1 kg', '18.99', $maxShops, ProductCategory::CoffeeTea);
         $this->seedProduct($user, 'Cat food 10 kg', '39.95', 2, ProductCategory::PetFood);
 
-        $this->command->info('FreeAccountSeeder: ' . $email . ' seeded on the Free plan.');
-        $this->command->info('  One product sits at the ' . $maxShops . '-shop ceiling, one has room for more.');
+        $this->command?->info('FreeAccountSeeder: ' . $email . ' seeded on the Free plan.');
+        $this->command?->info('  One product sits at the ' . $maxShops . '-shop ceiling, one has room for more.');
     }
 
     /**
@@ -87,7 +87,6 @@ final class FreeAccountSeeder extends Seeder
             ['user_id' => $user->id, 'title' => $title],
             [
                 'currency' => 'EUR',
-                'drop_threshold_pct' => 10.00,
                 'active' => true,
                 'image_url' => null,
                 'category' => $category,

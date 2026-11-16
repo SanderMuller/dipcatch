@@ -8,7 +8,7 @@ use App\Support\UnitWord;
 use Database\Factories\PriceDropEventFactory;
 use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -95,8 +95,8 @@ final class PriceDropEvent extends Model
             ->where('fired_at', '>=', now()->subDays(Config::integer('dipcatch.drops.resend_after_days')))
             ->when(
                 $unit === null,
-                fn (Builder $query): Builder => $query->whereNull('comparison_unit')->where('new_price', '<=', $basisPrice),
-                fn (Builder $query): Builder => $query->where('comparison_unit', $unit)->where('new_unit_price', '<=', $basisPrice),
+                fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->whereNull('comparison_unit')->where('new_price', '<=', $basisPrice),
+                fn (EloquentQueryBuilder $query): EloquentQueryBuilder => $query->where('comparison_unit', $unit)->where('new_unit_price', '<=', $basisPrice),
             )
             ->latest('fired_at')
             ->first();

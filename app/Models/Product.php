@@ -14,7 +14,9 @@ use App\Support\ComparablePacks;
 use App\Support\ImageUrl;
 use App\Support\Numeric;
 use App\Support\PackSize;
+use App\Support\TargetBasis;
 use App\Support\UnitTargetConversion;
+use App\Support\UnitTargetMath;
 use Carbon\CarbonImmutable;
 use Closure;
 use Database\Factories\ProductFactory;
@@ -29,6 +31,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @property ProductCategory|null $category
@@ -40,7 +43,8 @@ use Illuminate\Support\Facades\DB;
  * @property CarbonImmutable|null $listed_at
  * @property CarbonImmutable|null $list_checked_at
  * @property string|null $unit_price_target The per-unit target as the owner set it, in {@see $unit_price_target_unit}.
- * @property string|null $unit_price_target_unit `g`, `ml` or `piece`; null for a target set before units were recorded, or while the product had no unit.
+ * @property string|null $unit_price_target_unit `g`, `ml`, `piece`, or `pack` for a price for one shop's pack ({@see UnitTargetConversion::PACK}); null for a target set before units were recorded.
+ * @property string|null $unit_price_target_shop_id The shop a `pack` target compares with; null for any other target.
  * @property string|null $unit_price_target_effective The target in today's comparison unit; null while it cannot be expressed in it.
  * @property string|null $unit_price_notified_unit The unit `unit_price_notified` is money in.
  * @property-read PriceDropEvent|null $latestPriceDropEvent
@@ -60,16 +64,13 @@ final class Product extends Model
         // fresh row's own target and latch (set together, e.g. by a
         // factory) survive untouched.
         self::updating(function (self $product): void {
-            if ($product->isDirty('target_price')) {
-                $product->target_price_notified = null;
-                $product->target_price_notified_at = null;
-            }
-
             // A target given a unit for the first time keeps its latch: that
             // only records what the number already meant. Moving it from one
-            // unit to another is a new target, even at the same number.
+            // unit to another is a new target, even at the same number, and
+            // so is a pack target moved to another shop.
             if ($product->isDirty('unit_price_target')
-                || ($product->isDirty('unit_price_target_unit') && $product->getOriginal('unit_price_target_unit') !== null)) {
+                || ($product->isDirty('unit_price_target_unit') && $product->getOriginal('unit_price_target_unit') !== null)
+                || $product->isDirty('unit_price_target_shop_id')) {
                 $product->unit_price_notified = null;
                 $product->unit_price_notified_unit = null;
                 $product->unit_price_notified_at = null;
@@ -83,14 +84,9 @@ final class Product extends Model
     protected function casts(): array
     {
         return [
-            'drop_threshold_pct' => 'decimal:2',
-            'drop_threshold_abs' => 'decimal:2',
             'cheapest_price' => 'decimal:2',
             'best_value_price' => 'decimal:2',
             'best_value_pack_quantity' => 'decimal:2',
-            'target_price' => 'decimal:2',
-            'target_price_notified' => 'decimal:2',
-            'target_price_notified_at' => 'datetime',
             // Four, unlike the pack-money columns above: a price per piece is
             // often under a cent's worth of resolution. See PackSize.
             'unit_price_target' => 'decimal:4',
@@ -278,17 +274,31 @@ final class Product extends Model
 
     /**
      * An active product at or under the alert price its owner set, compared
-     * as {@see isAtTarget()} does, on the stored best value. Unqualified
-     * columns, so it also reads a subquery aliased `products`.
+     * as {@see isAtTarget()} does, on the stored best value. A `pack` target
+     * reads its pinned shop, on the conditions of {@see eligibleShops()}.
+     * Product columns are unqualified or `products.`, so it also reads a
+     * subquery aliased `products`.
      */
     public const string AT_TARGET_SQL = <<<'SQL'
         active = TRUE AND (
-            (target_price IS NOT NULL AND cheapest_price IS NOT NULL AND cheapest_price <= target_price)
-            OR ((CASE WHEN unit_price_target_unit IS NULL THEN unit_price_target ELSE unit_price_target_effective END) IS NOT NULL
+            ((unit_price_target_unit IS NULL OR unit_price_target_unit <> 'pack')
+                AND (CASE WHEN unit_price_target_unit IS NULL THEN unit_price_target ELSE unit_price_target_effective END) IS NOT NULL
                 AND best_value_price > 0 AND best_value_pack_quantity > 0
                 AND ROUND(best_value_price * 1.0 / best_value_pack_quantity
                     * (CASE best_value_pack_unit WHEN 'piece' THEN 1 ELSE 1000 END), 6)
                     <= (CASE WHEN unit_price_target_unit IS NULL THEN unit_price_target ELSE unit_price_target_effective END))
+            OR (unit_price_target_unit = 'pack' AND unit_price_target IS NOT NULL AND EXISTS (
+                SELECT 1 FROM shops AS pinned_shops
+                WHERE pinned_shops.id = products.unit_price_target_shop_id
+                    AND pinned_shops.product_id = products.id
+                    AND pinned_shops.active = TRUE
+                    AND pinned_shops.health <> 'dead'
+                    AND pinned_shops.kind <> 'reference'
+                    AND pinned_shops.consumer_price_issue IS NULL
+                    AND pinned_shops.currency = products.currency
+                    AND (pinned_shops.current_in_stock IS NULL OR pinned_shops.current_in_stock = TRUE)
+                    AND pinned_shops.current_price IS NOT NULL
+                    AND pinned_shops.current_price <= products.unit_price_target))
         )
         SQL;
 
@@ -375,55 +385,98 @@ final class Product extends Model
     }
 
     /**
-     * Whether the owner set a price to reach that is checked. Such a product
-     * alerts on what the owner configured and nothing else: no default drop
-     * thresholds. A unit-price target only counts when it can fire now, with a
-     * best-value shop that has a unit price, as `DetectUnitPriceTarget` checks.
-     * Otherwise the product would be left with no working alert at all.
+     * Whether the owner set a target that is checked. Such a product alerts on
+     * its target and nothing else: no default drop. A target only counts when
+     * it can fire now ({@see TargetBasis()}), as `DetectUnitPriceTarget`
+     * checks. Otherwise the product would be left with no working alert.
      */
     public function hasActiveTarget(): bool
     {
-        return $this->target_price !== null
-            || ($this->effectiveUnitPriceTarget() !== null && $this->bestValueUnitPriceValue() !== null);
+        return $this->targetBasis() !== null;
     }
 
     /**
-     * Whether the price is at or under a target the owner set, right now:
-     * the cheapest price against the price target, or the best value against
-     * the per-unit target. The same comparisons the target alerts make.
+     * Whether the price is at or under the target the owner set, right now:
+     * the best value per unit, or the pinned shop's price for a `pack`
+     * target. The same comparison the target alert makes.
      */
     public function isAtTarget(): bool
     {
-        if ($this->target_price !== null && $this->cheapest_price !== null
-            && bccomp(Numeric::str((string) $this->cheapest_price), Numeric::str((string) $this->target_price), self::BC_SCALE) <= 0) {
-            return true;
-        }
+        $basis = $this->targetBasis();
 
+        return $basis !== null && DetectUnitPriceTarget::meets($basis->value, $basis->target);
+    }
+
+    /**
+     * What the target compares with now: the best value's price per unit, or
+     * the pinned shop's price for a `pack` target. Null with no target, and
+     * while the target is suspended: no winner in its unit, or a pinned shop
+     * that is gone or cannot be bought from.
+     */
+    public function targetBasis(): ?TargetBasis
+    {
         $target = $this->effectiveUnitPriceTarget();
 
         if ($target === null) {
-            return false;
+            return null;
         }
 
-        $unitValue = $this->bestValueUnitPriceValue();
+        if ($this->unit_price_target_unit === UnitTargetConversion::PACK) {
+            $shop = $this->pinnedTargetShop();
 
-        return $unitValue !== null && DetectUnitPriceTarget::meets($unitValue, $target);
-    }
+            return $shop === null || $shop->current_price === null
+                ? null
+                : new TargetBasis(UnitTargetConversion::PACK, $target, $shop, (float) $shop->current_price, (string) $shop->current_price);
+        }
 
-    /** The best value's price per unit, on the size the resolver compares it by. */
-    private function bestValueUnitPriceValue(): ?float
-    {
         $packs = $this->comparablePacks();
         $shop = self::bestValueAmong($this->eligibleShops(), $packs);
+        // Two figures on purpose: the unrounded one decides, the rounded one
+        // is what the latch stores and the notification prints. Deciding on
+        // the rounded one fired alerts on prices that only rounded down onto
+        // the target.
+        $value = $shop === null ? null : $packs->unitPriceValueOf($shop);
+        $price = $shop === null ? null : $packs->unitPriceOf($shop);
+        $unit = $packs->unit();
 
-        return $shop === null ? null : $packs->unitPriceValueOf($shop);
+        if ($shop === null || $value === null || $price === null || $unit === null) {
+            return null;
+        }
+
+        return new TargetBasis($unit, $target, $shop, $value, $price);
+    }
+
+    /** The shop a `pack` target compares with, while a shopper can buy from it. */
+    public function pinnedTargetShop(): ?Shop
+    {
+        if ($this->unit_price_target_shop_id === null) {
+            return null;
+        }
+
+        return $this->eligibleShops()->first(fn (Shop $shop): bool => $shop->id === $this->unit_price_target_shop_id);
+    }
+
+    /**
+     * The shop the product was added with: the oldest one that is not a
+     * link, a shop still tracked before one that is not. A target set per
+     * pack before the product had a size meant that shop's pack.
+     */
+    public function firstAddedShop(): ?Shop
+    {
+        $tracked = fn (Shop $shop): int => $shop->active && $shop->health !== ShopHealth::Dead ? 0 : 1;
+
+        return $this->shops
+            ->reject(fn (Shop $shop): bool => $shop->isReference())
+            ->sort(fn (Shop $a, Shop $b): int => [$tracked($a), $a->created_at, (string) $a->id] <=> [$tracked($b), $b->created_at, (string) $b->id])
+            ->first();
     }
 
     /**
      * The per-unit target in the unit the product compares in today — the
      * figure every comparison reads. A target with no recorded unit means
      * today's unit, as it always did; one that cannot be expressed in today's
-     * unit answers null and does not fire.
+     * unit answers null and does not fire. A `pack` target is the pack price
+     * as it is, and null while its pinned shop cannot be bought from.
      */
     public function effectiveUnitPriceTarget(): ?string
     {
@@ -435,6 +488,10 @@ final class Product extends Model
             return (string) $this->unit_price_target;
         }
 
+        if ($this->unit_price_target_unit === UnitTargetConversion::PACK && $this->pinnedTargetShop() === null) {
+            return null;
+        }
+
         // Live, not the stored column: that one is as of the last recompute,
         // and a product whose shops have all sold out can resolve another
         // unit since. Only SQL reads the stored figure, and a product with no
@@ -442,7 +499,7 @@ final class Product extends Model
         return UnitTargetConversion::effective((string) $this->unit_price_target, $this->unit_price_target_unit, $this->comparablePacks());
     }
 
-    /** True while the owner's per-unit target cannot be expressed in today's comparison unit. */
+    /** True while the owner's target cannot fire: not expressible in today's unit, or a `pack` target whose shop cannot be bought from. */
     public function isUnitTargetSuspended(): bool
     {
         return $this->unit_price_target !== null && $this->effectiveUnitPriceTarget() === null;
@@ -761,6 +818,7 @@ final class Product extends Model
                 : (string) $bestValue->current_price;
 
             self::stampUnitBasis($locked, $packs);
+            self::convertPackTarget($locked, $packs);
 
             $locked->forceFill([
                 'cheapest_shop_id' => $newOfferId,
@@ -871,30 +929,99 @@ final class Product extends Model
     /**
      * Records the unit of a target or latch from before units were recorded:
      * the unit the product compared in until this recompute, which is the one
-     * it was read in, or the unit it compares in now when it had none. Never
-     * the unit this recompute just moved to: a €0.25 target read per piece
-     * would become €0.25 a kilo.
+     * it was read in. Never the unit this recompute just moved to: a €0.25
+     * target read per piece would become €0.25 a kilo. A lone latch on a
+     * product that compared in no unit takes the unit it compares in now.
+     *
+     * A target from while the product compared in no unit was typed as a
+     * price for a pack. It becomes a `pack` target on the shop the product
+     * was added with, and {@see convertPackTarget()} turns it into a price
+     * per unit once that shop has a size.
      */
     private static function stampUnitBasis(self $locked, ComparablePacks $packs): void
     {
-        $unit = $locked->best_value_pack_unit ?? $packs->unit();
+        $previous = $locked->best_value_pack_unit;
+        $columns = [];
 
-        if ($unit === null) {
+        if ($locked->unit_price_target !== null && $locked->unit_price_target_unit === null) {
+            $columns['unit_price_target_unit'] = $previous ?? UnitTargetConversion::PACK;
+
+            if ($previous === null) {
+                $columns['unit_price_target_shop_id'] = $locked->firstAddedShop()?->id;
+            }
+        }
+
+        // A latch beside a `pack` target was armed on that shop's price.
+        $targetUnit = $columns['unit_price_target_unit'] ?? $locked->unit_price_target_unit;
+        $latchUnit = $previous ?? ($targetUnit === UnitTargetConversion::PACK ? UnitTargetConversion::PACK : $packs->unit());
+
+        if ($locked->unit_price_notified !== null && $locked->unit_price_notified_unit === null && $latchUnit !== null) {
+            $columns['unit_price_notified_unit'] = $latchUnit;
+        }
+
+        if ($columns === []) {
             return;
         }
 
-        $stamps = array_filter([
-            'unit_price_target_unit' => $locked->unit_price_target !== null && $locked->unit_price_target_unit === null,
-            'unit_price_notified_unit' => $locked->unit_price_notified !== null && $locked->unit_price_notified_unit === null,
-        ]);
-
-        if ($stamps === []) {
-            return;
-        }
-
-        $columns = array_fill_keys(array_keys($stamps), $unit);
         self::query()->whereKey($locked->id)->update($columns);
         $locked->forceFill($columns)->syncOriginalAttributes(array_keys($columns));
+    }
+
+    /**
+     * Turns a `pack` target into a price per unit once the pinned shop has a
+     * size of its own in the product's unit. Never on another shop's size:
+     * shops sell different packs, and a 12-pack's price divided by one bar's
+     * weight would be wrong for good. The owner's number is rewritten once,
+     * and logged so a wrong rewrite can be repaired. A latch on the pack price
+     * is turned into the same unit on the same size, so the offer the owner
+     * heard about stays heard and a lower one is news.
+     */
+    private static function convertPackTarget(self $locked, ComparablePacks $packs): void
+    {
+        if ($locked->unit_price_target_unit !== UnitTargetConversion::PACK || $locked->unit_price_target === null) {
+            return;
+        }
+
+        $unit = $packs->unit();
+        $shop = $locked->shops->first(fn (Shop $shop): bool => $shop->id === $locked->unit_price_target_shop_id);
+        $pack = $shop === null ? null : $packs->for($shop);
+        $size = $pack?->isOwnSize() === true ? $pack->size : null;
+
+        if ($unit === null || $size === null || $size->unit !== $unit) {
+            return;
+        }
+
+        $perUnit = UnitTargetMath::fromPackPrice((string) $locked->unit_price_target, UnitTargetMath::perPack($size));
+
+        if ($perUnit === null) {
+            return;
+        }
+
+        Log::info('Pack target turned into a price per unit', [
+            'product_id' => $locked->id,
+            'shop_id' => $locked->unit_price_target_shop_id,
+            'pack_target' => (string) $locked->unit_price_target,
+            'pack_size' => $size->quantity . ' ' . $size->unit,
+            'unit_target' => $perUnit,
+            'unit' => $unit,
+        ]);
+
+        $heardAt = $locked->unit_price_notified !== null && $locked->unit_price_notified_unit === UnitTargetConversion::PACK
+            ? UnitTargetMath::fromPackPrice((string) $locked->unit_price_notified, UnitTargetMath::perPack($size))
+            : null;
+        $heardOn = $locked->unit_price_notified_at;
+
+        // The target saves on its own: `booted()` clears the latch with it.
+        $locked->forceFill([
+            'unit_price_target' => $perUnit,
+            'unit_price_target_unit' => $unit,
+            'unit_price_target_shop_id' => null,
+            'unit_price_target_effective' => $perUnit,
+        ])->save();
+
+        if ($heardAt !== null) {
+            $locked->forceFill(['unit_price_notified' => $heardAt, 'unit_price_notified_unit' => $unit, 'unit_price_notified_at' => $heardOn])->save();
+        }
     }
 
     /**

@@ -14,13 +14,12 @@ beforeEach(function (): void {});
 function connectToken(User $user, string $client = 'Claude'): Token
 {
     $record = new Client();
-    $record->forceFill([
-        'id' => (string) Str::uuid(),
-        'name' => $client,
-        'redirect_uris' => ['https://example.test/callback'],
-        'grant_types' => ['authorization_code'],
-        'revoked' => false,
-    ])->save();
+    $record->id = (string) Str::uuid();
+    $record->name = $client;
+    $record->redirect_uris = ['https://example.test/callback'];
+    $record->grant_types = ['authorization_code'];
+    $record->revoked = false;
+    $record->save();
 
     $token = Token::query()->forceCreate([
         'id' => (string) Str::uuid(),

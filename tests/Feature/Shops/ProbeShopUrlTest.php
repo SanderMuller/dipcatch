@@ -255,7 +255,7 @@ test('dedupe check runs before rate limit so retry on dup does not burn budget',
     Shop::factory()->for($product)->create(['url' => 'https://example.com/p/1']);
     $user = User::factory()->create();
 
-    foreach (range(1, 100) as $i) {
+    for ($i = 1; $i <= 100; $i++) {
         $outcome = app(ProbeShopUrl::class)($product, 'https://example.com/p/1', $user);
         expect($outcome->isDuplicate())->toBeTrue();
     }

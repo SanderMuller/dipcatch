@@ -15,25 +15,27 @@ final readonly class AlertRules
     /**
      * A price target carries `below` for the line under it; a drop names
      * itself. A unit-price target carries `pack`, what it comes to for the
-     * size the live shops that state one agree on.
+     * size the live shops that state one agree on; a target per pack names
+     * the shop whose pack it is.
      *
      * @return list<array{value: string, below: bool, pack?: string}>
      */
     public static function of(Product $product): array
     {
         $rules = [];
-
-        if ($product->target_price !== null) {
-            $rules[] = ['value' => MoneyFormatter::format((string) $product->target_price, $product->currency), 'below' => true];
-        }
-
         $packs = $product->comparablePacks();
         $unitLabel = UnitWord::labelFor($packs->unit());
-
         $effective = $product->effectiveUnitPriceTarget();
+        $pinned = $product->unit_price_target_unit === UnitTargetConversion::PACK ? $product->pinnedTargetShop() : null;
 
-        // Without a unit the figure would read as a pack price.
-        if ($effective !== null && $unitLabel !== '') {
+        if ($effective !== null && $pinned !== null) {
+            $rules[] = [
+                'value' => MoneyFormatter::format($effective, (string) $product->currency) . ' ' . UnitWord::labelFor(UnitTargetConversion::PACK),
+                'below' => true,
+                'pack' => __('the pack at :shop', ['shop' => ShopNames::label((string) $pinned->host)]),
+            ];
+        } elseif ($effective !== null && $unitLabel !== '') {
+            // Without a unit the figure would read as a pack price.
             $rule = [
                 'value' => MoneyFormatter::unitPrice($effective, $product->currency) . ' ' . $unitLabel,
                 'below' => true,
@@ -54,6 +56,13 @@ final readonly class AlertRules
             }
 
             $rules[] = $rule;
+        } elseif ($product->isUnitTargetSuspended() && $product->unit_price_target_unit === UnitTargetConversion::PACK) {
+            $rules[] = [
+                'value' => __(':target (paused: pick the pack you buy)', [
+                    'target' => MoneyFormatter::format((string) $product->unit_price_target, (string) $product->currency) . ' ' . UnitWord::labelFor(UnitTargetConversion::PACK),
+                ]),
+                'below' => false,
+            ];
         } elseif ($product->isUnitTargetSuspended()) {
             // In the unit it was set in, and named as not firing: read in
             // today's unit it would be a different price altogether.
@@ -65,21 +74,17 @@ final readonly class AlertRules
             ];
         }
 
-        // An empty drop threshold is not off: the drop check falls back to a
-        // default, read here from the same reference it uses. With a target
-        // set it is off, as in DropEvaluator.
+        // Without an active target the default drop applies, read here from the
+        // same reference the drop check uses. With one it is off, as in
+        // DropEvaluator.
         $reference = $product->hasActiveTarget() ? null : app(Reference::class)->compute($product);
         $defaults = $reference === null ? null : TierDefaults::forReference($reference);
 
-        if ($product->drop_threshold_pct !== null) {
-            $rules[] = ['value' => __(':percent% drop', ['percent' => Numeric::trimmed((string) $product->drop_threshold_pct)]), 'below' => false];
-        } elseif ($defaults !== null) {
+        if ($defaults !== null) {
             $rules[] = ['value' => __(':percent% drop (default)', ['percent' => Numeric::trimmed((string) $defaults['pct'])]), 'below' => false];
         }
 
-        if ($product->drop_threshold_abs !== null) {
-            $rules[] = ['value' => __(':amount drop', ['amount' => MoneyFormatter::format((string) $product->drop_threshold_abs, $product->currency)]), 'below' => false];
-        } elseif ($defaults !== null && $defaults['abs'] !== null) {
+        if ($defaults !== null && $defaults['abs'] !== null) {
             $rules[] = ['value' => __(':amount drop (default)', ['amount' => MoneyFormatter::format((string) $defaults['abs'], $product->currency)]), 'below' => false];
         }
 

@@ -50,16 +50,20 @@ it('names the best value apart from the lowest price, with the warning the page 
         ->toContain('| [Jumbo](<https://jumbo.com/p/1>) | €4.00 /kg | €2.00 for 500 g |');
 });
 
-it('lists the alert rules and marks a shop kept as a link', function (): void {
+it('lists the default drops as the alert rules of a product with no target, and marks a shop kept as a link', function (): void {
     $user = User::factory()->create();
+    // A drop threshold stored on the product no longer alerts, so it is not listed.
     $product = markdownProduct($user);
-    $product->update(['target_price' => '10.00', 'drop_threshold_pct' => '15']);
+    $product->forceFill(['drop_threshold_pct' => '20.00'])->save();
+    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '12.00']);
     Shop::factory()->for($product)->create(['url' => 'https://bol.com/p/1', 'kind' => ShopKind::Reference, 'current_price' => null]);
+    $product->recomputeCheapestShop();
 
     $markdown = $this->actingAs($user)->get(route('app.products.markdown', $product))->getContent();
 
+    // €12.00 sits under €25: 15% or €3.00.
     expect($markdown)
-        ->toContain("## Alerts\n\n- €10.00 or less\n- 15% drop\n")
+        ->toContain("## Alerts\n\n- 15% drop (default)\n- €3.00 drop (default)\n\n")
         ->toContain('| [bol.com](<https://bol.com/p/1>) | Link only | ' . ShopKind::Reference->note() . ' |');
 });
 
@@ -74,16 +78,16 @@ it('gives a unit-price target the pack price it comes to', function (): void {
     expect($markdown)->toContain("## Alerts\n\n- €2.54 /piece or less (€12.70 for 5 pieces)\n");
 });
 
-it('lists no default drop once a price target is set', function (): void {
+it('lists no default drop once a pack target is set', function (): void {
     $user = User::factory()->create();
     $product = markdownProduct($user);
-    $product->update(['target_price' => '10.00', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null]);
-    Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '12.00']);
+    $jumbo = Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '12.00']);
+    $product->forceFill(['unit_price_target' => '10.00', 'unit_price_target_unit' => 'pack', 'unit_price_target_shop_id' => $jumbo->id])->save();
     $product->recomputeCheapestShop();
 
     $markdown = $this->actingAs($user)->get(route('app.products.markdown', $product))->getContent();
 
-    expect($markdown)->toContain("## Alerts\n\n- €10.00 or less\n\n")
+    expect($markdown)->toContain("## Alerts\n\n- €10.00 /pack or less (the pack at Jumbo)\n\n")
         ->not->toContain('(default)');
 });
 

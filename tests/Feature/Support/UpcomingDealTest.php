@@ -65,3 +65,22 @@ it('lists an announced deal in the hover details apart from the discount now', f
         ->toContain('25% korting · 28 Sep – 4 Oct')
         ->toContain('No discount right now.');
 });
+
+it('shows a deal stated only as a price in the reader\'s money format', function (): void {
+    $this->travelTo('2026-10-24 12:00:00');
+    $shop = Shop::factory()->create(['url' => 'https://www.dirk.nl/boodschappen/x/mango/55252', 'current_price' => '1.79', 'currency' => 'EUR']);
+    $shop->forceFill([
+        'promotion_starts_at' => '2026-10-27 23:00:00',
+        'promotion_ends_at' => '2026-11-03 22:59:59',
+        'promotion_label' => '0.99',
+    ])->save();
+
+    expect(PromotionLabel::upcomingDeal($shop->refresh()))->toBe('€0.99 · 28 Oct – 3 Nov');
+
+    $this->travelTo('2026-10-29 12:00:00');
+
+    expect(PromotionLabel::runningDeal($shop))->toBe('€0.99 until 3 Nov')
+        ->and(Blade::render('<x-shop-deal :shop="$shop" />', ['shop' => $shop]))
+        ->not->toContain('<q>0.99</q>')
+        ->toContain('Offer period');
+});

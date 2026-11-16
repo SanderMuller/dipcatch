@@ -9,7 +9,7 @@
                 $shopChecksDoes = \App\Enums\AiFeature::ShopChecks->does();
                 $categoriesDoes = \App\Enums\AiFeature::Categories->does();
                 $isProPlan = $allowsAutoCategories || $allowsShopChecks;
-                $privacy = __('DipCatch sends the product name, its shops and their web addresses, the pack size, barcode and price, any offer a shop shows, and the category of the product to TypeSafe, our AI provider. Nothing about you.');
+                $privacy = __('DipCatch sends the product name, its shops and their web addresses, the pack size, barcode and price, any offer a shop shows, and the category of the product to TypeSafe, our AI provider. Before a web search for a name you type, it also sends that text and the names of the products found for it. No account details.');
             @endphp
 
             {{-- Every check as its own line, under the switch that runs it. A free

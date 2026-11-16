@@ -59,7 +59,7 @@
             <flux:callout icon="light-bulb" color="zinc" data-test="tracking-idea-hint">
                 <flux:callout.heading>{{ $trackingIdea->label() }}</flux:callout.heading>
                 <flux:callout.text>
-                    {{ __('Find the product at any shop and paste its link below. DipCatch reads these shops well:') }}
+                    {{ __('Type the product’s name below, or find it at any shop and paste its link. DipCatch reads these shops well:') }}
                 </flux:callout.text>
                 <ul role="list" class="mt-2 flex flex-wrap gap-2">
                     @foreach ($trackingIdea->group()->shops() as $host)
@@ -72,21 +72,22 @@
         @endif
 
         @if ($state === 'idle' || $state === 'error')
-            <form wire:submit.prevent="probe" class="space-y-3">
+            <form wire:submit.prevent="lookUp" class="space-y-3">
                 <flux:input
                     id="create-product-url"
-                    type="url"
-                    wire:model="url"
-                    :label="__('Product link')"
-                    :description="__('Paste a product link. We pick up the name, the photo and the price, and suggest when to alert you.')"
-                    placeholder="https://shop.example.com/product/123"
+                    type="text"
+                    wire:model="query"
+                    :label="__('Product link or name')"
+                    :description="__('Paste a product link, or type the name to search the supermarkets and bol.com. We pick up the name, the photo and the price, and suggest when to alert you.')"
+                    :placeholder="__('https://… or Calvé pindakaas 650 g')"
+                    autocomplete="off"
                     required
                     autofocus
                 />
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                     <flux:button type="submit" variant="primary">
-                        <span wire:loading.remove wire:target="probe">Look up this product</span>
-                        <span wire:loading wire:target="probe">Looking it up…</span>
+                        <span wire:loading.remove wire:target="lookUp">{{ __('Look up this product') }}</span>
+                        <span wire:loading wire:target="lookUp">{{ __('Looking it up…') }}</span>
                     </flux:button>
                     <flux:button type="button" variant="ghost" wire:click="switchMode('manual')">
                         {{ __('Add it by hand instead') }}
@@ -94,28 +95,44 @@
                 </div>
             </form>
 
-            <div wire:loading wire:target="probe" class="space-y-2" aria-hidden="true">
+            <div wire:loading wire:target="lookUp, pickResult" class="space-y-2" aria-hidden="true">
                 <flux:skeleton animate="pulse" class="h-4 w-2/3" />
                 <flux:skeleton animate="pulse" class="h-20 w-full" />
             </div>
 
-            {{-- Another way in, for someone adding many products: the assistant
-                 runs the same lookup and shows what it found before it saves. --}}
-            <flux:callout icon="sparkles" color="zinc" class="mt-6" data-test="assistant-hint">
-                <flux:callout.heading>{{ __('Add products and shops from :assistant', ['assistant' => $connectedAssistant ?? 'Claude']) }}</flux:callout.heading>
-                @if ($connectedAssistant !== null)
+            @if ($state === 'error')
+                <flux:callout variant="danger" icon="exclamation-triangle" id="wizard-probe-error" tabindex="-1" class="focus:outline-none">
+                    <flux:callout.heading>We could not open that page</flux:callout.heading>
                     <flux:callout.text>
-                        {{ __(':assistant is connected. Paste a product link and ask it to track it, or ask it to add a shop to a product you follow. It shows the name and the price it found before it saves anything.', ['assistant' => $connectedAssistant]) }}
+                        @include('livewire.shops.partials.probe-error')
                     </flux:callout.text>
-                @else
-                    <flux:callout.text>
-                        {{ __('Connect Claude once, then paste a product link and ask it to track it, or ask it to add a shop to a product you follow. It shows the name and the price it found before it saves anything.') }}
-                    </flux:callout.text>
-                    <x-slot name="actions">
-                        <flux:button size="sm" :href="route('app.connections')" wire:navigate>{{ __('Connect Claude') }}</flux:button>
-                    </x-slot>
-                @endif
-            </flux:callout>
+                    <flux:text class="mt-2">
+                        Can't reach the page? You can <flux:link as="button" wire:click="switchMode('manual')">fill the product in yourself</flux:link>.
+                    </flux:text>
+                </flux:callout>
+            @endif
+
+            @if ($nameResults !== null)
+                @include('livewire.products.partials.name-search-results')
+            @else
+                {{-- Another way in, for someone adding many products: the assistant
+                     runs the same lookup and shows what it found before it saves. --}}
+                <flux:callout icon="sparkles" color="zinc" class="mt-6" data-test="assistant-hint">
+                    <flux:callout.heading>{{ __('Add products and shops from :assistant', ['assistant' => $connectedAssistant ?? 'Claude']) }}</flux:callout.heading>
+                    @if ($connectedAssistant !== null)
+                        <flux:callout.text>
+                            {{ __(':assistant is connected. Paste a product link and ask it to track it, or ask it to add a shop to a product you follow. It shows the name and the price it found before it saves anything.', ['assistant' => $connectedAssistant]) }}
+                        </flux:callout.text>
+                    @else
+                        <flux:callout.text>
+                            {{ __('Connect Claude once, then paste a product link and ask it to track it, or ask it to add a shop to a product you follow. It shows the name and the price it found before it saves anything.') }}
+                        </flux:callout.text>
+                        <x-slot name="actions">
+                            <flux:button size="sm" :href="route('app.connections')" wire:navigate>{{ __('Connect Claude') }}</flux:button>
+                        </x-slot>
+                    @endif
+                </flux:callout>
+            @endif
         @endif
 
         @if ($state === 'manual_selector')
@@ -229,17 +246,6 @@
             </flux:card>
         @endif
 
-        @if ($state === 'error')
-            <flux:callout variant="danger" icon="exclamation-triangle">
-                <flux:callout.heading>We could not open that page</flux:callout.heading>
-                <flux:callout.text>
-                    @include('livewire.shops.partials.probe-error')
-                </flux:callout.text>
-                <flux:text class="mt-2">
-                    Can't reach the page? You can <flux:link as="button" wire:click="switchMode('manual')">fill the product in yourself</flux:link>.
-                </flux:text>
-            </flux:callout>
-        @endif
     @elseif ($step === 1)
         <form wire:submit="saveDetails" class="space-y-4" data-test="product-details-form">
             <flux:input wire:model="title" :label="__('Title')" required />
@@ -301,22 +307,18 @@
             @php($showsSuggestion = $packChoices !== [] && ($asksJev || $suggestion->unitTarget !== null))
             <div class="min-w-0 max-w-2xl space-y-6">
                 <h3 class="sr-only">{{ __('Your price alert') }}</h3>
-                @if ($packChoices === [])
-                    <flux:input
-                        wire:model="unitPriceTarget"
-                        :label="$unitWord ? __('Target price per :unit', ['unit' => $unitWord]) : __('Target price per kilo, litre or piece')"
-                        :description="__('We tell you when the best value reaches this price. The unit shows up here once a shop says how much is in the pack.')"
-                        type="number"
-                        step="any"
-                        min="0.0001"
-                    />
-                @else
+                @if ($packChoices === [] && $pinnablePacks !== [])
+                    {{-- No shop can be compared per unit yet: the price of the
+                         pack the person buys, at the shop they pick. --}}
+                    <x-pack-target :packs="$pinnablePacks" :currency="$product->currency" />
+                @elseif ($packChoices !== [])
                     <x-unit-target
                         model="unitPriceTarget"
                         :heading="false"
                         :packs="$packChoices"
                         :currency="$product->currency"
                         :unit-word="$unitWord ?? __('unit')"
+                        :stranded="$strandedOwnerSizes"
                         :suggested-unit="$showsSuggestion && ! $asksJev ? $suggestion->unitTarget : null"
                     >
                         @if ($showsSuggestion)
@@ -336,16 +338,16 @@
                 @if (! $showsSuggestion)
                     <p class="max-w-[65ch] text-base/7 text-pretty text-zinc-600 sm:text-sm/6 dark:text-zinc-400" data-test="alert-suggestion-reason">
                         @if ($suggestion->band === \App\Enums\PromotionDepthBand::Fixed)
-                            {{ __('This product has a fixed price, so we only alert you on a real drop. Keep the default alert below.') }}
+                            {{ __('This product has a fixed price, so we suggest no target: we tell you when the price drops well under its usual price.') }}
                         @elseif ($suggestion->unit === null)
-                            {{ __('We could not read a pack size, so we suggest the default alert below.') }}
+                            {{ __('We could not read a pack size, so we suggest no target: we tell you when the price drops well under its usual price.') }}
                         @elseif ($suggestion->normalUnitPrice === null)
-                            {{ __('We could not tell its normal price, so we suggest the default alert below.') }}
+                            {{ __('We could not tell its normal price, so we suggest no target: we tell you when the price drops well under its usual price.') }}
                         @else
-                            {{ __('We have no sign that this product goes on sale, so we suggest the default alert below.') }}
+                            {{ __('We have no sign that this product goes on sale, so we suggest no target: we tell you when the price drops well under its usual price.') }}
                         @endif
                         @if ($onOfferNow)
-                            {{ __('It is on offer now, so for its first weeks the default counts from the offer price.') }}
+                            {{ __('It is on offer now, so for its first weeks that counts from the offer price.') }}
                         @endif
                     </p>
                 @endif
@@ -360,45 +362,6 @@
                         <flux:link :href="route('app.billing')" wire:navigate>{{ __('Compare plans') }}</flux:link>
                     </flux:text>
                 @endif
-
-                {{-- Few people want these, so they stay folded until one is
-                     set or has an error. wire:ignore.self keeps the fold as
-                     the person left it across round trips. --}}
-                @php($otherAlertErrors = $errors->hasAny(['dropThresholdPct', 'dropThresholdAbs', 'targetPrice']))
-                <details
-                    class="group border-t border-zinc-950/5 pt-6 dark:border-white/10"
-                    wire:ignore.self
-                    @if ($otherAlertErrors || $otherAlerts !== []) open @endif
-                    data-test="other-alerts"
-                >
-                    <summary class="flex cursor-pointer list-none items-center gap-2 select-none [&::-webkit-details-marker]:hidden">
-                        <flux:icon.chevron-right variant="micro" class="shrink-0 text-zinc-400 group-open:rotate-90" />
-                        <span class="shrink-0 text-base/7 font-medium text-zinc-900 sm:text-sm/6 dark:text-white">{{ __('Other alerts') }}</span>
-                        <span class="truncate text-base/7 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-                            · {{ $otherAlerts === [] ? __('a drop in percent or money, or a price for any pack') : implode(', ', $otherAlerts) }}
-                        </span>
-                        @if ($otherAlertErrors)
-                            <span class="shrink-0 text-base/7 font-medium text-red-600 sm:text-sm/6 dark:text-red-400">{{ __('Check these') }}</span>
-                        @endif
-                    </summary>
-
-                    <div class="mt-4 space-y-3">
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <flux:input wire:model="dropThresholdPct" :label="__('Alert me when it drops by (%)')" type="number" step="0.01" min="0.01" max="99.99"
-                                :placeholder="$defaults['pct'] ?? ''" :description="($defaults['pct'] ?? '') !== '' ? __('Default: :value%.', ['value' => $defaults['pct']]) : null" class="tabular-nums" />
-                            <flux:input wire:model="dropThresholdAbs" :label="__('Alert me when it drops by (amount)')" type="number" step="0.01" min="0.01"
-                                :placeholder="$defaults['abs'] ?? ''" :description="($defaults['abs'] ?? '') !== '' ? __('Default: :value.', ['value' => $defaults['abs']]) : null" class="tabular-nums" />
-                        </div>
-                        <flux:input wire:model="targetPrice" :label="__('Price for any pack')" type="number" step="0.01" min="0.01" class="sm:max-w-xs" />
-                        <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400" data-test="alert-defaults-note">
-                            @if ($defaults === null)
-                                {{ __('The default alert starts once we have read a price.') }}
-                            @else
-                                {{ __('Leave the drop fields empty and we use the default shown. Once a target is set, the suggested one included, an empty drop field is off.') }}
-                            @endif
-                        </flux:text>
-                    </div>
-                </details>
             </div>
 
             <div class="flex flex-wrap gap-2">

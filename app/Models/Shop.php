@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Shops\SaveOwnerPackSize;
 use App\Enums\ConsumerPriceIssue;
 use App\Enums\PackExclusion;
 use App\Enums\ProbeFailure;
@@ -69,6 +70,8 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $alt_pack_check_key The page and the two sizes Jev was last asked about.
  * @property bool|null $alt_pack_confirmed Jev's answer about the second size: null not asked, true confirmed, false rejected.
  * @property CarbonInterface|null $alt_pack_since When the second size was stored or confirmed.
+ * @property string|null $owner_pack_quantity How much is in the pack, as the owner stated it for a page that states no size.
+ * @property string|null $owner_pack_unit
  */
 #[Unguarded]
 final class Shop extends Model
@@ -92,6 +95,7 @@ final class Shop extends Model
             'confirmed_pack_quantity' => 'decimal:2',
             'pack_checked_at' => 'datetime',
             'alt_pack_quantity' => 'decimal:2',
+            'owner_pack_quantity' => 'decimal:2',
             'alt_pack_confirmed' => 'boolean',
             'alt_pack_since' => 'datetime',
             'conditional_price' => 'decimal:2',
@@ -180,6 +184,9 @@ final class Shop extends Model
             'alt_pack_check_key' => null,
             'alt_pack_confirmed' => null,
             'alt_pack_since' => null,
+            // The owner said what this page's pack held, not the new one's.
+            'owner_pack_quantity' => null,
+            'owner_pack_unit' => null,
             'gtin' => null,
             // Until the next successful check this offer has no known price,
             // and a leftover one keeps it eligible for
@@ -350,12 +357,13 @@ final class Shop extends Model
     }
 
     /**
-     * The size this shop's prices are compared by: the page's own, or one
+     * The size this shop's prices are compared by: the page's own, the one
+     * the owner stated, or one
      * Jev confirmed for a page that states none. Not a borrowed size.
      */
     public function comparableSize(): ?PackSize
     {
-        return $this->packSize() ?? $this->confirmedPackSize();
+        return $this->ownOrOwnerPackSize() ?? $this->confirmedPackSize();
     }
 
     /**
@@ -546,6 +554,31 @@ final class Shop extends Model
         }
 
         return PackSize::of((float) $this->pack_quantity, $this->pack_unit);
+    }
+
+    /** The size the owner stated for the pack they buy here; see {@see SaveOwnerPackSize}. */
+    public function ownerPackSize(): ?PackSize
+    {
+        if ($this->owner_pack_quantity === null || $this->owner_pack_unit === null) {
+            return null;
+        }
+
+        return PackSize::of((float) $this->owner_pack_quantity, $this->owner_pack_unit);
+    }
+
+    /** Whether the owner's size is the one compared: the page states no readable size. */
+    public function isOwnerSized(): bool
+    {
+        return $this->packSize() === null && $this->ownerPackSize() !== null;
+    }
+
+    /**
+     * The size the page states, or else the one the owner stated. The page's
+     * own wins once it states one; the owner's comes back if it stops.
+     */
+    public function ownOrOwnerPackSize(): ?PackSize
+    {
+        return $this->packSize() ?? $this->ownerPackSize();
     }
 
     /** The second size this page states for the same pack, in another unit. */

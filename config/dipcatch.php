@@ -113,6 +113,13 @@ return [
         'retry_every_days' => (int) env('DIPCATCH_REFERENCE_RETRY_EVERY_DAYS', 7),
     ],
 
+    // Offers a shop announces before they start (Dirk, DekaMarkt and Jumbo
+    // read them from pages or an API beside the product page). Off in tests
+    // unless a test turns it on, so no check there reaches those shops.
+    'upcoming_offers' => [
+        'enabled' => (bool) env('DIPCATCH_UPCOMING_OFFERS', true),
+    ],
+
     'recheck' => [
         'interval_hours' => (int) env('DIPCATCH_RECHECK_INTERVAL_HOURS', 24),
         // Spread each batch of rechecks over this window. Capped at the SQS
@@ -189,8 +196,9 @@ return [
         'max_candidates' => (int) env('DIPCATCH_SHOP_CHECKS_MAX_CANDIDATES', 10),
         // Paid calls per account and app-wide per day, counted apart for each
         // ShopCheckPurpose (add-shop, suggestions, web discovery's two checks,
-        // and the alert suggestion), so background checks never use up the warning a person
-        // is waiting for. Zero lifts a cap.
+        // the alert suggestion, the pack size and the name search gate), so
+        // background checks never use up the warning a person is waiting for.
+        // Zero lifts a cap.
         'daily_limit_per_user' => (int) env('DIPCATCH_SHOP_CHECKS_DAILY_LIMIT_PER_USER', 50),
         'daily_limit' => (int) env('DIPCATCH_SHOP_CHECKS_DAILY_LIMIT', 2000),
     ],
@@ -221,6 +229,9 @@ return [
         'search_max_age_days' => (int) env('DIPCATCH_WEB_DISCOVERY_SEARCH_MAX_AGE_DAYS', 90),
         // Paid searches app-wide per day. Zero or less lifts the cap.
         'daily_search_limit' => (int) env('DIPCATCH_WEB_DISCOVERY_DAILY_SEARCH_LIMIT', 300),
+        // Paid searches app-wide per day for product names typed in the
+        // add-product wizard, on a counter apart from the one above.
+        'name_search_daily_limit' => (int) env('DIPCATCH_WEB_DISCOVERY_NAME_SEARCH_DAILY_LIMIT', 100),
         // Klarna pages as a source of shop leads (specs/klarna-shop-leads.md).
         // Switch off when Klarna changes its page or refuses DipCatch.
         'klarna_leads' => (bool) env('DIPCATCH_WEB_DISCOVERY_KLARNA_LEADS', true),
@@ -247,8 +258,8 @@ return [
     'not_a_shop' => [
         'wikipedia.org', 'youtube.com', 'facebook.com', 'instagram.com', 'pinterest.com', 'reddit.com', 'tiktok.com', 'x.com', 'twitter.com',
         'tweakers.net', 'beslist.nl', 'kieskeurig.nl', 'vergelijk.nl', 'idealo.nl', 'idealo.de', 'google.com', 'google.nl', 'trustpilot.com',
-        'kassa.bnnvara.nl', 'consumentenbond.nl', 'folders.nl', 'reclamefolder.nl', 'myshopi.com', 'openfoodfacts.org', 'voedingscentrum.nl',
-        'supermarktscanner.nl', 'fatsecret.nl', 'beeradvocate.com', 'techradar.com',
+        'kassa.bnnvara.nl', 'consumentenbond.nl', 'folders.nl', 'reclamefolder.nl', 'myshopi.com', 'openfoodfacts.org', 'ingredientenlijst.nl', 'voedingscentrum.nl',
+        'supermarktscanner.nl', 'zogoedkoop.nl', 'fatsecret.nl', 'beeradvocate.com', 'techradar.com',
         'kisteman-events.nl', 'partyverhuren.nl', 'bidfood.nl', 'makro.nl',
         'bcc.nl', 'maxict.nl',
         // Klarna and PriceRunner (Klarna's comparison site abroad) list other

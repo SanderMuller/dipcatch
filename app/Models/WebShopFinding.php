@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\WebFindingStatus;
 use App\Services\ShopDiscovery\ShoppersCountry;
 use App\Services\TypeSafe\TypeSafeClient;
+use App\Support\NotAShop;
 use App\Support\PackSize;
 use App\Support\UnitWord;
 use App\Support\UrlNormalizer;
@@ -160,8 +161,10 @@ final class WebShopFinding extends Model
         $barcodeGone = $this->matched_gtin !== null && ! in_array($this->matched_gtin, $trackedGtins, strict: true);
 
         $hidden = HiddenShop::covers($hiddenHosts, $this->addHost()) || ($this->served_host !== null && HiddenShop::covers($hiddenHosts, $this->served_host));
+        // A host listed as not a shop after the finding was made.
+        $notAShop = NotAShop::covers($this->addHost()) || ($this->served_host !== null && NotAShop::covers($this->served_host));
 
-        return ! $atTrackedShop && ! $barcodeGone && ! $hidden && ! $this->hasStaleGtins($trackedGtins);
+        return ! $atTrackedShop && ! $barcodeGone && ! $hidden && ! $notAShop && ! $this->hasStaleGtins($trackedGtins);
     }
 
     /**

@@ -12,31 +12,29 @@ function ref(string $value, string $kind = ReferenceValue::KIND_MEDIAN_30D, int 
 }
 
 test('absolute trigger fires even when percent threshold not met', function (): void {
-    $product = Product::factory()->create([
-        'drop_threshold_pct' => '50.00',
-        'drop_threshold_abs' => '5.00',
-    ]);
+    $product = Product::factory()->create();
 
+    // Reference 1500 → tier 500-2000: 5% or €50. €60 off is only 4%.
+    $outcome = new DropEvaluator()->evaluate($product, '1440.00', ref('1500.00'));
+
+    expect($outcome->belowThreshold)->toBeTrue()
+        ->and((float) $outcome->dropAbsolute)->toBe(60.0)
+        ->and((float) $outcome->dropPercent)->toBe(4.0)
+        ->and((float) $outcome->thresholdAbs)->toBe(50.0)
+        ->and((float) $outcome->thresholdPct)->toBe(5.0);
+});
+
+test('percent trigger fires even when absolute threshold not met', function (): void {
+    $product = Product::factory()->create();
+
+    // Reference 100 → tier 100-500: 8% or €25. 10% off is only €10.
     $outcome = new DropEvaluator()->evaluate($product, '90.00', ref('100.00'));
 
     expect($outcome->belowThreshold)->toBeTrue()
         ->and((float) $outcome->dropAbsolute)->toBe(10.0)
         ->and((float) $outcome->dropPercent)->toBe(10.0)
-        ->and((float) $outcome->thresholdAbs)->toBe(5.0)
-        ->and((float) $outcome->thresholdPct)->toBe(50.0);
-});
-
-test('percent trigger fires even when absolute threshold not met', function (): void {
-    $product = Product::factory()->create([
-        'drop_threshold_pct' => '5.00',
-        'drop_threshold_abs' => '500.00',
-    ]);
-
-    $outcome = new DropEvaluator()->evaluate($product, '90.00', ref('100.00'));
-
-    expect($outcome->belowThreshold)->toBeTrue()
-        ->and((float) $outcome->dropPercent)->toBe(10.0)
-        ->and((float) $outcome->thresholdPct)->toBe(5.0);
+        ->and((float) $outcome->thresholdPct)->toBe(8.0)
+        ->and((float) $outcome->thresholdAbs)->toBe(25.0);
 });
 
 test('both triggers met still yields belowThreshold true', function (): void {
@@ -89,45 +87,42 @@ test('falls back to tier defaults when product overrides are null', function ():
         ->and((float) $outcome->thresholdAbs)->toBe(25.0);
 });
 
-test('product override wins over tier default for pct only', function (): void {
+test('a drop threshold stored on the product is ignored: the tier defaults decide', function (): void {
     $product = Product::factory()->create([
         'drop_threshold_pct' => '20.00',
-        'drop_threshold_abs' => null,
+        'drop_threshold_abs' => '100.00',
     ]);
 
-    $outcome = new DropEvaluator()->evaluate($product, '85.00', ref('50.00'));
+    // Reference 50 → tier 25-100: 10% or €7. €5 off is 10%: under the stored
+    // 20% and €100, so only the default 10% can fire it.
+    $outcome = new DropEvaluator()->evaluate($product, '45.00', ref('50.00'));
 
-    // Reference 50 → tier 25-100 → abs default 7.
-    expect((float) $outcome->thresholdPct)->toBe(20.0)
+    expect($outcome->belowThreshold)->toBeTrue()
+        ->and((float) $outcome->thresholdPct)->toBe(10.0)
         ->and((float) $outcome->thresholdAbs)->toBe(7.0);
 });
 
-test('a product with a price target alerts on no default drop', function (): void {
-    $product = Product::factory()->create([
-        'target_price' => '50.00',
-        'drop_threshold_pct' => null,
-        'drop_threshold_abs' => null,
-    ]);
+test('a product with a pack target alerts on no default drop', function (): void {
+    $product = Product::factory()->withPackTarget('50.00', ['current_price' => '60.00'])->create();
 
     // 40% and €40 off: far past any default.
-    $outcome = new DropEvaluator()->evaluate($product, '60.00', ref('100.00'));
+    $outcome = new DropEvaluator()->evaluate($product->refresh(), '60.00', ref('100.00'));
 
-    expect($outcome->belowThreshold)->toBeFalse()
+    expect($product->hasActiveTarget())->toBeTrue()
+        ->and($outcome->belowThreshold)->toBeFalse()
         ->and($outcome->thresholdPct)->toBeNull()
         ->and($outcome->thresholdAbs)->toBeNull();
 });
 
-test('a product with a price target still alerts on a drop its owner set', function (): void {
-    $product = Product::factory()->create([
-        'target_price' => '50.00',
-        'drop_threshold_pct' => '10.00',
-        'drop_threshold_abs' => null,
-    ]);
+test('a product with a pack target does not alert on a drop threshold stored on it either', function (): void {
+    $product = Product::factory()
+        ->withPackTarget('50.00', ['current_price' => '85.00'])
+        ->create(['drop_threshold_pct' => '10.00', 'drop_threshold_abs' => '5.00']);
 
-    $outcome = new DropEvaluator()->evaluate($product, '85.00', ref('100.00'));
+    $outcome = new DropEvaluator()->evaluate($product->refresh(), '85.00', ref('100.00'));
 
-    expect($outcome->belowThreshold)->toBeTrue()
-        ->and((float) $outcome->thresholdPct)->toBe(10.0)
+    expect($outcome->belowThreshold)->toBeFalse()
+        ->and($outcome->thresholdPct)->toBeNull()
         ->and($outcome->thresholdAbs)->toBeNull();
 });
 

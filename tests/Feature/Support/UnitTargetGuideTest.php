@@ -7,7 +7,7 @@ use App\Models\Shop;
 use App\Support\UnitTargetGuide;
 
 /**
- * @param  array<string, mixed>  $columns
+ * @param  array<model-property<Shop>, mixed>  $columns
  */
 function guideShop(Product $product, string $host, string $price, string $quantity, string $unit, array $columns = []): Shop
 {

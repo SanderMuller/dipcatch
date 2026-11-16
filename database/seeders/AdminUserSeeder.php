@@ -15,7 +15,7 @@ final class AdminUserSeeder extends Seeder
         $password = config('dipcatch.admin.password');
 
         if (! is_string($email) || $email === '' || ! is_string($password) || $password === '') {
-            $this->command->warn('AdminUserSeeder skipped: set ADMIN_EMAIL and ADMIN_PASSWORD to seed the admin user.');
+            $this->command?->warn('AdminUserSeeder skipped: set ADMIN_EMAIL and ADMIN_PASSWORD to seed the admin user.');
 
             return;
         }

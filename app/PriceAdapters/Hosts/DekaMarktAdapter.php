@@ -10,6 +10,7 @@ use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopAdapter;
 use App\PriceAdapters\ShopSnapshot;
+use App\Services\Offers\DekaMarktUpcomingOffers;
 use App\Support\NuxtData;
 use Carbon\CarbonImmutable;
 use Throwable;
@@ -32,6 +33,8 @@ use Throwable;
  */
 final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
+    public function __construct(private ?DekaMarktUpcomingOffers $announced = null) {}
+
     private const string IMAGE_BASE = 'https://web-fileserver.dekamarkt.nl/';
 
     public function key(): string
@@ -78,12 +81,8 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
 
             if ($candidate !== null) {
                 $prices[$candidate] = true;
-                // Only the offer branch has a window: the shelf price is not
-                // a promotion, and last week's dates would label it as one.
-                $windows[] = self::offerApplies($data, $record) ? self::window($data, $record) : null;
-                // While an offer runs, the normal price is the price the shop
-                // says it charged before it.
-                $claim ??= self::offerApplies($data, $record) ? PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'normalPrice')) : null;
+                $windows[] = self::runningWindow($data, $record);
+                $claim ??= self::runningClaim($data, $record);
             }
         }
 
@@ -105,8 +104,9 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
         $title = NuxtData::value($data, $product, 'headerText');
         $packaging = NuxtData::value($data, $product, 'packaging');
         $window = self::agreedWindow($windows);
+        $offerRuns = array_any($priceRecords, fn (array $record): bool => self::offerApplies($data, $record));
 
-        return ExtractionResult::success(new ShopSnapshot(
+        $snapshot = new ShopSnapshot(
             title: is_string($title) && $title !== '' ? $title : 'Unknown',
             imageUrl: self::imageUrl($data, $product),
             price: $price,
@@ -121,7 +121,18 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
             promotionWindowAuthoritative: true,
             claimedRegularPrice: $claim,
             claimAuthoritative: true,
-        ));
+        );
+
+        return ExtractionResult::success($this->withAnnouncedOffer($snapshot, $offerRuns, $productId));
+    }
+
+    private function withAnnouncedOffer(ShopSnapshot $snapshot, bool $offerRuns, string $productId): ShopSnapshot
+    {
+        if ($offerRuns || $this->announced === null) {
+            return $snapshot;
+        }
+
+        return $this->announced->applyTo($snapshot, $productId);
     }
 
     /**
@@ -170,6 +181,30 @@ final readonly class DekaMarktAdapter implements HostSpecificAdapter, OwnsHosts,
         }
 
         return CarbonImmutable::now()->between($start, $end);
+    }
+
+    /**
+     * Only the offer branch has a window: the shelf price is not a promotion,
+     * and last week's dates would label it as one.
+     *
+     * @param  list<mixed>  $data
+     * @param  array<string, mixed>  $record
+     */
+    private static function runningWindow(array $data, array $record): ?PromotionWindow
+    {
+        return self::offerApplies($data, $record) ? self::window($data, $record) : null;
+    }
+
+    /**
+     * While an offer runs, the normal price is the price the shop says it
+     * charged before it.
+     *
+     * @param  list<mixed>  $data
+     * @param  array<string, mixed>  $record
+     */
+    private static function runningClaim(array $data, array $record): ?string
+    {
+        return self::offerApplies($data, $record) ? PriceNormalizer::fromMixed(NuxtData::value($data, $record, 'normalPrice')) : null;
     }
 
     /**

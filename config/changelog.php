@@ -29,6 +29,44 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-11-16',
+            'category' => 'feature',
+            'title' => 'Add a pack size on the product page',
+            'body' => "When a shop doesn't say how much is in its pack, the product page now shows Add the size next to that shop. Type the number and pick the unit, for example 36 and pieces, and that shop gets a price per kilo, litre or piece, so it can count as the best value.",
+        ],
+        [
+            'date' => '2026-10-26',
+            'category' => 'feature',
+            'title' => 'Upcoming deals at Aldi, Dirk, DekaMarkt and Jumbo',
+            'body' => "Next week's offers at Aldi, Dirk, DekaMarkt and Jumbo now show on a product before they start, like AH bonus deals already did. You see the deal and the days it runs. Your price alerts keep using today's price until the offer starts.\n\nAldi products no longer show their regular price as a deal.",
+        ],
+        [
+            'date' => '2026-10-24',
+            'category' => 'fix',
+            'title' => 'Right deal dates at Spar and Lidl',
+            'body' => "Spar products no longer show a deal that isn't there. At Lidl, an offer that runs this week keeps its end date, even when the shop already lists a later offer for the same product.",
+        ],
+        [
+            'date' => '2026-10-24',
+            'category' => 'feature',
+            'title' => 'Price alerts follow the pack you buy',
+            'body' => "Your price alert is now one price per kilo, litre or piece, so a single bar can't trigger an alert meant for a 12-pack. On a product's edit page, pick the pack you buy and set a price, a percentage off today's best, or an amount off.\n\nNo pack size known? Set a price for one shop's pack, or enter how much is in it.",
+        ],
+        [
+            'date' => '2026-10-23',
+            'category' => 'feature',
+            'title' => 'Find a product by its name',
+            'body' => "Track a product now takes a name as well as a link. Type what you buy and pick it from the matching supermarket and bol.com products, each with its photo and price.\n\nNot in the list? Search the web for it, or paste the product's link.",
+            'link' => ['route' => 'app.products.create', 'label' => 'Track a product'],
+        ],
+        [
+            'date' => '2026-10-23',
+            'category' => 'feature',
+            'title' => 'Track a product from your dashboard',
+            'body' => "The Track a product button is now on your dashboard too, in the same spot as on your product list. Ideas for what else to track sit next to it.\n\nThe product and savings counts at the top are gone. Your savings by month are still on the Stats page.",
+            'link' => ['route' => 'app.dashboard', 'label' => 'Go to your dashboard'],
+        ],
+        [
             'date' => '2026-10-19',
             'category' => 'fix',
             'title' => 'Sets and multipacks get the right size',

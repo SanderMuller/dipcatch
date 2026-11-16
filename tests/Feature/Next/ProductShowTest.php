@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Enums\CategorySource;
+use App\Enums\ConsumerPriceIssue;
 use App\Enums\PackExclusion;
 use App\Enums\PriceDisplay;
 use App\Enums\ProductCategory;
@@ -454,6 +455,192 @@ it('removes a shop and recomputes the cheapest offer', function (): void {
     // pointing at a row that no longer exists.
     expect(Shop::query()->find($cheap->id))->toBeNull()
         ->and($product->fresh()?->cheapest_shop_id)->not->toBe($cheap->id);
+});
+
+/**
+ * Two shops that disagree on the size, so the third one, whose page states
+ * none, borrows nothing and reads "Pack size unknown".
+ *
+ * @return array{0: User, 1: Product, 2: Shop}
+ */
+function productWithUnsizedShop(): array
+{
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://a.test/p', 'current_price' => '2.00', 'pack_quantity' => '100.00', 'pack_unit' => 'g']);
+    Shop::factory()->for($product)->create(['url' => 'https://b.test/p', 'current_price' => '3.00', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
+    $unsized = Shop::factory()->for($product)->create(['url' => 'https://c.test/p', 'current_price' => '2.50']);
+    $product->refresh()->recomputeCheapestShop();
+
+    return [$user, $product->refresh(), $unsized];
+}
+
+it('asks how much is in the pack at a shop whose size is unknown, and compares it per unit once told', function (): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee('Pack size unknown')
+        ->assertSeeHtml('data-test="ask-pack-size"')
+        ->call('askPackSize', $unsized->id)
+        ->assertDispatched('ask-pack-size')
+        ->assertSee('How much is in this pack?')
+        ->set('editingPackAmount', '150')->set('editingPackUnit', 'g')
+        ->call('saveEditedPackSize')
+        ->assertHasNoErrors()
+        ->assertSet('shopMessage', 'Size saved.')
+        ->assertDontSee('Pack size unknown')
+        ->assertDontSeeHtml('data-test="ask-pack-size"');
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBe('150.00')
+        ->and($unsized->owner_pack_unit)->toBe('g');
+});
+
+it('asks for the size on a product where no shop states one', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create(['url' => 'https://a.test/p', 'current_price' => '2.00']);
+    $product->refresh()->recomputeCheapestShop();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeHtml('data-test="ask-pack-size"')
+        ->call('askPackSize', $shop->id)
+        ->set('editingPackAmount', '500')->set('editingPackUnit', 'g')
+        ->call('saveEditedPackSize')
+        ->assertHasNoErrors()
+        ->assertDontSeeHtml('data-test="ask-pack-size"');
+
+    expect($shop->refresh()->owner_pack_quantity)->toBe('500.00');
+});
+
+it('does not ask for a size on a shop whose price nobody here pays', function (): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $unsized->forceFill(['consumer_price_issue' => ConsumerPriceIssue::ExcludesVat, 'consumer_price_note' => 'excl. btw'])->save();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertDontSeeHtml('data-test="ask-pack-size"');
+});
+
+it('saves a count picked from the unit list, with the unit the product compares in already chosen', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    Shop::factory()->for($product)->create(['url' => 'https://a.test/p', 'current_price' => '22.77', 'pack_quantity' => '100.00', 'pack_unit' => 'piece']);
+    Shop::factory()->for($product)->create(['url' => 'https://b.test/p', 'current_price' => '9.00', 'pack_quantity' => '40.00', 'pack_unit' => 'piece']);
+    $unsized = Shop::factory()->for($product)->create(['url' => 'https://c.test/p', 'current_price' => '10.26']);
+    $product->refresh()->recomputeCheapestShop();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->call('askPackSize', $unsized->id)
+        ->assertSet('editingPackUnit', 'pieces')
+        ->set('editingPackAmount', '36')
+        ->call('saveEditedPackSize')
+        ->assertHasNoErrors();
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBe('36.00')
+        ->and($unsized->owner_pack_unit)->toBe('piece');
+});
+
+it('reads a decimal comma and a larger unit', function (): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('askPackSize', $unsized->id)
+        ->set('editingPackAmount', '1,5')
+        ->set('editingPackUnit', 'kg')
+        ->call('saveEditedPackSize')
+        ->assertHasNoErrors();
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBe('1500.00')
+        ->and($unsized->owner_pack_unit)->toBe('g');
+});
+
+it('refuses an amount that is not a number', function (): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('askPackSize', $unsized->id)
+        ->set('editingPackAmount', 'a box')
+        ->call('saveEditedPackSize')
+        ->assertHasErrors('editingPackAmount');
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBeNull();
+});
+
+it('loads the size the owner stated into the panel, and removes it when the field is emptied', function (): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $unsized->forceFill(['owner_pack_quantity' => '150.00', 'owner_pack_unit' => 'g'])->save();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('editShop', $unsized->id)
+        ->assertSet('editingPackAmount', '150')->assertSet('editingPackUnit', 'g')
+        ->set('editingPackAmount', '')
+        ->call('saveEditedPackSize')
+        ->assertSet('shopMessage', 'Your size removed.');
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBeNull();
+});
+
+it('keeps the owner size exact when the panel is saved unchanged', function (string $quantity, string $unit, string $amount, string $field): void {
+    [$user, $product, $unsized] = productWithUnsizedShop();
+    $unsized->forceFill(['owner_pack_quantity' => $quantity, 'owner_pack_unit' => $unit])->save();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('editShop', $unsized->id)
+        ->assertSet('editingPackAmount', $amount)
+        ->assertSet('editingPackUnit', $field)
+        ->call('saveEditedPackSize')
+        ->assertHasNoErrors();
+
+    expect($unsized->refresh()->owner_pack_quantity)->toBe($quantity)
+        ->and($unsized->owner_pack_unit)->toBe($unit);
+})->with([
+    'grams over a kilo' => ['1234.00', 'g', '1234', 'g'],
+    'millilitres over a litre' => ['1500.50', 'ml', '1500.5', 'ml'],
+    'pieces' => ['4.00', 'piece', '4', 'pieces'],
+]);
+
+it('empties the size field when a new link drops the owner size', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '5.00',
+        'owner_pack_quantity' => '150.00',
+        'owner_pack_unit' => 'g',
+    ]);
+
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/2' => Http::response(jsonLdPage('9.00'), 200, ['Content-Type' => 'text/html']),
+    ]);
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('editShop', $shop->id)
+        ->assertSet('editingPackAmount', '150')->assertSet('editingPackUnit', 'g')
+        ->set('editingUrl', 'https://shop.example.com/p/2')
+        ->call('saveEditedUrl')
+        ->assertSet('editingPackAmount', '');
+
+    expect($shop->refresh()->owner_pack_quantity)->toBeNull();
+});
+
+it('does not ask for a size the shop page states itself', function (): void {
+    [$user, $product] = productWithUnsizedShop();
+    $sized = $product->shops()->where('url', 'https://a.test/p')->sole();
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('editShop', $sized->id)
+        ->assertDontSeeHtml('data-test="edit-pack-size"');
 });
 
 it('refuses to remove a shop belonging to someone else', function (): void {
@@ -1084,15 +1271,18 @@ it('explains the unit price, the pack price and the read time on hover', functio
         ->assertSeeText('Price last read 23 Sep 2026, 12:15.');
 });
 
-it('shows every alert rule the product has', function (): void {
+it('shows the target as the only alert rule, with no drop beside it', function (): void {
     $user = User::factory()->create();
     $product = smallPackCheapest($user, '6.60');
-    $product->forceFill(['target_price' => null, 'drop_threshold_pct' => '10.00', 'drop_threshold_abs' => null, 'unit_price_target' => '0.2000'])->save();
+    // A drop threshold stored on the product no longer alerts, so it is not listed either.
+    $product->forceFill(['drop_threshold_pct' => '10.00', 'drop_threshold_abs' => null, 'unit_price_target' => '0.2000', 'unit_price_target_unit' => 'piece'])->save();
 
     $this->actingAs($user);
 
     $component = livewire(ProductShow::class, ['product' => $product->refresh()]);
-    $component->assertSeeInOrder(['€0.2000 /piece', 'when a price reaches it', 'or 10% drop'])
+    $component->assertSeeInOrder(['€0.2000 /piece', 'when a price reaches it'])
+        ->assertDontSee('10% drop')
+        ->assertDontSee('drop (default)')
         ->assertDontSee('Any drop');
     $html = $component->html();
 
@@ -1121,17 +1311,17 @@ it('says what a unit-price target comes to for the pack every shop sells', funct
     'grams' => ['400.00', 'g', '10.0000', 'when a price reaches it (€4.00 for 400 g)'],
 ]);
 
-it('gives the pack price beside a unit-price target listed under a price target', function (): void {
+it('shows a pack target as a price for the pack of the shop it is pinned to', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user);
-    Shop::factory()->for($product)->create(['url' => 'https://amazon.nl/dp/B0BK923TZY', 'currency' => 'EUR', 'current_price' => '15.90', 'pack_quantity' => '5.00', 'pack_unit' => 'piece']);
-    $product->forceFill(['target_price' => '14.00', 'unit_price_target' => '2.5400', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+    $amazon = Shop::factory()->for($product)->create(['url' => 'https://amazon.nl/dp/B0BK923TZY', 'currency' => 'EUR', 'current_price' => '15.90']);
+    $product->forceFill(['unit_price_target' => '14.00', 'unit_price_target_unit' => 'pack', 'unit_price_target_shop_id' => $amazon->id])->save();
 
     $this->actingAs($user);
 
     livewire(ProductShow::class, ['product' => $product->refresh()])
-        ->assertSeeInOrder(['€14.00', 'when a price reaches it', 'or €2.54 /piece or less', '(€12.70 for 5 pieces)'])
-        ->assertDontSee('when a price reaches it (');
+        ->assertSeeInOrder(['€14.00 /pack', 'when a price reaches it (the pack at Amazon.nl)'])
+        ->assertDontSee('drop (default)');
 });
 
 it('gives no pack price for a unit-price target when the shops sell different packs', function (): void {
@@ -1156,15 +1346,23 @@ it('says any drop when the product has no alert rule and no price yet', function
     livewire(ProductShow::class, ['product' => $product->refresh()])->assertSee('Any drop');
 });
 
-it('says below for a second price target too', function (): void {
+it('lists no rule for a stored price for any pack', function (): void {
     $user = User::factory()->create();
     $product = smallPackCheapest($user, '6.60');
-    $product->forceFill(['target_price' => '2.00', 'unit_price_target' => '0.2000', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
+    $product->forceFill(['target_price' => '2.00', 'unit_price_target' => '0.2000', 'unit_price_target_unit' => 'piece', 'drop_threshold_pct' => null, 'drop_threshold_abs' => null])->save();
 
     $this->actingAs($user);
 
-    livewire(ProductShow::class, ['product' => $product->refresh()])
-        ->assertSeeInOrder(['€2.00', 'when a price reaches it', 'or €0.2000 /piece or less']);
+    $html = livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeInOrder(['€0.2000 /piece', 'when a price reaches it'])
+        ->html();
+
+    // From the rules down to the next card, the price chart.
+    preg_match('/data-test="alert-rules".*?data-test="price-history"/s', is_string($html) ? $html : '', $rules);
+
+    expect($rules[0] ?? '')->toContain('€0.2000 /piece')
+        ->not->toContain('€2.00')
+        ->not->toContain('or less');
 });
 
 it('names the default drop thresholds when the product has none of its own', function (): void {

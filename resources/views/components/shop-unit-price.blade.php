@@ -55,6 +55,10 @@
             <flux:tooltip content="{{ __('This page gives the pack as :size. Estimated from what one item weighs at the other shops, which all agree.', ['size' => $shop->packSize() === null ? '' : \App\Support\UnitWord::pack($shop->packSize())]) }}">
                 <flux:badge size="sm" color="zinc" data-test="pack-converted">{{ __('estimated') }}</flux:badge>
             </flux:tooltip>
+        @elseif ($pack?->provenance === \App\Enums\PackProvenance::Owner)
+            <flux:tooltip content="{{ __('No pack size on this page. You said how much is in the pack you buy here.') }}">
+                <flux:badge size="sm" color="zinc" data-test="pack-owner-size">{{ __('your size') }}</flux:badge>
+            </flux:tooltip>
         @elseif ($pack?->provenance === \App\Enums\PackProvenance::Confirmed)
             <flux:tooltip content="{{ __('No pack size on this page. The AI check read the page as the size the other shops state.') }}">
                 <flux:badge size="sm" color="zinc" data-test="pack-checked-by-ai">{{ __('size checked by AI') }}</flux:badge>

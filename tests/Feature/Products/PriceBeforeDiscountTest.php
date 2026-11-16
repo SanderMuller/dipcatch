@@ -334,7 +334,7 @@ test('one query answers for every shop', function (): void {
     $count = function (int $shops) use ($product): int {
         $product->shops()->delete();
 
-        foreach (range(1, $shops) as $i) {
+        for ($i = 1; $i <= $shops; $i++) {
             $shop = Shop::factory()->for($product)->create(['currency' => 'EUR', 'claimed_regular_price' => '100.00']);
             readDaily($shop, 40, 8, '80.00');
             readDaily($shop, 7, 0, '70.00', claim: '100.00');

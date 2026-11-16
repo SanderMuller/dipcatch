@@ -9,6 +9,7 @@ use App\PriceAdapters\PageMarkup;
 use App\PriceAdapters\PriceNormalizer;
 use App\PriceAdapters\PromotionWindow;
 use App\PriceAdapters\ShopSnapshot;
+use App\Services\Offers\JumboUpcomingPromotion;
 use App\Support\PackSize;
 use Carbon\CarbonImmutable;
 use Symfony\Component\DomCrawler\Crawler;
@@ -23,6 +24,8 @@ use Throwable;
  */
 final readonly class JumboAdapter extends HostAdapter
 {
+    public function __construct(private ?JumboUpcomingPromotion $announced = null) {}
+
     public function extract(string $url, string $html, ?AdapterContext $context = null): ExtractionResult
     {
         $result = parent::extract($url, $html, $context);
@@ -60,12 +63,17 @@ final readonly class JumboAdapter extends HostAdapter
 
         // The promotion block is authoritative, but it states only the
         // periods it runs itself. When it names none, the period the JSON-LD
-        // offer stated still stands.
-        return ExtractionResult::success(
-            self::withShelfPackSize($snapshot, $product)
-                ->withPromotionWindow($window ?? $snapshot->promotionWindow)
-                ->withBundleOffer($offer),
-        );
+        // offer stated stands, unless it is not running and Jumbo has
+        // announced next week's promotion.
+        $snapshot = self::withShelfPackSize($snapshot, $product)
+            ->withPromotionWindow($window ?? $snapshot->promotionWindow)
+            ->withBundleOffer($offer);
+
+        if ($promotion->count() > 0 || $snapshot->promotionWindow?->isRunning() === true) {
+            return ExtractionResult::success($snapshot);
+        }
+
+        return ExtractionResult::success($this->announced?->applyTo($snapshot, $url) ?? $snapshot);
     }
 
     /**

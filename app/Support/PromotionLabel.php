@@ -29,12 +29,12 @@ final readonly class PromotionLabel
             return null;
         }
 
-        return self::forWindow($window);
+        return self::forWindow($window, $shop?->currency);
     }
 
-    public static function forWindow(PromotionWindow $window): string
+    public static function forWindow(PromotionWindow $window, ?string $currency = null): string
     {
-        return ($window->label ?? 'Bonus') . ' ' . self::deadline($window);
+        return (self::terms($window, $currency) ?? 'Bonus') . ' ' . self::deadline($window);
     }
 
     /**
@@ -59,7 +59,7 @@ final readonly class PromotionLabel
     public static function runningDeal(?Shop $shop): ?string
     {
         $window = $shop?->promotionWindow();
-        $running = $window !== null && $window->isRunning() ? self::forWindow($window) : null;
+        $running = $window !== null && $window->isRunning() ? self::forWindow($window, $shop?->currency) : null;
         $offer = $shop?->liveBundleOffer();
         $single = $shop?->singleItemPrice();
 
@@ -102,7 +102,18 @@ final readonly class PromotionLabel
 
         return $bundle !== null
             ? BundlePriceLabel::condition($bundle, $shop->currency)
-            : $window->label ?? __('Bonus');
+            : self::terms($window, $shop->currency) ?? __('Bonus');
+    }
+
+    /**
+     * The shop's wording, or a bare amount formatted as money in the shop's
+     * currency: {@see UpcomingDeal} stores a price-only offer that way.
+     */
+    private static function terms(PromotionWindow $window, ?string $currency): ?string
+    {
+        return $currency !== null && is_numeric($window->label)
+            ? MoneyFormatter::format($window->label, $currency)
+            : $window->label;
     }
 
     /** When a window runs: "28 Sep – 4 Oct", or "until 4 Oct" with no stated start. */

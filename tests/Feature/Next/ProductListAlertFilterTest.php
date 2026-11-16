@@ -11,9 +11,15 @@ it('lists a product at the alert price under "Only discounts"', function (): voi
     $user = User::factory()->create();
 
     foreach (['At the alert price' => '2.50', 'Above the alert price' => '1.50'] as $title => $target) {
-        $product = Product::factory()->for($user)->create(['title' => $title, 'currency' => 'EUR', 'target_price' => $target]);
+        $product = Product::factory()->for($user)->create(['title' => $title, 'currency' => 'EUR']);
         $shop = Shop::factory()->for($product)->create(['current_price' => '2.00']);
-        $product->forceFill(['cheapest_shop_id' => $shop->id, 'cheapest_price' => '2.00'])->save();
+        $product->forceFill([
+            'cheapest_shop_id' => $shop->id,
+            'cheapest_price' => '2.00',
+            'unit_price_target' => $target,
+            'unit_price_target_unit' => 'pack',
+            'unit_price_target_shop_id' => $shop->id,
+        ])->save();
     }
 
     $this->actingAs($user);
@@ -26,10 +32,16 @@ it('lists a product at the alert price under "Only discounts"', function (): voi
 
 it('lists a product at the alert price under "Only discounts" at the shop with that price', function (): void {
     $user = User::factory()->create();
-    $product = Product::factory()->for($user)->create(['title' => 'At the alert price', 'currency' => 'EUR', 'target_price' => '2.50']);
+    $product = Product::factory()->for($user)->create(['title' => 'At the alert price', 'currency' => 'EUR']);
     $cheapest = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '2.00']);
     Shop::factory()->for($product)->create(['url' => 'https://jumbo.com/p/1', 'current_price' => '3.00']);
-    $product->forceFill(['cheapest_shop_id' => $cheapest->id, 'cheapest_price' => '2.00'])->save();
+    $product->forceFill([
+        'cheapest_shop_id' => $cheapest->id,
+        'cheapest_price' => '2.00',
+        'unit_price_target' => '2.50',
+        'unit_price_target_unit' => 'pack',
+        'unit_price_target_shop_id' => $cheapest->id,
+    ])->save();
 
     $this->actingAs($user);
 

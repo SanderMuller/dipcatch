@@ -15,7 +15,11 @@ enum AiFeature: string
     case Categories = 'categories';
     case ShopChecks = 'shop_checks';
 
-    /** The `users` column that holds the opt-in. */
+    /**
+     * The `users` column that holds the opt-in.
+     *
+     * @return 'auto_categories'|'shop_checks'
+     */
     public function column(): string
     {
         return match ($this) {
@@ -42,6 +46,7 @@ enum AiFeature: string
                 __('Warns you when a new shop sells another flavour or pack size.'),
                 __('Checks a page that hides its pack size, so the price per kilo stays right.'),
                 __('Searches the web, by name, by barcode and on comparison sites, for more shops.'),
+                __('Checks that a name you type names one product before DipCatch searches the web for it.'),
                 __('Suggests an alert price from how deep a product usually goes on sale.'),
             ],
             self::Categories => [

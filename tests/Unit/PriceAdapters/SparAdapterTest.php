@@ -36,6 +36,14 @@ test('a page without the subtitle still prices, just without a size', function (
         ->and($result->snapshot?->packSizeAuthoritative)->toBeFalse();
 });
 
+test('the date every page states is no promotion, and clears a stored one', function (): void {
+    // spar.nl states the same `priceValidUntil` on every product, on offer or not (2026-10-24).
+    $result = $this->adapter->extract('https://www.spar.nl/x-1/', sparPage(priceValidUntil: now()->addDays(5)->toDateString()));
+
+    expect($result->snapshot?->promotionWindow)->toBeNull()
+        ->and($result->snapshot?->promotionWindowAuthoritative)->toBeTrue();
+});
+
 test('a page without JSON-LD fails with a SPAR-specific reason', function (): void {
     $result = $this->adapter->extract('https://www.spar.nl/x-1/', '<html><body>nothing</body></html>');
 

@@ -19,6 +19,8 @@ use App\Support\NextData;
  * Every price carries a validity window — Aldi prices the whole assortment
  * in campaign periods — and the payload keeps the record after the window
  * closes, so an expired price is refused rather than reported as current.
+ * Only a price with a "was" price is a promotion; next campaign's prices sit
+ * beside it under `promotionPrices` (observed 2026-10-24).
  */
 final readonly class AldiAdapter implements HostSpecificAdapter, OwnsHosts, ShopAdapter
 {
@@ -77,9 +79,10 @@ final readonly class AldiAdapter implements HostSpecificAdapter, OwnsHosts, Shop
             raw: ['source' => 'aldi'],
             packSize: is_string($salesUnit) && trim($salesUnit) !== '' ? $salesUnit : null,
             packSizeAuthoritative: true,
-            // The price passed its window check, so that window is the one
-            // it belongs to.
-            promotionWindow: AldiOffer::window($product),
+            // The price passed its window check, so an offer's window is the
+            // one it belongs to. With no offer running, next campaign's lower
+            // price is announced while today's price stays tracked.
+            promotionWindow: AldiOffer::window($product) ?? AldiOffer::upcoming($product, $price),
             promotionWindowAuthoritative: true,
         ));
     }

@@ -56,15 +56,15 @@ final readonly class ProductPresenter
             'cheapest_bundle_total_price' => $bundle?->totalPrice,
             // The loaded collection: a count query here ran once per product.
             'shop_count' => $product->shops->count(),
-            'threshold_pct' => self::decimal($product->drop_threshold_pct),
-            'threshold_abs' => self::decimal($product->drop_threshold_abs),
-            'target_price' => self::decimal($product->target_price),
             // As the owner set it, in its own unit; `unit_price_target_effective`
             // is the same target in `comparison_unit`, which is what is compared.
             // Null there with a target set means the target is paused: the
-            // product moved to a unit it does not convert into.
+            // product moved to a unit it does not convert into. A `pack`
+            // target is the price of the pack at `unit_price_target_shop_id`,
+            // paused while that shop cannot be bought from.
             'unit_price_target' => self::decimal($product->unit_price_target),
             'unit_price_target_unit' => $product->unit_price_target === null ? null : ($product->unit_price_target_unit ?? $packs->unit()),
+            'unit_price_target_shop_id' => $product->unit_price_target_shop_id,
             'unit_price_target_effective' => self::decimal($product->effectiveUnitPriceTarget()),
             'unit_price_target_suspended' => $product->isUnitTargetSuspended(),
             // Whether the headline price can actually be bought. Without it a
@@ -153,6 +153,10 @@ final readonly class ProductPresenter
                 'stock' => self::stock($shop->current_in_stock),
                 'pack_quantity' => $shop->pack_quantity === null ? null : (float) $shop->pack_quantity,
                 'pack_unit' => $shop->pack_unit,
+                // The size the owner stated for a page that states none;
+                // `pack_size_provenance` is `owner` while it is the one compared.
+                'owner_pack_quantity' => $shop->owner_pack_quantity === null ? null : (float) $shop->owner_pack_quantity,
+                'owner_pack_unit' => $shop->owner_pack_unit,
                 // Which shops can supply a picture, so a caller choosing one
                 // for set_image can see the choice rather than guess at it.
                 'has_image' => $shop->safeImageUrl() !== null,

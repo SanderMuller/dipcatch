@@ -40,6 +40,8 @@ final readonly class TypeSafeClient
 
     public const string PROMOTION_DEPTH_QUESTION = 'promotion_depth';
 
+    public const string NAME_SEARCH_QUESTION = 'name_search';
+
     /** The Choice option for a product no getting-started idea covers. */
     public const string NO_TRACKING_IDEA = 'none';
 
@@ -177,6 +179,38 @@ final readonly class TypeSafeClient
         ], quick: true);
 
         return PromotionDepthQuestion::chances($payload);
+    }
+
+    /**
+     * Whether a typed text names one product a web search can find, as one
+     * Choice: `specific_product` or `too_vague`. A quick request: a person
+     * waits for it.
+     *
+     * @param  list<string>  $localTitles  The titles the catalogue and bol.com found for it.
+     * @return array<string, float>  Keyed by choice; a choice the answer leaves out is left out.
+     *
+     * @throws TypeSafeRequestFailed  Also when the answer has no `name_search` probabilities.
+     */
+    public function nameSearch(string $text, array $localTitles): array
+    {
+        $payload = $this->send(ShopCheckPurpose::NameSearch->value, [
+            'model' => self::MODEL,
+            'state' => ['typed_text' => $text, 'local_results' => $localTitles],
+            'questions' => [
+                self::NAME_SEARCH_QUESTION => [
+                    'type' => 'choice',
+                    'instructions' => 'A shopper typed this text to find one product to track the price of. '
+                        . 'Would a web search for it find shop pages for that one product, or is it too vague to tell which product is meant? '
+                        . 'The local results are what a supermarket catalogue already found for it.',
+                    'criteria' => [
+                        NameSearchQuestion::SPECIFIC_PRODUCT => 'The text names one product, for example by brand, product name, variant or size.',
+                        NameSearchQuestion::TOO_VAGUE => 'The text names a kind of product, such as "melk" or "koffie", that many different products match.',
+                    ],
+                ],
+            ],
+        ], quick: true);
+
+        return NameSearchQuestion::chances($payload);
     }
 
     /**

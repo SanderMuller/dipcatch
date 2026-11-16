@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Actions\Drops\DetectDrop;
-use App\Actions\Drops\DetectTargetPrice;
+use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Livewire\Dashboard;
 use App\Livewire\Products\ProductList;
 use App\Mail\DailyDigestMail;
@@ -13,7 +13,6 @@ use App\Models\Shop;
 use App\Models\TargetPriceEvent;
 use App\Models\User;
 use App\Notifications\PriceDropNotification;
-use App\Notifications\TargetPriceNotification;
 use App\Notifications\UnitPriceTargetNotification;
 use App\Support\HeadlinePrice;
 use App\Support\PriceVerdicts;
@@ -81,16 +80,17 @@ it('gives no verdict to a product nobody can buy now', function (): void {
 it('stores the lowest-in-90-days moment on a target alert, and the digest keeps it after the price moves', function (): void {
     Notification::fake();
     $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
-    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Crisps', 'target_price' => '1.75']);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Crisps']);
     $shop = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69']);
+    $product->forceFill(['unit_price_target' => '1.75', 'unit_price_target_unit' => 'pack', 'unit_price_target_shop_id' => $shop->id])->save();
     priceHistory($shop, '2.00', days: 90);
     $product->refresh()->recomputeCheapestShop();
 
-    app(DetectTargetPrice::class)($product->refresh());
+    app(DetectUnitPriceTarget::class)($product->refresh());
 
     $event = TargetPriceEvent::query()->sole();
     expect($event->lowest_in_90_days)->toBeTrue();
-    Notification::assertSentTo($user, TargetPriceNotification::class, fn (TargetPriceNotification $notification): bool => pushBody($notification->toWebPush($user)->toArray())->endsWith(' · lowest in 90 days'));
+    Notification::assertSentTo($user, UnitPriceTargetNotification::class, fn (UnitPriceTargetNotification $notification): bool => pushBody($notification->toWebPush($user)->toArray())->endsWith(' · lowest in 90 days'));
 
     $shop->forceFill(['current_price' => '2.40'])->save();
     PriceCheck::factory()->for($shop)->create(['price' => '2.40', 'checked_at' => now()]);
@@ -104,15 +104,16 @@ it('stores the lowest-in-90-days moment on a target alert, and the digest keeps 
 it('stores no lowest-in-90-days moment on an alert with too little history', function (): void {
     Notification::fake();
     $user = User::factory()->create();
-    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'target_price' => '1.75']);
+    $product = Product::factory()->for($user)->create(['currency' => 'EUR']);
     $shop = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69']);
+    $product->forceFill(['unit_price_target' => '1.75', 'unit_price_target_unit' => 'pack', 'unit_price_target_shop_id' => $shop->id])->save();
     priceHistory($shop, '2.00', days: 20);
     $product->refresh()->recomputeCheapestShop();
 
-    app(DetectTargetPrice::class)($product->refresh());
+    app(DetectUnitPriceTarget::class)($product->refresh());
 
     expect(TargetPriceEvent::query()->sole()->lowest_in_90_days)->toBeFalse();
-    Notification::assertSentTo($user, TargetPriceNotification::class, fn (TargetPriceNotification $notification): bool => ! pushBody($notification->toWebPush($user)->toArray())->contains('lowest in 90 days'));
+    Notification::assertSentTo($user, UnitPriceTargetNotification::class, fn (UnitPriceTargetNotification $notification): bool => ! pushBody($notification->toWebPush($user)->toArray())->contains('lowest in 90 days'));
 });
 
 it('stores the lowest-in-90-days moment on a price drop and says it in the push', function (): void {
@@ -138,8 +139,9 @@ it('stores the lowest-in-90-days moment on a price drop and says it in the push'
 
 it('shows the verdict on a dashboard card', function (): void {
     $user = User::factory()->create();
-    $product = Product::factory()->for($user)->create(['title' => 'Coffee', 'currency' => 'EUR', 'target_price' => '1.50']);
+    $product = Product::factory()->for($user)->create(['title' => 'Coffee', 'currency' => 'EUR']);
     $shop = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.00']);
+    $product->forceFill(['unit_price_target' => '1.50', 'unit_price_target_unit' => 'pack', 'unit_price_target_shop_id' => $shop->id])->save();
     priceHistory($shop, '1.30', days: 90);
     $product->refresh()->recomputeCheapestShop();
 

@@ -82,6 +82,17 @@ test('parses the English piece words Amazon titles a pack with', function (strin
     'pcs' => ['Coffee pods 10 pcs', 10.0],
 ]);
 
+test('does not read a singular piece in a title as a count', function (string $title, ?float $quantity, ?string $unit): void {
+    $size = PackSize::resolve(packSize: null, authoritative: false, title: $title);
+
+    expect($size?->quantity)->toBe($quantity)
+        ->and($size?->unit)->toBe($unit);
+})->with([
+    'a set of different things' => ['3 piece pan set 2 l', 2000.0, 'ml'],
+    'a dose beside the pack count' => ['60 tablets, take 1 piece daily', 60.0, 'piece'],
+    'a set of clothes' => ['T-shirt 2 piece XL', null, null],
+]);
+
 test('parses rollen', function (): void {
     $size = PackSize::parse('4 rollen');
 
@@ -371,11 +382,13 @@ test('a stated size the title does not contradict is left alone', function (stri
     'a set beside a count after the size' => ['500 g', 'Koffie 500 g, 20 zakjes, set van 2', 1000.0],
 ]);
 
-test('an authoritative empty size still clears the pack data', function (): void {
-    // Unchanged by the rule above: a shop that stops stating a size must be
-    // able to clear a stale one (spec Section 4).
-    expect(PackSize::resolve(packSize: null, authoritative: true, title: 'Barebells 12 x 55 g'))->toBeNull()
-        ->and(PackSize::resolve(packSize: null, authoritative: false, title: 'Barebells 12 x 55 g')?->quantity)->toBe(660.0);
+test('an authoritative empty size reads the shop\'s own title, and clears only when that states none', function (): void {
+    // The title is the shop's own word: it gives the product a price per
+    // unit. With no size there either, null lets the caller clear a stale
+    // one (spec Section 4).
+    expect(PackSize::resolve(packSize: null, authoritative: true, title: 'Barebells 12 x 55 g')?->quantity)->toBe(660.0)
+        ->and(PackSize::resolve(packSize: null, authoritative: false, title: 'Barebells 12 x 55 g')?->quantity)->toBe(660.0)
+        ->and(PackSize::resolve(packSize: null, authoritative: true, title: 'Barebells Creamy Crisp'))->toBeNull();
 });
 
 // --- a count written as a bare multiplier ------------------------------------

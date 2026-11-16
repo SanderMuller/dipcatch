@@ -6,6 +6,7 @@ use App\Filament\Admin\Resources\Subscribers\SubscriberResource;
 use App\Filament\Admin\Widgets\RevenueOverviewWidget;
 use App\Livewire\Billing\BillingPage;
 use App\Models\User;
+use Filament\Notifications\Notification;
 
 use function Pest\Livewire\livewire;
 
@@ -89,12 +90,15 @@ it('refuses checkout while the shop is shut', function (): void {
 
     // The gate's own message, not merely a redirect: without the gate the
     // Stripe call would fail and land the customer in the same place.
-    expect(session()->get('filament.notifications'))->not->toBeNull();
+    Notification::assertNotified(
+        Notification::make()
+            ->danger()
+            ->title('Billing unavailable')
+            ->body('Pro is not on sale yet.')
+            ->persistent(),
+    );
 
-    $notifications = json_encode(session()->get('filament.notifications'), JSON_THROW_ON_ERROR);
-
-    expect($notifications)->toContain('Pro is not on sale yet.')
-        ->and($user->fresh()?->stripe_checkout_session_id)->toBeNull();
+    expect($user->fresh()?->stripe_checkout_session_id)->toBeNull();
 });
 
 it('lets an account Stripe already bills reach the portal while blocked', function (): void {

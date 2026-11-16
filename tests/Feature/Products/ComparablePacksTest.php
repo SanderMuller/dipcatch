@@ -8,7 +8,7 @@ use App\Support\ComparablePack;
 use App\Support\ComparablePacks;
 
 /**
- * @param  array<string, array<string, mixed>>  $shops  host => attributes
+ * @param  array<string, array<model-property<Shop>, mixed>>  $shops  host => attributes
  */
 function productForPacks(array $shops, string $currency = 'EUR'): Product
 {

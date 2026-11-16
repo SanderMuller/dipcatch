@@ -57,6 +57,12 @@ function expectedToolAnnotations(): array
             'destructiveHint' => true,
             'openWorldHint' => false,
         ],
+        'set_pack_size' => [
+            'title' => 'Set pack size',
+            'readOnlyHint' => false,
+            'destructiveHint' => true,
+            'openWorldHint' => false,
+        ],
         'set_title' => [
             'title' => 'Rename product',
             'readOnlyHint' => false,

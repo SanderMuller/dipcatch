@@ -19,11 +19,19 @@ final readonly class WebSearchOutcome
 
     public const string FAILED = 'failed';
 
-    private function __construct(public string $reason, public ?WebSearch $search = null) {}
+    /**
+     * @param  bool  $searchedNow  This call ran the search and stored it; false for a stored search, a waiter's one included.
+     */
+    private function __construct(public string $reason, public ?WebSearch $search = null, public bool $searchedNow = false) {}
 
     public static function found(WebSearch $search): self
     {
         return new self(self::FOUND, $search);
+    }
+
+    public static function searchedNow(WebSearch $search): self
+    {
+        return new self(self::FOUND, $search, searchedNow: true);
     }
 
     public static function quotaSpent(): self

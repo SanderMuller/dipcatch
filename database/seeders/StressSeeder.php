@@ -83,7 +83,7 @@ final class StressSeeder extends Seeder
                     2 => 'https://example.invalid/missing-image-' . $i . '.jpg',
                     default => 'https://placehold.co/40x2000/png?text=tall',
                 },
-                'target_price' => $i % 6 === 0 ? 0.01 : null,
+                'unit_price_target' => $i % 6 === 0 ? 0.01 : null,
                 'active' => $i % 17 !== 0,
             ]);
 

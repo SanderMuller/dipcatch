@@ -58,7 +58,7 @@ function packLines(Product $product): array
 {
     $packs = $product->comparablePacks();
 
-    return $product->shops->sortBy('current_price')->map(fn ($shop): string => PackLine::of($shop, $packs)->text())->values()->all();
+    return $product->shops->sortBy('current_price')->map(fn (Shop $shop): string => PackLine::of($shop, $packs)->text())->values()->all();
 }
 
 test('a set title gives the pack its count of items', function (): void {
@@ -223,22 +223,6 @@ test('a price check reads a count after the size as items for kitchenware only',
     'a drink' => [ProductCategory::SoftDrinks, '350.00'],
     'no category' => [null, '350.00'],
 ]);
-
-test('the switch from a drop alert names its price per item for kitchenware', function (): void {
-    $user = User::factory()->create();
-    subscribeUser($user);
-    $product = glassesField($user, ProductCategory::Kitchen);
-    $product->forceFill(['drop_threshold_pct' => '10.00', 'drop_threshold_abs' => null, 'unit_price_target' => null])->save();
-    $product->recomputeCheapestShop();
-
-    $this->actingAs($user);
-
-    // €16.4214 a litre, 10% off, is €14.7793 a litre: €5.17 for a 350 ml glass.
-    livewire(EditProduct::class, ['product' => $product->refresh()])
-        ->assertSeeHtml('data-test="price-alert-switch"')
-        ->assertSee('at €5.17 per item or less')
-        ->assertDontSee('€14.7');
-});
 
 test('the price per item does not lead while a pack is only near a whole number of items', function (): void {
     // 1390 ml is 0.7% off four 350 ml glasses: counted, but converting the

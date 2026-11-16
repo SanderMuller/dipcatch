@@ -14,13 +14,12 @@ use App\Enums\TrackingIdea;
 use App\Jobs\PrewarmShopSearches;
 use App\Livewire\Concerns\DrivesShopProbe;
 use App\Livewire\Concerns\EditsAlertFields;
+use App\Livewire\Concerns\SearchesByName;
 use App\Livewire\Concerns\SuggestsAlert;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
 use App\Models\WebDiscovery;
-use App\Services\Drops\Reference;
-use App\Services\Drops\TierDefaults;
 use App\Services\ShopDiscovery\DiscoveryReach;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Support\AlertSuggestion\AlertSuggestion;
@@ -33,7 +32,6 @@ use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -45,8 +43,8 @@ use SanderMuller\FluentValidation\FluentRule;
 use SanderMuller\FluentValidation\HasFluentValidation;
 
 /**
- * Adding a product, in three steps: the product (from a shop link, or by
- * hand), more shops, then the alert.
+ * Adding a product, in three steps: the product (from a shop link, a name
+ * search, or by hand), more shops, then the alert.
  *
  * Leaving step 1 saves the product: the shop suggestions and the add-shop
  * form both need one. A product left behind after that is tracked like any
@@ -57,6 +55,7 @@ final class AddProductWizard extends Component
     use DrivesShopProbe;
     use EditsAlertFields;
     use HasFluentValidation;
+    use SearchesByName;
     use SuggestsAlert;
 
     /**
@@ -114,7 +113,7 @@ final class AddProductWizard extends Component
         $this->imageUrl = (string) $product->image_url;
         // From the product, so saving a product reopened later keeps what it
         // had rather than writing empty fields over it.
-        $this->loadAlertFields($product);
+        $this->loadUnitPriceTarget($product);
         $this->step = max(1, min(3, $this->step));
     }
 
@@ -286,6 +285,11 @@ final class AddProductWizard extends Component
     {
         if ($this->productId === '') {
             $this->mode = self::modeFrom($mode);
+
+            if ($this->mode === 'manual') {
+                $this->manualTitle = $this->handFormTitle($this->manualTitle);
+            }
+
             $this->limitMessage = null;
             $this->focus($this->mode === 'manual' ? 'wizard-manual-title' : 'create-product-url');
         }
@@ -307,9 +311,8 @@ final class AddProductWizard extends Component
         }
 
         $this->unitPriceTarget = $target;
-        $this->dropThresholdPct = null;
-        $this->dropThresholdAbs = null;
-        $this->targetPrice = null;
+        $this->alertHelper = 'price';
+        $this->alertHelperValue = null;
         $this->chosenTarget = $target;
         $this->status = __('Alert set to :target.', ['target' => $target]);
     }
@@ -318,17 +321,8 @@ final class AddProductWizard extends Component
     {
         $product = $this->product();
 
-        try {
-            $this->validate($this->alertFieldRules());
-        } catch (ValidationException $e) {
-            // The fold keeps its own open state across round trips, so an
-            // error in it would stay hidden in a closed one.
-            if (array_intersect(array_keys($e->errors()), ['dropThresholdPct', 'dropThresholdAbs', 'targetPrice']) !== []) {
-                $this->js("document.querySelector('[data-test=\"other-alerts\"]')?.setAttribute('open', '')");
-            }
-
-            throw $e;
-        }
+        $this->validate($this->alertFieldRules());
+        $this->prepareAlert($product);
 
         $save($product, $this->alertFieldValues(), $this->chosenTarget);
 
@@ -336,6 +330,11 @@ final class AddProductWizard extends Component
     }
 
     protected function suggestedProduct(): Product
+    {
+        return $this->product();
+    }
+
+    protected function alertProduct(): Product
     {
         return $this->product();
     }
@@ -441,25 +440,19 @@ final class AddProductWizard extends Component
     }
 
     /**
-     * The drop defaults come from the same reference the drop check measures
-     * from: for a product added during an offer, that is the offer price.
-     *
-     * @return array{suggestion: AlertSuggestion, onOfferNow: bool, asksJev: bool, usesJev: bool, canSwitchOnAi: bool, packChoices: list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float}>, unitWord: ?string, defaults: array{pct: string, abs: string}|null, otherAlerts: list<string>}
+     * @return array{suggestion: AlertSuggestion, onOfferNow: bool, asksJev: bool, usesJev: bool, canSwitchOnAi: bool, packChoices: list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, ownerAmount: ?string, ownerUnit: ?string, shopSays: ?string}>, pinnablePacks: list<array{shopId: string, host: string, shop: string, pack: string, perPack: float, price: ?float, unitPrice: ?float, ownerSize: ?string, ownerAmount: ?string, ownerUnit: ?string, shopSays: ?string}>, strandedOwnerSizes: list<array{shopId: string, shop: string, size: string}>, unitWord: ?string}
      */
     private function alertStep(Product $product): array
     {
-        $reference = app(Reference::class)->compute($product);
-        $defaults = $reference === null ? null : TierDefaults::forReference($reference);
+        $guide = new UnitTargetGuide($product);
+        $packChoices = $guide->packs();
 
         return [
             ...$this->suggestionCard($product),
-            'packChoices' => new UnitTargetGuide($product)->packs(),
+            'packChoices' => $packChoices,
+            'pinnablePacks' => $packChoices === [] ? $guide->pinnablePacks() : [],
+            'strandedOwnerSizes' => $packChoices === [] ? [] : $guide->strandedOwnerSizes(),
             'unitWord' => UnitWord::noun($product->comparablePacks()->unit()),
-            'defaults' => $defaults === null ? null : [
-                'pct' => number_format($defaults['pct'], 2, '.', ''),
-                'abs' => $defaults['abs'] === null ? '' : number_format($defaults['abs'], 2, '.', ''),
-            ],
-            'otherAlerts' => $this->otherAlertSummaries($product->currency),
         ];
     }
 }

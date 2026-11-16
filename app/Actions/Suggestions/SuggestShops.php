@@ -40,14 +40,6 @@ final class SuggestShops
     private const float THRESHOLD = 0.55;
 
     /**
-     * A chain whose newest row is older than this is dropped. Matches the
-     * fail threshold of `CheckjebonFreshnessCheck`: the importer keeps a
-     * chain's rows when upstream serves none, so one refreshed chain must
-     * not make a stale catalogue look current.
-     */
-    private const int MAX_AGE_HOURS = 96;
-
-    /**
      * Suggestions for a product, memoized for the request. The product page
      * renders two instances of the suggestions component (the panel and the
      * copy inside the add-shop form), and the catalogue scan is the
@@ -190,38 +182,11 @@ final class SuggestShops
     }
 
     /**
-     * Chains holding rows no older than the freshness window, keyed by chain.
-     * Per chain, never one global maximum: the importer keeps a chain's rows
-     * when upstream serves none, so a refreshed AH would otherwise make a
-     * month-old Jumbo catalogue look current.
-     *
      * @return array<string, CheckjebonChain>
      */
     private function readFreshChains(): array
     {
-        $freshness = CheckjebonPrice::query()
-            ->selectRaw('supermarket, max(refreshed_at) as chain_refreshed_at')
-            ->groupBy('supermarket')
-            ->pluck('chain_refreshed_at', 'supermarket');
-
-        $cutoff = now()->subHours(self::MAX_AGE_HOURS);
-        $chains = [];
-
-        foreach (CheckjebonChain::query()->get() as $chain) {
-            if (! SupermarketChains::isLinkable($chain->chain)) {
-                continue;
-            }
-
-            $refreshedAt = $freshness->get($chain->chain);
-
-            if (! is_string($refreshedAt) || now()->parse($refreshedAt)->lt($cutoff)) {
-                continue;
-            }
-
-            $chains[$chain->chain] = $chain;
-        }
-
-        return $chains;
+        return CheckjebonChain::freshByKey();
     }
 
     /**

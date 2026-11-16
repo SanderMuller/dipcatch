@@ -5,18 +5,14 @@ namespace App\Actions\Products;
 use App\Enums\ProductCategory;
 
 /**
- * The product half of a create. Both thresholds are separate `decimal(_, 2)`
- * columns, so neither collapses into one field. They are decimal strings, matching every other price in this
- * codebase — no floats, no cent integers.
+ * The product half of a create. The alert is set in a later step, after the
+ * product exists.
  */
 final readonly class ProductDraft
 {
     public function __construct(
         public string $title,
         public ?string $imageUrl = null,
-        public ?string $dropThresholdPct = null,
-        public ?string $dropThresholdAbs = null,
         public ?ProductCategory $category = null,
-        public ?string $unitPriceTarget = null,
     ) {}
 }

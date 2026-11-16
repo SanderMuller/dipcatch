@@ -204,9 +204,12 @@ final readonly class PackSize
 
     /**
      * Resolve the pack size a snapshot implies. The structured size wins; the
-     * product title is only parsed as a fallback when the source was NOT
-     * authoritative — an authoritative empty or unparseable size must stay
-     * null so persistence can clear stale pack data (spec Section 4).
+     * product title is parsed when the source states no readable size. That
+     * holds for an authoritative source too: its title is the shop's own word,
+     * and an empty size field there left the product with no price per unit
+     * at all. `$authoritative` decides only what the caller does with a null
+     * here — an authoritative source with no size and no title size clears
+     * the stored one (spec Section 4).
      *
      * One exception, in {@see StatedPackSize::wholePack()}: a shop that states
      * the size of a single item while its own title counts the items has
@@ -220,10 +223,6 @@ final readonly class PackSize
 
         if ($parsed !== null) {
             return StatedPackSize::wholePack($parsed, $title, confirmed: $wholePack, countsItems: $countsItems) ?? $parsed;
-        }
-
-        if ($authoritative) {
-            return null;
         }
 
         return StatedPackSize::fromTitle($title, $countsItems);

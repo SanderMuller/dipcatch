@@ -4,6 +4,7 @@ namespace App\Livewire\Products;
 
 use App\Actions\Products\CategoriseProduct;
 use App\Actions\Shops\ProbeBudget;
+use App\Actions\Shops\SaveOwnerPackSize;
 use App\Billing\Entitlements;
 use App\Billing\HistoryWindow;
 use App\Billing\Plan;
@@ -19,6 +20,7 @@ use App\Models\User;
 use App\Services\Drops\LargeDropConfirmation;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use App\Support\AlertRules;
+use App\Support\OwnerPackSizeField;
 use App\Support\PriceBeforeDiscount;
 use App\Support\PriceVerdicts;
 use App\Support\UrlNormalizer;
@@ -78,6 +80,12 @@ final class ProductShow extends Component
 
     public string $editingNotes = '';
 
+    /** "How much is in this pack?" for a shop whose page states no size: the owner's amount, or empty. */
+    public string $editingPackAmount = '';
+
+    /** A key of {@see OwnerPackSizeField::UNITS}. */
+    public string $editingPackUnit = 'g';
+
     public ?string $shareMessage = null;
 
     public function mount(Product $product): void
@@ -114,7 +122,17 @@ final class ProductShow extends Component
         $this->editingShopId = $shop->id;
         $this->editingUrl = $shop->url;
         $this->editingNotes = $shop->notes ?? '';
+        $owner = OwnerPackSizeField::of($shop);
+        $this->editingPackAmount = $owner['amount'] ?? '';
+        $this->editingPackUnit = $owner['unit'] ?? OwnerPackSizeField::defaultUnit($this->product->comparablePacks()->unit());
         $this->shopMessage = null;
+        $this->resetErrorBag('editingPackAmount');
+    }
+
+    public function askPackSize(string $shopId): void
+    {
+        $this->editShop($shopId);
+        $this->dispatch('ask-pack-size');
     }
 
     public function saveEditedUrl(): void
@@ -129,6 +147,23 @@ final class ProductShow extends Component
         if ($this->editingShopId !== null) {
             $this->saveShopNotes($this->editingShopId, $this->editingNotes);
         }
+    }
+
+    public function saveEditedPackSize(SaveOwnerPackSize $save): void
+    {
+        if ($this->editingShopId === null) {
+            return;
+        }
+
+        $shop = $this->shop($this->editingShopId);
+        $this->authorize('update', $shop);
+        $this->resetErrorBag('editingPackAmount');
+
+        $text = OwnerPackSizeField::text($this->editingPackAmount, $this->editingPackUnit, 'editingPackAmount');
+        $save($this->product, $shop->id, $text, 'editingPackAmount');
+
+        $this->product->refresh();
+        $this->shopMessage = $text === '' ? __('Your size removed.') : __('Size saved.');
     }
 
     /**
@@ -306,6 +341,11 @@ final class ProductShow extends Component
         }
 
         $shop->updateUrl($normalized);
+
+        // The new page drops the owner's size; the open panel must not save it back.
+        if ($shop->id === $this->editingShopId) {
+            $this->editingPackAmount = '';
+        }
 
         dispatch_sync(new CheckShopPrice($shop->refresh(), manual: true));
 

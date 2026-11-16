@@ -2,7 +2,6 @@
 
 namespace App\Actions\Products;
 
-use App\Actions\Drops\DetectUnitPriceTarget;
 use App\Models\Product;
 use App\Support\Numeric;
 use App\Support\UnitTargetConversion;
@@ -16,11 +15,11 @@ use Illuminate\Support\Facades\DB;
 final class SaveAlert
 {
     /**
-     * A per-unit target is written only when `$values` carries it: an
-     * untouched field leaves the owner's target, and the unit it was set in,
-     * as they are.
+     * The target is written only when `$values` carries it: an untouched
+     * field leaves the owner's target, the unit it was set in and its shop as
+     * they are.
      *
-     * @param  array{drop_threshold_pct: ?string, drop_threshold_abs: ?string, target_price: ?string, unit_price_target?: ?string, unit_price_target_unit?: ?string}  $values
+     * @param  array{unit_price_target?: ?string, unit_price_target_unit?: ?string, unit_price_target_shop_id?: ?string}  $values
      * @param  string|null  $suggestedTarget  The per-unit target the suggestion filled in, if the person used it.
      */
     public function __invoke(Product $product, array $values, ?string $suggestedTarget): void
@@ -46,31 +45,8 @@ final class SaveAlert
             $locked->save();
 
             if ($keptSuggestion) {
-                self::latchIfMet($locked);
+                app(LatchIfMet::class)($locked);
             }
         });
-    }
-
-    /** Never raises a latch the product already has. */
-    private static function latchIfMet(Product $product): void
-    {
-        $target = $product->effectiveUnitPriceTarget();
-        $packs = $product->comparablePacks();
-        $unit = $packs->unit();
-        $shop = $product->bestValueShop();
-        $value = $shop === null ? null : $packs->unitPriceValueOf($shop);
-        $price = $shop === null ? null : $packs->unitPriceOf($shop);
-
-        if ($target === null || $unit === null || $value === null || $price === null || ! DetectUnitPriceTarget::meets($value, $target)) {
-            return;
-        }
-
-        $latched = DetectUnitPriceTarget::latchIn($product, $unit, $packs);
-
-        if ($latched !== null && bccomp(Numeric::str(number_format($latched, 4, '.', '')), Numeric::str($price), 4) <= 0) {
-            return;
-        }
-
-        $product->forceFill(['unit_price_notified' => $price, 'unit_price_notified_unit' => $unit, 'unit_price_notified_at' => now()])->save();
     }
 }
