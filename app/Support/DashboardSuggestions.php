@@ -56,7 +56,7 @@ final readonly class DashboardSuggestions
      * suggestion, or switches the AI check. Other changes (a title edit, a
      * new AI answer) show within {@see CACHE_MINUTES} minutes.
      *
-     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}>
+     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int, chain: ?string, externalId: ?string}>
      */
     public function forUser(User $user): array
     {
@@ -107,12 +107,12 @@ final readonly class DashboardSuggestions
             $user->wantsShopChecks(),
         ];
 
-        // v2: earlier entries held objects the store cannot rebuild.
-        return "dashboard-suggestions:v2:{$user->id}:" . hash('sha256', (string) json_encode($fingerprint));
+        // v3: rows name the dataset row, so the review dialog can dismiss it.
+        return "dashboard-suggestions:v3:{$user->id}:" . hash('sha256', (string) json_encode($fingerprint));
     }
 
     /**
-     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}>
+     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int, chain: ?string, externalId: ?string}>
      */
     private function compute(User $user): array
     {
@@ -152,7 +152,7 @@ final readonly class DashboardSuggestions
      * row, at most {@see ROWS_PER_PRODUCT}, most likely first.
      *
      * @param  array<string, float>  $chances
-     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}>
+     * @return list<array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int, chain: ?string, externalId: ?string}>
      */
     private function rowsFor(Product $product, bool $aiChecked, array $chances): array
     {
@@ -283,7 +283,7 @@ final readonly class DashboardSuggestions
 
     /**
      * @param  array<string, float>  $chances
-     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}
+     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: ?float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int, chain: ?string, externalId: ?string}
      */
     private static function datasetRow(Product $product, ShopSuggestion $suggestion, array $chances): array
     {
@@ -303,13 +303,15 @@ final readonly class DashboardSuggestions
             'otherSize' => null,
             'viaKlarna' => false,
             'findingId' => null,
+            'chain' => $suggestion->chain,
+            'externalId' => $suggestion->externalId,
             'chance' => $suggestion->checked ? ($chances["{$product->id}|{$suggestion->chain}|{$suggestion->externalId}"] ?? null) : null,
             'score' => $suggestion->score,
         ];
     }
 
     /**
-     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int}
+     * @return array{product: Product, shop: string, host: string, url: string, name: string, unitPrice: ?string, packPrice: ?string, checkedOn: ?CarbonImmutable, barcode: bool, chance: float, score: float, otherSize: ?string, viaKlarna: bool, findingId: ?int, chain: ?string, externalId: ?string}
      */
     private static function webRow(Product $product, WebShopFinding $finding): array
     {
@@ -334,6 +336,8 @@ final readonly class DashboardSuggestions
             'otherSize' => $finding->otherSizeNote($product),
             'viaKlarna' => $finding->isLead(),
             'findingId' => $finding->id,
+            'chain' => null,
+            'externalId' => null,
             'chance' => $chance,
             'score' => $chance,
         ];

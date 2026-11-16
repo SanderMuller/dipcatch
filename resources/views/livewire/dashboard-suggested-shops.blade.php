@@ -46,7 +46,6 @@
                         <ul role="list" class="mt-3 divide-y divide-ink/5 border-t border-ink/5 dark:divide-white/5 dark:border-white/5">
                             @foreach ($productRows as $row)
                                 @php($badge = $match($row))
-                                @php($addUrl = route('app.products.show', array_filter([$product, 'add-shop' => 1, 'suggest' => $row['url'], 'finding' => $row['findingId']], fn ($value): bool => $value !== null)))
                                 <li class="pt-2.5 not-last:pb-2.5" wire:key="suggested-{{ $product->id }}-{{ $row['host'] }}" data-test="suggested-shop">
                                     <div class="flex items-center gap-2">
                                         <img src="{{ \App\Support\Favicon::url($row['host']) }}" alt="" loading="lazy" class="size-5 shrink-0 rounded" />
@@ -77,14 +76,16 @@
                                             data-test="suggested-shop-open"
                                             class="before:absolute before:top-1/2 before:left-1/2 before:size-[max(100%,3rem)] before:-translate-1/2 pointer-fine:before:hidden"
                                         />
+                                        {{-- Opens the review dialog here, on the dashboard: it reads the
+                                             shop's page next to the product, then moves on to the next
+                                             suggestion. The dialog opens before the server answers. --}}
                                         <flux:button
                                             size="sm"
                                             square
                                             icon="plus"
-                                            :href="$addUrl"
-                                            wire:navigate
-                                            :aria-label="__('Add :shop to :product', ['shop' => $row['shop'], 'product' => $product->title])"
-                                            :tooltip="__('Add this shop')"
+                                            x-on:click="$flux.modal({{ \Illuminate\Support\Js::from(\App\Livewire\Suggestions\ReviewSuggestedShops::MODAL) }}).show(); $wire.$dispatchTo('suggestions.review-suggested-shops', 'review-suggested-shop', { productId: {{ \Illuminate\Support\Js::from((string) $product->id) }}, host: {{ \Illuminate\Support\Js::from($row['host']) }} })"
+                                            :aria-label="__('Review :shop for :product', ['shop' => $row['shop'], 'product' => $product->title])"
+                                            :tooltip="__('Review and add this shop')"
                                             data-test="suggested-shop-add"
                                             class="before:absolute before:top-1/2 before:left-1/2 before:size-[max(100%,3rem)] before:-translate-1/2 pointer-fine:before:hidden"
                                         />
@@ -136,7 +137,7 @@
                                                 @endif
                                                 <div class="mt-3 flex flex-wrap items-center gap-2">
                                                     <flux:button size="sm" icon:trailing="arrow-top-right-on-square" :href="\App\Support\AffiliateLink::for($row['url'])" target="_blank" :rel="\App\Support\AffiliateLink::rel($row['url'])">{{ __('Open the page') }}</flux:button>
-                                                    <flux:button size="sm" variant="primary" icon="plus" :href="$addUrl" wire:navigate>{{ __('Add this shop') }}</flux:button>
+                                                    <flux:button size="sm" variant="primary" icon="plus" x-on:click="$flux.modal({{ \Illuminate\Support\Js::from($compareModal) }}).close(); $flux.modal({{ \Illuminate\Support\Js::from(\App\Livewire\Suggestions\ReviewSuggestedShops::MODAL) }}).show(); $wire.$dispatchTo('suggestions.review-suggested-shops', 'review-suggested-shop', { productId: {{ \Illuminate\Support\Js::from((string) $product->id) }}, host: {{ \Illuminate\Support\Js::from($row['host']) }} })">{{ __('Review and add') }}</flux:button>
                                                 </div>
                                             </div>
                                             <div class="rounded-xl bg-zinc-50 p-3 ring-1 ring-ink/10 dark:bg-white/5 dark:ring-white/10">
@@ -163,6 +164,8 @@
         </div>
 
         <x-hide-shop-confirm :name="'hide-shop-' . $this->getId()" />
+
+        <livewire:suggestions.review-suggested-shops wire:key="review-suggested-shops" />
     @endif
 
     @if ($offersWebSearch)

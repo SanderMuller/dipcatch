@@ -31,6 +31,13 @@ return [
         [
             'date' => '2026-11-16',
             'category' => 'feature',
+            'title' => 'Review suggested shops from your dashboard',
+            'body' => "Click the plus next to a suggested shop on your dashboard to check it right there. You see your product and the shop's page side by side, with photo, size and price, so you can tell if it's the same product.\n\nAdd the shop, mark it as a different product, or skip it. The next suggestion opens straight away, so you can go through them all in one go.",
+            'link' => ['route' => 'app.dashboard', 'label' => 'Go to your dashboard'],
+        ],
+        [
+            'date' => '2026-11-16',
+            'category' => 'feature',
             'title' => 'Add a pack size on the product page',
             'body' => "When a shop doesn't say how much is in its pack, the product page now shows Add the size next to that shop. Type the number and pick the unit, for example 36 and pieces, and that shop gets a price per kilo, litre or piece, so it can count as the best value.",
         ],

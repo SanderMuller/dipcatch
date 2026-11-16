@@ -10,6 +10,7 @@ use App\Services\ShopDiscovery\DiscoveryReach;
 use App\Support\DashboardSuggestions;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -20,6 +21,13 @@ use Livewire\Component;
 final class DashboardSuggestedShops extends Component
 {
     use HidesShops;
+
+    /**
+     * The review dialog added a shop or hid a suggestion. The listener needs
+     * no body: `render()` lists the suggestions again.
+     */
+    #[On('suggested-shops-reviewed')]
+    public function refreshSuggestions(): void {}
 
     public function placeholder(): View
     {

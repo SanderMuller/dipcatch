@@ -139,11 +139,11 @@ it('hides a shop from the dashboard suggestions', function (): void {
     $this->actingAs($product->user()->sole());
 
     Livewire::withoutLazyLoading()->test(DashboardSuggestedShops::class)
-        ->assertSeeHtml('aria-label="Add SPAR to Beemster Extra belegen 48+ plakken"')
+        ->assertSeeHtml('aria-label="Review SPAR for Beemster Extra belegen 48+ plakken"')
         ->call('hideShop', 'spar.nl')
         ->assertDispatched('toast-show')
-        ->assertDontSeeHtml('aria-label="Add SPAR to Beemster Extra belegen 48+ plakken"')
-        ->assertSeeHtml('aria-label="Add AH to Beemster Extra belegen 48+ plakken"');
+        ->assertDontSeeHtml('aria-label="Review SPAR for Beemster Extra belegen 48+ plakken"')
+        ->assertSeeHtml('aria-label="Review AH for Beemster Extra belegen 48+ plakken"');
 });
 
 it('lists the hidden shops in settings, and Show again brings one back', function (): void {
