@@ -100,8 +100,6 @@ it('checks a tracked bol.com shop through the API', function (): void {
 });
 
 it('spends from the probe budget when it reads a page through the API', function (): void {
-    // Security audit lead 14: every API read is a live call on the operator's
-    // credential, so it must be paced like a page fetch.
     fakeBolProductApi();
     $user = User::factory()->create();
 

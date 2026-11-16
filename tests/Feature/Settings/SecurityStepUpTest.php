@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Livewire\Settings\Security;
+use App\Livewire\Settings\TwoFactor\RecoveryCodes;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Testing\TestResponse;
@@ -9,7 +10,7 @@ use Livewire\Livewire;
 use Livewire\Mechanisms\HandleRequests\EndpointResolver;
 
 /*
- * Security audit lead 2: `password.confirm` guards the settings/security page
+ * `password.confirm` guards the settings/security page
  * request only. These tests send the component actions as real Livewire update
  * requests, because `Livewire::test()` skips the route's persistent middleware
  * and would pass whichever way the step-up is enforced.
@@ -29,8 +30,7 @@ beforeEach(function (): void {
 });
 
 /**
- * Loads the security page as the given user, with the password just confirmed,
- * and returns the snapshot of its Security component.
+ * With the password just confirmed. Returns the Security component's snapshot.
  */
 function securityPageSnapshot(User $user): string
 {
@@ -156,3 +156,83 @@ test('an unconfirmed session is sent to confirm the password', function (string 
 
     expect($owner->fresh()?->two_factor_confirmed_at)->not->toBeNull();
 })->with(['enable', 'disable']);
+
+test('an unconfirmed session cannot confirm a pending two factor setup', function (): void {
+    $owner = User::factory()->create([
+        'two_factor_secret' => encrypt('PENDINGSECRET'),
+        'two_factor_confirmed_at' => null,
+    ]);
+
+    $this->actingAs($owner);
+
+    Livewire::test(Security::class)
+        ->set('code', '123456')
+        ->call('confirmTwoFactor')
+        ->assertRedirect(route('password.confirm'));
+
+    expect($owner->fresh()?->two_factor_confirmed_at)->toBeNull();
+});
+
+test('an unconfirmed session is sent to confirm the password before deleting a passkey', function (): void {
+    $owner = User::factory()->create();
+    $passkey = $owner->passkeys()->create([
+        'name' => 'Owner key',
+        'credential_id' => 'owner-credential',
+        'credential' => ['publicKey' => 'placeholder'],
+    ]);
+
+    $this->actingAs($owner);
+
+    Livewire::test(Security::class)
+        ->call('confirmDelete', $passkey->id)
+        ->call('deletePasskey')
+        ->assertRedirect(route('password.confirm'));
+
+    $this->assertModelExists($passkey);
+});
+
+test('a confirmed session deletes a passkey through the update endpoint', function (): void {
+    // The control for the passkey test above that goes through the endpoint.
+    $owner = User::factory()->create();
+    $passkey = $owner->passkeys()->create([
+        'name' => 'Owner key',
+        'credential_id' => 'owner-credential',
+        'credential' => ['publicKey' => 'placeholder'],
+    ]);
+
+    $snapshot = securityPageSnapshot($owner);
+
+    callSecurityActions($snapshot, [
+        ['method' => 'confirmDelete', 'params' => [$passkey->id]],
+        ['method' => 'deletePasskey', 'params' => []],
+    ])->assertOk();
+
+    $this->assertModelMissing($passkey);
+});
+
+test('an unconfirmed session cannot regenerate the recovery codes', function (): void {
+    $owner = User::factory()->withTwoFactor()->create();
+    $codes = $owner->two_factor_recovery_codes;
+
+    $this->actingAs($owner);
+
+    Livewire::test(RecoveryCodes::class)
+        ->call('regenerateRecoveryCodes')
+        ->assertRedirect(route('password.confirm'));
+
+    expect($owner->fresh()?->two_factor_recovery_codes)->toBe($codes);
+});
+
+test('a confirmed session regenerates the recovery codes', function (): void {
+    $owner = User::factory()->withTwoFactor()->create();
+    $codes = $owner->two_factor_recovery_codes;
+
+    $this->actingAs($owner)
+        ->withSession(['auth.password_confirmed_at' => Carbon::now()->getTimestamp()]);
+
+    Livewire::test(RecoveryCodes::class)
+        ->call('regenerateRecoveryCodes')
+        ->assertNoRedirect();
+
+    expect($owner->fresh()?->two_factor_recovery_codes)->not->toBe($codes);
+});

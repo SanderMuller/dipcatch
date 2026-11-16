@@ -6,7 +6,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\RateLimiter;
 
 /**
- * How many pages one account may fetch per minute, across every path that
+ * How many reads one account may make per minute, across every path that
  * fetches one — adding a shop, creating a product, and asking for a recheck.
  *
  * One budget rather than one per tool: the shops do not care which tool
@@ -25,8 +25,9 @@ final readonly class ProbeBudget
      * limit and left an agent triaging candidate shops instead of adding
      * them — and breadth is the whole point of adding a shop.
      *
-     * Only a real page fetch spends from it. Confirming a draft writes what
-     * the earlier probe already read, so a shop costs one page, not two.
+     * A page fetch and a live API read spend from it. Confirming a draft
+     * writes what the earlier probe already read, so a shop costs one read,
+     * not two.
      */
     public const int PER_MINUTE = 30;
 

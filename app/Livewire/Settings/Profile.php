@@ -97,8 +97,6 @@ final class Profile extends Component
             return;
         }
 
-        // The address can be anyone's: the account just names it. Without a
-        // cap this button sends them mail without end.
         $sent = RateLimiter::attempt(
             'verification-resend:' . $user->id,
             self::VERIFICATION_RESENDS_PER_HOUR,

@@ -16,9 +16,8 @@ final readonly class FailedCheckUpdates
     /**
      * @return array{consecutive_failures?: int, consecutive_5xx_failures?: int, health?: string, active?: bool}
      */
-    public static function for(Shop $shop, ScrapeStatus $status, bool $countsAgainstShop = true): array
+    public static function for(Shop $shop, ScrapeStatus $status, bool $countsAgainstShop): array
     {
-        // DipCatch's own throttle: recorded, but not the shop's failure.
         if (! $countsAgainstShop) {
             return [];
         }

@@ -12,7 +12,7 @@ use Laravel\Mcp\Server\Http\Controllers\OAuthRegisterController;
 // is deliberately absent from bootstrap/app.php.
 
 // Register first so laravel/mcp skips its root well-known routes (hasGetRoute).
-// Nested `/.well-known/oauth-protected-resource/mcp` and DCR stay the package's.
+// Nested `/.well-known/oauth-protected-resource/mcp` stays the package's.
 Route::get('.well-known/oauth-protected-resource', [McpOauthDiscoveryController::class, 'protectedResource'])
     ->name('mcp.oauth.protected-resource');
 
@@ -21,7 +21,8 @@ Route::get('.well-known/oauth-authorization-server', [McpOauthDiscoveryControlle
 
 // Registration comes off so it can sit behind a limit. The package adds no
 // middleware, and every request creates a client row. The route keeps the
-// package's name, which discovery uses for `registration_endpoint`.
+// package's name, because the package's nested discovery route lists
+// `registration_endpoint` only when that name exists.
 Mcp::oauthRoutes(registration: false);
 
 Route::post('oauth/register', OAuthRegisterController::class)

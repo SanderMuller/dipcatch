@@ -15,9 +15,8 @@ final class CreateNewUser implements CreatesNewUsers
     use PasswordValidationRules, ProfileValidationRules;
 
     /**
-     * Accounts one address may create per hour. Each new account sends a
-     * verification mail to whatever address it names, so without a cap one
-     * client could send mail to any number of strangers.
+     * Accounts one IP address may create per hour. Each account mails the
+     * address it names, so this caps mail to strangers.
      */
     public const int REGISTRATIONS_PER_HOUR = 10;
 

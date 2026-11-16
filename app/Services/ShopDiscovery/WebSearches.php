@@ -33,7 +33,7 @@ final readonly class WebSearches
     /**
      * The stored search for a query, searched now when there is none or it
      * is stale. Null when nothing could be searched: switched off, the daily
-     * limit spent, the provider failed, or another worker held the lock too
+     * limit or the account's share spent, the provider failed, or another worker held the lock too
      * long.
      */
     public function forQuery(string $query, string $country, ?User $account = null): ?WebSearch
@@ -45,9 +45,9 @@ final readonly class WebSearches
      * As {@see forQuery()}, with the reason when there is no search. A
      * thrown error from the save is not caught here.
      *
-     * With an account, a new search also counts against that account's own
-     * daily share, so one account cannot spend the searches every account
-     * shares. A stored search costs nothing and is never refused.
+     * With an account, a new search also counts against that account's
+     * daily share (`account_daily_search_limit`). A stored search is free
+     * and never refused.
      */
     public function lookUp(string $query, string $country, WebSearchBudget $budget = WebSearchBudget::Discovery, ?User $account = null): WebSearchOutcome
     {
@@ -97,7 +97,6 @@ final readonly class WebSearches
 
     private function search(string $query, string $country, string $hash, WebSearchBudget $budget, ?User $account): WebSearchOutcome
     {
-        // Zero or less lifts the account's cap, as it does the app-wide one.
         $accountLimit = Config::integer('dipcatch.web_discovery.account_daily_search_limit');
         $accountKey = $account === null || $accountLimit <= 0 ? null : 'web-discovery:searches:user:' . $account->id;
 

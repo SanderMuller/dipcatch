@@ -34,14 +34,11 @@
                     </ul>
                 @endif
 
-                {{-- Anyone may register a client under any name, so the name
-                     alone is not identity. The host it sends you back to is
-                     the part a reader can actually check. That is the
-                     `redirect_uri` of this request, which Passport has already
-                     matched against the client's list: a client may register
-                     several, and the code goes to the one the request names,
-                     not to the first. Without one, Passport allows only a
-                     client with a single registered URI. --}}
+                {{-- A client may register under any name, so show the host the
+                     code goes to. That is this request's `redirect_uri`, which
+                     Passport has already matched against the client's list.
+                     Without one, Passport allows only a client with one URI,
+                     so `[0]` is that URI. --}}
                 @php($redirectUri = $request->query('redirect_uri', $client->redirect_uris[0] ?? ''))
                 @php($redirectHost = is_string($redirectUri) ? parse_url($redirectUri, PHP_URL_HOST) : null)
 

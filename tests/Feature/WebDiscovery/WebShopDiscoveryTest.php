@@ -1074,7 +1074,7 @@ it('starts stale findings over from the stored search when no new search can be 
 });
 
 it('gives each account its own share of the day\'s searches', function (): void {
-    // Security audit lead 15: renaming a product starts a new paid search,
+    // Renaming a product starts a new paid search,
     // and every account spends from one app-wide daily limit.
     config()->set('dipcatch.web_discovery.account_daily_search_limit', 2);
 

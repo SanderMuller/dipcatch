@@ -74,8 +74,6 @@ test('already verified user visiting verification link is redirected without fir
 });
 
 test('the verification link can be sent again only so often an hour', function (): void {
-    // The account names the address, which can be anyone's. Fortify's own
-    // limit is per minute only, so its route would send mail without end.
     Notification::fake();
 
     $user = User::factory()->unverified()->create();
@@ -90,6 +88,14 @@ test('the verification link can be sent again only so often an hour', function (
 
     Notification::assertSentToTimes($user, VerifyEmail::class, 6);
 
+    // Sending ran out, but the link that arrived still works.
+    $this->get(URL::temporarySignedRoute(
+        'verification.verify',
+        now()->addMinutes(60),
+        ['id' => $user->id, 'hash' => sha1($user->email)],
+    ))->assertRedirect('/app?verified=1');
+
+    $user->forceFill(['email_verified_at' => null])->save();
     $this->travel(1)->hours();
 
     $this->post(route('verification.send'))->assertRedirect();

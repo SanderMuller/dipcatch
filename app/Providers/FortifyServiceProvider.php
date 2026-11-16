@@ -103,16 +103,12 @@ final class FortifyServiceProvider extends ServiceProvider
         // Sending the verification link again, and following it. Fortify's
         // default is 6 a minute with no longer window, so an account that
         // names someone else's address could mail them without end. The
-        // two limits need distinct keys: a shared key would count each
-        // request twice.
+        // route name keeps a click on the link out of the sending count.
         RateLimiter::for('verification', function (Request $request) {
             $user = $request->user();
             $key = $user instanceof User ? 'user:' . $user->id : 'ip:' . $request->ip();
 
-            return [
-                Limit::perMinute(6)->by('minute:' . $key),
-                Limit::perHour(6)->by('hour:' . $key),
-            ];
+            return Limit::perHour(6)->by($request->route()?->getName() . ':' . $key);
         });
 
         RateLimiter::for('invitation', function (Request $request) {

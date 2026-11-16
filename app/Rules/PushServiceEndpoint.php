@@ -15,9 +15,6 @@ use Illuminate\Contracts\Validation\ValidationRule;
  */
 final class PushServiceEndpoint implements ValidationRule
 {
-    /**
-     * Hosts matched exactly.
-     */
     private const array HOSTS = [
         'fcm.googleapis.com', // Chrome, Opera, Samsung Internet
         'updates.push.services.mozilla.com', // Firefox
@@ -25,8 +22,7 @@ final class PushServiceEndpoint implements ValidationRule
     ];
 
     /**
-     * Hosts matched by their last labels, because the service picks a regional
-     * host per subscription.
+     * The service picks a regional host per subscription.
      */
     private const array HOST_SUFFIXES = [
         '.notify.windows.com', // Edge

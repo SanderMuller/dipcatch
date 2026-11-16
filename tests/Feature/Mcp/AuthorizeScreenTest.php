@@ -103,7 +103,7 @@ test('a guest reaching the consent route is left to Passport, not sent to verify
 });
 
 test('the consent screen names the host the code goes to, not the first one the client registered', function (): void {
-    // Security audit lead 4: anyone can register a client with a trusted name,
+    // Anyone can register a client with a trusted name,
     // a trusted first redirect URI and a second one of their own. The code
     // goes to whichever registered URI the request names.
     $clientId = $this->postJson('oauth/register', [

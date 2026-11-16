@@ -197,8 +197,6 @@ test('a Stripe failure leaves your account in place and signed in', function ():
 });
 
 test('the verification link can be sent again only so often', function (): void {
-    // Security audit lead 10: the account names the address, which can be
-    // anyone's, so the button must not send mail without end.
     Notification::fake();
 
     $user = User::factory()->unverified()->create();

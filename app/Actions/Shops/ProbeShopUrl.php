@@ -29,8 +29,9 @@ use InvalidArgumentException;
 
 /**
  * Sync probe used by the Add-Shop and Create-Product-From-URL Livewire
- * forms: normalize → dedupe → dataset short-circuit (checkjebon hosts) →
- * per-user rate-limit → fetch → resolve adapter → currency check. Never persists; the Livewire component does
+ * forms: normalize → dedupe → address refusal → API read (spends the
+ * budget) → dataset (free) → budget → fetch → resolve adapter → currency
+ * check. Never persists; the Livewire component does
  * that after Confirm. With a null product (create mode) the per-product
  * dedupe and currency-mismatch checks are skipped — the probed currency
  * defines the product currency.
@@ -85,9 +86,9 @@ final readonly class ProbeShopUrl
             }
         }
 
-        // Dataset-served hosts resolve locally: no network fetch, and no
-        // per-user probe budget consumed (bulk-adding must not throttle).
-        // An API-served host pays first: see BudgetedApiRead.
+        // A dataset-only host resolves locally and spends no probe budget, so
+        // bulk adding is not throttled. An API-served host spends it: see
+        // BudgetedApiRead.
         $host = UrlNormalizer::normalizeHost((string) parse_url($normalizedUrl, PHP_URL_HOST));
 
         $refused = $this->refusal->for($normalizedUrl, $host, fn (): ?ProbeOutcome => $this->overBudget($actor, $spendBudget));
@@ -281,7 +282,9 @@ final readonly class ProbeShopUrl
      * Some shops resolve through an API ({@see ApiPriceSources}); ah.nl
      * falls back to the checkjebon dataset's regular price when the
      * unofficial API misbehaves, and boodschaapje.nl/Lidl is dataset-only.
-     * Returns null otherwise, so the network probe runs.
+     * An API read spends the probe budget. Over budget, it reads the
+     * dataset, or refuses when no dataset serves the host. Returns null
+     * otherwise, so the network probe runs.
      */
     private function resolveFromLocalSources(?Product $product, string $normalizedUrl, string $host, User $actor, bool $spendBudget): ?ProbeOutcome
     {

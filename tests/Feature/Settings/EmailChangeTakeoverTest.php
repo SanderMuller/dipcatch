@@ -12,7 +12,7 @@ beforeEach(function (): void {
 });
 
 test('a session alone cannot move the address and then claim the account through a reset', function (): void {
-    // Security audit lead 1: someone holding only a session cookie, without the
+    // Someone holding only a session cookie, without the
     // password, changes the address to one they read, then resets the password
     // there. The claim path treats the now-unverified account as never owned.
     $owner = User::factory()->withTwoFactor()->create(['email' => 'owner@example.test']);

@@ -37,6 +37,7 @@ use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -170,8 +171,10 @@ final class CheckShopPrice implements ShouldBeUnique, ShouldQueue
             }
 
             // The host stayed saturated across the whole budget. Record the
-            // throttling rather than losing the cycle silently. When the
-            // throttle is our own, the shop's failure count stays.
+            // throttling rather than losing the cycle silently. Our own
+            // throttle leaves the shop's failure count alone, so this log is
+            // the only sign of a host that never gets a turn.
+            Log::warning('Price check stayed rate limited on every attempt.', ['shop_id' => $shop->id, 'host' => $shop->host, 'source' => $e->source]);
             $outcome = CheckOutcome::rateLimited($e);
         }
 

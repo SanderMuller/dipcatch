@@ -146,8 +146,6 @@ test('regional settings list every timezone and country as a searchable option, 
 });
 
 test('test notifications can be sent only so often', function (): void {
-    // Security audit lead 11: each test sends an email and a push to every
-    // subscription, on demand.
     Notification::fake();
 
     $user = User::factory()->create(['notify_via_email' => true]);

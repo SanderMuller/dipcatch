@@ -32,9 +32,8 @@ final class PushSubscriptionController extends Controller
             $data['contentEncoding'] ?? null,
         );
 
-        // Every push goes to each subscription in turn, inside one queued
-        // job. Browsers replace their endpoint now and then, so the oldest
-        // goes rather than the new one being refused.
+        // Browsers replace their endpoint now and then, so the oldest goes
+        // rather than the new one being refused.
         $newest = $user->pushSubscriptions()
             ->latest('id')
             ->limit(self::SUBSCRIPTIONS_PER_USER)

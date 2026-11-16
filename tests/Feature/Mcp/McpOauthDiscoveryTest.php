@@ -72,9 +72,8 @@ it('points a 401 at resource metadata when it sends WWW-Authenticate', function 
 });
 
 it('limits open client registration per address', function (): void {
-    // Security audit lead 13: anyone may register a client, and each request
-    // writes a client row. The limiter lives in Redis, which outlives a test,
-    // so this run takes an address of its own.
+    // The limiter lives in Redis, which outlives a test, so this run takes an
+    // address of its own.
     $this->withServerVariables(['REMOTE_ADDR' => fake()->unique()->ipv4()]);
 
     $register = fn () => $this->postJson('oauth/register', [

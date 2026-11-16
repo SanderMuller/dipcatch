@@ -68,7 +68,7 @@ test('a rule written for our own name is obeyed', function (): void {
 })->throws(RobotsDisallowed::class);
 
 test('a rule with many wildcards still matches a long address', function (): void {
-    // Security audit lead 17: as a regex, each `*` became `.*`, and a long
+    // As a regex, each `*` became `.*`, and a long
     // address ran the match into the backtrack limit. preg_match then failed,
     // which read as "no match", so a forbidden page was fetched.
     fakeRobots("User-agent: *\nDisallow: /*a*a*a*a*a*a*a*a*a*a*b\n");
@@ -86,4 +86,21 @@ test('a robots.txt full of wildcard rules does not stall a fetch', function (): 
 
     expect($response->html)->toContain('ok')
         ->and(microtime(true) - $started)->toBeLessThan(1.0);
+});
+
+test('a trailing dollar rule refuses the address it matches', function (string $rule, string $path): void {
+    fakeRobots("User-agent: *\nDisallow: {$rule}\n");
+
+    app(ShopFetcher::class)->fetch('https://shop.example.com' . $path);
+})->with([
+    'with a wildcard' => ['/*.pdf$', '/docs/file.pdf'],
+    'without a wildcard' => ['/cart$', '/cart'],
+])->throws(RobotsDisallowed::class);
+
+test('a trailing dollar rule without a wildcard lets a longer address through', function (): void {
+    fakeRobots("User-agent: *\nDisallow: /cart$\n");
+
+    $response = app(ShopFetcher::class)->fetch('https://shop.example.com/cart/items');
+
+    expect($response->html)->toContain('ok');
 });

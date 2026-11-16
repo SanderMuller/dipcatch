@@ -56,7 +56,6 @@ final class NotificationPreferences extends Component
     {
         $user = $this->user();
 
-        // Each test sends an email and a push to every subscription.
         $sent = RateLimiter::attempt(
             'notification-test:' . $user->id,
             self::TESTS_PER_HOUR,

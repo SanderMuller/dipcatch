@@ -25,7 +25,7 @@ test('new users can register', function (): void {
 });
 
 test('one network can create only so many accounts an hour', function (): void {
-    // Security audit lead 9: every account sends a verification mail to the
+    // Every account sends a verification mail to the
     // address it names, so unlimited sign-ups send mail to any stranger.
     Notification::fake();
 

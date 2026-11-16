@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
 use Laravel\Fortify\Contracts\PasskeyUser;
@@ -178,9 +179,14 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
      */
     public function routeNotificationForWebPush(): EloquentCollection
     {
-        return $this->pushSubscriptions
-            ->filter(static fn (PushSubscription $subscription): bool => PushServiceEndpoint::allows($subscription->endpoint))
-            ->values();
+        $allows = static fn (PushSubscription $subscription): bool => PushServiceEndpoint::allows($subscription->endpoint);
+        $refused = $this->pushSubscriptions->reject($allows);
+
+        if ($refused->isNotEmpty()) {
+            Log::warning('Push skipped for subscriptions outside the push service list.', ['user_id' => $this->id, 'subscription_ids' => $refused->modelKeys()]);
+        }
+
+        return $this->pushSubscriptions->filter($allows)->values();
     }
 
     public function canAccessPanel(Panel $panel): bool

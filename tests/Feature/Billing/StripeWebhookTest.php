@@ -254,7 +254,7 @@ it('queues a retry when a lost dispute cannot be linked to an account', function
 
     webhook('charge.dispute.closed', ['id' => 'dp_orphan', 'charge' => 'ch_orphan', 'amount' => 499, 'currency' => 'eur', 'status' => 'lost']);
 
-    // Security audit lead 8: queued before the webhook transaction commits, a
+    // Queued before the webhook transaction commits, a
     // worker could read the dispute before the close, or not at all, and
     // never block the account.
     Queue::assertPushed(RelinkStripeDispute::class, fn (RelinkStripeDispute $job): bool => $job->afterCommit === true);

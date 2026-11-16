@@ -202,7 +202,7 @@ it('sends a customer with no stripe account back from the portal', function (): 
 });
 
 it('does not touch checkout when another site sends the browser to it', function (): void {
-    // Security audit lead 7: checkout is a GET link, so any site can navigate
+    // Checkout is a GET link, so any site can navigate
     // a signed-in browser to it. The browser marks that request cross-site.
     configureStripe();
     config()->set('plans.stripe.pro_yearly_price_id', 'price_year');

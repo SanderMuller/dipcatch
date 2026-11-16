@@ -231,7 +231,8 @@ return [
         'daily_search_limit' => (int) env('DIPCATCH_WEB_DISCOVERY_DAILY_SEARCH_LIMIT', 300),
         // New title and barcode searches one account may start per day, out
         // of the limit above. Renaming a product starts one, so without this
-        // one account could spend the searches every account shares.
+        // one account could spend the searches every account shares. Zero or
+        // less lifts the cap.
         'account_daily_search_limit' => (int) env('DIPCATCH_WEB_DISCOVERY_ACCOUNT_DAILY_SEARCH_LIMIT', 30),
         // Paid searches app-wide per day for product names typed in the
         // add-product wizard, on a counter apart from the one above.

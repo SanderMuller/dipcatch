@@ -327,7 +327,7 @@ test('subscribe accepts the endpoints the browser push services hand out', funct
 ]);
 
 test('subscribe refuses an endpoint that is not a browser push service', function (string $endpoint): void {
-    // Security audit lead 5: the queue worker POSTs to the stored endpoint,
+    // The queue worker POSTs to the stored endpoint,
     // so any other address turns a subscription into a request from inside
     // the app's network.
     $user = User::factory()->create();
@@ -344,6 +344,8 @@ test('subscribe refuses an endpoint that is not a browser push service', functio
     'push service over http' => 'http://fcm.googleapis.com/fcm/send/abc',
     'push service on another port' => 'https://fcm.googleapis.com:8443/fcm/send/abc',
     'look-alike host' => 'https://fcm.googleapis.com.attacker.example.test/abc',
+    'look-alike regional host' => 'https://wns.notify.windows.com.attacker.example.test/x',
+    'the bare regional suffix' => 'https://notify.windows.com/x',
     'credentials in the URL' => 'https://user:pass@fcm.googleapis.com/fcm/send/abc',
     'unknown host' => 'https://attacker.example.test/push',
 ]);
@@ -360,8 +362,6 @@ test('a stored endpoint that is not a browser push service is never sent to', fu
 });
 
 test('an account keeps only its newest push subscriptions', function (): void {
-    // Security audit lead 12: every push goes to each subscription in turn,
-    // inside one queued job.
     $user = User::factory()->create();
     $this->actingAs($user);
 

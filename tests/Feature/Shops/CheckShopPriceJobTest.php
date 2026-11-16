@@ -313,7 +313,7 @@ test('per-host rate limit releases instead of writing a failed check or ticking 
 });
 
 test('our own per-host throttle never counts against the shop, even on the last attempt', function (): void {
-    // Security audit lead 16: probes and scheduled checks share one bucket
+    // Probes and scheduled checks share one bucket
     // per host. One account filling it with probes would otherwise walk
     // another account's shop to dead, which stops its price alerts.
     $perMinute = config()->integer('dipcatch.fetcher.rate_limit_per_minute', 12);
@@ -344,6 +344,34 @@ test('our own per-host throttle never counts against the shop, even on the last 
         ->and($shop->health)->toBe(ShopHealth::Failing)
         ->and($shop->active)->toBeTrue()
         ->and($shop->last_status)->toBe(ScrapeStatus::RateLimited);
+});
+
+test('a shop that answers 429 on the last attempt still counts it as a failure', function (): void {
+    Cache::put('dipcatch:robots:shop.test', [], 60);
+    Http::fake([
+        'https://shop.test/p/1' => Http::response('slow down', 429),
+    ]);
+
+    $shop = Shop::factory()->create([
+        'url' => 'https://shop.test/p/1',
+        'consecutive_failures' => config()->integer('dipcatch.shop.dead_after') - 1,
+        'health' => ShopHealth::Failing,
+    ]);
+
+    $job = new CheckShopPrice($shop)->withFakeQueueInteractions();
+    $job->job->attempts = 5;
+
+    $job->handle(
+        app(ShopFetcher::class),
+        app(AdapterResolver::class),
+        app(CheckjebonSource::class),
+        app(AhApiSource::class),
+    );
+
+    $shop->refresh();
+    expect($shop->consecutive_failures)->toBe(config()->integer('dipcatch.shop.dead_after'))
+        ->and($shop->health)->toBe(ShopHealth::Dead)
+        ->and($shop->active)->toBeFalse();
 });
 
 test('successful check resets both counters and clears failing health', function (): void {
