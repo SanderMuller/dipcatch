@@ -134,7 +134,7 @@ it('counts a categorisation a daily cap refused under categorise', function (): 
 });
 
 it('counts an unreachable Serper as a failed call', function (): void {
-    Http::fake([SerperProvider::ENDPOINT => fn () => throw new ConnectionException('timed out')]);
+    Http::fake([SerperProvider::ENDPOINT => fn (): never => throw new ConnectionException('timed out')]);
 
     expect(app(WebSearches::class)->forQuery('kattenvoer 2 kg', 'nl'))->toBeNull()
         ->and(usageToday(ApiService::Serper, SerperProvider::PURPOSE))->calls->toBe(1)->failures->toBe(1);

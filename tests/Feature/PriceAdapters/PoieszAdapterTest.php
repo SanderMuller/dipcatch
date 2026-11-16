@@ -103,7 +103,7 @@ test('a feed that cannot be read still prices the product and leaves the stored 
     'server error' => fn (): Closure => fn () => Http::response('', 500),
     'connection failure' => fn (): Closure => fn () => Http::failedConnection(),
     'body without offers' => fn (): Closure => fn () => Http::response('<html>maintenance</html>', 200),
-    'request exception' => fn (): Closure => fn () => throw new RequestException(new Response(new Psr7Response(503))),
+    'request exception' => fn (): Closure => fn (): never => throw new RequestException(new Response(new Psr7Response(503))),
 ]);
 
 test('a feed that is down is asked again after five minutes, not on the next check', function (): void {

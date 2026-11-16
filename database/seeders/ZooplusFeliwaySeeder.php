@@ -33,7 +33,8 @@ final class ZooplusFeliwaySeeder extends Seeder
 
     public function run(): void
     {
-        $owner = User::query()->orderBy('created_at')->first();
+        $owner = User::query()
+            ->oldest()->first();
 
         if (! $owner instanceof User) {
             $this->command?->warn(

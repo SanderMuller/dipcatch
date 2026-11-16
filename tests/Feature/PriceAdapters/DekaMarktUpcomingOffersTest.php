@@ -15,7 +15,8 @@ function dekaProductUrl(): string
 
 beforeEach(function (): void {
     Cache::flush();
-    config(['dipcatch.upcoming_offers.enabled' => true]);
+    config()
+        ->set('dipcatch.upcoming_offers.enabled', true);
     $this->travelTo(CarbonImmutable::parse('2026-10-24 12:00', 'Europe/Amsterdam'));
 });
 

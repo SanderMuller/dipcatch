@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8894af68a21c17838eef689c2f20f5e6",
+    "content-hash": "27ef2cc275e910b85fec497b2b017b8e",
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -13046,16 +13046,16 @@
         },
         {
             "name": "webmozart/assert",
-            "version": "2.5.0",
+            "version": "2.5.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/webmozarts/assert.git",
-                "reference": "8a163706bbcac613733dba03f51e13b5eb1bb819"
+                "reference": "e578132c01bd0c64108386ab20d8217cd175ddec"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/webmozarts/assert/zipball/8a163706bbcac613733dba03f51e13b5eb1bb819",
-                "reference": "8a163706bbcac613733dba03f51e13b5eb1bb819",
+                "url": "https://api.github.com/repos/webmozarts/assert/zipball/e578132c01bd0c64108386ab20d8217cd175ddec",
+                "reference": "e578132c01bd0c64108386ab20d8217cd175ddec",
                 "shasum": ""
             },
             "require": {
@@ -13106,9 +13106,10 @@
             ],
             "support": {
                 "issues": "https://github.com/webmozarts/assert/issues",
-                "source": "https://github.com/webmozarts/assert/tree/2.5.0"
+                "source": "https://github.com/webmozarts/assert/tree/2.5.1"
             },
-            "time": "2026-10-05T23:14:19+00:00"
+            "time": "2026-11-15T13:41:13+00:00",
+            "published-time": "2026-11-15T13:41:42+00:00"
         },
         {
             "name": "zae/strict-transport-security",
@@ -13487,21 +13488,21 @@
         },
         {
             "name": "driftingly/rector-laravel",
-            "version": "2.7.0",
+            "version": "2.7.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/driftingly/rector-laravel.git",
-                "reference": "64d0c56d948f81e80c40b813e33fc7a7d38bc74e"
+                "reference": "699f25bda7efcbe98cf8ff9c9e687da76ce0d8c5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/driftingly/rector-laravel/zipball/64d0c56d948f81e80c40b813e33fc7a7d38bc74e",
-                "reference": "64d0c56d948f81e80c40b813e33fc7a7d38bc74e",
+                "url": "https://api.github.com/repos/driftingly/rector-laravel/zipball/699f25bda7efcbe98cf8ff9c9e687da76ce0d8c5",
+                "reference": "699f25bda7efcbe98cf8ff9c9e687da76ce0d8c5",
                 "shasum": ""
             },
             "require": {
                 "php": ">=8.3",
-                "rector/rector": "^2.7",
+                "rector/rector": "^2.8",
                 "symplify/rule-doc-generator-contracts": "^11.2",
                 "webmozart/assert": "^1.11 || ^2.0"
             },
@@ -13550,9 +13551,10 @@
             ],
             "support": {
                 "issues": "https://github.com/driftingly/rector-laravel/issues",
-                "source": "https://github.com/driftingly/rector-laravel/tree/2.7.0"
+                "source": "https://github.com/driftingly/rector-laravel/tree/2.7.3"
             },
-            "time": "2026-10-20T13:43:25+00:00"
+            "time": "2026-10-27T12:37:16+00:00",
+            "published-time": "2026-10-27T12:41:55+00:00"
         },
         {
             "name": "entropy/entropy",
@@ -13939,21 +13941,21 @@
         },
         {
             "name": "hihaho/rector-rules",
-            "version": "0.22.0",
+            "version": "1.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hihaho/rector-rules.git",
-                "reference": "dfb71c4d53fc5b4bb35a21a3d9ee81ffbfc53798"
+                "reference": "b0b081911cc9fd7d28622a917a6dbce12a8e3971"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hihaho/rector-rules/zipball/dfb71c4d53fc5b4bb35a21a3d9ee81ffbfc53798",
-                "reference": "dfb71c4d53fc5b4bb35a21a3d9ee81ffbfc53798",
+                "url": "https://api.github.com/repos/hihaho/rector-rules/zipball/b0b081911cc9fd7d28622a917a6dbce12a8e3971",
+                "reference": "b0b081911cc9fd7d28622a917a6dbce12a8e3971",
                 "shasum": ""
             },
             "require": {
                 "php": "^8.3",
-                "rector/rector": "^2.4.1",
+                "rector/rector": "^2.6.0",
                 "symplify/rule-doc-generator-contracts": "^11.2"
             },
             "require-dev": {
@@ -14022,11 +14024,12 @@
                 "static-analysis"
             ],
             "support": {
-                "docs": "https://guidelines.hihaho.com",
+                "docs": "https://hihaho.github.io/rector-rules/",
                 "issues": "https://github.com/hihaho/rector-rules/issues",
                 "source": "https://github.com/hihaho/rector-rules"
             },
-            "time": "2026-08-31T16:08:01+00:00"
+            "time": "2026-11-09T19:10:46+00:00",
+            "published-time": "2026-11-09T19:22:50+00:00"
         },
         {
             "name": "iamcal/sql-parser",
@@ -16398,11 +16401,11 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "2.3.2",
+            "version": "2.3.6",
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/18bc23a0682f08591529377d271b5c4dfe9ed1dd",
-                "reference": "18bc23a0682f08591529377d271b5c4dfe9ed1dd",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/00cedebb76cc82c1592414fa4f616cefdccda16f",
+                "reference": "00cedebb76cc82c1592414fa4f616cefdccda16f",
                 "shasum": ""
             },
             "require": {
@@ -16458,7 +16461,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-24T11:36:00+00:00"
+            "time": "2026-11-15T19:58:26+00:00",
+            "published-time": "2026-11-15T19:58:39+00:00"
         },
         {
             "name": "phpstan/phpstan-deprecation-rules",
@@ -17226,21 +17230,21 @@
         },
         {
             "name": "rector/rector",
-            "version": "2.7.0",
+            "version": "2.8.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/rectorphp/rector.git",
-                "reference": "4d6a39b7fff302cac0ce90cd959a53c2f6a32776"
+                "reference": "bf2982e3e2b8dfbcb43e5589fa301431cb1e479e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/rectorphp/rector/zipball/4d6a39b7fff302cac0ce90cd959a53c2f6a32776",
-                "reference": "4d6a39b7fff302cac0ce90cd959a53c2f6a32776",
+                "url": "https://api.github.com/repos/rectorphp/rector/zipball/bf2982e3e2b8dfbcb43e5589fa301431cb1e479e",
+                "reference": "bf2982e3e2b8dfbcb43e5589fa301431cb1e479e",
                 "shasum": ""
             },
             "require": {
                 "php": "^7.4|^8.0",
-                "phpstan/phpstan": "^2.3.0"
+                "phpstan/phpstan": "^2.3.5"
             },
             "conflict": {
                 "rector/rector-doctrine": "*",
@@ -17271,7 +17275,7 @@
             ],
             "support": {
                 "issues": "https://github.com/rectorphp/rector/issues",
-                "source": "https://github.com/rectorphp/rector/tree/2.7.0"
+                "source": "https://github.com/rectorphp/rector/tree/2.8.5"
             },
             "funding": [
                 {
@@ -17279,7 +17283,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-06T08:46:45+00:00"
+            "time": "2026-11-14T23:24:35+00:00",
+            "published-time": "2026-11-14T23:24:41+00:00"
         },
         {
             "name": "rector/swiss-knife",
@@ -17820,6 +17825,97 @@
                 "source": "https://github.com/SanderMuller/project-boost-laravel/tree/1.6.0"
             },
             "time": "2026-10-16T11:50:08+00:00"
+        },
+        {
+            "name": "sandermuller/rector-preset",
+            "version": "v2.8.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SanderMuller/rector-preset.git",
+                "reference": "5e2568cb54835ed538729043be1888e085f784ea"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SanderMuller/rector-preset/zipball/5e2568cb54835ed538729043be1888e085f784ea",
+                "reference": "5e2568cb54835ed538729043be1888e085f784ea",
+                "shasum": ""
+            },
+            "require": {
+                "composer-runtime-api": "^2.2",
+                "php": "^8.4",
+                "rector/rector": "~2.8.0"
+            },
+            "conflict": {
+                "driftingly/rector-laravel": "<2.7.2",
+                "hihaho/rector-rules": "<1.2.1"
+            },
+            "require-dev": {
+                "driftingly/rector-laravel": "^2.7.2",
+                "hihaho/rector-rules": "^1.2.1",
+                "laravel/pao": "^1.0",
+                "laravel/pint": "^1.29",
+                "mrpunyapal/rector-pest": "^0.2.17",
+                "nunomaduro/collision": "^8.0",
+                "orchestra/testbench": "^11.0",
+                "pestphp/pest": "^5.0",
+                "pestphp/pest-plugin-agent": "^5.0",
+                "pestphp/pest-plugin-arch": "^5.0",
+                "pestphp/pest-plugin-phpstan": "^5.0",
+                "pestphp/pest-plugin-rector": "^5.0",
+                "phpstan/extension-installer": "^1.4",
+                "phpstan/phpstan": "^2.0",
+                "phpstan/phpstan-deprecation-rules": "^2.0",
+                "phpstan/phpstan-phpunit": "^2.0",
+                "phpstan/phpstan-strict-rules": "^2.0",
+                "sandermuller/boost-skills": "^2.27.0",
+                "sandermuller/laravel-fluent-validation-rector": "^1.11",
+                "sandermuller/package-boost-php": "^1.0",
+                "spaze/phpstan-disallowed-calls": "^4.13",
+                "stolt/lean-package-validator": "^6.0.1",
+                "symfony/process": "^8.1",
+                "symplify/phpstan-rules": "^14.19",
+                "tomasvotruba/cognitive-complexity": "^1.2",
+                "tomasvotruba/type-coverage": "^2.3"
+            },
+            "suggest": {
+                "driftingly/rector-laravel": "Enables the Laravel sets and skips when installed",
+                "hihaho/rector-rules": "Enables HihahoSetList::ALL when installed",
+                "mrpunyapal/rector-pest": "Enables the Pest code-quality and chain sets when installed",
+                "pestphp/pest-plugin-rector": "Enables the Pest coding-style set when installed",
+                "sandermuller/laravel-fluent-validation-rector": "Enables the FluentValidation sets when installed"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "SanderMuller\\RectorPreset\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Sander Muller",
+                    "email": "github@scode.nl",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Shared Rector presets for apps and packages, versioned with Rector.",
+            "homepage": "https://github.com/SanderMuller/rector-preset",
+            "keywords": [
+                "laravel",
+                "rector",
+                "rector-preset",
+                "refactoring",
+                "static-analysis"
+            ],
+            "support": {
+                "issues": "https://github.com/SanderMuller/rector-preset/issues",
+                "source": "https://github.com/SanderMuller/rector-preset/tree/v2.8.1"
+            },
+            "time": "2026-11-11T23:00:52+00:00",
+            "published-time": "2026-11-11T23:01:28+00:00"
         },
         {
             "name": "sandermuller/richter",
@@ -19358,7 +19454,8 @@
                 }
             ],
             "abandoned": true,
-            "time": "2024-03-18T22:02:54+00:00"
+            "time": "2024-03-18T22:02:54+00:00",
+            "published-time": "2024-03-18T22:01:44+00:00"
         },
         {
             "name": "ta-tikoma/phpunit-architecture-test",
@@ -19682,5 +19779,5 @@
         "ext-intl": "*"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.11.0"
 }

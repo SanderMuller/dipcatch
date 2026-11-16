@@ -731,7 +731,7 @@ it('puts its own claims back when the second check throws', function (): void {
     app(WebPageReads::class)->read(findingAt($product, 'a.test')->load('product.user', 'product.shops'));
 
     Http::swap(new Factory());
-    Http::fake([TypeSafeClient::ENDPOINT => static fn () => throw new RuntimeException('boom')]);
+    Http::fake([TypeSafeClient::ENDPOINT => static fn (): never => throw new RuntimeException('boom')]);
 
     expect(fn () => app(WebSecondCheck::class)->check($product->refresh()->load('user', 'shops')))->toThrow(RuntimeException::class)
         ->and(findingAt($product, 'a.test')->status)->toBe(WebFindingStatus::Read);

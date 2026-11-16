@@ -121,16 +121,18 @@ it('removes the owner\'s size on an empty input', function (): void {
 it('refuses a word for the pack instead of what is in it', function (string $input): void {
     [$product, $pack] = sizelessForOwner();
 
-    expect(fn () => app(SaveOwnerPackSize::class)($product, $pack->id, $input))->toThrow(ValidationException::class);
-    expect($pack->refresh()->owner_pack_quantity)->toBeNull();
+    expect(fn () => app(SaveOwnerPackSize::class)($product, $pack->id, $input))->toThrow(ValidationException::class)
+        ->and($pack->refresh()->owner_pack_quantity)
+        ->toBeNull();
 })->with(['a box', '1 pack', '2 packs', 'big']);
 
 it('refuses a shop of another product', function (): void {
     [$product] = sizelessForOwner();
     $elsewhere = Shop::factory()->create();
 
-    expect(fn () => app(SaveOwnerPackSize::class)($product, $elsewhere->id, '660 g'))->toThrow(ValidationException::class);
-    expect($elsewhere->refresh()->owner_pack_quantity)->toBeNull();
+    expect(fn () => app(SaveOwnerPackSize::class)($product, $elsewhere->id, '660 g'))->toThrow(ValidationException::class)
+        ->and($elsewhere->refresh()->owner_pack_quantity)
+        ->toBeNull();
 });
 
 it('prices the shop per kilo on the public page as in the app', function (): void {
@@ -146,8 +148,9 @@ it('prices the shop per kilo on the public page as in the app', function (): voi
 it('refuses a size the column cannot hold', function (string $input): void {
     [$product, $pack] = sizelessForOwner();
 
-    expect(fn () => app(SaveOwnerPackSize::class)($product, $pack->id, $input))->toThrow(ValidationException::class);
-    expect($pack->refresh()->owner_pack_quantity)->toBeNull();
+    expect(fn () => app(SaveOwnerPackSize::class)($product, $pack->id, $input))->toThrow(ValidationException::class)
+        ->and($pack->refresh()->owner_pack_quantity)
+        ->toBeNull();
 })->with(['100000 kg', '0.001 g']);
 
 it('answers a shop id that is not a uuid as no such shop', function (): void {

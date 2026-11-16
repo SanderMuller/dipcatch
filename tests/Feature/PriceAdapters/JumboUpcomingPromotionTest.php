@@ -22,7 +22,8 @@ function jumboGrapesUrl(): string
 
 beforeEach(function (): void {
     Cache::flush();
-    config(['dipcatch.upcoming_offers.enabled' => true]);
+    config()
+        ->set('dipcatch.upcoming_offers.enabled', true);
     $this->travelTo(CarbonImmutable::parse('2026-10-24 12:00', 'Europe/Amsterdam'));
 });
 
@@ -198,7 +199,7 @@ test('a failed lookup keeps the stored announcement but stores the page\'s new p
 test('a failed lookup does not write an ended page window over a stored announcement', function (): void {
     Http::fake([JumboUpcomingPromotion::URL . '*' => Http::response('', 503)]);
     $ended = PromotionWindow::make(endsAt: CarbonImmutable::now()->subDay(), startsAt: CarbonImmutable::now()->subDays(7));
-    $page = new ShopSnapshot(title: 'Druiven', imageUrl: null, price: '1.99', currency: 'EUR', inStock: true, raw: [], promotionWindow: $ended, promotionWindowAuthoritative: true);
+    $page = new ShopSnapshot(title: 'Druiven', imageUrl: null, price: '1.99', currency: 'EUR', inStock: true, promotionWindow: $ended, promotionWindowAuthoritative: true);
 
     $snapshot = app(JumboUpcomingPromotion::class)->applyTo($page, jumboGrapesUrl());
 

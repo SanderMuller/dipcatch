@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Charts\PriceHistorySeries;
 use App\Models\Product;
 use App\Models\Shop;
+use LogicException;
 
 /**
  * What a person needs to set a target in the terms they think in: the packs
@@ -101,7 +102,7 @@ final readonly class UnitTargetGuide
             ->map(fn (Shop $shop): array => [
                 'shopId' => (string) $shop->id,
                 'shop' => ShopNames::label((string) $shop->host),
-                'size' => UnitWord::pack($shop->ownerPackSize() ?? throw new \LogicException('An owner-sized shop has an owner size.')),
+                'size' => UnitWord::pack($shop->ownerPackSize() ?? throw new LogicException('An owner-sized shop has an owner size.')),
             ])
             ->values()
             ->all();

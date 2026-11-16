@@ -758,7 +758,7 @@ test('an exception thrown out of the job fails it once rather than looping', fun
     // maxExceptions the deadline would retry it for a quarter of an hour.
     Http::fake([
         'https://api.ah.nl/mobile-auth/*' => Http::response(['access_token' => 't'], 200),
-        'https://api.ah.nl/mobile-services/*' => fn () => throw new RuntimeException('kaboom'),
+        'https://api.ah.nl/mobile-services/*' => fn (): never => throw new RuntimeException('kaboom'),
     ]);
 
     $shop = Shop::factory()->create(['url' => 'https://ah.nl/producten/product/wi1/x']);

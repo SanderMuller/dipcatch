@@ -4,6 +4,7 @@ use App\Support\Favicon;
 use App\Support\ShopPage;
 use App\Support\ShopPages;
 use App\Support\SupportedShops;
+use App\Support\UseCase;
 use App\Support\UseCases;
 use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Support\Facades\Config;
@@ -42,7 +43,7 @@ it('links each shop page to the categories that name it, and no others', functio
     // Asserted on the page object, not on the markup: the footer links every
     // category from every page, so the rendered HTML cannot tell the two
     // kinds of link apart.
-    $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
+    $slugs = array_map(static fn (UseCase $useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
 
     expect($slugs)->toBe(['groceries', 'pet-food', 'coffee', 'beauty']);
 
@@ -52,7 +53,7 @@ it('links each shop page to the categories that name it, and no others', functio
 it('links Amazon UK and US shops to groceries, coffee and filters', function (string $slug): void {
     $shop = ShopPages::find($slug);
 
-    $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
+    $slugs = array_map(static fn (UseCase $useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
 
     expect($slugs)->toBe(['groceries', 'coffee', 'filters']);
 })->with(['amazon-com', 'amazon-co-uk']);
@@ -60,7 +61,7 @@ it('links Amazon UK and US shops to groceries, coffee and filters', function (st
 it('links Amazon.nl to groceries, pet food, coffee, filters, beauty, electronics, toys and DIY', function (): void {
     $shop = ShopPages::find('amazon-nl');
 
-    $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
+    $slugs = array_map(static fn (UseCase $useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
 
     expect($slugs)->toBe(['groceries', 'pet-food', 'coffee', 'filters', 'beauty', 'electronics', 'toys', 'diy']);
 });
@@ -68,7 +69,7 @@ it('links Amazon.nl to groceries, pet food, coffee, filters, beauty, electronics
 it('links the new category shops to their own page', function (string $slug, array $expected): void {
     $shop = ShopPages::find($slug);
 
-    expect(array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []))->toBe($expected);
+    expect(array_map(static fn (UseCase $useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []))->toBe($expected);
 })->with([
     'MediaMarkt' => ['mediamarkt-nl', ['electronics']],
     'Intertoys' => ['intertoys-nl', ['toys']],
@@ -78,7 +79,7 @@ it('links the new category shops to their own page', function (string $slug, arr
 it('links The Ordinary, Lookfantastic, Cult Beauty and Ulta to the beauty category only', function (string $slug): void {
     $shop = ShopPages::find($slug);
 
-    $slugs = array_map(static fn ($useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
+    $slugs = array_map(static fn (UseCase $useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
 
     expect($slugs)->toBe(['beauty']);
 })->with(['theordinary-com', 'lookfantastic-com', 'cultbeauty-com', 'ulta-com']);
