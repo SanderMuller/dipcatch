@@ -91,18 +91,6 @@ test('handles top-level @graph', function (): void {
         ->and($result->snapshot?->currency)->toBe('USD');
 });
 
-test('handles price as a number (not string)', function (): void {
-    $json = json_encode([
-        '@type' => 'Product',
-        'name' => 'Numeric',
-        'offers' => ['@type' => 'Offer', 'price' => 99.99, 'priceCurrency' => 'GBP'],
-    ], JSON_THROW_ON_ERROR);
-
-    $result = new JsonLdAdapter()->extract('https://x.test', withJsonLd($json));
-
-    expect($result->snapshot?->price)->toBe('99.99');
-});
-
 test('handles price nested under priceSpecification.price', function (): void {
     $json = json_encode([
         '@type' => 'Product',

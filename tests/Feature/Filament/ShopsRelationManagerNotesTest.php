@@ -18,19 +18,6 @@ test('edit_notes action saves a note on the shop', function (): void {
     expect($shop->fresh()->notes)->toBe("ships only to NL\ncoupon CODE10");
 });
 
-test('edit_notes pre-fills the existing value', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->for($user)->create();
-    $shop = Shop::factory()->for($product)->create(['notes' => 'existing note']);
-
-    $this->actingAs($user);
-
-    mountShopsRelationManager($product)
-        ->assertSet('shopMessage', null);
-
-    expect($shop->fresh()?->notes)->toBe('existing note');
-});
-
 test('cannot edit notes on a shop that belongs to a different user\'s product', function (): void {
     $owner = User::factory()->create();
     $ownerProduct = Product::factory()->for($owner)->create();

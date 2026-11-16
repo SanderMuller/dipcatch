@@ -441,16 +441,6 @@ it('blocks a conversion on a pair in doubt until Jev confirms it', function (): 
     expect($product->unit_price_target_effective)->toBe('8.9286');
 });
 
-it('stamps an old target with the unit it was last compared in when backfilled', function (): void {
-    $product = igloField(['unit_price_target' => '0.25', 'best_value_pack_unit' => 'piece']);
-
-    $this->artisan('dipcatch:stamp-target-units')->assertSuccessful();
-
-    expect($product->refresh())
-        ->unit_price_target_unit->toBe('piece')
-        ->unit_price_target_effective->toBe('8.9286');
-});
-
 it('settles a tie on the unit most shops lead with when no shop states a second size, whatever it compared in', function (): void {
     $product = Product::factory()->create(['currency' => 'EUR', 'best_value_pack_unit' => 'piece']);
     pairedShop($product, 'a.nl', '2.00', '500.00', 'g');

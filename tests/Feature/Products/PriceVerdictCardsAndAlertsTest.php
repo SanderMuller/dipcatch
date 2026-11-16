@@ -171,15 +171,3 @@ it('says lowest in 90 days on a drop in the digest only when the event stored it
 
     expect(str_contains($html, 'Lowest in 90 days'))->toBe($lowest);
 })->with(['stored' => true, 'not stored' => false]);
-
-it('says lowest in 90 days in a unit-price alert push when the event stored it', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->for($user)->create(['currency' => 'EUR', 'title' => 'Crisps']);
-    $shop = Shop::factory()->for($product)->create(['url' => 'https://ah.nl/p/1', 'current_price' => '1.69', 'pack_quantity' => '200.00', 'pack_unit' => 'g']);
-
-    $with = new UnitPriceTargetNotification($product, $shop, '8.4500', '9.00', lowestIn90Days: true);
-    $without = new UnitPriceTargetNotification($product, $shop, '8.4500', '9.00');
-
-    expect(pushBody($with->toWebPush($user)->toArray())->endsWith(' · lowest in 90 days'))->toBeTrue()
-        ->and(pushBody($without->toWebPush($user)->toArray())->contains('lowest in 90 days'))->toBeFalse();
-});

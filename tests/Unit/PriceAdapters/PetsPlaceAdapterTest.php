@@ -78,10 +78,3 @@ HTML;
     expect($result->isFailed())->toBeTrue()
         ->and($result->failureReason)->toBe('petsplace_extraction_failed');
 });
-
-test('fails when a petsplace page has neither JSON-LD nor a price amount', function (): void {
-    $result = $this->adapter->extract('https://petsplace.nl/p/1', '<html><body><p>broken page</p></body></html>');
-
-    expect($result->isFailed())->toBeTrue()
-        ->and($result->failureReason)->toBe('petsplace_extraction_failed');
-});

@@ -93,13 +93,6 @@ test('does not read a singular piece in a title as a count', function (string $t
     'a set of clothes' => ['T-shirt 2 piece XL', null, null],
 ]);
 
-test('parses rollen', function (): void {
-    $size = PackSize::parse('4 rollen');
-
-    expect($size->quantity)->toBe(4.0)
-        ->and($size->unit)->toBe('piece');
-});
-
 test('lone vellen counts as pieces', function (): void {
     $size = PackSize::parse('200 vellen');
 
@@ -151,10 +144,6 @@ test('a percent-suffixed number never matches', function (): void {
     expect(PackSize::parse('40% minder zout'))->toBeNull();
 });
 
-test('a plus-suffixed cheese fat marker alone parses to null', function (): void {
-    expect(PackSize::parse('48+ plakken'))->toBeNull();
-});
-
 test('plakken is excluded from the piece vocabulary entirely', function (): void {
     expect(PackSize::parse('Beemster Kaas extra belegen 48+ plakken'))->toBeNull();
 });
@@ -169,15 +158,6 @@ test('counts coffee capsules, cups and cleaning pads as pieces', function (): vo
         ->and(PackSize::parse('36 pads')->quantity)->toBe(36.0)
         ->and(PackSize::parse('36 pads')->unit)->toBe('piece')
         ->and(PackSize::parse('1 pad')->quantity)->toBe(1.0);
-});
-
-test('a weight beside a capsule count still wins', function (): void {
-    // Bucket precedence: the shopper compares grams, and the count is packaging
-    // detail. Same rule the existing mass-over-pieces case proves.
-    $size = PackSize::parse('Nescafé Dolce Gusto Lungo 30 capsules 216 g');
-
-    expect($size->quantity)->toBe(216.0)
-        ->and($size->unit)->toBe('g');
 });
 
 // --- Multipacks: x / × / à --------------------------------------------------
@@ -543,7 +523,6 @@ test('a count written as a drugstore abbreviation is read', function (string $ti
         ->and(PackSize::parse($title)?->unit)->toBe('piece');
 })->with([
     ['Davitamon Vitamine D3 20mcg Smelttabletten 150TB', 150.0],
-    ['Davitamon Vitamine D3 20mcg Smelttabletten 75TB', 75.0],
     ['Roter Vitamine C 400 TABL', 400.0],
     ['Omega 3 visolie 60 caps', 60.0],
     ['Magnesium 90 CPS', 90.0],

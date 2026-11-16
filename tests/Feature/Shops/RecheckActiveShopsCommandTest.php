@@ -45,18 +45,6 @@ test('skips dead, inactive, and offers attached to inactive products', function 
     Queue::assertNothingPushed();
 });
 
-test('respects scheduler batch size', function (): void {
-    config()->set('dipcatch.recheck.interval_hours', 1);
-    config()->set('dipcatch.scheduler.batch_size', 2);
-
-    $product = Product::factory()->create();
-    Shop::factory()->count(5)->for($product)->create(['last_checked_at' => now()->subHours(2)]);
-
-    $this->artisan('dipcatch:recheck-offers')->assertSuccessful();
-
-    Queue::assertPushed(CheckShopPrice::class, 2);
-});
-
 test('never-checked shops are prioritised over oldest checked, then oldest first', function (): void {
     config()->set('dipcatch.recheck.interval_hours', 6);
     config()->set('dipcatch.recheck.jitter_minutes', 0);

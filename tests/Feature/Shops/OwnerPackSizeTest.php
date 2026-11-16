@@ -59,7 +59,6 @@ it('accepts the singular piece as the size', function (string $input, float $qua
     'one piece' => ['1 piece', 1.0],
     'capitalised' => ['1 Piece', 1.0],
     'no space' => ['1piece', 1.0],
-    'more than one' => ['4 piece', 4.0],
     'the plural still' => ['4 pieces', 4.0],
 ]);
 

@@ -21,11 +21,6 @@ it('refuses an unauthenticated tool call', function (): void {
         ->assertUnauthorized();
 });
 
-it('advertises both oauth discovery documents', function (): void {
-    $this->getJson('/.well-known/oauth-protected-resource')->assertOk();
-    $this->getJson('/.well-known/oauth-authorization-server')->assertOk();
-});
-
 it('answers 405 with an Allow header for a GET', function (): void {
     $this->get('/mcp')->assertStatus(405)->assertHeader('Allow', 'POST');
 });

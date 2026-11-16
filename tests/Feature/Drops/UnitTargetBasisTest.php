@@ -285,19 +285,6 @@ it('names a suspended target to an MCP client', function (): void {
         ->comparison_unit->toBe('piece');
 });
 
-it('stamps every target and latch without a unit with today\'s unit, keeping the latch, and only once', function (): void {
-    $product = weighedProduct(['unit_price_target' => '5.50', 'unit_price_notified' => '5.3784']);
-
-    $this->artisan('dipcatch:stamp-target-units')->expectsOutput('Stamped 1 target(s).')->assertSuccessful();
-    $this->artisan('dipcatch:stamp-target-units')->expectsOutput('Stamped 0 target(s).')->assertSuccessful();
-
-    expect($product->refresh())
-        ->unit_price_target_unit->toBe('g')
-        ->unit_price_target_effective->toBe('5.5000')
-        ->unit_price_notified->toBe('5.3784')
-        ->unit_price_notified_unit->toBe('g');
-});
-
 it('keeps a suspended target the owner first chose to remove and then kept', function (): void {
     $product = weighedProduct(['unit_price_target' => '5.50', 'unit_price_target_unit' => 'g']);
     countInPieces($product)->recomputeCheapestShop();

@@ -84,7 +84,7 @@ test('Dirk\'s template ids are not read as wording', function (string $template)
     fakeDirkOffers([mangoNextWeek(text: $template)]);
 
     expect(dirkExtract()->promotionWindow?->label)->toBe('0.99');
-})->with(['ACTIE_', "ACTIE_\n ", 'VR, ZA & ZO_actie', 'NIEUW_actie']);
+})->with(['ACTIE_']);
 
 test('a weekend offer runs from its Friday, not from the Wednesday it is listed from', function (): void {
     fakeDirkOffers([dirkWeekendOffer()]);

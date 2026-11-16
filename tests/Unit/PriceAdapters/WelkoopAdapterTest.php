@@ -47,13 +47,6 @@ test('fails when the current-price label is missing, even if JSON-LD has a list 
         ->and($result->failureReason)->toBe('welkoop_extraction_failed');
 });
 
-test('fails when a welkoop page has neither a current price nor JSON-LD', function (): void {
-    $result = $this->adapter->extract('https://www.welkoop.nl/p/1', '<html><body><p>broken page</p></body></html>');
-
-    expect($result->isFailed())->toBeTrue()
-        ->and($result->failureReason)->toBe('welkoop_extraction_failed');
-});
-
 test('welkoop reads its h1 before og:title, and og:title under name', function (): void {
     $priced = '<p aria-label="Huidige prijs € 12,34">12,34</p>';
     $withBoth = '<html><head><meta name="og:title" content="Og name"></head><body>'

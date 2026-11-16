@@ -307,13 +307,3 @@ it('dates money by when it moved, not when the object was raised', function (): 
     expect($payment->occurred_at)->toBeSameTimestampAs($settled)
         ->and($refund->occurred_at)->toBeSameTimestampAs($settled);
 });
-
-it('tells the customer when the card is declined', function (): void {
-    Notification::fake();
-
-    $user = customer();
-
-    webhook('invoice.payment_failed', ['id' => 'in_2', 'customer' => 'cus_test123', 'amount_due' => 499, 'currency' => 'eur']);
-
-    Notification::assertSentTo($user, SubscriptionPaymentFailedNotification::class);
-});

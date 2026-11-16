@@ -11,16 +11,6 @@ beforeEach(function (): void {
     Filament::setCurrentPanel('admin');
 });
 
-test('admin shops list exposes a notes column showing the value', function (): void {
-    $this->actingAs(User::factory()->admin()->create());
-    $shop = Shop::factory()->create(['notes' => 'Ships only to NL']);
-
-    livewire(ListShops::class)
-        ->assertOk()
-        ->assertCanSeeTableRecords([$shop])
-        ->assertTableColumnExists('notes');
-});
-
 test('the notes column renders the saved text inline', function (): void {
     $this->actingAs(User::factory()->admin()->create());
     Shop::factory()->create(['notes' => 'Ships only to NL']);

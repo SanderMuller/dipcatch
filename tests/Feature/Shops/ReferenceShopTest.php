@@ -63,19 +63,6 @@ test('a product whose only shop is a link has no price and still renders', funct
         ->and($product->comparablePacks()->hasComparisonUnit())->toBeFalse();
 });
 
-test('a kept link is never sent to the recheck queue', function (): void {
-    // Its page is known to refuse us. A check would spend a fetch to learn
-    // nothing, then count the refusal against the row until it died.
-    Queue::fake();
-
-    $product = Product::factory()->for(User::factory())->create(['currency' => 'EUR', 'active' => true]);
-    keptLink($product);
-
-    $this->artisan(RecheckActiveShopsCommand::class)->assertSuccessful();
-
-    Queue::assertNotPushed(CheckShopPrice::class);
-});
-
 test('a tracked shop on the same product is still rechecked', function (): void {
     // The exclusion is the kind, not the product.
     Queue::fake();

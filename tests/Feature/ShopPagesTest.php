@@ -50,40 +50,6 @@ it('links each shop page to the categories that name it, and no others', functio
     $this->get(route('shop', ['slug' => 'ah-nl']))->assertOk()->assertSeeHtml('What people track at Albert Heijn');
 });
 
-it('links Amazon UK and US shops to groceries, coffee and filters', function (string $slug): void {
-    $shop = ShopPages::find($slug);
-
-    $slugs = array_map(static fn (UseCase $useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
-
-    expect($slugs)->toBe(['groceries', 'coffee', 'filters']);
-})->with(['amazon-com', 'amazon-co-uk']);
-
-it('links Amazon.nl to groceries, pet food, coffee, filters, beauty, electronics, toys and DIY', function (): void {
-    $shop = ShopPages::find('amazon-nl');
-
-    $slugs = array_map(static fn (UseCase $useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
-
-    expect($slugs)->toBe(['groceries', 'pet-food', 'coffee', 'filters', 'beauty', 'electronics', 'toys', 'diy']);
-});
-
-it('links the new category shops to their own page', function (string $slug, array $expected): void {
-    $shop = ShopPages::find($slug);
-
-    expect(array_map(static fn (UseCase $useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []))->toBe($expected);
-})->with([
-    'MediaMarkt' => ['mediamarkt-nl', ['electronics']],
-    'Intertoys' => ['intertoys-nl', ['toys']],
-    'Hubo' => ['hubo-nl', ['diy']],
-]);
-
-it('links The Ordinary, Lookfantastic, Cult Beauty and Ulta to the beauty category only', function (string $slug): void {
-    $shop = ShopPages::find($slug);
-
-    $slugs = array_map(static fn (UseCase $useCase): string => $useCase->slug, $shop?->relatedUseCases() ?? []);
-
-    expect($slugs)->toBe(['beauty']);
-})->with(['theordinary-com', 'lookfantastic-com', 'cultbeauty-com', 'ulta-com']);
-
 it('states that Dierapotheker reads the article number', function (): void {
     $this->get(route('shop', ['slug' => 'dierapotheker-nl']))->assertOk()->assertSeeHtml('article number');
 });

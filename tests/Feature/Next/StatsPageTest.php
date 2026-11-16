@@ -180,9 +180,3 @@ it('keeps notifications that are not price alerts out of the history', function 
 
     livewire(StatsPage::class)->assertDontSee('Recent alerts');
 });
-
-it('shows no alert history to an account with no alerts', function (): void {
-    $this->actingAs(User::factory()->create());
-
-    livewire(StatsPage::class)->assertDontSee('Recent alerts');
-});

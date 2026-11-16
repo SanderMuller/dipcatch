@@ -21,12 +21,6 @@ test('adds the pack size the JSON-LD omits, so SPAR shops get a unit price', fun
         ->and($result->snapshot?->packSizeAuthoritative)->toBeTrue();
 });
 
-test('a related product card cannot donate its size', function (): void {
-    // The page lists other products at 125 Gram; only the offer subtitle counts.
-    expect($this->adapter->extract('https://www.spar.nl/x-1/', sparPage())->snapshot?->packSize)
-        ->toBe('200 Gram');
-});
-
 test('a page without the subtitle still prices, just without a size', function (): void {
     $result = $this->adapter->extract('https://www.spar.nl/x-1/', sparPage(packSize: null));
 

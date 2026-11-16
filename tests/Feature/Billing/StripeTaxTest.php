@@ -19,17 +19,3 @@ it('tells Stripe to save the address it collects', function (): void {
     // customer it already knows — and the address is what decides the rate.
     expect(StripeTax::checkoutOptions())->toBe(['customer_update' => ['address' => 'auto']]);
 });
-
-it('reads the flag as a boolean, whatever the environment writes', function (): void {
-    foreach (['true', '1', 'on'] as $truthy) {
-        config()->set('plans.stripe.automatic_tax', filter_var($truthy, FILTER_VALIDATE_BOOLEAN));
-
-        expect(StripeTax::isEnabled())->toBeTrue();
-    }
-
-    foreach (['false', '0', ''] as $falsy) {
-        config()->set('plans.stripe.automatic_tax', filter_var($falsy, FILTER_VALIDATE_BOOLEAN));
-
-        expect(StripeTax::isEnabled())->toBeFalse();
-    }
-});

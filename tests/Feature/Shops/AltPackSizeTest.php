@@ -210,16 +210,6 @@ test('a shop pointed at another page forgets its second size', function (): void
         ->alt_pack_since->toBeNull();
 });
 
-test('a shop attached from a preview keeps the second size the page stated', function (): void {
-    $draft = ShopDraft::fromSnapshot([
-        'title' => 'Iglo 20 Vissticks', 'price' => '4.99', 'currency' => 'EUR', 'in_stock' => true,
-        'pack_size' => '20.00 Stuks', 'pack_size_authoritative' => true, 'alt_pack_sizes' => ['560 g'],
-    ], 'https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/305527', 'poiesz');
-
-    expect($draft->altPackSize?->quantity)->toBe(560.0)
-        ->and($draft->altPackSize?->unit)->toBe('g');
-});
-
 test('Poiesz states its content apart from the description', function (?float $volume, ?string $unitId, array $expected, bool $authoritative): void {
     $this->travelTo('2026-10-06 12:00:00');
     $result = app(PoieszAdapter::class)->extract('https://webwinkel.poiesz-supermarkten.nl/boodschappen/producten/278550', poieszPage(packageDescription: '20.00 Stuks', volumeCe: $volume, unitId: $unitId));

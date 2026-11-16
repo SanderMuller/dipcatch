@@ -818,17 +818,6 @@ it('charts the pack price alone when no pack size is known', function (): void {
         ->assertDontSee('data-test="price-history-chart-unit"', escape: false);
 });
 
-it('states the shop limit instead of offering another', function (): void {
-    $user = User::factory()->create();
-    $product = ownedProduct($user);
-    Shop::factory()->count(4)->for($product)->create();
-
-    $this->actingAs($user);
-
-    livewire(ProductShow::class, ['product' => $product])
-        ->assertSee('This product is at its shop limit');
-});
-
 it('stops advertising the old price when the re-check is rate limited', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user);

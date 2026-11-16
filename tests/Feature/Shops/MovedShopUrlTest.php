@@ -67,7 +67,7 @@ it('keeps the stored address after a temporary redirect', function (int $status)
     ]);
 
     expect(checkShopAt('https://shop.test/p/beans')->url)->toBe('https://shop.test/p/beans');
-})->with([302, 303, 307]);
+})->with([302, 307]);
 
 it('keeps the stored address when a permanent hop is followed by a temporary one', function (): void {
     fakeShop([

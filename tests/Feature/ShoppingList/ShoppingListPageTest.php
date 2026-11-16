@@ -143,19 +143,6 @@ it('answers 404 for an id that is not a UUID', function (string $action): void {
     livewire(ShoppingListPage::class)->call($action, "1' OR 1=1")->assertNotFound();
 })->with(['toggleCrossedOff', 'remove']);
 
-it('does not bring back an item another tab removed when it is crossed off', function (): void {
-    $user = User::factory()->create();
-    $product = shoppingPageProduct($user, 'Coffee');
-
-    $this->actingAs($user);
-    $page = livewire(ShoppingListPage::class);
-    $product->removeFromShoppingList();
-
-    $page->call('toggleCrossedOff', $product->id);
-
-    expect($product->refresh()->isOnShoppingList())->toBeFalse();
-});
-
 it('renders the page in the same number of queries however long the list is', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);

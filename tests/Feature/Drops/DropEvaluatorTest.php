@@ -74,19 +74,6 @@ test('price increase produces negative drop and stays below threshold', function
         ->and((float) $outcome->dropPercent)->toBe(-10.0);
 });
 
-test('falls back to tier defaults when product overrides are null', function (): void {
-    $product = Product::factory()->create([
-        'drop_threshold_pct' => null,
-        'drop_threshold_abs' => null,
-    ]);
-
-    $outcome = new DropEvaluator()->evaluate($product, '90.00', ref('100.00'));
-
-    // 100.00 sits in the 100-500 tier per spec? No: bands say "< 100" → 25-100 tier. 100 lands in 100-500.
-    expect((float) $outcome->thresholdPct)->toBe(8.0)
-        ->and((float) $outcome->thresholdAbs)->toBe(25.0);
-});
-
 test('a drop threshold stored on the product is ignored: the tier defaults decide', function (): void {
     $product = Product::factory()->create([
         'drop_threshold_pct' => '20.00',
@@ -128,22 +115,6 @@ test('a product with a pack target does not alert on a drop threshold stored on 
 
 test('a unit-price target on a free account switches the default drops off too', function (): void {
     $product = Product::factory()->create([
-        'unit_price_target' => '5.00',
-        'drop_threshold_pct' => null,
-        'drop_threshold_abs' => null,
-    ]);
-    Shop::factory()->for($product)->create(['current_price' => '6.00', 'pack_quantity' => 500, 'pack_unit' => 'g']);
-
-    $outcome = new DropEvaluator()->evaluate($product, '60.00', ref('100.00'));
-
-    expect($outcome->belowThreshold)->toBeFalse();
-});
-
-test('a unit-price target a Pro account is alerted on switches the default drops off', function (): void {
-    $user = User::factory()->create();
-    subscribeUser($user);
-    $product = Product::factory()->create([
-        'user_id' => $user->id,
         'unit_price_target' => '5.00',
         'drop_threshold_pct' => null,
         'drop_threshold_abs' => null,

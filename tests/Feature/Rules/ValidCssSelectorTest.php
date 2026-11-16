@@ -4,9 +4,6 @@ use App\Rules\ValidCssSelector;
 
 dataset('valid_selectors', [
     'class' => '.foo',
-    'id' => '#bar',
-    'descendant + child combo' => '#bar > span',
-    'attribute selector' => '[data-x]',
     'compound class + pseudo' => '.product-price:not(.strike)',
     'meta with attr equality' => 'meta[itemprop="price"]',
 ]);

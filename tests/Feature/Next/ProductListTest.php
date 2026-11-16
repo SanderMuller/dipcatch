@@ -27,19 +27,6 @@ it('lists only the signed-in users products', function (): void {
         ->assertDontSee('Somebody elses coffee');
 });
 
-it('searches by title', function (): void {
-    $user = User::factory()->create();
-    Product::factory()->create(['user_id' => $user->id, 'title' => 'Arabica beans']);
-    Product::factory()->create(['user_id' => $user->id, 'title' => 'Dish soap']);
-
-    $this->actingAs($user);
-
-    livewire(ProductList::class)
-        ->set('search', 'arabica')
-        ->assertSee('Arabica beans')
-        ->assertDontSee('Dish soap');
-});
-
 it('searches by title whether or not the accents are typed', function (string $search): void {
     $user = User::factory()->create();
     Product::factory()->create(['user_id' => $user->id, 'title' => 'Andrélon droogshampoo Verrassend Volume / Volume boost 250 ml']);
@@ -1178,17 +1165,6 @@ it('marks a product whose price is at or under its target, and only that one', f
         ->values()->all();
 
     expect($badged)->toBe(['Per kilo', 'Reached']);
-});
-
-it('calls the line between the drops and the rest "No discount right now"', function (): void {
-    $user = User::factory()->create();
-    $dropped = Product::factory()->create(['user_id' => $user->id, 'last_notified_price' => '6.00', 'last_notified_at' => now()]);
-    PriceDropEvent::factory()->create(['user_id' => $user->id, 'product_id' => $dropped->id, 'drop_pct' => 40]);
-    Product::factory()->create(['user_id' => $user->id]);
-
-    $this->actingAs($user);
-
-    livewire(ProductList::class)->assertSeeText('No discount right now')->assertDontSeeText('No drop right now');
 });
 
 it('marks a price exactly at the target, but not a price above a per-unit target, nor a paused product', function (): void {

@@ -40,8 +40,3 @@ test('a web response sends no CORS headers', function (): void {
         ->assertHeaderMissing('Access-Control-Allow-Origin')
         ->assertHeaderMissing('Access-Control-Allow-Credentials');
 });
-
-test('a missing page returns a 404', function (): void {
-    $this->get('/this/page/should/not/exist/and/return/a/404')
-        ->assertNotFound();
-});

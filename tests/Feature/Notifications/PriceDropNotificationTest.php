@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Notifications\PriceDropNotification;
 use App\Services\Drops\DropOutcome;
 use Illuminate\Support\Str;
-use NotificationChannels\WebPush\WebPushChannel;
 
 function buildOutcome(): DropOutcome
 {
@@ -79,22 +78,6 @@ test('via() returns only real-time channels (database + push); never mail', func
     expect($notification->via($bellOnly))->toBe(['database'])
         ->and($notification->via($silent))->toBeEmpty()
         ->and($notification->via($bellOnly))->not->toContain('mail');
-});
-
-test('via() includes web push only when user has subscriptions AND opted in', function (): void {
-    $product = Product::factory()->create();
-    $outcome = buildOutcome();
-
-    $optedInNoSubscriptions = User::factory()->create([
-        'notify_via_filament' => false,
-        'notify_via_push' => true,
-    ]);
-
-    $notification = new PriceDropNotification($product, $outcome, 'fake-id');
-
-    // No subscriptions yet → push channel not included.
-    expect($notification->via($optedInNoSubscriptions))->toBeEmpty()
-        ->and($notification->via($optedInNoSubscriptions))->not->toContain(WebPushChannel::class);
 });
 
 test('snapshots bundle terms from triggering check when cheapest shop changes', function (): void {

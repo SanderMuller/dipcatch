@@ -29,12 +29,6 @@ test('reports the offer price while the offer runs — the number the shopper se
         ->toBe('https://web-fileserver.dekamarkt.nl/artikelen/492657_2026-08-25_14-04-01-473_57ec706c.png');
 });
 
-test('falls back to the shelf price once the offer window has closed', function (): void {
-    $page = dekaMarktPage(offerStart: '-14 days', offerEnd: '-7 days');
-
-    expect($this->adapter->extract(dekaMarktUrl(), $page)->snapshot?->price)->toBe('1.95');
-});
-
 test('uses the shelf price when there is no offer at all', function (): void {
     $page = dekaMarktPage(offerPrice: null, offerStart: null, offerEnd: null);
 

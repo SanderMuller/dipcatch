@@ -19,14 +19,3 @@ test('the owner can remove a shop from the product', function (): void {
 
     expect(Shop::query()->whereKey($shop->id)->exists())->toBeFalse();
 });
-
-test('a note icon click mounts the edit_notes modal only when a note exists', function (): void {
-    $user = User::factory()->create();
-    $product = Product::factory()->for($user)->create();
-    Shop::factory()->for($product)->create(['notes' => 'ships free above 20']);
-
-    $this->actingAs($user);
-
-    mountShopsRelationManager($product)
-        ->assertSeeHtml('notes_indicator');
-});

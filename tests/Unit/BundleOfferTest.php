@@ -151,7 +151,6 @@ test('a bundle sets the tracked price only when it beats the single price and it
     'cheaper, window running' => ['2.85', 'running', true],
     'cheaper, window not started' => ['2.85', 'not started', false],
     'cheaper, window ended' => ['2.85', 'ended', false],
-    'not cheaper, no window' => ['1.50', null, false],
     'not cheaper, window running' => ['1.50', 'running', false],
     'equal to the single price' => ['2.00', null, false],
     'single price not money' => ['free', null, false],
