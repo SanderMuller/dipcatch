@@ -11,7 +11,7 @@
     "render": "sh scripts/render.sh final"
   },
   "dependencies": {
-    "@remotion/cli": "4.0.528",
+    "@remotion/cli": "4.0.544",
     "@remotion/google-fonts": "4.0.528",
     "@remotion/transitions": "4.0.528",
     "react": "19.2.0",
