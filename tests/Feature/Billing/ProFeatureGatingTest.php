@@ -233,6 +233,7 @@ it('does not touch checkout when another site sends the browser to it', function
         ->get('/billing/checkout/yearly')
         ->assertRedirect('/app/billing');
 
-    expect($sessions->expired)->toBe([])
+    expect($sessions->expired)
+        ->toBeEmpty()
         ->and($user->fresh()?->stripe_checkout_session_id)->toBe('cs_monthly');
 });

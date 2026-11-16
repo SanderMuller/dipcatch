@@ -42,7 +42,7 @@ final class PushServiceEndpoint implements ValidationRule
 
         $host = strtolower($parts['host'] ?? '');
 
-        return in_array($host, self::HOSTS, true)
+        return in_array($host, self::HOSTS, strict: true)
             || array_any(self::HOST_SUFFIXES, static fn (string $suffix): bool => str_ends_with($host, $suffix));
     }
 
