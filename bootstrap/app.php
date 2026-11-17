@@ -7,6 +7,7 @@ use App\Console\Commands\DispatchDailyDigestsCommand;
 use App\Console\Commands\ImportBolFeedCommand;
 use App\Console\Commands\LookUpBolOffersCommand;
 use App\Console\Commands\PruneOldChecksCommand;
+use App\Console\Commands\PruneUnusedOAuthClientsCommand;
 use App\Console\Commands\PruneWebSearchesCommand;
 use App\Console\Commands\RecheckActiveShopsCommand;
 use App\Console\Commands\RefreshBolOffersCommand;
@@ -115,6 +116,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->command(PruneWebSearchesCommand::class)
             ->dailyAt('03:05')
+            ->onOneServer();
+
+        $schedule->command(PruneUnusedOAuthClientsCommand::class)
+            ->dailyAt('03:10')
             ->onOneServer();
 
         $schedule->command(PruneOldChecksCommand::class)
