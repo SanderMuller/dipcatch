@@ -85,3 +85,15 @@ test('one account\'s wrong guesses do not lock another account', function (): vo
         ->post(route('password.confirm.store'), ['password' => 'password'])
         ->assertSessionHasNoErrors();
 });
+
+test('a guess past the limit is refused without a check, as when requests arrive at once', function (): void {
+    $user = User::factory()->create();
+    $guesses = app(PasswordGuesses::class);
+
+    for ($guess = 1; $guess <= PasswordGuesses::WRONG_GUESSES; $guess++) {
+        expect($guesses->check($user, 'wrong-password'))->toBeFalse();
+    }
+
+    // Requests that passed lockedFor() before the others were counted.
+    expect($guesses->check($user, 'password'))->toBeFalse();
+});

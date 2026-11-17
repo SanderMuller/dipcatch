@@ -12,9 +12,13 @@ use Illuminate\Support\Facades\DB;
  * Anyone may register a client for the MCP server, so without this the
  * table keeps every registration that never led to a sign-in. Only public
  * clients without an owner are deleted: what registration creates.
+ *
+ * It reads the tokens and codes that exist now. "Sign out everywhere", a
+ * password change and a deleted account delete them, so a client used
+ * before that goes too, and its assistant registers again.
  */
 #[Signature('dipcatch:prune-unused-oauth-clients')]
-#[Description('Delete self-registered OAuth clients that no account ever signed in with.')]
+#[Description('Delete self-registered OAuth clients with no tokens or codes left.')]
 final class PruneUnusedOAuthClientsCommand extends Command
 {
     /** Time to finish the first sign-in after registering. */

@@ -193,6 +193,24 @@ it('looks up a gone product on the shop\'s own site, for Pro with AI help on', f
     Queue::assertPushed(DiscoverWebShops::class);
 });
 
+it('spends the owner\'s daily share of searches on site lookups', function (): void {
+    config()->set('services.serper.key', 'test-key');
+    config()->set('services.typesafe.key', 'test-key');
+    config()->set('dipcatch.web_discovery.account_daily_search_limit', 1);
+    Queue::fake([DiscoverWebShops::class]);
+    $user = User::factory()->create(['shop_checks' => true]);
+    subscribeUser($user);
+    $product = linkCheckProduct($user);
+    Http::fake([SerperProvider::ENDPOINT => Http::response(['organic' => []])]);
+
+    runLinkCheck(new CheckCatalogueLinks((string) $product->id, [], [
+        ['chain' => 'dirk', 'name' => 'Beemster Kaas extra belegen 48+ plakken', 'size' => '150 g'],
+        ['chain' => 'dirk', 'name' => 'Beemster Kaas jong belegen plakken', 'size' => '150 g'],
+    ]));
+
+    Http::assertSentCount(1);
+});
+
 it('skips the site lookup when the owner switched AI help off after it was queued', function (): void {
     config()->set('services.serper.key', 'test-key');
     config()->set('services.typesafe.key', 'test-key');

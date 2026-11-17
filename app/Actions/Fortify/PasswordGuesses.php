@@ -29,17 +29,23 @@ final readonly class PasswordGuesses
             : null;
     }
 
+    /**
+     * Counts the guess before it checks the hash, so requests sent at once
+     * cannot all pass {@see lockedFor()} first and guess past the limit.
+     */
     public function check(User $user, string $password): bool
     {
-        if ($user->password !== null && Hash::check($password, $user->password)) {
-            RateLimiter::clear(self::key($user));
+        $key = self::key($user);
 
-            return true;
+        if (RateLimiter::hit($key, self::DECAY_SECONDS) > self::WRONG_GUESSES
+            || $user->password === null
+            || ! Hash::check($password, $user->password)) {
+            return false;
         }
 
-        RateLimiter::hit(self::key($user), self::DECAY_SECONDS);
+        RateLimiter::clear($key);
 
-        return false;
+        return true;
     }
 
     public static function lockedMessage(int $seconds): string

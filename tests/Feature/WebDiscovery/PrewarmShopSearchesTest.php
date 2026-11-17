@@ -49,14 +49,15 @@ function previewPage(string $currency = 'EUR'): void
 it('starts the shop search at the preview, before the product is saved', function (): void {
     Queue::fake();
     previewPage();
-    $this->actingAs(shopCheckUser());
+    $user = shopCheckUser();
+    $this->actingAs($user);
 
     Livewire::test(AddProductWizard::class)
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSet('state', 'preview');
 
-    Queue::assertPushed(PrewarmShopSearches::class, fn (PrewarmShopSearches $job): bool => $job->title === 'Ecodor UF2000 urinegeur verwijderaar 2 x 1 liter');
+    Queue::assertPushed(PrewarmShopSearches::class, fn (PrewarmShopSearches $job): bool => $job->title === 'Ecodor UF2000 urinegeur verwijderaar 2 x 1 liter' && $job->account?->is($user) === true);
     expect(Product::query()->count())->toBe(0);
 });
 

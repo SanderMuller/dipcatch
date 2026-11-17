@@ -11,6 +11,7 @@ use App\Services\ShopDiscovery\WebSearches;
 use App\Services\ShopDiscovery\WebShopDiscovery;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Support\Facades\Cache;
@@ -23,6 +24,7 @@ use Illuminate\Support\Facades\Cache;
  */
 #[Tries(1)]
 #[Timeout(75)]
+#[DeleteWhenMissingModels]
 final class PrewarmShopSearches implements ShouldQueue
 {
     use Queueable;
