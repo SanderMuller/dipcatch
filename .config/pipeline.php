@@ -86,8 +86,11 @@ return [
             $steps->in(Tests::class)->parallel(static function (StepCollection $steps) use ($withTestDatabase, $wrapperTest): void {
                 // The default 128M limit runs out partway through the whole suite
                 // and reads like a test failure, so the limit is raised here.
+                // `--no-tia`: Pest's local test impact analysis can replay cached
+                // results instead of running a test, and while it records it
+                // leaks memory (pestphp/pest#2035).
                 $steps->append($withTestDatabase(
-                    Shell::run('php -d memory_limit=1G vendor/bin/pest --compact', id: 'test-php')->timeout(1500)->tagged('backend')
+                    Shell::run('php -d memory_limit=1G vendor/bin/pest --compact --no-tia', id: 'test-php')->timeout(1500)->tagged('backend')
                 ));
                 $steps->append($wrapperTest());
             });

@@ -68,7 +68,7 @@ reached that way. One process running all of it dies partway through with
 be running — it reads like a test failure and is not one. Raise the limit for the run:
 
 ```bash
-DB_DATABASE="dipcatch_test_${slug}" php -d memory_limit=1G vendor/bin/pest --compact || true
+DB_DATABASE="dipcatch_test_${slug}" php -d memory_limit=1G vendor/bin/pest --compact --no-tia || true
 ```
 
 ### Parallel runs — create the base database once
