@@ -60,19 +60,19 @@ selection='tests/Unit/ATest.php
 tests/Unit/BTest.php'
 
 run 'empty selection runs no tests'                0 ''          0 'NONE'
-run 'undeterminable selection runs the suite'      2 ''          0 'TEST_ARGS:--compact'
-run 'a selection runs only those files'            0 "$selection" 0 'TEST_ARGS:--compact tests/Unit/ATest.php tests/Unit/BTest.php'
+run 'undeterminable selection runs the suite'      2 ''          0 'TEST_ARGS:--compact --no-tia'
+run 'a selection runs only those files'            0 "$selection" 0 'TEST_ARGS:--compact --no-tia tests/Unit/ATest.php tests/Unit/BTest.php'
 run 'an unexpected richter exit is not guessed at' 1 ''          1 'NONE'
 
 # A wrapper that cannot report a failing suite is a false-green gate, so both paths
 # that reach the suite must hand its exit code back.
 STUB_TEST_EXIT=3
-run 'a failing selection run propagates its exit code' 0 "$selection" 3 'TEST_ARGS:--compact tests/Unit/ATest.php tests/Unit/BTest.php'
-run 'a failing full-suite run propagates its exit code' 2 ''         3 'TEST_ARGS:--compact'
+run 'a failing selection run propagates its exit code' 0 "$selection" 3 'TEST_ARGS:--compact --no-tia tests/Unit/ATest.php tests/Unit/BTest.php'
+run 'a failing full-suite run propagates its exit code' 2 ''         3 'TEST_ARGS:--compact --no-tia'
 STUB_TEST_EXIT=0
 
 EXTRA_ARGS='--stop-on-failure'
-run 'extra arguments reach the suite' 0 "$selection" 0 'TEST_ARGS:--compact tests/Unit/ATest.php tests/Unit/BTest.php --stop-on-failure'
+run 'extra arguments reach the suite' 0 "$selection" 0 'TEST_ARGS:--compact --no-tia tests/Unit/ATest.php tests/Unit/BTest.php --stop-on-failure'
 EXTRA_ARGS=''
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"

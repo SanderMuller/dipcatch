@@ -151,7 +151,7 @@
             "@test"
         ],
         "test": "vendor/bin/pest --parallel",
-        "test-serial": "vendor/bin/pest",
+        "test-serial": "vendor/bin/pest --no-tia",
         "fix-cs": "vendor/bin/pint --parallel . .config",
         "format": "vendor/bin/pint . .config",
         "phpstan": "vendor/bin/phpstan analyse --memory-limit=2G",

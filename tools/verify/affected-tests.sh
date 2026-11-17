@@ -11,6 +11,9 @@
 # to "run everything"; a pipeline step should stop loudly instead of spending the full
 # suite's budget on a selection nobody computed.
 #
+# `--no-tia` on both runs: Pest's local test impact analysis can replay cached results
+# instead of running a test, and leaks memory while it records (pestphp/pest#2035).
+#
 # Usage:  tools/verify/affected-tests.sh [extra artisan test args...]
 # Tests:  bash tools/verify/affected-tests.test.sh tools/verify/affected-tests.sh
 
@@ -22,7 +25,7 @@ status=$?
 
 if [ "$status" -eq 2 ]; then
     echo "Affected tests: selection undeterminable — running the full suite."
-    exec php artisan test --compact "$@"
+    exec php artisan test --compact --no-tia "$@"
 fi
 
 if [ "$status" -ne 0 ]; then
@@ -38,4 +41,4 @@ fi
 echo "Affected tests: $(printf '%s\n' "$selection" | grep -c .) file(s)."
 
 # shellcheck disable=SC2086 # word splitting is intended: one path per line.
-exec php artisan test --compact $selection "$@"
+exec php artisan test --compact --no-tia $selection "$@"
