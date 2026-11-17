@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use App\Models\User;
+use App\Providers\FortifyServiceProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Fortify\Features;
@@ -168,4 +169,32 @@ test('a password changed elsewhere ends this session', function (): void {
 
     $this->get('/app')->assertRedirect(route('login'));
     $this->assertGuest();
+});
+
+test('guesses at one account from many addresses run out too', function (): void {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+
+    for ($attempt = 1; $attempt <= FortifyServiceProvider::LOGINS_PER_ACCOUNT_PER_HOUR; $attempt++) {
+        $this->withServerVariables(['REMOTE_ADDR' => "198.51.100.{$attempt}"])
+            ->post(route('login.store'), ['email' => $user->email, 'password' => 'wrong-password'])
+            ->assertSessionHasErrors('email');
+    }
+
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.1'])
+        ->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])
+        ->assertSessionHasErrors(['email' => __('Too many sign-in attempts for this account. Try again later, or reset your password.')]);
+    $this->assertGuest();
+
+    // Another account is not affected, and the account signs in again an hour later.
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.1'])
+        ->post(route('login.store'), ['email' => $other->email, 'password' => 'password'])
+        ->assertSessionHasNoErrors();
+    $this->post(route('logout'));
+
+    $this->travel(1)->hours();
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.1'])
+        ->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])
+        ->assertSessionHasNoErrors();
+    $this->assertAuthenticatedAs($user);
 });

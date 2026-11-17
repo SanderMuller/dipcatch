@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -18,6 +19,8 @@ use Laravel\Fortify\Fortify;
 
 final class FortifyServiceProvider extends ServiceProvider
 {
+    public const int LOGINS_PER_ACCOUNT_PER_HOUR = 20;
+
     /**
      * Register any application services.
      */
@@ -92,10 +95,20 @@ final class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->session()->get('login.id'));
         });
 
-        RateLimiter::for('login', function (Request $request) {
-            $throttleKey = Str::transliterate(Str::lower($request->string(Fortify::username())->toString()) . '|' . $request->ip());
+        RateLimiter::for('login', function (Request $request): array {
+            $email = Str::transliterate(Str::lower($request->string(Fortify::username())->toString()));
 
-            return Limit::perMinute(5)->by($throttleKey);
+            return [
+                Limit::perMinute(5)->by($email . '|' . $request->ip()),
+                // Per account from any address, so guesses spread over many
+                // addresses run out too. Wide, because anyone who knows the
+                // address can spend it; the reset link still works.
+                Limit::perHour(self::LOGINS_PER_ACCOUNT_PER_HOUR)->by('login-account:' . $email)->response(
+                    static fn (): RedirectResponse => back()->withInput($request->only(Fortify::username()))->withErrors([
+                        Fortify::username() => __('Too many sign-in attempts for this account. Try again later, or reset your password.'),
+                    ]),
+                ),
+            ];
         });
 
         RateLimiter::for('passkeys', function (Request $request) {
