@@ -351,7 +351,7 @@ test('subscribe refuses an endpoint that is not a browser push service', functio
 ]);
 
 test('a stored endpoint that is not a browser push service is never sent to', function (): void {
-    // Rows saved before the subscribe check existed stay in the table.
+    // A row saved before the subscribe check could name any address.
     $user = User::factory()->create();
     $user->updatePushSubscription('http://169.254.169.254/latest/meta-data', 'k', 'a');
     $user->updatePushSubscription('https://fcm.googleapis.com/fcm/send/abc', 'k', 'a');
@@ -391,4 +391,25 @@ test('the limit counts per account, not across accounts', function (): void {
     }
 
     expect($other->pushSubscriptions()->count())->toBe(1);
+});
+
+test('the cleanup migration removes the subscriptions stored before the subscribe checks', function (): void {
+    $user = User::factory()->create();
+    $user->updatePushSubscription('http://169.254.169.254/latest/meta-data', 'k', 'a');
+    $user->updatePushSubscription('https://fcm.googleapis.com:8443/fcm/send/port', 'k', 'a');
+    $user->updatePushSubscription('https://wns2-par02p.notify.windows.com/w/edge', 'k', 'a');
+
+    foreach (range(1, 11) as $number) {
+        $user->updatePushSubscription("https://fcm.googleapis.com/fcm/send/device-{$number}", 'k', 'a');
+    }
+
+    $other = User::factory()->create();
+    $other->updatePushSubscription('https://updates.push.services.mozilla.com/wpush/v2/other', 'k', 'a');
+
+    (require database_path('migrations/2026_11_17_183000_delete_push_subscriptions_stored_before_the_subscribe_checks.php'))->up();
+
+    $endpoints = $user->pushSubscriptions()->orderBy('id')->pluck('endpoint')->all();
+
+    expect($endpoints)->toBe(array_map(static fn (int $number): string => "https://fcm.googleapis.com/fcm/send/device-{$number}", range(2, 11)))
+        ->and($other->pushSubscriptions()->pluck('endpoint')->all())->toBe(['https://updates.push.services.mozilla.com/wpush/v2/other']);
 });
