@@ -108,7 +108,7 @@ test('the consent screen names the host the code goes to, not the first one the 
     // goes to whichever registered URI the request names.
     $clientId = $this->postJson('oauth/register', [
         'client_name' => 'Trusted',
-        'redirect_uris' => ['https://trusted.example.test/cb', 'https://other.example.test/cb'],
+        'redirect_uris' => ['https://claude.ai/api/mcp/auth_callback', 'http://localhost:4100/cb'],
     ])->assertSuccessful()->json('client_id');
 
     $verifier = Str::random(64);
@@ -118,13 +118,13 @@ test('the consent screen names the host the code goes to, not the first one the 
         ->get(route('passport.authorizations.authorize', [
             'client_id' => $clientId,
             'response_type' => 'code',
-            'redirect_uri' => 'https://other.example.test/cb',
+            'redirect_uri' => 'http://localhost:4100/cb',
             'scope' => 'mcp:use',
             'code_challenge' => $challenge,
             'code_challenge_method' => 'S256',
             'state' => 'the-client-state',
         ]))
         ->assertOk()
-        ->assertSee('It will send you back to other.example.test.')
-        ->assertDontSee('trusted.example.test');
+        ->assertSee('It will send you back to localhost.')
+        ->assertDontSee('claude.ai');
 });

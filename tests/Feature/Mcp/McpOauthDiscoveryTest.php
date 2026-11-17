@@ -78,7 +78,7 @@ it('limits open client registration per address', function (): void {
 
     $register = fn () => $this->postJson('oauth/register', [
         'client_name' => 'Flood',
-        'redirect_uris' => ['https://client.example.test/cb'],
+        'redirect_uris' => ['https://claude.ai/api/mcp/auth_callback'],
     ]);
 
     for ($attempt = 1; $attempt <= 30; $attempt++) {
@@ -87,3 +87,30 @@ it('limits open client registration per address', function (): void {
 
     $register()->assertTooManyRequests();
 });
+
+it('registers a client that sends the code back to a known assistant', function (string $redirectUri): void {
+    $this->withServerVariables(['REMOTE_ADDR' => fake()->unique()->ipv4()]);
+
+    $this->postJson('oauth/register', [
+        'client_name' => 'Assistant',
+        'redirect_uris' => [$redirectUri],
+    ])->assertSuccessful();
+})->with([
+    'Claude' => 'https://claude.ai/api/mcp/auth_callback',
+    'ChatGPT' => 'https://chatgpt.com/connector_platform_oauth_redirect',
+    'a desktop client on loopback' => 'http://127.0.0.1:33418/callback',
+    'Cursor' => 'cursor://anysphere.cursor-mcp/oauth/callback',
+]);
+
+it('refuses a client that sends the code anywhere else', function (string $redirectUri): void {
+    $this->withServerVariables(['REMOTE_ADDR' => fake()->unique()->ipv4()]);
+
+    $this->postJson('oauth/register', [
+        'client_name' => 'Claude',
+        'redirect_uris' => [$redirectUri],
+    ])->assertStatus(400)->assertJsonPath('error', 'invalid_redirect_uri');
+})->with([
+    'an unknown site' => 'https://attacker.example.test/cb',
+    'a look-alike host' => 'https://claude.ai.attacker.example.test/cb',
+    'an unknown custom scheme' => 'attacker://callback',
+]);
