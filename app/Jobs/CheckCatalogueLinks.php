@@ -63,7 +63,7 @@ final class CheckCatalogueLinks implements ShouldQueue
         foreach ($this->toSearch as $lost) {
             $host = self::hostOf($lost['chain']);
             // The chains of the daily list are Dutch, whoever owns the product.
-            $search = $host === null ? null : $searches->forQuery(trim("site:{$host} {$lost['name']} {$lost['size']}"), 'nl');
+            $search = $host === null ? null : $searches->forQuery(trim("site:{$host} {$lost['name']} {$lost['size']}"), 'nl', $product->user);
 
             if ($search instanceof WebSearch) {
                 $found = $discovery->storeFindingsOn($product, $search, $host) || $found;

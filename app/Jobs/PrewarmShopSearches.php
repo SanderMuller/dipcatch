@@ -43,9 +43,13 @@ final class PrewarmShopSearches implements ShouldQueue
      */
     public string $country = 'nl';
 
-    public function __construct(public string $title, string $country = 'nl')
+    /** The account whose daily search share pays; null for a job queued before it had one. */
+    public ?User $account = null;
+
+    public function __construct(public string $title, string $country = 'nl', ?User $account = null)
     {
         $this->country = $country;
+        $this->account = $account;
     }
 
     /** Only where discovery would search after the save, and within the account's budget. */
@@ -62,7 +66,7 @@ final class PrewarmShopSearches implements ShouldQueue
             return;
         }
 
-        dispatch(new self($title, ShoppersCountry::of($user)));
+        dispatch(new self($title, ShoppersCountry::of($user), $user));
     }
 
     /**
@@ -78,12 +82,12 @@ final class PrewarmShopSearches implements ShouldQueue
 
     public function handle(WebSearches $searches): void
     {
-        $search = $searches->lookUp($this->title, $this->country)->search;
+        $search = $searches->lookUp($this->title, $this->country, account: $this->account)->search;
 
         // Discovery searches for the Klarna page only when the open search
         // has none among its results.
         if (KlarnaSource::enabled() && KlarnaPageSearch::searchesIn($this->country) && $search instanceof WebSearch && KlarnaPageSearch::klarnaResults($search) === []) {
-            $searches->lookUp(KlarnaPageSearch::queryFor($this->title, $this->country), $this->country);
+            $searches->lookUp(KlarnaPageSearch::queryFor($this->title, $this->country), $this->country, account: $this->account);
         }
     }
 }

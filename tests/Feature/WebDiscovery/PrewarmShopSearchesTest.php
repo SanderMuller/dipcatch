@@ -134,6 +134,23 @@ it('stores the shop search and the Klarna search, which discovery then reuses fo
     Http::assertSent(fn (Request $request): bool => $request['q'] === 'Ecodor UF2000');
 });
 
+it('spends the account\'s daily share of searches, not another account\'s', function (): void {
+    config()->set('dipcatch.web_discovery.account_daily_search_limit', 1);
+    Http::preventStrayRequests();
+    Http::fake([SerperProvider::ENDPOINT => Http::response(['organic' => [['title' => 'Ecodor 2 x 1 liter', 'link' => 'https://shop.test/p/1']]])]);
+    $user = shopCheckUser();
+
+    // The open search takes the account's one search; the Klarna search is refused.
+    new PrewarmShopSearches('Ecodor UF2000', 'nl', $user)->handle(app(WebSearches::class));
+    new PrewarmShopSearches('Ecodor UF3000', 'nl', $user)->handle(app(WebSearches::class));
+
+    Http::assertSentCount(1);
+
+    new PrewarmShopSearches('Ecodor UF3000', 'nl', shopCheckUser())->handle(app(WebSearches::class));
+
+    Http::assertSentCount(2);
+});
+
 it('searches for the account\'s country, and skips the Klarna search where DipCatch does not search Klarna', function (): void {
     Queue::fake();
     $user = shopCheckUser();

@@ -441,6 +441,27 @@ test('a spent search limit leaves leads pending for the next run, which finishes
         ->and(WebShopFinding::query()->where('product_id', $product->id)->where('status', WebFindingStatus::Proposed)->count())->toBe(2);
 });
 
+test('the Klarna searches spend the owner\'s daily share, and leads wait for the next day', function (): void {
+    fakeKlarnaWorld(happyKlarnaSearches(), [
+        medpetsLeadUrl() => medpetsPage(),
+        brekzLeadUrl() => leadPage('Hill’s Adult Sterilised Cat met eend kattenvoer 10 kg', '85.69'),
+    ]);
+    config()->set('dipcatch.web_discovery.account_daily_search_limit', 2);
+    $product = klarnaProduct();
+
+    // Open search and Klarna search spend the account's two searches.
+    discoverKlarna($product);
+
+    $discovery = WebDiscovery::query()->findOrFail($product->id);
+    expect(array_column($discovery->klarna_leads ?? [], 'state'))->toBe(['pending', 'pending'])
+        ->and(array_column($discovery->klarna_leads ?? [], 'attempts'))->toBe([0, 0]);
+
+    $this->travel(1)->day();
+    discoverKlarna($product->refresh()->load('user', 'shops'));
+
+    expect(array_column($discovery->refresh()->klarna_leads ?? [], 'state'))->toBe(['done', 'done']);
+});
+
 test('a lookup whose search fails counts against its lead until it gives up', function (): void {
     fakeKlarnaWorld(['site:medpets.nl' => 500]);
     $product = klarnaProduct();

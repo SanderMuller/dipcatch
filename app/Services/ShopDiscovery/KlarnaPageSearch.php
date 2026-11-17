@@ -44,7 +44,7 @@ final readonly class KlarnaPageSearch
             return self::NONE;
         }
 
-        $outcome = $this->searches->lookUp(self::queryFor($product->title, $country), $country);
+        $outcome = $this->searches->lookUp(self::queryFor($product->title, $country), $country, account: $product->user);
 
         if (! $outcome->search instanceof WebSearch) {
             return $outcome->isDeferred() ? self::DEFERRED : self::FAILED;
