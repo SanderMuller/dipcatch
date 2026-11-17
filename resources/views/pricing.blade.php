@@ -10,11 +10,15 @@
     $trialDays = auth()->user()?->qualifiesForTrial() === false ? 0 : \App\Billing\ProPrice::trialDays();
     $authed = auth()->check();
     $ctaHref = $authed ? url('/app/billing') : route('register');
-    // Pro has its own destination: `upgrade` decides between registration,
-    // checkout and the billing page, so the card links to one URL whoever
-    // is reading it.
+    // A stranger goes through `upgrade` to registration. An account starts
+    // checkout from here with a form post.
     $isPro = $authed && auth()->user()?->isPro() === true;
-    $proCtaHref = $isPro ? url('/app/billing') : route('upgrade');
+    $startsCheckout = $authed && ! $isPro;
+    $proCtaHref = match (true) {
+        $isPro => url('/app/billing'),
+        $startsCheckout => route('billing.checkout'),
+        default => route('upgrade'),
+    };
     $proCtaLabel = match (true) {
         $isPro => __('Your plan'),
         $authed => __('Upgrade to Pro'),
@@ -60,8 +64,8 @@
                 <x-plans.comparison
                     class="mt-12"
                     :free-cta="$isPro ? null : ['href' => $ctaHref, 'label' => $authed ? __('Your plan') : __('Start free')]"
-                    :pro-cta="['href' => $proCtaHref, 'label' => $proCta, 'short' => $trialDays > 0 ? __('Try free') : __('Get Pro')]"
-                    :yearly-cta="! $isPro && \App\Billing\ProPrice::hasYearly() ? ['href' => route('upgrade', ['interval' => 'yearly']), 'label' => __('Pay yearly instead: :price', ['price' => \App\Billing\ProPrice::yearlyLabel()])] : null"
+                    :pro-cta="['href' => $proCtaHref, 'post' => $startsCheckout, 'label' => $proCta, 'short' => $trialDays > 0 ? __('Try free') : __('Get Pro')]"
+                    :yearly-cta="! $isPro && \App\Billing\ProPrice::hasYearly() ? ['href' => $startsCheckout ? route('billing.checkout', ['interval' => 'yearly']) : route('upgrade'), 'post' => $startsCheckout, 'label' => __('Pay yearly instead: :price', ['price' => \App\Billing\ProPrice::yearlyLabel()])] : null"
                     :note="$isPro ? null : $trialNote"
                     :is-pro="$isPro"
                     :offers-trial="$trialDays > 0"

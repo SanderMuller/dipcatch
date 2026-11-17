@@ -70,7 +70,7 @@ it('refuses checkout when no stripe price is configured', function (): void {
     config()->set('plans.stripe.pro_price_id');
 
     $this->actingAs(User::factory()->create())
-        ->get('/billing/checkout')
+        ->post('/billing/checkout')
         ->assertRedirect('/app/billing');
 });
 
@@ -81,7 +81,7 @@ it('sends an already-pro customer back instead of selling twice', function (): v
     subscribeUser($user);
 
     $this->actingAs($user)
-        ->get('/billing/checkout')
+        ->post('/billing/checkout')
         ->assertRedirect('/app/billing');
 });
 
@@ -93,7 +93,7 @@ it('refuses to sell a second subscription to a blocked customer', function (): v
     $user = User::factory()->create(['billing_blocked_at' => now()]);
 
     $this->actingAs($user)
-        ->get('/billing/checkout')
+        ->post('/billing/checkout')
         ->assertRedirect('/app/billing');
 
     expect($user->fresh()?->stripe_checkout_session_id)->toBeNull();
@@ -106,7 +106,7 @@ it('sends an active subscriber back rather than starting a second checkout', fun
     subscribeUser($user, 'past_due');
 
     $this->actingAs($user)
-        ->get('/billing/checkout')
+        ->post('/billing/checkout')
         ->assertRedirect('/app/billing');
 });
 
@@ -125,7 +125,7 @@ it('does not open a second checkout while one is already paid for', function ():
     });
 
     $this->actingAs($user)
-        ->get('/billing/checkout')
+        ->post('/billing/checkout')
         ->assertRedirect('/app/billing');
 
     // No new session was started: the stored one is still the only one.
@@ -146,7 +146,7 @@ it('resumes a checkout session the customer left open', function (): void {
     });
 
     $this->actingAs($user)
-        ->get('/billing/checkout')
+        ->post('/billing/checkout')
         ->assertRedirect('https://checkout.stripe.test/cs_open');
 });
 
@@ -177,7 +177,7 @@ it('ends an open session for the other interval instead of resuming it', functio
     app()->instance(CheckoutSessions::class, $sessions);
 
     $this->actingAs($user)
-        ->get('/billing/checkout/yearly')
+        ->post('/billing/checkout/yearly')
         ->assertRedirect('/app/billing');
 
     expect($sessions->expired)->toBe(['cs_monthly']);
@@ -189,7 +189,7 @@ it('refuses a yearly checkout while there is no yearly Price, rather than sell m
     $user = User::factory()->create();
 
     $this->actingAs($user)
-        ->get('/billing/checkout/yearly')
+        ->post('/billing/checkout/yearly')
         ->assertRedirect('/app/billing');
 
     expect($user->fresh()?->stripe_checkout_session_id)->toBeNull();
@@ -202,8 +202,8 @@ it('sends a customer with no stripe account back from the portal', function (): 
 });
 
 it('does not touch checkout when another site sends the browser to it', function (): void {
-    // Checkout is a GET link, so any site can navigate
-    // a signed-in browser to it. The browser marks that request cross-site.
+    // Any site can navigate a signed-in browser to a URL, so checkout takes
+    // a form post with a CSRF token and refuses a plain visit.
     configureStripe();
     config()->set('plans.stripe.pro_yearly_price_id', 'price_year');
 
@@ -229,9 +229,8 @@ it('does not touch checkout when another site sends the browser to it', function
     app()->instance(CheckoutSessions::class, $sessions);
 
     $this->actingAs($user)
-        ->withHeader('Sec-Fetch-Site', 'cross-site')
         ->get('/billing/checkout/yearly')
-        ->assertRedirect('/app/billing');
+        ->assertMethodNotAllowed();
 
     expect($sessions->expired)
         ->toBeEmpty()

@@ -2,14 +2,14 @@
     Free and Pro side by side, row by row, with what Pro adds on each row.
     The numbers come from the plans, so no page can drift from them. The
     page decides where each button goes: the pricing page sends a visitor
-    to sign up, the app sends an account straight to checkout.
+    to sign up, the app posts an account straight to checkout.
 --}}
 @props([
     /** @var array{href: string, label: string}|null */
     'freeCta' => null,
-    /** @var array{href: string, label: string, short: string}|null */
+    /** @var array{href: string, label: string, short: string, post?: bool}|null */
     'proCta' => null,
-    /** @var array{href: string, label: string}|null */
+    /** @var array{href: string, label: string, post?: bool}|null */
     'yearlyCta' => null,
     'note' => null,
     'isPro' => false,
@@ -116,9 +116,9 @@
                         <p class="text-sm font-normal text-zinc-600 dark:text-zinc-400">{{ __('or :price a year', ['price' => \App\Billing\ProPrice::yearlyLabel()]) }}</p>
                     @endif
                     @if ($onSale && $proCta !== null)
-                        <a href="{{ $proCta['href'] }}" @class([$proButton, 'mt-3', 'max-sm:hidden' => $isPro])>
+                        <x-plans.cta :cta="$proCta" @class([$proButton, 'mt-3', 'max-sm:hidden' => $isPro])>
                             <span class="sm:hidden">{{ $proCta['short'] }}</span><span class="max-sm:hidden">{{ $proCta['label'] }}</span>
-                        </a>
+                        </x-plans.cta>
                     @endif
                 </th>
             </tr>
@@ -156,9 +156,9 @@
                 <td class="rounded-b-2xl bg-soft-yellow/60 px-3 dark:bg-zinc-900 pt-6 pb-6 align-top sm:px-6">
                     {{-- On a phone the buttons sit full width under the table. --}}
                     @if ($onSale && $proCta !== null)
-                        <a href="{{ $proCta['href'] }}" class="{{ $proButton }} max-sm:hidden">{{ $proCta['label'] }}</a>
+                        <x-plans.cta :cta="$proCta" class="{{ $proButton }} max-sm:hidden">{{ $proCta['label'] }}</x-plans.cta>
                         @if ($yearlyCta !== null)
-                            <a href="{{ $yearlyCta['href'] }}" class="mt-3 block text-center text-sm max-sm:hidden font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">{{ $yearlyCta['label'] }}</a>
+                            <x-plans.cta :cta="$yearlyCta" class="mt-3 block w-full text-center text-sm max-sm:hidden font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">{{ $yearlyCta['label'] }}</x-plans.cta>
                         @endif
                     @else
                         <p class="rounded-full bg-ink/5 px-3 py-2 text-center text-sm font-medium text-zinc-500">{{ __('Coming soon') }}</p>
@@ -168,11 +168,11 @@
         </tfoot>
     </table>
 
-    <div class="mt-6 space-y-3 sm:hidden">
+    <div class="mt-6 flex flex-col gap-3 sm:hidden">
         @if ($onSale && $proCta !== null)
-            <a href="{{ $proCta['href'] }}" class="flex w-full items-center justify-center rounded-full bg-ink px-4 py-2.5 text-base font-medium text-paper hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{{ $proCta['label'] }}</a>
+            <x-plans.cta :cta="$proCta" class="flex w-full items-center justify-center rounded-full bg-ink px-4 py-2.5 text-base font-medium text-paper hover:bg-ink/85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{{ $proCta['label'] }}</x-plans.cta>
             @if ($yearlyCta !== null)
-                <a href="{{ $yearlyCta['href'] }}" class="block text-center text-base font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">{{ $yearlyCta['label'] }}</a>
+                <x-plans.cta :cta="$yearlyCta" class="block w-full text-center text-base font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand">{{ $yearlyCta['label'] }}</x-plans.cta>
             @endif
         @endif
         @if ($freeCta !== null)

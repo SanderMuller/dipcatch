@@ -30,11 +30,11 @@
 
         @if ($onSale)
             <div class="mt-8 flex flex-col items-center gap-3">
-                <a href="{{ route('billing.checkout') }}" class="{{ $cta }}" data-test="pro-page-cta">{{ $ctaLabel }}</a>
+                <x-plans.cta :cta="['href' => route('billing.checkout'), 'post' => true]" class="{{ $cta }}" data-test="pro-page-cta">{{ $ctaLabel }}</x-plans.cta>
                 <p class="text-base text-zinc-500 sm:text-sm dark:text-zinc-400">
                     {{ $offersTrial ? __('No charge before the trial ends. Cancel any time.') : __('Cancel any time.') }}
                     @if ($yearlyLabel !== null)
-                        <a href="{{ route('billing.checkout', ['interval' => 'yearly']) }}" class="font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand dark:text-white">{{ $yearlyLabel }}</a>
+                        <x-plans.cta :cta="['href' => route('billing.checkout', ['interval' => 'yearly']), 'post' => true]" class="font-medium text-ink underline decoration-line underline-offset-4 hover:text-brand dark:text-white">{{ $yearlyLabel }}</x-plans.cta>
                     @endif
                 </p>
             </div>
@@ -91,8 +91,8 @@
                 class="mt-8"
                 sticky-top="top-[4.75rem]"
                 :offers-trial="$offersTrial"
-                :pro-cta="['href' => route('billing.checkout'), 'label' => $offersTrial ? __('Try Pro free') : __('Get Pro'), 'short' => $offersTrial ? __('Try free') : __('Get Pro')]"
-                :yearly-cta="$yearlyLabel === null ? null : ['href' => route('billing.checkout', ['interval' => 'yearly']), 'label' => $yearlyLabel]"
+                :pro-cta="['href' => route('billing.checkout'), 'post' => true, 'label' => $offersTrial ? __('Try Pro free') : __('Get Pro'), 'short' => $offersTrial ? __('Try free') : __('Get Pro')]"
+                :yearly-cta="$yearlyLabel === null ? null : ['href' => route('billing.checkout', ['interval' => 'yearly']), 'post' => true, 'label' => $yearlyLabel]"
             />
         </section>
 
@@ -101,7 +101,7 @@
                 <h2 class="max-w-[40ch] text-2xl font-semibold tracking-tight text-balance text-ink dark:text-white">{{ __('Try it on the products you already follow') }}</h2>
                 <p class="max-w-[56ch] text-base text-pretty text-zinc-600 dark:text-zinc-300">{{ __('If you go back to Free, nothing you follow is deleted or stopped.') }}</p>
                 <div class="pt-3">
-                    <a href="{{ route('billing.checkout') }}" class="{{ $cta }}">{{ $ctaLabel }}</a>
+                    <x-plans.cta :cta="['href' => route('billing.checkout'), 'post' => true]" class="{{ $cta }}">{{ $ctaLabel }}</x-plans.cta>
                 </div>
             </section>
         @endif

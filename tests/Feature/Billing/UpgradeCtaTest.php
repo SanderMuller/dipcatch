@@ -11,10 +11,11 @@ it('remembers the billing page while a stranger registers', function (): void {
         ->assertSessionHas('url.intended', url('/app/billing'));
 });
 
-it('sends a signed-in free account straight to checkout', function (): void {
+it('sends a signed-in free account to the billing page, where checkout is a form', function (): void {
     $this->actingAs(User::factory()->create());
 
-    $this->get(route('upgrade'))->assertRedirect(route('billing.checkout'));
+    $this->get(route('upgrade'))->assertRedirect('/app/billing');
+    $this->get(route('upgrade', ['interval' => 'yearly']))->assertRedirect('/app/billing');
 });
 
 it('sends a subscriber to the page that manages the subscription', function (): void {
@@ -64,5 +65,5 @@ it('labels only the plan the account is on as its plan', function (): void {
     $this->get(route('pricing'))
         ->assertOk()
         ->assertSee('Your plan')
-        ->assertSeeHtml(route('upgrade'));
+        ->assertSeeHtml('action="' . route('billing.checkout') . '"');
 });

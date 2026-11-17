@@ -62,19 +62,12 @@ it('sells the yearly Price when it exists, and the monthly one when it does not'
         ->and(ProPrice::priceIdFor(BillingInterval::Monthly))->toBe('price_1');
 });
 
-it('carries the yearly choice from the upgrade link to the checkout', function (): void {
-    $this->actingAs(User::factory()->create());
-
-    $this->get(route('upgrade', ['interval' => 'yearly']))
-        ->assertRedirect(route('billing.checkout', ['interval' => 'yearly']));
-
-    $this->get('/upgrade/weekly')->assertNotFound();
-});
-
-it('keeps a guest yearly choice through signup', function (): void {
+it('sends a guest from the yearly link through signup to the billing page', function (): void {
     $this->get(route('upgrade', ['interval' => 'yearly']))->assertRedirect(route('register'));
 
-    expect(session('url.intended'))->toBe(route('upgrade', ['interval' => 'yearly']));
+    expect(session('url.intended'))->toBe(url('/app/billing'));
+
+    $this->get('/upgrade/weekly')->assertNotFound();
 });
 
 it('offers the yearly price beside the monthly one on the billing page and the pricing page', function (): void {
@@ -135,7 +128,7 @@ it('charges the yearly Price for a yearly checkout, also after ending an open mo
     Cache::put('billing:checkout-interval:' . $user->id, 'monthly');
 
     $this->actingAs($user)
-        ->get(route('billing.checkout', ['interval' => 'yearly']))
+        ->post(route('billing.checkout', ['interval' => 'yearly']))
         ->assertRedirect('https://checkout.stripe.test/cs_new');
 
     $created = collect($api->calls)->firstWhere('path', '/v1/checkout/sessions');

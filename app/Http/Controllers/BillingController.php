@@ -11,7 +11,6 @@ use App\Billing\StripeTax;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Cashier\Checkout;
 use Throwable;
@@ -24,45 +23,27 @@ final class BillingController extends Controller
 {
     /**
      * The one link the marketing pages point Pro at, for signed-in visitors
-     * and strangers alike.
+     * and strangers alike. It ends on the billing page, because checkout
+     * takes a form post and a redirect cannot make one.
      *
      * A stranger is sent to registration with the billing page recorded as
-     * the intended URL, or this link again for a yearly choice, so it is not
-     * lost. Fortify's register, login and email-verification responses all
-     * redirect through `intended()`, so the intent survives the whole signup
-     * — without this the CTA landed them on the dashboard with nothing to say
-     * why they were there.
+     * the intended URL. Fortify's register, login and email-verification
+     * responses all redirect through `intended()`, so the intent survives
+     * the whole signup.
      */
-    public function upgrade(string $interval = 'monthly'): RedirectResponse
+    public function upgrade(): RedirectResponse
     {
         if (! auth()->check()) {
-            session()->put('url.intended', $interval === BillingInterval::Yearly->value
-                ? route('upgrade', ['interval' => $interval])
-                : url('/app/billing'));
+            session()->put('url.intended', url('/app/billing'));
 
             return redirect()->route('register');
         }
 
-        // Anyone Stripe already bills goes to the page that manages it, not
-        // to a second checkout. Any live row, not the newest one — see
-        // `User::payingSubscription()`.
-        if ($this->user()->payingSubscription()?->valid() === true) {
-            return redirect('/app/billing');
-        }
-
-        return redirect()->route('billing.checkout', $interval === BillingInterval::Yearly->value ? ['interval' => $interval] : []);
+        return redirect('/app/billing');
     }
 
-    public function checkout(Request $request, string $interval = 'monthly'): Checkout|RedirectResponse
+    public function checkout(string $interval = 'monthly'): Checkout|RedirectResponse
     {
-        // A GET link, so another site can send a signed-in browser here, and
-        // this action creates, ends and redirects to Stripe sessions. The
-        // browser marks such a request, and a redirect keeps the mark. The
-        // billing page offers the same choice behind one more click.
-        if ($request->headers->get('Sec-Fetch-Site') === 'cross-site') {
-            return redirect('/app/billing');
-        }
-
         if (! BillingGate::isOpen()) {
             return $this->failed('Pro is not on sale yet.');
         }

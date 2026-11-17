@@ -212,7 +212,7 @@ it('does not offer a second checkout to an account Stripe already bills', functi
 
     // Both doors: the upgrade entry point and the checkout itself.
     $this->actingAs($user)->get('/upgrade')->assertRedirect('/app/billing');
-    $this->actingAs($user)->get('/billing/checkout')->assertRedirect('/app/billing');
+    $this->actingAs($user)->post('/billing/checkout')->assertRedirect('/app/billing');
 });
 
 it('still drops to free when every row is dead', function (): void {

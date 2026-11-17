@@ -85,7 +85,7 @@ it('refuses checkout while the shop is shut', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user)
-        ->get('/billing/checkout')
+        ->post('/billing/checkout')
         ->assertRedirect('/app/billing');
 
     // The gate's own message, not merely a redirect: without the gate the

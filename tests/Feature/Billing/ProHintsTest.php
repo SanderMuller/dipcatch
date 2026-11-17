@@ -92,7 +92,7 @@ it('lands a free account on the Pro page, with checkout one click away', functio
         ->get(route('app.pro'))
         ->assertOk()
         ->assertSee('Catch every good price, at every shop')
-        ->assertSeeHtml('href="' . route('billing.checkout') . '"')
+        ->assertSeeHtml('action="' . route('billing.checkout') . '"')
         ->assertSee('Free and Pro, side by side');
 });
 
@@ -108,7 +108,7 @@ it('sells nothing on the Pro page while Pro cannot be bought', function (): void
         ->get(route('app.pro'))
         ->assertOk()
         ->assertSee('Pro is not on sale yet.')
-        ->assertDontSeeHtml('href="' . route('billing.checkout') . '"');
+        ->assertDontSeeHtml('action="' . route('billing.checkout') . '"');
 });
 
 it('offers no Pro button to an account checkout would refuse', function (): void {
