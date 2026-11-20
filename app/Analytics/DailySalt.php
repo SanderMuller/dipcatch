@@ -43,7 +43,7 @@ final class DailySalt
     private static function forgetOlderSalts(Repository $cache, CarbonImmutable $day): void
     {
         $days = max(
-            config()->integer('analytics.retention.anonymous_days', 30),
+            config()->integer('analytics.retention.anonymous_days', 32),
             config()->integer('analytics.retention.linked_days', 90),
         ) + 1;
 

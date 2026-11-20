@@ -2,6 +2,7 @@
 
 namespace App\Analytics\Console;
 
+use App\Analytics\Enums\StatPeriod;
 use App\Analytics\PageViewStats;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
@@ -32,7 +33,7 @@ final class RollupCommand extends Command
             return self::INVALID;
         }
 
-        $oldestComplete = Date::now()->toImmutable()->startOfDay()->subDays(config()->integer('analytics.retention.anonymous_days', 30) - 1);
+        $oldestComplete = Date::now()->toImmutable()->startOfDay()->subDays(config()->integer('analytics.retention.anonymous_days', 32) - 1);
 
         if ($day->lessThan($oldestComplete)) {
             $this->error("The raw page views for {$day->toDateString()} may already be pruned, so a rollup would overwrite its totals with partial counts. The oldest day that can be rolled up is {$oldestComplete->toDateString()}.");
@@ -43,6 +44,18 @@ final class RollupCommand extends Command
         $count = $stats->rollup($day);
 
         $this->info("Rolled up {$day->toDateString()}: {$count} rows.");
+
+        foreach (StatPeriod::cases() as $period) {
+            $start = $period->startOf($day);
+
+            if ($start->lessThan($oldestComplete)) {
+                $this->warn("Skipped the {$period->value} from {$start->toDateString()}: it starts before {$oldestComplete->toDateString()}, so its raw page views may already be pruned.");
+
+                continue;
+            }
+
+            $stats->rollupPeriod($period, $start);
+        }
 
         return self::SUCCESS;
     }

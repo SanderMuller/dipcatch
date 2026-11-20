@@ -89,11 +89,11 @@ it('puts a view on the day it happened in the app timezone', function (): void {
     expect(analyticsStat('2026-11-19', PageViewSection::Marketing, StatDimension::Total)?->views)->toBe(2);
 });
 
-it('prunes anonymous rows after 30 days and linked rows after 90', function (): void {
+it('prunes anonymous rows after 32 days and linked rows after 90', function (): void {
     $user = User::factory()->create();
 
-    $keptAnonymous = PageView::factory()->anonymous()->create([PageView::VIEWED_AT => now()->subDays(29)]);
-    PageView::factory()->anonymous()->create([PageView::VIEWED_AT => now()->subDays(31)]);
+    $keptAnonymous = PageView::factory()->anonymous()->create([PageView::VIEWED_AT => now()->subDays(31)]);
+    PageView::factory()->anonymous()->create([PageView::VIEWED_AT => now()->subDays(33)]);
     $keptLinked = PageView::factory()->linked($user)->create([PageView::VIEWED_AT => now()->subDays(89)]);
     PageView::factory()->linked($user)->create([PageView::VIEWED_AT => now()->subDays(91)]);
 

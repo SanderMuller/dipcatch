@@ -10,6 +10,7 @@ use App\Filament\Admin\Widgets\Visitors\TopPagesWidget;
 use App\Filament\Admin\Widgets\Visitors\TopReferrersWidget;
 use App\Filament\Admin\Widgets\Visitors\TopUtmCampaignsWidget;
 use App\Filament\Admin\Widgets\Visitors\TopUtmSourcesWidget;
+use App\Filament\Admin\Widgets\Visitors\UniqueVisitorsWidget;
 use App\Filament\Admin\Widgets\Visitors\VisitorRange;
 use App\Filament\Admin\Widgets\Visitors\VisitorsPerDayChart;
 use App\Filament\Admin\Widgets\Visitors\VisitorStatsWidget;
@@ -61,6 +62,7 @@ final class Visitors extends Dashboard
     {
         return [
             VisitorStatsWidget::class,
+            UniqueVisitorsWidget::class,
             VisitorsPerDayChart::class,
             TopPagesWidget::class,
             TopReferrersWidget::class,

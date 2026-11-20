@@ -4,8 +4,10 @@ namespace App\Analytics;
 
 use App\Analytics\Enums\PageViewSection;
 use App\Analytics\Enums\StatDimension;
+use App\Analytics\Enums\StatPeriod;
 use App\Analytics\Models\PageView;
 use App\Analytics\Models\PageViewDailyStat;
+use App\Analytics\Models\PageViewPeriodStat;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder as EloquentQueryBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -42,6 +44,79 @@ final class PageViewStats
         });
 
         return count($rows);
+    }
+
+    /**
+     * Rebuilds the unique counts for the period that starts on `$start`, up to
+     * the end of yesterday. A rerun replaces the period's rows.
+     */
+    public function rollupPeriod(StatPeriod $period, CarbonImmutable $start): int
+    {
+        $start = $period->startOf($start->startOfDay());
+        $end = $period->endAfter($start)->min(now()->toImmutable()->startOfDay());
+
+        $views = fn (): QueryBuilder => PageView::query()
+            ->toBase()
+            ->selectRaw('COUNT(DISTINCT user_id) as visitors')
+            ->selectRaw('COUNT(DISTINCT user_id) as users')
+            ->whereNotNull(PageView::USER_ID)
+            ->where(PageView::VIEWED_AT, '>=', $start)
+            ->where(PageView::VIEWED_AT, '<', $end);
+
+        $results = $views()->selectRaw('section as section')->groupBy(PageView::SECTION)->get()
+            ->push((object) [...(array) $views()->first(), 'section' => PageViewPeriodStat::ALL_SECTIONS]);
+
+        $rows = $results
+            ->filter(static fn (object $row): bool => self::number($row->users ?? 0) > 0)
+            ->map(static fn (object $row): array => [
+                PageViewPeriodStat::PERIOD => $period->value,
+                PageViewPeriodStat::STARTS_ON => $start->toDateString(),
+                PageViewPeriodStat::SECTION => self::text($row->section ?? ''),
+                PageViewPeriodStat::VISITORS => self::number($row->visitors ?? 0),
+                PageViewPeriodStat::USERS => self::number($row->users ?? 0),
+            ])
+            ->values()
+            ->all();
+
+        DB::transaction(function () use ($period, $start, $rows): void {
+            PageViewPeriodStat::query()
+                ->where(PageViewPeriodStat::PERIOD, $period->value)
+                ->whereDate(PageViewPeriodStat::STARTS_ON, $start->toDateString())
+                ->delete();
+
+            PageViewPeriodStat::query()->insert($rows);
+        });
+
+        return count($rows);
+    }
+
+    /**
+     * The stored whole-site weeks and months that overlap a range, newest
+     * first. `complete` is false for a period that has not ended yet.
+     *
+     * @return list<array{period: StatPeriod, starts_on: CarbonImmutable, visitors: int, users: int, complete: bool}>
+     */
+    public function periods(CarbonImmutable $from, CarbonImmutable $until): array
+    {
+        $today = now()->toImmutable()->startOfDay();
+
+        return PageViewPeriodStat::query()
+            ->where(PageViewPeriodStat::SECTION, PageViewPeriodStat::ALL_SECTIONS)
+            ->whereDate(PageViewPeriodStat::STARTS_ON, '<=', $until->toDateString())
+            ->whereDate(PageViewPeriodStat::STARTS_ON, '>', $from->startOfDay()->subMonthNoOverflow()->toDateString())
+            ->orderByDesc(PageViewPeriodStat::STARTS_ON)
+            ->orderBy(PageViewPeriodStat::PERIOD)
+            ->get()
+            ->filter(static fn (PageViewPeriodStat $stat): bool => $stat->period->endAfter($stat->starts_on)->greaterThan($from->startOfDay()))
+            ->map(static fn (PageViewPeriodStat $stat): array => [
+                'period' => $stat->period,
+                'starts_on' => $stat->starts_on,
+                'visitors' => $stat->visitors,
+                'users' => $stat->users,
+                'complete' => $stat->period->endAfter($stat->starts_on)->lessThanOrEqualTo($today),
+            ])
+            ->values()
+            ->all();
     }
 
     /**

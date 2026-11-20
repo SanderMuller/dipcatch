@@ -149,5 +149,5 @@ it('explains visit counting on the privacy page', function (): void {
     $this->get(route('privacy'))
         ->assertOk()
         ->assertSee('we count the pages people open on this site ourselves, without cookies or analytics scripts.', false)
-        ->assertSee('Page visits are kept for 30 days', false);
+        ->assertSee('Page visits are kept for 32 days', false);
 });

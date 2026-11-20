@@ -99,7 +99,7 @@
                     <section>
                         <h2>{{ __('How long') }}</h2>
                         <p class="mt-2">{{ __('As long as you have an account. Price-check history older than a year is pruned, keeping the most recent points so your charts keep working. Delete a product and its history goes with it. Delete your account (Settings → Profile) and everything goes.') }}</p>
-                        <p class="mt-2">{{ __('Page visits are kept for 30 days, and app usage linked to your account for 90 days. After that only daily totals remain, which say nothing about you.') }}</p>
+                        <p class="mt-2">{{ __('Page visits are kept for 32 days, and app usage linked to your account for 90 days. After that only daily, weekly and monthly totals remain, which say nothing about you.') }}</p>
                         <p class="mt-2">{{ __('A web search is stored as its search text, without your account id, so the next search for the same text needs no new one. A search text nothing else uses is deleted after 90 days. One that found shops for a product stays with that product.') }}</p>
                         <p class="mt-2">{{ __('Payment records are the exception. They stay after you delete your account, without your name, because Dutch tax law requires us to keep them for seven years. Stripe keeps its own records under the same kind of rules.') }}</p>
                     </section>

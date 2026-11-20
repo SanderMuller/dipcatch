@@ -74,7 +74,7 @@ final class PageView extends Model
      */
     public function prunable(): EloquentQueryBuilder
     {
-        $anonymousDays = config()->integer('analytics.retention.anonymous_days', 30);
+        $anonymousDays = config()->integer('analytics.retention.anonymous_days', 32);
         $linkedDays = config()->integer('analytics.retention.linked_days', 90);
 
         return self::query()

@@ -30,7 +30,7 @@ return [
     'salt_store' => null,
 
     'retention' => [
-        'anonymous_days' => 30,
+        'anonymous_days' => 32,
         'linked_days' => 90,
     ],
 
