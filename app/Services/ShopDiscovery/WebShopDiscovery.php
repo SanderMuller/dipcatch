@@ -291,10 +291,8 @@ final readonly class WebShopDiscovery
             price: null,
             snippet: $finding->snippet,
         ))->all();
-        // A Klarna lead may point at the product in another size.
-        $anyPack = array_values($pending->filter(static fn (WebShopFinding $finding): bool => $finding->isLead())->keys()->all());
-
-        $answers = $this->shopMatch->ask($product, ShopCheckPurpose::WebDiscovery, $candidates, quick: false, anyPackKeys: $anyPack, shoppersCountry: ShoppersCountry::name(ShoppersCountry::forProduct($product)));
+        // A product may track several sizes, so a shop that sells another one is a find too.
+        $answers = $this->shopMatch->ask($product, ShopCheckPurpose::WebDiscovery, $candidates, quick: false, anyPackKeys: array_keys($candidates), shoppersCountry: ShoppersCountry::name(ShoppersCountry::forProduct($product)));
         arsort($answers);
 
         $readFrom = Config::float('dipcatch.web_discovery.read_from');

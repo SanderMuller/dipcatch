@@ -12,7 +12,7 @@
         </div>
         @if (\App\Services\TypeSafe\TypeSafeClient::configured())
         <x-pro-hint upsell class="mt-3" data-test="suggestions-pro-hint">
-            {{ __('Pro finds more shops for you. It searches the web by name and by barcode, reads comparison sites, and checks with AI that each shop sells the same product and pack.') }}
+            {{ __('Pro finds more shops for you. It searches the web by name and by barcode, reads comparison sites, and checks with AI that each shop sells the same product.') }}
         </x-pro-hint>
         @endif
     @else

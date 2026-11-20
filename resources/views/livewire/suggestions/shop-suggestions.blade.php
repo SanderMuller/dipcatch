@@ -175,7 +175,7 @@
                                 @if ($webOtherSize !== null || $finding->isLead())
                                     <div class="mt-1 flex flex-wrap gap-1.5" data-test="web-suggestion-lead">
                                         @if ($webOtherSize !== null)
-                                            <flux:badge size="sm" color="amber">{{ $webOtherSize }}</flux:badge>
+                                            <flux:badge size="sm">{{ $webOtherSize }}</flux:badge>
                                         @endif
                                         @if ($finding->isLead())
                                             <flux:badge size="sm">{{ __('Found through Klarna') }}</flux:badge>

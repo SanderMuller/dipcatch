@@ -847,7 +847,7 @@ function storedLeadFinding(Product $product, string $url, string $host, WebFindi
     ], $state));
 }
 
-test('one first check asks lead findings about any pack size and open findings about the tracked size', function (): void {
+test('one first check asks lead and open findings about any pack size', function (): void {
     // Keeps the Klarna steps out, so only the findings below are asked about.
     config()->set('dipcatch.web_discovery.klarna_leads', false);
     $questions = [];
@@ -861,7 +861,7 @@ test('one first check asks lead findings about any pack size and open findings a
 
     $asked = array_column($questions, 'question', 'title');
     expect($asked)->toHaveCount(3)
-        ->and($asked['Hill’s Young Adult Sterilised Eend 10 kg'])->not->toContain('in any pack size')
+        ->and($asked['Hill’s Young Adult Sterilised Eend 10 kg'])->toContain('in any pack size')
         ->and($asked['Hill’s Sterilised Eend at medpets.nl'])->toContain('in any pack size')
         ->and($asked['Hill’s Sterilised Eend at brekz.nl'])->toContain('in any pack size')
         ->and(Http::recorded(static fn (Request $request): bool => $request->url() === TypeSafeClient::ENDPOINT))->toHaveCount(1);

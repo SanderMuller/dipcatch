@@ -214,6 +214,26 @@ it('finds a shop, reads its page and proposes it after two checks', function ():
         ->and(array_first($second))->toMatchArray(['title' => 'Coffee beans', 'listing_title' => 'Coffee beans 1kg — Koffiehenk', 'price' => '17.49 EUR']);
 });
 
+it('asks both checks about the product in any pack size, and proposes a shop that sells another size', function (): void {
+    $product = discoveryProduct();
+    fakeDiscovery(
+        [['title' => 'Coffee beans 500 g — Koffiehenk', 'link' => 'https://koffiehenk.test/coffee-500g']],
+        ['https://koffiehenk.test/coffee-500g' => htmlPage(discoveryPage('Coffee beans 500 g', '9.49'))],
+    );
+
+    discover($product);
+
+    $finding = findingAt($product, 'koffiehenk.test');
+    $questions = Http::recorded(fn (Request $request): bool => $request->url() === TypeSafeClient::ENDPOINT)
+        ->map(fn (array $pair): mixed => array_first((array) ($pair[0]->data()['questions'] ?? []))['instructions']['question'] ?? null)
+        ->all();
+
+    expect($finding->status)->toBe(WebFindingStatus::Proposed)
+        ->and($finding->otherSizeNote($product))->toBe('Other size: 500 g — compared per kilo')
+        ->and($questions)->toHaveCount(2)
+        ->each->toContain('in any pack size');
+});
+
 it('reads only the results that pass the first check, up to the read cap', function (): void {
     config()->set('dipcatch.web_discovery.max_reads_per_product', 1);
     $product = discoveryProduct();

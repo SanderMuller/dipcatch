@@ -106,3 +106,25 @@ it('knows which statuses are unfinished', function (): void {
         WebFindingStatus::New, WebFindingStatus::PendingRead, WebFindingStatus::Read, WebFindingStatus::Checking,
     ]);
 });
+
+it('sends open findings the AI turned away back to the first check, and leaves the rest', function (): void {
+    $product = Product::factory()->create();
+    $rejected = webFinding($product, ['status' => WebFindingStatus::Rejected, 'first_chance' => 0.2, 'generation' => 1]);
+    $declined = webFinding($product, ['status' => WebFindingStatus::Declined, 'first_chance' => 0.9, 'second_chance' => 0.1, 'page_title' => 'Coffee beans 500 g', 'checked_at' => now()]);
+    $keep = [
+        'read cap' => webFinding($product, ['status' => WebFindingStatus::Rejected, 'failure' => 'read_cap']),
+        'tracked host' => webFinding($product, ['status' => WebFindingStatus::Rejected, 'failure' => 'tracked_host']),
+        'hidden' => webFinding($product, ['status' => WebFindingStatus::Declined, 'dismissed_at' => now()]),
+        'Klarna lead' => webFinding($product, ['status' => WebFindingStatus::Declined, 'lead_url' => 'https://www.klarna.com/nl/shopping/pl/1/']),
+        'proposed' => webFinding($product),
+    ];
+
+    (require database_path('migrations/2026_11_20_120000_recheck_web_findings_turned_away_for_another_pack_size.php'))->up();
+
+    expect($rejected->refresh())->status->toBe(WebFindingStatus::New)->first_chance->toBeNull()->generation->toBe(2)
+        ->and($declined->refresh())->status->toBe(WebFindingStatus::New)->second_chance->toBeNull()->page_title->toBeNull()->checked_at->toBeNull();
+
+    foreach ($keep as $finding) {
+        expect($finding->refresh()->status)->not->toBe(WebFindingStatus::New);
+    }
+});

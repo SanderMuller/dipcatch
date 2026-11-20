@@ -92,8 +92,7 @@ final readonly class WebSecondCheck
             listingTitle: $finding->search_title,
         ), $claimed);
 
-        $anyPack = array_keys(array_filter($claimed, static fn (WebShopFinding $finding): bool => $finding->isLead()));
-        $answers = $this->shopMatch->ask($product, ShopCheckPurpose::WebDiscoveryConfirm, $candidates, quick: false, anyPackKeys: $anyPack, shoppersCountry: ShoppersCountry::name(ShoppersCountry::forProduct($product)));
+        $answers = $this->shopMatch->ask($product, ShopCheckPurpose::WebDiscoveryConfirm, $candidates, quick: false, anyPackKeys: array_keys($candidates), shoppersCountry: ShoppersCountry::name(ShoppersCountry::forProduct($product)));
         $gtins = WebShopFinding::trackedGtins($product);
 
         foreach ($claimed as $key => $finding) {
