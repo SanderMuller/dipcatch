@@ -4,7 +4,7 @@ namespace App\Actions\Suggestions;
 
 /**
  * A dataset row the suggestions matched on its name, waiting for Jev to say
- * whether it sells the same product and pack.
+ * whether it sells the same product.
  */
 final readonly class UncheckedSuggestion
 {

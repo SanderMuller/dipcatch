@@ -11,8 +11,9 @@ use Illuminate\Support\Facades\Config;
 
 /**
  * Asks Jev, after the response, whether the suggested rows a product has no
- * answer for yet sell the same product and pack, and stores each answer. The
- * next render of the suggestions reads them.
+ * answer for yet sell the same product, in any pack size, and stores each
+ * answer. The next render of the suggestions reads them. A product may track
+ * several sizes, and the name match already prefers a row in a tracked size.
  *
  * Registered through `app()->terminating()` for the reason `CategoriseProduct`
  * gives, and at most once per product per ten minutes, because the product
@@ -87,7 +88,7 @@ final readonly class VerifyShopSuggestions
             );
         }
 
-        foreach ($this->shopMatch->ask($product, ShopCheckPurpose::Suggestions, $candidates) as $key => $chance) {
+        foreach ($this->shopMatch->ask($product, ShopCheckPurpose::Suggestions, $candidates, anyPackKeys: array_keys($candidates)) as $key => $chance) {
             $row = $batch[(int) substr($key, 1)] ?? null;
 
             if (! $row instanceof UncheckedSuggestion) {

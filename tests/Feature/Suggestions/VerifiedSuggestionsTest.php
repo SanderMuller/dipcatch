@@ -260,3 +260,44 @@ test('without the opt-in a borderline name match still shows at once', function 
 
     expect(suggestedChains(checkedBeemsterProduct(optedIn: false)))->toBe(['dirk']);
 });
+
+test('the check asks whether a row sells the same product in any pack size, so a row in another size can show', function (): void {
+    seedChains();
+    $otherSize = seedRow('ah', 'Beemster Extra belegen 48+ plakken', '300 g', '5.99');
+    $product = checkedBeemsterProduct();
+    $questions = [];
+
+    Http::fake([TypeSafeClient::ENDPOINT => function (Request $request) use (&$questions): PromiseInterface {
+        foreach ((array) ($request->data()['questions'] ?? []) as $question) {
+            $questions[] = is_array($question) ? ($question['instructions']['question'] ?? null) : null;
+        }
+
+        return noulAnswers(array_map(static fn (): float => 0.9, candidateShops($request)));
+    }]);
+
+    suggestedChains($product);
+    app()->terminate();
+
+    expect($questions)->not->toBeEmpty()
+        ->each->toContain('in any pack size')
+        ->and(ShopSuggestionVerdict::query()->where('external_id', $otherSize->external_id)->sole()->same_chance)->toBe(0.9)
+        ->and(suggestedChains($product))->toBe(['ah']);
+});
+
+test('the answers that did not accept a row under the same-size question are asked again', function (): void {
+    seedChains();
+    $rejected = seedRow('ah', 'Beemster Extra belegen 48+ plakken', '300 g', '5.99');
+    $borderline = seedRow('dirk', 'Beemster Kaas extra belegen 48+ plakken', '300 g', '5.79');
+    $accepted = seedRow('poiesz', 'Beemster Extra belegen kaas', '150 g', '2.69');
+    $justAccepted = seedRow('jumbo', 'Beemster Extra belegen plakken', '150 g', '3.39');
+    $product = checkedBeemsterProduct();
+    verdict($product, $rejected, 0.1);
+    verdict($product, $borderline, 0.59);
+    verdict($product, $accepted, 0.9);
+    verdict($product, $justAccepted, 0.6);
+
+    (require database_path('migrations/2026_11_20_130000_recheck_suggestion_verdicts_given_for_the_same_pack_size.php'))->up();
+
+    expect(ShopSuggestionVerdict::query()->where('product_id', $product->id)->pluck('external_id')->sort()->values()->all())
+        ->toBe(collect([$accepted->external_id, $justAccepted->external_id])->sort()->values()->all());
+});

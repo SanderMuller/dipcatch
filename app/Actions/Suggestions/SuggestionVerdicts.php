@@ -108,7 +108,7 @@ final class SuggestionVerdicts
         return $this->unchecked;
     }
 
-    /** Whether Jev confirmed the row sells the same product and pack. */
+    /** Whether Jev confirmed the row sells the same product. */
     public function confirmed(CheckjebonPrice $row): bool
     {
         $chance = $this->chanceFor($row);

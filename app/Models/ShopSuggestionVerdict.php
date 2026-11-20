@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * Jev's chance that one suggested dataset row sells the same product, in
- * the same pack, as the product it was suggested for.
+ * any pack size, as the product it was suggested for.
  *
  * @property int $id
  * @property string $product_id
