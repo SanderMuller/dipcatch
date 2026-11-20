@@ -29,6 +29,19 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-11-20',
+            'category' => 'feature',
+            'title' => 'Choose whether your visits help improve DipCatch',
+            'body' => "DipCatch now counts page visits itself, without cookies or tracking scripts. When you're signed in, the pages you open show us which features people use and where they get stuck.\n\nYou can switch this off with \"Use my visits to improve DipCatch\" in Settings, under Profile.",
+            'link' => ['route' => 'profile.edit', 'label' => 'Open your profile settings'],
+        ],
+        [
+            'date' => '2026-11-20',
+            'category' => 'fix',
+            'title' => 'No warning for another pack size',
+            'body' => "When you add a shop that sells your product in another size, DipCatch no longer warns you. It shows both sizes and compares them per kilo, litre or piece.\n\nWith Pro, the AI check now only warns when a shop sells a different product or flavour.",
+        ],
+        [
             'date' => '2026-11-16',
             'category' => 'feature',
             'title' => 'Changing your email asks for your password',
