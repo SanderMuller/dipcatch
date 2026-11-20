@@ -1,5 +1,8 @@
 <?php declare(strict_types=1);
 
+use App\Analytics\Console\RollupCommand;
+use App\Analytics\Http\RecordPageView;
+use App\Analytics\Models\PageView;
 use App\Console\Commands\CategoriseProductsCommand;
 use App\Console\Commands\CheckCatalogueLinksCommand;
 use App\Console\Commands\DiscoverWebShopsCommand;
@@ -40,6 +43,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
+    ->withCommands([
+        RollupCommand::class,
+    ])
     ->withSchedule(function (Schedule $schedule): void {
         // Production scales to zero. Laravel Cloud wakes the App per due task,
         // from the `schedule:list` it stored at deploy, and stops it after the
@@ -91,9 +97,15 @@ return Application::configure(basePath: dirname(__DIR__))
             ->onOneServer();
 
         // Searches without results and pages we could not read are kept six
-        // months after the last one.
-        $schedule->command(PruneCommand::class, ['--model' => [EmptySearch::class, FailedShopPage::class]])
+        // months after the last one. Page views: see `analytics.retention`.
+        $schedule->command(PruneCommand::class, ['--model' => [EmptySearch::class, FailedShopPage::class, PageView::class]])
             ->dailyAt('01:50')
+            ->onOneServer();
+
+        // Yesterday's page views into daily totals. The admin page reads past
+        // days only from these totals, so run it soon after midnight.
+        $schedule->command(RollupCommand::class)
+            ->dailyAt('00:20')
             ->onOneServer();
 
         $schedule->command(RunAdapterCanaryCommand::class)
@@ -165,6 +177,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             AuthenticateSession::class,
             RequireVerifiedEmailToAddCredentials::class,
+            // Inside `StartSession`, so the signup source it puts in the
+            // session is saved with this response.
+            RecordPageView::class,
         ]);
 
         // Laravel 11+ stopped aliasing Passport's middleware, and the MCP

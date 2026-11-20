@@ -24,6 +24,7 @@
         "ext-intl": "*",
         "aws/aws-sdk-php": "^3.403.6",
         "filament/filament": "^5.11.4",
+        "jaybizzle/crawler-detect": "^1.4",
         "laravel-notification-channels/webpush": "^13.0.1",
         "laravel/cashier": "^16.10",
         "laravel/fortify": "^1.42.0",

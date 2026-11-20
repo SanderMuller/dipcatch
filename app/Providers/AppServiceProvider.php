@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Actions\Products\SearchProductsByName;
 use App\Actions\Suggestions\SuggestShops;
+use App\Analytics\Listeners\StoreSignupSource;
 use App\Billing\StripeTax;
 use App\Health\AdapterCanaryCheck;
 use App\Health\BillingConfigurationCheck;
@@ -17,6 +18,7 @@ use App\Services\Offers\DekaMarktUpcomingOffers;
 use App\Services\Offers\DirkUpcomingOffers;
 use App\Services\Offers\JumboUpcomingPromotion;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -86,6 +88,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->registerHealthChecks();
         $this->configureBilling();
         $this->registerSocialiteProviders();
+        $this->registerAnalytics();
 
         // Livewire re-applies only listed middleware to its update requests.
         // Without this, a component on a page behind `verified` stays callable
@@ -131,6 +134,15 @@ final class AppServiceProvider extends ServiceProvider
      * as an extension that registers itself on this event, which Socialite
      * fires the first time a driver is resolved. Google needs nothing here.
      */
+    /**
+     * Both registration paths, Fortify and social login, fire `Registered`,
+     * so this one listener stores the signup source for either.
+     */
+    protected function registerAnalytics(): void
+    {
+        Event::listen(Registered::class, StoreSignupSource::class);
+    }
+
     protected function registerSocialiteProviders(): void
     {
         Event::listen(function (SocialiteWasCalled $event): void {

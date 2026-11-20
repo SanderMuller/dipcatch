@@ -51,7 +51,10 @@
                             <li><strong>{{ __('Hidden shops') }}:</strong> {{ __('the shops you chose not to have suggested.') }}</li>
                             <li><strong>{{ __('Pages we could not read') }}:</strong> {{ __('when you try to add a shop page DipCatch cannot read, its web address, why it failed and who tried it last, so we can make that shop work. We keep it for six months after the last try.') }}</li>
                             <li><strong>{{ __('Searches without results') }}:</strong> {{ __('when a search in the app finds nothing, the words you searched for and how often, so we can see what is missing. We keep them for six months after the last such search.') }}</li>
-                            <li><strong>{{ __('Technical') }}:</strong> {{ __('a session cookie to keep you signed in, and short-lived rate-limit counters keyed on your IP address to protect the shops we read prices from and this service.') }}</li>
+                            <li><strong>{{ __('Visits') }}:</strong> {{ __('we count the pages people open on this site ourselves, without cookies or analytics scripts. For each page we store the page, the website that linked to it, the campaign in the link, your country, and whether you use a phone, tablet or computer. Your IP address is only used, together with your browser, to recognise the same visitor for one day; we do not store it, and the next day you are a new visitor.') }}</li>
+                            <li><strong>{{ __('App usage') }}:</strong> {{ __('when you are signed in, we link the pages you open in DipCatch to your account, so we can see which features people use and where they get stuck. You can switch this off in Settings → Profile.') }}</li>
+                            <li><strong>{{ __('Where you came from') }}:</strong> {{ __('when you sign up, we store the website and campaign that first brought you to DipCatch with your account.') }}</li>
+                            <li><strong>{{ __('Technical') }}:</strong> {{ __('a session cookie to keep you signed in. Until you sign up, it also holds the website and campaign that first brought you here. Short-lived rate-limit counters keyed on your IP address protect the shops we read prices from and this service.') }}</li>
                         </ul>
                     </section>
 
@@ -66,6 +69,7 @@
                             <li>{{ __('To give you the service you signed up for: your account, the products you track, your alerts and your payments.') }}</li>
                             <li>{{ __('Because you switched it on: browser push, an AI feature, or a connected assistant. Switch it off and that use stops.') }}</li>
                             <li>{{ __('Because we need a working and safe service: rate limits, error reports, and the lists of pages we could not read and of searches without results.') }}</li>
+                            <li>{{ __('Because we have a legitimate interest in improving DipCatch: counting visits, and the app usage linked to your account. You can object to the linked usage at any time by switching it off in Settings → Profile.') }}</li>
                             <li>{{ __('Because the law requires it: payment records for the tax authorities.') }}</li>
                         </ul>
                     </section>
@@ -95,6 +99,7 @@
                     <section>
                         <h2>{{ __('How long') }}</h2>
                         <p class="mt-2">{{ __('As long as you have an account. Price-check history older than a year is pruned, keeping the most recent points so your charts keep working. Delete a product and its history goes with it. Delete your account (Settings → Profile) and everything goes.') }}</p>
+                        <p class="mt-2">{{ __('Page visits are kept for 30 days, and app usage linked to your account for 90 days. After that only daily totals remain, which say nothing about you.') }}</p>
                         <p class="mt-2">{{ __('A web search is stored as its search text, without your account id, so the next search for the same text needs no new one. A search text nothing else uses is deleted after 90 days. One that found shops for a product stays with that product.') }}</p>
                         <p class="mt-2">{{ __('Payment records are the exception. They stay after you delete your account, without your name, because Dutch tax law requires us to keep them for seven years. Stripe keeps its own records under the same kind of rules.') }}</p>
                     </section>

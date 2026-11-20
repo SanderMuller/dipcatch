@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Analytics\Contracts\TrackableUser;
+use App\Analytics\Models\PageView;
+use App\Analytics\SignupSource;
 use App\Concerns\Subscribes;
 use App\Enums\AiPromptPlace;
 use App\Rules\PushServiceEndpoint;
@@ -56,17 +59,23 @@ use NotificationChannels\WebPush\PushSubscription;
  * @property CarbonImmutable|null $tracking_ideas_hidden_at
  * @property CarbonImmutable|null $timezone_detected_at
  * @property string|null $country The country web discovery finds shops for; null lets the timezone decide.
+ * @property bool $usage_tracking_opted_out The person objected to linking their page views to their account.
+ * @property string|null $signup_referrer_host Referrer host of the first page load before signup that had a referrer or UTM value.
+ * @property string|null $signup_utm_source
+ * @property string|null $signup_utm_medium
+ * @property string|null $signup_utm_campaign
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property CarbonImmutable|null $two_factor_confirmed_at
  * @property string|null $remember_token
  * @property CarbonImmutable $created_at
  * @property CarbonImmutable $updated_at
+ * @property-read EloquentCollection<int, PageView> $pageViews
  * @property-read EloquentCollection<int, SocialAccount> $socialAccounts
  */
 #[Fillable(['name', 'email', 'password', 'timezone'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-final class User extends Authenticatable implements FilamentUser, MustVerifyEmail, OAuthenticatable, PasskeyUser
+final class User extends Authenticatable implements FilamentUser, MustVerifyEmail, OAuthenticatable, PasskeyUser, TrackableUser
 {
     /** @use HasFactory<UserFactory> */
     use Billable, HasApiTokens, HasFactory, HasPushSubscriptions, Notifiable, PasskeyAuthenticatable, Subscribes, TwoFactorAuthenticatable;
@@ -107,6 +116,7 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
             'digest_processed_until' => 'datetime',
             'tracking_ideas_hidden_at' => 'datetime',
             'timezone_detected_at' => 'datetime',
+            'usage_tracking_opted_out' => 'boolean',
         ];
     }
 
@@ -148,6 +158,31 @@ final class User extends Authenticatable implements FilamentUser, MustVerifyEmai
     public function trackingIdeaMarks(): HasMany
     {
         return $this->hasMany(TrackingIdeaMark::class);
+    }
+
+    /**
+     * Page views linked to this account, for product usage analytics.
+     *
+     * @return HasMany<PageView, $this>
+     */
+    public function pageViews(): HasMany
+    {
+        return $this->hasMany(PageView::class, PageView::USER_ID);
+    }
+
+    public function allowsUsageTracking(): bool
+    {
+        return $this->usage_tracking_opted_out !== true;
+    }
+
+    public function recordSignupSource(SignupSource $source): void
+    {
+        $this->forceFill([
+            'signup_referrer_host' => $source->referrerHost,
+            'signup_utm_source' => $source->utmSource,
+            'signup_utm_medium' => $source->utmMedium,
+            'signup_utm_campaign' => $source->utmCampaign,
+        ])->save();
     }
 
     /**

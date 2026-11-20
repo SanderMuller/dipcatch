@@ -90,6 +90,21 @@ test('a first-time Google user gets an account that needs no email verification'
     $this->assertAuthenticatedAs($user);
 });
 
+test('a first-time social account stores the source the guest arrived with', function (): void {
+    fakeSocialiteDriver(fakeSocialiteUser('google-sub-source', 'bron@example.test', 'Bron Gebruiker', [
+        'email_verified' => true,
+    ]));
+
+    $this->withSession(['signup_source' => ['referrer_host' => 'news.example.test', 'utm_source' => 'newsletter']])
+        ->get(route('social.callback', 'google'))
+        ->assertRedirect('/app');
+
+    $user = User::query()->where('email', 'bron@example.test')->sole();
+
+    expect($user->signup_referrer_host)->toBe('news.example.test')
+        ->and($user->signup_utm_source)->toBe('newsletter');
+});
+
 test('a provider that did not verify the address still gets the user a verification mail', function (): void {
     Notification::fake();
 

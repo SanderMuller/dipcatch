@@ -48,6 +48,8 @@
 
         <livewire:settings.regional-preferences />
 
+        <livewire:settings.usage-tracking />
+
         @if ($this->showDeleteUser)
             <livewire:settings.delete-user-form />
         @endif
