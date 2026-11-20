@@ -623,7 +623,7 @@ test('adding a Klarna lead suggestion tracks its variant and asks the any-size q
         ->and($questions[0]['question'])->toContain('in any pack size');
 });
 
-test('a pasted link that is not the suggestion asks the same-size question', function (): void {
+test('a pasted link asks the any-size question too, since a product may track several sizes', function (): void {
     $questions = [];
     fakeKlarnaWorld([], [brekzLeadUrl() => leadPage('Hill’s Adult Sterilised Cat met eend kattenvoer 10 kg', '85.69')], questions: $questions);
     $product = klarnaProduct();
@@ -633,7 +633,7 @@ test('a pasted link that is not the suggestion asks the same-size question', fun
         ->set('url', brekzLeadUrl())
         ->call('probe');
 
-    expect($questions[0]['question'] ?? '')->not->toContain('in any pack size');
+    expect($questions[0]['question'] ?? '')->toContain('in any pack size');
 });
 
 test('leads in another currency, or in a unit the product does not compare in, are skipped', function (): void {

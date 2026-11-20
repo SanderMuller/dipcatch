@@ -121,7 +121,7 @@
                         </h3>
                         <dl class="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-base sm:text-sm">
                             <dt class="font-medium text-zinc-700 dark:text-zinc-300">{{ __('Size') }}</dt>
-                            <dd @class(['text-zinc-500 dark:text-zinc-400', 'font-medium text-amber-700! dark:text-amber-400!' => $previewPackSize !== null && $this->otherPackNote() !== null]) data-test="review-page-size">{{ $previewPackSize === null ? __('Not stated') : \App\Support\UnitWord::pack($previewPackSize) }}</dd>
+                            <dd class="text-zinc-500 dark:text-zinc-400" data-test="review-page-size">{{ $previewPackSize === null ? __('Not stated') : \App\Support\UnitWord::pack($previewPackSize) }}</dd>
                             <dt class="font-medium text-zinc-700 dark:text-zinc-300">{{ __('Price') }}</dt>
                             <dd class="text-zinc-500 tabular-nums dark:text-zinc-400" data-test="review-page-price">
                                 {{ \App\Support\MoneyFormatter::format($snapshot['price'], $snapshot['currency']) }}@if ($previewUnitPriceValue !== null) · {{ \App\Support\MoneyFormatter::unitPrice($previewUnitPriceValue, $snapshot['currency']) }} {{ $previewPackSize->label() }}@endif
@@ -172,12 +172,12 @@
             <div class="space-y-3">
                 @if ($this->doubtsSameProduct())
                     <flux:callout icon="exclamation-triangle" color="amber" data-test="same-product-warning">
-                        <flux:callout.heading>{{ __('This may be a different product or pack') }}</flux:callout.heading>
-                        <flux:callout.text>{{ __('AI compared this page with the shops you already track. Check the name and the size before you add it.') }}</flux:callout.text>
+                        <flux:callout.heading>{{ __('This may be a different product') }}</flux:callout.heading>
+                        <flux:callout.text>{{ __('AI compared this page with the shops you already track. Check the name and the variant before you add it.') }}</flux:callout.text>
                     </flux:callout>
                 @endif
                 @if ($otherPack !== null)
-                    <flux:callout icon="scale" color="amber" data-test="other-pack-warning">
+                    <flux:callout icon="scale" data-test="other-pack-note">
                         <flux:callout.text>{{ $otherPack }}</flux:callout.text>
                     </flux:callout>
                 @endif

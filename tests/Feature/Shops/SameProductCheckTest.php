@@ -47,7 +47,7 @@ function sameProductAnswer(float $chance): array
     return ['model' => 'jev-latest', 'answers' => ['draft' => ['type' => 'noul', 'noul' => $chance]], 'usage' => ['input_tokens' => 400, 'output_tokens' => 10]];
 }
 
-test('the add-shop preview warns when Jev doubts the page sells the same product and pack', function (): void {
+test('the add-shop preview warns when Jev doubts the page sells the same product', function (): void {
     Http::fake(fakeJsonLdOffer(name: 'Whiskas Adult Zalm 4 x 85 g') + [TypeSafeClient::ENDPOINT => Http::response(sameProductAnswer(0.12))]);
     $product = productWithShopChecks();
     $this->actingAs($product->user()->sole());

@@ -41,16 +41,9 @@ final class AddShop extends Component
     /** Keep suggestions visible whenever the add-shop form is open. */
     public bool $expandSuggestions = true;
 
-    /** Jev's chance that the previewed shop sells the same product (and pack, unless the preview is a Klarna lead suggestion); null when unchecked. */
+    /** Jev's chance that the previewed shop sells the same product, in any pack size; null when unchecked. */
     #[Locked]
     public ?float $sameProductChance = null;
-
-    /**
-     * The URL of a Klarna lead suggestion being added: its preview asks
-     * whether the page sells the product in any pack size.
-     */
-    #[Locked]
-    public ?string $anyPackUrl = null;
 
     /**
      * The dashboard suggestion this form reviews in the review dialog, or
@@ -117,7 +110,7 @@ final class AddShop extends Component
     /**
      * A suggestion hands over a URL; the flow from here is the normal one. A
      * web suggestion also names its finding: the probe asks for the variant
-     * its read picked, and a Klarna lead's preview asks the any-size question.
+     * its read picked.
      */
     #[On('suggest-shop')]
     public function useSuggestion(string $url, ProbeShopUrl $probe, ?int $findingId = null): void
@@ -130,7 +123,6 @@ final class AddShop extends Component
 
         $this->resetProbeState();
         $this->url = $url;
-        $this->anyPackUrl = $finding?->isLead() === true ? $url : null;
 
         $this->runProbe($probe, variantKey: $finding?->variant_key);
 
@@ -151,7 +143,7 @@ final class AddShop extends Component
 
     protected function onPreviewShown(ProbeOutcome $outcome): void
     {
-        $this->sameProductChance = app(ShopMatchCheck::class)->draft($this->product, $this->shopDraft(), anyPack: $this->anyPackUrl === $this->url);
+        $this->sameProductChance = app(ShopMatchCheck::class)->draft($this->product, $this->shopDraft());
     }
 
     /**
@@ -186,10 +178,9 @@ final class AddShop extends Component
 
     /**
      * A note when the previewed page sells another pack size than every shop
-     * already tracked, in the same unit: a 300 g bar where the other shops
-     * sell 100 g. Often a different product, not only a bigger pack, and it
-     * needs no AI to notice. Per-kilo prices still compare, so it is a note,
-     * not a refusal.
+     * already tracked, in the same unit: 450 g where the other shops sell
+     * 930 g. A product may track several sizes, compared per kilo, litre or
+     * piece, so the note informs and does not warn.
      */
     public function otherPackNote(): ?string
     {
@@ -200,9 +191,10 @@ final class AddShop extends Component
             return null;
         }
 
-        return __('This page sells :pack. Your other shops sell :others. Check it is the same product, not another one in a bigger or smaller pack.', [
+        return __('This page sells :pack. Your other shops sell :others. DipCatch compares them per :unit.', [
             'pack' => UnitWord::pack($size),
             'others' => implode(', ', array_map(UnitWord::pack(...), $tracked)),
+            'unit' => UnitWord::noun($size->unit),
         ]);
     }
 

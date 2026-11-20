@@ -80,14 +80,14 @@
                 </flux:callout>
             @endif
             @if ($otherPack = $this->otherPackNote())
-                <flux:callout icon="scale" color="amber" data-test="other-pack-warning">
+                <flux:callout icon="scale" data-test="other-pack-note">
                     <flux:callout.text>{{ $otherPack }}</flux:callout.text>
                 </flux:callout>
             @endif
             @if ($this->doubtsSameProduct())
                 <flux:callout icon="exclamation-triangle" color="amber" data-test="same-product-warning">
-                    <flux:callout.heading>{{ __('This may be a different product or pack') }}</flux:callout.heading>
-                    <flux:callout.text>{{ __('AI compared this page with the shops you already track for :product. Check the name and the pack size before you confirm.', ['product' => $product->title]) }}</flux:callout.text>
+                    <flux:callout.heading>{{ __('This may be a different product') }}</flux:callout.heading>
+                    <flux:callout.text>{{ __('AI compared this page with the shops you already track for :product. Check the name and the variant before you confirm.', ['product' => $product->title]) }}</flux:callout.text>
                 </flux:callout>
             @endif
             @php($pageUrl = $this->previewPageUrl())
@@ -191,7 +191,7 @@
 
             <livewire:ai-feature-prompt place="add_shop" wire:key="ai-prompt-add-shop" />
             @if (\App\Services\TypeSafe\TypeSafeClient::configured())
-                <x-pro-hint upsell data-test="shop-check-pro-hint">{{ __('Pro checks with AI whether this page sells the same product and pack as your other shops, so a wrong flavour or size does not slip in.') }}</x-pro-hint>
+                <x-pro-hint upsell data-test="shop-check-pro-hint">{{ __('Pro checks with AI whether this page sells the same product as your other shops, so a wrong flavour or variant does not slip in.') }}</x-pro-hint>
             @endif
 
             <div class="flex flex-wrap gap-2">

@@ -23,13 +23,13 @@ final readonly class ShopMatchCheck
     ) {}
 
     /**
-     * The chance the drafted shop sells the same product and pack, or null
-     * when nothing was checked: the account has not opted in, the product has
-     * no shop to compare with, the budget is spent, or the call failed.
-     * `$anyPack` asks about the product in any pack size, for a suggestion
-     * that came from a Klarna lead.
+     * The chance the drafted shop sells the same product, in any pack size,
+     * or null when nothing was checked: the account has not opted in, the
+     * product has no shop to compare with, the budget is spent, or the call
+     * failed. A product may track several sizes, and the preview states the
+     * page's size beside the tracked ones, so the AI judges only the product.
      */
-    public function draft(Product $product, ShopDraft $draft, bool $anyPack = false): ?float
+    public function draft(Product $product, ShopDraft $draft): ?float
     {
         if (! $this->applies($product)) {
             return null;
@@ -46,7 +46,7 @@ final readonly class ShopMatchCheck
             packSize: $draft->packSize === null ? null : self::packLabel($draft->packSize),
             price: "{$draft->trackedPrice()} {$draft->currency}",
             gtin: $draft->gtin,
-        )], anyPackKeys: $anyPack ? ['draft'] : [])['draft'] ?? null;
+        )], anyPackKeys: ['draft'])['draft'] ?? null;
     }
 
     public function applies(Product $product): bool

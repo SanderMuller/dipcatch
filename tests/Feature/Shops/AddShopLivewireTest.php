@@ -583,8 +583,8 @@ test('the preview notes a pack size none of the tracked shops sells', function (
         ->assertSet('state', 'preview');
 
     $noted
-        ? $preview->assertSeeHtml('data-test="other-pack-warning"')->assertSee('This page sells 300 g. Your other shops sell 100 g.')
-        : $preview->assertDontSeeHtml('data-test="other-pack-warning"');
+        ? $preview->assertSeeHtml('data-test="other-pack-note"')->assertSee('This page sells 300 g. Your other shops sell 100 g. DipCatch compares them per kilo.')
+        : $preview->assertDontSeeHtml('data-test="other-pack-note"');
 })->with([
     'another size, same unit' => ['Milka Mmmax 300 g', '100 g', true],
     'the same size' => ['Milka Choco Biscuit 100 g', '100 g', false],
@@ -675,7 +675,7 @@ test('the preview says when the page sells the pack a tracked shop sells', funct
         ->set('url', 'https://shop.example.com/p/1')
         ->call('probe')
         ->assertSee('Same pack as your other shops')
-        ->assertDontSeeHtml('data-test="other-pack-warning"');
+        ->assertDontSeeHtml('data-test="other-pack-note"');
 });
 
 test('the preview marks the words the page title and the product title do not share', function (): void {

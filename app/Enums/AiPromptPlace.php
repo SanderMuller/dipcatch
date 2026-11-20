@@ -37,7 +37,7 @@ enum AiPromptPlace: string
         return match ($this) {
             self::ProductList => __('Switch it on and DipCatch puts your products in a category, the ones already here and each one you add, so you can filter your list.'),
             self::ProductCategory => __('Switch it on and DipCatch picks a category for each product you track, so you don\'t have to.'),
-            self::AddShop => __('Switch it on and DipCatch warns you when a shop sells a different product or pack size.'),
+            self::AddShop => __('Switch it on and DipCatch warns you when a shop sells a different product.'),
             self::WizardShops => __('Switch it on and DipCatch searches the web for more shops that sell this product.'),
             self::ShopSuggestions => __('Switch it on and DipCatch searches the web for more shops that sell this product, and checks that each one sells the same thing.'),
             self::DashboardSuggestions => __('Switch it on and DipCatch searches the web for more shops that sell your products.'),
