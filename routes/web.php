@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use App\Analytics\Http\ObjectionController;
 use App\Enums\SocialProvider;
 use App\Http\Controllers\AutoDetectTimezoneController;
 use App\Http\Controllers\BillingController;
@@ -63,6 +64,8 @@ Route::prefix(Config::string('cashier.path', 'stripe'))->name('cashier.')->group
 
 Route::view('/', 'welcome')->middleware(MarketingLocale::class)->name('home');
 Route::view('privacy', 'privacy')->middleware(MarketingLocale::class)->name('privacy');
+Route::post('analytics/objection', [ObjectionController::class, 'store'])->name('analytics.objection.store');
+Route::delete('analytics/objection', [ObjectionController::class, 'destroy'])->name('analytics.objection.destroy');
 Route::view('support', 'support')->middleware(MarketingLocale::class)->name('support');
 Route::view('terms-of-service', 'terms')->middleware(MarketingLocale::class)->name('terms');
 

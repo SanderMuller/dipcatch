@@ -85,6 +85,25 @@ it('stores the source on the account at registration', function (): void {
         ->and($user->signup_utm_campaign)->toBe('autumn');
 });
 
+it('stores no source when the browser objected before registering', function (array $headers, array $cookies): void {
+    $this->skipUnlessFortifyHas(Features::registration());
+
+    $this->withHeaders($headers)
+        ->withCookies($cookies)
+        ->withSession(['signup_source' => ['referrer_host' => 'news.example.test', 'utm_source' => 'newsletter']])
+        ->post(route('register.store'), analyticsRegistration())
+        ->assertSessionHasNoErrors()
+        ->assertSessionMissing('signup_source');
+
+    $user = User::query()->where('email', 'new@example.test')->sole();
+
+    expect($user->signup_referrer_host)->toBeNull()
+        ->and($user->signup_utm_source)->toBeNull();
+})->with([
+    'Global Privacy Control' => [['Sec-GPC' => '1'], []],
+    'objection cookie' => [[], ['dipcatch_no_count' => '1']],
+]);
+
 it('leaves the source empty when a guest registers without one', function (): void {
     $this->skipUnlessFortifyHas(Features::registration());
 

@@ -57,9 +57,9 @@ final class PageViewStats
 
         $views = fn (): QueryBuilder => PageView::query()
             ->toBase()
-            ->selectRaw('COUNT(DISTINCT user_id) as visitors')
+            ->selectRaw("COUNT(DISTINCT COALESCE('u' || CAST(user_id AS TEXT), visitor_id)) as visitors")
             ->selectRaw('COUNT(DISTINCT user_id) as users')
-            ->whereNotNull(PageView::USER_ID)
+            ->where(static fn (QueryBuilder $query): QueryBuilder => $query->whereNotNull(PageView::USER_ID)->orWhereNotNull(PageView::VISITOR_ID))
             ->where(PageView::VIEWED_AT, '>=', $start)
             ->where(PageView::VIEWED_AT, '<', $end);
 
@@ -67,7 +67,7 @@ final class PageViewStats
             ->push((object) [...(array) $views()->first(), 'section' => PageViewPeriodStat::ALL_SECTIONS]);
 
         $rows = $results
-            ->filter(static fn (object $row): bool => self::number($row->users ?? 0) > 0)
+            ->filter(static fn (object $row): bool => self::number($row->visitors ?? 0) > 0)
             ->map(static fn (object $row): array => [
                 PageViewPeriodStat::PERIOD => $period->value,
                 PageViewPeriodStat::STARTS_ON => $start->toDateString(),

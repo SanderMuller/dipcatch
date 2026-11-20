@@ -31,6 +31,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $utm_medium
  * @property string|null $utm_source
  * @property CarbonImmutable $viewed_at
+ * @property string|null $visitor_id
  * @property string $visitor_hash
  *
  * n:1 relations
@@ -59,7 +60,8 @@ final class PageView extends Model
         UTM_MEDIUM = 'utm_medium',
         UTM_SOURCE = 'utm_source',
         VIEWED_AT = 'viewed_at',
-        VISITOR_HASH = 'visitor_hash';
+        VISITOR_HASH = 'visitor_hash',
+        VISITOR_ID = 'visitor_id';
 
     /* Relations */
     final public const string

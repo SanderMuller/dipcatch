@@ -16,12 +16,15 @@ use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use SanderMuller\FluentValidation\FluentRule;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 use UnexpectedValueException;
 
 /**
- * Counts a page load without JavaScript, cookies or a stored IP address.
+ * Counts a page load without JavaScript or a stored IP address. Only a guest
+ * in a country listed under `analytics.visitor_cookie` gets a cookie, and only
+ * while that switch is on.
  *
  * `handle()` decides and collects the values once the response exists, and
  * keeps them on the request. `terminate()` writes the row after the response
@@ -48,7 +51,7 @@ final class RecordPageView
                 return $response;
             }
 
-            $values = $this->values($request, $route);
+            $values = $this->values($request, $route, $response);
             $request->attributes->set(self::ATTRIBUTE, $values);
 
             $this->rememberSignupSource($request, $values);
@@ -76,6 +79,10 @@ final class RecordPageView
 
     private function counts(Request $request, Response $response, Route $route): bool
     {
+        if (self::hasObjected($request)) {
+            return false;
+        }
+
         if (! $request->isMethod('GET') || $this->isPrefetch($request)) {
             return false;
         }
@@ -99,6 +106,25 @@ final class RecordPageView
         return ! UserAgent::isBot($request->userAgent());
     }
 
+    /**
+     * The visitor asked not to be counted, with the objection cookie or a
+     * Global Privacy Control signal. Holds whether or not the cookie switch is on.
+     */
+    public static function hasObjected(Request $request): bool
+    {
+        return self::hasObjectionCookie($request) || self::sendsGlobalPrivacyControl($request);
+    }
+
+    public static function hasObjectionCookie(Request $request): bool
+    {
+        return $request->cookie(config()->string('analytics.visitor_cookie.objection_name')) !== null;
+    }
+
+    public static function sendsGlobalPrivacyControl(Request $request): bool
+    {
+        return trim((string) $request->headers->get('Sec-GPC', '')) === '1';
+    }
+
     private function isPrefetch(Request $request): bool
     {
         foreach (['Sec-Purpose', 'Purpose', 'X-Purpose', 'X-Moz'] as $header) {
@@ -113,12 +139,13 @@ final class RecordPageView
     /**
      * @return array<string, mixed>
      */
-    private function values(Request $request, Route $route): array
+    private function values(Request $request, Route $route, Response $response): array
     {
         $now = now()->toImmutable();
         $user = $request->user();
         $userAgent = (string) $request->userAgent();
         $utm = $this->utmValues($request);
+        $country = $this->resolver('analytics.country_resolver', ResolvesCountry::class)->country($request);
 
         return [
             PageView::VIEWED_AT => $now,
@@ -129,12 +156,46 @@ final class RecordPageView
             PageView::UTM_SOURCE => $utm['utm_source'],
             PageView::UTM_MEDIUM => $utm['utm_medium'],
             PageView::UTM_CAMPAIGN => $utm['utm_campaign'],
-            PageView::COUNTRY => $this->resolver('analytics.country_resolver', ResolvesCountry::class)->country($request),
+            PageView::COUNTRY => $country,
             PageView::DEVICE => UserAgent::device($userAgent)->value,
             PageView::IS_AUTHENTICATED => $user !== null,
             PageView::USER_ID => $this->linkedUserId($user),
             PageView::VISITOR_HASH => DailySalt::visitorHash($now, (string) $request->ip(), $userAgent, config()->string('app.url', '')),
+            PageView::VISITOR_ID => $user === null ? $this->visitorId($request, $response, $country) : null,
         ];
+    }
+
+    /**
+     * The keyed hash of the guest's visitor cookie. A missing or invalid
+     * cookie gets a new value on the response. One that is present is never
+     * set again, so its lifetime is never extended.
+     */
+    private function visitorId(Request $request, Response $response, ?string $country): ?string
+    {
+        if (! config()->boolean('analytics.visitor_cookie.enabled') || $country === null || ! in_array($country, config()->array('analytics.visitor_cookie.countries'), true)) {
+            return null;
+        }
+
+        $name = config()->string('analytics.visitor_cookie.name');
+        $value = $request->cookie($name);
+
+        if (! is_string($value) || preg_match('/^[a-f0-9]{64}$/', $value) !== 1) {
+            $value = bin2hex(random_bytes(32));
+
+            $response->headers->setCookie(Cookie::create(
+                $name,
+                $value,
+                now()->addDays(config()->integer('analytics.visitor_cookie.lifetime_days', 395)),
+                '/',
+                null,
+                $request->isSecure(),
+                true,
+                false,
+                Cookie::SAMESITE_LAX,
+            ));
+        }
+
+        return substr(hash_hmac('sha256', $value, config()->string('app.key')), 0, 32);
     }
 
     /**

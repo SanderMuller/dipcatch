@@ -10,6 +10,10 @@
     $operator = config('site.operator');
     $updated = config('site.privacy_updated_at');
     $description = __('What DipCatch stores about you, why, and how to get rid of it.');
+    $visitorCookie = config()->boolean('analytics.visitor_cookie.enabled');
+    $hasObjectionCookie = \App\Analytics\Http\RecordPageView::hasObjectionCookie(request());
+    $sendsGlobalPrivacyControl = \App\Analytics\Http\RecordPageView::sendsGlobalPrivacyControl(request());
+    $objectionStatus = session(\App\Analytics\Http\ObjectionController::STATUS);
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth bg-canvas">
@@ -51,16 +55,24 @@
                             <li><strong>{{ __('Hidden shops') }}:</strong> {{ __('the shops you chose not to have suggested.') }}</li>
                             <li><strong>{{ __('Pages we could not read') }}:</strong> {{ __('when you try to add a shop page DipCatch cannot read, its web address, why it failed and who tried it last, so we can make that shop work. We keep it for six months after the last try.') }}</li>
                             <li><strong>{{ __('Searches without results') }}:</strong> {{ __('when a search in the app finds nothing, the words you searched for and how often, so we can see what is missing. We keep them for six months after the last such search.') }}</li>
-                            <li><strong>{{ __('Visits') }}:</strong> {{ __('we count the pages people open on this site ourselves, without cookies or analytics scripts. For each page we store the page, the website that linked to it, the campaign in the link, your country, and whether you use a phone, tablet or computer. Your IP address is only used, together with your browser, to recognise the same visitor for one day; we do not store it, and the next day you are a new visitor.') }}</li>
+                            @if ($visitorCookie)
+                                <li><strong>{{ __('Visits') }}:</strong> {{ __('we count the pages people open on this site ourselves, without analytics scripts. For each page we store the page, the website that linked to it, the campaign in the link, your country, and whether you use a phone, tablet or computer. Your IP address is only used, together with your browser, to recognise the same visitor for one day; we do not store it.') }} {{ __('Visitors from the Netherlands and France also get a cookie with a random number for 13 months, so a visitor who comes back counts once per week and month. The cookie holds nothing about you, and we store only a scrambled form of it.') }}</li>
+                            @else
+                                <li><strong>{{ __('Visits') }}:</strong> {{ __('we count the pages people open on this site ourselves, without cookies or analytics scripts. For each page we store the page, the website that linked to it, the campaign in the link, your country, and whether you use a phone, tablet or computer. Your IP address is only used, together with your browser, to recognise the same visitor for one day; we do not store it, and the next day you are a new visitor.') }}</li>
+                            @endif
                             <li><strong>{{ __('App usage') }}:</strong> {{ __('when you are signed in, we link the pages you open in DipCatch to your account, so we can see which features people use and where they get stuck. You can switch this off in Settings → Profile.') }}</li>
                             <li><strong>{{ __('Where you came from') }}:</strong> {{ __('when you sign up, we store the website and campaign that first brought you to DipCatch with your account.') }}</li>
-                            <li><strong>{{ __('Technical') }}:</strong> {{ __('a session cookie to keep you signed in. Until you sign up, it also holds the website and campaign that first brought you here. Short-lived rate-limit counters keyed on your IP address protect the shops we read prices from and this service.') }}</li>
+                            <li><strong>{{ __('Technical') }}:</strong> {{ __('a session cookie to keep you signed in. Until you sign up, it also holds the website and campaign that first brought you here. Short-lived rate-limit counters keyed on your IP address protect the shops we read prices from and this service.') }} {{ __('If you ask us not to count your visits, a cookie remembers that for 13 months.') }}@if ($visitorCookie) {{ __('Visitors from the Netherlands and France also get the visitor cookie described under Visits.') }}@endif</li>
                         </ul>
                     </section>
 
                     <section>
                         <h2>{{ __('What we do with it') }}</h2>
-                        <p class="mt-2">{{ __('Run the service: check the prices of the products you track, work out the cheapest shop, and send you the alerts you asked for. Now and then we also email you about DipCatch itself, such as a new feature. Every such email has a link to stop them. We do not sell data, we do not build advertising profiles, and we do not use tracking cookies or analytics scripts on this site.') }}</p>
+                        @if ($visitorCookie)
+                            <p class="mt-2">{{ __('Run the service: check the prices of the products you track, work out the cheapest shop, and send you the alerts you asked for. Now and then we also email you about DipCatch itself, such as a new feature. Every such email has a link to stop them. We do not sell data, we do not build advertising profiles, and we do not use advertising cookies or third-party analytics scripts on this site.') }}</p>
+                        @else
+                            <p class="mt-2">{{ __('Run the service: check the prices of the products you track, work out the cheapest shop, and send you the alerts you asked for. Now and then we also email you about DipCatch itself, such as a new feature. Every such email has a link to stop them. We do not sell data, we do not build advertising profiles, and we do not use tracking cookies or analytics scripts on this site.') }}</p>
+                        @endif
                     </section>
 
                     <section>
@@ -72,6 +84,31 @@
                             <li>{{ __('Because we have a legitimate interest in improving DipCatch: counting visits, and the app usage linked to your account. You can object to the linked usage at any time by switching it off in Settings → Profile.') }}</li>
                             <li>{{ __('Because the law requires it: payment records for the tax authorities.') }}</li>
                         </ul>
+                    </section>
+
+                    <section id="count-visits" class="scroll-mt-24">
+                        <h2>{{ __('Counting your visits') }}</h2>
+                        <p class="mt-2">{{ __('You can ask us not to count your visits. This browser then gets a cookie that remembers it for 13 months, and your visits are not counted at all, also not when you are signed in.') }} {{ __('A Global Privacy Control signal from your browser has the same effect.') }}</p>
+                        @if ($objectionStatus === 'stored')
+                            <p class="mt-2 font-medium text-ink" role="status">{{ __('Done. Your visits in this browser are no longer counted.') }}</p>
+                        @elseif ($objectionStatus === 'removed' && ! $sendsGlobalPrivacyControl)
+                            <p class="mt-2 font-medium text-ink" role="status">{{ __('Done. Your visits in this browser are counted again.') }}</p>
+                        @endif
+                        @if ($sendsGlobalPrivacyControl)
+                            <p class="mt-2">{{ __('Your browser sends this signal, so your visits are not counted.') }}</p>
+                        @endif
+                        @if ($hasObjectionCookie)
+                            <form method="POST" action="{{ route('analytics.objection.destroy', $langQuery) }}" class="mt-2">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('Count my visits again') }}</button>
+                            </form>
+                        @else
+                            <form method="POST" action="{{ route('analytics.objection.store', $langQuery) }}" class="mt-2">
+                                @csrf
+                                <button type="submit" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('Don’t count my visits') }}</button>
+                            </form>
+                        @endif
                     </section>
 
                     <section>

@@ -23,7 +23,7 @@ final class UniqueVisitorsWidget extends TableWidget
     {
         return $table
             ->heading('Unique visitors per week and month')
-            ->description('Signed-in users only, for now. Guests are counted per day only, so they are not in these numbers.')
+            ->description('Signed-in users, and guests from countries where a visitor cookie is allowed. Other guests are counted per day only.')
             ->records(function (): array {
                 $range = $this->visitorRange();
                 $records = [];

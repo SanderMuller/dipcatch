@@ -34,6 +34,7 @@ final class PageViewFactory extends Factory
             PageView::IS_AUTHENTICATED => false,
             PageView::USER_ID => null,
             PageView::VISITOR_HASH => fake()->md5(),
+            PageView::VISITOR_ID => null,
         ];
     }
 
