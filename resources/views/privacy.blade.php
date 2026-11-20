@@ -81,7 +81,7 @@
                             <li>{{ __('To give you the service you signed up for: your account, the products you track, your alerts and your payments.') }}</li>
                             <li>{{ __('Because you switched it on: browser push, an AI feature, or a connected assistant. Switch it off and that use stops.') }}</li>
                             <li>{{ __('Because we need a working and safe service: rate limits, error reports, and the lists of pages we could not read and of searches without results.') }}</li>
-                            <li>{{ __('Because we have a legitimate interest in improving DipCatch: counting visits, and the app usage linked to your account. You can object to the linked usage at any time by switching it off in Settings → Profile.') }}</li>
+                            <li>{{ __('Because we have a legitimate interest in improving DipCatch: counting visits, and the app usage linked to your account. You can object to the linked usage at any time by switching it off in Settings → Profile.') }} <a href="#count-visits" class="font-medium text-ink underline underline-offset-4 hover:text-brand">{{ __('You can also ask us not to count your visits at all.') }}</a></li>
                             <li>{{ __('Because the law requires it: payment records for the tax authorities.') }}</li>
                         </ul>
                     </section>
