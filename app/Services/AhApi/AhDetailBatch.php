@@ -19,8 +19,6 @@ use Illuminate\Support\Facades\Http;
  */
 final readonly class AhDetailBatch
 {
-    private const string DETAIL_URL = 'https://api.ah.nl/mobile-services/product/detail/v4/fir/%s';
-
     private const int TIMEOUT_SECONDS = 15;
 
     /**
@@ -79,7 +77,7 @@ final readonly class AhDetailBatch
                     ->withToken($token)
                     ->withHeaders(['User-Agent' => $userAgent, 'X-Application' => $application])
                     ->timeout(self::TIMEOUT_SECONDS)
-                    ->get(sprintf(self::DETAIL_URL, $id));
+                    ->post(AhGraphqlProduct::URL, AhGraphqlProduct::body($id));
             }
 
             return $requests;

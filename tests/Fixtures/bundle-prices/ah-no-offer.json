@@ -1,12 +1,21 @@
 {
-    "productCard": {
-        "webshopId": 54074,
-        "title": "AH Komkommer",
-        "priceBeforeBonus": 0.79,
-        "isStapelBonus": false,
-        "isBonus": false,
-        "isBonusPrice": false,
-        "isVirtualBundle": false,
-        "discountLabels": []
+    "data": {
+        "product": {
+            "id": 54074,
+            "title": "AH Komkommer",
+            "availability": {
+                "isOrderable": true
+            },
+            "priceV2": {
+                "now": {
+                    "amount": 0.79
+                },
+                "was": {
+                    "amount": 0.79
+                },
+                "discount": null,
+                "promotionLabel": null
+            }
+        }
     }
 }

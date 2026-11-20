@@ -18,15 +18,15 @@ use Illuminate\Support\Facades\Log;
  * regular price — this API returns the current price INCLUDING bonus.
  *
  * Unofficial but community-documented (bartmachielsen/SupermarktConnector):
- * an anonymous token (no account) authorizes the product endpoints. On any
+ * an anonymous token (no account) authorizes the product endpoints. Products
+ * are read through the GraphQL API since the detail endpoint went away (see
+ * {@see AhGraphqlProduct}). On any
  * API failure the caller falls back to the checkjebon dataset row, so a
  * broken API degrades to regular prices instead of dead shops.
  */
 final readonly class AhApiSource
 {
     private const string TOKEN_URL = 'https://api.ah.nl/mobile-auth/v1/auth/token/anonymous';
-
-    private const string DETAIL_URL = 'https://api.ah.nl/mobile-services/product/detail/v4/fir/%s';
 
     private const string USER_AGENT = 'Appie/8.22.3';
 
@@ -88,7 +88,7 @@ final readonly class AhApiSource
             $response = Http::withToken($token)
                 ->withHeaders(['User-Agent' => self::USER_AGENT, 'X-Application' => self::APPLICATION])
                 ->timeout(15)
-                ->get(sprintf(self::DETAIL_URL, $productId));
+                ->post(AhGraphqlProduct::URL, AhGraphqlProduct::body($productId));
         } catch (ConnectionException $e) {
             Log::warning('AH API detail fetch failed.', ['product_id' => $productId, 'error' => $e->getMessage()]);
 
@@ -108,20 +108,19 @@ final readonly class AhApiSource
             return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
         }
 
-        if ($response->status() === 404) {
-            return CheckjebonResult::miss(CheckjebonResult::REASON_NOT_IN_DATASET);
-        }
-
         if (! $response->successful()) {
-            Log::warning('AH API detail returned an error.', ['product_id' => $productId, 'status' => $response->status()]);
+            Log::warning('AH API product query returned an error.', ['product_id' => $productId, 'status' => $response->status()]);
 
             return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
         }
 
-        /** @var array<string, mixed> $payload */
-        $payload = (array) $response->json();
+        $product = $response->json('data.product');
 
-        $snapshot = self::snapshotFrom($payload);
+        if (! is_array($product)) {
+            return self::missWithoutProduct($productId, $response);
+        }
+
+        $snapshot = self::snapshotFrom(AhGraphqlProduct::toDetailPayload($product));
         if ($snapshot === null) {
             Log::warning('AH API detail had no parseable price.', ['product_id' => $productId]);
 
@@ -129,6 +128,24 @@ final readonly class AhApiSource
         }
 
         return CheckjebonResult::found($snapshot);
+    }
+
+    /**
+     * AH answers an unknown product id with a redacted error on the
+     * `product` path, where the detail endpoint answered 404. Any other
+     * error, such as a field the schema no longer has, is an API failure.
+     */
+    private static function missWithoutProduct(string $productId, Response $response): CheckjebonResult
+    {
+        $errors = $response->json('errors');
+
+        if (is_array($errors) && array_any($errors, static fn (mixed $error): bool => data_get($error, 'path.0') === 'product')) {
+            return CheckjebonResult::miss(CheckjebonResult::REASON_NOT_IN_DATASET);
+        }
+
+        Log::warning('AH API product query failed.', ['product_id' => $productId, 'error' => data_get($errors, '0.message')]);
+
+        return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
     }
 
     private function token(): ?string
@@ -164,8 +181,8 @@ final readonly class AhApiSource
     }
 
     /**
-     * Reads the `productCard` from the detail response (shape verified live
-     * on 2026-08-31). `currentPrice` is bonus-aware — for a bonus product it
+     * Reads the `productCard` that {@see AhGraphqlProduct} builds, in the
+     * shape of the old detail response (verified live on 2026-08-31). `currentPrice` is bonus-aware — for a bonus product it
      * carries the discounted price while `priceBeforeBonus` holds the
      * regular one.
      *
@@ -209,9 +226,19 @@ final readonly class AhApiSource
         $salesUnitSize = $hasSalesUnitSize && is_string($card['salesUnitSize']) ? $card['salesUnitSize'] : null;
         $hasPromotionDate = array_key_exists('bonusStartDate', $card) || array_key_exists('bonusEndDate', $card);
         $invalidPromotionWindow = $bundleEligible && $hasPromotionDate && $promotionWindow === null;
-        $bundleOffer = $bundleEligible && ! $invalidPromotionWindow && is_string($mechanism)
-            ? BundleOffer::fromLabel($mechanism, $price)
-            : null;
+        $percentTiers = AhPercentTiers::fromCard($card);
+        $bundleOffer = match (true) {
+            ! $bundleEligible || $invalidPromotionWindow => null,
+            ! $percentTiers->isEmpty() => $percentTiers->bundleOffer($price),
+            is_string($mechanism) => BundleOffer::fromLabel($mechanism, $price),
+            default => null,
+        };
+
+        // A one-item step sets the shelf price once the bonus runs, as
+        // `currentPrice` would for a plain discount.
+        if ($bundleEligible && ! $invalidPromotionWindow && ! $upcoming) {
+            $price = $percentTiers->singleItemPrice($price);
+        }
 
         $raw = [
             'source' => 'ah-api',
@@ -298,6 +325,7 @@ final readonly class AhApiSource
             // at 17.99 for 32 rolls listed as dearer than 11.95 for 16.
             'DISCOUNT_X_PLUS_Y_FREE' => $count >= 1 && is_int(data_get($label, 'freeCount')) && data_get($label, 'freeCount') >= 1,
             'DISCOUNT_X_FOR_Y', 'DISCOUNT_ONE_HALF_PRICE' => $count >= 2,
+            'DISCOUNT_TIERED_PERCENT' => AhPercentTiers::isTierLabel($label),
             default => false,
         };
     }

@@ -236,57 +236,68 @@ function ahApiDownFakes(): array
 }
 
 /**
- * Fake the AH mobile API serving a product (trimmed replica of the
- * detail/v4 response shape, observed live 2026-08-31).
+ * Fake the AH GraphQL API serving a product (trimmed replica of the
+ * `product` query answer, observed live 2026-11-20).
+ *
+ * The parameters keep the names of the old detail card: `$currentPrice` is
+ * `priceV2.now` and `$priceBeforeBonus` is `priceV2.was`.
  *
  * @return array<string, PromiseInterface>
  */
 function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBonus = '2.19', bool $isBonus = true, string $title = "Lay's Naturel", ?string $salesUnitSize = '200 g', ?string $bonusStart = '2026-08-31', ?string $bonusEnd = '2026-09-06', ?string $bonusMechanism = 'VOOR 1.69', array|false|null $netContent = false): array
 {
-    $card = [
-        'webshopId' => 526381,
+    // A product with no bonus has no discount at all, exactly as the live
+    // API answers — the case where a finished bonus has to clear.
+    $discount = $isBonus ? [
+        'type' => 'Normal',
+        'theme' => 'BONUS',
+        'description' => $bonusMechanism,
+        'segmentType' => 'AH',
+        'promotionType' => 'NATIONAL',
+        'availability' => ['startDate' => $bonusStart, 'endDate' => $bonusEnd],
+    ] : null;
+
+    $units = ['g' => 'Gram', 'kg' => 'Kilogram', 'ml' => 'Milliliter', 'l' => 'Liter', 'st' => 'Stuks'];
+
+    return ahGraphqlProductFakes([
+        'id' => 526381,
         'title' => $title,
-        'images' => [['width' => 800, 'height' => 800, 'url' => 'https://static.ah.nl/dam/product/test.webp']],
-        'currentPrice' => (float) $currentPrice,
-        'priceBeforeBonus' => (float) $priceBeforeBonus,
-        'isBonus' => $isBonus,
-        'orderAvailabilityStatus' => 'IN_ASSORTMENT',
-    ];
+        // Null is a product with no stated size, which must not count as
+        // authoritative.
+        'salesUnitSize' => $salesUnitSize,
+        'imagePack' => [['medium' => ['url' => 'https://static.ah.nl/dam/product/test.webp']]],
+        'availability' => ['isOrderable' => true],
+        'priceV2' => [
+            'now' => ['amount' => (float) $currentPrice],
+            'was' => ['amount' => (float) $priceBeforeBonus],
+            'discount' => $discount,
+            'promotionLabel' => null,
+        ],
+        // False is no trade item, as a partial answer would have; null keeps
+        // it with no net content, as AH answers for eggs. Each entry is
+        // `[value, unit code]`, e.g. `[560, 'g']`.
+        'tradeItem' => $netContent === false ? null : ['contents' => ['netContents' => $netContent === null ? null : array_map(
+            fn (array $entry): string => number_format((float) $entry[0], 1, '.', '') . ' ' . $units[$entry[1]],
+            $netContent,
+        )]],
+    ]);
+}
 
-    // A null $salesUnitSize omits the key entirely — the partial-response
-    // case the authority flag must treat as non-authoritative.
-    if ($salesUnitSize !== null) {
-        $card['salesUnitSize'] = $salesUnitSize;
-    }
-
-    // A product with no bonus omits the period keys, exactly as the live
-    // API does — the case where a finished bonus has to clear.
-    if ($isBonus) {
-        foreach (['bonusStartDate' => $bonusStart, 'bonusEndDate' => $bonusEnd, 'bonusMechanism' => $bonusMechanism] as $key => $value) {
-            if ($value !== null) {
-                $card[$key] = $value;
-            }
-        }
-    }
-
+/**
+ * Fake the AH token and GraphQL endpoints, the latter answering with one
+ * product.
+ *
+ * @param  array<string, mixed>  $product
+ * @return array<string, PromiseInterface>
+ */
+function ahGraphqlProductFakes(array $product): array
+{
     return [
         'https://api.ah.nl/mobile-auth/v1/auth/token/anonymous' => Http::response([
             'access_token' => 'fake-token',
             'expires_in' => 604798,
         ]),
-        'https://api.ah.nl/mobile-services/product/detail/v4/fir/*' => Http::response([
-            'productId' => 526381,
-            'productCard' => $card,
-            // False omits the trade item, as a partial response would; null
-            // keeps it with no net content, as AH answers for eggs. Each
-            // entry is `[value, unit code]`, e.g. `[560, 'g']`.
-            ...($netContent === false ? [] : ['tradeItem' => ['measurements' => [
-                'netContent' => $netContent === null ? null : array_map(
-                    fn (array $entry): array => ['value' => $entry[0], 'measurementUnitCode' => ['value' => $entry[1]]],
-                    $netContent,
-                ),
-            ]]]),
-        ]),
+        'https://api.ah.nl/graphql' => Http::response(['data' => ['product' => $product]]),
     ];
 }
 

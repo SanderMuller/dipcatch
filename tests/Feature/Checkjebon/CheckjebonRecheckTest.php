@@ -249,19 +249,20 @@ test('an announced AH bonus is priced at the price before it until it starts', f
 
 test('an announced AH bonus without a price before it is no price, so the dataset answers', function (): void {
     $this->travelTo('2026-09-25 12:00:00');
-    Http::fake([
-        'https://api.ah.nl/mobile-auth/v1/auth/token/anonymous' => Http::response(['access_token' => 'fake-token', 'expires_in' => 604798]),
-        'https://api.ah.nl/mobile-services/product/detail/v4/fir/*' => Http::response(['productId' => 183521, 'productCard' => [
-            'webshopId' => 183521,
-            'title' => 'Aviko Aardappelkroketjes',
-            'currentPrice' => 2.17,
-            'isBonus' => true,
-            'bonusStartDate' => '2026-09-28',
-            'bonusEndDate' => '2026-10-04',
-            'bonusMechanism' => '25% korting',
-            'orderAvailabilityStatus' => 'IN_ASSORTMENT',
-        ]]),
-    ]);
+    Http::fake(ahGraphqlProductFakes([
+        'id' => 183521,
+        'title' => 'Aviko Aardappelkroketjes',
+        'priceV2' => [
+            'now' => ['amount' => 2.17],
+            'was' => null,
+            'discount' => [
+                'type' => 'Normal',
+                'theme' => 'BONUS',
+                'description' => '25% korting',
+                'availability' => ['startDate' => '2026-09-28', 'endDate' => '2026-10-04'],
+            ],
+        ],
+    ]));
 
     expect(app(AhApiSource::class)->resolve('https://ah.nl/producten/product/wi183521/aviko-aardappelkroketjes')->snapshot)->toBeNull();
 });

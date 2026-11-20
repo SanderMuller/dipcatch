@@ -1,0 +1,63 @@
+{
+    "data": {
+        "product": {
+            "id": 233499,
+            "title": "Edet Ultra soft toiletpapier stro voordeelpak",
+            "salesUnitSize": "16 stuks",
+            "imagePack": [
+                {
+                    "medium": {
+                        "url": "https://static.ah.nl/dam/product/AHI_79713767794e75365236324b36735072777731496877?revLabel=1&rendition=400x400_WEBP&fileType=binary"
+                    }
+                }
+            ],
+            "availability": {
+                "isOrderable": true
+            },
+            "priceV2": {
+                "now": {
+                    "amount": 17.99
+                },
+                "was": {
+                    "amount": 17.99
+                },
+                "discount": {
+                    "type": "Normal",
+                    "theme": "TIERED_OFFER",
+                    "description": "2 stapelen tot 60%",
+                    "segmentType": "AH",
+                    "promotionType": "NATIONAL",
+                    "availability": {
+                        "startDate": "2026-11-23",
+                        "endDate": "2026-11-29"
+                    }
+                },
+                "promotionLabel": {
+                    "tiers": [
+                        {
+                            "count": 2,
+                            "percentage": 60.0,
+                            "price": null,
+                            "unit": "PIECE",
+                            "description": "2 stuks 60%"
+                        },
+                        {
+                            "count": 1,
+                            "percentage": 50.0,
+                            "price": null,
+                            "unit": "PIECE",
+                            "description": "1 stuk 50%"
+                        }
+                    ]
+                }
+            },
+            "tradeItem": {
+                "contents": {
+                    "netContents": [
+                        "16.0 Stuks"
+                    ]
+                }
+            }
+        }
+    }
+}

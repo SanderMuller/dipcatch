@@ -62,6 +62,30 @@ test('a 1 + 1 is read as a bundle, not as its pre-bonus price', function (): voi
         ->and($snapshot?->trackedPrice())->toBe('9.00');
 });
 
+test('a tiered AH percentage offer is announced at the regular price and tracked at its best tier once it runs', function (): void {
+    // Captured live on 2026-11-20: "1 stuk 50% korting, 2 stuks 60%
+    // korting", announced for 23–29 Nov, with 17.99 as both prices.
+    fakeAhBundleApi('ah-tiered-percent.json');
+    CarbonImmutable::setTestNow('2026-11-20 12:00:00 Europe/Amsterdam');
+
+    $announced = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi233499')->snapshot;
+
+    expect($announced?->price)->toBe('17.99')
+        ->and($announced?->trackedPrice())->toBe('17.99')
+        ->and($announced?->claimedRegularPrice)->toBeNull()
+        ->and($announced?->promotionWindow?->label)->toBe('2 stapelen tot 60%')
+        ->and($announced?->bundleOffer?->quantity)->toBe(2)
+        ->and($announced?->bundleOffer?->totalPrice)->toBe('14.39');
+
+    CarbonImmutable::setTestNow('2026-11-24 12:00:00 Europe/Amsterdam');
+    $running = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi233499')->snapshot;
+
+    // One pack at 50% off is 9.00; two at 60% off are 14.39, so 7.20 each.
+    expect($running?->price)->toBe('9.00')
+        ->and($running?->claimedRegularPrice)->toBe('17.99')
+        ->and($running?->trackedPrice())->toBe('7.20');
+});
+
 test('explicit no-offer card authoritatively clears bundle state', function (): void {
     fakeAhBundleApi('ah-no-offer.json');
 
@@ -74,16 +98,10 @@ test('explicit no-offer card authoritatively clears bundle state', function (): 
 });
 
 test('tiered AH wording stays disabled without captured source contract', function (): void {
-    fakeAhPayload([
-        'productCard' => [
-            'title' => 'Future tier sample',
-            'priceBeforeBonus' => 10,
-            'isBonus' => true,
-            'isVirtualBundle' => false,
-            'bonusMechanism' => '2 stuks 20%, 3 stuks 30%, 4 stuks 40% korting',
-            'discountLabels' => [['code' => 'UNKNOWN_TIER', 'count' => 4]],
-        ],
-    ]);
+    fakeAhPayload(ahBonusProduct('10', [
+        'description' => '2 stuks 20%, 3 stuks 30%, 4 stuks 40% korting',
+        'theme' => 'UNKNOWN_TIER',
+    ], [['count' => 4, 'description' => '4 stuks 40%']]));
 
     $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi1')->snapshot;
 
@@ -93,17 +111,7 @@ test('tiered AH wording stays disabled without captured source contract', functi
 });
 
 test('direct Bonus prices stay scalar', function (): void {
-    fakeAhPayload([
-        'productCard' => [
-            'title' => 'Direct price sample',
-            'currentPrice' => 2.5,
-            'priceBeforeBonus' => 3,
-            'isBonus' => true,
-            'isVirtualBundle' => false,
-            'bonusMechanism' => 'VOOR 2.50',
-            'discountLabels' => [],
-        ],
-    ]);
+    fakeAhPayload(ahBonusProduct('3', ['description' => 'VOOR 2.50'], [], now: '2.5'));
 
     $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi2')->snapshot;
 
@@ -111,20 +119,11 @@ test('direct Bonus prices stay scalar', function (): void {
         ->and($snapshot?->bundleOffer)->toBeNull();
 });
 
-test('conditional campaigns cannot drive tracked bundle prices', function (array $campaign): void {
-    fakeAhPayload([
-        'productCard' => array_merge([
-            'title' => 'Conditional sample',
-            'priceBeforeBonus' => 3,
-            'isBonus' => true,
-            'isVirtualBundle' => false,
-            'bonusMechanism' => '2 VOOR 4.00',
-            'discountType' => 'AH',
-            'promotionType' => 'NATIONAL',
-            'segmentType' => 'AH',
-            'discountLabels' => [['code' => 'DISCOUNT_X_FOR_Y', 'count' => 2]],
-        ], $campaign),
-    ]);
+test('conditional campaigns cannot drive tracked bundle prices', function (string $field, string $value): void {
+    fakeAhPayload(ahBonusProduct('3', [
+        'description' => '2 VOOR 4.00',
+        $field => $value,
+    ], [['count' => 2, 'price' => 4.0, 'description' => '2 voor 4.00']]));
 
     $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi3')->snapshot;
 
@@ -132,14 +131,14 @@ test('conditional campaigns cannot drive tracked bundle prices', function (array
         ->and($snapshot?->bundleOffer)->toBeNull()
         ->and($snapshot?->bundleOfferAuthoritative)->toBeTrue();
 })->with([
-    'personal promotion' => [['promotionType' => 'PERSONAL']],
-    'coupon segment' => [['segmentType' => 'COUPON']],
-    'premium discount' => [['discountType' => 'PREMIUM']],
-    'virtual app bundle' => [['isVirtualBundle' => true]],
+    'personal promotion' => ['promotionType', 'PERSONAL'],
+    'coupon segment' => ['segmentType', 'COUPON'],
+    'another theme' => ['theme', 'PREMIUM'],
+    'virtual app bundle' => ['type', 'Bundle'],
 ]);
 
 test('partial product card preserves bundle authority state', function (): void {
-    fakeAhPayload(['productCard' => ['title' => 'Partial', 'priceBeforeBonus' => 3]]);
+    fakeAhPayload(['data' => ['product' => ['title' => 'Partial', 'priceV2' => ['was' => ['amount' => 3]]]]]);
 
     $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi4')->snapshot;
 
@@ -150,23 +149,44 @@ test('partial product card preserves bundle authority state', function (): void 
 });
 
 test('invalid promotion dates cannot create an undated AH bundle', function (string $dateKey): void {
-    $payload = jsonObject(File::get(base_path('tests/Fixtures/bundle-prices/ah-fixed-total.json')));
-    $productCard = $payload['productCard'] ?? null;
-
-    if (! is_array($productCard)) {
-        throw new UnexpectedValueException('AH fixture must contain a product card.');
-    }
-
-    $productCard[$dateKey] = 'not-a-date';
-    $payload['productCard'] = $productCard;
-    fakeAhPayload($payload);
+    fakeAhPayload(array_replace_recursive(
+        jsonObject(File::get(base_path('tests/Fixtures/bundle-prices/ah-fixed-total.json'))),
+        ['data' => ['product' => ['priceV2' => ['discount' => ['availability' => [$dateKey => 'not-a-date']]]]]],
+    ));
 
     $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi597752')->snapshot;
 
     expect($snapshot?->trackedPrice())->toBe('6.49')
         ->and($snapshot?->bundleOffer)->toBeNull()
         ->and($snapshot?->raw['bundle_diagnostic'] ?? null)->toBe('invalid_promotion_window');
-})->with(['bonusStartDate', 'bonusEndDate']);
+})->with(['startDate', 'endDate']);
+
+/**
+ * A national AH bonus product as the GraphQL API answers it, with the
+ * discount and tiers overridden per test.
+ *
+ * @param  array<string, mixed>  $discount
+ * @param  list<array<string, mixed>>  $tiers
+ * @return array<string, mixed>
+ */
+function ahBonusProduct(string $was, array $discount, array $tiers, ?string $now = null): array
+{
+    return ['data' => ['product' => [
+        'title' => 'Bonus sample',
+        'priceV2' => [
+            'now' => ['amount' => (float) ($now ?? $was)],
+            'was' => ['amount' => (float) $was],
+            'discount' => [
+                'type' => 'Normal',
+                'theme' => 'BONUS',
+                'segmentType' => 'AH',
+                'promotionType' => 'NATIONAL',
+                ...$discount,
+            ],
+            'promotionLabel' => ['tiers' => $tiers],
+        ],
+    ]]];
+}
 
 function fakeAhBundleApi(string $fixture): void
 {
@@ -202,7 +222,7 @@ function jsonObject(string $json): array
 }
 
 /**
- * @param  array<string, mixed>  $payload
+ * @param  array<mixed>  $payload
  */
 function fakeAhPayload(array $payload): void
 {
@@ -211,6 +231,6 @@ function fakeAhPayload(array $payload): void
             'access_token' => 'test-token',
             'expires_in' => 7200,
         ]),
-        'https://api.ah.nl/mobile-services/product/detail/v4/fir/*' => Http::response($payload),
+        'https://api.ah.nl/graphql' => Http::response($payload),
     ]);
 }

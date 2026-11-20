@@ -193,12 +193,43 @@ final readonly class BundleOffer
 
         preg_match_all('/(\d+)\s+stuks?\s+(\d+(?:\.\d+)?)%\s*(?:korting)?/u', $label, $matches, PREG_SET_ORDER);
 
+        return self::bestTier(
+            array_map(static fn (array $match): array => [(int) $match[1], self::numeric($match[2])], $matches),
+            $singleItemPrice,
+        );
+    }
+
+    /**
+     * The cheapest per item of a "N items P% off" ladder, read from a shop's
+     * structured tiers rather than its wording. Every tier needs two or more
+     * items; a one-item tier is a plain discount, not a bundle.
+     *
+     * @param  list<array{int, numeric-string}>  $tiers  quantity and percentage off
+     */
+    public static function fromTiers(array $tiers, string $singleItemPrice): ?self
+    {
+        if ($tiers === [] || ! self::isMoney($singleItemPrice) || bccomp($singleItemPrice, '0.01', 2) < 0) {
+            return null;
+        }
+
+        try {
+            $offer = self::bestTier($tiers, self::money($singleItemPrice));
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        return $offer?->isCheaperThan($singleItemPrice) === true ? $offer : null;
+    }
+
+    /**
+     * @param  list<array{int, numeric-string}>  $tiers
+     * @param  numeric-string  $singleItemPrice
+     */
+    private static function bestTier(array $tiers, string $singleItemPrice): ?self
+    {
         $best = null;
 
-        foreach ($matches as $match) {
-            $quantity = (int) $match[1];
-            $discount = self::numeric($match[2]);
-
+        foreach ($tiers as [$quantity, $discount]) {
             if ($quantity < 2 || bccomp($discount, '0', 4) <= 0 || bccomp($discount, '100', 4) >= 0) {
                 return null;
             }

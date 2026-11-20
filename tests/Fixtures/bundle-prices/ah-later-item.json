@@ -1,27 +1,41 @@
 {
-    "productCard": {
-        "webshopId": 62661,
-        "title": "AH Rucola slamelange",
-        "bonusStartDate": "2026-09-07",
-        "bonusEndDate": "2026-09-13",
-        "discountType": "AH",
-        "promotionType": "NATIONAL",
-        "segmentType": "AH",
-        "bonusMechanism": "2e Halve Prijs",
-        "priceBeforeBonus": 1.39,
-        "isStapelBonus": false,
-        "bonusSegmentId": 808400,
-        "hqPromotionId": 191811,
-        "bonusSegmentDescription": "Alle AH Slamelanges 75-130 gram",
-        "isBonus": true,
-        "isBonusPrice": false,
-        "isVirtualBundle": false,
-        "discountLabels": [
-            {
-                "code": "DISCOUNT_ONE_HALF_PRICE",
-                "defaultDescription": "2e halve prijs",
-                "count": 2
+    "data": {
+        "product": {
+            "id": 62661,
+            "title": "AH Rucola slamelange",
+            "availability": {
+                "isOrderable": true
+            },
+            "priceV2": {
+                "now": {
+                    "amount": 1.39
+                },
+                "was": {
+                    "amount": 1.39
+                },
+                "discount": {
+                    "type": "Normal",
+                    "theme": "BONUS",
+                    "description": "2e Halve Prijs",
+                    "segmentType": "AH",
+                    "promotionType": "NATIONAL",
+                    "availability": {
+                        "startDate": "2026-09-07",
+                        "endDate": "2026-09-13"
+                    }
+                },
+                "promotionLabel": {
+                    "tiers": [
+                        {
+                            "count": 2,
+                            "percentage": null,
+                            "price": null,
+                            "unit": null,
+                            "description": "2e halve prijs"
+                        }
+                    ]
+                }
             }
-        ]
+        }
     }
 }
