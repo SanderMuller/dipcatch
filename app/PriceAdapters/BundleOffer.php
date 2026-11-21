@@ -208,7 +208,7 @@ final readonly class BundleOffer
      */
     public static function fromTiers(array $tiers, string $singleItemPrice): ?self
     {
-        if ($tiers === [] || ! self::isMoney($singleItemPrice) || bccomp($singleItemPrice, '0.01', 2) < 0) {
+        if (! self::isMoney($singleItemPrice) || bccomp($singleItemPrice, '0.01', 2) < 0) {
             return null;
         }
 

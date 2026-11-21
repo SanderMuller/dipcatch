@@ -2,6 +2,7 @@
 
 use App\Services\AhApi\AhApiSource;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -84,6 +85,56 @@ test('a tiered AH percentage offer is announced at the regular price and tracked
     expect($running?->price)->toBe('9.00')
         ->and($running?->claimedRegularPrice)->toBe('17.99')
         ->and($running?->trackedPrice())->toBe('7.20');
+});
+
+test('the tiered GraphQL query asks for the product the URL names', function (): void {
+    fakeAhBundleApi('ah-tiered-percent.json');
+
+    app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi233499');
+
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.ah.nl/graphql'
+        && $request->method() === 'POST'
+        && data_get($request->data(), 'variables.id') === 233499);
+});
+
+test('a tiered offer with one step prices only what that step covers', function (int $count, float $percentage, string $price, ?string $bundleTotal, string $tracked): void {
+    fakeAhPayload(ahBonusProduct('10', ['theme' => 'TIERED_OFFER'], [['count' => $count, 'percentage' => $percentage, 'unit' => 'PIECE']]));
+
+    $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi5')->snapshot;
+
+    expect($snapshot?->price)->toBe($price)
+        ->and($snapshot?->bundleOffer?->totalPrice)->toBe($bundleTotal)
+        ->and($snapshot?->trackedPrice())->toBe($tracked);
+})->with([
+    'only one item' => [1, 50.0, '5.00', null, '5.00'],
+    'only two items' => [2, 60.0, '10', '8.00', '4.00'],
+]);
+
+test('a tier AH cannot mean as a piece discount changes no price', function (mixed $percentage, string $unit): void {
+    fakeAhPayload(ahBonusProduct('10', ['theme' => 'TIERED_OFFER'], [['count' => 1, 'percentage' => $percentage, 'unit' => $unit]]));
+
+    $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi6')->snapshot;
+
+    expect($snapshot?->price)->toBe('10')
+        ->and($snapshot?->bundleOffer)->toBeNull();
+})->with([
+    'free' => [100.0, 'PIECE'],
+    'no discount' => [0.0, 'PIECE'],
+    'no percentage' => [null, 'PIECE'],
+    'not per piece' => [50.0, 'KILOGRAM'],
+]);
+
+test('the one-item step discounts the price before the bonus, not the bonus price', function (): void {
+    // Should AH start to put the step into `now`, the price must not be
+    // discounted twice.
+    fakeAhPayload(ahBonusProduct('17.99', ['theme' => 'TIERED_OFFER'], [
+        ['count' => 2, 'percentage' => 60.0, 'unit' => 'PIECE'],
+        ['count' => 1, 'percentage' => 50.0, 'unit' => 'PIECE'],
+    ], now: '9.00'));
+
+    $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi7')->snapshot;
+
+    expect($snapshot?->price)->toBe('9.00');
 });
 
 test('explicit no-offer card authoritatively clears bundle state', function (): void {

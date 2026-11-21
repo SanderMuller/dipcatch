@@ -19,10 +19,9 @@ use Illuminate\Support\Facades\Log;
  *
  * Unofficial but community-documented (bartmachielsen/SupermarktConnector):
  * an anonymous token (no account) authorizes the product endpoints. Products
- * are read through the GraphQL API since the detail endpoint went away (see
- * {@see AhGraphqlProduct}). On any
- * API failure the caller falls back to the checkjebon dataset row, so a
- * broken API degrades to regular prices instead of dead shops.
+ * are read through the GraphQL API ({@see AhGraphqlProduct}). On any API
+ * failure the caller falls back to the checkjebon dataset row, so a broken
+ * API degrades to regular prices instead of dead shops.
  */
 final readonly class AhApiSource
 {
@@ -90,7 +89,7 @@ final readonly class AhApiSource
                 ->timeout(15)
                 ->post(AhGraphqlProduct::URL, AhGraphqlProduct::body($productId));
         } catch (ConnectionException $e) {
-            Log::warning('AH API detail fetch failed.', ['product_id' => $productId, 'error' => $e->getMessage()]);
+            Log::warning('AH API product fetch failed.', ['product_id' => $productId, 'error' => $e->getMessage()]);
 
             return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
         }
@@ -104,6 +103,7 @@ final readonly class AhApiSource
         if ($response->status() === 401) {
             // Token expired early — drop it so the next check re-authenticates.
             Cache::forget(self::TOKEN_CACHE_KEY);
+            Log::warning('AH API rejected the token.', ['product_id' => $productId]);
 
             return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
         }
@@ -114,38 +114,20 @@ final readonly class AhApiSource
             return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
         }
 
-        $product = $response->json('data.product');
+        $product = AhGraphqlProduct::product($productId, $response);
 
-        if (! is_array($product)) {
-            return self::missWithoutProduct($productId, $response);
+        if ($product instanceof CheckjebonResult) {
+            return $product;
         }
 
         $snapshot = self::snapshotFrom(AhGraphqlProduct::toDetailPayload($product));
         if ($snapshot === null) {
-            Log::warning('AH API detail had no parseable price.', ['product_id' => $productId]);
+            Log::warning('AH API product had no parseable price.', ['product_id' => $productId]);
 
             return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
         }
 
         return CheckjebonResult::found($snapshot);
-    }
-
-    /**
-     * AH answers an unknown product id with a redacted error on the
-     * `product` path, where the detail endpoint answered 404. Any other
-     * error, such as a field the schema no longer has, is an API failure.
-     */
-    private static function missWithoutProduct(string $productId, Response $response): CheckjebonResult
-    {
-        $errors = $response->json('errors');
-
-        if (is_array($errors) && array_any($errors, static fn (mixed $error): bool => data_get($error, 'path.0') === 'product')) {
-            return CheckjebonResult::miss(CheckjebonResult::REASON_NOT_IN_DATASET);
-        }
-
-        Log::warning('AH API product query failed.', ['product_id' => $productId, 'error' => data_get($errors, '0.message')]);
-
-        return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
     }
 
     private function token(): ?string
@@ -181,10 +163,9 @@ final readonly class AhApiSource
     }
 
     /**
-     * Reads the `productCard` that {@see AhGraphqlProduct} builds, in the
-     * shape of the old detail response (verified live on 2026-08-31). `currentPrice` is bonus-aware — for a bonus product it
-     * carries the discounted price while `priceBeforeBonus` holds the
-     * regular one.
+     * Reads the `productCard` that {@see AhGraphqlProduct} builds.
+     * `currentPrice` carries a bonus price, except the one-item step of a
+     * tiered offer, while `priceBeforeBonus` holds the regular one.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -227,16 +208,15 @@ final readonly class AhApiSource
         $hasPromotionDate = array_key_exists('bonusStartDate', $card) || array_key_exists('bonusEndDate', $card);
         $invalidPromotionWindow = $bundleEligible && $hasPromotionDate && $promotionWindow === null;
         $percentTiers = AhPercentTiers::fromCard($card);
+        $readsOffer = $bundleEligible && ! $invalidPromotionWindow;
         $bundleOffer = match (true) {
-            ! $bundleEligible || $invalidPromotionWindow => null,
+            ! $readsOffer => null,
             ! $percentTiers->isEmpty() => $percentTiers->bundleOffer($price),
             is_string($mechanism) => BundleOffer::fromLabel($mechanism, $price),
             default => null,
         };
 
-        // A one-item step sets the shelf price once the bonus runs, as
-        // `currentPrice` would for a plain discount.
-        if ($bundleEligible && ! $invalidPromotionWindow && ! $upcoming) {
+        if ($readsOffer && ! $upcoming) {
             $price = $percentTiers->singleItemPrice($price);
         }
 
@@ -279,8 +259,7 @@ final readonly class AhApiSource
     }
 
     /**
-     * Enable only product-card contracts captured in fixtures. Tiered AH
-     * offers stay disabled until a live payload proves their exact shape.
+     * Enable only product-card contracts captured in fixtures.
      *
      * @param  array<mixed>  $card
      */

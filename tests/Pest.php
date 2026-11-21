@@ -284,9 +284,6 @@ function ahApiProductFakes(string $currentPrice = '1.69', string $priceBeforeBon
 }
 
 /**
- * Fake the AH token and GraphQL endpoints, the latter answering with one
- * product.
- *
  * @param  array<string, mixed>  $product
  * @return array<string, PromiseInterface>
  */

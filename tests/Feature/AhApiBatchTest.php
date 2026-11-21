@@ -39,8 +39,6 @@ test('many products are asked about together and answered by URL', function (): 
         // relying on the order they came back in.
         ->and($results['https://www.ah.nl/producten/product/wi1/een']->isFound())->toBeTrue()
         ->and($results['https://www.ah.nl/producten/product/wi1/een']->snapshot?->price)->toBe('1.49')
-        // A product Albert Heijn no longer sells is a miss, not a gap in
-        // the array.
         ->and($results['https://www.ah.nl/producten/product/wi2/twee']->isFound())->toBeFalse()
         ->and($results['https://www.ah.nl/producten/product/wi3/drie']->isFound())->toBeTrue();
 });
@@ -87,4 +85,77 @@ test('a query AH rejects is an API error, not a product it does not sell', funct
     $result = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi1/een');
 
     expect($result->missReason)->toBe(CheckjebonResult::REASON_API_ERROR);
+});
+
+test('a missing product without the unknown-product error is an API error', function (array $answer): void {
+    Http::fake([
+        'https://api.ah.nl/mobile-auth/*' => Http::response(['access_token' => 'fake', 'expires_in' => 604798]),
+        'https://api.ah.nl/graphql' => Http::response($answer),
+    ]);
+
+    $result = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi1/een');
+
+    expect($result->missReason)->toBe(CheckjebonResult::REASON_API_ERROR);
+})->with([
+    'no errors' => [['data' => ['product' => null]]],
+    'an error inside the product' => [['data' => ['product' => null], 'errors' => [['message' => 'Subgraph errors redacted', 'path' => ['product', 'priceV2']]]]],
+]);
+
+test('a product AH cannot take orders for is out of stock', function (?bool $isOrderable, bool $inStock): void {
+    Http::fake(ahGraphqlProductFakes([
+        'title' => 'Iglo Vissticks',
+        'priceV2' => ['now' => ['amount' => 4.99], 'was' => ['amount' => 4.99], 'discount' => null],
+        ...($isOrderable === null ? [] : ['availability' => ['isOrderable' => $isOrderable]]),
+    ]));
+
+    expect(app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi1/een')->snapshot?->inStock)->toBe($inStock);
+})->with([
+    'not orderable' => [false, false],
+    'orderable' => [true, true],
+    'not stated' => [null, true],
+]);
+
+test('net contents in a unit DipCatch cannot read leave the stored sizes alone', function (): void {
+    Http::fake(ahGraphqlProductFakes([
+        'title' => 'Iglo Vissticks',
+        'priceV2' => ['now' => ['amount' => 4.99], 'was' => ['amount' => 4.99], 'discount' => null],
+        'tradeItem' => ['contents' => ['netContents' => ['20.0 Stuks', '1.0 Rol']]],
+    ]));
+
+    $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi1/een')->snapshot;
+
+    expect($snapshot?->altPackSizesAuthoritative)->toBeFalse();
+});
+
+test('a product answered in part is an API error, so nothing stored is cleared', function (): void {
+    // GraphQL nulls a field it could not resolve and names it in `errors`.
+    // Read as complete, the null discount would clear a running bonus.
+    Http::fake([
+        'https://api.ah.nl/mobile-auth/*' => Http::response(['access_token' => 'fake', 'expires_in' => 604798]),
+        'https://api.ah.nl/graphql' => Http::response([
+            'data' => ['product' => [
+                'title' => 'Gevonden',
+                'priceV2' => ['now' => ['amount' => 1.49], 'was' => ['amount' => 1.99], 'discount' => null],
+            ]],
+            'errors' => [['message' => 'Subgraph errors redacted', 'path' => ['product', 'priceV2', 'discount']]],
+        ]),
+    ]);
+
+    $result = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi1/een');
+
+    expect($result->missReason)->toBe(CheckjebonResult::REASON_API_ERROR);
+});
+
+test('net contents in centilitres read as millilitres', function (): void {
+    // Leffe Blond 0.0% states "30.0 Centiliter", captured 2026-11-21.
+    Http::fake(ahGraphqlProductFakes([
+        'title' => 'Leffe Blond 0.0% 6-pack',
+        'priceV2' => ['now' => ['amount' => 6.79], 'was' => ['amount' => 6.79], 'discount' => null],
+        'tradeItem' => ['contents' => ['netContents' => ['30.0 Centiliter']]],
+    ]));
+
+    $snapshot = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi1/een')->snapshot;
+
+    expect($snapshot?->altPackSizes)->toBe(['300 ml'])
+        ->and($snapshot?->altPackSizesAuthoritative)->toBeTrue();
 });

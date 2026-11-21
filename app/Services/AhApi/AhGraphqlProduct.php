@@ -2,6 +2,10 @@
 
 namespace App\Services\AhApi;
 
+use App\Services\Checkjebon\CheckjebonResult;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Log;
+
 /**
  * One product from AH's GraphQL API, read into the product-card shape the
  * rest of {@see AhApiSource} was written against.
@@ -22,7 +26,6 @@ final class AhGraphqlProduct
     private const string QUERY = <<<'GRAPHQL'
         query Product($id: Int!) {
           product(id: $id) {
-            id
             title
             salesUnitSize
             imagePack { medium { url } }
@@ -48,12 +51,14 @@ final class AhGraphqlProduct
     /** The themes of AH's own national bonus. Any other theme enables no bundle. */
     private const array BONUS_THEMES = ['BONUS', 'TIERED_OFFER'];
 
+    /** Each unit as a code the detail card used, and the factor to reach it. */
     private const array UNIT_CODES = [
-        'Gram' => 'g',
-        'Kilogram' => 'kg',
-        'Milliliter' => 'ml',
-        'Liter' => 'l',
-        'Stuks' => 'st',
+        'Gram' => ['g', '1'],
+        'Kilogram' => ['kg', '1'],
+        'Milliliter' => ['ml', '1'],
+        'Centiliter' => ['ml', '10'],
+        'Liter' => ['l', '1'],
+        'Stuks' => ['st', '1'],
     ];
 
     /** @return array{query: string, variables: array{id: int}} */
@@ -63,8 +68,43 @@ final class AhGraphqlProduct
     }
 
     /**
+     * The product in a successful answer, or the miss the answer means.
+     *
+     * AH answers an unknown product id with a redacted error on the
+     * `product` path itself. Any other error is an API failure: a field the
+     * schema no longer has, or a field AH nulled because it failed to
+     * resolve it. Read as complete, such a null would clear a bonus or a
+     * pack size that still holds.
+     *
+     * @return array<mixed>|CheckjebonResult
+     */
+    public static function product(string $productId, Response $response): array|CheckjebonResult
+    {
+        $product = $response->json('data.product');
+        $errors = $response->json('errors');
+
+        if (is_array($product) && $errors === null) {
+            return $product;
+        }
+
+        if (! is_array($product) && is_array($errors) && array_any($errors, static fn (mixed $error): bool => data_get($error, 'path') === ['product'])) {
+            // Logged, so a run where every product is unknown is visible: a
+            // failing product service may answer in the same shape.
+            Log::info('AH API knows no such product.', ['product_id' => $productId]);
+
+            return CheckjebonResult::miss(CheckjebonResult::REASON_NOT_IN_DATASET);
+        }
+
+        Log::warning('AH API product query failed.', ['product_id' => $productId, 'error' => data_get($errors, '0.message')]);
+
+        return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
+    }
+
+    /**
      * `priceV2.now` is bonus-aware, an announced bonus included, as the
      * detail card's `currentPrice` was; `priceV2.was` is the price before it.
+     * The one-item step of a tiered offer is the exception: `now` leaves it
+     * out (see {@see AhPercentTiers::singleItemPrice()}).
      *
      * @param  array<mixed>  $product
      * @return array<string, mixed>
@@ -73,7 +113,6 @@ final class AhGraphqlProduct
     {
         $discount = data_get($product, 'priceV2.discount');
         $card = [
-            'webshopId' => data_get($product, 'id'),
             'title' => data_get($product, 'title'),
             'images' => [['url' => data_get($product, 'imagePack.0.medium.url')]],
             'currentPrice' => data_get($product, 'priceV2.now.amount'),
@@ -81,15 +120,15 @@ final class AhGraphqlProduct
             'orderAvailabilityStatus' => data_get($product, 'availability.isOrderable') === false ? 'UNAVAILABLE' : 'IN_ASSORTMENT',
         ];
 
-        // A null discount is no bonus, and clears one that ended. A missing
-        // discount is a partial answer, which says nothing about it.
+        // A null discount is no bonus, and clears one that ended. Without
+        // the key the answer says nothing about it.
         if (is_array($product['priceV2'] ?? null) && array_key_exists('discount', $product['priceV2'])) {
             $card['isBonus'] = is_array($discount);
         }
 
-        // Only a stated size is authoritative: an empty one must never clear
-        // stored pack data.
-        if (is_string($product['salesUnitSize'] ?? null)) {
+        // Only a stated size is authoritative: a missing or empty one must
+        // never clear stored pack data.
+        if (is_string($product['salesUnitSize'] ?? null) && $product['salesUnitSize'] !== '') {
             $card['salesUnitSize'] = $product['salesUnitSize'];
         }
 
@@ -99,8 +138,12 @@ final class AhGraphqlProduct
 
         $payload = ['productCard' => $card];
 
-        if (is_array($product['tradeItem'] ?? null)) {
-            $payload['tradeItem'] = ['measurements' => ['netContent' => self::netContent(data_get($product, 'tradeItem.contents.netContents'))]];
+        $netContent = self::netContent(data_get($product, 'tradeItem.contents.netContents'));
+
+        // A size in a unit this cannot read leaves the trade item out, so the
+        // stored sizes stay rather than clear.
+        if (is_array($product['tradeItem'] ?? null) && $netContent !== false) {
+            $payload['tradeItem'] = ['measurements' => ['netContent' => $netContent]];
         }
 
         return $payload;
@@ -166,10 +209,11 @@ final class AhGraphqlProduct
 
     /**
      * `560.0 Gram` becomes `[value 560.0, unit g]`, the detail card's shape.
+     * False when an entry is in a form this cannot read.
      *
-     * @return list<array{value: string, measurementUnitCode: array{value: string}}>|null
+     * @return list<array{value: string, measurementUnitCode: array{value: string}}>|false|null
      */
-    private static function netContent(mixed $entries): ?array
+    private static function netContent(mixed $entries): array|false|null
     {
         if (! is_array($entries)) {
             return null;
@@ -178,9 +222,14 @@ final class AhGraphqlProduct
         $netContent = [];
 
         foreach ($entries as $entry) {
-            if (is_string($entry) && preg_match('/^(\d+(?:\.\d+)?)\s+(\w+)$/u', trim($entry), $matches) === 1 && isset(self::UNIT_CODES[$matches[2]])) {
-                $netContent[] = ['value' => $matches[1], 'measurementUnitCode' => ['value' => self::UNIT_CODES[$matches[2]]]];
+            if (! is_string($entry) || preg_match('/^(\d+(?:\.\d+)?)\s+(\w+)$/u', trim($entry), $matches) !== 1 || ! is_numeric($matches[1]) || ! isset(self::UNIT_CODES[$matches[2]])) {
+                Log::info('AH net content in an unknown form.', ['net_content' => $entry]);
+
+                return false;
             }
+
+            [$code, $factor] = self::UNIT_CODES[$matches[2]];
+            $netContent[] = ['value' => bcmul($matches[1], $factor, 3), 'measurementUnitCode' => ['value' => $code]];
         }
 
         return $netContent;

@@ -6,8 +6,8 @@ use App\PriceAdapters\BundleOffer;
 use App\PriceAdapters\PriceNormalizer;
 
 /**
- * The steps of an AH `DISCOUNT_TIERED_PERCENT` offer. AH sends one discount
- * label per step and words the mechanism by its top step only: Edet toilet
+ * The steps of an AH `DISCOUNT_TIERED_PERCENT` offer. AH sends one tier per
+ * step and words the mechanism by its top step only: Edet toilet
  * paper, captured on 2026-11-20, was "2 stapelen tot 60%" over a count 1 at
  * 50% and a count 2 at 60%.
  */
@@ -38,7 +38,6 @@ final readonly class AhPercentTiers
         return $this->tiers === [];
     }
 
-    /** The cheapest per item of the steps that take two or more items. */
     public function bundleOffer(string $singleItemPrice): ?BundleOffer
     {
         return BundleOffer::fromTiers(
