@@ -216,7 +216,8 @@ final readonly class AhApiSource
             default => null,
         };
 
-        if ($readsOffer && ! $upcoming) {
+        // Only while the bonus runs: a step past its end is no discount.
+        if ($readsOffer && $promotionWindow?->isRunning() !== false) {
             $price = $percentTiers->singleItemPrice($price);
         }
 

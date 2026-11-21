@@ -85,6 +85,13 @@ test('a tiered AH percentage offer is announced at the regular price and tracked
     expect($running?->price)->toBe('9.00')
         ->and($running?->claimedRegularPrice)->toBe('17.99')
         ->and($running?->trackedPrice())->toBe('7.20');
+
+    // Should AH still list the offer after 29 Nov, its steps no longer apply.
+    CarbonImmutable::setTestNow('2026-11-30 12:00:00 Europe/Amsterdam');
+    $ended = app(AhApiSource::class)->resolve('https://www.ah.nl/producten/product/wi233499')->snapshot;
+
+    expect($ended?->price)->toBe('17.99')
+        ->and($ended?->trackedPrice())->toBe('17.99');
 });
 
 test('the tiered GraphQL query asks for the product the URL names', function (): void {
