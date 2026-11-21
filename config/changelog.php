@@ -31,6 +31,12 @@ return [
         [
             'date' => '2026-11-21',
             'category' => 'fix',
+            'title' => 'Kamera Express products can be added',
+            'body' => "DipCatch can now read the price on Kamera Express product pages, along with other shops that set up their pages the same way.",
+        ],
+        [
+            'date' => '2026-11-21',
+            'category' => 'fix',
             'title' => 'Check a shop link again',
             'body' => "On a product page, \"Save the link and check again\" now checks the price even when you keep the same link. Before, it did nothing.",
         ],

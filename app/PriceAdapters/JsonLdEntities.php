@@ -22,11 +22,11 @@ final class JsonLdEntities
 
         $graph = $decoded['@graph'] ?? null;
         if (is_array($graph)) {
-            foreach ($graph as $entity) {
-                if (is_array($entity)) {
-                    /** @var array<string, mixed> $entity */
-                    yield $entity;
-                }
+            $nodes = array_filter($graph, is_array(...));
+
+            foreach ($nodes as $entity) {
+                /** @var array<string, mixed> $entity */
+                yield self::withOffersResolved($entity, $nodes);
             }
 
             return;
@@ -45,6 +45,35 @@ final class JsonLdEntities
 
         /** @var array<string, mixed> $decoded */
         yield $decoded;
+    }
+
+    /**
+     * An `offers` that only names a graph node by `@id` (kamera-express.nl,
+     * 2026-11-21) is replaced by that node, so every reader sees the offer.
+     *
+     * @param  array<string, mixed>  $entity
+     * @param  array<array-key, array<mixed>>  $nodes
+     * @return array<string, mixed>
+     */
+    private static function withOffersResolved(array $entity, array $nodes): array
+    {
+        $offers = $entity['offers'] ?? null;
+
+        if (! is_array($offers)) {
+            return $entity;
+        }
+
+        $resolve = static function (mixed $offer) use ($nodes): mixed {
+            if (! is_array($offer) || array_keys($offer) !== ['@id'] || ! is_string($offer['@id'])) {
+                return $offer;
+            }
+
+            return array_find($nodes, static fn (array $node): bool => ($node['@id'] ?? null) === $offer['@id']) ?? $offer;
+        };
+
+        $entity['offers'] = array_is_list($offers) ? array_map($resolve, $offers) : $resolve($offers);
+
+        return $entity;
     }
 
     /**

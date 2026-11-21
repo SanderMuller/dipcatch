@@ -26,6 +26,8 @@ final class FailedShopPageResource extends Resource
 
     protected static ?string $modelLabel = 'page we could not read';
 
+    protected static ?string $pluralModelLabel = 'pages we could not read';
+
     public static function canCreate(): bool
     {
         return false;

@@ -91,6 +91,40 @@ test('handles top-level @graph', function (): void {
         ->and($result->snapshot?->currency)->toBe('USD');
 });
 
+test('reads an offer the Product names by its @id in the graph', function (): void {
+    // kamera-express.nl, 2026-11-21: the Product's `offers` is only a
+    // reference to an Offer node elsewhere in the same @graph, and a second
+    // script adds a Product with no offers at all.
+    $graph = json_encode([
+        '@context' => 'https://schema.org',
+        '@graph' => [
+            ['@type' => 'WebPage', '@id' => 'https://shop.test/p/1#webpage', 'mainEntity' => ['@id' => 'https://shop.test/p/1#product']],
+            [
+                '@type' => 'Product',
+                '@id' => 'https://shop.test/p/1#product',
+                'name' => 'Pocket camera',
+                'offers' => ['@id' => 'https://shop.test/p/1#offer'],
+            ],
+            [
+                '@type' => 'Offer',
+                '@id' => 'https://shop.test/p/1#offer',
+                'price' => '685.0',
+                'priceCurrency' => 'EUR',
+                'availability' => 'https://schema.org/InStock',
+            ],
+        ],
+    ], JSON_THROW_ON_ERROR);
+    $ratings = json_encode(['@context' => 'https://schema.org', '@type' => 'Product', 'name' => 'Pocket camera', 'sku' => '1'], JSON_THROW_ON_ERROR);
+    $html = "<html><head><script type=\"application/ld+json\">{$graph}</script><script type=\"application/ld+json\">{$ratings}</script></head><body></body></html>";
+
+    $result = new JsonLdAdapter()->extract('https://shop.test/p/1', $html);
+
+    expect($result->isSuccess())->toBeTrue()
+        ->and($result->snapshot?->price)->toBe('685.0')
+        ->and($result->snapshot?->currency)->toBe('EUR')
+        ->and($result->snapshot?->inStock)->toBeTrue();
+});
+
 test('handles price nested under priceSpecification.price', function (): void {
     $json = json_encode([
         '@type' => 'Product',
