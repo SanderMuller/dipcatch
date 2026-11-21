@@ -24,6 +24,29 @@ final readonly class ParentPageRedirect
         if ($redirected && self::dropsProduct($finalUrl, $requested)) {
             throw new HttpError(404, "Redirected to {$finalUrl}, a page above the one asked for: the shop no longer has it.");
         }
+
+        if ($redirected && self::leavesDecathlonProductPages($finalUrl, $requested)) {
+            throw new HttpError(404, "Redirected to {$finalUrl}, which left the product pages: the shop no longer has it.");
+        }
+    }
+
+    /**
+     * Decathlon keeps every product page under a `p` segment, and its own
+     * redirects for a new address, slug or variant stay there. A product it
+     * dropped goes to a category in another branch instead, which prices the
+     * whole range from its cheapest item (decathlon.nl, 2026-11-21).
+     */
+    private static function leavesDecathlonProductPages(string $finalUrl, string $requested): bool
+    {
+        $host = parse_url($requested, PHP_URL_HOST);
+
+        if (! is_string($host) || preg_match('/^decathlon\.[a-z.]+$/', UrlNormalizer::normalizeHost($host)) !== 1) {
+            return false;
+        }
+
+        $hasProductSegment = static fn (string $url): bool => in_array('p', explode('/', (string) parse_url($url, PHP_URL_PATH)), strict: true);
+
+        return $hasProductSegment($requested) && ! $hasProductSegment($finalUrl);
     }
 
     /**

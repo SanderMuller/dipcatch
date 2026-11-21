@@ -244,6 +244,53 @@ test('a redirect to the category above a slug that ends in its number reports th
         ->toThrow(HttpError::class, 'a page above the one asked for');
 });
 
+test('a Decathlon product that redirects out of its product pages is reported gone', function (string $host): void {
+    // decathlon.nl, 2026-11-21: a dropped product answers 307 to a category
+    // in another branch, whose JSON-LD prices the whole range from €2.69.
+    RateLimiter::clear(ShopFetcher::throttleKey($host));
+    $requested = "https://www.{$host}/p/eiwitten-gold-whey-standard-100-isolate-chocolade-930-g/_/R-p-X8794424";
+    $category = "https://www.{$host}/sporten/crosstraining/whey-proteine";
+
+    Http::fake([
+        "https://www.{$host}/robots.txt" => Http::response('', 404),
+        $requested => Http::response('', 307, ['Location' => $category]),
+        $category => Http::response('<html>a list of other products</html>', 200),
+    ]);
+
+    expect(fn (): mixed => app(ShopFetcher::class)->fetch($requested))
+        ->toThrow(HttpError::class, 'left the product pages');
+})->with(['decathlon.nl', 'decathlon.co.uk']);
+
+test('a Decathlon redirect that stays on a product page still reads the product', function (string $requested, string $target): void {
+    // decathlon.nl, 2026-11-21: an old address, a wrong slug and an unknown
+    // variant each answer 308 to the product's own page.
+    RateLimiter::clear(ShopFetcher::throttleKey('decathlon.nl'));
+
+    Http::fake([
+        'https://www.decathlon.nl/robots.txt' => Http::response('', 404),
+        $requested => Http::response('', 308, ['Location' => $target]),
+        $target => Http::response('<html>ok</html>', 200),
+    ]);
+
+    expect(app(ShopFetcher::class)->fetch($requested)->finalUrl)->toBe($target);
+})->with([
+    'the old address' => ['https://www.decathlon.nl/p/whey-aardbei-780-gram/_/R-p-387343', 'https://www.decathlon.nl/p/whey-aardbei-780-gram/387343/g42m9034074'],
+    'a wrong slug' => ['https://www.decathlon.nl/p/wrong-slug/387343/g42m9034074', 'https://www.decathlon.nl/p/whey-aardbei-780-gram/387343/g42m9034074'],
+    'a language prefix' => ['https://www.decathlon.be/nl/p/whey/_/R-p-387343', 'https://www.decathlon.be/nl/p/whey/387343/g42m9034074'],
+]);
+
+test('another shop may move a product out of a p segment', function (): void {
+    RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
+
+    Http::fake([
+        'https://shop.test/robots.txt' => Http::response('', 404),
+        'https://shop.test/p/coffee-123' => Http::response('', 301, ['Location' => 'https://shop.test/coffee/beans-123']),
+        'https://shop.test/coffee/beans-123' => Http::response('<html>ok</html>', 200),
+    ]);
+
+    expect(app(ShopFetcher::class)->fetch('https://shop.test/p/coffee-123')->finalUrl)->toBe('https://shop.test/coffee/beans-123');
+});
+
 test('a redirect that drops a size or a numbered slug below the product number still reads the product', function (string $requested, string $target): void {
     RateLimiter::clear(ShopFetcher::throttleKey('shop.test'));
 
