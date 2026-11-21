@@ -311,13 +311,10 @@ final class ProductShow extends Component
             return;
         }
 
-        if (UrlNormalizer::hash($normalized) === $shop->url_hash) {
-            $this->shopMessage = 'That URL is already saved. Nothing to update.';
+        // The same link saved again is a request to check it again.
+        $unchanged = UrlNormalizer::hash($normalized) === $shop->url_hash;
 
-            return;
-        }
-
-        $collision = Shop::query()
+        $collision = ! $unchanged && Shop::query()
             ->where('product_id', $shop->product_id)
             ->where('url_hash', UrlNormalizer::hash($normalized))
             ->whereKeyNot($shop->id)
@@ -340,11 +337,13 @@ final class ProductShow extends Component
             return;
         }
 
-        $shop->updateUrl($normalized);
+        if (! $unchanged) {
+            $shop->updateUrl($normalized);
 
-        // The new page drops the owner's size; the open panel must not save it back.
-        if ($shop->id === $this->editingShopId) {
-            $this->editingPackAmount = '';
+            // The new page drops the owner's size; the open panel must not save it back.
+            if ($shop->id === $this->editingShopId) {
+                $this->editingPackAmount = '';
+            }
         }
 
         dispatch_sync(new CheckShopPrice($shop->refresh(), manual: true));
@@ -354,7 +353,7 @@ final class ProductShow extends Component
         // so without this the product would keep advertising the old one.
         $this->product->refresh()->recomputeCheapestShop();
 
-        $this->shopMessage = $this->urlSaveMessageFor($shop->refresh());
+        $this->shopMessage = $this->urlSaveMessageFor($shop->refresh(), $unchanged);
 
         $this->product->refresh();
     }
@@ -364,8 +363,16 @@ final class ProductShow extends Component
      * the page reports it: the shops table shows a price, a stock badge and a
      * check time, and none of those say why a price is missing.
      */
-    private function urlSaveMessageFor(Shop $shop): string
+    private function urlSaveMessageFor(Shop $shop, bool $unchanged): string
     {
+        if ($unchanged) {
+            return match ($shop->last_status) {
+                ScrapeStatus::Pending => 'The shop was too busy to read now, so the price follows with the next scheduled check.',
+                ScrapeStatus::Ok => 'Price re-checked',
+                default => 'No price could be read from this page. Check that the link opens the product itself.',
+            };
+        }
+
         return match ($shop->last_status) {
             // Still Pending means the check gave up before it read anything,
             // and a release does nothing on a sync dispatch, so nothing runs

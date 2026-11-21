@@ -633,6 +633,33 @@ it('empties the size field when a new link drops the owner size', function (): v
     expect($shop->refresh()->owner_pack_quantity)->toBeNull();
 });
 
+it('checks the price again when the same link is saved, and keeps the owner size', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user);
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://shop.example.com/p/1',
+        'current_price' => '5.00',
+        'owner_pack_quantity' => '150.00',
+        'owner_pack_unit' => 'g',
+    ]);
+
+    RateLimiter::clear('dipcatch:fetcher:host:shop.example.com');
+    Http::fake([
+        'https://shop.example.com/robots.txt' => Http::response('', 404),
+        'https://shop.example.com/p/1' => Http::response(jsonLdPage('4.00'), 200, ['Content-Type' => 'text/html']),
+    ]);
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->call('editShop', $shop->id)
+        ->call('saveEditedUrl')
+        ->assertSet('shopMessage', 'Price re-checked')
+        ->assertSet('editingPackAmount', '150');
+
+    expect($shop->refresh()->current_price)->toBe('4.00')
+        ->and($shop->owner_pack_quantity)->toBe('150.00');
+});
+
 it('does not ask for a size the shop page states itself', function (): void {
     [$user, $product] = productWithUnsizedShop();
     $sized = $product->shops()->where('url', 'https://a.test/p')->sole();

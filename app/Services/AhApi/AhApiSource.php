@@ -11,6 +11,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Live price source for ah.nl via Albert Heijn's mobile API. The website
@@ -109,7 +110,7 @@ final readonly class AhApiSource
         }
 
         if (! $response->successful()) {
-            Log::warning('AH API product query returned an error.', ['product_id' => $productId, 'status' => $response->status()]);
+            Log::warning('AH API product query returned an error.', ['product_id' => $productId, 'status' => $response->status(), 'body' => Str::limit($response->body(), 500)]);
 
             return CheckjebonResult::miss(CheckjebonResult::REASON_API_ERROR);
         }

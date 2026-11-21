@@ -31,6 +31,12 @@ return [
         [
             'date' => '2026-11-21',
             'category' => 'fix',
+            'title' => 'Check a shop link again',
+            'body' => "On a product page, \"Save the link and check again\" now checks the price even when you keep the same link. Before, it did nothing.",
+        ],
+        [
+            'date' => '2026-11-21',
+            'category' => 'fix',
             'title' => 'AH bonus prices and offers with steps',
             'body' => "Albert Heijn changed how it shares product details, and DipCatch now reads them the new way, so AH bonus prices and next week's offers keep showing.\n\nOffers with steps, like \"1 stuk 50% korting, 2 stuks 60% korting\", now count too. You see the offer before it starts. Once it runs, your price uses the cheapest step.",
         ],

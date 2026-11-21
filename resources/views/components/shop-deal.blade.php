@@ -21,7 +21,7 @@
 @endphp
 
 @if ($bundle !== null || $window !== null || $beforeDiscount !== null)
-    <div {{ $attributes->class("space-y-2 rounded-lg p-3 ring-1 {$surfaceClasses}") }}>
+    <div {{ $attributes->class("space-y-2 rounded-lg p-3 whitespace-normal ring-1 {$surfaceClasses}") }}>
         @if ($isUpcoming)
             {{-- Announced, not running: say what it gives, at which shop and
                  when, so it cannot be read as today's price. --}}
