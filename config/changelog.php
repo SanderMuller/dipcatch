@@ -30,6 +30,12 @@ return [
     'entries' => [
         [
             'date' => '2026-11-21',
+            'category' => 'feature',
+            'title' => 'Upcoming deals show their price per unit',
+            'body' => "An upcoming deal on a product page now shows what it costs per piece, kilo or litre, so you can compare it with the other shops before it starts.",
+        ],
+        [
+            'date' => '2026-11-21',
             'category' => 'fix',
             'title' => 'Kamera Express products can be added',
             'body' => "DipCatch can now read the price on Kamera Express product pages, along with other shops that set up their pages the same way.",

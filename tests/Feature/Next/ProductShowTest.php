@@ -116,6 +116,78 @@ it('discloses bundle terms in headline and shop row', function (): void {
     expect(substr_count($component->html(), '2 for €4.00'))->toBe(2);
 });
 
+it('states an announced bundle per unit, to compare with the other shops', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '17.99');
+    $shop = Shop::factory()->for($product)->create([
+        'url' => 'https://www.ah.nl/producten/product/wi233499/edet',
+        'current_price' => '17.99',
+        'single_item_price' => '17.99',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '14.39',
+        'promotion_starts_at' => now()->addDays(2),
+        'promotion_ends_at' => now()->addDays(8),
+        'promotion_label' => '2 stapelen tot 60%',
+        'pack_quantity' => '16',
+        'pack_unit' => 'piece',
+    ]);
+    $product->forceFill(['cheapest_shop_id' => $shop->id])->save();
+
+    $this->actingAs($user);
+
+    // 14.39 for two packs of 16: 7.195 a pack, so €0.4497 a roll.
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee('Upcoming deal')
+        ->assertSeeHtml('data-test="deal-unit-price"')
+        ->assertSeeText('In the deal: €0.4497 /piece')
+        ->assertDontSeeHtml('data-test="deal-unit-price-estimated"');
+});
+
+it('marks an announced bundle per unit as estimated when the size comes from the other shops', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, 'Protein bars');
+    piecePacks($product, ['first.nl' => ['24.00', '12.00'], 'second.nl' => ['25.00', '12.00']]);
+    Shop::factory()->for($product)->create([
+        'url' => 'https://estimate.nl/p/1',
+        'currency' => 'EUR',
+        'current_price' => '23.99',
+        'current_in_stock' => true,
+        'single_item_price' => '23.99',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '36.00',
+        'promotion_starts_at' => now()->addDays(2),
+        'promotion_ends_at' => now()->addDays(8),
+    ]);
+
+    $this->actingAs($user);
+
+    // 36.00 for two packs of 12: €1.50 a bar.
+    livewire(ProductShow::class, ['product' => $product->refresh()])
+        ->assertSeeText('In the deal: €1.50 /piece')
+        ->assertSeeHtml('data-test="deal-unit-price-estimated"');
+});
+
+it('adds no deal price per unit to a bundle that runs', function (): void {
+    $user = User::factory()->create();
+    $product = ownedProduct($user, cheapestPrice: '2.00');
+    Shop::factory()->for($product)->create([
+        'url' => 'https://jumbo.com/p/fanta',
+        'current_price' => '2.00',
+        'single_item_price' => '2.85',
+        'bundle_quantity' => 2,
+        'bundle_total_price' => '4.00',
+        'promotion_ends_at' => now()->addDays(2),
+        'pack_quantity' => '1500',
+        'pack_unit' => 'ml',
+    ]);
+
+    $this->actingAs($user);
+
+    livewire(ProductShow::class, ['product' => $product])
+        ->assertSee('2 for €4.00')
+        ->assertDontSeeHtml('data-test="deal-unit-price"');
+});
+
 it('shows how far a deal puts the best value below the regular price', function (): void {
     $user = User::factory()->create();
     $product = ownedProduct($user, cheapestPrice: '2.00');

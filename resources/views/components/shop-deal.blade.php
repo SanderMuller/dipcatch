@@ -4,6 +4,9 @@
     // A {@see \App\Support\DiscountCheck}: the product page passes one, the
     // product cards never do.
     'beforeDiscount' => null,
+    // A {@see \App\Support\ComparablePacks}: with it an announced bundle
+    // states its price per unit, comparable with the other rows.
+    'packs' => null,
 ])
 
 @php
@@ -12,6 +15,11 @@
     $window = $shop->promotionWindow();
     $isUpcoming = $window?->hasNotStarted() ?? false;
     $bundle = $isUpcoming ? $shop->bundleOffer() : $liveBundle;
+    // An announced bundle per unit, beside the rows it will compete with. A
+    // running one needs none: the row's own figure already holds the deal.
+    // Only where the row leads with a price per unit, so both read alike.
+    $pack = $isUpcoming && $packs?->leadingItems() === null ? $packs?->for($shop) : null;
+    $dealUnitPrice = $bundle === null || $pack === null || $pack->isExcluded() ? null : $pack->unitPriceFor(bcdiv($bundle->totalPrice, (string) $bundle->quantity, 4));
     // A bare amount is a reader's own label (see UpcomingDeal), not the shop page's words.
     $sourceOffer = is_numeric($window?->label) ? null : $window?->label;
     $deadline = $window === null ? null : \App\Support\PromotionLabel::short($shop);
@@ -33,6 +41,15 @@
                 {{ \App\Support\PromotionLabel::upcomingTerms($shop) }}
                 <span class="font-normal text-zinc-500 dark:text-zinc-400">{{ __('at :host', ['host' => $shop->displayName()]) }}</span>
             </p>
+            @if ($dealUnitPrice !== null)
+                <p class="flex flex-wrap items-baseline gap-x-2 text-base text-zinc-700 tabular-nums sm:text-sm dark:text-zinc-300" data-test="deal-unit-price">
+                    <span>{{ __('In the deal: :price', ['price' => \App\Support\MoneyFormatter::unitPrice($dealUnitPrice, $shop->currency) . ' ' . $pack->size?->label()]) }}</span>
+                    {{-- The same marker as the row: a size taken from the other shops is an estimate. --}}
+                    @if (in_array($pack->provenance, [\App\Enums\PackProvenance::Inferred, \App\Enums\PackProvenance::Converted], true))
+                        <flux:badge size="sm" color="zinc" data-test="deal-unit-price-estimated">{{ __('estimated') }}</flux:badge>
+                    @endif
+                </p>
+            @endif
             @if ($bundle !== null && $singleItemPrice !== null)
                 {{-- Not struck through: until the deal starts this is what a shopper pays. --}}
                 <p class="text-base text-zinc-500 sm:text-sm dark:text-zinc-400">

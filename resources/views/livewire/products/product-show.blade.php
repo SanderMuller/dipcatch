@@ -113,7 +113,7 @@
                                 @endif
                                 <x-shop-link :shop="$headlineShop" />
                             </dd>
-                            <dd><x-shop-deal :shop="$headlineShop" :show-source="false" :before-discount="$discountChecks[$headlineShop->id] ?? null" class="mt-3" /></dd>
+                            <dd><x-shop-deal :shop="$headlineShop" :show-source="false" :before-discount="$discountChecks[$headlineShop->id] ?? null" :packs="$packs" class="mt-3" /></dd>
                         @endif
 
                         {{-- A note, not a warning: the headline already names the
@@ -342,7 +342,7 @@
                                     <x-price-verdict :verdict="$verdicts[$shop->id] ?? null" class="mt-1.5" />
                                     {{-- A price that is only good until a date says so, or the
                                          number reads as permanent when it is not. --}}
-                                    <x-shop-deal :shop="$shop" :before-discount="$discountChecks[$shop->id] ?? null" class="mt-2 max-w-xl" />
+                                    <x-shop-deal :shop="$shop" :before-discount="$discountChecks[$shop->id] ?? null" :packs="$packs" class="mt-2 max-w-xl" />
                                     {{-- An offer only some shoppers can claim is named, so the
                                          headline price is not read as everyone's price. --}}
                                     @php($conditional = $shop->conditionalOffer())
