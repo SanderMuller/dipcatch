@@ -85,6 +85,25 @@ it('replaces a cookie that is not a valid visitor id', function (string $value):
         ->and(PageView::query()->sole()->visitor_id)->toBe(visitorCookieHmac($newValue));
 })->with(['too short' => 'abc123', 'not hex' => str_repeat('zz', 32)]);
 
+it('stores no campaign on a page view that carries a visitor id, but keeps the signup source', function (): void {
+    visitorCookieVisit('NL', uri: '/pricing?utm_source=newsletter&utm_medium=email&utm_campaign=spring')->assertOk();
+
+    expect(PageView::query()->sole())
+        ->visitor_id->not->toBeNull()
+        ->utm_source->toBeNull()
+        ->utm_medium->toBeNull()
+        ->utm_campaign->toBeNull()
+        ->and(session('signup_source'))->toMatchArray(['utm_source' => 'newsletter', 'utm_campaign' => 'spring']);
+});
+
+it('keeps the campaign on a page view without a visitor id', function (): void {
+    visitorCookieVisit('DE', uri: '/pricing?utm_source=newsletter')->assertOk();
+
+    expect(PageView::query()->sole())
+        ->visitor_id->toBeNull()
+        ->utm_source->toBe('newsletter');
+});
+
 it('neither sets nor reads the cookie outside the listed countries', function (string $country, array $cookies): void {
     $response = visitorCookieVisit($country, $cookies)->assertOk();
 

@@ -131,6 +131,36 @@ it('lists the weeks and months in the range, newest first, and marks the current
         ->assertSeeInOrder(['Week 47, 2026 (up to yesterday)', 'Week 45, 2026', 'November 2026 (up to yesterday)']);
 });
 
+it('shows unique visitors to the nearest ten', function (int $visitors, string $shown): void {
+    expect(UniqueVisitorsWidget::roundedVisitors($visitors))->toBe($shown);
+})->with([
+    'none' => [0, '< 10'],
+    'just under ten' => [9, '< 10'],
+    'rounded down' => [14, '10'],
+    'rounded up' => [15, '20'],
+    'thousands' => [1234, '1,230'],
+]);
+
+it('rounds the unique visitors in the widget, and keeps the app users exact', function (): void {
+    foreach ([[StatPeriod::Week, '2026-11-16', 1234, 7], [StatPeriod::Month, '2026-11-01', 8, 3]] as [$period, $startsOn, $visitors, $users]) {
+        PageViewPeriodStat::query()->insert([
+            PageViewPeriodStat::PERIOD => $period->value,
+            PageViewPeriodStat::STARTS_ON => $startsOn,
+            PageViewPeriodStat::SECTION => PageViewPeriodStat::ALL_SECTIONS,
+            PageViewPeriodStat::VISITORS => $visitors,
+            PageViewPeriodStat::USERS => $users,
+        ]);
+    }
+
+    $this->actingAs(User::factory()->create(['is_admin' => true]));
+    Filament::setCurrentPanel('admin');
+
+    livewire(UniqueVisitorsWidget::class, ['pageFilters' => ['range' => '30']])
+        ->assertSeeInOrder(['Week 47, 2026', '1,230', '7', 'November 2026', '< 10', '3'])
+        ->assertDontSee('1,234')
+        ->assertDontSee('>8<', false);
+});
+
 it('lists the month a range starts in when the range starts on the 31st', function (): void {
     $this->travelTo(CarbonImmutable::parse('2026-04-05 00:20:00'));
     PageViewPeriodStat::query()->insert([

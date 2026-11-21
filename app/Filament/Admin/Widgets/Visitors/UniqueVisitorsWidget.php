@@ -6,6 +6,7 @@ use App\Analytics\PageViewStats;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
+use Illuminate\Support\Number;
 
 final class UniqueVisitorsWidget extends TableWidget
 {
@@ -31,7 +32,7 @@ final class UniqueVisitorsWidget extends TableWidget
                 foreach (app(PageViewStats::class)->periods($range->from, $range->until) as $index => $row) {
                     $records[$index + 1] = [
                         'period' => $row['period']->label($row['starts_on']) . ($row['complete'] ? '' : ' (up to yesterday)'),
-                        'visitors' => $row['visitors'],
+                        'visitors' => self::roundedVisitors($row['visitors']),
                         'users' => $row['users'],
                     ];
                 }
@@ -42,8 +43,22 @@ final class UniqueVisitorsWidget extends TableWidget
             ->emptyStateHeading('No weeks or months counted in this range')
             ->columns([
                 TextColumn::make('period')->label('Period'),
-                TextColumn::make('visitors')->label('Unique visitors')->numeric()->alignEnd(),
+                TextColumn::make('visitors')->label('Unique visitors (to the nearest 10)')->alignEnd(),
                 TextColumn::make('users')->label('App users')->numeric()->alignEnd(),
             ]);
+    }
+
+    /**
+     * The total includes guests counted with the visitor cookie. The CNIL's
+     * consent exemption asks that such statistics are shown to the nearest
+     * ten, so a small count cannot single out one visitor.
+     */
+    public static function roundedVisitors(int $visitors): string
+    {
+        if ($visitors < 10) {
+            return '< 10';
+        }
+
+        return (string) Number::format((int) round($visitors, -1));
     }
 }

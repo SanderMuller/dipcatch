@@ -52,9 +52,8 @@ final class RecordPageView
             }
 
             $values = $this->values($request, $route, $response);
-            $request->attributes->set(self::ATTRIBUTE, $values);
-
             $this->rememberSignupSource($request, $values);
+            $request->attributes->set(self::ATTRIBUTE, $this->withoutCampaignForCookieVisitor($values));
         } catch (Throwable $e) {
             report($e);
         }
@@ -163,6 +162,23 @@ final class RecordPageView
             PageView::VISITOR_HASH => DailySalt::visitorHash($now, (string) $request->ip(), $userAgent, config()->string('app.url', '')),
             PageView::VISITOR_ID => $user === null ? $this->visitorId($request, $response, $country) : null,
         ];
+    }
+
+    /**
+     * The CNIL's consent exemption for audience measurement asks that no
+     * campaign identifier from the URL is collected, so a row that carries a
+     * visitor id stores no UTM values.
+     *
+     * @param  array<string, mixed>  $values
+     * @return array<string, mixed>
+     */
+    private function withoutCampaignForCookieVisitor(array $values): array
+    {
+        if ($values[PageView::VISITOR_ID] === null) {
+            return $values;
+        }
+
+        return [...$values, PageView::UTM_SOURCE => null, PageView::UTM_MEDIUM => null, PageView::UTM_CAMPAIGN => null];
     }
 
     /**
