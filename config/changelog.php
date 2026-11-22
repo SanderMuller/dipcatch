@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-11-22',
+            'category' => 'feature',
+            'title' => 'Clearer buttons in your price alert email',
+            'body' => 'Each product in your daily price alert email now has two buttons. One opens it in DipCatch, and the other takes you straight to the shop with the lowest price.',
+        ],
+        [
             'date' => '2026-11-21',
             'category' => 'feature',
             'title' => 'Upcoming deals show their price per unit',

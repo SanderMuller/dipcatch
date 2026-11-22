@@ -145,9 +145,19 @@ $image = $product->safeImageUrl();
 </table>
 @endif
 
-<x-mail::button :url="route('app.products.show', $product)">
-View {{ $product->title }}
-</x-mail::button>
+{{-- Two labelled buttons, so it is clear which one opens DipCatch and which
+     one opens the shop. Inline blocks wrap below each other on a narrow
+     screen. --}}
+<table class="action" align="center" width="100%" cellpadding="0" cellspacing="0" role="presentation">
+<tr>
+<td align="center">
+<a href="{{ route('app.products.show', $product) }}" class="button button-primary" target="_blank" rel="noopener" style="margin: 4px;">Open in {{ config('app.name') }}</a>
+@if ($group['shop'] !== null)
+<a href="{{ $group['shop']->url }}" class="button button-success" target="_blank" rel="noopener" style="margin: 4px;">Go to {{ $group['shop']->displayName() }}</a>
+@endif
+</td>
+</tr>
+</table>
 
 @endforeach
 

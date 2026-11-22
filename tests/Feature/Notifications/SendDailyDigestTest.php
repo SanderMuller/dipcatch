@@ -325,7 +325,7 @@ test('the digest table renders money as symbol-first, not the ISO code', functio
     // what registers the `x-mail::` component namespace.
     $html = (string) app(Markdown::class)->render('emails.daily-digest', [
         'grouped' => collect([
-            $product->id => ['product' => $product, 'events' => collect([$event]), 'reached' => collect()],
+            $product->id => ['product' => $product, 'events' => collect([$event]), 'reached' => collect(), 'shop' => $shop],
         ]),
         'heading' => '1 price drop today',
         'totalDrops' => 1,
@@ -358,7 +358,7 @@ test('digest reads bundle terms from protected triggering check', function (): v
 
     $html = (string) app(Markdown::class)->render('emails.daily-digest', [
         'grouped' => collect([
-            $product->id => ['product' => $product, 'events' => collect([$event]), 'reached' => collect()],
+            $product->id => ['product' => $product, 'events' => collect([$event]), 'reached' => collect(), 'shop' => $shop],
         ]),
         'heading' => '1 price drop today',
         'totalDrops' => 1,
@@ -645,4 +645,37 @@ test('the shop name in the digest links to the product page, not the shop homepa
 
     expect($html)->toContain('href="https://www.amazon.nl/dp/B0DROP0001"')
         ->toContain('href="https://www.amazon.nl/dp/B0TARGET01"');
+});
+
+test('each product in the digest has a button to DipCatch and a button to the cheapest shop', function (): void {
+    Mail::swap(app('mail.manager'));
+
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create();
+    $dearShop = Shop::factory()->for($product)->create(['host' => 'www.bol.com', 'url' => 'https://www.bol.com/nl/p/dear/1/']);
+    $cheapShop = Shop::factory()->for($product)->create(['host' => 'www.amazon.nl', 'url' => 'https://www.amazon.nl/dp/B0CHEAP001']);
+    $drops = PriceDropEvent::factory()->count(1)->for($user)->create(['product_id' => $product->id, 'triggered_by_shop_id' => $dearShop->id, 'new_price' => '19.99']);
+    $reached = TargetPriceEvent::factory()->count(1)->for($user)->for($product)->create(['shop_id' => $cheapShop->id, 'price' => '14.99']);
+
+    $html = new DailyDigestMail(
+        $user,
+        PriceDropEvent::query()->whereKey($drops->modelKeys())->get(),
+        TargetPriceEvent::query()->whereKey($reached->modelKeys())->get(),
+    )->render();
+
+    expect($html)->toMatch('#href="' . preg_quote(route('app.products.show', $product), '#') . '"[^>]*>Open in DipCatch</a>#')
+        ->toMatch('#href="https://www\.amazon\.nl/dp/B0CHEAP001"[^>]*>Go to [^<]+</a>#')
+        ->not->toMatch('#bol\.com/nl/p/dear/1/"[^>]*>Go to#');
+});
+
+test('the digest leaves out the shop button when the shop is gone', function (): void {
+    Mail::swap(app('mail.manager'));
+
+    $user = User::factory()->create(['timezone' => 'Europe/Amsterdam']);
+    $product = Product::factory()->for($user)->create();
+    $drops = PriceDropEvent::factory()->count(1)->for($user)->create(['product_id' => $product->id, 'triggered_by_shop_id' => null]);
+
+    $html = new DailyDigestMail($user, PriceDropEvent::query()->whereKey($drops->modelKeys())->get())->render();
+
+    expect($html)->toContain('Open in DipCatch')->not->toContain('Go to ');
 });

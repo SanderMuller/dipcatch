@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\PriceDropEvent;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\TargetPriceEvent;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -28,9 +29,10 @@ final class DailyDigestMail extends Mailable
 
     /**
      * Grouped events for the Blade view: `product_id => { product, events,
-     * reached }`.
+     * reached, shop }`. `shop` is where the cheapest price in the group is,
+     * for the "Go to shop" button.
      *
-     * @var Collection<int|string, array{product: ?Product, events: Collection<int, PriceDropEvent>, reached: Collection<int, TargetPriceEvent>}>
+     * @var Collection<int|string, array{product: ?Product, events: Collection<int, PriceDropEvent>, reached: Collection<int, TargetPriceEvent>, shop: ?Shop}>
      */
     public Collection $grouped;
 
@@ -73,10 +75,28 @@ final class DailyDigestMail extends Mailable
                     'product' => $first->product,
                     'events' => $drops,
                     'reached' => $targets,
+                    'shop' => self::cheapestShop($drops->first(), $targets->first()),
                 ]];
             });
 
         $this->heading = $this->headingFor();
+    }
+
+    /**
+     * The shop with the cheapest price of the first drop and the first reached
+     * target, both already sorted cheapest first. Null when that shop is gone
+     * or has no link.
+     */
+    private static function cheapestShop(?PriceDropEvent $drop, ?TargetPriceEvent $hit): ?Shop
+    {
+        $dropPrice = $drop === null ? null : (float) ($drop->new_unit_price ?? $drop->new_price);
+        $hitPrice = $hit === null ? null : (float) ($hit->unit_price ?? $hit->price ?? 0);
+
+        $shop = $hitPrice !== null && ($dropPrice === null || $hitPrice <= $dropPrice)
+            ? $hit?->shop
+            : $drop?->triggeredByShop;
+
+        return is_string($shop?->url) && $shop->url !== '' ? $shop : null;
     }
 
     private function headingFor(): string
