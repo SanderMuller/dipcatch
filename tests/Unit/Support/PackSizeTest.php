@@ -325,6 +325,9 @@ test('a title that counts first and sizes last is a pack, with no stated size at
 })->with([
     'the shop house style' => ['12st Barebells Hazelnut Nougat eiwitrepen 55g', 660.0],
     'spelled out' => ['12 stuks 55 g', 660.0],
+    // The à already multiplies: fifteen 20 g bars, not fifteen of 300 g.
+    'an à multipack' => ['Twix Minis mini-chocoladereep 15 stuks à 20 g', 300.0],
+    'an à multipack of a volume' => ['6 blikjes à 330 ml', 1980.0],
     // Order is the signal: this is 500 g holding twenty sachets.
     'size before the count' => ['Koffie 500 g 20 zakjes', 500.0],
     'a count of what is inside, first' => ['Nescafé Dolce Gusto Lungo 30 capsules 216 g', 216.0],

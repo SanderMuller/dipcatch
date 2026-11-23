@@ -141,7 +141,7 @@ final readonly class PackSize
         $sizeUnitAlt = $massAlt . '|' . $volumeAlt . '|' . $pieceAlt;
 
         preg_match_all('/' . self::NUMBER . '\s*[x\x{00D7}]\s*' . self::NUMBER . '\s*(' . $sizeUnitAlt . ')\b/iu', $text, $formA, PREG_SET_ORDER);
-        preg_match_all('/' . self::NUMBER . '\s*(?:\S+\s+)?\x{00E0}\s*' . self::NUMBER . '\s*(' . $sizeUnitAlt . ')\b/iu', $text, $formB, PREG_SET_ORDER);
+        preg_match_all(self::eachFormPattern(), $text, $formB, PREG_SET_ORDER);
         preg_match_all('/' . self::NUMBER . '-pack\b/i', $text, $formC, PREG_SET_ORDER);
         preg_match_all(self::sizeFirstCrossFormPattern(), $text, $formD, PREG_SET_ORDER);
 
@@ -241,10 +241,26 @@ final readonly class PackSize
             . '|' . self::alternation(array_keys(self::VOLUME_UNITS)) . ')\b/iu';
     }
 
-    /** True when the title writes its multipack as `<count> x <size>`, or `<size> x <count>`. */
+    /**
+     * True when the title writes its multipack as `<count> x <size>`,
+     * `<size> x <count>` or `<count> stuks à <size>`. Each form counts the
+     * items already, so no other count in the title multiplies it again.
+     */
     public static function hasCrossForm(string $title): bool
     {
-        return preg_match(self::crossFormPattern(), $title) === 1 || preg_match(self::sizeFirstCrossFormPattern(), $title) === 1;
+        return preg_match(self::crossFormPattern(), $title) === 1
+            || preg_match(self::sizeFirstCrossFormPattern(), $title) === 1
+            || preg_match(self::eachFormPattern(), $title) === 1;
+    }
+
+    /** `<count> [word] à <size><unit>`: "6 blikjes à 330 ml", "15 stuks à 20 g". */
+    private static function eachFormPattern(): string
+    {
+        $sizeUnitAlt = self::alternation(array_keys(self::MASS_UNITS))
+            . '|' . self::alternation(array_keys(self::VOLUME_UNITS))
+            . '|' . self::alternation(self::PIECE_WORDS);
+
+        return '/' . self::NUMBER . '\s*(?:\S+\s+)?\x{00E0}\s*' . self::NUMBER . '\s*(' . $sizeUnitAlt . ')\b/iu';
     }
 
     /**
