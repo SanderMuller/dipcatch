@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,7 +25,7 @@ return new class extends Migration {
 
     public function up(): void
     {
-        DB::table('push_subscriptions')->select(['id', 'endpoint'])->chunkById(500, function ($rows): void {
+        DB::table('push_subscriptions')->select(['id', 'endpoint'])->chunkById(500, function (Collection $rows): void {
             $refused = $rows->reject(fn (object $row): bool => is_string($row->endpoint) && $this->isPushServiceEndpoint($row->endpoint))->pluck('id');
 
             if ($refused->isNotEmpty()) {
