@@ -12,10 +12,10 @@ return [
     | reads a price that has not moved implausibly since the last good run.
     |
     | Each default was fetched and read on 2026-09-24, amazon and bol on
-    | 2026-09-25. An env value replaces it; an empty one keeps it. etos and
-    | walmart have none: they refuse DipCatch's fetcher (no answer, a bot
-    | page), so a URL would only report "unreachable". The health check names
-    | both as uncovered, which is true.
+    | 2026-09-25, viking on 2026-11-23. An env value replaces it; an empty
+    | one keeps it. etos and walmart have none: they refuse DipCatch's
+    | fetcher (no answer, a bot page), so a URL would only report
+    | "unreachable". The health check names both as uncovered, which is true.
     |
     | Keyed on the adapter rather than the host on purpose: an adapter is not a
     | host. AmazonAdapter declares 21 country domains and ZooplusAdapter 18, so
@@ -51,6 +51,7 @@ return [
         'spar' => env('CANARY_URL_SPAR') ?: 'https://www.spar.nl/lay\'s-chips-naturel-9183397/',
         'toolstation' => env('CANARY_URL_TOOLSTATION') ?: 'https://www.toolstation.nl/dynaplus-universele-schroeven-platkop-deeldraad-verzinkt/p13052',
         'ulta' => env('CANARY_URL_ULTA') ?: 'https://www.ulta.com/p/moisturizing-cream-body-face-moisturizer-xlsImpprod3530069?sku=2234849',
+        'viking' => env('CANARY_URL_VIKING') ?: 'https://www.vikingdirect.nl/nl/twix-chocoladereep-pak-van-15-p-1284319',
         'vomar' => env('CANARY_URL_VOMAR') ?: 'https://www.vomar.nl/producten/voorraadkast/x/x/106908',
         'walmart' => env('CANARY_URL_WALMART'),
         'welkoop' => env('CANARY_URL_WELKOOP') ?: 'https://www.welkoop.nl/agri-select-houtpellets-100-naaldhout-10kg_1340325',

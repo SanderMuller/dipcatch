@@ -29,6 +29,12 @@ return [
 
     'entries' => [
         [
+            'date' => '2026-11-23',
+            'category' => 'fix',
+            'title' => 'Right prices at Viking Direct',
+            'body' => "Viking Direct now shows the price of one pack, with VAT. Before, it showed the bulk price without VAT.\n\nPack sizes written like \"15 stuks à 20 g\" are read correctly now too, so the price per kilo is right.",
+        ],
+        [
             'date' => '2026-11-22',
             'category' => 'feature',
             'title' => 'Clearer buttons in your price alert email',

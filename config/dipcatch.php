@@ -30,6 +30,7 @@ use App\PriceAdapters\Hosts\PrenatalAdapter;
 use App\PriceAdapters\Hosts\SparAdapter;
 use App\PriceAdapters\Hosts\ToolstationAdapter;
 use App\PriceAdapters\Hosts\UltaAdapter;
+use App\PriceAdapters\Hosts\VikingAdapter;
 use App\PriceAdapters\Hosts\VomarAdapter;
 use App\PriceAdapters\Hosts\WalmartAdapter;
 use App\PriceAdapters\Hosts\WelkoopAdapter;
@@ -296,6 +297,7 @@ return [
         PoieszAdapter::class,
         SparAdapter::class,
         UltaAdapter::class,
+        VikingAdapter::class,
         VomarAdapter::class,
         WalmartAdapter::class,
         WelkoopAdapter::class,

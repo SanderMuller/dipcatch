@@ -147,6 +147,12 @@ final readonly class ShopSnapshot
         return clone($this, ['packSize' => $packSize, 'packSizeAuthoritative' => $authoritative, 'packSizeIsWholePack' => $wholePack]);
     }
 
+    /** For a host whose structured price is not the price of one item, as a shopper pays it. */
+    public function withPrice(string $price): self
+    {
+        return clone($this, ['price' => $price]);
+    }
+
     public function withPromotionWindow(?PromotionWindow $promotionWindow): self
     {
         return clone($this, ['promotionWindow' => $promotionWindow, 'promotionWindowAuthoritative' => true]);

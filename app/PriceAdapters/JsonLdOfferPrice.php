@@ -118,6 +118,27 @@ final readonly class JsonLdOfferPrice
     }
 
     /**
+     * The spec that prices a single item, when the offer prices by quantity
+     * tier: the one whose `eligibleQuantity` starts at one. Null when the
+     * offer states no tiers, or none of them sells one item.
+     *
+     * Viking Direct puts its "6+ packs" price in the offer's own `price` and
+     * the price of one pack only in a tier spec (Twix Minis, 2026-11-23).
+     *
+     * @param  array<string, mixed>  $offer
+     * @return array<string, mixed>|null
+     */
+    public static function singleItemTier(array $offer): ?array
+    {
+        return array_find(self::specs($offer['priceSpecification'] ?? null), static function (array $spec): bool {
+            $quantity = $spec['eligibleQuantity'] ?? null;
+            $from = is_array($quantity) ? ($quantity['minValue'] ?? null) : null;
+
+            return is_numeric($from) && (float) $from <= 1.0 && PriceNormalizer::fromMixed($spec['price'] ?? null) !== null;
+        });
+    }
+
+    /**
      * The seller the offer names, when a marketplace offer names one.
      *
      * @param  array<string, mixed>  $offer
